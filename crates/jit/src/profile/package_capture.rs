@@ -122,6 +122,8 @@ pub struct CapturedContribution {
     pub identity: ContributionIdentity,
     /// What the registry holding it said.
     pub state: CapturedContributionState,
+    /// Whether this package's applied record claims the declaration.
+    pub owned: bool,
 }
 
 /// A validated package tree drawn from the sources its manifest declares.
@@ -465,14 +467,19 @@ fn refresh_contributions(
                     source: Box::new(source),
                 })?
                 .flatten();
+            let owned = owned.contains(&identity);
             let (state, held) = match held {
                 Some(held) if &held == contribution => (CapturedContributionState::Unchanged, None),
-                _ if !owned.contains(&identity) => (CapturedContributionState::Unowned, None),
+                _ if !owned => (CapturedContributionState::Unowned, None),
                 None => (CapturedContributionState::Absent, None),
                 Some(held) => (CapturedContributionState::Refreshed, Some(held)),
             };
             Ok(ContributionRefresh {
-                captured: CapturedContribution { identity, state },
+                captured: CapturedContribution {
+                    identity,
+                    state,
+                    owned,
+                },
                 held,
             })
         })

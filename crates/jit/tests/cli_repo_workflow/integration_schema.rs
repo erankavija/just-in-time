@@ -99,12 +99,14 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
             "profile {command} must expose a success schema"
         );
     }
-    for command in ["apply", "reconfigure", "upgrade"] {
+    for command in ["apply", "capture", "pack", "add", "reconfigure", "upgrade"] {
         assert!(profile[command]["flags"]
             .as_array()
             .unwrap()
             .iter()
             .any(|flag| flag["name"] == "dry-run"));
+    }
+    for command in ["apply", "reconfigure", "upgrade"] {
         for name in ["set", "values-file"] {
             assert!(
                 profile[command]["flags"]
@@ -113,6 +115,27 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
                     .iter()
                     .any(|flag| flag["name"] == name),
                 "profile {command} must expose --{name}"
+            );
+        }
+    }
+
+    for command in profile.keys() {
+        let success = &profile[command]["output"]["success_schema"];
+        let documents = success["oneOf"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_else(|| std::slice::from_ref(success));
+        for document in documents {
+            let properties = document["properties"]
+                .as_object()
+                .unwrap_or_else(|| panic!("profile {command} output is an object schema"));
+            assert_eq!(
+                properties
+                    .keys()
+                    .cloned()
+                    .collect::<std::collections::BTreeSet<_>>(),
+                std::collections::BTreeSet::from(["count".to_string(), "profiles".to_string()]),
+                "profile {command} must use the shared collection envelope"
             );
         }
     }

@@ -402,58 +402,27 @@ async function main() {
           .filter(tool => tool.name.startsWith('jit_profile_'))
           .map(tool => [tool.name, Object.keys(tool.inputSchema.properties).sort()])
       );
-      // `profile` names an ordered selector; enumeration and the agreement
-      // check take none, because both follow the repository's own records;
-      // capture works between two named directories rather than over a
-      // selected profile. The difference report takes the lifecycle selection
-      // surface without the rehearsal flag: it publishes nothing, so there is
-      // nothing for it to rehearse.
-      assert.deepStrictEqual(profileInputKeys, {
-        jit_profile_apply: ['dry-run', 'json', 'profile', 'set', 'values-file'],
-        jit_profile_capture: ['destination', 'json', 'source'],
-        jit_profile_diff: ['json', 'profile', 'set', 'values-file'],
-        jit_profile_list: ['json'],
-        jit_profile_reconfigure: ['dry-run', 'json', 'profile', 'set', 'values-file'],
-        jit_profile_show: ['json', 'profile'],
-        jit_profile_upgrade: ['dry-run', 'json', 'profile', 'set', 'values-file'],
-        jit_profile_validate: ['json'],
-      });
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.required,
-        ['profile']
+      const profileCommands = schema.commands.profile.subcommands;
+      const declaredProfileInputs = Object.fromEntries(
+        Object.entries(profileCommands)
+          .map(([command, definition]) => [
+            `jit_profile_${command}`,
+            [...definition.args, ...definition.flags].map(input => input.name).sort(),
+          ])
+          .filter(([name]) => Object.hasOwn(profileInputKeys, name))
       );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_reconfigure').inputSchema.required,
-        ['profile']
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_show').inputSchema.required,
-        ['profile']
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_diff').inputSchema.required,
-        ['profile']
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_upgrade').inputSchema.required,
-        ['profile']
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_list').inputSchema.required,
-        []
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_validate').inputSchema.required,
-        []
-      );
-      assert.deepStrictEqual(
-        tools.find(tool => tool.name === 'jit_profile_capture').inputSchema.required,
-        ['source', 'destination']
-      );
-      const applyProperties = tools.find(tool => tool.name === 'jit_profile_apply').inputSchema.properties;
-      assert.strictEqual(applyProperties['values-file'].type, 'string');
-      assert.strictEqual(applyProperties.set.type, 'array');
-      assert.strictEqual(applyProperties.set.items.type, 'string');
+      assert.deepStrictEqual(profileInputKeys, declaredProfileInputs,
+        'profile MCP inputs must derive from the CLI command definitions');
+
+      for (const tool of tools.filter(tool => tool.name.startsWith('jit_profile_'))) {
+        const command = tool.name.slice('jit_profile_'.length);
+        const definition = profileCommands[command];
+        const declaredRequired = [...definition.args, ...definition.flags]
+          .filter(input => input.required)
+          .map(input => input.name);
+        assert.deepStrictEqual(tool.inputSchema.required, declaredRequired,
+          `${tool.name} required inputs must derive from its CLI command definition`);
+      }
     });
 
     await runTest('profile descriptions source the package from the repository, never from the connected binary', async () => {
@@ -642,8 +611,8 @@ async function main() {
         assert.strictEqual(basePreview.profiles.length, basePreview.count);
         assert.strictEqual(basePreview.profiles[0].status, 'would_apply');
 
-        // An application reports one result per applied package: the packages
-        // the named one depends on, then the named one.
+        // An application reports the aggregate observations: dependency-only
+        // packages before the selected root occurrences.
         const applied = await profileCall('jit_profile_apply', {
           profile: [`path:${workflowLocation}`],
         });
@@ -662,20 +631,15 @@ async function main() {
         assert.strictEqual(appliedProfileIds.at(-1), shown.profiles[0].manifest.id);
         assert.strictEqual(applied.profiles.at(-1).status, 'applied');
 
-        // The applied package's own preview names the target it published.
+        // The aggregate preview names the target under the package that owns it.
         const preview = await profileCall('jit_profile_apply', {
           profile: ['id:workflow'],
           'dry-run': true,
         });
-        assert.strictEqual(preview.count, 1);
-        assert.ok(preview.profiles[0].targets.some(target => target.path === 'docs/workflow.txt'));
-
-        const unchanged = await profileCall('jit_profile_apply', {
-          profile: ['id:workflow'],
-          'dry-run': true,
-        });
-        assert.strictEqual(unchanged.count, 1);
-        assert.strictEqual(unchanged.profiles[0].status, 'unchanged');
+        assert.strictEqual(preview.count, preview.profiles.length);
+        const workflowPreview = preview.profiles.find(profile => profile.id === 'workflow');
+        assert.ok(workflowPreview.targets.some(target => target.path === 'docs/workflow.txt'));
+        assert.ok(preview.profiles.every(profile => profile.status === 'unchanged'));
 
         // The bridge preserves one repeated --profile occurrence stream,
         // including interleaved path and recorded-id selectors.

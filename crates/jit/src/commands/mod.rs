@@ -2014,6 +2014,33 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// Capture and finalize one repository export without publishing it.
+    pub(crate) fn plan_repository_export(
+        &self,
+        layout: &crate::repository_state::RepositoryLayout,
+        intent: &crate::repository_state::RepositoryExportIntent,
+        budget: crate::repository_state::CaptureBudget,
+    ) -> Result<()>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        use crate::repository_state::finalize_repository_export;
+
+        with_mutation_session(
+            &self.storage,
+            layout,
+            "repository export planning",
+            |session| {
+                let Some(image) = capture_or_retry(session.capture(intent.capture_spec(budget)?))?
+                else {
+                    return Ok(SessionStep::Retry);
+                };
+                finalize_repository_export(&image, intent)?;
+                Ok(SessionStep::Done(()))
+            },
+        )
+    }
+
     /// Rebase one closed issue-local operation on a freshly captured record.
     ///
     /// The request determines its complete capture set. The caller cannot pass a

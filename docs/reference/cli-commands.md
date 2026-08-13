@@ -681,7 +681,7 @@ jit profile show --profile <SELECTOR>... [--json]
 Human output summarizes each package's identity, compatibility, hashes,
 contribution and asset counts, and installed state. JSON returns the
 count-wrapped `ProfileShowResult` collection `{"count": N, "profiles": [...]}`;
-each entry carries the complete parsed manifest, `origin`, `package_hash`,
+each entry carries `id`, `version`, the complete parsed manifest, `origin`, `package_hash`,
 `target_hashes`, `file_count`, `byte_size`, and the parseable stored `applied`
 provenance record when one is present. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare that
@@ -707,9 +707,9 @@ record's ownership claims name still holds the value the profile published. A
 claimed target that is no longer in the repository is reported in its own right,
 as is every target claimed by a record whose package is gone.
 
-Human output shows one line per profile with its ID and origin, followed by one
+Human output shows one line per profile with its ID, version, and origin, followed by one
 line per divergence. JSON uses the standard list envelope
-`{"count": N, "profiles": [...]}`; each entry carries `id`, the `record` path,
+`{"count": N, "profiles": [...]}`; each entry carries `id`, `version`, the `record` path,
 the recorded `origin`, and its own count-wrapped `divergences`, each naming its
 `kind` and the target or package fact it reports.
 
@@ -761,7 +761,7 @@ select it with a `path:` selector to inspect it before applying it.
 `--values-file` and `--set` supply the same variable inputs as
 [`jit profile apply`](#jit-profile-apply).
 
-Human output shows one line per profile with its status, then one line per
+Human output shows one line per profile with its ID, version, origin, and status, then one line per
 decision with its action and owners — targets first, then declarations — and the
 reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
@@ -790,23 +790,23 @@ jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VAL
 `--values-file` and `--set` use the same variable inputs as profiled init.
 `--dry-run` builds and validates the exact plans without writing. JSON returns
 the count-wrapped `ProfilePlanResult` collection
-`{"count": N, "profiles": [...]}` with one `ProfilePlanEntry` per selector
-occurrence in selector order. Each entry includes `status` (`would_apply` or
-`unchanged`), `plan_hash`, and the sorted target and declaration lists in the
-vocabulary [`jit profile diff`](#jit-profile-diff) documents. A rehearsal fails
-where its publication would, so it never reports a `conflict`; read
-`jit profile diff` to see one.
-
-`--dry-run` previews each selected package. Applying selectors applies the
-packages each declares a dependency on as well, so a preview accounts for the
-selected package's own targets.
+`{"count": N, "profiles": [...]}`. It reports dependency-only packages once
+before every selected root occurrence in selector order, exactly like the run
+it rehearses. Each entry includes `id`, `version`, `origin`, `status`
+(`would_apply` or `unchanged`), `plan_hash`, and the sorted target and
+declaration lists in the vocabulary [`jit profile diff`](#jit-profile-diff)
+documents. A repeated root's later observations are `unchanged` and carry no
+decisions. A rehearsal fails where its publication would, so it never reports a
+`conflict`; read `jit profile diff` to see one.
 
 Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
 count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
-`ProfileApplyResult` per applied package in dependency-first selector order.
-Each entry carries profile identity, `status` (`applied` or
-`unchanged`), `plan_hash`, an optional `transaction_id`, and non-fatal cleanup
-warnings. Exact reapplication of a whole set is a successful no-op. Application
+`ProfileApplyResult` per corresponding rehearsal observation. Each entry carries
+`id`, `version`, `origin`, `status` (`applied` or `unchanged`), `plan_hash`, an
+optional `transaction_id`, non-fatal cleanup warnings, and the target and
+declaration decisions in the shared vocabulary. Exact reapplication of a whole
+set is a successful no-op. Human output uses the same identity, origin, status,
+and per-target decisions. Application
 and all coupled derived targets use the canonical recoverable multi-target
 transaction described in [Repository Profiles](profiles.md), including strict
 managed-region composition.
@@ -854,8 +854,8 @@ of `would_apply` only when that profile would publish. A repeated selector's
 later occurrences report `unchanged` and carry no target decisions, because the
 first occurrence accounts for the publication they observe. Without `--dry-run`,
 JSON returns `ProfileComposedApplyResult` in the standard count-wrapped envelope
-`{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per package the
-selection publishes. A published run uses the same recoverable multi-target
+`{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per corresponding
+rehearsal observation. A published run uses the same recoverable multi-target
 transaction as `jit profile apply` and appends one profile-lifecycle audit event
 naming the operation and each profile's outcome.
 
@@ -903,7 +903,7 @@ with, fails the upgrade with nothing published.
 Capture a package tree from the repository targets its manifest declares:
 
 ```bash
-jit profile capture --source <DIR> --destination <DIR> [--json]
+jit profile capture --source <DIR> --destination <DIR> [--dry-run] [--json]
 ```
 
 `--source` names the package directory whose `manifest.toml` declares what to
@@ -938,29 +938,30 @@ is removed in the same transaction. The manifest is republished whole, so a
 contribution it stopped declaring does not survive in the captured package. A
 capture that changes nothing publishes nothing.
 
+`--dry-run` performs the same reads and validation and reports the exact tree
+and declaration decisions without publishing the destination, a provenance
+record, or an event.
+
 A declared target that is a symbolic link, resolves outside the worktree, or
 carries executable permission its declaration did not is refused before anything
 is published, leaving the destination exactly as it was. The captured content is
 validated as a package before publication, so a published tree always decodes.
 
-JSON uses the standard list envelope `{"count": N, "files": [...]}` beside the
-captured package's `id`, `version`, `package_hash`, `source`, `destination`,
-`file_count`, `byte_size`, and `status`. Each `files` entry carries the
-repository-relative `path`, its `executable` mode intent, and an `action` of
-`unchanged`, `create`, `update`, or `remove`. A `contributions` entry beside
-them carries each declared contribution's canonical `identity` and an `action`
-of `unchanged`, `refreshed` (the registry stated another value, which the
-captured manifest now declares), `absent` (this package published the
-declaration and the repository no longer holds it), or `unowned` (the repository
-states something else under a declaration no record of this package claims).
-Human output names the refreshed and absent ones.
+JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
+entry carries `id`, `version`, `origin`, `package_hash`, `source`, `destination`,
+`file_count`, `byte_size`, `status`, and `targets` and `contributions` decisions.
+Those decisions use the same `unchanged`, `create`, `update`, `retain`, `remove`,
+and `conflict` vocabulary as the lifecycle commands; each names its owners and
+any reason. `status` is `would_apply` for a rehearsal that would publish,
+`applied` after publication, or `unchanged`. Human output presents the same
+identity, origin, status, and decisions.
 
 ### `jit profile pack`
 
 Pack a package directory into one portable archive file:
 
 ```bash
-jit profile pack --source <DIR> --output <FILE> [--json]
+jit profile pack --source <DIR> --output <FILE> [--dry-run] [--json]
 ```
 
 `--source` names the package directory and must classify as worktree content.
@@ -985,15 +986,20 @@ archive arrived over.
 
 An occupied output path is refused, leaving what it held untouched.
 
-JSON reports the packed package's `id`, `version`, `package_hash`, `source`,
-`archive`, `file_count`, `byte_size`, and the written `archive_bytes`.
+`--dry-run` validates and builds the exact archive bytes and checks that the
+output is publishable without writing it.
+
+JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
+entry reports `id`, `version`, `origin`, `package_hash`, `source`, `archive`,
+`file_count`, `byte_size`, `archive_bytes`, `status`, and the archive target
+decision. Human output presents the same identity, origin, status, and decision.
 
 ### `jit profile add`
 
 Place the package an archive carries into the worktree:
 
 ```bash
-jit profile add --archive <FILE> --destination <DIR> [--json]
+jit profile add --archive <FILE> --destination <DIR> [--dry-run] [--json]
 ```
 
 `--archive` names the archive to read, which may live anywhere. `--destination`
@@ -1022,9 +1028,15 @@ A refused add publishes nothing and leaves no partially extracted package: the
 archive is read into memory and the whole tree is published through one
 recoverable transaction, exactly as a capture is.
 
-JSON reports the added package's `id`, `version`, `package_hash`, `archive`,
-`destination`, `file_count`, and `byte_size`. The identity fields are recomputed
-from the extracted content rather than copied from the archive.
+`--dry-run` performs the same archive validation and reports the exact package
+tree publication without writing the destination, provenance, or an event.
+
+JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
+entry reports `id`, `version`, `origin`, `package_hash`, `archive`, `destination`,
+`file_count`, `byte_size`, `status`, and every package-tree target decision. The
+identity fields are recomputed from the extracted content rather than copied
+from the archive. Human output presents the same identity, origin, status, and
+decisions.
 
 ## Version
 

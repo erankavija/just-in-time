@@ -11,8 +11,29 @@ use std::collections::BTreeMap;
 pub enum ProfileApplicationStatus {
     /// Repository targets and audit state were already exact.
     Unchanged,
+    /// A rehearsal found a publication it would make.
+    WouldApply,
     /// A recoverable transaction reached its durable commit point.
     Applied,
+}
+
+/// The one count-wrapped collection envelope returned by profile commands.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileCollection<T> {
+    /// Number of entries in [`Self::profiles`].
+    pub count: usize,
+    /// Per-profile entries in the command's documented order.
+    pub profiles: Vec<T>,
+}
+
+impl<T> ProfileCollection<T> {
+    /// Wrap entries without changing their order.
+    pub fn new(profiles: Vec<T>) -> Self {
+        Self {
+            count: profiles.len(),
+            profiles,
+        }
+    }
 }
 
 /// Non-fatal application diagnostics.
@@ -35,6 +56,8 @@ pub struct ProfileApplyResult {
     pub id: String,
     /// Applied semantic version.
     pub version: String,
+    /// Where the package bytes were read from.
+    pub origin: ProfileOrigin,
     /// Whether anything was published.
     pub status: ProfileApplicationStatus,
     /// Deterministic plan identity rebuilt under the write lock.
@@ -44,38 +67,24 @@ pub struct ProfileApplyResult {
     pub transaction_id: Option<String>,
     /// Non-fatal cleanup diagnostics.
     pub warnings: Vec<ProfileApplicationWarning>,
+    /// Every file target this profile decided about.
+    pub targets: Vec<ProfileTargetChange>,
+    /// Every semantic declaration this profile decided about.
+    pub contributions: Vec<ProfileContributionChange>,
 }
 
-/// Result of applying one package together with the packages it depends on.
+/// Result of applying an ordered selection and its dependency closure.
 ///
-/// A package that declares a dependency is applied as a set: every package the
-/// closure resolves to is applied in its own right, with its own provenance
-/// record and its own audit event, so [`Self::profiles`] carries one entry per
-/// applied package rather than one summary over them. The order is the order
-/// they were applied — each package after everything it depends on — which puts
-/// the package the caller named last ([`Self::requested`]).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileComposedApplyResult {
-    /// Number of results in [`Self::profiles`].
-    pub count: usize,
-    /// One result per applied package, dependencies before their dependants.
-    pub profiles: Vec<ProfileApplyResult>,
-}
+/// Dependency-only packages appear once before the selected roots, followed by
+/// the roots in selector occurrence order. A repeated root's later observations
+/// carry no publication decisions. This is the same projection a rehearsal
+/// returns, so both results compare entry for entry.
+pub type ProfileComposedApplyResult = ProfileCollection<ProfileApplyResult>;
 
-impl ProfileComposedApplyResult {
-    /// Collect per-package results into the composed answer.
-    pub(crate) fn new(profiles: Vec<ProfileApplyResult>) -> Self {
-        Self {
-            count: profiles.len(),
-            profiles,
-        }
-    }
-
-    /// The result for the package the caller named.
+impl ProfileCollection<ProfileApplyResult> {
+    /// The result for the caller's last selected package occurrence.
     ///
-    /// `None` only for an empty composition, which application does not
-    /// produce: the named package is always applied, after everything it
-    /// depends on.
+    /// `None` only for an empty composition, which application does not produce.
     pub fn requested(&self) -> Option<&ProfileApplyResult> {
         self.profiles.last()
     }
@@ -110,6 +119,8 @@ impl SelectionObservation for ProfileApplyResult {
         self.status = ProfileApplicationStatus::Unchanged;
         self.transaction_id = None;
         self.warnings.clear();
+        self.targets.clear();
+        self.contributions.clear();
     }
 }
 
@@ -141,17 +152,15 @@ pub struct ProfileSummary {
 }
 
 /// Count-wrapped profile-list response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileListResult {
-    /// Number of profiles in [`Self::profiles`].
-    pub count: usize,
-    /// Profiles sorted by stable ID.
-    pub profiles: Vec<ProfileSummary>,
-}
+pub type ProfileListResult = ProfileCollection<ProfileSummary>;
 
 /// One complete package inspection entry.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowEntry {
+    /// Stable profile identifier.
+    pub id: String,
+    /// Semantic package version.
+    pub version: String,
     /// Canonical package model produced from the immutable manifest bytes.
     pub manifest: ProfilePackageModel,
     /// Package discovery origin.
@@ -170,23 +179,7 @@ pub struct ProfileShowEntry {
 }
 
 /// Count-wrapped, occurrence-ordered package inspection response.
-#[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
-pub struct ProfileShowResult {
-    /// Number of entries in [`Self::profiles`].
-    pub count: usize,
-    /// One package entry per selector occurrence, in selector order.
-    pub profiles: Vec<ProfileShowEntry>,
-}
-
-impl ProfileShowResult {
-    /// Collect package inspection entries without changing their selector order.
-    pub(crate) fn new(profiles: Vec<ProfileShowEntry>) -> Self {
-        Self {
-            count: profiles.len(),
-            profiles,
-        }
-    }
-}
+pub type ProfileShowResult = ProfileCollection<ProfileShowEntry>;
 
 /// What one profile would do to one target or declaration it participates in.
 ///
@@ -303,6 +296,8 @@ pub struct ProfilePlanEntry {
     pub id: String,
     /// Semantic package version.
     pub version: String,
+    /// Where the package bytes were read from.
+    pub origin: ProfileOrigin,
     /// Whether execution would publish this profile.
     pub status: ProfilePlanStatus,
     /// Identity of the complete canonical repository materialization plan this
@@ -343,24 +338,9 @@ impl ProfilePlanEntry {
 }
 
 /// Count-wrapped profile application previews.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfilePlanResult {
-    /// Number of previews in [`Self::profiles`].
-    pub count: usize,
-    /// One preview per profile this rehearsal reports. Which profiles those are
-    /// is stated by the command that produced them.
-    pub profiles: Vec<ProfilePlanEntry>,
-}
+pub type ProfilePlanResult = ProfileCollection<ProfilePlanEntry>;
 
-impl ProfilePlanResult {
-    /// Collect previews without changing their selector order.
-    pub(crate) fn new(profiles: Vec<ProfilePlanEntry>) -> Self {
-        Self {
-            count: profiles.len(),
-            profiles,
-        }
-    }
-
+impl ProfileCollection<ProfilePlanEntry> {
     /// The profiles that decided a target or declaration that cannot be
     /// published, in report order.
     pub fn conflicted(&self) -> impl Iterator<Item = &ProfilePlanEntry> {
@@ -495,75 +475,20 @@ mod tests {
     }
 }
 
-/// What one capture did to a path in the tree it published.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ProfileCaptureAction {
-    /// Already exactly what the manifest declares.
-    Unchanged,
-    /// Absent, so the declared content was created.
-    Create,
-    /// Present with other content or mode, so it was replaced.
-    Update,
-    /// Present and no longer declared, so it was removed.
-    Remove,
-}
-
-/// One path a package-tree publication decided about.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileCaptureFile {
-    /// Repository-relative path in the published tree.
-    pub path: String,
-    /// What the capture did to it.
-    pub action: ProfileCaptureAction,
-    /// Platform-neutral file-mode intent.
-    pub executable: bool,
-}
-
-/// What a capture read back from the repository for one declared contribution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ProfileContributionCaptureAction {
-    /// The registry declares the value the manifest already carried.
-    Unchanged,
-    /// This package published the declaration and the registry declares another
-    /// value, which the captured manifest now carries.
-    Refreshed,
-    /// This package published the declaration and the registry declares nothing
-    /// under it, so the captured manifest keeps the value its author wrote.
-    Absent,
-    /// The registry declares something other than the manifest under a
-    /// declaration no record of this package claims, so it is the repository's
-    /// own and the captured manifest keeps the value its author wrote.
-    Unowned,
-}
-
-/// One contribution the captured manifest declares, beside what the repository
-/// said about it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileCapturedContribution {
-    /// Canonical semantic identity of the declaration.
-    pub identity: String,
-    /// What the registry holding it said.
-    pub action: ProfileContributionCaptureAction,
-}
-
-/// Count-wrapped response of one package-tree capture.
+/// One package-tree capture inside the shared profile collection.
 ///
-/// The collection is every path the capture decided about, including the ones
-/// it removed, so an adopter reading it sees what the destination stopped
-/// carrying as well as what it now carries. Beside it, the declarations the
-/// captured manifest carries are reported with what the repository said about
-/// each: a contributed value read back from the registry that owns it, and a
-/// declaration the repository no longer holds named rather than dropped.
+/// [`Self::targets`] carries every path the capture decided about, including
+/// removals, so an adopter sees what the destination stopped carrying as well
+/// as what it now carries. [`Self::contributions`] reports the declarations the
+/// captured manifest carries through the same decision vocabulary.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileCaptureResult {
-    /// Number of entries in [`Self::files`].
-    pub count: usize,
+pub struct ProfileCaptureEntry {
     /// Stable identifier the captured manifest declares.
     pub id: String,
     /// Semantic version the captured manifest declares.
     pub version: String,
+    /// Where the source package bytes were read from.
+    pub origin: ProfileOrigin,
     /// Hash of the complete captured package.
     pub package_hash: String,
     /// Repository-relative package directory the capture read.
@@ -577,22 +502,26 @@ pub struct ProfileCaptureResult {
     /// Whether the capture published a transaction.
     pub status: ProfileApplicationStatus,
     /// Every path the capture decided about, in canonical path order.
-    pub files: Vec<ProfileCaptureFile>,
-    /// Every contribution the captured manifest declares, in declaration order.
-    pub contributions: Vec<ProfileCapturedContribution>,
+    pub targets: Vec<ProfileTargetChange>,
+    /// Every contribution the capture decided about, in declaration order.
+    pub contributions: Vec<ProfileContributionChange>,
 }
 
-/// Response of packing one package into a portable archive.
+pub type ProfileCaptureResult = ProfileCollection<ProfileCaptureEntry>;
+
+/// One packed package inside the shared profile collection.
 ///
 /// The identity fields are the package's own, read from the directory that was
 /// packed; the archive carries the same three, which is what an add holds the
 /// arriving content against.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfilePackResult {
+pub struct ProfilePackEntry {
     /// Stable identifier the packed manifest declares.
     pub id: String,
     /// Semantic version the packed manifest declares.
     pub version: String,
+    /// Where the package bytes were read from.
+    pub origin: ProfileOrigin,
     /// Identity digest of the packed package.
     pub package_hash: String,
     /// Repository-relative package directory that was packed.
@@ -605,18 +534,26 @@ pub struct ProfilePackResult {
     pub byte_size: usize,
     /// Size of the written archive.
     pub archive_bytes: u64,
+    /// The archive-file publication decision.
+    pub targets: Vec<ProfileTargetChange>,
+    /// Whether the archive was published or only rehearsed.
+    pub status: ProfileApplicationStatus,
 }
 
-/// Response of adding one archived package to the worktree.
+pub type ProfilePackResult = ProfileCollection<ProfilePackEntry>;
+
+/// One added package inside the shared profile collection.
 ///
 /// The identity fields are recomputed from the extracted content rather than
 /// read from the archive, so they describe the package that was published.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileAddResult {
+pub struct ProfileAddEntry {
     /// Stable identifier the added manifest declares.
     pub id: String,
     /// Semantic version the added manifest declares.
     pub version: String,
+    /// Where the package will be readable after publication.
+    pub origin: ProfileOrigin,
     /// Identity digest recomputed from the added content.
     pub package_hash: String,
     /// Path the archive was read from, as the invocation named it.
@@ -627,4 +564,10 @@ pub struct ProfileAddResult {
     pub file_count: usize,
     /// Total added package byte size.
     pub byte_size: usize,
+    /// Every package-tree path the add decided about.
+    pub targets: Vec<ProfileTargetChange>,
+    /// Whether the package tree was published or only rehearsed.
+    pub status: ProfileApplicationStatus,
 }
+
+pub type ProfileAddResult = ProfileCollection<ProfileAddEntry>;

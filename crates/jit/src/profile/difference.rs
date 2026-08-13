@@ -25,8 +25,8 @@
 //! conflict per run cannot see how much work the selection actually is.
 
 use crate::profile::{
-    ProfileContributionChange, ProfileId, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileContributionChange, ProfileId, ProfileOrigin, ProfilePlanEntry, ProfilePlanStatus,
+    ProfileTargetAction, ProfileTargetChange,
 };
 use crate::repository_state::{
     MaterializationPlan, ProfileContributionMaterialization, ProfileTargetConflictEntry,
@@ -108,6 +108,7 @@ pub(crate) fn profile_plan_entry(
     plan: &MaterializationPlan,
     id: &ProfileId,
     version: &str,
+    origin: ProfileOrigin,
 ) -> ProfilePlanEntry {
     let targets = profile_target_changes(plan, id);
     let contributions = profile_contribution_changes(plan, id);
@@ -126,6 +127,7 @@ pub(crate) fn profile_plan_entry(
     ProfilePlanEntry {
         id: id.to_string(),
         version: version.to_string(),
+        origin,
         status,
         plan_hash: plan.hash().to_string(),
         targets,

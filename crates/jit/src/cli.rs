@@ -3114,7 +3114,7 @@ pub enum ProfileCommands {
     ///   jit profile capture --source profiles/my-profile --destination build/my-profile
     ///   jit profile capture --source profiles/my-profile --destination profiles/my-profile
     ///
-    /// JSON output uses the list envelope `{"count": N, "files": [...]}`.
+    /// JSON output uses the profile envelope `{"count": N, "profiles": [...]}`.
     Capture {
         /// Package directory whose manifest declares what to capture
         #[arg(long, value_name = "DIR")]
@@ -3123,6 +3123,10 @@ pub enum ProfileCommands {
         /// Directory the captured package tree is published at
         #[arg(long, value_name = "DIR")]
         destination: std::path::PathBuf,
+
+        /// Build and validate the exact capture plan without writing
+        #[arg(long)]
+        dry_run: bool,
 
         /// Output as JSON
         #[arg(long)]
@@ -3154,6 +3158,10 @@ pub enum ProfileCommands {
         #[arg(long, value_name = "FILE")]
         output: std::path::PathBuf,
 
+        /// Build and validate the exact archive publication without writing
+        #[arg(long)]
+        dry_run: bool,
+
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -3181,6 +3189,10 @@ pub enum ProfileCommands {
         /// Directory the package is published at
         #[arg(long, value_name = "DIR")]
         destination: std::path::PathBuf,
+
+        /// Build and validate the exact package-tree publication without writing
+        #[arg(long)]
+        dry_run: bool,
 
         /// Output as JSON
         #[arg(long)]
@@ -3314,7 +3326,9 @@ impl ProfileCommands {
             // added package tree, or an archive written inside a repository
             // root — so they dispatch recovery like every other mutating
             // profile operation.
-            Self::Capture { .. } | Self::Pack { .. } | Self::Add { .. } => true,
+            Self::Capture { dry_run, .. }
+            | Self::Pack { dry_run, .. }
+            | Self::Add { dry_run, .. } => !*dry_run,
             Self::List { .. } | Self::Show { .. } | Self::Validate { .. } | Self::Diff { .. } => {
                 false
             }

@@ -517,14 +517,11 @@ impl CommandSchema {
                         schema_to_value::<crate::profile::ProfilePlanResult>(),
                     ],
                     "description": "Normal execution returns ProfileComposedApplyResult, \
-                        one ProfileApplyResult per package in dependency-first application \
-                        order for the ordered selectors. With --dry-run, returns the count-wrapped \
-                        ProfilePlanResult of non-mutating ProfilePlanEntry values. profile apply \
-                        plans each selector's package on its own, so its dry run carries one entry \
-                        per selector occurrence in selector order. profile reconfigure and profile \
-                        upgrade rehearse one aggregate selection, so their dry run carries the \
-                        entries their own run reports: dependency closure members before the roots \
-                        that declare them, then one entry per root occurrence. An entry that \
+                        per aggregate selection observation. With --dry-run, returns the count-wrapped \
+                        ProfilePlanResult of non-mutating ProfilePlanEntry values. Every lifecycle \
+                        rehearsal carries the entries its run reports: dependency-only closure \
+                        members before the selected roots, then one entry per root occurrence. \
+                        An entry that \
                         publishes nothing reports status unchanged and carries no target or \
                         declaration decisions."
                 });

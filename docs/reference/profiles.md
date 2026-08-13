@@ -98,6 +98,7 @@ Capture a package tree from the repository files its manifest declares, which
 is how an edit made in place reaches the package that owns it:
 
 ```bash
+jit profile capture --source profiles/my-workflow --destination build/my-workflow --dry-run
 jit profile capture --source profiles/my-workflow --destination build/my-workflow
 ```
 
@@ -115,7 +116,9 @@ Pack a package into one portable file to hand to somebody, and place one
 somebody handed you:
 
 ```bash
+jit profile pack --source profiles/my-workflow --output my-workflow.tar --dry-run
 jit profile pack --source profiles/my-workflow --output my-workflow.tar
+jit profile add --archive my-workflow.tar --destination packages/my-workflow --dry-run
 jit profile add --archive my-workflow.tar --destination packages/my-workflow
 ```
 
@@ -161,21 +164,20 @@ the same thing.
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
 
-All profile commands support `--json`. Profile commands that emit collections
-use the standard count-wrapped collection shape. A show response
-contains one package entry per selector occurrence in selector order, including
-repeated selectors; `profile apply --dry-run` reports one plan entry per
-selected occurrence, while a `profile reconfigure` or `profile upgrade`
-rehearsal reports the entries its own run reports; normal application reports
-one result per applied package, dependencies before the package that declares
-them. Each show entry carries the manifest, package
+All profile commands support `--json` and use the standard count-wrapped
+`{"count": N, "profiles": [...]}` collection shape. A show response contains
+one package entry per selector occurrence in selector order, including repeated
+selectors. Lifecycle rehearsals and runs report the same ordered observations:
+dependency-only packages once before the selected roots, then every selected
+root occurrence in selector order. A repeated root's later observations are
+`unchanged` and carry no decisions. Each show entry carries the manifest, package
 identity, target hashes, size, and stored provenance record when present.
 Showing that record does not re-verify current target bytes. Use
 `jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state
-verification of the named package: it returns a one-entry collection with the
-deterministic plan hash and every target's `create`, `update`, or `unchanged`
-action without writing. Successful reapplication of an exact installation
-returns `unchanged` for every package of the set.
+verification of the named package and its dependency closure: it returns the
+deterministic plan hash and every package's target and declaration decisions
+without writing. Successful reapplication of an exact installation returns
+`unchanged` for every package of the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated publication; where the profile declares dependencies, the

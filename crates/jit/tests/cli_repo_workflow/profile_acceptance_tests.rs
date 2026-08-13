@@ -199,10 +199,16 @@ fn snapshot_tree(root: &Path) -> BTreeMap<String, SnapshotEntry> {
 }
 
 fn target<'a>(plan: &'a Value, path: &str) -> &'a Value {
-    plan["profiles"][0]["targets"]
+    plan["profiles"]
         .as_array()
-        .expect("profile targets")
+        .expect("profile collection")
         .iter()
+        .flat_map(|profile| {
+            profile["targets"]
+                .as_array()
+                .expect("profile targets")
+                .iter()
+        })
         .find(|target| target["path"] == path)
         .unwrap_or_else(|| panic!("missing profile target {path}"))
 }
@@ -293,8 +299,8 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "--json",
         ],
     );
-    assert_eq!(no_op["count"], 1);
-    assert_eq!(no_op["profiles"][0]["status"], "unchanged");
+    assert_eq!(no_op["count"], 2);
+    assert_eq!(requested_profile(&no_op)["status"], "unchanged");
     assert_eq!(
         target(&no_op, "contrib/gates/ai-review.sh")["executable"],
         true
@@ -820,9 +826,9 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     // move a package between repositories, so each takes the package location
     // it works from and the archive it works through.
     for (command, flags) in [
-        ("capture", ["destination", "json", "source"]),
-        ("pack", ["json", "output", "source"]),
-        ("add", ["archive", "destination", "json"]),
+        ("capture", ["destination", "dry-run", "json", "source"]),
+        ("pack", ["dry-run", "json", "output", "source"]),
+        ("add", ["archive", "destination", "dry-run", "json"]),
     ] {
         assert_eq!(
             commands[command]["flags"]
@@ -892,10 +898,12 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "applied",
             "byte_size",
             "file_count",
+            "id",
             "manifest",
             "origin",
             "package_hash",
             "target_hashes",
+            "version",
         ])
     );
     assert_eq!(
@@ -955,12 +963,16 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         .as_array()
         .unwrap();
     assert_eq!(apply_schemas.len(), 2);
-    let by_title = apply_schemas
+    let apply_schema = apply_schemas
         .iter()
-        .map(|schema| (schema["title"].as_str().unwrap(), schema))
-        .collect::<BTreeMap<_, _>>();
+        .find(|schema| schema["definitions"].get("ProfileApplyResult").is_some())
+        .expect("apply output schema");
+    let plan_schema = apply_schemas
+        .iter()
+        .find(|schema| schema["definitions"].get("ProfilePlanEntry").is_some())
+        .expect("rehearsal output schema");
     assert_eq!(
-        by_title["ProfileComposedApplyResult"]["properties"]
+        apply_schema["properties"]
             .as_object()
             .unwrap()
             .keys()
@@ -969,18 +981,21 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         expected_keys(&["count", "profiles"])
     );
     assert_eq!(
-        property_keys(by_title["ProfileComposedApplyResult"], "ProfileApplyResult"),
+        property_keys(apply_schema, "ProfileApplyResult"),
         expected_keys(&[
+            "contributions",
             "id",
+            "origin",
             "plan_hash",
             "status",
+            "targets",
             "transaction_id",
             "version",
             "warnings",
         ])
     );
     assert_eq!(
-        by_title["ProfilePlanResult"]["properties"]
+        plan_schema["properties"]
             .as_object()
             .unwrap()
             .keys()
@@ -989,10 +1004,11 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         expected_keys(&["count", "profiles"])
     );
     assert_eq!(
-        property_keys(by_title["ProfilePlanResult"], "ProfilePlanEntry"),
+        property_keys(plan_schema, "ProfilePlanEntry"),
         expected_keys(&[
             "contributions",
             "id",
+            "origin",
             "plan_hash",
             "status",
             "targets",
@@ -1000,18 +1016,15 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         ])
     );
     assert_eq!(
-        variant_property_keys(
-            by_title["ProfileComposedApplyResult"],
-            "ProfileApplicationWarning"
-        ),
+        variant_property_keys(apply_schema, "ProfileApplicationWarning"),
         expected_keys(&["kind", "reason", "transaction_id"])
     );
     assert_eq!(
-        property_keys(by_title["ProfilePlanResult"], "ProfileTargetChange"),
+        property_keys(plan_schema, "ProfileTargetChange"),
         expected_keys(&["action", "executable", "owners", "path", "reason"])
     );
     assert_eq!(
-        property_keys(by_title["ProfilePlanResult"], "ProfileContributionChange"),
+        property_keys(plan_schema, "ProfileContributionChange"),
         expected_keys(&["action", "identity", "owners", "reason"])
     );
 }
@@ -1033,12 +1046,14 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
         "release smoke must use the repeatable selector syntax for dry-run"
     );
     assert!(
-        workflow.contains("assert plan[\"count\"] == len(plan[\"profiles\"]) == 1, plan"),
+        workflow.contains("assert plan[\"count\"] == len(plan[\"profiles\"]) >= 1, plan"),
         "release smoke must validate the count-wrapped dry-run envelope"
     );
     assert!(
-        workflow.contains("assert plan[\"profiles\"][0][\"status\"] == \"unchanged\", plan"),
-        "release smoke must validate the per-profile dry-run status"
+        workflow.contains(
+            "assert all(profile[\"status\"] == \"unchanged\" for profile in plan[\"profiles\"]), plan"
+        ),
+        "release smoke must validate every aggregate profile observation"
     );
     assert!(
         !workflow.contains("assert plan[\"status\"] == \"unchanged\", plan"),

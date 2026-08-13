@@ -462,6 +462,34 @@ await runTest('generateTools matches real schema without errors', () => {
   }
 });
 
+await runTest('real profile tool inventory and inputs derive from command definitions', () => {
+  const profileCommands = realSchema.commands.profile.subcommands;
+  const profileTools = generateTools(realSchema)
+    .filter(tool => tool.name.startsWith('jit_profile_'));
+
+  assert.deepStrictEqual(
+    profileTools.map(tool => tool.name).sort(),
+    Object.keys(profileCommands).map(command => `jit_profile_${command}`).sort()
+  );
+  for (const tool of profileTools) {
+    const command = tool.name.slice('jit_profile_'.length);
+    const declaredInputs = [
+      ...profileCommands[command].args,
+      ...profileCommands[command].flags,
+    ];
+    assert.deepStrictEqual(
+      Object.keys(tool.inputSchema.properties).sort(),
+      declaredInputs.map(input => input.name).sort(),
+      `${tool.name} inputs must derive from its command definition`
+    );
+    assert.deepStrictEqual(
+      tool.inputSchema.required,
+      declaredInputs.filter(input => input.required).map(input => input.name),
+      `${tool.name} required inputs must derive from its command definition`
+    );
+  }
+});
+
 await runTest('real schema exposes only dependency-aware archive tools', () => {
   const names = new Set(generateTools(realSchema).map(tool => tool.name));
   const retiredTool = ['jit_doc', 'archive'].join('_');
