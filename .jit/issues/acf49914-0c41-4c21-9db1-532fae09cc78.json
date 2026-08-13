@@ -35,7 +35,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Prove an in-place edit refreshes back into agreement",
-  "updated_at": "2026-08-13T07:11:26.353800649Z"
+  "updated_at": "2026-08-13T15:32:43.454480834Z"
 }
