@@ -4,7 +4,15 @@
   "created_at": "2026-08-13T09:51:35.291061297Z",
   "dependencies": [],
   "description": "The build gate fails on ambient build-cache state rather than on the tree it\nwas asked to judge, so one commit gets two verdicts depending on what the\nmachine happened to compile beforehand.\n\n## Background\n\nTwo steps of `scripts/cargo-ci.sh` and `scripts/rust-build-budget.sh` decide\nagainst the environment instead of the change.\n\n**Suite duration counts first-touch I/O.** The same merge commit, 4512 tests\npassing in both runs, measured minutes apart on an idle host:\n\n    cold:  suite-build 36,704 ms   suite-clock 43,285 ms   budget FAILED (threshold 30,000)\n    warm:  suite-build    358 ms   suite-clock 22,669 ms   budget passed\n\n`suite-build` keeps compilation outside the measured clock by design, but it\ncannot pre-warm the page cache for executables written seconds earlier, so the\ntest step pays that I/O inside the clock. The discriminator is `suite-build`\nitself: two orders of magnitude between the two runs. A reader who does not\nknow this signature diagnoses a real regression in the change under test, and\nthe correct remedy today is undocumented folklore: re-run and read the second\nnumber.\n\n**The incremental preflight fails on state the gate did not create.**\n`incremental-preflight` (`scripts/cargo-ci.sh`) rejects a non-empty\n`target/debug/incremental` before compiling anything. A rust-analyzer instance\nindexing the checkout writes exactly that directory continuously, in every\nworktree it has open, and it repopulates within seconds of being cleared. The\ngate then reports a policy breach for a directory no gate run produced. The\nstanding workaround is to clear it inside a lock immediately before each run.\n\nThe two are one defect: a checker that judges the machine rather than the tree.\nBoth produce a red verdict that says nothing about the change, and both are\nsurvivable only by knowing an unwritten recovery step.\n\n## Success Criteria\n\n- [hard] REQ-01: Two runs of one unchanged commit reach the same budget verdict regardless of whether the build tree was already warm, so build-cache state cannot decide a gate.\n- [hard] REQ-02: The suite-duration budget continues to fail a change that genuinely lengthens the suite, evidenced by a test that lengthens it and observes the failure.\n- [hard] REQ-03: The incremental policy is judged by what the gate run itself produced, so incremental state written by another process before the run does not fail it.\n- [hard] REQ-04: The gate-run incremental ban stays in force and stays checked; the measured rationale for disabling it during a gate run is unchanged by this work.\n- [hard] REQ-05: A failure from either step names what it observed and what it compared against, so a reader can tell an environmental condition from a regression in the change.\n\n## Notes\n\nScope is the checker, not the policy. `CARGO_INCREMENTAL=0` during a gate run\nrests on a measurement — a gate compiles once and exits, so incremental state\nhas no later rebuild to amortize against and accumulated without bound across\nruns — and it is enforced in three places: the export in `scripts/cargo-ci.sh`,\nthe policy-drift check in `scripts/rust-build-budget.sh`, and\n`build_profile_policy_tests.rs`. The workspace manifest deliberately leaves\nincremental on for ordinary interactive builds, which is unaffected. REQ-04\nexists so a fix for REQ-03 does not quietly relax the ban.\n\nThe suite-duration budget is the guard that took the workspace suite from\n192,994 ms to ~22,000 ms. REQ-02 exists so a fix for REQ-01 does not buy\ndeterminism by loosening it.\n\nFiled by the execution lead of `c639cfb5` after the cold verdict cost a cycle\non that epic's wave 15 merge. Placed under the v1.0 release container because\nit is release-blocking CI correctness rather than profile work; move it if\nanother container owns these scripts.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Cold and warm suite-clock verdicts, with the attribution of the cold penalty",
+      "path": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+    }
+  ],
   "first_ready_at": "2026-08-13T09:51:35.291061297Z",
   "gates_required": [
     "cargo-ci",
@@ -32,5 +40,5 @@
   "priority": "high",
   "state": "ready",
   "title": "The build gate decides on build-cache state instead of the tree",
-  "updated_at": "2026-08-13T09:51:48.403330238Z"
+  "updated_at": "2026-08-13T10:56:30.168396450Z"
 }
