@@ -95,13 +95,21 @@ fn revalidate_external_parent(path: &Path, held: &Dir) -> Result<()> {
     Ok(())
 }
 
+/// Validate the no-follow parent and absent-leaf precondition for publishing
+/// one external file, without creating a staging file or destination.
+pub(crate) fn preflight_external_file_noreplace(
+    path: &crate::repository_state::ExternalExportPath,
+) -> Result<()> {
+    external_file_noreplace_target(path).map(drop)
+}
+
 /// Publish one staged file to an absent external target without following links.
 pub(crate) fn publish_external_file_noreplace(
     path: &crate::repository_state::ExternalExportPath,
     source: &Path,
 ) -> Result<ExternalExportOutcome> {
     let target = path.as_path();
-    let (parent_path, leaf, parent) = external_parent(target)?;
+    let (parent_path, leaf, parent) = external_file_noreplace_target(path)?;
     let tmp_name = external_temp_name(leaf);
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -239,6 +247,27 @@ fn external_parent(target: &Path) -> Result<(&Path, &OsStr, Dir)> {
     let parent = super::repository_state_store::open_absolute_dir_nofollow(parent_path)
         .with_context(|| format!("opening external export parent {}", parent_path.display()))?;
     Ok((parent_path, leaf, parent))
+}
+
+/// Open an external file target's parent without following links and require
+/// its leaf to be absent. Publication and rehearsal share this exact read-only
+/// precondition; publication's final hard link still closes races after it.
+fn external_file_noreplace_target(
+    path: &crate::repository_state::ExternalExportPath,
+) -> Result<(&Path, &OsStr, Dir)> {
+    let target = path.as_path();
+    let (parent_path, leaf, parent) = external_parent(target)?;
+    match parent.symlink_metadata(leaf) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok((parent_path, leaf, parent))
+        }
+        Ok(_) => Err(crate::errors::AlreadyExistsError::new(format!(
+            "Output path already exists: {}",
+            target.display()
+        ))
+        .into()),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn external_temp_name(leaf: &OsStr) -> String {

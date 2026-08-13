@@ -13,6 +13,7 @@
 //! divergences without either resolving a package to ask the question.
 
 use crate::domain::ProfileOrigin;
+use crate::profile::ProfileCollection;
 use crate::repository_state::{
     claimed_target_state, AppliedProfileRecord, ClaimedTargetState, RepositoryImage,
     RepositoryStateError,
@@ -109,6 +110,8 @@ impl ProfileDivergence {
 pub struct ProfileAgreement {
     /// Stable profile identifier the record names.
     pub id: String,
+    /// Semantic version the applied record names.
+    pub version: String,
     /// Repository-relative path of the applied-profile record.
     pub record: String,
     /// Where the record says its package was read from.
@@ -124,12 +127,14 @@ impl ProfileAgreement {
     /// Collect one profile's divergences into its answer.
     pub fn new(
         id: impl Into<String>,
+        version: impl Into<String>,
         record: impl Into<String>,
         origin: ProfileOrigin,
         divergences: Vec<ProfileDivergence>,
     ) -> Self {
         Self {
             id: id.into(),
+            version: version.into(),
             record: record.into(),
             origin,
             count: divergences.len(),
@@ -148,23 +153,9 @@ impl ProfileAgreement {
 /// A repository that records no profile reports no entry, because the records
 /// are the whole inventory: nothing about the running binary or the packages
 /// present in the worktree adds to it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileAgreementResult {
-    /// Number of profiles in [`Self::profiles`].
-    pub count: usize,
-    /// One entry per recorded profile, in profile-id order.
-    pub profiles: Vec<ProfileAgreement>,
-}
+pub type ProfileAgreementResult = ProfileCollection<ProfileAgreement>;
 
-impl ProfileAgreementResult {
-    /// Collect per-profile answers into the report.
-    pub fn new(profiles: Vec<ProfileAgreement>) -> Self {
-        Self {
-            count: profiles.len(),
-            profiles,
-        }
-    }
-
+impl ProfileCollection<ProfileAgreement> {
     /// Whether every recorded profile agrees.
     pub fn agrees(&self) -> bool {
         self.profiles.iter().all(ProfileAgreement::agrees)

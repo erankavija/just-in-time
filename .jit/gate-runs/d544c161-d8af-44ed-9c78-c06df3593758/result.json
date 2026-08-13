@@ -1,0 +1,23 @@
+{
+  "branch": "worktree-agent-cb26de35",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4982b755fa71a9c2cbce6528289b2b36598c25a0",
+  "completed_at": "2026-08-13T16:24:11.299241393Z",
+  "duration_ms": 242272,
+  "exit_code": 1,
+  "gate_key": "code-review",
+  "issue_id": "cb26de35-de6b-4297-983b-00aa8ef4c64f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d544c161-d8af-44ed-9c78-c06df3593758",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:20:09.026400388Z",
+  "status": "failed",
+  "stderr": "---\nERROR: Agent produced no output.\n--- agent stderr (first 13 of 136 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-cb26de35\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffbec-83ee-72b1-9588-1a8877b546c6\n--------\nuser\n--- 123 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "",
+  "tree_dirty": true
+}

@@ -1,0 +1,43 @@
+{
+  "branch": "worktree-agent-cb26de35",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4982b755fa71a9c2cbce6528289b2b36598c25a0",
+  "completed_at": "2026-08-13T16:30:18.292975251Z",
+  "duration_ms": 349730,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 453,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/atomic-writes",
+          "@/issue/cb26de35/requirement/REQ-02",
+          "@/issue/c639cfb5/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "External profile pack dry-run checks only the output leaf, not the no-follow parent-open precondition enforced by real publication."
+      }
+    ],
+    "summary": "External profile-pack rehearsal can report a publishable archive when real publication cannot safely open its parent directory.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cb26de35-de6b-4297-983b-00aa8ef4c64f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1b90d809-053e-45fd-bfb5-d82a40b7ebb6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:24:28.562907472Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11454 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-cb26de35\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffbf0-7993-7480-8b2d-efcd0533fe8f\n--------\nuser\n--- 11441 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `0d7efe9a7` (workflow state only), `4982b755f` (implementation)\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-8` (dev/vision/9db27a3a-charter.md), `@/invariant/atomic-writes` (.jit/invariants.toml), `@/issue/cb26de35/requirement/REQ-02` (.jit/issues/cb26de35-de6b-4297-983b-00aa8ef4c64f.json), `@/issue/c639cfb5/requirement/REQ-06` (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T16:17:45Z); mcp-ci passed (exit 0, 2026-08-13T16:19:57Z); prior code-review failed (exit 1, unstructured)\nTruncation recovery: partitioned `4982b755f` patches by affected paths; narrowed current command, storage, test, MCP, and documentation reads\n\n1. **[blocking, issue-impact]** `profile pack --dry-run` does not validate that an external output’s parent directory can be opened safely, although real publication does. The rehearsal accepts a missing leaf through `symlink_metadata` at [profile.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-cb26de35/crates/jit/src/commands/profile.rs:453), while the actual path opens the parent with no-follow semantics before it can publish at [external_publish.rs](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-cb26de35/crates/jit/src/storage/external_publish.rs:232). Thus `--dry-run` can report a `create` decision for a nonexistent or unsafe parent where the mutation fails, violating the required “exact” rehearsal contract. No test covers external-output rehearsal; the added test only uses a repository-local `synthetic.tar`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"External profile-pack rehearsal can report a publishable archive when real publication cannot safely open its parent directory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"External profile pack dry-run checks only the output leaf, not the no-follow parent-open precondition enforced by real publication.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":453,\"references\":[\"@/invariant/atomic-writes\",\"@/issue/cb26de35/requirement/REQ-02\",\"@/issue/c639cfb5/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

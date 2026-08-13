@@ -50,6 +50,8 @@ fn init_profile_results(
             result.status = ProfileApplicationStatus::Unchanged;
             result.transaction_id = None;
             result.warnings.clear();
+            result.targets.clear();
+            result.contributions.clear();
         }
         results.push(result);
     }
@@ -294,28 +296,28 @@ impl CommandExecutor<JsonFileStorage> {
                 let gitattributes = scaffold.gitattributes_status(&base)?;
                 let (created_paths, modified_paths) = init_response_paths(&plan, gitattributes)?;
 
-                let profile = (!packages.is_empty()).then(|| {
-                    ProfileComposedApplyResult::new(
+                let profile = if packages.is_empty() {
+                    None
+                } else {
+                    Some(ProfileComposedApplyResult::new(
                         packages
                             .iter()
                             .map(|package| {
                                 let changed = plan.applied_profiles().contains(&package.model().id);
-                                ProfileApplyResult {
-                                    id: package.model().id.to_string(),
-                                    version: package.model().version.clone(),
-                                    status: if changed {
+                                super::profile::applied_profile_result(
+                                    &plan,
+                                    package,
+                                    &layout,
+                                    if changed {
                                         ProfileApplicationStatus::Applied
                                     } else {
                                         ProfileApplicationStatus::Unchanged
                                     },
-                                    plan_hash: plan.hash().to_string(),
-                                    transaction_id: changed.then(|| plan.hash().to_string()),
-                                    warnings: Vec::new(),
-                                }
+                                )
                             })
-                            .collect(),
-                    )
-                });
+                            .collect::<Result<Vec<_>>>()?,
+                    ))
+                };
                 Ok(SessionStep::Apply(
                     plan,
                     FreshInitResult {

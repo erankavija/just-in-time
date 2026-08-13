@@ -14,7 +14,23 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T16:36:56.071349786Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T16:40:52.838867566Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T16:37:11.564596969Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cb26de35-de6b-4297-983b-00aa8ef4c64f",
   "labels": [
     "type:task",
@@ -28,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Give the profile subcommands one presentation contract",
-  "updated_at": "2026-08-13T15:36:21.862398481Z"
+  "updated_at": "2026-08-13T16:40:52.838867566Z"
 }

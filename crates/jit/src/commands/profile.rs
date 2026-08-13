@@ -3,14 +3,15 @@ use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
     read_package_archive, resolve_package, resolve_package_from_record, CapturedContributionState,
-    CapturedPackageTree, EngineVersion, ProfileAddResult, ProfileApplicationStatus,
-    ProfileApplyResult, ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult,
-    ProfileCapturedContribution, ProfileComposedApplyResult, ProfileContributionCaptureAction,
-    ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackResult,
-    ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
-    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileVariableAssignment,
-    ProfileVariableName, RecordedValueAuthority, ResolvedProfileContent, ResolvedProfileGraph,
-    ResolvedVariables, SelectionObservation, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    CapturedPackageTree, EngineVersion, ProfileAddEntry, ProfileAddResult,
+    ProfileApplicationStatus, ProfileApplyResult, ProfileCaptureEntry, ProfileCaptureResult,
+    ProfileComposedApplyResult, ProfileContributionChange, ProfileGraphError, ProfileId,
+    ProfileListResult, ProfileOrigin, ProfilePackEntry, ProfilePackResult, ProfilePackage,
+    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
+    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority, ResolvedProfileContent,
+    ResolvedProfileGraph, ResolvedVariables, SelectionObservation, VariableInputs,
+    MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::profile::{
     claimed_target_divergences, profile_plan_entry, unowned_target_divergences, ProfileAgreement,
@@ -424,6 +425,29 @@ enum TreePlacement {
     RequireAbsent,
 }
 
+/// Project package-tree materialization outcomes into the profile family's one
+/// public target-decision vocabulary.
+fn tree_target_changes(outcomes: &[TreeFileOutcome]) -> Vec<ProfileTargetChange> {
+    outcomes
+        .iter()
+        .map(|outcome| {
+            let action = match outcome.disposition {
+                TreeFileDisposition::Unchanged => ProfileTargetAction::Unchanged,
+                TreeFileDisposition::Create => ProfileTargetAction::Create,
+                TreeFileDisposition::Update => ProfileTargetAction::Update,
+                TreeFileDisposition::Remove => ProfileTargetAction::Remove,
+            };
+            ProfileTargetChange::new(
+                outcome.path.repository_relative(),
+                action,
+                outcome.mode,
+                Vec::new(),
+                None,
+            )
+        })
+        .collect()
+}
+
 /// Read-only command options for the package's non-secret input channels.
 ///
 /// The command boundary turns these filesystem and process inputs into the
@@ -601,10 +625,7 @@ impl CommandExecutor<JsonFileStorage> {
             else {
                 return Ok(SessionStep::Retry);
             };
-            Ok(SessionStep::Done(ProfileListResult {
-                count: profiles.len(),
-                profiles,
-            }))
+            Ok(SessionStep::Done(ProfileListResult::new(profiles)))
         })
     }
 
@@ -724,55 +745,82 @@ impl CommandExecutor<JsonFileStorage> {
         package_source: &Path,
         destination: &Path,
     ) -> Result<ProfileCaptureResult> {
+        self.capture_profile_package_inner(invocation_dir, package_source, destination, true)
+    }
+
+    /// Rehearse a package capture without publishing the destination tree.
+    pub fn plan_profile_capture(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        destination: &Path,
+    ) -> Result<ProfileCaptureResult> {
+        self.capture_profile_package_inner(invocation_dir, package_source, destination, false)
+    }
+
+    fn capture_profile_package_inner(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        destination: &Path,
+        publish: bool,
+    ) -> Result<ProfileCaptureResult> {
         let layout = self.require_layout()?;
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let captured = capture_package_tree(&source, &layout)?;
-        let (status, outcomes) =
-            self.publish_package_tree(&layout, &destination, &captured, TreePlacement::Republish)?;
-        let files = outcomes
-            .iter()
-            .map(|outcome| ProfileCaptureFile {
-                path: outcome.path.repository_relative(),
-                action: match outcome.disposition {
-                    TreeFileDisposition::Unchanged => ProfileCaptureAction::Unchanged,
-                    TreeFileDisposition::Create => ProfileCaptureAction::Create,
-                    TreeFileDisposition::Update => ProfileCaptureAction::Update,
-                    TreeFileDisposition::Remove => ProfileCaptureAction::Remove,
-                },
-                executable: outcome.mode == FileMode::Executable,
-            })
-            .collect::<Vec<_>>();
+        let (status, outcomes) = self.publish_package_tree(
+            &layout,
+            &destination,
+            &captured,
+            TreePlacement::Republish,
+            publish,
+        )?;
+        let targets = tree_target_changes(&outcomes);
+        let profile_id = captured.model().id.to_string();
         let contributions = captured
             .contributions()
             .iter()
-            .map(|contribution| ProfileCapturedContribution {
+            .map(|contribution| ProfileContributionChange {
                 identity: contribution.identity.to_string(),
                 action: match contribution.state {
-                    CapturedContributionState::Unchanged => {
-                        ProfileContributionCaptureAction::Unchanged
+                    CapturedContributionState::Unchanged => ProfileTargetAction::Unchanged,
+                    CapturedContributionState::Refreshed => ProfileTargetAction::Update,
+                    CapturedContributionState::Absent | CapturedContributionState::Unowned => {
+                        ProfileTargetAction::Retain
                     }
-                    CapturedContributionState::Refreshed => {
-                        ProfileContributionCaptureAction::Refreshed
+                },
+                owners: contribution
+                    .owned
+                    .then(|| profile_id.clone())
+                    .into_iter()
+                    .collect(),
+                reason: match contribution.state {
+                    CapturedContributionState::Absent => Some(
+                        "the repository no longer holds this profile-owned declaration".to_string(),
+                    ),
+                    CapturedContributionState::Unowned => {
+                        Some("the repository value is not owned by this profile".to_string())
                     }
-                    CapturedContributionState::Absent => ProfileContributionCaptureAction::Absent,
-                    CapturedContributionState::Unowned => ProfileContributionCaptureAction::Unowned,
+                    CapturedContributionState::Unchanged | CapturedContributionState::Refreshed => {
+                        None
+                    }
                 },
             })
             .collect::<Vec<_>>();
-        Ok(ProfileCaptureResult {
-            count: files.len(),
-            id: captured.model().id.to_string(),
+        Ok(ProfileCaptureResult::new(vec![ProfileCaptureEntry {
+            id: profile_id,
             version: captured.model().version.clone(),
+            origin: ProfileOrigin::Directory(source.relative().clone()),
             package_hash: captured.hashes().package.clone(),
             source: source.repository_relative(),
             destination: destination.repository_relative(),
             file_count: captured.file_count(),
             byte_size: captured.byte_size(),
             status,
-            files,
+            targets,
             contributions,
-        })
+        }]))
     }
 
     /// Pack the package at `package_source` into one portable archive at
@@ -806,6 +854,26 @@ impl CommandExecutor<JsonFileStorage> {
         package_source: &Path,
         output: &Path,
     ) -> Result<(ProfilePackResult, Vec<String>)> {
+        self.pack_profile_package_inner(invocation_dir, package_source, output, true)
+    }
+
+    /// Rehearse packing a package without writing the archive.
+    pub fn plan_profile_pack(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        output: &Path,
+    ) -> Result<(ProfilePackResult, Vec<String>)> {
+        self.pack_profile_package_inner(invocation_dir, package_source, output, false)
+    }
+
+    fn pack_profile_package_inner(
+        &self,
+        invocation_dir: &Path,
+        package_source: &Path,
+        output: &Path,
+        publish: bool,
+    ) -> Result<(ProfilePackResult, Vec<String>)> {
         let layout = self.require_layout()?;
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
         let package = ProfilePackage::from_directory(
@@ -817,18 +885,32 @@ impl CommandExecutor<JsonFileStorage> {
         })?;
         let archive = pack_package_archive(&package)?;
         let archive_bytes = archive.len() as u64;
-        let warnings = self.publish_package_archive(&layout, invocation_dir, output, archive)?;
+        let warnings =
+            self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;
         Ok((
-            ProfilePackResult {
+            ProfilePackResult::new(vec![ProfilePackEntry {
                 id: package.model().id.to_string(),
                 version: package.model().version.clone(),
+                origin: ProfileOrigin::Directory(source.relative().clone()),
                 package_hash: package.hashes().package.clone(),
                 source: source.repository_relative(),
                 archive: output.display().to_string(),
                 file_count: package.file_count(),
                 byte_size: package.byte_size(),
                 archive_bytes,
-            },
+                targets: vec![ProfileTargetChange::new(
+                    output.display().to_string(),
+                    ProfileTargetAction::Create,
+                    FileMode::Regular,
+                    Vec::new(),
+                    None,
+                )],
+                status: if publish {
+                    ProfileApplicationStatus::Applied
+                } else {
+                    ProfileApplicationStatus::WouldApply
+                },
+            }]),
             warnings,
         ))
     }
@@ -858,19 +940,48 @@ impl CommandExecutor<JsonFileStorage> {
         archive: &Path,
         destination: &Path,
     ) -> Result<ProfileAddResult> {
+        self.add_profile_package_inner(invocation_dir, archive, destination, true)
+    }
+
+    /// Rehearse adding an archive without publishing its package tree.
+    pub fn plan_profile_add(
+        &self,
+        invocation_dir: &Path,
+        archive: &Path,
+        destination: &Path,
+    ) -> Result<ProfileAddResult> {
+        self.add_profile_package_inner(invocation_dir, archive, destination, false)
+    }
+
+    fn add_profile_package_inner(
+        &self,
+        invocation_dir: &Path,
+        archive: &Path,
+        destination: &Path,
+        publish: bool,
+    ) -> Result<ProfileAddResult> {
         let layout = self.require_layout()?;
         let destination = worktree_directory(&layout, invocation_dir, destination)?;
         let tree = read_package_archive(&read_archive_bytes(invocation_dir, archive)?)?;
-        self.publish_package_tree(&layout, &destination, &tree, TreePlacement::RequireAbsent)?;
-        Ok(ProfileAddResult {
+        let (status, outcomes) = self.publish_package_tree(
+            &layout,
+            &destination,
+            &tree,
+            TreePlacement::RequireAbsent,
+            publish,
+        )?;
+        Ok(ProfileAddResult::new(vec![ProfileAddEntry {
             id: tree.model().id.to_string(),
             version: tree.model().version.clone(),
+            origin: ProfileOrigin::Directory(destination.relative().clone()),
             package_hash: tree.hashes().package.clone(),
             archive: archive.display().to_string(),
             destination: destination.repository_relative(),
             file_count: tree.file_count(),
             byte_size: tree.byte_size(),
-        })
+            targets: tree_target_changes(&outcomes),
+            status,
+        }]))
     }
 
     /// Publish one validated package tree at `destination`.
@@ -893,6 +1004,7 @@ impl CommandExecutor<JsonFileStorage> {
         destination: &VirtualPath,
         tree: &CapturedPackageTree,
         placement: TreePlacement,
+        publish: bool,
     ) -> Result<(ProfileApplicationStatus, Vec<TreeFileOutcome>)> {
         let capture = PackageTreeCapture::new(
             destination.clone(),
@@ -939,10 +1051,16 @@ impl CommandExecutor<JsonFileStorage> {
             let (plan, outcomes) = finalize_package_tree_capture(&image, &capture)?;
             let status = if plan.delta().actions().is_empty() {
                 ProfileApplicationStatus::Unchanged
+            } else if !publish {
+                ProfileApplicationStatus::WouldApply
             } else {
                 ProfileApplicationStatus::Applied
             };
-            Ok(SessionStep::Apply(plan, (status, outcomes)))
+            if publish {
+                Ok(SessionStep::Apply(plan, (status, outcomes)))
+            } else {
+                Ok(SessionStep::Done((status, outcomes)))
+            }
         })
     }
 
@@ -958,6 +1076,7 @@ impl CommandExecutor<JsonFileStorage> {
         invocation_dir: &Path,
         output: &Path,
         archive: Vec<u8>,
+        publish: bool,
     ) -> Result<Vec<String>> {
         match classify_repository_export(layout, invocation_dir, output)? {
             RepositoryExportDestination::Repository(target) => {
@@ -979,13 +1098,19 @@ impl CommandExecutor<JsonFileStorage> {
                     max_bytes: crate::profile::MAX_PROFILE_PACKAGE_ARCHIVE_BYTES as u64,
                     max_depth: 128,
                 };
-                super::map_occupied_export_error(
-                    self.publish_repository_export(layout, &intent, budget),
-                    output,
-                )?;
+                let result = if publish {
+                    self.publish_repository_export(layout, &intent, budget)
+                } else {
+                    self.plan_repository_export(layout, &intent, budget)
+                };
+                super::map_occupied_export_error(result, output)?;
                 Ok(Vec::new())
             }
             RepositoryExportDestination::External(path) => {
+                if !publish {
+                    crate::storage::external_publish::preflight_external_file_noreplace(&path)?;
+                    return Ok(Vec::new());
+                }
                 // Staging is not publication: the archive lands in a temporary
                 // file outside both repository roots so the shared no-replace
                 // publisher can rename it into place, and nothing at the output
@@ -1025,6 +1150,8 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<ProfileShowEntry> {
         let id = package.model().id.as_str();
         Ok(ProfileShowEntry {
+            id: package.model().id.to_string(),
+            version: package.model().version.clone(),
             manifest: package.model().clone(),
             origin: package_origin(package, layout)?,
             package_hash: package.hashes().package.clone(),
@@ -1046,22 +1173,32 @@ impl CommandExecutor<JsonFileStorage> {
         selectors: &[ProfileSelector],
         inputs: &VariableInputs,
     ) -> Result<ProfilePlanResult> {
-        // Validate the complete request first so dry-run uses the same
-        // selector-level ambiguity and confinement rules as show/apply before
-        // constructing any individual preview.
         let selected = self.resolve_profile_selectors(selectors)?;
-        if !selected.is_empty() {
-            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
-            validate_variable_inputs(&packages, inputs)?;
+        if selected.is_empty() {
+            return Ok(ProfilePlanResult::new(Vec::new()));
         }
-        selectors
+        let packages = self
+            .resolve_profile_graph_for_mutation(&selected)?
+            .selected_packages();
+        validate_variable_inputs(&packages, inputs)?;
+        let resolved = packages
             .iter()
-            .map(|selector| {
-                let package = self.resolve_profile_package(selector)?;
-                self.plan_profile_package_with_inputs(&package, inputs)
+            .map(|package| {
+                resolve_package(
+                    package,
+                    &inputs.for_declarations(&package.model().variables),
+                )
+                .map_err(anyhow::Error::from)
             })
-            .collect::<Result<Vec<_>>>()
-            .map(ProfilePlanResult::new)
+            .collect::<Result<Vec<_>>>()?;
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        self.plan_resolved_profile_selection(
+            &selected,
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Apply,
+        )
     }
 
     /// Build plans after loading the values file and declared environment
@@ -1075,7 +1212,8 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph(&selected)?.selected_packages()
+            self.resolve_profile_graph_for_mutation(&selected)?
+                .selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -1132,6 +1270,7 @@ impl CommandExecutor<JsonFileStorage> {
                 &plan,
                 &metadata.id,
                 &metadata.version,
+                package_origin(package, &layout)?,
             )))
         })
     }
@@ -1836,15 +1975,15 @@ impl CommandExecutor<JsonFileStorage> {
                 return Ok(SessionStep::Done(ProfileComposedApplyResult::new(
                     packages
                         .iter()
-                        .map(|package| ProfileApplyResult {
-                            id: package.model().id.to_string(),
-                            version: package.model().version.clone(),
-                            status: ProfileApplicationStatus::Unchanged,
-                            plan_hash: plan.hash().to_string(),
-                            transaction_id: None,
-                            warnings: Vec::new(),
+                        .map(|package| {
+                            applied_profile_result(
+                                &plan,
+                                package,
+                                &layout,
+                                ProfileApplicationStatus::Unchanged,
+                            )
                         })
-                        .collect(),
+                        .collect::<Result<Vec<_>>>()?,
                 )));
             }
             let proposed = apply_overlay(plan.image(), super::validation_overlay(plan.delta()))
@@ -1862,18 +2001,16 @@ impl CommandExecutor<JsonFileStorage> {
                 .iter()
                 .map(|package| {
                     let changed = plan.applied_profiles().contains(&package.model().id);
-                    Ok(ProfileApplyResult {
-                        id: package.model().id.to_string(),
-                        version: package.model().version.clone(),
-                        status: if changed {
+                    applied_profile_result(
+                        &plan,
+                        package,
+                        &layout,
+                        if changed {
                             ProfileApplicationStatus::Applied
                         } else {
                             ProfileApplicationStatus::Unchanged
                         },
-                        plan_hash: plan.hash().to_string(),
-                        transaction_id: changed.then(|| plan.hash().to_string()),
-                        warnings: Vec::new(),
-                    })
+                    )
                 })
                 .collect::<Result<Vec<_>>>()?;
             Ok(SessionStep::Apply(
@@ -1935,9 +2072,14 @@ impl CommandExecutor<JsonFileStorage> {
             let rehearsed = packages
                 .iter()
                 .map(|package| {
-                    profile_plan_entry(&plan, &package.model().id, &package.model().version)
+                    Ok(profile_plan_entry(
+                        &plan,
+                        &package.model().id,
+                        &package.model().version,
+                        package_origin(package, &layout)?,
+                    ))
                 })
-                .collect::<Vec<_>>();
+                .collect::<Result<Vec<_>>>()?;
             let plans = selection_observations(rehearsed, selected)?;
             Ok(SessionStep::Done(ProfilePlanResult::new(plans)))
         })
@@ -1956,6 +2098,7 @@ impl CommandExecutor<JsonFileStorage> {
             Vec<crate::profile::ProfileTargetChange>,
         )>,
     > {
+        let layout = self.require_layout()?;
         let resolved = resolve_package(package, &VariableInputs::default())?;
         let contribution_context = self.profile_contribution_candidates(
             std::slice::from_ref(package),
@@ -1970,9 +2113,11 @@ impl CommandExecutor<JsonFileStorage> {
             ProfileLifecycleOperation::Apply,
             ProfileConflictResponse::Refuse,
         )?;
+        let origin = package_origin(package, &layout)?;
         Ok(plan.map(|plan| {
             let changes =
-                profile_plan_entry(&plan, &package.model().id, &package.model().version).targets;
+                profile_plan_entry(&plan, &package.model().id, &package.model().version, origin)
+                    .targets;
             (plan, changes)
         }))
     }
@@ -2768,6 +2913,7 @@ pub(super) fn recorded_profile_agreement(
     };
     Ok(ProfileAgreement::new(
         record.id.as_str(),
+        record.version.as_str(),
         record_path.repository_relative(),
         record.origin.clone(),
         divergences,
@@ -2866,6 +3012,34 @@ pub(super) fn package_origin(
             }
             .into()
         })
+}
+
+/// Project one aggregate publication decision into the same per-profile facts
+/// its rehearsal reports.
+pub(super) fn applied_profile_result(
+    plan: &MaterializationPlan,
+    package: &ProfilePackage,
+    layout: &RepositoryLayout,
+    status: ProfileApplicationStatus,
+) -> Result<ProfileApplyResult> {
+    let preview = profile_plan_entry(
+        plan,
+        &package.model().id,
+        &package.model().version,
+        package_origin(package, layout)?,
+    );
+    let changed = status == ProfileApplicationStatus::Applied;
+    Ok(ProfileApplyResult {
+        id: preview.id,
+        version: preview.version,
+        origin: preview.origin,
+        status,
+        plan_hash: preview.plan_hash,
+        transaction_id: changed.then(|| plan.hash().to_string()),
+        warnings: Vec::new(),
+        targets: preview.targets,
+        contributions: preview.contributions,
+    })
 }
 
 /// The expected provenance record for a package read through this repository.
@@ -3014,6 +3188,15 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
     use tempfile::TempDir;
+
+    fn only_profile<T>(result: crate::profile::ProfileCollection<T>) -> T {
+        assert_eq!(result.count, 1);
+        result
+            .profiles
+            .into_iter()
+            .next()
+            .expect("one profile entry")
+    }
 
     struct RecaptureRaceSession {
         inner: Box<dyn RepositoryMutationSession>,
@@ -8118,9 +8301,11 @@ target = "docs/guide.md"
         capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
         let destination = temp.path().join("build/captured");
 
-        let result = executor
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("the authored package captures");
+        let result = only_profile(
+            executor
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("the authored package captures"),
+        );
 
         assert_eq!(
             tree_paths(&destination),
@@ -8140,11 +8325,10 @@ target = "docs/guide.md"
         );
         assert_eq!(result.id, "captured-workflow");
         assert_eq!(result.file_count, 5);
-        assert_eq!(result.count, result.files.len());
         assert!(result
-            .files
+            .targets
             .iter()
-            .all(|file| file.action == ProfileCaptureAction::Create));
+            .all(|file| file.action == ProfileTargetAction::Create));
     }
 
     /// The published tree reads back through the package model, and the
@@ -8156,9 +8340,11 @@ target = "docs/guide.md"
         capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
         let destination = temp.path().join("build/captured");
 
-        let result = executor
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("the authored package captures");
+        let result = only_profile(
+            executor
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("the authored package captures"),
+        );
 
         let published = ProfilePackage::from_directory(&destination)
             .expect("the published tree reads back as a package");
@@ -8187,9 +8373,11 @@ target = "docs/guide.md"
             &reduced,
         )
         .unwrap();
-        let result = executor
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("the reduced package captures over the previous tree");
+        let result = only_profile(
+            executor
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("the reduced package captures over the previous tree"),
+        );
 
         assert!(
             !destination.join("assets/live/docs/guide.md").exists(),
@@ -8197,10 +8385,10 @@ target = "docs/guide.md"
         );
         assert!(destination.join("assets/live/bin/check.sh").is_file());
         assert!(result
-            .files
+            .targets
             .iter()
             .any(|file| file.path.ends_with("assets/live/docs/guide.md")
-                && file.action == ProfileCaptureAction::Remove));
+                && file.action == ProfileTargetAction::Remove));
         ProfilePackage::from_directory(&destination)
             .expect("the republished tree still reads back as a package");
     }
@@ -8212,14 +8400,18 @@ target = "docs/guide.md"
         let (temp, _storage, executor, _fixture) = fixture();
         capture_sources(&temp, "profiles/captured", CAPTURE_MANIFEST);
         let destination = temp.path().join("build/captured");
-        let before = executor
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("the authored package captures");
+        let before = only_profile(
+            executor
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("the authored package captures"),
+        );
 
         fs::write(temp.path().join("docs/guide.md"), b"# Edited in place\n").unwrap();
-        let after = executor
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("the edited package captures");
+        let after = only_profile(
+            executor
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("the edited package captures"),
+        );
 
         assert_ne!(
             after.package_hash, before.package_hash,
@@ -8256,15 +8448,17 @@ target = "docs/guide.md"
             publications.clone(),
         ))
         .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let result = counted
-            .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
-            .expect("an unchanged package captures again");
+        let result = only_profile(
+            counted
+                .capture_profile_package(temp.path(), Path::new("profiles/captured"), &destination)
+                .expect("an unchanged package captures again"),
+        );
 
         assert_eq!(result.status, ProfileApplicationStatus::Unchanged);
         assert!(result
-            .files
+            .targets
             .iter()
-            .all(|file| file.action == ProfileCaptureAction::Unchanged));
+            .all(|file| file.action == ProfileTargetAction::Unchanged));
         assert_eq!(publications.count(), 0);
     }
 
@@ -8305,13 +8499,15 @@ target = "docs/guide.md"
             PUBLISHED_WORDING
         );
 
-        let result = executor
-            .capture_profile_package(
-                temp.path(),
-                Path::new(location),
-                &temp.path().join(location),
-            )
-            .expect("the applied package captures over itself");
+        let result = only_profile(
+            executor
+                .capture_profile_package(
+                    temp.path(),
+                    Path::new(location),
+                    &temp.path().join(location),
+                )
+                .expect("the applied package captures over itself"),
+        );
 
         assert_eq!(
             contributed_description(&temp, location, REFRESH_NAMESPACE),
@@ -8322,14 +8518,23 @@ target = "docs/guide.md"
             result
                 .contributions
                 .iter()
-                .filter(|contribution| contribution.action
-                    == ProfileContributionCaptureAction::Refreshed)
+                .filter(|contribution| contribution.action == ProfileTargetAction::Update)
                 .map(|contribution| contribution.identity.clone())
                 .collect::<Vec<_>>()
                 .len(),
             1,
             "the capture reported no single refreshed declaration: {:?}",
             result.contributions
+        );
+        assert_eq!(
+            result
+                .contributions
+                .iter()
+                .find(|contribution| contribution.action == ProfileTargetAction::Update)
+                .expect("the refreshed declaration is reported")
+                .owners,
+            vec!["workflow"],
+            "the shared decision names the package whose record claims it"
         );
     }
 
@@ -8468,20 +8673,24 @@ target = "docs/guide.md"
             &CAPTURE_MANIFEST.replace("captured-workflow", "second-workflow"),
         );
 
-        let first = executor
-            .capture_profile_package(
-                temp.path(),
-                Path::new("profiles/captured"),
-                &temp.path().join("build/first"),
-            )
-            .expect("the first package captures");
-        let second = executor
-            .capture_profile_package(
-                temp.path(),
-                Path::new("vendor/second"),
-                &temp.path().join("staging/nested/second"),
-            )
-            .expect("the second package captures");
+        let first = only_profile(
+            executor
+                .capture_profile_package(
+                    temp.path(),
+                    Path::new("profiles/captured"),
+                    &temp.path().join("build/first"),
+                )
+                .expect("the first package captures"),
+        );
+        let second = only_profile(
+            executor
+                .capture_profile_package(
+                    temp.path(),
+                    Path::new("vendor/second"),
+                    &temp.path().join("staging/nested/second"),
+                )
+                .expect("the second package captures"),
+        );
 
         assert_eq!(first.id, "captured-workflow");
         assert_eq!(second.id, "second-workflow");

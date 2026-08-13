@@ -959,26 +959,8 @@ fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
             jit::profile::ProfilePlanStatus::WouldApply => "would apply",
             jit::profile::ProfilePlanStatus::WouldConflict => "would conflict",
         };
-        println!("Profile {} {}: {}", plan.id, plan.version, status);
-        for target in &plan.targets {
-            print_profile_decision(
-                target.action,
-                &target.path,
-                &target.owners,
-                target.reason.as_deref(),
-            );
-        }
-        // A declaration is decided by its semantic identity rather than by the
-        // registry file holding it, so it is named by that identity and listed
-        // in its own right rather than folded into the registry's target line.
-        for contribution in &plan.contributions {
-            print_profile_decision(
-                contribution.action,
-                &contribution.identity,
-                &contribution.owners,
-                contribution.reason.as_deref(),
-            );
-        }
+        print_profile_heading(&plan.id, &plan.version, &plan.origin, status);
+        print_profile_decisions(&plan.targets, &plan.contributions);
     }
 }
 
@@ -1004,6 +986,44 @@ fn print_profile_decision(
     );
     if let Some(reason) = reason {
         println!("      {reason}");
+    }
+}
+
+/// Render one profile identity and operation outcome in the family-wide human
+/// heading shape.
+fn print_profile_heading(
+    id: &str,
+    version: &str,
+    origin: &jit::profile::ProfileOrigin,
+    status: &str,
+) {
+    println!(
+        "Profile {id} {version} ({}): {status}",
+        profile_origin_label(origin)
+    );
+}
+
+/// Render file and declaration decisions through the one public action
+/// vocabulary.
+fn print_profile_decisions(
+    targets: &[jit::profile::ProfileTargetChange],
+    contributions: &[jit::profile::ProfileContributionChange],
+) {
+    for target in targets {
+        print_profile_decision(
+            target.action,
+            &target.path,
+            &target.owners,
+            target.reason.as_deref(),
+        );
+    }
+    for contribution in contributions {
+        print_profile_decision(
+            contribution.action,
+            &contribution.identity,
+            &contribution.owners,
+            contribution.reason.as_deref(),
+        );
     }
 }
 
@@ -1067,9 +1087,11 @@ fn print_profile_applications(
     for profile in applied.profiles {
         let status = match profile.status {
             jit::profile::ProfileApplicationStatus::Unchanged => "unchanged",
+            jit::profile::ProfileApplicationStatus::WouldApply => "would apply",
             jit::profile::ProfileApplicationStatus::Applied => changed_status,
         };
-        println!("Profile {} {}: {}", profile.id, profile.version, status);
+        print_profile_heading(&profile.id, &profile.version, &profile.origin, status);
+        print_profile_decisions(&profile.targets, &profile.contributions);
         for warning in profile.warnings {
             eprintln!("Warning: {warning:?}");
         }
@@ -1118,11 +1140,15 @@ fn render_profile_agreement(
     }
 
     for profile in &result.profiles {
-        println!(
-            "{} {} {}",
-            if profile.agrees() { "✓" } else { "✗" },
-            profile.id,
-            profile_origin_label(&profile.origin)
+        print_profile_heading(
+            &profile.id,
+            &profile.version,
+            &profile.origin,
+            if profile.agrees() {
+                "✓ agrees"
+            } else {
+                "✗ diverged"
+            },
         );
         for divergence in &profile.divergences {
             println!("    {}", divergence.message());
@@ -1137,42 +1163,6 @@ fn render_profile_agreement(
         result.count
     );
     std::process::exit(jit::ExitCode::ValidationFailed.code());
-}
-
-/// Render what a capture did to one path, for human output.
-fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &'static str {
-    use jit::profile::ProfileCaptureAction;
-    match action {
-        ProfileCaptureAction::Unchanged => "unchanged",
-        ProfileCaptureAction::Create => "created  ",
-        ProfileCaptureAction::Update => "updated  ",
-        ProfileCaptureAction::Remove => "removed  ",
-    }
-}
-
-/// Report what a capture read back for the contributions its manifest declares.
-///
-/// A declaration the capture took nothing from says nothing an adopter acts on,
-/// so the lines name the declarations whose value moved into the package and the
-/// ones this package published that the repository no longer holds. The count
-/// states the whole set those lines came out of, which is what keeps a quiet
-/// report readable as "nothing to act on" rather than as "nothing was read".
-fn print_captured_contributions(contributions: &[jit::profile::ProfileCapturedContribution]) {
-    use jit::profile::ProfileContributionCaptureAction;
-
-    if contributions.is_empty() {
-        return;
-    }
-    println!("Contributions: {}", contributions.len());
-    for contribution in contributions {
-        let label = match contribution.action {
-            ProfileContributionCaptureAction::Unchanged
-            | ProfileContributionCaptureAction::Unowned => continue,
-            ProfileContributionCaptureAction::Refreshed => "refreshed",
-            ProfileContributionCaptureAction::Absent => "not held ",
-        };
-        println!("  {label} {}", contribution.identity);
-    }
 }
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
@@ -2452,12 +2442,15 @@ fn run() -> Result<()> {
                         println!("{}", output.to_json_string()?);
                     } else {
                         for profile in result.profiles {
-                            println!(
-                                "{} {} {}{}",
-                                profile.id,
-                                profile.version,
-                                profile_origin_label(&profile.origin),
-                                if profile.applied { " (applied)" } else { "" }
+                            print_profile_heading(
+                                &profile.id,
+                                &profile.version,
+                                &profile.origin,
+                                if profile.applied {
+                                    "applied"
+                                } else {
+                                    "not applied"
+                                },
                             );
                         }
                     }
@@ -2486,9 +2479,12 @@ fn run() -> Result<()> {
                         } else {
                             for result in result.profiles {
                                 let profile = &result.manifest;
-                                println!("Profile: {}", profile.id);
-                                println!("Version: {}", profile.version);
-                                println!("Origin: {}", profile_origin_label(&result.origin));
+                                print_profile_heading(
+                                    &result.id,
+                                    &result.version,
+                                    &result.origin,
+                                    "inspected",
+                                );
                                 println!("Compatible JIT: {}", profile.compatible_jit);
                                 println!("Package hash: {}", result.package_hash);
                                 println!(
@@ -2572,29 +2568,45 @@ fn run() -> Result<()> {
             ProfileCommands::Capture {
                 source,
                 destination,
+                dry_run,
                 json,
             } => {
                 let invocation_dir = std::env::current_dir()?;
-                match executor.capture_profile_package(&invocation_dir, &source, &destination) {
+                let result = if dry_run {
+                    executor.plan_profile_capture(&invocation_dir, &source, &destination)
+                } else {
+                    executor.capture_profile_package(&invocation_dir, &source, &destination)
+                };
+                match result {
                     Ok(result) => {
                         if json {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!(
-                                "Captured {} {} at {}",
-                                result.id, result.version, result.destination
-                            );
-                            println!("Package hash: {}", result.package_hash);
-                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
-                            for file in &result.files {
-                                println!(
-                                    "  {} {}",
-                                    profile_capture_action_label(file.action),
-                                    file.path
+                            for profile in result.profiles {
+                                let status = match profile.status {
+                                    jit::profile::ProfileApplicationStatus::Unchanged => {
+                                        "unchanged"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::WouldApply => {
+                                        "would capture"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::Applied => "captured",
+                                };
+                                print_profile_heading(
+                                    &profile.id,
+                                    &profile.version,
+                                    &profile.origin,
+                                    status,
                                 );
+                                println!("Destination: {}", profile.destination);
+                                println!("Package hash: {}", profile.package_hash);
+                                println!(
+                                    "Files: {} ({} bytes)",
+                                    profile.file_count, profile.byte_size
+                                );
+                                print_profile_decisions(&profile.targets, &profile.contributions);
                             }
-                            print_captured_contributions(&result.contributions);
                         }
                     }
                     Err(error) if json => {
@@ -2608,10 +2620,16 @@ fn run() -> Result<()> {
             ProfileCommands::Pack {
                 source,
                 output,
+                dry_run,
                 json,
             } => {
                 let invocation_dir = std::env::current_dir()?;
-                match executor.pack_profile_package(&invocation_dir, &source, &output) {
+                let result = if dry_run {
+                    executor.plan_profile_pack(&invocation_dir, &source, &output)
+                } else {
+                    executor.pack_profile_package(&invocation_dir, &source, &output)
+                };
+                match result {
                     Ok((result, warnings)) => {
                         for warning in warnings {
                             eprintln!("Warning: {warning}");
@@ -2620,15 +2638,30 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!(
-                                "Packed {} {} into {}",
-                                result.id, result.version, result.archive
-                            );
-                            println!("Package hash: {}", result.package_hash);
-                            println!(
-                                "Files: {} ({} bytes); archive {} bytes",
-                                result.file_count, result.byte_size, result.archive_bytes
-                            );
+                            for profile in result.profiles {
+                                let status = match profile.status {
+                                    jit::profile::ProfileApplicationStatus::WouldApply => {
+                                        "would pack"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::Applied => "packed",
+                                    jit::profile::ProfileApplicationStatus::Unchanged => {
+                                        "unchanged"
+                                    }
+                                };
+                                print_profile_heading(
+                                    &profile.id,
+                                    &profile.version,
+                                    &profile.origin,
+                                    status,
+                                );
+                                println!("Archive: {}", profile.archive);
+                                println!("Package hash: {}", profile.package_hash);
+                                println!(
+                                    "Files: {} ({} bytes); archive {} bytes",
+                                    profile.file_count, profile.byte_size, profile.archive_bytes
+                                );
+                                print_profile_decisions(&profile.targets, &[]);
+                            }
                         }
                     }
                     Err(error) if json => {
@@ -2642,21 +2675,46 @@ fn run() -> Result<()> {
             ProfileCommands::Add {
                 archive,
                 destination,
+                dry_run,
                 json,
             } => {
                 let invocation_dir = std::env::current_dir()?;
-                match executor.add_profile_package(&invocation_dir, &archive, &destination) {
+                let result = if dry_run {
+                    executor.plan_profile_add(&invocation_dir, &archive, &destination)
+                } else {
+                    executor.add_profile_package(&invocation_dir, &archive, &destination)
+                };
+                match result {
                     Ok(result) => {
                         if json {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!(
-                                "Added {} {} at {}",
-                                result.id, result.version, result.destination
-                            );
-                            println!("Package hash: {}", result.package_hash);
-                            println!("Files: {} ({} bytes)", result.file_count, result.byte_size);
+                            for profile in result.profiles {
+                                let status = match profile.status {
+                                    jit::profile::ProfileApplicationStatus::WouldApply => {
+                                        "would add"
+                                    }
+                                    jit::profile::ProfileApplicationStatus::Applied => "added",
+                                    jit::profile::ProfileApplicationStatus::Unchanged => {
+                                        "unchanged"
+                                    }
+                                };
+                                print_profile_heading(
+                                    &profile.id,
+                                    &profile.version,
+                                    &profile.origin,
+                                    status,
+                                );
+                                println!("Archive: {}", profile.archive);
+                                println!("Destination: {}", profile.destination);
+                                println!("Package hash: {}", profile.package_hash);
+                                println!(
+                                    "Files: {} ({} bytes)",
+                                    profile.file_count, profile.byte_size
+                                );
+                                print_profile_decisions(&profile.targets, &[]);
+                            }
                         }
                     }
                     Err(error) if json => {

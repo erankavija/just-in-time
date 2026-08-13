@@ -520,7 +520,7 @@ fn test_profile_show_human_renders_each_selected_occurrence() {
     assert!(show.status.success(), "{show:?}");
     let stdout = String::from_utf8_lossy(&show.stdout);
     assert_eq!(
-        stdout.matches("Profile: planner-asset-only").count(),
+        stdout.matches("Profile planner-asset-only 1.0.0").count(),
         2,
         "human rendering must include every selected occurrence"
     );
@@ -923,7 +923,7 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
             .iter()
             .map(|profile| profile["status"].as_str().unwrap())
             .collect::<Vec<_>>(),
-        vec!["would_apply", "unchanged", "unchanged", "would_apply"]
+        vec!["would_apply", "unchanged", "unchanged", "unchanged"]
     );
     assert_eq!(
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
@@ -951,6 +951,11 @@ fn test_profile_apply_dry_run_preserves_order_and_duplicates_without_mutation() 
     );
     assert!(human.status.success(), "{human:?}");
     let human_stdout = String::from_utf8_lossy(&human.stdout);
+    assert!(
+        human_stdout.contains("Profile second 1.0.0 (directory packages/second): would apply"),
+        "{human_stdout}"
+    );
+    assert!(human_stdout.contains("  create:"), "{human_stdout}");
     let human_ids = human_stdout
         .lines()
         .filter_map(|line| line.strip_prefix("Profile "))
@@ -1509,8 +1514,15 @@ fn test_profile_apply_dry_run_is_read_only_then_apply_is_exact_no_op() {
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["count"], 1);
-    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
+    assert_eq!(json(&preview)["count"], 2);
+    assert!(
+        json(&preview)["profiles"]
+            .as_array()
+            .expect("a rehearsal reports the composed profile collection")
+            .iter()
+            .any(|profile| profile["status"] == "would_apply"),
+        "the rehearsal attributes the repair to the package that owns it"
+    );
     assert_eq!(
         fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
         events_before
@@ -1587,8 +1599,15 @@ fn test_profile_reapply_repairs_missing_and_stale_default_schemas_before_no_op()
         ],
     );
     assert!(preview.status.success(), "{preview:?}");
-    assert_eq!(json(&preview)["count"], 1);
-    assert_eq!(json(&preview)["profiles"][0]["status"], "would_apply");
+    assert_eq!(json(&preview)["count"], 2);
+    assert!(
+        json(&preview)["profiles"]
+            .as_array()
+            .expect("a rehearsal reports the composed profile collection")
+            .iter()
+            .any(|profile| profile["status"] == "would_apply"),
+        "the rehearsal attributes the repair to the package that owns it"
+    );
     assert!(!namespace_schema.exists(), "dry-run must remain read-only");
 
     let repaired_missing = jit(
@@ -1832,6 +1851,32 @@ fn assert_count_envelope(response: &Value, collection: &str) {
     );
 }
 
+/// The single profile entry returned by one-package authoring and exchange
+/// operations.
+fn only_profile(response: &Value) -> &Value {
+    assert_count_envelope(response, "profiles");
+    assert_eq!(response["count"], 1);
+    &response["profiles"][0]
+}
+
+fn assert_human_profile_decision(
+    output: &Output,
+    id: &str,
+    version: &str,
+    origin: &str,
+    status: &str,
+) {
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(&format!(
+            "Profile {id} {version} (directory {origin}): {status}"
+        )),
+        "{stdout}"
+    );
+    assert!(stdout.contains("  create:"), "{stdout}");
+}
+
 #[test]
 fn test_profile_reconfigure_and_upgrade_json_carry_the_count_wrapped_collection_envelope() {
     let id = "lifecycle-envelope";
@@ -2037,13 +2082,13 @@ fn test_profile_capture_publishes_the_declared_tree_and_reports_the_list_envelop
 
     assert!(output.status.success(), "{output:?}");
     let payload = json(&output);
+    let payload = only_profile(&payload);
     assert_eq!(payload["id"], "captured");
     assert_eq!(payload["destination"], "build/captured");
     assert_eq!(payload["source"], "packages/captured");
-    let files = payload["files"]
+    let files = payload["targets"]
         .as_array()
         .expect("a capture reports one entry per decided path");
-    assert_eq!(payload["count"], files.len());
     assert_eq!(
         files
             .iter()
@@ -2074,6 +2119,153 @@ fn test_profile_capture_publishes_the_declared_tree_and_reports_the_list_envelop
     );
     assert!(applied.status.success(), "{applied:?}");
     assert_eq!(applied_ids(&json(&applied)), vec!["captured"]);
+}
+
+#[test]
+fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writing() {
+    let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    capture_sources(repo.path(), "packages/captured");
+
+    let capture = jit(
+        repo.path(),
+        &[
+            "profile",
+            "capture",
+            "--source",
+            "packages/captured",
+            "--destination",
+            "build/captured",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(capture.status.success(), "{capture:?}");
+    let capture = json(&capture);
+    let captured = only_profile(&capture);
+    assert_eq!(captured["status"], "would_apply");
+    assert_eq!(captured["origin"]["location"], "packages/captured");
+    assert!(captured["targets"]
+        .as_array()
+        .is_some_and(|targets| targets.iter().all(|target| target["action"] == "create")));
+    assert!(!repo.path().join("build/captured").exists());
+    let capture_human = jit(
+        repo.path(),
+        &[
+            "profile",
+            "capture",
+            "--source",
+            "packages/captured",
+            "--destination",
+            "build/captured",
+            "--dry-run",
+        ],
+    );
+    assert_human_profile_decision(
+        &capture_human,
+        "captured",
+        "1.0.0",
+        "packages/captured",
+        "would capture",
+    );
+
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let external = TempDir::new().unwrap();
+    let external_archive = external.path().join("synthetic.tar");
+    let pack = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            external_archive.to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(pack.status.success(), "{pack:?}");
+    let pack = json(&pack);
+    let packed = only_profile(&pack);
+    assert_eq!(packed["status"], "would_apply");
+    assert_eq!(packed["targets"][0]["action"], "create");
+    assert!(!external_archive.exists());
+    let pack_human = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            external_archive.to_str().unwrap(),
+            "--dry-run",
+        ],
+    );
+    assert_human_profile_decision(
+        &pack_human,
+        "synthetic-workflow",
+        "1.2.3",
+        "packages/synthetic",
+        "would pack",
+    );
+
+    let packed = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            "synthetic.tar",
+            "--json",
+        ],
+    );
+    assert!(packed.status.success(), "{packed:?}");
+    let add = jit(
+        repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            "synthetic.tar",
+            "--destination",
+            "packages/added",
+            "--dry-run",
+            "--json",
+        ],
+    );
+    assert!(add.status.success(), "{add:?}");
+    let add = json(&add);
+    let added = only_profile(&add);
+    assert_eq!(added["status"], "would_apply");
+    assert_eq!(added["origin"]["location"], "packages/added");
+    assert!(added["targets"]
+        .as_array()
+        .is_some_and(|targets| !targets.is_empty()
+            && targets.iter().all(|target| target["action"] == "create")));
+    assert!(!repo.path().join("packages/added").exists());
+    let add_human = jit(
+        repo.path(),
+        &[
+            "profile",
+            "add",
+            "--archive",
+            "synthetic.tar",
+            "--destination",
+            "packages/added",
+            "--dry-run",
+        ],
+    );
+    assert_human_profile_decision(
+        &add_human,
+        "synthetic-workflow",
+        "1.2.3",
+        "packages/added",
+        "would add",
+    );
 }
 
 /// A destination outside the repository worktree is a typed JSON failure that
@@ -2229,6 +2421,7 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     );
     assert!(packed.status.success(), "{packed:?}");
     let packed = json(&packed);
+    let packed = only_profile(&packed);
 
     let added = jit(
         target_repo.path(),
@@ -2244,6 +2437,7 @@ fn test_profile_pack_and_add_carry_one_package_between_repositories() {
     );
     assert!(added.status.success(), "{added:?}");
     let added = json(&added);
+    let added = only_profile(&added);
 
     assert_eq!(added["id"], packed["id"]);
     assert_eq!(added["version"], packed["version"]);
@@ -2476,6 +2670,70 @@ fn test_profile_pack_refuses_an_occupied_output_path_without_replacing_it() {
     }
 }
 
+#[test]
+fn test_profile_pack_external_dry_run_refuses_a_missing_parent_without_writing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let missing_parent = outside.path().join("missing");
+    let output = missing_parent.join("synthetic.tar");
+
+    let packed = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            output.to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(!packed.status.success(), "{packed:?}");
+    assert!(
+        !missing_parent.exists(),
+        "external rehearsal must not create its missing parent"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_profile_pack_external_dry_run_refuses_a_symlinked_parent_without_writing() {
+    let repo = TempDir::new().unwrap();
+    let outside = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let package = synthetic_package_at(repo.path(), "packages/synthetic");
+    let actual_parent = outside.path().join("actual");
+    let linked_parent = outside.path().join("linked");
+    fs::create_dir(&actual_parent).unwrap();
+    std::os::unix::fs::symlink(&actual_parent, &linked_parent).unwrap();
+    let output = linked_parent.join("synthetic.tar");
+
+    let packed = jit(
+        repo.path(),
+        &[
+            "profile",
+            "pack",
+            "--source",
+            package,
+            "--output",
+            output.to_str().unwrap(),
+            "--dry-run",
+            "--json",
+        ],
+    );
+
+    assert!(!packed.status.success(), "{packed:?}");
+    assert!(
+        !actual_parent.join("synthetic.tar").exists(),
+        "external rehearsal must not follow a symlinked parent or publish through it"
+    );
+}
+
 /// A package at the limits the model permits survives the exchange whole.
 ///
 /// The round trip is where a bound that does not hold shows up as an archive
@@ -2512,6 +2770,7 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
     );
     assert!(packed.status.success(), "{packed:?}");
     let packed = json(&packed);
+    let packed = only_profile(&packed);
     assert_eq!(
         packed["file_count"],
         jit::profile::MAX_PROFILE_PACKAGE_FILES,
@@ -2538,6 +2797,7 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
 
     assert!(added.status.success(), "{added:?}");
     let added = json(&added);
+    let added = only_profile(&added);
     assert_eq!(added["package_hash"], packed["package_hash"]);
     assert_eq!(added["file_count"], packed["file_count"]);
     assert_eq!(
@@ -2585,6 +2845,7 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
     );
     assert!(packed.status.success(), "{packed:?}");
     let packed = json(&packed);
+    let packed = only_profile(&packed);
 
     // The package under test binds every dimension the model constrains, so a
     // publication that survives it has no headroom left in any of them.
@@ -2617,7 +2878,9 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
         ],
     );
     assert!(added.status.success(), "{added:?}");
-    assert_eq!(json(&added)["package_hash"], packed["package_hash"]);
+    let added = json(&added);
+    let added = only_profile(&added);
+    assert_eq!(added["package_hash"], packed["package_hash"]);
 
     // The directories the publication had to enumerate outnumber the files it
     // published, which is the shape the model does not bound.
@@ -2651,6 +2914,7 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
     );
     assert!(captured.status.success(), "{captured:?}");
     let captured = json(&captured);
+    let captured = only_profile(&captured);
     assert_eq!(captured["package_hash"], packed["package_hash"]);
     assert_eq!(
         captured["status"], "unchanged",

@@ -296,8 +296,9 @@ jobs:
           # Re-planning an exact installation reports no work, which is what
           # makes the quickstart's result observable rather than merely quiet.
           plan = json.load(open("plan.json"))
-          assert plan["count"] == len(plan["profiles"]) == 1, plan
-          assert plan["profiles"][0]["status"] == "unchanged", plan
+          assert plan["count"] == len(plan["profiles"]) >= 1, plan
+          assert plan["profiles"][-1]["id"] == "jit-dogfood", plan
+          assert all(profile["status"] == "unchanged" for profile in plan["profiles"]), plan
           PY
 
       - name: Verify the machine contract the archive carries
