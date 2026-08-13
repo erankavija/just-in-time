@@ -32,6 +32,20 @@ set -uo pipefail
 # tree: that is the recorded reason a build-only merge guard was vacuous, kept
 # here as a regression so the distinction cannot quietly be lost again.
 #
+# Three further scenarios (jit:0708d692) assert how the gate judges its
+# incremental-compilation ban, since a verdict about the machine is not a
+# verdict about the tree. What decides that verdict is the ban's runtime value,
+# not the contents of a shared directory no shell can attribute to a writer:
+#
+#   incremental-pre-existing incremental state another process wrote before the
+#                            run              -> recorded, ignored, gate passes
+#   incremental-concurrent   incremental state that appears while the run works,
+#                            as an editor indexing the same checkout writes it
+#                                              -> reported, gate passes
+#   incremental-ban-lifted   a gate whose CARGO_INCREMENTAL=0 export is gone,
+#                            run with the ban lifted in its environment
+#                                              -> the incremental verdict fails
+#
 # Cost: every fixture is a dependency-free two-module crate in a throwaway git
 # repo with its own target directory. This workspace is never rebuilt.
 #
@@ -100,6 +114,30 @@ all_step_summaries_have_integer_milliseconds() {
 
 suite_clock_is_reported() {
   grep -Eq '^  ✓ suite-clock: [0-9]+ ms$' "$1"
+}
+
+# jit:0708d692: the step that prepares the measured suite keeps the costs of
+# getting there out of the clock — compiling the suite, and reading the
+# executables it linked back into the page cache — and reports both. A run that
+# warmed nothing is the regression this predicate catches; the counts come from
+# the gate's own report of what it did, not from a fixed expectation about a
+# fixture's size.
+suite_preparation_warms_the_linked_executables() {
+  local report warmed bytes
+  report=$(grep -E '^  ✓ suite-build: ' "$1" | tail -1)
+  warmed=$(grep -oP 'warmed \K[0-9]+(?= executables)' <<<"$report")
+  bytes=$(grep -oP 'warmed [0-9]+ executables \(\K[0-9]+' <<<"$report")
+  [ -n "$warmed" ] && [ -n "$bytes" ] && [ "$warmed" -gt 0 ] && [ "$bytes" -gt 0 ]
+}
+
+# Those costs must be paid before the clock starts, which the reported order of
+# the summary lines records: the summary is accumulated step by step.
+suite_preparation_precedes_the_clock() {
+  awk '
+    /^  ✓ suite-build: built in [0-9]+ ms.*warmed [0-9]+ executables/ { prepared = NR }
+    /^  ✓ suite-clock: [0-9]+ ms$/ { clock = NR }
+    END { exit !(prepared && clock && prepared < clock) }
+  ' "$1"
 }
 
 # The scope is a source-order contract rather than an elapsed-time assertion:
@@ -399,13 +437,20 @@ stale_expect_worker() { signature_worker "$1"; }
 # directory this run inherited, and the host-wide build lock is skipped: this
 # self-test itself runs inside a gate run that already holds that lock, and the
 # fixture is far too small to need it.
-run_gate() { # run_gate <repo> <output-file>
-  local repo="$1" out="$2"
+run_gate_script() { # run_gate_script <script> <repo> <output-file> [VAR=value ...]
+  local script="$1" repo="$2" out="$3"
+  shift 3
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR
-    CARGO_CI_NO_LOCK=1 "$gate"
+    env CARGO_CI_NO_LOCK=1 "$@" "$script"
   ) >"$out" 2>&1
+}
+
+run_gate() { # run_gate <repo> <output-file> [VAR=value ...]
+  local repo="$1" out="$2"
+  shift 2
+  run_gate_script "$gate" "$repo" "$out" "$@"
 }
 
 # The removed merge guard's command, run over the same tree.
@@ -450,6 +495,10 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
         suite_clock_is_reported "$out"
       check "$name: the suite clock brackets only nextest and doctests" \
         suite_clock_has_exact_substep_scope
+      check "$name: the suite preparation reads the executables it linked into the page cache" \
+        suite_preparation_warms_the_linked_executables "$out"
+      check "$name: the suite is compiled and warmed before the clock starts" \
+        suite_preparation_precedes_the_clock "$out"
       ;;
     fail)
       check "$name: the gate reports its build-and-test step failing" \
@@ -471,6 +520,168 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
   fi
 }
 
+# --- how the gate judges its incremental ban (jit:0708d692) ------------------
+
+# The incremental state another process leaves in a target directory it shares
+# with the gate: one per-crate directory holding one session directory, the
+# shape rustc writes. An editor's rust-analyzer writes exactly this, in every
+# checkout it has open, and repopulates it within seconds of it being cleared.
+seed_foreign_incremental_state() { # seed_foreign_incremental_state <repo>
+  local session="$1/target/debug/incremental/foreign-crate-1a2b3c/s-foreign-session-working"
+  mkdir -p "$session"
+  printf 'written by another process before the gate ran\n' >"$session/dep-graph.bin"
+}
+
+foreign_incremental_state_survives() { # foreign_incremental_state_survives <repo>
+  test -f "$1/target/debug/incremental/foreign-crate-1a2b3c/s-foreign-session-working/dep-graph.bin"
+}
+
+# A healthy merge whose target directory already holds another process's
+# incremental state. The gate must judge the tree, so it records that state and
+# proceeds; before jit:0708d692 it refused at a preflight step and never reached
+# the tests, which is the failure mode these assertions pin.
+test_pre_existing_incremental_state_does_not_fail_the_gate() {
+  local name="incremental-pre-existing"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out"
+
+  echo
+  echo "== $name: state another process wrote must not decide this gate =="
+  if ! build_merge "$repo" "healthy_mainline" "healthy_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  seed_foreign_incremental_state "$repo"
+  run_gate "$repo" "$out"
+
+  check "$name: the gate records the pre-existing state as a baseline instead of refusing to run" \
+    step_passed "$out" incremental-baseline
+  check "$name: the gate reaches and passes its build-and-test step" \
+    step_passed "$out" test
+  check "$name: the incremental verdict passes over state this run did not create" \
+    step_passed "$out" incremental-state
+  check "$name: the verdict says how much pre-existing state it ignored" \
+    grep -Eq '✓ incremental-state: .*[0-9]+ pre-existing entries ignored' "$out"
+  check "$name: the gate leaves another process's state alone" \
+    foreign_incremental_state_survives "$repo"
+}
+
+# A worker side whose test writes incremental state into the target directory
+# while the gate's own suite runs — after the baseline snapshot, before the
+# verdict. That is the ordering an editor's rust-analyzer produces by indexing
+# the checkout the gate is working in, reproduced without a sleep or a race: the
+# gate itself runs the writer. The directory is named through the environment so
+# the fixture holds no assumption about where the gate resolved its target.
+concurrent_writer_worker() {
+  cat >"$1/src/omega.rs" <<'EOF'
+pub fn label() -> &'static str {
+    "omega"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::label;
+
+    #[test]
+    fn test_label_names_the_module() {
+        assert_eq!(label(), "omega");
+    }
+
+    #[test]
+    fn test_another_process_writes_incremental_state_while_this_suite_runs() {
+        let Ok(session) = std::env::var("SELFTEST_INJECT_INCREMENTAL") else {
+            return;
+        };
+        std::fs::create_dir_all(&session).expect("create the injected session directory");
+        std::fs::write(
+            std::path::Path::new(&session).join("dep-graph.bin"),
+            b"written by another process while the gate was running\n",
+        )
+        .expect("write the injected session file");
+    }
+}
+EOF
+}
+
+# The concurrent case the filesystem comparison could not tell from a regression
+# of the gate's own: state that appears mid-run. The ban held for every
+# compilation this run performed, so the entries came from elsewhere, and a
+# verdict that failed here would be decided by whether an editor happened to
+# have the checkout open.
+test_concurrent_incremental_state_is_observed_without_failing_the_gate() {
+  local name="incremental-concurrent"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out"
+  local session="target/debug/incremental/concurrent-crate-9f8e7d/s-concurrent-session-working"
+
+  echo
+  echo "== $name: state that appears while the run works must not decide it =="
+  if ! build_merge "$repo" "healthy_mainline" "concurrent_writer_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  run_gate "$repo" "$out" "SELFTEST_INJECT_INCREMENTAL=$repo/$session"
+
+  check "$name: the injected state really was written during the run" \
+    test -f "$repo/$session/dep-graph.bin"
+  check "$name: the gate reaches and passes its build-and-test step" \
+    step_passed "$out" test
+  check "$name: the incremental verdict passes over state this run did not compile" \
+    step_passed "$out" incremental-state
+  check "$name: the observation names the entries that appeared" \
+    grep -q "concurrent-crate-9f8e7d" "$out"
+  check "$name: the observation states the ban that places them outside this run" \
+    grep -q 'ban in force (CARGO_INCREMENTAL=0)' "$out"
+}
+
+# The regression the policy exists to catch: a gate that compiles without its
+# incremental ban in force. The shipped script exports CARGO_INCREMENTAL=0
+# itself, and an exported value cannot be overridden from outside it, so the
+# only way to observe the assertion firing is to run a gate whose export is
+# gone. The mutant is derived from the shipped file at run time by deleting that
+# one line — no logic is copied here, and a rename of the export makes this
+# fixture fail loudly rather than silently stop testing anything.
+gate_without_the_incremental_ban() { # gate_without_the_incremental_ban <destination>
+  local dest="$1" export_line='export CARGO_INCREMENTAL=0'
+  grep -qxF "$export_line" "$gate" || return 1
+  grep -vxF "$export_line" "$gate" >"$dest" || return 1
+  chmod +x "$dest"
+}
+
+test_lifted_incremental_ban_fails_the_gate() {
+  local name="incremental-ban-lifted"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out" rc
+  local mutant="$scratch/$name-cargo-ci.sh"
+
+  echo
+  echo "== $name: a run that compiled without the ban must fail =="
+  if ! build_merge "$repo" "healthy_mainline" "healthy_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  if ! gate_without_the_incremental_ban "$mutant"; then
+    echo "FAIL: $name: the shipped gate has no 'export CARGO_INCREMENTAL=0' line to remove"
+    fail=1
+    return
+  fi
+  check "$name: the mutant gate no longer exports the ban" \
+    test -z "$(grep -xF 'export CARGO_INCREMENTAL=0' "$mutant")"
+
+  run_gate_script "$mutant" "$repo" "$out" CARGO_INCREMENTAL=1
+  rc=$?
+
+  check "$name: the incremental verdict fails when the ban was not in force" \
+    step_failed "$out" incremental-state
+  check "$name: the gate exits nonzero" test "$rc" -ne 0
+  check "$name: the diagnostic names the value it observed" \
+    grep -q 'observed: CARGO_INCREMENTAL=1' "$out"
+  check "$name: the diagnostic names the value it compared against" \
+    grep -q 'compared against: the CARGO_INCREMENTAL=0' "$out"
+  check "$name: the diagnostic separates the gate's conduct from the machine's state" \
+    grep -q "regression in the gate's conduct" "$out"
+}
+
 echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
@@ -479,6 +690,10 @@ run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
 run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
 run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
+
+test_pre_existing_incremental_state_does_not_fail_the_gate
+test_concurrent_incremental_state_is_observed_without_failing_the_gate
+test_lifted_incremental_ban_fails_the_gate
 
 echo
 if [ "$fail" -eq 0 ]; then

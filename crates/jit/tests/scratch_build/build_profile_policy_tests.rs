@@ -10,9 +10,15 @@
 //! disables incremental compilation for every Rust compilation step the gate
 //! runs, so broad gate builds do not accumulate incremental state.
 //! REQ-04: the gate makes that property deterministic itself — a dedicated
-//! step fails the run when a non-empty `incremental` directory remains under
-//! the target directory the run actually used, rather than relying on a
-//! one-off manual isolated-run observation.
+//! step judges the ban rather than relying on a one-off manual isolated-run
+//! observation. jit:0708d692 settled what that step judges: the ban's value in
+//! its own environment, which every compilation the run performed inherited.
+//! The target directory is shared with every other process that compiles the
+//! checkout, and no filesystem comparison can attribute a write to a writer, so
+//! entries that appear during a run are reported as an observation about the
+//! machine instead of deciding the verdict. `scripts/cargo-ci-selftest.sh` runs
+//! the shipped gate over incremental state seeded before and during a run, and
+//! a mutant gate whose export is gone, and asserts which of the three fails.
 //!
 //! jit:6d10e5d4 added two more policies this file covers. First, the
 //! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
@@ -25,11 +31,14 @@
 //! `scripts/profile-test-suite.sh --self-test` so that evidence is
 //! re-established on every suite run rather than attested once.
 //!
-//! jit:94d85bf1 added the suite-duration policy: the gate compiles the measured
+//! jit:94d85bf1 added the suite-duration policy: the gate prepares the measured
 //! suite in its own reported step before the named suite clock starts, then
 //! hands the measurement to `scripts/rust-build-budget.sh` as
 //! `--test-suite-ms`, so the budget declared there is enforced live over an
-//! already-built warm target instead of silently skipped.
+//! already-built warm target instead of silently skipped. jit:0708d692
+//! completed what that step prepares: compiling the suite outside the clock
+//! left the `test` substep paying first-touch I/O on executables linked seconds
+//! earlier inside it, so the same step now also reads them into the page cache.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,40 +98,69 @@ fn test_dev_and_test_profiles_state_incremental_intent_explicitly() {
     }
 }
 
+/// The body of the shell function `name` defines in `script`, from its opening
+/// header line to the first line closing it at column zero. Lets a test read
+/// what a `run_step` line delegates to, rather than only the invocation.
+fn shell_function_body<'a>(script: &'a str, name: &str) -> &'a str {
+    let header = format!("\n{name}() {{\n");
+    let start = script
+        .find(&header)
+        .unwrap_or_else(|| panic!("scripts/cargo-ci.sh must define a `{name}` function"))
+        + header.len();
+    let end = script[start..]
+        .find("\n}\n")
+        .unwrap_or_else(|| panic!("`{name}` must be closed at column zero"));
+    &script[start..start + end]
+}
+
 #[test]
 fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
     let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
         .expect("read scripts/cargo-ci.sh");
 
+    // Matched as a whole line: a mention inside a comment satisfies a substring
+    // search while leaving incremental compilation on for every gate step.
     let export_pos = script
-        .find("export CARGO_INCREMENTAL=0")
-        .unwrap_or_else(|| panic!("scripts/cargo-ci.sh must export CARGO_INCREMENTAL=0"));
-    let preflight_pos = script
-        .find("run_step incremental-preflight")
-        .expect("scripts/cargo-ci.sh must check existing incremental state first");
+        .find("\nexport CARGO_INCREMENTAL=0\n")
+        .unwrap_or_else(|| {
+            panic!(
+                "scripts/cargo-ci.sh must export CARGO_INCREMENTAL=0 as a live \
+                 statement of its own"
+            )
+        });
+    let baseline_pos = script
+        .find("run_step incremental-baseline")
+        .expect("scripts/cargo-ci.sh must record the pre-compilation incremental baseline first");
     let first_step_pos = script
         .find("run_step fmt")
         .expect("scripts/cargo-ci.sh must run the fmt step");
 
     assert!(
-        export_pos < preflight_pos && preflight_pos < first_step_pos,
+        export_pos < baseline_pos && baseline_pos < first_step_pos,
         "CARGO_INCREMENTAL=0 must be exported before the first gate step so it \
          covers every Rust compilation the gate performs (fmt, clippy, test, \
          doctest)"
     );
     assert!(
-        script[preflight_pos..first_step_pos].contains("if [ \"$failed\" -ne 0 ]"),
-        "a failed incremental-state preflight must exit before the expensive \
+        script[baseline_pos..first_step_pos].contains("if [ \"$failed\" -ne 0 ]"),
+        "a baseline the gate could not record leaves the incremental policy \
+         unjudgeable for the whole run, so it must exit before the expensive \
          fmt, clippy, test, doctest, and budget steps"
     );
 }
 
 #[test]
-fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling() {
+fn test_cargo_ci_judges_the_incremental_ban_by_its_runtime_value() {
     let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
         .expect("read scripts/cargo-ci.sh");
 
-    let step_pos = script
+    let baseline_pos = script
+        .find("run_step incremental-baseline")
+        .expect("scripts/cargo-ci.sh must record an incremental baseline before compiling");
+    let first_step_pos = script
+        .find("run_step fmt")
+        .expect("scripts/cargo-ci.sh must run the fmt step");
+    let verdict_pos = script
         .find("run_step incremental-state")
         .unwrap_or_else(|| {
             panic!(
@@ -134,18 +172,42 @@ fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling()
     let test_step_pos = script
         .find("run_step test ")
         .expect("scripts/cargo-ci.sh must run the test step");
+
     assert!(
-        step_pos > test_step_pos,
+        baseline_pos < first_step_pos,
+        "the baseline must be taken before any compilation, or it cannot \
+         separate what this run produced from what was already there"
+    );
+    assert!(
+        verdict_pos > test_step_pos,
         "the incremental-state check must run after compilation (the test \
          step), so it observes what the gate's own builds actually left \
          behind on disk"
     );
 
+    let baseline_impl = shell_function_body(&script, "capture_incremental_baseline");
+    let verdict_impl = shell_function_body(&script, "check_gate_incremental_policy");
     assert!(
-        script.contains("-name incremental") && script.contains("-not -empty"),
-        "the incremental-state step must search for non-empty `incremental` \
-         directories (the actual regression signal), not merely assert that \
-         a variable is exported"
+        baseline_impl.contains("incremental_entries")
+            && verdict_impl.contains("incremental_entries"),
+        "both steps must read the target directory through one snapshot helper, \
+         so the two snapshots they compare are taken the same way \
+         (@/inv/convention-convergence)"
+    );
+    assert!(
+        verdict_impl.contains("CARGO_INCREMENTAL"),
+        "the verdict must be the ban's value in the step's own environment — the \
+         condition every compilation this run performed inherited — because that \
+         is the only thing about the ban a gate run can establish. A shared \
+         target directory cannot attribute a write to a writer"
+    );
+    assert!(
+        verdict_impl.contains("$INCREMENTAL_BASELINE") && verdict_impl.contains("comm -13"),
+        "what appeared since the baseline must still be reported alongside that \
+         verdict, as an observation about the machine: the target directory is \
+         shared with every other process that compiles the checkout, and an \
+         editor's rust-analyzer repopulates `incremental` within seconds of it \
+         being cleared"
     );
 }
 
@@ -155,7 +217,7 @@ fn test_cargo_ci_fails_the_gate_on_non_empty_incremental_state_after_compiling()
 const SUITE_CLOCK_VARIABLE: &str = "suite_clock_ms";
 
 #[test]
-fn test_cargo_ci_compiles_the_measured_suite_before_starting_the_suite_clock() {
+fn test_cargo_ci_compiles_and_warms_the_measured_suite_before_starting_the_suite_clock() {
     let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
         .expect("read scripts/cargo-ci.sh");
 
@@ -171,19 +233,38 @@ fn test_cargo_ci_compiles_the_measured_suite_before_starting_the_suite_clock() {
     );
 
     let before_clock = &script[..clock_start];
-    let build_step = before_clock
+    let prepare_step = before_clock
         .rfind("run_step ")
         .and_then(|start| before_clock[start..].lines().next())
         .expect("scripts/cargo-ci.sh must run its gate steps through run_step");
+    let prepare_impl = prepare_step
+        .split_whitespace()
+        .nth(2)
+        .map(|name| shell_function_body(&script, name))
+        .unwrap_or_else(|| {
+            panic!(
+                "the reported step immediately preceding the suite clock must \
+                 delegate to a named function whose body can be read: \
+                 {prepare_step}"
+            )
+        });
 
     assert!(
-        build_step.contains("--no-run"),
+        prepare_impl.contains("--no-run"),
         "the reported step immediately preceding the suite clock must compile \
          the measured suite without running it. The enforced budget is defined \
          over an already-built warm target, so compilation paid inside the \
          clock would fail the budget on every cold target — every fresh clone \
          and every CI runner — with nothing wrong in the tree. Found: \
-         {build_step}"
+         {prepare_step}"
+    );
+    assert!(
+        prepare_impl.contains(".executable") && prepare_impl.contains(">/dev/null"),
+        "the same step must also read the executables it just linked into the \
+         page cache. Compiling outside the clock is not enough on its own: the \
+         `test` substep pays first-touch I/O on those executables inside the \
+         clock, which made one unchanged commit fail the suite budget cold and \
+         pass it warm. Found: {prepare_impl}"
     );
 }
 
@@ -228,6 +309,75 @@ fn test_cargo_ci_enforces_the_measured_suite_clock_through_the_budget_checker() 
         "--test-suite-ms must carry the live value the gate just measured into \
          `{SUITE_CLOCK_VARIABLE}`, not a literal or an unrelated value: \
          {checker_invocation}"
+    );
+}
+
+/// jit:0708d692: nothing the measured suite runs may compile, because the suite
+/// clock the `budget` step judges is defined over an already-built target.
+/// cargo-nextest runs its setup scripts inside that clock, and Cargo unifies
+/// features over the packages one invocation selects — so a setup script
+/// selecting a single package resolves a second variant of the whole dependency
+/// graph and builds it mid-suite. Measured on a target freshly built by
+/// `cargo test --workspace --no-run`, the one setup script that invokes Cargo
+/// compiled 60 crates in 24,677 ms under `-p jit --test cli_issue` and was
+/// fresh in 131 ms under `--workspace --test cli_issue`.
+#[test]
+fn test_nextest_setup_scripts_reuse_the_workspace_build_resolution() {
+    const BUILDING_SUBCOMMANDS: [&str; 5] = ["test", "build", "check", "run", "nextest"];
+
+    let root = workspace_root();
+    let config: toml::Value = fs::read_to_string(root.join(".config/nextest.toml"))
+        .expect("read .config/nextest.toml")
+        .parse()
+        .expect("nextest configuration must be valid TOML");
+    let declared = config
+        .get("scripts")
+        .and_then(|scripts| scripts.get("setup"))
+        .and_then(toml::Value::as_table)
+        .expect(".config/nextest.toml must declare its setup scripts under [scripts.setup]");
+
+    let repository_scripts = declared.iter().filter_map(|(name, declaration)| {
+        let command = declaration.get("command")?;
+        // Only a script stored in the repository can be read here; a
+        // target-relative command names a built binary, not a source file.
+        if command.get("relative-to").and_then(toml::Value::as_str) != Some("workspace-root") {
+            return None;
+        }
+        Some((name, command.get("command-line")?.as_str()?.to_string()))
+    });
+
+    let mut checked = 0usize;
+    for (name, command_line) in repository_scripts {
+        let path = root.join(command_line.split_whitespace().next().expect("script path"));
+        let text = fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read setup script {}: {error}", path.display()));
+
+        for line in text.lines() {
+            let tokens: Vec<&str> = line.split_whitespace().collect();
+            let Some(cargo) = tokens.iter().position(|token| token.contains("cargo")) else {
+                continue;
+            };
+            if !tokens[cargo + 1..]
+                .iter()
+                .any(|token| BUILDING_SUBCOMMANDS.contains(token))
+            {
+                continue;
+            }
+            checked += 1;
+            assert!(
+                line.contains("--workspace"),
+                "setup script `{name}` invokes Cargo with a package selection \
+                 that is not the workspace, so its unit graph is resolved \
+                 independently of the build the gate already paid for and it \
+                 compiles inside the measured suite clock: {line}"
+            );
+        }
+    }
+
+    assert!(
+        checked > 0,
+        "no Cargo invocation was found in the repository setup scripts \
+         `.config/nextest.toml` declares, so this policy checked nothing"
     );
 }
 

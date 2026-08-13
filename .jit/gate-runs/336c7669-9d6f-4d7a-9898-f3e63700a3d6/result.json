@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2103a5e7a6d42ff63a587d07851e8e510e81f678",
+  "completed_at": "2026-08-13T12:22:05.212949878Z",
+  "duration_ms": 181251,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied by the attributed current implementation and evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0708d692-66d3-4536-ac75-739e759ac179",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "336c7669-9d6f-4d7a-9898-f3e63700a3d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T12:19:03.961473261Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f04c1cf, 46abba6, b2bacd4, ca65743, 0ad02ad, ba84bb9, d95bbfe, a3c2f59, c6a08c3, 837b881, 56de2dd, c81f656, da97715, 2103a5e\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/invariant/single-source-prose (.jit/invariants.toml); @/invariant/convention-convergence (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T12:17:10Z); code-review pending\nTruncation recovery: reread patches and current files by commit/path/range; omitted truncated event/progress records as historical evidence outside the current behavior review\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied by the attributed current implementation and evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

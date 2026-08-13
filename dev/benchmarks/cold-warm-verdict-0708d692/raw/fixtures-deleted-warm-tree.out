@@ -1,0 +1,12 @@
+=== run I (fixed gate, WARM build tree but the suite's per-target fixture caches deleted) start 2026-08-13T13:40:38+03:00
+  ✓ incremental-baseline: 0 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/target, none of them this run's (31 ms)
+  ✓ fmt: ok (1533 ms)
+  ✓ clippy: ok (197 ms)
+  ✓ suite-build: built in 511 ms, flushed in 16 ms, warmed 17 executables (1918021104 bytes) in 70 ms (600 ms)
+  ✓ test: 4513 passed, 0 failed, 7 skipped (22375 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4518 ms)
+  ✓ suite-clock: 26911 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1595965032/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=26911ms (83 ms)
+  ✓ incremental-state: no incremental state created by this run (0 pre-existing entries ignored) (34 ms)
+
+=== exit=0 end 2026-08-13T13:41:08+03:00
