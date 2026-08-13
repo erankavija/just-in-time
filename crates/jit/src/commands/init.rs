@@ -235,13 +235,6 @@ impl CommandExecutor<JsonFileStorage> {
                     }
                     probe = expanded;
                 }
-                if !contribution_context.is_empty() {
-                    let profile_base = scaffold.profile_composition_base(&probe)?;
-                    crate::repository_state::preflight_profile_contributions(
-                        &profile_base,
-                        contribution_context.clone(),
-                    )?;
-                }
                 let delta_overlay = super::validation_overlay(
                     derive_materialization(
                         &probe,
@@ -1050,7 +1043,7 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
-    fn test_fresh_profile_init_preflights_a_conflicting_closure_before_scaffolding() {
+    fn test_fresh_profile_init_refuses_a_conflicting_closure_before_scaffolding() {
         let repo = TempDir::new().unwrap();
         let storage = JsonFileStorage::new(repo.path().join(".jit"));
         composition_package_with_namespace(

@@ -2994,9 +2994,12 @@ pub enum ProfileCommands {
     /// Resolves the selection, closes it over the packages it depends on, and
     /// plans it through the same preparation a publication runs, then states
     /// what each participating profile decided: the targets it would create or
-    /// update, the recorded claims it would retain or remove, and the targets
-    /// it cannot publish, each named beside the packages that claim it. A
-    /// target no package claims is repository-authored content.
+    /// update, the registry declarations it would publish, the recorded claims
+    /// it would retain or remove, and the targets and declarations it cannot
+    /// publish, each named beside the packages that claim it. A target or
+    /// declaration no package claims is repository-authored content, and a
+    /// declaration is named by its semantic identity rather than by the
+    /// registry file holding it.
     ///
     /// A conflicting decision is reported rather than refused, which is the
     /// difference from `--dry-run` on the lifecycle commands: a rehearsal fails
@@ -3005,7 +3008,7 @@ pub enum ProfileCommands {
     /// a `path:` selector inspects a package before applying it.
     ///
     /// The report writes nothing and exits 4 when any profile decided a target
-    /// that cannot be published.
+    /// or a declaration that cannot be published.
     ///
     /// Examples:
     ///   jit profile diff --profile path:profiles/my-profile

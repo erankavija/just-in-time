@@ -990,7 +990,14 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     );
     assert_eq!(
         property_keys(by_title["ProfilePlanResult"], "ProfilePlanEntry"),
-        expected_keys(&["id", "plan_hash", "status", "targets", "version"])
+        expected_keys(&[
+            "contributions",
+            "id",
+            "plan_hash",
+            "status",
+            "targets",
+            "version",
+        ])
     );
     assert_eq!(
         variant_property_keys(
@@ -1002,6 +1009,10 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     assert_eq!(
         property_keys(by_title["ProfilePlanResult"], "ProfileTargetChange"),
         expected_keys(&["action", "executable", "owners", "path", "reason"])
+    );
+    assert_eq!(
+        property_keys(by_title["ProfilePlanResult"], "ProfileContributionChange"),
+        expected_keys(&["action", "identity", "owners", "reason"])
     );
 }
 
@@ -1540,6 +1551,145 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
             Vec::new()
         )),
         "the report states the target it cannot publish, claimed by no package: {report}"
+    );
+    assert_eq!(
+        snapshot_tree(&repo.path),
+        before,
+        "the report writes nothing"
+    );
+}
+
+/// The declaration decisions the report carries for profile `id`, each as its
+/// action beside the semantic identity it names and the packages that claim it.
+fn declarations(report: &Value, id: &str) -> Vec<(String, String, Vec<String>)> {
+    report["profiles"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the report carries a profile collection: {report}"))
+        .iter()
+        .find(|profile| profile["id"] == id)
+        .unwrap_or_else(|| panic!("the report names profile {id}: {report}"))["contributions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("a profile entry carries its declarations: {report}"))
+        .iter()
+        .map(|declaration| {
+            (
+                declaration["action"]
+                    .as_str()
+                    .expect("a decision names its action")
+                    .to_string(),
+                declaration["identity"]
+                    .as_str()
+                    .expect("a decision names the declaration it is about")
+                    .to_string(),
+                declaration["owners"]
+                    .as_array()
+                    .expect("a decision names the packages that claim its declaration")
+                    .iter()
+                    .map(|owner| {
+                        owner
+                            .as_str()
+                            .expect("an owner is a package id")
+                            .to_string()
+                    })
+                    .collect(),
+            )
+        })
+        .collect()
+}
+
+/// The package at `location`, declaring `id` and contributing the label
+/// namespace `namespace` described as `description`.
+///
+/// Contributions are what a package states about a registry rather than about a
+/// file, so a report over one is authored from the same fixture tree the target
+/// cases stage.
+fn package_contributing(repo: &TestRepo, location: &str, id: &str, description: &str) {
+    let directory = repo.path.join(location);
+    jit::test_utils::write_package_declaring(&composition_package(), &directory, id, &[]);
+    let manifest = directory.join(jit::profile::MANIFEST_FILE_NAME);
+    let authored = fs::read_to_string(&manifest).expect("read the staged package manifest");
+    fs::write(
+        &manifest,
+        format!(
+            "{authored}\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\n\
+             identity = \"{CONTRIBUTED_NAMESPACE}\"\n\
+             value = {{ description = \"{description}\", unique = false }}\n"
+        ),
+    )
+    .expect("declare the package's contribution");
+}
+
+/// The label namespace every declaration case below contributes.
+const CONTRIBUTED_NAMESPACE: &str = "reported-vocabulary";
+
+/// The canonical identity of the contributed namespace declaration, read from
+/// the engine's own identity vocabulary rather than spelled here.
+fn contributed_identity() -> String {
+    jit::repository_state::Contribution::MapEntry {
+        target: jit::repository_state::MapEntryTarget::Namespaces,
+        identity: CONTRIBUTED_NAMESPACE.to_string(),
+        value: serde_json::json!({}),
+    }
+    .semantic_identity()
+    .to_string()
+}
+
+/// A report states the declarations a selection would publish beside its file
+/// targets: one no package claims is created and unowned, and one two packages
+/// define differently is stated as the conflict it is, named by the package
+/// that claims it (REQ-01, REQ-02).
+#[test]
+fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
+    let repo = TestRepo::new();
+    success_json(&repo.path, &["init", "--json"]);
+    package_contributing(&repo, "packages/base", "base", "The base meaning.");
+    package_contributing(
+        &repo,
+        "packages/workflow",
+        "workflow",
+        "The workflow meaning.",
+    );
+
+    let (status, report) = profile_difference(&repo.path, "path:packages/base");
+
+    assert_eq!(status, Some(0), "a publishable selection is a clean check");
+    assert!(
+        declarations(&report, "base").contains(&(
+            "create".to_string(),
+            contributed_identity(),
+            Vec::new()
+        )),
+        "the report states the declaration the package would publish, claimed by no package: \
+         {report}"
+    );
+
+    success_json(
+        &repo.path,
+        &[
+            "profile",
+            "apply",
+            "--profile",
+            "path:packages/base",
+            "--json",
+        ],
+    );
+    let before = snapshot_tree(&repo.path);
+
+    let (status, report) = profile_difference(&repo.path, "path:packages/workflow");
+
+    assert_eq!(
+        status,
+        Some(4),
+        "a selection that cannot be published fails the check: {report}"
+    );
+    assert!(
+        declarations(&report, "workflow").contains(&(
+            "conflict".to_string(),
+            contributed_identity(),
+            vec!["base".to_string()]
+        )),
+        "the report states the declaration it cannot publish, claimed by the package that \
+         declared it first: {report}"
     );
     assert_eq!(
         snapshot_tree(&repo.path),

@@ -143,15 +143,11 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     // to its bare inner `ProjectionError`/`ManagedDocumentError`, which the checks
     // above classify identically.
     if let Some(state_error) = error.downcast_ref::<jit::repository_state::RepositoryStateError>() {
-        use jit::repository_state::{InitializationError, RepositoryStateError};
+        use jit::repository_state::RepositoryStateError;
         return match state_error {
             RepositoryStateError::Projection(_)
             | RepositoryStateError::ManagedDocument(_)
             | RepositoryStateError::ProfileTargetConflicts(_)
-            | RepositoryStateError::ContributionComposition(_)
-            | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                _,
-            ))
             | RepositoryStateError::AmbiguousOwnership(_)
             | RepositoryStateError::GateRegistryEdit(_)
             | RepositoryStateError::ArchiveExecution(_) => ErrorCode::ValidationFailed,
@@ -965,27 +961,54 @@ fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
         };
         println!("Profile {} {}: {}", plan.id, plan.version, status);
         for target in &plan.targets {
-            // An empty owner list is the fact that no package claims the
-            // target, which is what separates repository content from
-            // published content; it is not a claim by the repository.
-            let owners = if target.owners.is_empty() {
-                "claimed by no package".to_string()
-            } else {
-                format!("claimed by {}", target.owners.join(", "))
-            };
-            println!(
-                "  {}: {} ({owners})",
-                profile_target_action_label(target.action),
-                target.path
+            print_profile_decision(
+                target.action,
+                &target.path,
+                &target.owners,
+                target.reason.as_deref(),
             );
-            if let Some(reason) = &target.reason {
-                println!("      {reason}");
-            }
+        }
+        // A declaration is decided by its semantic identity rather than by the
+        // registry file holding it, so it is named by that identity and listed
+        // in its own right rather than folded into the registry's target line.
+        for contribution in &plan.contributions {
+            print_profile_decision(
+                contribution.action,
+                &contribution.identity,
+                &contribution.owners,
+                contribution.reason.as_deref(),
+            );
         }
     }
 }
 
-/// Name what a profile decided about one target, for human output.
+/// Render one decision: what it would do, what it is about, who claims it, and
+/// why it cannot be published when it cannot.
+fn print_profile_decision(
+    action: jit::profile::ProfileTargetAction,
+    subject: &str,
+    owners: &[String],
+    reason: Option<&str>,
+) {
+    // An empty owner list is the fact that no package claims the subject, which
+    // is what separates repository content from published content; it is not a
+    // claim by the repository.
+    let owners = if owners.is_empty() {
+        "claimed by no package".to_string()
+    } else {
+        format!("claimed by {}", owners.join(", "))
+    };
+    println!(
+        "  {}: {subject} ({owners})",
+        profile_target_action_label(action)
+    );
+    if let Some(reason) = reason {
+        println!("      {reason}");
+    }
+}
+
+/// Name what a profile decided about one target or declaration, for human
+/// output.
 fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'static str {
     use jit::profile::ProfileTargetAction;
     match action {
@@ -1129,7 +1152,7 @@ fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
-    use jit::repository_state::{InitializationError, RepositoryStateError};
+    use jit::repository_state::RepositoryStateError;
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
         return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
@@ -1165,22 +1188,14 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         );
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
-    // repository-state error: refused profile targets (raised directly or through
-    // initialization) and a profile registry contribution conflict are conflicts; an
+    // repository-state error: every refused profile decision — a target or a
+    // declaration, raised directly or through initialization — is a conflict; an
     // unreadable or unparseable profile registry is a generic profile error. Every
     // other variant keeps the generic profile-error code.
     if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
-        let is_conflict = matches!(
-            state_error,
-            RepositoryStateError::ProfileTargetConflicts(_)
-                | RepositoryStateError::ContributionComposition(_)
-                | RepositoryStateError::Initialization(
-                    InitializationError::ContributionComposition(_),
-                )
-        );
-        if is_conflict {
+        if matches!(state_error, RepositoryStateError::ProfileTargetConflicts(_)) {
             return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
-        };
+        }
         return JsonError::new(ErrorCode::ProfileError, error.to_string());
     }
     JsonError::new(ErrorCode::ProfileError, error.to_string())
@@ -8775,31 +8790,20 @@ mod repository_state_classifier_tests {
     use super::{error_to_exit_code, profile_json_error};
     use jit::profile::ThreeWayValue;
     use jit::repository_state::{
-        AmbiguousOwnershipError, ArchiveExecutionError, Contribution,
-        ContributionCompositionConflict, GateRegistryEditError, InitializationError,
-        ManagedDocumentError, ProducerError, ProfileBaseFingerprint, ProfileConflictOccupant,
-        ProfilePackageId, ProfileTargetConflict, ProfileTargetConflictEntry,
-        ProfileTargetConflictsError, ProjectionError, RepositoryLayoutError, RepositoryStateError,
-        ScalarTarget, VirtualPath,
+        AmbiguousOwnershipError, ArchiveExecutionError, Contribution, ContributionConflictOwner,
+        GateRegistryEditError, InitializationError, ManagedDocumentError, ProducerError,
+        ProfileBaseFingerprint, ProfileConflictOccupant, ProfilePackageId, ProfileTargetConflict,
+        ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject,
+        ProjectionError, RepositoryLayoutError, RepositoryStateError, ScalarTarget, VirtualPath,
     };
 
     fn path() -> VirtualPath {
         VirtualPath::data("issues/abc123.json").unwrap()
     }
 
-    fn contribution_conflict() -> ContributionCompositionConflict {
-        ContributionCompositionConflict {
-            identity: Contribution::Scalar {
-                target: ScalarTarget::ValidationDefaultType,
-                value: "task".to_string(),
-            }
-            .semantic_identity(),
-            owners: Vec::new(),
-        }
-    }
-
-    /// A refusal carrying both conflict reasons, which is what a selection with
-    /// an occupied target and a concurrently edited one produces.
+    /// A refusal carrying every conflict reason, which is what a selection with
+    /// an occupied target, a concurrently edited one, and a declaration two
+    /// packages define differently produces.
     fn target_conflicts() -> ProfileTargetConflictsError {
         let fingerprint = || {
             serde_json::from_str::<ProfileBaseFingerprint>(
@@ -8810,18 +8814,36 @@ mod repository_state_classifier_tests {
         ProfileTargetConflictsError::new(vec![
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
-                target: path(),
+                subject: ProfileTargetSubject::File(path()),
                 conflict: ProfileTargetConflict::Occupied {
                     occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("occupant")),
                 },
             },
             ProfileTargetConflictEntry {
                 owner: "candidate".try_into().expect("a canonical profile id"),
-                target: VirtualPath::data("issues/def456.json").unwrap(),
+                subject: ProfileTargetSubject::File(
+                    VirtualPath::data("issues/def456.json").unwrap(),
+                ),
                 conflict: ProfileTargetConflict::Diverged {
                     base: ThreeWayValue::Present(fingerprint()),
                     current: ThreeWayValue::Present(fingerprint()),
                     candidate: ThreeWayValue::Absent,
+                },
+            },
+            ProfileTargetConflictEntry {
+                owner: "candidate".try_into().expect("a canonical profile id"),
+                subject: ProfileTargetSubject::Contribution(
+                    Contribution::Scalar {
+                        target: ScalarTarget::ValidationDefaultType,
+                        value: "task".to_string(),
+                    }
+                    .semantic_identity(),
+                ),
+                conflict: ProfileTargetConflict::Contested {
+                    owners: vec![
+                        ContributionConflictOwner::Repository,
+                        ContributionConflictOwner::Package(ProfilePackageId::new("occupant")),
+                    ],
                 },
             },
         ])
@@ -8839,13 +8861,6 @@ mod repository_state_classifier_tests {
                 4,
             ),
             (target_conflicts().into(), 4),
-            (contribution_conflict().into(), 4),
-            (
-                RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                    contribution_conflict(),
-                )),
-                4,
-            ),
             (
                 AmbiguousOwnershipError::DuplicateRuleName("dup".into()).into(),
                 4,
@@ -8880,16 +8895,10 @@ mod repository_state_classifier_tests {
 
     #[test]
     fn test_profile_json_error_classifies_repository_state_variants() {
-        // A profile target conflict and a registry contribution conflict are
-        // profile conflicts (validation exit 4); an unreadable registry and an
+        // Every refused profile decision — a target or a declaration — is a
+        // profile conflict (validation exit 4); an unreadable registry and an
         // unrelated variant keep the generic profile-error code (exit 1).
-        let conflict_cases: Vec<RepositoryStateError> = vec![
-            target_conflicts().into(),
-            contribution_conflict().into(),
-            RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                contribution_conflict(),
-            )),
-        ];
+        let conflict_cases: Vec<RepositoryStateError> = vec![target_conflicts().into()];
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);
             let json = profile_json_error(&error);

@@ -47,8 +47,9 @@ pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileAddResult, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
     ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
-    ProfileListResult, ProfilePackResult, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus,
-    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileContributionChange, ProfileListResult, ProfilePackResult, ProfilePlanEntry,
+    ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary,
+    ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,

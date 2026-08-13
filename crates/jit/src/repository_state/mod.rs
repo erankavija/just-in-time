@@ -196,17 +196,16 @@ pub use profile_apply::{
     applied_profile_records, claimed_target_state, compose_resolved_contributions,
     AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
     AppliedProfileClaimIdentity, AppliedProfileRecord, ClaimedTargetState,
-    CompleteProjectionConfig, ComposedContribution, Contribution, ContributionCompositionConflict,
-    ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
-    ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
-    ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims,
-    ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
-    ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetConflictsError, ScalarTarget,
+    CompleteProjectionConfig, ComposedContribution, Contribution, ContributionConflictOwner,
+    ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
+    ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput,
+    ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims, ProfileConflictOccupant,
+    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict,
+    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
     SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    preflight_profile_contributions, profile_capture_closure, profile_contribution_overrides,
-    profile_contribution_target_paths,
+    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
 };
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
@@ -582,6 +581,7 @@ pub struct MaterializationPlan {
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    profile_contributions: Vec<ProfileContributionMaterialization>,
     applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
@@ -628,12 +628,33 @@ pub(crate) struct ProfileTargetMaterialization {
     pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
+/// What one profile decided about one semantic identity it participates in.
+///
+/// Contributions compose by identity rather than by the registry file that
+/// holds them, so this is what a plan carries beside its file-target decisions:
+/// the same disposition vocabulary and the same ownership fact, stated for the
+/// declaration an adopter reads and resolves.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ProfileContributionMaterialization {
+    /// Package whose composed claims decided this declaration.
+    pub(crate) owner: crate::profile::ProfileId,
+    /// Canonical semantic identity the decision is about.
+    pub(crate) identity: ContributionIdentity,
+    pub(crate) disposition: ProfileTargetDisposition,
+    /// Packages whose applied records claim this identity, in package-id order.
+    ///
+    /// Empty means no package owns the declaration, so it is the repository's
+    /// own.
+    pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
+}
+
 /// Complete producer output awaiting the shared plan-identity tail.
 struct MaterializationDerivation {
     delta: RepositoryDelta,
     seed: RepositorySeed,
     intent: MaterializationIntent,
     profile_targets: Vec<ProfileTargetMaterialization>,
+    profile_contributions: Vec<ProfileContributionMaterialization>,
     applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
@@ -644,12 +665,21 @@ impl MaterializationDerivation {
             seed,
             intent,
             profile_targets: Vec::new(),
+            profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
         }
     }
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    fn with_profile_contributions(
+        mut self,
+        contributions: Vec<ProfileContributionMaterialization>,
+    ) -> Self {
+        self.profile_contributions = contributions;
         self
     }
 
@@ -688,6 +718,10 @@ impl MaterializationPlan {
         &self.profile_targets
     }
 
+    pub(crate) fn profile_contributions(&self) -> &[ProfileContributionMaterialization] {
+        &self.profile_contributions
+    }
+
     /// Package identities responsible for a non-event effect in this plan.
     pub(crate) fn applied_profiles(
         &self,
@@ -709,6 +743,7 @@ impl MaterializationPlan {
             hash,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
+            profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
         })
     }
@@ -720,6 +755,14 @@ impl MaterializationPlan {
 
     fn with_profile_targets(mut self, targets: Vec<ProfileTargetMaterialization>) -> Self {
         self.profile_targets = targets;
+        self
+    }
+
+    fn with_profile_contributions(
+        mut self,
+        contributions: Vec<ProfileContributionMaterialization>,
+    ) -> Self {
+        self.profile_contributions = contributions;
         self
     }
 
@@ -862,12 +905,14 @@ pub fn derive_materialization(
         seed,
         intent,
         profile_targets,
+        profile_contributions,
         applied_profiles,
     } = derivation;
     MaterializationPlan::new(image, &seed, &intent, delta)
         .map(|plan| {
             plan.with_projection_counts(projection_counts)
                 .with_profile_targets(profile_targets)
+                .with_profile_contributions(profile_contributions)
                 .with_applied_profiles(applied_profiles)
         })
         .map_err(Into::into)
@@ -946,12 +991,9 @@ pub enum RepositoryStateError {
     /// Projection declaration or source resolution failed.
     #[error(transparent)]
     Projection(#[from] ProjectionError),
-    /// A profile selection decided targets it cannot publish.
+    /// A profile selection decided targets or declarations it cannot publish.
     #[error(transparent)]
     ProfileTargetConflicts(#[from] ProfileTargetConflictsError),
-    /// Resolved package definitions disagree for one semantic identity.
-    #[error(transparent)]
-    ContributionComposition(#[from] ContributionCompositionConflict),
     /// Layout classification rejected a producer path.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),

@@ -1,26 +1,37 @@
 //! What a profile selection would do to a repository, read from the decision a
 //! publication would act on.
 //!
-//! A prepared materialization plan carries one decision per target each
-//! participating profile takes part in: the values it would create or update,
-//! the recorded claims it would retain or remove, and the targets it cannot
-//! publish at all. [`profile_target_decisions`] is the sole reader of that
-//! decision, and it has exactly two callers: the difference report, which
-//! states the decision without publishing any of it, and
-//! [`ensure_publishable_targets`], which refuses a publication the decision
-//! says cannot be made. A reported outcome and a published outcome therefore
-//! cannot disagree — there is nothing for them to disagree about.
+//! A prepared materialization plan carries one decision per target and one per
+//! semantic identity each participating profile takes part in: the values it
+//! would create or update, the declarations it would publish, the recorded
+//! claims it would retain or remove, and the targets and declarations it cannot
+//! publish at all. [`profile_target_decisions`] and
+//! [`profile_contribution_decisions`] are the sole readers of that decision, and
+//! each has exactly two callers: the difference report, which states the
+//! decision without publishing any of it, and [`ensure_publishable_targets`],
+//! which refuses a publication the decision says cannot be made. A reported
+//! outcome and a published outcome therefore cannot disagree — there is nothing
+//! for them to disagree about.
 //!
-//! The refusal carries every conflicting target rather than the first one,
+//! Both halves of the decision are read the same way because contributions
+//! compose by identity: a package claims a semantic declaration inside a
+//! registry rather than the registry file, so who owns a declaration, what
+//! publishing it would do, and whether it can be published at all are answered
+//! per identity and reported beside the file targets rather than folded into
+//! them.
+//!
+//! The refusal carries every conflicting decision rather than the first one,
 //! because a selection is refused as a whole and an adopter resolving one
 //! conflict per run cannot see how much work the selection actually is.
 
 use crate::profile::{
-    ProfileId, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction, ProfileTargetChange,
+    ProfileContributionChange, ProfileId, ProfilePlanEntry, ProfilePlanStatus, ProfileTargetAction,
+    ProfileTargetChange,
 };
 use crate::repository_state::{
-    MaterializationPlan, ProfileTargetConflictEntry, ProfileTargetConflictsError,
-    ProfileTargetDisposition, ProfileTargetMaterialization,
+    MaterializationPlan, ProfileContributionMaterialization, ProfileTargetConflictEntry,
+    ProfileTargetConflictsError, ProfileTargetDisposition, ProfileTargetMaterialization,
+    ProfileTargetSubject,
 };
 use std::collections::BTreeSet;
 
@@ -41,8 +52,20 @@ pub(crate) fn profile_target_decisions<'plan>(
         .collect()
 }
 
-/// Project one profile's decisions into the public target vocabulary.
-pub(crate) fn profile_target_changes(
+/// Every declaration `owner` decided in a prepared plan, in canonical identity
+/// order. Scoped to one profile for the same reason its targets are.
+pub(crate) fn profile_contribution_decisions<'plan>(
+    plan: &'plan MaterializationPlan,
+    owner: &ProfileId,
+) -> Vec<&'plan ProfileContributionMaterialization> {
+    plan.profile_contributions()
+        .iter()
+        .filter(|contribution| &contribution.owner == owner)
+        .collect()
+}
+
+/// Project one profile's target decisions into the public target vocabulary.
+fn profile_target_changes(
     plan: &MaterializationPlan,
     owner: &ProfileId,
 ) -> Vec<ProfileTargetChange> {
@@ -53,16 +76,25 @@ pub(crate) fn profile_target_changes(
                 target.path.repository_relative(),
                 target_action(&target.disposition),
                 target.mode,
-                target
-                    .owners
-                    .iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>(),
-                match &target.disposition {
-                    ProfileTargetDisposition::Conflict(conflict) => Some(conflict.message()),
-                    _ => None,
-                },
+                owner_names(&target.owners),
+                conflict_reason(&target.disposition),
             )
+        })
+        .collect()
+}
+
+/// Project one profile's declaration decisions into the public vocabulary.
+fn profile_contribution_changes(
+    plan: &MaterializationPlan,
+    owner: &ProfileId,
+) -> Vec<ProfileContributionChange> {
+    profile_contribution_decisions(plan, owner)
+        .into_iter()
+        .map(|contribution| ProfileContributionChange {
+            identity: contribution.identity.to_string(),
+            action: target_action(&contribution.disposition),
+            owners: owner_names(&contribution.owners),
+            reason: conflict_reason(&contribution.disposition),
         })
         .collect()
 }
@@ -78,10 +110,13 @@ pub(crate) fn profile_plan_entry(
     version: &str,
 ) -> ProfilePlanEntry {
     let targets = profile_target_changes(plan, id);
-    let status = if targets
+    let contributions = profile_contribution_changes(plan, id);
+    let conflicted = targets
         .iter()
-        .any(|target| target.action == ProfileTargetAction::Conflict)
-    {
+        .map(|target| target.action)
+        .chain(contributions.iter().map(|contribution| contribution.action))
+        .any(|action| action == ProfileTargetAction::Conflict);
+    let status = if conflicted {
         ProfilePlanStatus::WouldConflict
     } else if plan.applied_profiles().contains(id) {
         ProfilePlanStatus::WouldApply
@@ -94,22 +129,24 @@ pub(crate) fn profile_plan_entry(
         status,
         plan_hash: plan.hash().to_string(),
         targets,
+        contributions,
     }
 }
 
-/// Refuse a plan whose profile decisions include a target no publication may
-/// make.
+/// Refuse a plan whose profile decisions include a target or a declaration no
+/// publication may make.
 ///
 /// Every mutating profile route — application, reconfiguration, upgrade, their
 /// rehearsals, and a profiled initialization — passes through this refusal, so
-/// a conflicting target stops a publication regardless of which command asked
-/// for it. The difference report is the one caller that reads the same decision
-/// without refusing it.
+/// a conflicting decision stops a publication regardless of which command asked
+/// for it, and regardless of whether it was about a file or a declaration. The
+/// difference report is the one caller that reads the same decision without
+/// refusing it.
 ///
 /// # Errors
 ///
-/// Returns [`ProfileTargetConflictsError`] naming every profile, target, and
-/// reason the plan refused.
+/// Returns [`ProfileTargetConflictsError`] naming every profile, target,
+/// declaration, and reason the plan refused.
 pub(crate) fn ensure_publishable_targets(
     plan: &MaterializationPlan,
 ) -> Result<(), ProfileTargetConflictsError> {
@@ -117,22 +154,36 @@ pub(crate) fn ensure_publishable_targets(
         .profile_targets()
         .iter()
         .map(|target| &target.owner)
+        .chain(
+            plan.profile_contributions()
+                .iter()
+                .map(|contribution| &contribution.owner),
+        )
         .collect::<BTreeSet<_>>();
     let conflicts = owners
         .into_iter()
         .flat_map(|owner| {
-            profile_target_decisions(plan, owner)
+            let targets = profile_target_decisions(plan, owner)
                 .into_iter()
-                .filter_map(|target| match &target.disposition {
-                    ProfileTargetDisposition::Conflict(conflict) => {
-                        Some(ProfileTargetConflictEntry {
-                            owner: owner.clone(),
-                            target: target.path.clone(),
-                            conflict: conflict.clone(),
-                        })
-                    }
-                    _ => None,
+                .filter_map(|target| {
+                    refused(&target.disposition).map(|conflict| ProfileTargetConflictEntry {
+                        owner: owner.clone(),
+                        subject: ProfileTargetSubject::File(target.path.clone()),
+                        conflict,
+                    })
                 })
+                .collect::<Vec<_>>();
+            let contributions = profile_contribution_decisions(plan, owner)
+                .into_iter()
+                .filter_map(|contribution| {
+                    refused(&contribution.disposition).map(|conflict| ProfileTargetConflictEntry {
+                        owner: owner.clone(),
+                        subject: ProfileTargetSubject::Contribution(contribution.identity.clone()),
+                        conflict,
+                    })
+                })
+                .collect::<Vec<_>>();
+            targets.into_iter().chain(contributions)
         })
         .collect::<Vec<_>>();
     if conflicts.is_empty() {
@@ -152,4 +203,24 @@ fn target_action(disposition: &ProfileTargetDisposition) -> ProfileTargetAction 
         ProfileTargetDisposition::Remove => ProfileTargetAction::Remove,
         ProfileTargetDisposition::Conflict(_) => ProfileTargetAction::Conflict,
     }
+}
+
+/// The sentence a decision that cannot be published states, absent otherwise.
+fn conflict_reason(disposition: &ProfileTargetDisposition) -> Option<String> {
+    refused(disposition).map(|conflict| conflict.message())
+}
+
+/// The reason one decision cannot be published, absent when it can.
+fn refused(
+    disposition: &ProfileTargetDisposition,
+) -> Option<crate::repository_state::ProfileTargetConflict> {
+    match disposition {
+        ProfileTargetDisposition::Conflict(conflict) => Some(conflict.clone()),
+        _ => None,
+    }
+}
+
+/// Name the packages that claim one decided subject, in package-id order.
+fn owner_names(owners: &BTreeSet<crate::repository_state::ProfilePackageId>) -> Vec<String> {
+    owners.iter().map(ToString::to_string).collect()
 }

@@ -121,6 +121,7 @@ impl SelectionObservation for ProfilePlanEntry {
     fn observe_without_publishing(&mut self) {
         self.status = ProfilePlanStatus::Unchanged;
         self.targets.clear();
+        self.contributions.clear();
     }
 }
 
@@ -187,11 +188,12 @@ impl ProfileShowResult {
     }
 }
 
-/// What one profile would do to one target it participates in.
+/// What one profile would do to one target or declaration it participates in.
 ///
 /// The vocabulary is the whole three-way decision a profile selection makes, so
 /// a reader of a rehearsal and a reader of a difference report name the same
-/// outcomes. A rehearsal fails on [`Self::Conflict`] rather than reporting it,
+/// outcomes, and a file and a declaration are named in one vocabulary rather
+/// than two. A rehearsal fails on [`Self::Conflict`] rather than reporting it,
 /// which is the only difference between the two surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -251,6 +253,32 @@ impl ProfileTargetChange {
     }
 }
 
+/// One deterministic profile declaration decision.
+///
+/// A package claims semantic declarations as well as files, and composes them
+/// by identity rather than by the registry file that holds them, so a reader
+/// inspecting what a selection would do reads them in the same vocabulary a
+/// target decision uses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileContributionChange {
+    /// Canonical semantic identity, spelled the way `jit profile validate`
+    /// names one: the registry it lives in, its declaration kind and target,
+    /// and its local name.
+    pub identity: String,
+    /// Planned operation.
+    pub action: ProfileTargetAction,
+    /// Packages whose applied records claim this declaration, in package-id
+    /// order.
+    ///
+    /// An empty list states that no package owns the declaration, so it is the
+    /// repository's own; more than one entry names every owner of a shared
+    /// declaration.
+    pub owners: Vec<String>,
+    /// Why an unpublishable declaration cannot be published, absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
 /// Whether a preview found work to publish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -259,7 +287,8 @@ pub enum ProfilePlanStatus {
     Unchanged,
     /// Applying the plan would publish at least one change.
     WouldApply,
-    /// The profile decided at least one target that cannot be published.
+    /// The profile decided at least one target or declaration that cannot be
+    /// published.
     ///
     /// A rehearsal of a publication fails before it can report this; a
     /// difference report states it, which is what lets an adopter inspect the
@@ -284,6 +313,11 @@ pub struct ProfilePlanEntry {
     /// An observation that would publish nothing decides no target, so a
     /// repeated selector's later observations carry none.
     pub targets: Vec<ProfileTargetChange>,
+    /// The declarations this profile decides, sorted by semantic identity.
+    ///
+    /// An observation that would publish nothing decides no declaration, so a
+    /// repeated selector's later observations carry none.
+    pub contributions: Vec<ProfileContributionChange>,
 }
 
 impl ProfilePlanEntry {
@@ -295,6 +329,16 @@ impl ProfilePlanEntry {
         self.targets
             .iter()
             .filter(move |target| target.action == action)
+    }
+
+    /// The declarations this profile decided `action` about, in report order.
+    pub fn decided_contributions(
+        &self,
+        action: ProfileTargetAction,
+    ) -> impl Iterator<Item = &ProfileContributionChange> {
+        self.contributions
+            .iter()
+            .filter(move |contribution| contribution.action == action)
     }
 }
 
@@ -317,8 +361,8 @@ impl ProfilePlanResult {
         }
     }
 
-    /// The profiles that decided a target that cannot be published, in report
-    /// order.
+    /// The profiles that decided a target or declaration that cannot be
+    /// published, in report order.
     pub fn conflicted(&self) -> impl Iterator<Item = &ProfilePlanEntry> {
         self.profiles
             .iter()

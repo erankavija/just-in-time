@@ -525,7 +525,8 @@ impl CommandSchema {
                         upgrade rehearse one aggregate selection, so their dry run carries the \
                         entries their own run reports: dependency closure members before the roots \
                         that declare them, then one entry per root occurrence. An entry that \
-                        publishes nothing reports status unchanged and carries no target decisions."
+                        publishes nothing reports status unchanged and carries no target or \
+                        declaration decisions."
                 });
                 (Some(union), "ProfileComposedApplyResult")
             }
