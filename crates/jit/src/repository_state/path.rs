@@ -343,11 +343,22 @@ impl VirtualPath {
     /// identities persist targets, and messages name paths in exactly this
     /// spelling.
     pub fn repository_relative(&self) -> String {
-        let relative = self.relative().as_str();
-        match self.root_class() {
-            RepositoryRootClass::Data => format!(".jit/{relative}"),
-            RepositoryRootClass::Worktree => relative.to_string(),
-        }
+        repository_relative_path(self.root_class(), self.relative())
+    }
+}
+
+/// The adopter-facing repository-relative spelling of a path below `root`.
+///
+/// [`VirtualPath::repository_relative`] is this rule applied to a canonical
+/// identity. A persisted target carries the same two components without having
+/// been re-guarded as an identity, so a consumer naming one — an applied-profile
+/// claim naming what it owns — spells it through this function rather than
+/// through a second `.jit/` prefix adapter.
+pub fn repository_relative_path(root: RepositoryRootClass, relative: &RootRelativePath) -> String {
+    let relative = relative.as_str();
+    match root {
+        RepositoryRootClass::Data => format!(".jit/{relative}"),
+        RepositoryRootClass::Worktree => relative.to_string(),
     }
 }
 

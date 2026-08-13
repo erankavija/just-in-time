@@ -685,8 +685,46 @@ each entry carries the complete parsed manifest, `origin`, `package_hash`,
 `target_hashes`, `file_count`, `byte_size`, and the parseable stored `applied`
 provenance record when one is present. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare that
-record with current target bytes; use `jit profile apply --profile <SELECTOR>
---dry-run` for exact current-state verification.
+record with current target bytes; use `jit profile validate` to check every
+recorded profile against its package and the content it owns, or `jit profile
+apply --profile <SELECTOR> --dry-run` to rehearse one package's application.
+
+### `jit profile validate`
+
+Check the profiles this repository records against their packages and its own
+content:
+
+```bash
+jit profile validate [--json]
+```
+
+The applied-profile records are the whole inventory, exactly as they are for
+[`jit profile list`](#jit-profile-list): a repository that has applied nothing
+reports no profile and succeeds. For each recorded profile the check reports
+whether its package is still readable at the location the record names, whether
+that package is still the one the record identifies, and whether each target the
+record's ownership claims name still holds the value the profile published. A
+claimed target that is no longer in the repository is reported in its own right,
+as is every target claimed by a record whose package is gone.
+
+Human output shows one line per profile with its ID and origin, followed by one
+line per divergence. JSON uses the standard list envelope
+`{"count": N, "profiles": [...]}`; each entry carries `id`, the `record` path,
+the recorded `origin`, and its own count-wrapped `divergences`, each naming its
+`kind` and the target or package fact it reports.
+
+The check writes nothing: no target, no provenance record, and no audit event.
+It exits `0` when every recorded profile agrees and `4` when any diverged, so it
+serves as a repository check. A repository that cannot be read — an unreadable
+record, or a claimed registry that is not a regular file — is an error rather
+than a divergence, and uses the shared typed error envelope.
+
+Whole-repository [`jit validate`](#jit-validate) reports the same owned-target
+divergences among everything else it checks, under the `profile-ownership` rule.
+What each divergence means for the package that owns it, and which of
+[`reconfigure`](#jit-profile-reconfigure), [`upgrade`](#jit-profile-upgrade), and
+[`capture`](#jit-profile-capture) resolves it, is described in
+[Repository Profiles](profiles.md#publication-rollback-and-recovery).
 
 ### `jit profile apply`
 

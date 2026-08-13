@@ -14,7 +14,23 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T00:02:34.516021773Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T00:11:37.180703531Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T00:03:25.819784701Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f2389b18-5ce3-4e55-ab22-c7807c2ab62c",
   "labels": [
     "type:task",
@@ -28,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Check applied profiles against their packages and the repository",
-  "updated_at": "2026-08-12T22:26:13.409794106Z"
+  "updated_at": "2026-08-13T00:11:37.180703531Z"
 }

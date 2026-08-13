@@ -499,12 +499,14 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                             count: 0,
                             divergences: Vec::new(),
                         });
-                let report =
+                let report = with_profile_ownership_findings(
                     crate::validation::repository::validate_repository_with_materializations(
                         &captured.image,
                         &captured.declarations,
                         captured.plan.as_ref(),
-                    );
+                    ),
+                    &captured.image,
+                );
                 Ok(SessionStep::Done((report, divergences)))
             },
         )
@@ -681,6 +683,52 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             declarations,
             plan,
         })))
+    }
+}
+
+/// Add the profile-ownership findings `image` carries to a validation outcome.
+///
+/// Whole-repository validation is the surface an adopter runs over a checkout,
+/// so it reports which recorded profile no longer holds what it published —
+/// through the same per-claim comparison `jit profile validate` reports it with
+/// ([`collect_profile_ownership_findings`](crate::validation::repository::collect_profile_ownership_findings)),
+/// never a second one. The findings are added here rather than inside the
+/// validation pipeline because that pipeline also judges proposed state, whose
+/// overlay carries bytes without file modes; a published asset's mode is part of
+/// the value its owner recorded, so only a captured repository is evidence about
+/// it.
+///
+/// A failed read of the records leaves the outcome as it was: the structural
+/// failure the pipeline already reports is the authoritative answer, and adding
+/// nothing is honest about a record set that could not be enumerated.
+fn with_profile_ownership_findings(
+    outcome: std::result::Result<
+        crate::validation::repository::RepositoryValidationReport,
+        crate::validation::repository::RepositoryValidationFailure,
+    >,
+    image: &crate::repository_state::RepositoryImage,
+) -> std::result::Result<
+    crate::validation::repository::RepositoryValidationReport,
+    crate::validation::repository::RepositoryValidationFailure,
+> {
+    let Ok(findings) = crate::validation::repository::collect_profile_ownership_findings(image)
+    else {
+        return outcome;
+    };
+    match outcome {
+        Ok(mut report) => {
+            report.rule_report.findings.extend(findings);
+            Ok(report)
+        }
+        Err(failure) => {
+            let (error, mut report) = failure.into_parts();
+            report.rule_report.findings.extend(findings);
+            Err(
+                crate::validation::repository::RepositoryValidationFailure::with_report(
+                    error, report,
+                ),
+            )
+        }
     }
 }
 
@@ -910,16 +958,15 @@ fn captured_profile_repair_claims(
                     ))))
                 }
             };
-        if !actual.matches_package_provenance(&super::profile::expected_record(
-            package,
-            image.layout(),
-            &actual.variables,
-        )?) {
+        if let Some(divergence) =
+            super::profile::package_identity_divergence(package, &actual, image.layout())
+        {
             return Ok(Some(Err(RepositoryValidationFailure::materialization(
                 anyhow!(
-                    "applied profile provenance for '{}@{}' does not match the package its record resolves to",
+                    "applied profile provenance for '{}@{}' does not match the package its record resolves to: {}",
                     metadata.id,
-                    metadata.version
+                    metadata.version,
+                    divergence.message()
                 ),
             ))));
         }

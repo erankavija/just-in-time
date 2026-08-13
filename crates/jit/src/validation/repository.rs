@@ -101,6 +101,14 @@ impl RepositoryValidationFailure {
         )
     }
 
+    /// Recompose a failure from its structural error and a report a caller
+    /// extended with findings the pipeline itself does not produce.
+    ///
+    /// The structural error stays authoritative; only the partial report grows.
+    pub(crate) fn with_report(error: anyhow::Error, report: RepositoryValidationReport) -> Self {
+        Self::new(error, report)
+    }
+
     /// Partial validation report collected from the exact supplied view.
     pub fn report(&self) -> &RepositoryValidationReport {
         &self.report
@@ -641,6 +649,67 @@ fn collect_enforcement_drift_findings(
     })
     .collect()
 }
+
+/// Report every owned target a recorded profile no longer holds the published
+/// value for.
+///
+/// The comparison is the shared per-claim one
+/// ([`claimed_target_divergences`](crate::profile::claimed_target_divergences)),
+/// so repository-wide validation and `jit profile validate` report the same
+/// divergences from one implementation rather than two views of the same
+/// evidence.
+///
+/// This runs over a CAPTURED repository, never over a proposed-state overlay: an
+/// overlay projects a delta to bytes alone, and a published asset's file mode is
+/// part of the value its owner recorded, so an overlaid executable asset would
+/// read as changed on every application. The proposed-state pipeline
+/// ([`validate_repository_with_materializations`]) therefore does not run this,
+/// and the repository-wide validation command adds it to the report it renders.
+///
+/// Whether the package a record names is still readable, and still the package
+/// that record identifies, is deliberately not asked here: answering either
+/// means reading a package directory, and this reads only the closed image. The
+/// profile-scoped check adds those two questions around this same comparison,
+/// and derived-state repair refuses to plan without them.
+///
+/// A claim whose target the image never captured produces nothing, so a
+/// narrower capture reports fewer divergences rather than inventing them.
+///
+/// # Errors
+///
+/// Returns an error when a record does not parse, is filed under another
+/// profile's name, or claims a registry that is not a regular file.
+pub(crate) fn collect_profile_ownership_findings(
+    image: &RepositoryImage,
+) -> Result<Vec<ReportedFinding>> {
+    crate::repository_state::applied_profile_records(image)?
+        .into_iter()
+        .map(|(path, record)| {
+            Ok(crate::profile::claimed_target_divergences(image, &record)?
+                .into_iter()
+                .map(|divergence| {
+                    ReportedFinding::new(
+                        None,
+                        &Finding {
+                            rule: PROFILE_OWNERSHIP_RULE.to_string(),
+                            severity: Severity::Error,
+                            message: format!(
+                                "applied profile '{}' ({}): {}",
+                                record.id,
+                                path.repository_relative(),
+                                divergence.message()
+                            ),
+                        },
+                    )
+                })
+                .collect::<Vec<_>>())
+        })
+        .collect::<Result<Vec<_>>>()
+        .map(|findings| findings.into_iter().flatten().collect())
+}
+
+/// Rule name under which profile-ownership divergence is reported.
+const PROFILE_OWNERSHIP_RULE: &str = "profile-ownership";
 
 fn collect_review_placeholder_findings(gates: &GateRegistry) -> Vec<ReportedFinding> {
     let mut keys: Vec<&str> = gates

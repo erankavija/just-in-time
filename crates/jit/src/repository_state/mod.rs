@@ -189,12 +189,13 @@ pub enum GateRegistryEditError {
 }
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
-    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
-    RootRelativePath, VirtualPath,
+    repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 pub use profile_apply::{
-    compose_resolved_contributions, AppliedClaimTarget, AppliedManagedRegionTarget,
-    AppliedProfileClaim, AppliedProfileClaimIdentity, AppliedProfileRecord,
+    applied_profile_records, claimed_target_state, compose_resolved_contributions,
+    AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
+    AppliedProfileClaimIdentity, AppliedProfileRecord, ClaimedTargetState,
     CompleteProjectionConfig, ComposedContribution, Contribution, ContributionCompositionConflict,
     ContributionConflictOwner, ContributionIdentity, ContributionIdentityTarget,
     ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,

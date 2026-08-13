@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-f2389b18",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "9216908ba073fe9c71c08b65dca45372052572b8",
+  "completed_at": "2026-08-13T00:01:49.534535844Z",
+  "duration_ms": 72015,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "6f4fd3b4adfec7569449666c264eecf0825da9ac1ff523d88ad95b557ef057a4",
+  "issue_id": "f2389b18-5ce3-4e55-ab22-c7807c2ab62c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "09959784-d852-47e4-ae1f-8fb914c68030",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T00:00:37.518878870Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget output ---\nrust-build-budget: FAILED\n  - test suite duration: observed 41739 ms, threshold 30000 ms (must be below threshold).\n  ✓ incremental-preflight: ok (119 ms)\n  ✓ fmt: ok (1540 ms)\n  ✓ clippy: ok (27826 ms)\n  ✓ suite-build: ok (374 ms)\n  ✓ test: 4493 passed, 0 failed, 7 skipped (37231 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4492 ms)\n  ✓ suite-clock: 41739 ms\n  ✗ budget: FAILED (exit 1) (226 ms)\n  ✓ incremental-state: ok (36 ms)\n\n",
+  "tree_dirty": false
+}

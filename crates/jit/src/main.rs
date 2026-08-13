@@ -1008,6 +1008,58 @@ fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
     }
 }
 
+/// Render the profile-agreement report and terminate on divergence.
+///
+/// The report is the answer either way: a diverged profile is reported in full
+/// before the process exits, so a caller reading `--json` gets the same envelope
+/// whether or not anything diverged, carried by the shared typed error shape
+/// when it did. The exit status is the repository-check contract — `0` when
+/// every recorded profile agrees, [`ExitCode::ValidationFailed`] when one did
+/// not — and nothing is written in either case.
+fn render_profile_agreement(
+    result: &jit::profile::ProfileAgreementResult,
+    json: bool,
+) -> Result<()> {
+    let diverged = result.diverged().count();
+    if json {
+        let details = serde_json::to_value(result)?;
+        let message = if diverged == 0 {
+            format!("{} recorded profile(s) agree", result.count)
+        } else {
+            format!(
+                "{diverged} of {} recorded profile(s) diverged",
+                result.count
+            )
+        };
+        return render_validation_json(
+            details,
+            message,
+            (diverged > 0).then_some(ErrorCode::ValidationFailed),
+        );
+    }
+
+    for profile in &result.profiles {
+        println!(
+            "{} {} {}",
+            if profile.agrees() { "✓" } else { "✗" },
+            profile.id,
+            profile_origin_label(&profile.origin)
+        );
+        for divergence in &profile.divergences {
+            println!("    {}", divergence.message());
+        }
+    }
+    if diverged == 0 {
+        println!("✓ {} recorded profile(s) agree", result.count);
+        return Ok(());
+    }
+    eprintln!(
+        "{diverged} of {} recorded profile(s) diverged",
+        result.count
+    );
+    std::process::exit(jit::ExitCode::ValidationFailed.code());
+}
+
 /// Render what a capture did to one path, for human output.
 fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &'static str {
     use jit::profile::ProfileCaptureAction;
@@ -2374,6 +2426,15 @@ fn run() -> Result<()> {
                     Err(error) => return Err(error),
                 }
             }
+            ProfileCommands::Validate { json } => match executor.validate_recorded_profiles() {
+                Ok(result) => render_profile_agreement(&result, json)?,
+                Err(error) if json => {
+                    let json_error = profile_json_error(&error);
+                    println!("{}", json_error.to_json_string()?);
+                    std::process::exit(json_error.exit_code().code());
+                }
+                Err(error) => return Err(error),
+            },
             ProfileCommands::Apply {
                 profile,
                 values_file,

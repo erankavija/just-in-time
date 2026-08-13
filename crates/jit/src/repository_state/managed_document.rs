@@ -293,6 +293,26 @@ fn append_region(bytes: &mut Vec<u8>, claim: RegionClaim<'_>) {
     bytes.push(b'\n');
 }
 
+/// The bytes one region's delimiters enclose in `document`, or `None` when the
+/// document does not hold exactly that region.
+///
+/// This is the read side of the splice [`apply_region`] performs, so an owner
+/// asking what the repository currently holds for its region reads it back
+/// through the same delimiter rule composition wrote it under: exactly one
+/// begin and one end delimiter, in that order. A document carrying neither,
+/// only one, or several answers `None`, because no single region is named.
+///
+/// The returned body still carries the newline the splice inserts after the
+/// begin delimiter; only the delimiters themselves are excluded.
+pub(crate) fn region_body<'a>(document: &'a [u8], begin: &[u8], end: &[u8]) -> Option<&'a [u8]> {
+    let begins = find_all(document, begin);
+    let ends = find_all(document, end);
+    match (begins.as_slice(), ends.as_slice()) {
+        ([at], [to]) if at + begin.len() <= *to => document.get(at + begin.len()..*to),
+        _ => None,
+    }
+}
+
 fn find_all(haystack: &[u8], needle: &[u8]) -> Vec<usize> {
     if needle.is_empty() {
         return Vec::new();
@@ -439,6 +459,32 @@ mod tests {
             render_managed_document(b"", &bases),
             Err(ManagedDocumentError::CompetingBaseClaims(_))
         ));
+    }
+
+    /// The reader is the inverse of the splice: what composition writes into a
+    /// document is what an owner reads back out of it, and a document naming no
+    /// single region answers with nothing rather than guessing at one.
+    #[test]
+    fn test_region_body_reads_back_the_content_the_splice_published() {
+        let published = render_managed_document(
+            b"prefix\n<B>\nstale\n</B>\nsuffix\n",
+            &[region("profile", "guidance", b"<B>", b"</B>", b"managed\n")],
+        )
+        .expect("the region composes over its existing markers");
+
+        assert_eq!(
+            region_body(&published, b"<B>", b"</B>"),
+            Some(b"\nmanaged\n".as_slice()),
+            "the body carries the content and the newline the splice inserts"
+        );
+        for unnamed in [
+            b"no markers at all".as_slice(),
+            b"<B> only a begin".as_slice(),
+            b"only an end </B>".as_slice(),
+            b"<B>first</B> and <B>second</B>".as_slice(),
+        ] {
+            assert_eq!(region_body(unnamed, b"<B>", b"</B>"), None, "{unnamed:?}");
+        }
     }
 
     #[test]
