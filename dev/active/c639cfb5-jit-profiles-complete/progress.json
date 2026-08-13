@@ -401,6 +401,13 @@
       "evidence": "Worker built the literal reading first: 19 lib tests failed, capture of jit-dogfood folded this repository's local config (real gate wiring, local script paths, projection paths) over the package's deliberate shipped values, and the published-package drift check became vacuous. Ownership scoping keeps the motivating trap closed because applying creates the record.",
       "owner_decision": "Ownership-scoped reading binds; ratified via AskUserQuestion.",
       "lead_resolution": "Ruling appended to the issue description. Worker's implementation stands; 'unowned' reporting state accepted."
+    },
+    {
+      "date": "2026-08-13",
+      "question": "REQ-07 failed three code-review rounds, each on a different budget: model-derived byte bounds cannot cover applied artifacts (adopter-supplied variable values, template-expanded targets). How should the agreement capture's bounds be settled?",
+      "options_presented": "A: unbound named-path payload reads, bound shape only (recommended); B: amend REQ-07 and derive ceilings from observed file sizes; C: A now plus a follow-up issue for observed-size ceilings",
+      "owner_decision": "A \u2014 unbound named-path reads.",
+      "lead_resolution": "Ruling appended to the issue description so the reviewer reads it as an owner ruling. Rework dispatched: byte ceilings removed from record and claimed-target reads with the listing's no-discovery documentation; shape bounds retained."
     }
   ],
   "rework_counts": {
@@ -417,7 +424,7 @@
     "6a479c58": 1,
     "15cc28c5": 2,
     "0708d692": 1,
-    "5a3ecba0": 2
+    "5a3ecba0": 3
   },
   "review_verdicts": [
     {
@@ -1324,6 +1331,22 @@
         }
       ],
       "notes": "cargo-ci passed at 12f572914. Round-1 budget findings verified closed at HEAD (claim/record budgets scale with the repository's record count; RECORD_CAPTURE_BUDGET removed; depth derived from construction). Lead determination: converge on the shared validator, fail by name on mismatch rather than treating as absent, unit test the mismatched-record case."
+    },
+    {
+      "issue": "5a3ecba0",
+      "round": "code-review gate round 3",
+      "session": 13,
+      "date": "2026-08-13",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "high",
+          "disposition": "blocking",
+          "summary": "recorded_profile_bytes bounds records and claimed targets by one package byte budget, but applied records retain unbounded resolved variables and template expansion can publish owned content larger than its source; a valid application can be unreadable by the agreement check."
+        }
+      ],
+      "notes": "cargo-ci passed at d6184bd79; rounds 1-2 findings stayed closed. Root cause structural; escalated to the owner, who ruled for unbounded named-path payload reads bounded by shape."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",

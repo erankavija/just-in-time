@@ -14070,3 +14070,4 @@
 {"id":"59254e14-65fc-4307-834b-98a6f62613cd","issue_id":"d2b7d19b-3ffe-4fae-bb2b-2cc43847e491","priority":"high","timestamp":"2026-08-13T13:46:34.522464488Z","title":"A fixture-receipt test races another test's TempDir and flakes a third of suite runs","type":"issue_created"}
 {"gate_key":"cargo-ci","id":"362b5015-56e4-4be6-a10c-90a4be704d3b","issue_id":"d2b7d19b-3ffe-4fae-bb2b-2cc43847e491","timestamp":"2026-08-13T13:46:47.112767200Z","type":"gate_added"}
 {"gate_key":"code-review","id":"74bb456c-43aa-40b4-9daf-ad6f38ade8f9","issue_id":"d2b7d19b-3ffe-4fae-bb2b-2cc43847e491","timestamp":"2026-08-13T13:46:47.259699462Z","type":"gate_added"}
+{"fields":["description"],"id":"aa7dfdf8-f172-4f49-92c4-de49b5dad8d1","issue_id":"5a3ecba0-9e2a-401c-9994-85066ddaba8f","timestamp":"2026-08-13T14:40:47.792060426Z","type":"issue_updated","updated_by":"issue-update"}
