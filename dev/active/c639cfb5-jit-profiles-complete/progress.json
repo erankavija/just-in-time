@@ -394,6 +394,13 @@
       "options_presented": "A: accept and record (lead's recommendation); B: move fixture construction outside the clock as follow-up",
       "owner_decision": "A \u2014 accept and record.",
       "lead_resolution": "Recorded in 0708d692's description and in the REQ-06 canonical budget document. Revisit only if a cold failure recurs."
+    },
+    {
+      "date": "2026-08-13",
+      "question": "Does 5a3ecba0 REQ-01's 'every contribution the manifest declares' bind literally, or scoped to declarations the applied-profile record claims for the package?",
+      "evidence": "Worker built the literal reading first: 19 lib tests failed, capture of jit-dogfood folded this repository's local config (real gate wiring, local script paths, projection paths) over the package's deliberate shipped values, and the published-package drift check became vacuous. Ownership scoping keeps the motivating trap closed because applying creates the record.",
+      "owner_decision": "Ownership-scoped reading binds; ratified via AskUserQuestion.",
+      "lead_resolution": "Ruling appended to the issue description. Worker's implementation stands; 'unowned' reporting state accepted."
     }
   ],
   "rework_counts": {

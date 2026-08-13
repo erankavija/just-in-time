@@ -14066,3 +14066,4 @@
 {"gate_key":"code-review","id":"32cde67b-8921-4da3-ab1c-49e079827548","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T12:22:05.596094797Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"gated","id":"3d2c3dee-d359-4198-a2b7-e0137598bd1f","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T12:22:19.657860270Z","to":"done","type":"issue_state_changed"}
 {"id":"4df3429c-0ba9-4639-9cac-7d0c066b7a5d","issue_id":"0708d692-66d3-4536-ac75-739e759ac179","timestamp":"2026-08-13T12:22:19.657860270Z","type":"issue_completed"}
+{"fields":["description"],"id":"0614e35f-fbe3-42e3-9c55-50149360bb05","issue_id":"5a3ecba0-9e2a-401c-9994-85066ddaba8f","timestamp":"2026-08-13T13:12:55.122142083Z","type":"issue_updated","updated_by":"issue-update"}
