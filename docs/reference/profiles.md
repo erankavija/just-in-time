@@ -4,10 +4,11 @@
 
 Repository profiles install a coherent JIT workflow as one explicit operation.
 A profile is a package: a directory holding a manifest, the assets that
-manifest declares, and the managed-region sources it owns. JIT v1.0 publishes
-two, `jit-dogfood`, the workflow package an adopter names, and `jit-default`,
-the generic vocabulary it declares a dependency on. Applying `jit-dogfood`
-applies both, so the dependency is never named.
+manifest declares, and the managed-region sources it owns. This is the
+canonical adopter reference for the profile lifecycle: authoring and capture,
+offline exchange, composition, variables and ownership, drift recovery,
+reconfiguration, and upgrade. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
+to inspect the exact packages a release or a repository currently carries.
 
 ## Obtaining a package
 
@@ -49,11 +50,7 @@ jit init --profile path:packages/jit-dogfood
 
 Plain `jit init` remains the methodology-neutral alternative. It creates the
 structural minimum — the schema version and the project name, beside the empty
-registries, the event log and the index — and declares no vocabulary at all.
-`jit-default` carries the generic vocabulary a repository needs to be usable
-(the type hierarchy, the namespace registry, the item kinds, the validation
-defaults, and the development-area classification), and `jit-dogfood` declares
-this project's workflow on top of it.
+registries, the event log and the index — and declares no workflow vocabulary.
 
 ## Commands
 
@@ -94,8 +91,10 @@ jit profile apply --profile path:packages/jit-dogfood
 jit profile apply --profile id:jit-dogfood --dry-run
 ```
 
-Capture a package tree from the repository files its manifest declares, which
-is how an edit made in place reaches the package that owns it:
+Author a package by creating its manifest and declared sources in a worktree
+directory. Capture refreshes a package tree from the repository targets its
+manifest declares, which is how an edit made in place reaches the package that
+owns it:
 
 ```bash
 jit profile capture --source profiles/my-workflow --destination build/my-workflow --dry-run
@@ -127,6 +126,11 @@ that identity from the extracted content and refuses an archive that disagrees.
 This detects an archive damaged or truncated in transit; it establishes
 integrity rather than origin, so the channel the archive arrived over is still
 what says who produced it.
+
+`--output` for `jit profile pack` can be outside the repository. When it is
+inside the repository, the output path may be at most 128 path components below
+the repository root; choose an external path if a deeper output location is
+needed. An existing output or add destination is never overwritten.
 
 Packages may declare non-secret variables. Supply a TOML values file containing
 `[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
@@ -163,6 +167,42 @@ the same thing.
 
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).
+
+## Inspect, recover, and evolve
+
+Use `jit profile diff` before a change to see every target and semantic
+declaration a selection would create, update, retain, remove, or conflict on.
+Each decision identifies every package that owns it; an empty owner list is
+repository-authored content, while several owners identify shared content.
+`jit profile validate` checks every applied-profile record against its package
+and the content it owns. `jit validate` includes those findings in its
+whole-repository validation. Both checks report drift without changing files.
+
+Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
+validation as its corresponding `apply`, `reconfigure`, `upgrade`, `capture`,
+`pack`, or `add` command, but writes no target, provenance record, or lifecycle
+event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
+operator can identify the conflicting target or declaration and its owner.
+
+Choose the recovery action from the reported ownership and intended authority:
+
+- Reconfigure an unchanged installed package when a declared variable needs a
+  different value: `jit profile reconfigure --profile id:<PROFILE_ID> --set NAME=VALUE --dry-run`,
+  then repeat without `--dry-run`.
+- Capture a package when its owner intentionally adopts a changed declared live
+  asset or semantic contribution from the repository: `jit profile capture --source <DIR> --destination <DIR>`.
+  Capture refreshes every declared contribution it owns from the registry and
+  leaves repository-authored declarations out of the package.
+- Upgrade when the package directory contains a newer version: `jit profile upgrade --profile path:<DIR> --dry-run`,
+  then repeat without `--dry-run`. Upgrade preserves shared content another
+  installed package still owns and removes unchanged content the replaced
+  package solely owned but no longer contributes.
+
+An owned target that has drifted is a conflict for reconfigure or upgrade; the
+conflict publishes nothing. Restore the intended owner’s content, or capture
+the intended package change before applying or upgrading it. Do not use a
+profile operation to overwrite repository-authored or another profile’s
+conflicting content.
 
 All profile commands support `--json` and use the standard count-wrapped
 `{"count": N, "profiles": [...]}` collection shape. A show response contains
@@ -321,23 +361,6 @@ including init, profile application, project rendering, and validation, work
 without Git. Claim leases remain the documented exception: their shared
 coordination state lives under `.git/jit/`, so claim acquire/renew/release require
 a Git repository. Profiles do not add or alter that lease surface.
-
-## Profile surface boundary
-
-Profile variables are non-secret by declaration, and the profile surface carries
-no secret-value channel: no input, storage, interpolation, or audit path accepts
-one. A secret goes to the tool that consumes it, never to a package.
-
-Profile-owned content leaves the repository through
-[`jit profile upgrade`](cli-commands.md#jit-profile-upgrade): replacing an
-installed version removes the unchanged content that version solely owned and
-the replacement stopped contributing. Removing an applied profile as a whole is
-not part of this release.
-
-Package lookup follows the command contract in
-[Profile Commands](cli-commands.md#profile-commands);
-no configured search path discovers a package. Edit repository configuration
-directly for advanced customization, or start from the manual guides below.
 
 ## Advanced customization
 
