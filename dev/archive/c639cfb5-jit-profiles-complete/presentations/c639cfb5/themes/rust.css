@@ -1,0 +1,40 @@
+/* ============================================================================
+   Theme: rust  (default)
+   The mdBook / rustdoc "rust" palette. Warm light background, deep-rust accent.
+   This file is ONLY the :root token block — all structure lives in base.css.
+   ============================================================================ */
+
+:root {
+  /* surfaces & text */
+  --bg:         #e1e1db;
+  --text:       #262625;
+  --text-mute:  #6e6b5e;
+  --surface:    #d3d3cc;
+  --border:     #c1c0bb;
+  --rule:       #b3a497;
+
+  /* semantic accents */
+  --link:       #2b79a2;
+  --accent:     #8c391f;
+
+  /* syntax highlighting */
+  --kw:         #b25000;
+  --str:        #689313;
+  --cmt:        #6e6b5e;
+  --fn:         #2b79a2;
+
+  /* callout hues (border + label; base.css tints the fill via color-mix) */
+  --c-def:      #3f7d3f;
+  --c-thm:      #7a3d8a;
+  --c-lemma:    #2f6f8f;
+  --c-proof:    #6e6b5e;
+  --c-note:     #2b79a2;
+  --c-warn:     #9a5b00;
+  --c-example:  #7a756a;
+
+  /* typography (rust: humanist sans throughout, Source Code Pro for code) */
+  --font-body:  "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-head:  "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-label: "Open Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:  "Source Code Pro", "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}

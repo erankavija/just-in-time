@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1280">
+<title>Your workflow, packaged — JIT profiles</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+
+<link rel="stylesheet" id="theme" href="themes/rust.css">
+<link rel="stylesheet" href="base.css">
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+<!-- 1 · TITLE -->
+<section class="title">
+  <h1>Your workflow, packaged</h1>
+  <p class="tagline">Create it. Refresh it. Share it. Without surrendering the repository.</p>
+  <p>JIT profiles &nbsp;·&nbsp; adopters + profile contributors &nbsp;·&nbsp; 2026-08-14</p>
+  <p class="caption">A showcase and hands-on path through epic c639cfb5</p>
+  <aside class="notes">
+    This talk has two audiences. Adopters need confidence that a profile is inspectable
+    and safe. Contributors need a short, complete path from a working repository to a
+    reusable package. The same sim-research example connects both halves.
+  </aside>
+</section>
+
+<!-- 2 · PROMISE -->
+<section>
+  <span class="seclabel">The promise</span>
+  <h2>The lifecycle is complete</h2>
+  <div class="three-col">
+    <div>
+      <h3>Create</h3>
+      <p>Declare a package, or capture one from a repository that already works.</p>
+    </div>
+    <div>
+      <h3>Refresh</h3>
+      <p>Turn intentional edits and new configuration into the next package state.</p>
+    </div>
+    <div>
+      <h3>Share</h3>
+      <p>Pack one deterministic archive; verify and add it entirely offline.</p>
+    </div>
+  </div>
+  <p class="center"><span class="badge green">shipped</span> One directory model · one composition graph · one recoverable publication path</p>
+  <aside class="notes">
+    The north star is not merely “apply a profile.” Apply-only made a profile effectively
+    write-once. The completed epic adds the authoring, refresh, composition, ownership,
+    upgrade, and exchange paths required to operate profiles over time.
+  </aside>
+</section>
+
+<!-- 3 · MENTAL MODEL -->
+<section>
+  <span class="seclabel">Mental model</span>
+  <h2>A profile is a declared repository change</h2>
+  <div class="item-decl">package = manifest + sources · profile = tracked identity + ownership</div>
+  <div class="two-col">
+    <div>
+      <h3>The package declares</h3>
+      <ul>
+        <li>identity, compatibility, dependencies</li>
+        <li>workflow vocabulary and projections</li>
+        <li>whole files and managed regions</li>
+        <li>public variables and capture roots</li>
+      </ul>
+    </div>
+    <div>
+      <h3>The repository records</h3>
+      <ul>
+        <li>the worktree-relative package location</li>
+        <li>resolved public inputs</li>
+        <li>which profile owns each contribution</li>
+        <li>the exact published-base fingerprints</li>
+      </ul>
+    </div>
+  </div>
+  <p>The manifest stays authoritative; the applied record is evidence, not shadow configuration.</p>
+  <aside class="notes">
+    This distinction prevents a second configuration database. Later operations re-read
+    the package from the repository directory recorded at apply time.
+  </aside>
+</section>
+
+<!-- 4 · QUICKSTART -->
+<section>
+  <span class="seclabel">Adopt</span>
+  <h2>Adopt a workflow in one operation</h2>
+<pre><code class="language-bash" data-trim>mkdir my-project
+cd my-project
+cp -R &lt;release&gt;/packages .
+
+jit init --profile path:packages/jit-dogfood
+jit profile list</code></pre>
+  <ul>
+    <li><code>jit-dogfood</code> brings its <code>jit-default</code> dependency with it.</li>
+    <li>Dependencies are sibling directories named by profile ID.</li>
+  </ul>
+  <div class="warning">Keep the package directories where they were applied. Later validation and repair re-read them there.</div>
+  <aside class="notes">
+    A bare jit init stays methodology-neutral. The profile is what declares workflow
+    vocabulary. Packages must be inside the worktree, and dependencies sit beside the
+    selected package under directories named by their profile IDs.
+  </aside>
+</section>
+
+<!-- 5 · INSPECT PACKAGE -->
+<section>
+  <span class="seclabel">Adopt</span>
+  <h2>Read the package before applying it</h2>
+<pre><code class="language-bash" data-trim>jit profile show \
+  --profile path:packages/jit-dogfood --json
+
+# months later: exact-state verification
+jit profile apply --profile id:jit-dogfood --dry-run</code></pre>
+  <p><code>show</code> reports identity, compatibility, dependencies, inputs, contributions, sources, targets, hashes, and any stored provenance.</p>
+  <p><code>path:</code> introduces a package directory; <code>id:</code> later resolves the recorded profile and its remembered location.</p>
+  <aside class="notes">
+    Show answers “what is this package?” It does not verify current repository target
+    bytes; use apply dry-run or profile validate for exact current-state checks.
+  </aside>
+</section>
+
+<!-- 6 · PREVIEW REPOSITORY -->
+<section>
+  <span class="seclabel">Adopt</span>
+  <h2>Preview the repository decision</h2>
+<pre><code class="language-bash" data-trim>jit profile diff \
+  --profile path:packages/jit-dogfood
+
+jit profile apply \
+  --profile path:packages/jit-dogfood --dry-run --json</code></pre>
+  <div class="two-col">
+    <div><h3><code>diff</code></h3><p>Reports every decision and owner—even when publication cannot proceed.</p></div>
+    <div><h3><code>--dry-run</code></h3><p>Runs the exact publication planner and validation path, but writes nothing.</p></div>
+  </div>
+  <aside class="notes">
+    Diff answers “what would this package mean here?” Dry-run answers “would the real
+    operation succeed?” Diff exits 4 when it reports conflicts; rehearsal fails where
+    the corresponding publication would fail.
+  </aside>
+</section>
+
+<!-- 7 · COMPOSITION -->
+<section>
+  <span class="seclabel">Compose</span>
+  <h2>Profiles compose as declarations, not scripts</h2>
+<pre><code class="language-bash" data-trim>jit profile apply \
+  --profile path:packages/sim-research \
+  --dry-run</code></pre>
+  <ol>
+    <li>Resolve dependencies and compatibility.</li>
+    <li>Build one deterministic contribution graph.</li>
+    <li>Deduplicate definitions that are semantically identical.</li>
+    <li>Reject different definitions—selection order never chooses a winner.</li>
+  </ol>
+  <div class="note"><code>sim-research</code> can specialize a shared foundation without copying the foundation’s workflow inventory.</div>
+  <aside class="notes">
+    This is the first Claude/user-informed example. In gf2, sim-research depends on
+    jit-default and adds research-specific brackets, tasks, rules, gates, projections,
+    and agent guidance.
+  </aside>
+</section>
+
+<!-- 8 · OWNERSHIP -->
+<section>
+  <span class="seclabel">Operate</span>
+  <h2>Ownership turns change into a decision</h2>
+  <table>
+    <thead><tr><th>Repository vs published base vs candidate</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>repository still equals the base; candidate is equal</td><td><span class="badge green">unchanged</span></td></tr>
+      <tr><td>repository still equals the base; candidate changed</td><td><span class="badge blue">update</span></td></tr>
+      <tr><td>repository changed; candidate still equals the base</td><td><span class="badge orange">diverged</span></td></tr>
+      <tr><td>repository and candidate changed differently</td><td><span class="badge gray">conflict</span></td></tr>
+      <tr><td>unchanged, solely owned content disappears on upgrade</td><td><span class="badge blue">remove</span></td></tr>
+    </tbody>
+  </table>
+  <p>Shared content survives while another installed profile still owns it.</p>
+  <aside class="notes">
+    The point is not the names of internal types; it is the operator’s choice. JIT can
+    update only when the repository still reflects the previous publication. Otherwise
+    it reports who owns the content and refuses to guess.
+  </aside>
+</section>
+
+<!-- 9 · LIFECYCLE MAP -->
+<section>
+  <span class="seclabel">Operate</span>
+  <h2>Choose the verb by intent</h2>
+  <table>
+    <thead><tr><th>Intent</th><th>Command</th></tr></thead>
+    <tbody>
+      <tr><td>Understand a package or pending change</td><td><code>show</code> · <code>diff</code></td></tr>
+      <tr><td>Check package, record, and owned content</td><td><code>validate</code></td></tr>
+      <tr><td>Install a selection</td><td><code>apply</code></td></tr>
+      <tr><td>Change declared public inputs</td><td><code>reconfigure</code></td></tr>
+      <tr><td>Adopt intentional live repository edits</td><td><code>capture</code></td></tr>
+      <tr><td>Replace an installed version</td><td><code>upgrade</code></td></tr>
+      <tr><td>Move a package between repositories</td><td><code>pack</code> · <code>add</code></td></tr>
+    </tbody>
+  </table>
+  <p>Every mutation above supports <code>--dry-run</code>.</p>
+  <aside class="notes">
+    Capture is deliberately the one authoring and drift-adoption verb. There is no
+    separate “bless drift” shortcut. Restore means the package remains authoritative;
+    capture means the repository edit becomes the next package state.
+  </aside>
+</section>
+
+<!-- 10 · RESTORE OR CAPTURE -->
+<section>
+  <span class="seclabel">User case</span>
+  <h2>Drift asks: who should own this change?</h2>
+  <table>
+    <thead><tr><th>Intent</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td>The package remains authoritative</td><td>restore the published value</td></tr>
+      <tr><td>The repository edit becomes package content</td><td><code>profile capture</code></td></tr>
+      <tr><td>A declared public input should change</td><td><code>profile reconfigure</code></td></tr>
+      <tr><td>A newer package version should replace this one</td><td><code>profile upgrade</code></td></tr>
+    </tbody>
+  </table>
+  <div class="item-decl">repository target or registry → capture → package source or manifest</div>
+  <p>Capture folds owned semantic declarations and declared live assets back into the package, then republishes its tree whole.</p>
+  <p class="small">Capture + reapply needs no version bump. Use <code>upgrade</code> only for a newer package version.</p>
+  <aside class="notes">
+    The human and JSON failure surfaces carry restore-or-capture guidance. Capture only
+    reads targets declared by the manifest and only semantic contributions already
+    claimed by that package’s applied record. This closes the dead-end Claude hit in
+    gf2 on JIT 1.0.0, where capture refreshed files but not semantic contributions.
+  </aside>
+</section>
+
+<!-- 11 · CONTRIBUTOR START -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Start with the repository that already works</h2>
+  <ol>
+    <li>Decide the package boundary: what should travel together?</li>
+    <li>Create <code>packages/sim-research/manifest.toml</code>.</li>
+    <li>Declare every file, region, semantic contribution, and live root.</li>
+    <li>Capture repository-authored material into the package.</li>
+    <li>Rehearse in a clean repository; then pack it.</li>
+  </ol>
+  <div class="note">The manifest is an allowlist. Capture does not crawl the repository and invent a package.</div>
+  <aside class="notes">
+    This is the crucial contributor mental model. Capture is not magical inference.
+    The contributor first states intent and ownership in the manifest; capture supplies
+    bytes and current values for the declared repository-authored pieces.
+  </aside>
+</section>
+
+<!-- 12 · MINIMAL MANIFEST -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>A valid v2 package starts this small</h2>
+<pre><code class="language-toml" data-trim>[profile]
+manifest-version = 2
+id = "sim-research"
+version = "1.0.0"
+compatible-jit = "&gt;=1.0.0, &lt;2.0.0"</code></pre>
+  <ul>
+    <li><code>id</code> is lowercase-kebab; <code>version</code> is SemVer.</li>
+    <li><code>compatible-jit</code> is a SemVer requirement for the binary.</li>
+    <li>Unknown fields and unsafe relative paths are rejected.</li>
+  </ul>
+  <div class="note">Author new packages as v2. Existing v1 package content still decodes; package and JIT versions remain independent.</div>
+  <aside class="notes">
+    This exact skeleton is parser-valid. All declaration arrays are optional, making
+    it a good incremental starting point.
+  </aside>
+</section>
+
+<!-- 13 · DECLARATION FAMILIES -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Four declarations cover the repository surface</h2>
+  <table>
+    <thead><tr><th>Manifest block</th><th>What it owns</th></tr></thead>
+    <tbody>
+      <tr><td><code>[[contribution]]</code></td><td>one typed configuration or registry declaration</td></tr>
+      <tr><td><code>[[asset]]</code></td><td>one complete file at a declared target</td></tr>
+      <tr><td><code>[[region]]</code></td><td>one marked region inside a repository file</td></tr>
+      <tr><td><code>[[live-source]]</code></td><td>one repository area capture must fully account for</td></tr>
+    </tbody>
+  </table>
+  <p>Dependencies and incompatibilities define the package graph; variables parameterize supported values and generated text.</p>
+  <aside class="notes">
+    The complete semantic contribution families are scalar, map-entry, set-string,
+    keyed-array, and projection. Contributors should use the canonical profiles
+    reference for each target’s complete value contract.
+  </aside>
+</section>
+
+<!-- 14 · SOURCE AUTHORITY -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Say who authors each byte</h2>
+  <table>
+    <thead><tr><th>Source class</th><th>Authority during capture</th></tr></thead>
+    <tbody>
+      <tr><td><code>assets/live/**</code></td><td>refresh from the declared repository target</td></tr>
+      <tr><td>owned semantic contribution</td><td>refresh from the live registry declaration</td></tr>
+      <tr><td>asset outside <code>assets/live/**</code></td><td>retain package-authored source bytes</td></tr>
+      <tr><td>managed-region source</td><td>retain package-authored region body</td></tr>
+    </tbody>
+  </table>
+  <div class="warning">Capture adopts only declared repository-authored material. It never silently absorbs an unrelated file.</div>
+  <aside class="notes">
+    This boundary came directly from execution feedback. Generated regions and
+    install-only assets remain package-authored; live assets and contributions owned
+    by the applied package may be refreshed from repository state.
+  </aside>
+</section>
+
+<!-- 15 · SEMANTIC CONTRIBUTION -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Declare meaning—not a file patch</h2>
+<pre><code class="language-toml" data-trim>[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "experiment"
+value = 4</code></pre>
+  <p>The kind defines merge semantics. Identical entries can share ownership; different values for the same identity conflict before publication.</p>
+  <div class="note">Every contribution value is complete. An overlay is not a partial patch.</div>
+  <aside class="notes">
+    sim-research is an overlay: it depends on a shared base and adds only the research
+    vocabulary. This keeps workflow inventories single-sourced and lets independent
+    packages safely restate a genuinely shared definition.
+  </aside>
+</section>
+
+<!-- 16 · VARIABLES -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Variables are public, deterministic configuration</h2>
+<pre><code class="language-toml" data-trim>[[variable]]
+name = "PROJECT_NAME"
+default = "simulation"
+env = "JIT_PROFILE_PROJECT_NAME"</code></pre>
+  <div class="item-decl">default → values file → declared environment → repeated --set</div>
+  <p>Use <code>{{jit:var:PROJECT_NAME}}</code> only in supported templated bodies and description fields.</p>
+  <div class="warning">Profiles expose no secret input, interpolation, persistence, or audit channel.</div>
+  <aside class="notes">
+    The final set value wins. Resolved values are recorded so reconfiguration is
+    deterministic. Audit events record variable names and source kinds, never values.
+  </aside>
+</section>
+
+<!-- 17 · CAPTURE -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Capture creates—and later refreshes—the package</h2>
+  <div class="item-decl">declared live repository state → capture → complete package tree</div>
+<pre><code class="language-bash" data-trim>jit profile capture \
+  --source packages/sim-research \
+  --destination packages/sim-research \
+  --dry-run --json
+
+# repeat without --dry-run to publish</code></pre>
+  <ul>
+    <li>Reads only manifest-declared targets.</li>
+    <li>Rejects unsafe paths, links, and undeclared executable content.</li>
+    <li>Republishes the tree whole; removed declarations cannot leave stale sources.</li>
+  </ul>
+  <aside class="notes">
+    The destination can equal the source for an in-place refresh. Dry-run validates
+    the exact tree publication without writing it.
+  </aside>
+</section>
+
+<!-- 18 · CLEAN-ROOM REHEARSAL -->
+<section>
+  <span class="seclabel">Contribute</span>
+  <h2>Prove the package in a clean repository</h2>
+<pre><code class="language-bash" data-trim>mkdir ../scratch &amp;&amp; cd ../scratch
+cp -R ../my-project/packages .
+
+jit init --profile path:packages/sim-research
+jit profile validate
+jit profile apply --profile id:sim-research --dry-run</code></pre>
+  <p>Test the dependency closure, variables, contributions, assets, regions, and conflict decisions—not just whether the manifest parses.</p>
+  <aside class="notes">
+    In a demo, copy the sibling dependency package beside sim-research, run init or
+    apply with path:sim-research, and then validate. Exact reapplication should report
+    unchanged throughout.
+  </aside>
+</section>
+
+<!-- 19 · PACK -->
+<section>
+  <span class="seclabel">Share</span>
+  <h2>Pack one deterministic offline artifact</h2>
+<pre><code class="language-bash" data-trim>jit profile pack \
+  --source packages/sim-research \
+  --output dist/sim-research.tar \
+  --dry-run
+
+jit profile pack \
+  --source packages/sim-research \
+  --output dist/sim-research.tar</code></pre>
+  <ul>
+    <li>The archive carries package ID, version, and content digest.</li>
+    <li>Packing identical content produces identical bytes.</li>
+    <li>The digest proves integrity—not who supplied the archive.</li>
+  </ul>
+  <aside class="notes">
+    JIT deliberately does not fetch or publish to a registry. The archive travels over
+    the channel the adopter already trusts: a release, source control, USB, or another
+    offline transport.
+  </aside>
+</section>
+
+<!-- 20 · ADD + APPLY -->
+<section>
+  <span class="seclabel">Share</span>
+  <h2>Verify, add, rehearse, apply</h2>
+<pre><code class="language-bash" data-trim>jit profile add --archive sim-research.tar \
+  --destination packages/sim-research --dry-run
+jit profile add --archive sim-research.tar \
+  --destination packages/sim-research
+
+jit profile apply --profile path:packages/sim-research \
+  --dry-run
+jit profile apply --profile path:packages/sim-research</code></pre>
+  <p><code>add</code> recomputes the identity and rejects digest mismatch, traversal, links, unexpected modes, malformed content, and an occupied destination.</p>
+  <aside class="notes">
+    Dependencies also need to be present as sibling package directories. A refused add
+    publishes nothing; apply then uses the same package graph and transaction path as
+    every other lifecycle mutation.
+  </aside>
+</section>
+
+<!-- 21 · GUARANTEES -->
+<section>
+  <span class="seclabel">Confidence</span>
+  <h2>One contract, from terminal to automation</h2>
+  <div class="two-col">
+    <div>
+      <h3>Operational guarantees</h3>
+      <ul>
+        <li>offline and Git-free</li>
+        <li>aggregate preflight validation</li>
+        <li>repository-wide caller serialization</li>
+        <li>recoverable all-old or all-new publication</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Public interfaces</h3>
+      <ul>
+        <li>stable human output</li>
+        <li><code>--json</code> profile envelopes</li>
+        <li>generated command and result schema</li>
+        <li>matching MCP tool family</li>
+      </ul>
+    </div>
+  </div>
+  <p class="center"><span class="badge green">verified</span> 4,540 Rust tests · 63 doctests · 79 MCP tests · zero-finding final review</p>
+  <aside class="notes">
+    Those are final epic gate results, not slideware estimates. Interruption,
+    concurrency, Git-free use, exact CLI/schema/MCP contracts, and the edit-capture-
+    reapply journey all have dedicated coverage.
+  </aside>
+</section>
+
+<!-- 22 · CLOSE -->
+<section class="title">
+  <h1>Make the workflow portable</h1>
+  <p class="tagline">Declare intent · preview decisions · capture deliberate change · share verified bytes</p>
+  <p><code>docs/reference/profiles.md</code></p>
+  <p class="caption">Start with one repository that already works.</p>
+  <aside class="notes">
+    For adopters: inspect, diff, and dry-run before applying. For contributors: draw a
+    clear ownership boundary, capture only declared repository-authored material, test
+    in a clean repo, and pack. The lifecycle is now complete enough to evolve honestly.
+  </aside>
+</section>
+
+</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+  window.__deckReady = false;
+  window.__mathReady = false;
+
+  function initDeck() {
+    if (window.renderMathInElement) {
+      renderMathInElement(document.body, {
+        delimiters: [
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+    window.__mathReady = true;
+
+    Reveal.initialize({
+      width: 1280,
+      height: 720,
+      margin: 0.04,
+      minScale: 0.4,
+      maxScale: 1.2,
+      hash: true,
+      center: false,
+      slideNumber: 'c/t',
+      transition: 'none',
+      backgroundTransition: 'none',
+      plugins: [ RevealHighlight ],
+    }).then(function () {
+      Promise.resolve(document.fonts ? document.fonts.ready : null)
+        .finally(function () { window.__deckReady = true; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', function () {
+      setTimeout(initDeck, 0);
+    });
+  } else {
+    setTimeout(initDeck, 0);
+  }
+</script>
+</body>
+</html>

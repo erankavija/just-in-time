@@ -53,6 +53,111 @@
       "format": "markdown",
       "label": "Authoritative-plan",
       "path": "dev/archive/c639cfb5-jit-profiles-complete/active/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;family=Source+Code+Pro:wght@400;500&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.gstatic.com",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://fonts.googleapis.com",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e964dd787590ea2c2eb5784b5362674504e66d2e4626bca1b1e8abff071f7059",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "base.css",
+          "resolved_path": "dev/archive/c639cfb5-jit-profiles-complete/presentations/c639cfb5/base.css"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7ba057c88a30dc41c8564b549d0b76bb6fa98413c3a50b66fd6a3f80a4783cbe",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "themes/rust.css",
+          "resolved_path": "dev/archive/c639cfb5-jit-profiles-complete/presentations/c639cfb5/themes/rust.css"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "presentation",
+      "format": "html",
+      "label": "Adopter and profile contributor showcase",
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/presentations/c639cfb5/talk.html"
     }
   ],
   "done_at": "2026-08-13T20:35:41.904368129Z",
@@ -103,5 +208,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-13T20:39:39.854741797Z"
+  "updated_at": "2026-08-13T21:15:46.728978984Z"
 }
