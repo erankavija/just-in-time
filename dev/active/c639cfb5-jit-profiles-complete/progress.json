@@ -1359,7 +1359,8 @@
         "Deadlock-freedom and starvation-freedom are different properties and a fixed acquisition order buys only the first. A session that takes M and then blocks on P holds the checkout lock — which every commit needs — while waiting on a lock an unrelated third party holds. Never block on a second lock while holding a first: wait for freeness outside both, then acquire in order. Reading who holds a lock takes no lock, so checking first introduces no ordering hazard.",
         "A worker's silence is not evidence about the work, in either direction. Both wave-13/14 workers went idle without reporting; reading their branches settled every open review item faster than the three messages sent asking, and the corrections had all landed. A report is the worker's account of what it did; the diff is what it did. Read the branch, then decide.",
         "An automated remedy outlives the diagnosis that justified it. A background watcher armed to clear a stuck lock became a booby trap once the lock was cleared by hand — its trigger condition no longer meant what it meant when written, and it would have killed a live sccache mid-build. It fired two seconds after the manual fix and was harmless only by luck."
-      ]
+      ],
+      "status": "not currently in force — no second session is active against this checkout; retained because the hazards are properties of the repository, not of that session"
     }
   ],
   "measurements": [
@@ -1387,5 +1388,21 @@
       "detail": "cf42d08b's three new tests measure 4.56 s in isolation (the 511-asset regression test alone is 4.55 s, just under the suite's 5324 ms slowest existing test); f2389b18's seven measure 0.643 s. Predicted suite impact by addition: ~5.2 s onto a 22095 ms baseline. Measured impact: 22218 ms and 22128 ms — roughly 0.1 s. nextest runs process-per-test across 24 workers, so an expensive test lengthens wall-clock only if it lands last on the critical path. The additive model would have imposed a false constraint on every remaining wave of this epic and led to shrinking tests to buy margin that was never being consumed.",
       "standing_rule": "Measure a test's suite impact by running the suite, not by adding the test's isolated cost to a baseline. Isolated cost answers 'is this test expensive', which is a different question from 'does this test cost the suite anything'."
     }
-  ]
+  ],
+  "last_handoff": "handoff-11.md",
+  "session_11_summary": {
+    "date": "2026-08-13",
+    "waves_closed": [
+      13,
+      14
+    ],
+    "issues_completed": [
+      "cf42d08b",
+      "f2389b18"
+    ],
+    "rework_rounds": 0,
+    "gates_run": "cf42d08b cargo-ci (2 cold-fail, 2 warm-pass) + code-review (pass, 0 findings); f2389b18 cargo-ci (1 cold-fail, 1 warm-pass) + mcp-ci (1 fail on stale installed binary, 1 pass under worktree PATH) + code-review (pass); combined tree cargo-ci (1 cold-fail, 1 warm-pass at 22314 ms, 4497 tests)",
+    "integration_defect": "The combined tree did not compile: f2389b18 added two CaptureBudget construction sites while cf42d08b removed the max_paths field. Both branches were individually green and the merge was textually clean. Fixed lead-side in 95460dfe5. Merging both to main separately would have left main broken between the merges.",
+    "blocking_questions_for_next_session": 4
+  }
 }
