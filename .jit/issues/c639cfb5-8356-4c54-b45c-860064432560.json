@@ -24,27 +24,27 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-13T18:55:45.341188369Z",
+      "updated_at": "2026-08-13T20:25:00.435791643Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_at": "2026-08-13T19:16:33.371036353Z",
+      "updated_at": "2026-08-13T20:29:20.810022377Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-13T19:14:48.570092999Z",
+      "updated_at": "2026-08-13T20:25:21.418473716Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "status": "failed",
-      "updated_at": "2026-08-13T19:19:32.189173243Z",
+      "status": "passed",
+      "updated_at": "2026-08-13T20:32:24.601370430Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_at": "2026-08-13T19:14:45.650716864Z",
+      "updated_at": "2026-08-13T20:25:10.342686437Z",
       "updated_by": "auto:executor"
     }
   },
@@ -60,5 +60,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-13T19:47:38.725027075Z"
+  "updated_at": "2026-08-13T20:32:24.601370430Z"
 }

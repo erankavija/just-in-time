@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "cbbce0e74747850d82540cad0cac51db179b6dfc",
+  "completed_at": "2026-08-13T20:25:10.329667414Z",
+  "duration_ms": 2451,
+  "exit_code": 0,
+  "gate_key": "repo-validate",
+  "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0f2f727b-c178-4d69-9ed2-9f103a2fdad1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T20:25:07.878062472Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "✓ Repository validation passed\n⚠ 6 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cbbce0e74747850d82540cad0cac51db179b6dfc",
+  "completed_at": "2026-08-13T20:32:23.596835262Z",
+  "duration_ms": 166869,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are verifiably met; no blocking incoherence found.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8507ad49-d0d8-49eb-ab5e-d3476eb22e49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T20:29:36.727184981Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; no blocking incoherence found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
