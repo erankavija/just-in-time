@@ -14196,3 +14196,7 @@
 {"gate_key":"repo-validate","id":"b264d151-a705-4721-96fe-3e6c254e0467","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T18:55:51.952271840Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"a9a14a0b-823c-48b1-948c-81f4763dde70","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T18:55:55.526448263Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"9e578361-74db-4218-8bba-6c866ab56645","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T18:58:13.868282883Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"3ef2adaf-5f2e-47de-a2ab-c77633193085","issue_id":"08883a21-571d-4b00-a639-6e21309dee31","priority":"high","timestamp":"2026-08-13T18:59:21.638097612Z","title":"Document the profile manifest authoring contract","type":"issue_created"}
+{"fields":["dependencies"],"id":"e4a5caa5-45a8-4991-bc7f-25ab1d2c84a2","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T18:59:42.229388383Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"279ab90f-2f48-4a81-825b-c1cd850a7b9d","issue_id":"08883a21-571d-4b00-a639-6e21309dee31","timestamp":"2026-08-13T18:59:51.716181647Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"2e06eacd-4170-45bd-b158-2136c9294e13","issue_id":"08883a21-571d-4b00-a639-6e21309dee31","timestamp":"2026-08-13T18:59:51.716181647Z","type":"issue_claimed"}

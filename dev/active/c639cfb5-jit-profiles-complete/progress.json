@@ -308,9 +308,26 @@
           "note": "Completed after one container-level rework cycle. The first holistic review found the superseded profile_applied contract; focused remediation b5bb4b9c removed it. Fresh forced repo-validate and holistic-review now pass on the merged tree, with the reviewer confirming the command, aggregate event, adopter documentation, acceptance coverage, and clean cut satisfy the hard criterion."
         }
       ]
+    },
+    {
+      "wave_number": 23,
+      "issues": [
+        {
+          "short_id": "08883a21",
+          "title": "Document the profile manifest authoring contract",
+          "classification": "documentation",
+          "status": "in_progress",
+          "note": "Created from epic doc-review finding F1. The canonical guide explains the authoring workflow but does not expose the required versioned TOML contract; this bounded remediation supplies a parser-checked v2 skeleton and complete declaration-family reference without changing the package model or creating a second canonical home."
+        }
+      ]
     }
   ],
   "created_during_execution": [
+    {
+      "short_id": "08883a21",
+      "title": "Document the profile manifest authoring contract",
+      "reason": "The epic completion doc-review found that REQ-10's local authoring promise was not usable from adopter documentation: profiles.md told readers to create manifest.toml but neither documented nor linked the accepted versioned TOML shape. This is direct criterion repair, not expanded product scope. Wired directly into the epic before rerunning its completion reviews."
+    },
     {
       "short_id": "b5bb4b9c",
       "title": "Remove the superseded profile_applied event contract",
@@ -451,7 +468,10 @@
     "3dcce8a8": 1,
     "d7558ef6": 0,
     "8021d507": 0,
-    "b5bb4b9c": 0
+    "b5bb4b9c": 0,
+    "dd268d0f": 1,
+    "08883a21": 0,
+    "c639cfb5": 1
   },
   "review_verdicts": [
     {

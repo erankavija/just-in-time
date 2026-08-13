@@ -1,0 +1,29 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T18:59:51.716181647Z",
+  "context": {},
+  "created_at": "2026-08-13T18:59:21.638097612Z",
+  "dependencies": [],
+  "description": "Make local profile-package authoring usable from the canonical adopter documentation by documenting the versioned `manifest.toml` contract that the production decoder accepts.\n\n## Background\n\nThe profile guide already explains the authoring and capture workflow, but it tells an adopter to create a manifest without showing or linking the required TOML shape. The completed lifecycle must be usable without reading Rust source or reverse-engineering the normalized CLI schema.\n\n## Success Criteria\n\n- [hard] REQ-01: The canonical profile guide contains, or directly links to, a copyable minimal version-2 `manifest.toml` skeleton that the production package decoder accepts and explains the required identity, version, compatibility, and source layout fields.\n- [hard] REQ-02: The same canonical authoring reference describes every supported manifest declaration family and its material required, optional, repeatable, and default behavior sufficiently for an adopter to author dependencies, incompatibilities, non-secret variables, assets, managed regions, semantic contributions, and live-source capture roots without reading implementation code.\n- [hard] REQ-03: Examples and field names are checked against the production parser or an existing parser-derived contract, repository-configured vocabulary is cited rather than copied, and the documentation mechanical and independent documentation-review gates pass.\n\n## Notes\n\nThis is documentation-contract repair for epic REQ-10. It does not add a manifest version, change the package model, or introduce a second canonical reference.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-13T18:59:21.638097612Z",
+  "gates_required": [
+    "docs-mechanical",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "08883a21-571d-4b00-a639-6e21309dee31",
+  "labels": [
+    "epic:jit-profiles-complete",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:docs",
+    "satisfies:REQ-10",
+    "milestone:v1.0",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Document the profile manifest authoring contract",
+  "updated_at": "2026-08-13T18:59:51.716181647Z"
+}
