@@ -101,6 +101,16 @@ is how an edit made in place reaches the package that owns it:
 jit profile capture --source profiles/my-workflow --destination build/my-workflow
 ```
 
+That covers both classes of content a package owns and the repository authors:
+the bytes of a live asset, and the value of a declared contribution. An adopter
+who changes a contributed value in its registry captures the package that
+published it and applies the result; the registry keeps the value they chose,
+and the package and its applied-profile record agree with it again. Until they
+do, [`jit profile diff`](cli-commands.md#jit-profile-diff),
+[`jit profile validate`](cli-commands.md#jit-profile-validate), and `jit
+validate` all name that declaration, and an application is refused rather than
+reporting nothing to do.
+
 Pack a package into one portable file to hand to somebody, and place one
 somebody handed you:
 
