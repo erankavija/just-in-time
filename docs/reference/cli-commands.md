@@ -745,8 +745,9 @@ would `retain` or `remove`, and the targets it cannot publish at all
 
 Beside those targets it states the registry declarations that profile decided,
 in the same vocabulary and each named by its semantic identity — the registry,
-declaration kind and target, and local name, as in
-`.jit/config.toml:map-entry:namespaces:workflow`. A package composes its
+declaration kind and target, and local name. For example, the `namespaces.type`
+entry in `.jit/config.toml` is identified as `map-entry:namespaces:type`.
+A package composes its
 declarations by identity rather than by the registry file holding them, so
 several packages contribute to one registry and each declaration is decided on
 its own.
@@ -966,6 +967,8 @@ jit profile pack --source <DIR> --output <FILE> [--dry-run] [--json]
 
 `--source` names the package directory and must classify as worktree content.
 `--output` names the archive file to write, anywhere the invocation can write.
+When that path is inside the repository, it is limited to 128 path components
+below the repository root; an external output path has no repository traversal.
 
 The archive is an uncompressed tar carrying one metadata entry — the package
 `id`, `version`, and identity digest — and one entry per package file under a

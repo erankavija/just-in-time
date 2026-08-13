@@ -50,7 +50,7 @@ This documentation follows the [Diátaxis](https://diataxis.fr/) framework:
 - [Release Policy](reference/release-policy.md) - How the product version is
   declared and verified, what a release publishes, and the supported Rust
   version with its recency window
-- [Repository Profiles](reference/profiles.md) - Preferred repository workflow setup, package contract, and recovery boundary
+- [Repository Profiles](reference/profiles.md) - Canonical profile lifecycle: authoring, exchange, composition, ownership, recovery, and upgrade
 - [Exit Codes](reference/exit-codes.md) - Process exit-code taxonomy and per-command mappings
 - [Machine-readable Error Codes](reference/error-codes.md) - Generated vocabulary of error-envelope codes, meanings, and exit statuses
 - [CLI Command-Grammar Standard](reference/cli-command-grammar.md) - Canonical command grammar (nouns/verbs, positionals, id acceptance, gate grouping)
