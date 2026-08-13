@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-b3d92595",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "29c6b859295ab4958066bdc2c30da01d6aa19b06",
+  "completed_at": "2026-08-13T17:09:52.126867100Z",
+  "duration_ms": 136514,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped profile lifecycle documentation is accurate, discoverable, and complete.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "b3d92595-a878-478c-825d-529b9a15572e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "51074c72-949b-4d60-9142-a8ff2bb3675a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:07:35.612351033Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; reviewed the four individually inspected `jit:b3d92595` commits. Uncommitted JIT metadata was excluded.\n\nThe canonical profile reference now covers the shipped lifecycle, while nearby entry points link to it. Commands and lifecycle-event claims match the current CLI/source; links and citations pass the mechanical documentation check. The prior failed review produced no findings.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped profile lifecycle documentation is accurate, discoverable, and complete.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

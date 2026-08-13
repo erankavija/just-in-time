@@ -14,7 +14,18 @@
     "docs-mechanical",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T17:09:52.432948677Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-13T17:07:07.423548848Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b3d92595-a878-478c-825d-529b9a15572e",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document the completed profile lifecycle for adopters",
-  "updated_at": "2026-08-13T16:55:41.984191422Z"
+  "updated_at": "2026-08-13T17:09:52.432948677Z"
 }

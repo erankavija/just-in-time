@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-b3d92595",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "6fd163be382ae18649a0debbb30975ce9a59de1d",
+  "completed_at": "2026-08-13T17:05:19.338933425Z",
+  "duration_ms": 3273,
+  "exit_code": 1,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "082ee45ba2beccc39b3c83c83fb29508e44f3546598006390b52f6d8f4af9c7e",
+  "issue_id": "b3d92595-a878-478c-825d-529b9a15572e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c9dbd378-c56b-44ed-881e-856202b06bec",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:05:16.065482758Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nMISSING: .jit/config.toml:map-entry:namespaces:workflow\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n",
+  "tree_dirty": false
+}
