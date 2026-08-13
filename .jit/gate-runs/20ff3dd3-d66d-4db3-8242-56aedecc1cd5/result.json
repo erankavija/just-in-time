@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-08883a21",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "859636f574a38aee3fe45bd5938641068c5b0010",
+  "completed_at": "2026-08-13T19:11:47.004557003Z",
+  "duration_ms": 2145,
+  "exit_code": 0,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "82be77b478b9dd60ba21407e27f2dcdfe24ef2b211f6d203c8d4be586a6e7aed",
+  "issue_id": "08883a21-571d-4b00-a639-6e21309dee31",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20ff3dd3-d66d-4db3-8242-56aedecc1cd5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T19:11:44.858657989Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n",
+  "tree_dirty": false
+}

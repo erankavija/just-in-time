@@ -52,6 +52,150 @@ Plain `jit init` remains the methodology-neutral alternative. It creates the
 structural minimum — the schema version and the project name, beside the empty
 registries, the event log and the index — and declares no workflow vocabulary.
 
+## Author a version-2 manifest
+
+Create a package as a directory with a root `manifest.toml`. The minimal
+version-2 package needs no sources or declarations; this copyable manifest is
+accepted by the package decoder as-is:
+
+```toml
+[profile]
+manifest-version = 2
+id = "my-workflow"
+version = "1.0.0"
+compatible-jit = "*"
+```
+
+`id` is a lowercase-kebab package identifier, `version` is a semantic version,
+and `compatible-jit` is a semantic-version requirement for the JIT binary. The
+version discriminator, identity, package version, and compatibility requirement
+are all required. New packages use version 2: it has the `compatible-jit`
+spelling above and hashes the authored manifest bytes as part of package
+identity. The decoder continues to accept version-1 manifests already present
+in package content, but their `jit` compatibility spelling, bare dependency
+IDs, and lack of variables, incompatibilities, and template opt-in are not this
+authoring contract.
+
+The rest of the top-level declarations are optional arrays of tables. Omit a
+family to declare none of it; repeat `[[...]]` to declare several entries in
+the order written. Version-2 manifests reject unknown fields. Every package
+path is a non-empty, safe relative path: it cannot be absolute, traverse with
+`..`, contain an empty path segment, or use a platform path prefix.
+
+```toml
+# Each block below is optional and repeatable.
+[[dependency]]
+id = "base-workflow"
+version = ">=1.0.0, <2.0.0"
+
+[[incompatibility]]
+id = "legacy-workflow"
+version = ">=1.0.0"
+
+[[variable]]
+name = "PROJECT_NAME"
+default = "my-project"
+env = "JIT_PROFILE_PROJECT_NAME"
+
+[[asset]]
+source = "assets/install/guide.md"
+target = "docs/workflow.md"
+executable = false
+template = false
+
+[[region]]
+source = "regions/agents.md"
+target = "AGENTS.md"
+region-id = "my-workflow-guidance"
+placement = "append"
+template = false
+
+[[live-source]]
+root = "docs"
+exclude = ["docs/drafts/**"]
+```
+
+### Package identity, compatibility, and variables
+
+`[[dependency]]` and `[[incompatibility]]` each require a lowercase-kebab
+`id` and a semantic-version `version` requirement. A package cannot depend on
+itself. Dependencies are resolved before the package that declares them;
+incompatibilities make a selection containing a matching installed or selected
+package fail before publication.
+
+A `[[variable]]` requires `name`; `default` and `env` are independently
+optional. Both the profile variable name and the optional environment name use
+`[A-Z][A-Z0-9_]*`, and a name is declared at most once. Variables are
+non-secret public configuration: do not place credentials in them or in a
+values file. Their resolution precedence is declaration default, values file,
+the declared environment variable, then repeated `--set NAME=VALUE` (the last
+`--set` wins).
+
+Use `{{jit:var:NAME}}` only in a templated asset or region body, or in the
+following contribution fields: a namespace entry's `description`; a gate's
+`title`, `description`, or `checker.prompt`; or an invariant, rule, or template
+entry's `description`. A templated body must be UTF-8; an untemplated body may
+be binary but cannot contain that token. All other contribution strings, plus
+paths, IDs, versions, modes, and targets, are literal and reject variable
+references. A reference with no resolved value refuses the operation.
+
+### Files, regions, and capture roots
+
+An `[[asset]]` copies exactly one package file at required `source` to the
+required repository `target`. `executable` and `template` are optional and
+default to `false`. Set `executable = true` for a source that must be published
+with executable mode; a source that is executable on disk but omits that
+declaration is rejected.
+
+An `[[region]]` inserts the required package `source` into a managed region in
+the required repository `target`. `region-id` is a required lowercase-kebab
+marker identity, and `placement = "append"` is currently the required placement
+policy: it appends the delimited region if absent, then later refreshes only
+that region. `template` is optional and defaults to `false`. An asset and a
+region cannot share a source or a target, and package files other than
+`manifest.toml` must be declared as one of those sources.
+
+For a live asset that `jit profile capture` refreshes from the repository,
+write its asset source below `assets/live/` and make its `target` the repository
+file that supplies the bytes. The package does not need a checked-in copy of
+that live source when capture creates its destination. Assets outside that
+prefix, and every region source, are package-authored files read from the
+package directory.
+
+Each `[[live-source]]` declares one required repository-relative directory
+`root`; its optional `exclude` list defaults to `[]`. Use shell-style,
+repository-relative patterns in `exclude` (`*` stays within a path segment and
+`**` spans segments). Roots cannot repeat or overlap. A root states the live
+repository area the package intends to account for. When a package is intended
+to capture a complete area, declare each live asset under that root or
+explicitly exclude it, rather than silently omitting material.
+
+### Semantic contributions
+
+`[[contribution]]` publishes one semantic registry declaration instead of a
+file. Every contribution requires `kind` and the fields in the matching row.
+Its `value` is TOML data that represents the complete registry value, not a
+partial patch. The target names below are stable profile-model vocabulary; the
+names, tables, and policy values your repository declares belong to its
+[Configuration reference](configuration.md), rather than to this repository's
+dogfood configuration.
+
+| `kind` | Required fields | Target and value contract |
+|---|---|---|
+| `scalar` | `target`, non-empty string `value` | `target` is one of `documentation-development-root`, `documentation-archive-root`, `validation-strictness`, or `validation-default-type`; it selects that scalar configuration setting. |
+| `map-entry` | `target`, non-empty `identity`, `value` | `target` is `type-hierarchy-types`, `label-associations`, `namespaces`, or `item-kinds`; `value` must be the complete value for that configuration entry (a positive integer for a type-hierarchy entry, a string for a label association, and a complete table for a namespace or item kind). |
+| `set-string` | `target`, non-empty string `value` | `target` is `strategic-types`, `documentation-managed-paths`, `documentation-permanent-paths`, or `documentation-issue-scoped-areas`; it adds one member to that configured string collection. |
+| `keyed-array` | `target`, `identity`, complete-table `value` | `target` is `gates`, `invariants`, `rules`, or `templates`. The value must carry the same identity: `key` for a [gate](storage-format.md#gate-registry), `id` for an [invariant](storage-format.md#invariants-registry), and `name` for a [rule](storage-format.md#validation-rules-registry) or [template](storage-format.md#graph-template-registry). The linked registry references define the rest of each table; [Author Validation Rules](../how-to/validation-rules.md#anatomy-of-a-rule) gives rule anatomy. |
+| `projection` | `name`, table `value` | `value` requires `kind`, `mode`, `target`, and `style`, in the same shape as a [`[projection.<name>]` declaration](configuration.md#projectionname). Its `target` is a safe repository-relative path. |
+
+Contributions have unique semantic identities within a package. In particular,
+two entries cannot publish the same target and identity. Use the
+[Configuration reference](configuration.md) for namespaces, item kinds,
+hierarchy, documentation, and projections; use the linked registry references
+above for gates, invariants, rules, and templates. The manifest carries each
+declared value whole so it can be composed, validated, and captured without
+treating repository-local vocabulary as an engine default.
+
 ## Commands
 
 List the profiles this repository's own records name, and inspect one or more —
@@ -132,12 +276,10 @@ inside the repository, the output path may be at most 128 path components below
 the repository root; choose an external path if a deeper output location is
 needed. An existing output or add destination is never overwritten.
 
-Packages may declare non-secret variables. Supply a TOML values file containing
-`[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
-values file, declared environment variable, then `--set`, with the last
-`--set` winning. Variable references are available in templated asset and
-region bodies and declared free-form prose fields; package paths, identities,
-modes, and other constrained fields reject them.
+For a declared profile variable, supply a TOML values file containing
+`[variables]` or repeat `--set NAME=VALUE`. See [Package identity,
+compatibility, and variables](#package-identity-compatibility-and-variables)
+for declaration, reference, and precedence semantics.
 
 The selector syntax and package-resolution contract are defined in [Profile
 Commands](cli-commands.md#profile-commands). This page
