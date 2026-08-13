@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-acf49914",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "813e9b5f7b741daece3fcf8edc7711ed040de906",
+  "completed_at": "2026-08-13T16:06:12.241522472Z",
+  "duration_ms": 282660,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "01043a0abf468c17a8b0f2e713c434722572665efc1a5bbbb76d1041cfff140e",
+  "issue_id": "acf49914-0c41-4c21-9db1-532fae09cc78",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "97ae86fa-4ef7-47ae-860c-aa484ba922ab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:01:29.581515853Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 46354 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 46354 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 98860 ms, warmed 17 executables (1925565256 bytes) in 74 ms.\n  ✓ incremental-baseline: 18 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-acf49914/target, none of them this run's (334 ms)\n  ✓ fmt: ok (94327 ms)\n  ✓ clippy: ok (35008 ms)\n  ✓ suite-build: built in 98860 ms, warmed 17 executables (1925565256 bytes) in 74 ms (98938 ms)\n  ✓ test: 4532 passed, 0 failed, 7 skipped (36163 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (10172 ms)\n  ✓ suite-clock: 46354 ms\n  ✗ budget: FAILED (exit 1) (87 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-acf49914/target during this run (18 pre-existing entries ignored) (6916 ms)\n\n",
+  "tree_dirty": false
+}

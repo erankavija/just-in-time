@@ -15,14 +15,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-13T05:31:49.049107229Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T16:07:02.883731041Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-13T05:31:49.218583337Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T16:10:01.100636579Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "acf49914-0c41-4c21-9db1-532fae09cc78",
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prove an in-place edit refreshes back into agreement",
-  "updated_at": "2026-08-13T15:36:27.537274604Z"
+  "updated_at": "2026-08-13T16:10:01.100636579Z"
 }

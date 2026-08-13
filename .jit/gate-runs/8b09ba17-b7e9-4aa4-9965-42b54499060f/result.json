@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-acf49914",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "813e9b5f7b741daece3fcf8edc7711ed040de906",
+  "completed_at": "2026-08-13T16:10:00.781887358Z",
+  "duration_ms": 163112,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable integration test satisfies the issue's hard criteria with current post-commit Cargo CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "acf49914-0c41-4c21-9db1-532fae09cc78",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8b09ba17-b7e9-4aa4-9965-42b54499060f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:07:17.669512931Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 64668f755, 0d7efe9a7, 813e9b5f7 (`jit:acf49914`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/c639cfb5/requirement/REQ-11 and REQ-13 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/gate/cargo-ci (.jit/gates.toml); @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-08-13T16:06:31Z; code-review pending\nTruncation recovery: reread individual tagged patches and scoped current-file/policy ranges after combined reads truncated; historical event/progress records excluded from behavioral judgment\n\n1. No findings. The added CLI integration test covers edit, refusal-without-write, capture refresh, same-version reapply, record refresh, and restored agreement; it is registered in the existing integration target.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable integration test satisfies the issue's hard criteria with current post-commit Cargo CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
