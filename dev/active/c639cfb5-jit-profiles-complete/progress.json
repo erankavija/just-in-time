@@ -297,7 +297,8 @@
           "short_id": "dd268d0f",
           "title": "Surface, documentation, and evidence",
           "classification": "checkpoint",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "All four dependencies are done and individually gated. Lead is running the story's authoritative repository-validation and independent holistic-review checkpoints over the complete command surface, aggregate audit contract, canonical adopter reference, behavioral evidence, and structural cutover guards."
         }
       ]
     }

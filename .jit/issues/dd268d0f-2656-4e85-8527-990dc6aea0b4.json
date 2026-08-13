@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:lead",
+  "claimed_at": "2026-08-13T18:17:40.451573457Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -10,6 +11,7 @@
   ],
   "description": "The completed lifecycle reaches adopters through one command surface, one\ncanonical reference, and evidence that the surface behaves as documented.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands the profile command surface, its audit event, the canonical adopter reference, behavioural acceptance coverage, and mechanical proof that no superseded lifecycle path survives.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T18:17:31.159669058Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
@@ -33,7 +35,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Surface, documentation, and evidence",
-  "updated_at": "2026-08-13T05:31:58.299024945Z"
+  "updated_at": "2026-08-13T18:17:40.451573457Z"
 }
