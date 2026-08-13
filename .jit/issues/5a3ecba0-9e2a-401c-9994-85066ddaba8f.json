@@ -2,12 +2,28 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-08-13T06:09:07.025187479Z",
-  "dependencies": [],
+  "dependencies": [
+    "96268a98-ef75-487d-acab-22a813ff7803"
+  ],
   "description": "Capture reads a declared contribution's value back from the repository's own\nregistries, so a contributed value an adopter changed in place is refreshed\nfrom that change instead of wedging repository validation.\n\n## Background\n\nA profile contributes semantic values into the repository's declared\nconfiguration. An adopter who changes one of those values in place reaches a\nstate no sanctioned sequence clears, verified against a built binary:\n\n    jit profile validate  -> '.jit/config.toml:map-entry:type-hierarchy-types:widget'\n                             no longer holds the value this profile published  (exit 4)\n    jit validate          -> [profile-ownership] rule error; repository validation fails\n    jit validate --fix    -> 0 fixes would be applied\n    jit profile capture   -> manifest unchanged; contributions are not read\n    jit profile apply     -> \"unchanged\"; the repository keeps the adopter's value\n    jit profile reconfigure -> \"unchanged\"; identical outcome\n\nCapture draws asset bytes from the repository for a live-source declaration, but\nit reads no contribution at all, so the one class of profile-owned content whose\nauthor is the repository is the one class capture cannot refresh. That inverts\nthe ownership the charter states: a record is provenance and ownership evidence\nand never an authority for declared repository configuration (`@/charter/D-8`\ndecision D-04 on this container), yet here the record's copy outranks the\nregistry in every available operation while none of them can reconcile the two.\n\nThe other classes need no equivalent work, and this issue must not add it. A\nmanaged region's body is generated from the package's region source, and an\ninstall-only asset's bytes are content the package authors rather than content\nthe repository holds, so neither has a repository-side value to read back; an\napply re-renders the region, and an edited install-only asset is refused with an\nactionable conflict that names restoring the published value.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture refreshes every contribution the manifest declares from the value the repository's registries currently hold, so a contributed value changed in place becomes the package's declared value.\n- [hard] REQ-02: Capture reads only the contributions the manifest already declares and infers no new contribution from repository state, so a package cannot widen through capture.\n- [hard] REQ-03: After a capture and a re-application, a repository whose contributed value was changed in place reports agreement from both the profile check and whole-repository validation.\n- [hard] REQ-04: A declared contribution whose target the repository no longer holds is reported by name rather than dropped from the captured manifest or replaced by a default.\n- [hard] REQ-05: Capture republishes the manifest whole, so a contribution the manifest stopped declaring does not survive in the captured package.\n\n## Notes\n\nThe manifest is already republished by capture as an ordinary declared source,\nso the contribution values reach the captured tree through that same manifest\nrather than through a second write path.",
   "documents": [],
   "first_ready_at": "2026-08-13T06:09:07.025187479Z",
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-13T07:10:26.408855068Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-13T07:10:26.561684252Z",
+      "updated_by": null
+    }
+  },
   "id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
   "labels": [
     "type:task",
@@ -22,5 +38,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Refresh declared contributions from the repository on capture",
-  "updated_at": "2026-08-13T06:09:07.025187479Z"
+  "updated_at": "2026-08-13T07:11:04.360638236Z"
 }

@@ -7,6 +7,7 @@
   ],
   "description": "Unify how every profile subcommand presents itself: human output, machine\nenvelopes, rehearsal mode, generated schema, and the bridge tool inventory.\n\n## Background\n\nThe family grows from three subcommands to the full lifecycle, and each new one\narrives with its own wiring. Left alone they drift into different envelopes,\ndifferent rehearsal semantics, and hand-maintained bridge entries. This work runs\nafter the subcommands exist so it can standardize what is actually there.\n\n## Success Criteria\n\n- [hard] REQ-01: Every profile subcommand emits machine-readable output under the project's collection envelope, and list-emitting subcommands share one envelope shape.\n- [hard] REQ-02: Each mutating subcommand supports a rehearsal mode that reports the decisions it would publish and writes nothing.\n- [hard] REQ-03: Human output states profile id, version, origin, and per-target decision consistently, and no subcommand uses a decision vocabulary the others do not.\n- [hard] REQ-04: The generated command schema and the bridge tool inventory expose the family from the command definitions, with no hand-written duplicate of a subcommand's arguments.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T07:11:15.044375673Z",
   "gates_required": [
     "cargo-ci",
     "mcp-ci",
@@ -24,7 +25,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Give the profile subcommands one presentation contract",
-  "updated_at": "2026-08-10T15:43:32.529267646Z"
+  "updated_at": "2026-08-13T07:11:15.044375673Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 15,
+  "current_wave": 16,
   "waves": [
     {
       "wave_number": 1,
@@ -199,7 +199,7 @@
           "short_id": "96268a98",
           "title": "Report what an operation would change before it runs",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -1147,6 +1147,45 @@
         "F4 (lead): the surviving-region-owner change (Retain instead of Remove) alters REQ-07's removal rule and is documented in prose with no test pinning it."
       ],
       "note": "Stale-narrative sweep clean. No linked docs, so the deferred-items tier is n/a. First code-review run, so no regression tier."
+    },
+    {
+      "issue": "96268a98",
+      "round": 2,
+      "verdict": "PASS",
+      "date": "2026-08-13",
+      "gates": {
+        "cargo-ci": "passed at 4aa9e613e (4512 tests, suite 22,546 ms warm, derivation executed, 25 s)",
+        "code-review": "passed (277 s, derivation executed, 0 findings)"
+      },
+      "criteria": {
+        "REQ-01": "MET - identities reported beside file targets in jit profile validate's spelling; verified by running the rebuilt binary",
+        "REQ-02": "MET - 'claimed by no package' vs 'claimed by demo' observed on the same declaration before and after apply",
+        "REQ-03": "MET - profile_target_decisions and profile_contribution_decisions each have exactly two callers, the report and ensure_publishable_targets",
+        "REQ-04": "MET - diff on an unapplied path: selector reports create decisions"
+      },
+      "regression_table": [
+        {
+          "finding": "F1 report omits semantic identities; composition aborts",
+          "status": "closed",
+          "evidence": "ContributionCompositionConflict, both ContributionComposition error variants, profile_composition_error and preflight_profile_contributions absent from the tree; compose_profile_contributions returns a decision map (profile_apply.rs:2110)"
+        },
+        {
+          "finding": "F2 owners must extend to identities",
+          "status": "closed",
+          "evidence": "ProfileContributionChange.owners (application.rs:276) documents empty=repository-owned, many=shared"
+        },
+        {
+          "finding": "F3 module doc claims what is true of the file half only",
+          "status": "closed",
+          "evidence": "difference.rs module doc rewritten to cover both readers"
+        },
+        {
+          "finding": "F4 surviving-region-owner change unpinned",
+          "status": "closed",
+          "evidence": "test_diff_profiles_from_sources_retains_a_departing_asset_a_region_owner_still_claims (commands/profile.rs:6778)"
+        }
+      ],
+      "note": "Tier 2.5 sweep clean over the superseded vocabulary. No linked docs, so Tier 2.75 is n/a. Both gate records verified as derivation 'executed' rather than reused."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1279,6 +1318,13 @@
       "subject": "a criterion enumerating properties admits no implicit carve-out",
       "detail": "REQ-03 lists 'absolute path, parent-directory traversal, symlink, or unexpected mode' as properties that must be refused. The lead accepted an implementation that stopped checking mode for one entry kind, reasoning the property had no referent there. The reviewer read the enumeration literally and failed it. Lesson: when a criterion enumerates properties to refuse, a change that stops checking one of them for any subset of inputs needs the criterion amended (escalation) rather than a lead judgement that the property does not apply.",
       "status": "process-note"
+    },
+    {
+      "subject": "diff, profile validate and repo validate disagree on a drifted contribution",
+      "detail": "On one repository state - a profile-contributed value edited in place - jit profile diff reports status 'unchanged' and exits 0, while jit profile validate exits 4 and jit validate fails with a profile-ownership rule error. diff is truthful: contribution rendering publishes only where the registry has no entry and overwrites none, so applying really would change nothing. The gap is that the report an adopter consults before acting says the selection is clean while repository validation is failing on that declaration. Verified by running the reworked binary against a scratch repository.",
+      "status": "assigned-5a3ecba0",
+      "owner": "lead",
+      "note": "Not 96268a98's defect: its criteria are about stating the decision and it states it correctly. Belongs with the contribution-refresh work. Lead proposed adding a criterion to 5a3ecba0 requiring the three commands to agree on whether a repository needs attention; raised with the owner, no reply yet, so 5a3ecba0's criteria are unchanged."
     }
   ],
   "scope_changes": [
@@ -1302,6 +1348,12 @@
       "authority": "invoker",
       "detail": "The archive digest establishes integrity (truncation, corruption, accidental modification), not authenticity. It travels inside the archive, so anyone who can rewrite the content can rewrite the digest; the adopter's chosen channel carries authenticity (epic D-02). Confirmed as sufficient for this release. Signing or provenance attestation would be an additional artifact beside the digest rather than a change to it, so no half-built surface is left behind.",
       "constraint": "Neither code documentation nor adopter documentation (b3d92595) may describe the digest as proof of origin. Recorded in dev/active/15cc28c5/15cc28c5-threat-model.md, which is linked to 15cc28c5 and backs its precheck security-review attestation."
+    },
+    {
+      "date": "2026-08-13",
+      "issue": "f6a17e0d",
+      "change": "Wired f6a17e0d to depend on 5a3ecba0 before running its holistic-review checkpoint.",
+      "reason": "f6a17e0d REQ-01 names capture 'from declared repository targets' and a package being 'refreshed'. Capture does not read declared contributions, so that pitfall's subject is named by the criterion. Per lead-review-protocol, a pitfall whose subject a container criterion names is a criterion violation rather than a follow-up and must close before the container gate runs."
     }
   ],
   "container_reconciliations": [
@@ -1431,6 +1483,13 @@
       "finding": "Suite wall-clock is a critical path, not a sum. Adding test time does not add it to the suite.",
       "detail": "cf42d08b's three new tests measure 4.56 s in isolation (the 511-asset regression test alone is 4.55 s, just under the suite's 5324 ms slowest existing test); f2389b18's seven measure 0.643 s. Predicted suite impact by addition: ~5.2 s onto a 22095 ms baseline. Measured impact: 22218 ms and 22128 ms \u2014 roughly 0.1 s. nextest runs process-per-test across 24 workers, so an expensive test lengthens wall-clock only if it lands last on the critical path. The additive model would have imposed a false constraint on every remaining wave of this epic and led to shrinking tests to buy margin that was never being consumed.",
       "standing_rule": "Measure a test's suite impact by running the suite, not by adding the test's isolated cost to a baseline. Isolated cost answers 'is this test expensive', which is a different question from 'does this test cost the suite anything'."
+    },
+    {
+      "date": "2026-08-13",
+      "subject": "merged-tree gate for 96268a98 on main",
+      "cold": "suite-build 36,704 ms, suite-clock 43,285 ms - FAILED the 30,000 ms budget",
+      "warm": "suite-build 358 ms, suite-clock 22,669 ms - passed",
+      "note": "Textbook instance of the cold-tree trap: same commit, same 4512 passing tests, budget verdict flipped on suite-build alone. Also hit the rust-analyzer incremental-preflight failure on main; cleared inside the CPU lock immediately before the run, per the standing remedy."
     }
   ],
   "last_handoff": "handoff-11.md",

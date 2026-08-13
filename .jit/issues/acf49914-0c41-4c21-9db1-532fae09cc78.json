@@ -3,7 +3,7 @@
   "context": {},
   "created_at": "2026-08-13T05:31:40.379911348Z",
   "dependencies": [
-    "96268a98-ef75-487d-acab-22a813ff7803"
+    "5a3ecba0-9e2a-401c-9994-85066ddaba8f"
   ],
   "description": "Prove the edit-and-refresh loop returns a repository to agreement, so the\nmotivating use case of this epic cannot regress unnoticed.\n\n## Background\n\nThe profiles MVP made an in-place edit to profile-owned content unrecoverable,\nand that is the reason this epic was prioritized. The loop that resolves it\nworks today, verified against a built binary: editing a profile-owned target\nmakes `jit profile validate` report the profile diverged; `jit profile capture`\nover the package's own directory folds the edit into the package; `jit profile\napply` then sees the target's current value equal to the candidate, publishes no\nchange to it, rewrites the record's package identity and base fingerprints, and\n`jit profile validate` reports agreement again. No version bump is involved, and\napply carries no installed-identity precondition, unlike reconfigure.\n\nEach half of that loop has coverage. `test_capture_profile_package_publishes_an_identity_reflecting_an_in_place_edit`\ncovers capture refreshing from an edit, and\n`test_apply_profile_package_reapplies_changed_content_and_rewrites_its_record`\ncovers apply rewriting a record for a changed package. Nothing joins them, so\nnothing observes the property the epic exists to deliver. The loop rests on apply\nhaving no identity gate; reconfigure acquired exactly such a gate deliberately,\nso a later change adding one to apply would close the loop again and no test\nwould fail.\n\n## Success Criteria\n\n- [hard] REQ-01: A test edits a profile-owned target in place, refreshes the package from that edit, re-applies, and asserts the repository reports agreement, with each step's observable outcome asserted rather than only the final state.\n- [hard] REQ-02: The test asserts the loop requires no package version change, so a re-introduced version or identity precondition on the application path fails it.\n- [hard] REQ-03: A test asserts that applying without refreshing the package first refuses the target, writes nothing, and leaves the edit intact.\n- [hard] REQ-04: The suite is a module of an existing integration-test target.",
   "documents": [],
@@ -37,5 +37,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Prove an in-place edit refreshes back into agreement",
-  "updated_at": "2026-08-13T05:31:52.874612273Z"
+  "updated_at": "2026-08-13T07:11:26.353800649Z"
 }

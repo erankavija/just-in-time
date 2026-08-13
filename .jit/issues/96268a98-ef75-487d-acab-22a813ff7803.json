@@ -8,6 +8,7 @@
   ],
   "description": "Add the read-only report that answers what a selection would do to this\nrepository, so an adopter can inspect a decision before publishing it.\n\n## Background\n\nThe command family cannot answer what an operation would change. Once\nreconfiguration and upgrade exist, every mutation has a decision behind it that a\nreader needs to see before it is published.\n\n## Success Criteria\n\n- [hard] REQ-01: A difference report states, for each participating profile, the targets and identities that would update, conflict, be retained, or be removed, and writes nothing.\n- [hard] REQ-02: The report distinguishes a target no package owns from one a package owns, and names the owning packages for shared content.\n- [hard] REQ-03: The report is produced from the same decision the mutating path would publish, so a reported decision and the published outcome cannot disagree.\n- [hard] REQ-04: The report is available for a selection that is not yet applied, so an adopter can inspect a package before applying it.\n",
   "documents": [],
+  "done_at": "2026-08-13T07:10:58.970587994Z",
   "first_ready_at": "2026-08-13T04:31:57.088972541Z",
   "gates_required": [
     "cargo-ci",
@@ -36,7 +37,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Report what an operation would change before it runs",
-  "updated_at": "2026-08-13T07:06:09.127635370Z"
+  "updated_at": "2026-08-13T07:10:58.970587994Z"
 }
