@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 13,
+  "current_wave": 15,
   "waves": [
     {
       "wave_number": 1,
@@ -171,7 +171,7 @@
           "short_id": "cf42d08b",
           "title": "A deep package packs but cannot be published",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -188,7 +188,7 @@
           "short_id": "f2389b18",
           "title": "Check applied profiles against their packages and the repository",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -1121,7 +1121,8 @@
     {
       "subject": "fail-fast conflict reporting",
       "detail": "The three-way seam reports the first conflicting target only. REQ-03 says 'reports a conflict' so 7156f64b passes literally; reporting all would change apply's error type (shared seam).",
-      "status": "open"
+      "status": "open",
+      "reconciliation_2026_08_13": "Candidate against epic REQ-07 ('concurrent user/profile changes produce actionable conflicts', plural). The three-way seam reports the first conflicting target only. Reporting all would change apply's error type on a shared seam. Needs a decision before the container gate: either REQ-07 is satisfied by one actionable conflict at a time, or a remediation task reports the full set."
     },
     {
       "subject": "profiles.md stale deferral",
@@ -1146,14 +1147,16 @@
     {
       "subject": "live-asset classification encoded twice",
       "detail": "Whether a package asset draws its bytes from the repository is answered by a package-relative source path prefix (JIT_DOGFOOD_LIVE_SOURCE_PREFIX = \"assets/live/\", crates/jit/src/profile/repository_package.rs:5, consumed in production only at package_assembly.rs:190) while the manifest separately declares [[live-source]] roots (manifest.rs:149, LiveSourceDeclaration at :346). Two encodings of one convention (@/inv/convention-convergence), and the constant names one package for a rule applied to every package (@/inv/domain-agnostic). The epic plan fixes the prefix convention for REQ-13, so 6a479c58 is directed to rename the constant only; converging on a declared per-asset marker would be a manifest-schema change beyond the plan.",
-      "status": "reported-to-invoker",
-      "owner": "invoker"
+      "status": "partially-resolved-still-open",
+      "owner": "invoker",
+      "reconciliation_2026_08_13": "Half fixed, half live. The domain-agnostic half is closed: the constant no longer names one package (JIT_DOGFOOD_LIVE_SOURCE_PREFIX renamed to LIVE_ASSET_SOURCE_PREFIX, manifest.rs:20), so no site names a particular package for a rule applied to every package. The convention-convergence half is live and load-bearing in production: whether an asset draws its bytes from the repository is decided BOTH by a hardcoded path prefix (package_capture.rs:187 'authority: if asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX)', repository_package.rs:334 and :347 filtering on the same prefix) AND by the manifest's declared [[live-source]] roots (manifest.rs:159, LiveSourceDeclaration at :357). Two encodings of one convention, both live. Bears on epic REQ-12 ('no adapter, dual format, fallback behavior, temporary compatibility code, or duplicated workflow inventory') and on @/inv/convention-convergence. Per lead-review-protocol, the plan deferring it binds the fan-out shape only and cannot make an unmet criterion met: this needs either a remediation task inside the container or positive evidence it is not a REQ-12 violation, BEFORE the f6a17e0d/dd268d0f checkpoints and the epic gate."
     },
     {
       "subject": "empty directories survive a capture removal",
       "detail": "RepositoryAction (repository_state/image.rs:1274) has DeleteFile and no DeleteDirectory, so a directory left empty by a whole-tree republication remains. No undeclared FILE survives, which is what REQ-01 states, and ProfilePackage::from_directory ignores empty directories. Bears on 15cc28c5 (pack), which archives a package directory and would carry the empty directory into the archive.",
       "status": "open",
-      "owner": "15cc28c5"
+      "owner": "15cc28c5",
+      "reconciliation_2026_08_13": "Downstream half closed: 15cc28c5 writes no directory entries into the archive at all, so an empty directory cannot be carried into a pack. Residual is repository-side only — a directory left empty by a whole-tree republication remains, because RepositoryAction has DeleteFile and no DeleteDirectory. Epic REQ-13 forbids a 'source the manifest stopped declaring' surviving; an empty directory is not a declared source, so this reads as a follow-up rather than a REQ-13 violation. Recorded rather than assumed."
     },
     {
       "subject": "gate verdict memoisation hides an environmental failure",
@@ -1224,8 +1227,9 @@
     {
       "subject": "the limits CLI round trip costs ~33 s, over the whole 30 s suite budget",
       "detail": "test_profile_pack_and_add_carry_a_package_at_the_model_limits publishes 512 files totalling 4 MiB through the repository transaction and measures ~33 s alone, exceeding the standing budget 4b7c06d0 sets for the entire suite. Kept deliberately: it is the test that proves the pack->add round trip the bound defect broke, and it was added at lead instruction during rework. Not trimmed in 15cc28c5 because that would be a third rework round on a passing issue, which policy sends to escalation rather than dispatch. A concrete cheaper shape exists and belongs to 4b7c06d0: the bound that broke was the ENTRY count, not the byte payload, so the CLI test needs 512 files with small content to exercise both the entry count and the real publication path, while the unit test already proves the 4 MiB byte bound without publishing. That split should keep both properties at a fraction of the cost.",
-      "status": "open",
-      "owner": "4b7c06d0"
+      "status": "resolved-by-remeasurement",
+      "owner": "4b7c06d0",
+      "resolution": "Re-measured at main on 2026-08-13: 1.346 s, not ~33 s. The dominant lever is 4dc5e9275 ([profile.dev.package.\"*\"] opt-level = 1), which landed after 15cc28c5. The test stays as written: it neither needs trimming nor qualifies as inherent cost. Standing rule: re-measure before trimming, excluding, or attributing any test on a figure from an earlier session."
     },
     {
       "subject": "a criterion enumerating properties admits no implicit carve-out",
@@ -1310,6 +1314,12 @@
         "v1.0 applied-record migration boundary",
         "shipped_v1_conversion_count test race"
       ]
+    },
+    {
+      "date": "2026-08-13",
+      "scope": "early reconciliation of surfaced_pitfalls against the epic's 14 hard criteria, run at wave 15 rather than at the container gate",
+      "why_early": "The peer epic 4b7c06d0 failed its container code-review on REQ-04 three waves after the work that invalidated it. Its REQ-04 was correct when written; 355565c2, pursued for REQ-01, deleted a feature whose tests REQ-04 protected, and the two criteria became jointly unsatisfiable — restoring the feature would have put the suite back near 193 s. Nothing in either criterion's text would reveal that had happened, and only the reviewer surfaced it. This epic has 14 hard criteria and 6 waves left; REQ-12 is the same shape.",
+      "result": "24 pitfalls reviewed. 5 were open. Pitfall 22 closed by re-measurement. Pitfall 8's downstream half closed by 15cc28c5's implementation; residual is a follow-up, not a REQ-13 violation. Pitfall 7 is half-closed and half-live, and the live half is a REQ-12 candidate that needs resolution before the story checkpoints. Pitfall 2 is a REQ-07 candidate needing a decision. Pitfall 13 is an error-taxonomy follow-up."
     }
   ],
   "coordination": [
