@@ -4969,18 +4969,16 @@ placement = "append"
             ));
         }
         let message = error.to_string();
-        for expected in [
-            "docs/profile.txt",
-            "planner-asset-only",
-            "base",
-            "current",
-            "candidate",
-        ] {
+        for expected in ["docs/profile.txt", "planner-asset-only"] {
             assert!(
                 message.contains(expected),
-                "conflict omits '{expected}': {message}"
+                "the refusal omits '{expected}': {message}"
             );
         }
+        assert!(
+            message.contains(&conflict.conflict.message()),
+            "the refusal carries the reason the report states: {message}"
+        );
         assert_eq!(fs::read_to_string(&target).unwrap(), "repository edit\n");
         assert_eq!(
             fs::read(temp.path().join(".jit/profiles/planner-asset-only.json")).unwrap(),
