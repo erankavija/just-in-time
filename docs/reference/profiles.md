@@ -220,10 +220,10 @@ without writing. Successful reapplication of an exact installation returns
 `unchanged` for every package of the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
-into one validated publication; where the profile declares dependencies, the
-first package of the resolved set is published with the scaffold and the rest
-follow it in order. For an existing repository, `jit profile apply` uses the
-same profile planner and publisher.
+into one validated, recoverable transaction. The scaffold and the complete
+dependency-ordered profile selection are planned and published together; no
+member of that selection is published separately. For an existing repository,
+`jit profile apply` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
 tools.
@@ -330,14 +330,13 @@ application.
 
 Successful application writes a canonical provenance record at
 `.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
-matching filename) and appends the repository-scoped `profile_applied` audit
-event. Every applied package writes its own record and appends its own event,
-so applying a package that declares a dependency leaves one record and one
-event per package of the set. The record stores the profile ID, version, origin,
-package hash, resolved public variable values with their source kinds, and
-sorted ownership claims. Each claim names one semantic declaration, file target,
-or managed region together with its published-base fingerprint and retention
-intent. That fingerprint is what
+matching filename). Every changed or applied package has its own provenance
+record. One repository-scoped `profile_lifecycle` audit event records the
+operation and its per-profile outcomes for the complete selection. Each record
+stores the profile ID, version, origin, package hash, resolved public variable
+values with their source kinds, and sorted ownership claims. Each claim names
+one semantic declaration, file target, or managed region together with its
+published-base fingerprint and retention intent. That fingerprint is what
 [`jit profile validate`](cli-commands.md#jit-profile-validate) holds the
 repository's current content against, so it names the profile that diverged and
 the contribution that did. A managed region whose published body encloses a
