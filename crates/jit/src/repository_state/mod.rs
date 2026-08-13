@@ -207,6 +207,7 @@ pub use profile_apply::{
 pub(crate) use profile_apply::{
     contributed_toml_value, contribution_in_registry, profile_capture_closure,
     profile_contribution_overrides, profile_contribution_target_paths,
+    validate_applied_record_path,
 };
 // The declared value of one contribution as JSON: the TOML spelling above is
 // what production needs, and the packaged-carrier comparison in

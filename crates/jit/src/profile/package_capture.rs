@@ -56,9 +56,9 @@ use super::{
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
 use crate::repository_state::{
-    contribution_in_registry, AppliedProfileClaimIdentity, AppliedProfileRecord, Contribution,
-    ContributionIdentity, FileMode, RepositoryLayout, RepositoryLayoutError, RepositoryStateError,
-    VirtualPath,
+    contribution_in_registry, validate_applied_record_path, AppliedProfileClaimIdentity,
+    AppliedProfileRecord, Contribution, ContributionIdentity, FileMode, RepositoryLayout,
+    RepositoryLayoutError, RepositoryStateError, VirtualPath,
 };
 use cap_std::ambient_authority;
 use cap_std::fs::Dir as CapDir;
@@ -252,6 +252,22 @@ pub enum PackageCaptureError {
         path: String,
         /// The underlying deserialization error.
         source: serde_json::Error,
+    },
+    /// The record at a package's canonical record path names another profile,
+    /// so it is evidence about that profile rather than about this one.
+    #[error(
+        "applied profile record '{path}' names profile '{found}', not the '{expected}' \
+         whose record path it occupies: {source}"
+    )]
+    MisplacedRecord {
+        /// Repository-relative path of the record.
+        path: String,
+        /// Profile whose record path this is, which the manifest declares.
+        expected: String,
+        /// Profile the record itself names.
+        found: String,
+        /// The shared path-identity validation this record failed.
+        source: Box<RepositoryStateError>,
     },
     /// The manifest is not a document the value its declared contribution holds
     /// can be written back into.
@@ -472,6 +488,14 @@ fn refresh_contributions(
 /// applied it, or whose records a confined read cannot reach — states no such
 /// declaration, and a capture then takes none: everything its registries hold
 /// under a declared identity is the repository's own.
+///
+/// A record is evidence, and evidence is verified rather than assumed
+/// (`@/charter/D-8`): the file at a package's canonical record path is held to
+/// the same rule every other ownership reader holds it to, that a record
+/// occupies the one path its own identity names. A record naming another
+/// profile is repository corruption, not an absent record — reading its claims
+/// as this package's would let a misplaced file decide which registry values a
+/// capture rewrites the manifest from — so it fails the capture by name.
 fn published_identities(
     model: &ProfilePackageModel,
     layout: &RepositoryLayout,
@@ -500,6 +524,14 @@ fn published_identities(
             path: path.repository_relative(),
             source,
         })?;
+    validate_applied_record_path(&path, &record).map_err(|source| {
+        PackageCaptureError::MisplacedRecord {
+            path: path.repository_relative(),
+            expected: model.id.to_string(),
+            found: record.id.to_string(),
+            source: Box::new(source.into()),
+        }
+    })?;
     Ok(record
         .claims
         .into_iter()
@@ -886,6 +918,10 @@ identity = "widget"
 value = 3
 "#;
 
+    /// The package identity `SYNTHETIC_MANIFEST` declares, which is also the
+    /// name its applied-profile record is filed under.
+    const SYNTHETIC_PACKAGE_ID: &str = "synthetic-capture";
+
     /// The semantic identity `SYNTHETIC_MANIFEST` contributes.
     fn contributed_identity() -> ContributionIdentity {
         ContributionIdentity {
@@ -1005,12 +1041,23 @@ value = 3
         /// by value would answer differently for a value an adopter changed —
         /// which is the very case the capture exists to fold back.
         fn recording(self, claimed: &[ContributionIdentity]) -> Self {
+            self.recording_as(SYNTHETIC_PACKAGE_ID, claimed)
+        }
+
+        /// File a record naming profile `named` at the synthetic package's own
+        /// canonical record path.
+        ///
+        /// The path is always the one the manifest's identity names, because
+        /// that is the file a capture reads; `named` is what the record itself
+        /// says it is. Passing another profile's id is therefore a record
+        /// misplaced under this package's name, which is the shape the path
+        /// rule exists to catch.
+        fn recording_as(self, named: &str, claimed: &[ContributionIdentity]) -> Self {
             let unrelated_fingerprint: crate::repository_state::ProfileBaseFingerprint =
                 serde_json::from_value(serde_json::json!("0".repeat(64)))
                     .expect("64 hexadecimal characters are a fingerprint");
             let record = AppliedProfileRecord::new(
-                crate::profile::ProfileId::try_from("synthetic-capture")
-                    .expect("a canonical package id"),
+                crate::profile::ProfileId::try_from(named).expect("a canonical package id"),
                 "1.0.0",
                 ">=1.0.0",
                 crate::profile::ProfileOrigin::Directory(
@@ -1031,7 +1078,9 @@ value = 3
                     .collect(),
             );
             write_file(
-                &self.worktree.join(".jit/profiles/synthetic-capture.json"),
+                &self
+                    .worktree
+                    .join(format!(".jit/profiles/{SYNTHETIC_PACKAGE_ID}.json")),
                 &record.to_bytes().expect("the record serializes"),
                 false,
             );
@@ -1465,6 +1514,50 @@ value = 3
             !String::from_utf8(captured.files()[MANIFEST_FILE_NAME].bytes.clone())
                 .expect("the captured manifest is UTF-8")
                 .contains("widget")
+        );
+    }
+
+    /// A record filed under this package's name that names another profile is
+    /// repository corruption, so the capture fails naming both profiles rather
+    /// than reading another profile's claims as this package's.
+    ///
+    /// Nothing else would catch it: the file parses, its claims are well formed,
+    /// and its identities are ones this manifest declares. Only the rule that a
+    /// record occupies the one path its own identity names separates evidence
+    /// about this package from evidence about another.
+    #[test]
+    fn test_capture_package_tree_refuses_a_record_that_names_another_profile() {
+        let misplaced = "another-profile";
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5")
+            .recording_as(misplaced, &[contributed_identity()]);
+
+        let error = fixture
+            .capture()
+            .expect_err("a record naming another profile is not evidence about this one");
+
+        assert!(
+            matches!(
+                &error,
+                PackageCaptureError::MisplacedRecord { expected, found, .. }
+                    if expected == SYNTHETIC_PACKAGE_ID && found == misplaced
+            ),
+            "{error}"
+        );
+        let rendered = error.to_string();
+        for named in [SYNTHETIC_PACKAGE_ID, misplaced] {
+            assert!(rendered.contains(named), "{rendered}");
+        }
+
+        // The same repository with the record naming this package is the case
+        // the refusal is separating itself from: there the claim is read and
+        // the value is drawn back.
+        let owned = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5")
+            .recording(&[contributed_identity()]);
+        assert_eq!(
+            contributed_state(&owned.capture().expect("the owned package captures")),
+            Some(CapturedContributionState::Refreshed)
         );
     }
 
