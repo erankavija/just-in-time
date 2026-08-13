@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-3dcce8a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "059f29df591607065e2f8493bcec140687d48845",
+  "completed_at": "2026-08-13T17:36:01.814892281Z",
+  "duration_ms": 145979,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are covered by the current structural guards; both prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d6aa1464-dabc-462e-bbad-03839645c8bc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:33:35.835590316Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2bd70825, f21c19ad, 059f29df\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover (.jit/invariants.toml); @/issue/c639cfb5/requirement/REQ-12 (issue description)\nGate evidence: cargo-ci passed (0, 2026-08-13T17:32:32Z); prior code-review failed (1, 2026-08-13T17:15:32Z)\nTruncation recovery: narrowed reads of guard helpers/tests, canonical decoder/model/record reader, bridge inventory, and policy sources\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are covered by the current structural guards; both prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

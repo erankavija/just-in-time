@@ -40,6 +40,198 @@ fn definition_owners(root: &Path, definition: &str) -> Vec<PathBuf> {
     owners
 }
 
+/// Require one capability shape to remain in the canonical module.
+///
+/// This deliberately identifies authorities by the data they decode, model, or
+/// enumerate rather than their function/type spelling: a renamed parallel
+/// implementation is still a parallel authority. Package-local helpers that
+/// consume the canonical reader for a known path do not have the complete
+/// inventory shape and therefore remain permitted.
+fn assert_canonical_authority(
+    authority: &str,
+    mut owners: Vec<PathBuf>,
+    expected: PathBuf,
+) -> Result<(), String> {
+    owners.sort();
+    (owners == [expected.clone()]).then_some(()).ok_or_else(|| {
+        format!(
+            "forbidden duplicate {authority} authority: found {owners:?}, expected only \
+             {expected:?}; the clean-cut lifecycle contract has one canonical package decoder, model, and \
+             applied-record inventory reader rather than parallel formats or readers"
+        )
+    })
+}
+
+fn authority_owners_from_sources<'a>(
+    sources: impl IntoIterator<Item = (&'a Path, &'a str)>,
+    is_authority: fn(&str) -> bool,
+) -> Vec<PathBuf> {
+    let mut owners = sources
+        .into_iter()
+        .filter(|(_, source)| is_authority(source))
+        .map(|(path, _)| path.to_path_buf())
+        .collect::<Vec<_>>();
+    owners.sort();
+    owners
+}
+
+fn authority_owners(root: &Path, is_authority: fn(&str) -> bool) -> Vec<PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut sources = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                let relative = path.strip_prefix(root).unwrap().to_path_buf();
+                let source = production_source(&path);
+                sources.push((relative, source));
+            }
+        }
+    }
+    authority_owners_from_sources(
+        sources
+            .iter()
+            .map(|(path, source)| (path.as_path(), source.as_str())),
+        is_authority,
+    )
+}
+
+/// A manifest wire authority both parses TOML and decides the versioned
+/// `manifest-version` representation that becomes `ProfilePackageModel`.
+fn is_manifest_decoder(source: &str) -> bool {
+    source.contains("toml::from_str")
+        && source.contains("manifest-version")
+        && source.contains("ProfilePackageModel")
+}
+
+/// A package model authority carries the manifest's complete semantic
+/// contribution vocabulary, not merely a view or a resolved copy of it.
+fn is_package_model(source: &str) -> bool {
+    [
+        "compatible_jit:",
+        "variables: Vec<ProfileVariableDeclaration>",
+        "contributions: Vec<Contribution>",
+        "assets: Vec<AssetDeclaration>",
+        "regions: Vec<RegionDeclaration>",
+    ]
+    .into_iter()
+    .all(|field| source.contains(field))
+}
+
+/// An applied-record inventory authority lists the profile directory and
+/// returns the records that listing names. Known-path readers do neither: they
+/// receive a path from a caller and only decode that one record.
+fn is_applied_record_inventory_reader(source: &str) -> bool {
+    source.contains("Result<Vec<(VirtualPath, AppliedProfileRecord)>")
+        && source.contains("listing_fingerprints()")
+}
+
+/// Reject a predecessor declaration rather than its harmless mentions in tests,
+/// documentation, or a historical event parser.
+fn assert_retired_lifecycle_entry_point_absent(
+    production: &str,
+    definition: &str,
+) -> Result<(), String> {
+    (!production.contains(definition))
+        .then_some(())
+        .ok_or_else(|| {
+            format!(
+                "forbidden retired lifecycle entry point returned: {definition}; it violates the \
+             clean-cut lifecycle contract by restoring a single-profile selector, per-package \
+             publication bypass, or pre-aggregate audit constructor"
+            )
+        })
+}
+
+/// Find a positive secret/sensitive classification while accepting the one
+/// deliberate vocabulary for this contract: an input may be described as
+/// *non-secret* or *non-sensitive*. Splitting into words makes this independent
+/// of JSON, Rust comments, and prose punctuation without maintaining a field
+/// inventory for every public surface.
+fn sensitive_profile_input_description(source: &str) -> Option<&'static str> {
+    let words = source
+        .split(|character: char| !character.is_ascii_alphabetic())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    words.iter().enumerate().find_map(|(index, word)| {
+        matches!(word.as_str(), "secret" | "sensitive")
+            .then(|| (index == 0 || words[index - 1] != "non").then_some(word.as_str()))
+            .flatten()
+            .map(|word| match word {
+                "secret" => "secret",
+                _ => "sensitive",
+            })
+    })
+}
+
+fn assert_profile_input_surface_is_non_sensitive(
+    surface: &str,
+    description: &str,
+) -> Result<(), String> {
+    sensitive_profile_input_description(description)
+        .map(|term| {
+            format!(
+                "forbidden {term} profile input description in {surface}; it violates the \
+                 clean-cut lifecycle contract because profile inputs must remain non-secret and \
+                 their values must not gain a sensitive-data channel"
+            )
+        })
+        .map_or(Ok(()), Err)
+}
+
+/// The bridge maps every generated tool into exactly one curation section.
+/// Lifecycle input descriptions can therefore move between `include` and
+/// `exclude` without falling outside this check; membership is the generated
+/// init command plus the profile command family, not its current curation.
+fn lifecycle_bridge_inventory(inventory: &serde_json::Value) -> Vec<&serde_json::Value> {
+    ["include", "exclude"]
+        .into_iter()
+        .flat_map(|section| {
+            inventory[section]
+                .as_object()
+                .expect("bridge inventory keeps every curation section as a generated-tool map")
+                .iter()
+        })
+        .filter(|(name, _)| *name == "jit_init" || name.starts_with("jit_profile_"))
+        .map(|(_, description)| description)
+        .collect()
+}
+
+fn profile_generated_schema_text() -> String {
+    let schema = jit::CommandSchema::generate();
+    let profile = schema
+        .commands
+        .get("profile")
+        .expect("generated schema retains the profile command family");
+    let init = schema
+        .commands
+        .get("init")
+        .expect("generated schema retains initialization's profile inputs");
+    let manifest = schema
+        .types
+        .get("ProfilePackageModel")
+        .expect("generated schema retains the canonical manifest model");
+    let lifecycle_events = schema
+        .events
+        .iter()
+        .filter(|event| event.tag.as_str() == "profile_lifecycle")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        lifecycle_events.len(),
+        1,
+        "the generated schema must carry one canonical profile lifecycle audit event"
+    );
+    serde_json::json!({
+        "init": init,
+        "profile": profile,
+        "manifest": manifest,
+        "profile_lifecycle_events": lifecycle_events,
+    })
+    .to_string()
+}
+
 fn contains_cargo_manifest(root: &Path) -> bool {
     std::fs::read_dir(root).unwrap().any(|entry| {
         let path = entry.unwrap().path();
@@ -168,6 +360,191 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
             "known renderer ownership changed: {definition}"
         );
     }
+}
+
+/// The package lifecycle has one decoder, one runtime model, and one reader
+/// for the repository's applied-record inventory. A helper that reads a known
+/// record path is not another inventory: its caller already chose that path.
+/// These ownership checks therefore guard only declarations that can become a
+/// competing format authority.
+#[test]
+fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    for (authority, expected, classify) in [
+        (
+            "manifest decoder",
+            "profile/wire.rs",
+            is_manifest_decoder as fn(&str) -> bool,
+        ),
+        ("package model", "profile/manifest.rs", is_package_model),
+        (
+            "applied-record inventory reader",
+            "repository_state/profile_apply.rs",
+            is_applied_record_inventory_reader,
+        ),
+    ] {
+        assert_canonical_authority(
+            authority,
+            authority_owners(&source_root, classify),
+            PathBuf::from(expected),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// The selection stream and aggregate lifecycle event replaced three public
+/// predecessor shapes. Keeping their names absent is more precise than
+/// banning the legitimate `apply_profile_package*` closure wrappers: those
+/// wrappers resolve one package's dependency closure and enter the one
+/// aggregate seam rather than publishing per package.
+#[test]
+fn test_profile_lifecycle_has_no_retired_selector_bypass_or_event_constructor() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    for (relative, definition) in [
+        ("commands/init.rs", "struct ProfileSelection"),
+        ("commands/profile.rs", "fn apply_one_profile_package("),
+        ("domain/types.rs", "fn draft_profile_applied("),
+    ] {
+        assert_retired_lifecycle_entry_point_absent(
+            &production_source(&source_root.join(relative)),
+            definition,
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// Inputs reach users through the manifest and CLI, machine clients through
+/// the generated schema and bridge inventory, and later readers through the
+/// lifecycle audit projection. Every one must say the same thing: values are
+/// ordinary non-secret inputs, not credentials carried by profile lifecycle.
+#[test]
+fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = crate_root.join("../..");
+    let manifest = production_source(&crate_root.join("src/profile/manifest.rs"));
+    let cli = production_source(&crate_root.join("src/cli.rs"));
+    let profile_cli = cli
+        .split_once("/// Repository profile commands.")
+        .expect("profile CLI declaration remains a separately documented command family")
+        .1;
+    let audit_types = production_source(&crate_root.join("src/domain/types.rs"));
+    let profile_audit_inputs = audit_types
+        .split_once("/// One variable's non-sensitive provenance in a lifecycle event.")
+        .expect("profile lifecycle audit retains its variable provenance type")
+        .1
+        .split_once("/// System event types for audit log")
+        .expect("profile lifecycle audit inputs remain separate from unrelated event types")
+        .0;
+    let bridge_inventory =
+        std::fs::read_to_string(workspace_root.join("mcp-server/curated-tools.json")).unwrap();
+    let bridge_inventory = serde_json::from_str::<serde_json::Value>(&bridge_inventory).unwrap();
+    let bridge_lifecycle_inventory = lifecycle_bridge_inventory(&bridge_inventory);
+
+    for (surface, description) in [
+        ("profile manifest model", manifest),
+        ("profile command-line definitions", profile_cli.to_string()),
+        ("generated profile schema", profile_generated_schema_text()),
+        (
+            "profile lifecycle audit record",
+            profile_audit_inputs.to_string(),
+        ),
+        (
+            "MCP init and profile lifecycle inventory",
+            serde_json::to_string(&bridge_lifecycle_inventory).unwrap(),
+        ),
+    ] {
+        assert_profile_input_surface_is_non_sensitive(surface, &description)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// Red-first proof for the structural predicates above. These are deliberately
+/// small source fragments rather than mutations of production files: each
+/// proves the corresponding guard has a failing path without coupling the
+/// suite to a temporary working-tree rewrite.
+#[test]
+fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
+    for (authority, expected, classify, canonical, renamed_duplicate) in [
+        (
+            "manifest decoder",
+            "profile/wire.rs",
+            is_manifest_decoder as fn(&str) -> bool,
+            "fn decode_manifest() { toml::from_str(text); manifest-version; ProfilePackageModel; }",
+            "fn reconstruct_package_wire() { toml::from_str(text); manifest-version; ProfilePackageModel; }",
+        ),
+        (
+            "package model",
+            "profile/manifest.rs",
+            is_package_model,
+            "struct ProfilePackageModel { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
+            "struct AlternatePackageShape { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
+        ),
+        (
+            "applied-record inventory reader",
+            "repository_state/profile_apply.rs",
+            is_applied_record_inventory_reader,
+            "fn applied_profile_records() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
+            "fn collect_installed_provenance() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
+        ),
+    ] {
+        let duplicate = assert_canonical_authority(
+            authority,
+            authority_owners_from_sources(
+                [
+                    (Path::new(expected), canonical),
+                    (Path::new("profile/renamed_parallel.rs"), renamed_duplicate),
+                ],
+                classify,
+            ),
+            PathBuf::from(expected),
+        )
+        .unwrap_err();
+        assert!(
+            duplicate.contains(&format!("forbidden duplicate {authority} authority"))
+                && duplicate.contains("clean-cut lifecycle contract")
+        );
+    }
+
+    let retired_bypass = assert_retired_lifecycle_entry_point_absent(
+        "pub(super) fn apply_one_profile_package() {}",
+        "fn apply_one_profile_package(",
+    )
+    .unwrap_err();
+    assert!(
+        retired_bypass.contains("forbidden retired lifecycle entry point")
+            && retired_bypass.contains("clean-cut lifecycle contract")
+    );
+
+    for term in ["secret", "sensitive"] {
+        let error = assert_profile_input_surface_is_non_sensitive(
+            "injected profile input surface",
+            &format!("a {term} profile input"),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(&format!("forbidden {term} profile input description"))
+                && error.contains("clean-cut lifecycle contract")
+        );
+    }
+    assert!(assert_profile_input_surface_is_non_sensitive(
+        "affirmative contract",
+        "a non-secret and non-sensitive profile input"
+    )
+    .is_ok());
+
+    let omitted_init = serde_json::json!({
+        "include": { "jit_profile_apply": "ordinary profile inputs" },
+        "exclude": { "jit_init": "accepts a secret initialization input" },
+    });
+    let bridge_error = assert_profile_input_surface_is_non_sensitive(
+        "injected MCP lifecycle inventory",
+        &serde_json::to_string(&lifecycle_bridge_inventory(&omitted_init)).unwrap(),
+    )
+    .unwrap_err();
+    assert!(
+        bridge_error.contains("forbidden secret profile input description")
+            && bridge_error.contains("clean-cut lifecycle contract")
+    );
 }
 
 /// A package read must resolve each source once, at the open, and take

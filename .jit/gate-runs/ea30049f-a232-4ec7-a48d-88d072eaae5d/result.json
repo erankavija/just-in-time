@@ -1,0 +1,54 @@
+{
+  "branch": "worktree-agent-3dcce8a8",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f21c19adb258e89e2092cd0b61cb30ebdee8df36",
+  "completed_at": "2026-08-13T17:19:02.409635077Z",
+  "duration_ms": 209943,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 287,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Exact-symbol ownership checks do not detect a differently named second package decoder, model, or applied-record reader."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+        "id": "F2",
+        "line": 350,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8"
+        ],
+        "severity": "high",
+        "summary": "The sensitive-input check excludes jit_init and excluded bridge inventory descriptions despite init accepting profile variable inputs."
+      }
+    ],
+    "summary": "The new guards leave duplicate-authority and init bridge-inventory regressions undetected.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea30049f-a232-4ec7-a48d-88d072eaae5d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:15:32.465847742Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5583 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-3dcce8a8\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffc1f-39d6-7550-adc3-78712557b0d3\n--------\nuser\n--- 5570 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f21c19adb; 2bd70825c (historical issue/event records only)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci: passed (exit 0, 2026-08-13T17:14:48Z); code-review: pending\nTruncation recovery: narrowed reads of the added test, profile decoder/model/record reader, CLI/init surfaces, schema, bridge inventory, and canonical policy sources\n\n1. **F1 — blocking / issue-impact (high):** The canonical-owner test only counts three exact declaration strings (`decode_manifest`, `ProfilePackageModel`, and `applied_profile_records`). A second decoder, model, or applied-record inventory with a different identifier would pass, despite becoming a competing authority. This does not meet the hard requirement that the check fail for a second authority. [crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:287](@/charter/D-8, @/invariant/canonical-cutover)\n\n2. **F2 — blocking / issue-impact (high):** The secret/sensitive scan omits the top-level `jit init` bridge inventory entry and all excluded-inventory descriptions by filtering only included names beginning `jit_profile_`. `jit init` accepts profile, values-file, and set inputs, so a secret/sensitive description on that lifecycle input path could reappear without failing the check. [crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:350](@/charter/D-8)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The new guards leave duplicate-authority and init bridge-inventory regressions undetected.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Exact-symbol ownership checks do not detect a differently named second package decoder, model, or applied-record reader.\",\"file\":\"crates/jit/tests/scratch_build/repository_state_cutover_tests.rs\",\"line\":287,\"references\":[\"@/charter/D-8\",\"@/invariant/canonical-cutover\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The sensitive-input check excludes jit_init and excluded bridge inventory descriptions despite init accepting profile variable inputs.\",\"file\":\"crates/jit/tests/scratch_build/repository_state_cutover_tests.rs\",\"line\":350,\"references\":[\"@/charter/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
