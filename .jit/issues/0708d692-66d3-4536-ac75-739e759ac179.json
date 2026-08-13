@@ -38,6 +38,7 @@
       "path": "dev/benchmarks/rust-build-budgets/README.md"
     }
   ],
+  "done_at": "2026-08-13T12:22:19.657860270Z",
   "first_ready_at": "2026-08-13T09:51:35.291061297Z",
   "gates_required": [
     "cargo-ci",
@@ -46,13 +47,13 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-13T11:25:51.194849124Z",
+      "updated_at": "2026-08-13T12:18:31.025293208Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-13T09:51:48.403330238Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T12:22:05.596094797Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "0708d692-66d3-4536-ac75-739e759ac179",
@@ -63,7 +64,7 @@
     "component:testing"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "The build gate decides on build-cache state instead of the tree",
-  "updated_at": "2026-08-13T11:45:33.249337082Z"
+  "updated_at": "2026-08-13T12:22:19.657860270Z"
 }
