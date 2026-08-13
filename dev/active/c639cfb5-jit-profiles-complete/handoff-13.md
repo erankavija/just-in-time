@@ -12,7 +12,7 @@
 - Active claims: `5a3ecba0` claimed `agent:worker` (mid-rework, see next steps); epic claimed `agent:lead-c639cfb5`
 - Open escalations: none — all four of this session's owner questions were answered (see progress.json → escalations)
 - Progress file: `dev/active/c639cfb5-jit-profiles-complete/progress.json`
-- Main head: `5eca81456`, working tree clean apart from this handoff
+- Main head: `2bab8a437`, working tree clean, `jit validate` passes (4 pre-existing divergences on archived core-maintenance issues)
 - Branch `worktree-agent-5a3ecba0` at `b8572db93` in `.agents/worktrees/agent-5a3ecba0`: clean, resumable, carries rounds 1–2 rework, committed gate evidence, and both owner rulings merged
 
 ## What just happened
