@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 20,
+  "current_wave": 21,
   "waves": [
     {
       "wave_number": 1,
@@ -273,8 +273,8 @@
           "short_id": "d7558ef6",
           "title": "Prove concurrent lifecycle callers serialize",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Dispatched at the strongest tier because deterministic two-caller orchestration must prove locking, recapture-after-wait, and serial equivalence without weakening the existing publication/recovery contract. Test-only is expected; any new production coordination seam requires escalation."
+          "status": "done",
+          "note": "Completed test-only at the strongest tier. A Condvar-controlled winner holds the canonical mutation lock before publication; a real CLI contender deterministically fails with an explicit exclusive-lock timeout, observes no partial state, and after release retries against the complete winner state as unchanged. Branch cargo-ci/code-review passed; focused merged-main validation passes."
         }
       ]
     },
@@ -434,7 +434,8 @@
     "acf49914": 1,
     "b3d92595": 2,
     "6574f951": 0,
-    "3dcce8a8": 1
+    "3dcce8a8": 1,
+    "d7558ef6": 0
   },
   "review_verdicts": [
     {
