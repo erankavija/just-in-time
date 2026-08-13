@@ -417,7 +417,7 @@
     "6a479c58": 1,
     "15cc28c5": 2,
     "0708d692": 1,
-    "5a3ecba0": 1
+    "5a3ecba0": 2
   },
   "review_verdicts": [
     {
@@ -1308,6 +1308,22 @@
       ],
       "lead_determination": "Budget becomes a function of the repository's own recorded-profile count (known before the capture at the call site): max_bytes = count.max(1) * MAX_PROFILE_PACKAGE_BYTES, saturating. Membership from the repository's registry per @/inv/domain-agnostic; tests pin the scaling relationship, not literals.",
       "notes": "Lead tiers 2-3 otherwise clean: owner ratified the REQ-01 ownership scoping (recorded on the issue); sweep clean; docs coherent; independent fmt/clippy/test run green (2588 lib tests)."
+    },
+    {
+      "issue": "5a3ecba0",
+      "round": "code-review gate round 2",
+      "session": 13,
+      "date": "2026-08-13",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "medium",
+          "disposition": "blocking",
+          "summary": "published_identities (package_capture.rs:498) trusts a deserialized applied-profile record without validate_applied_record_path; a misplaced record could let capture refresh contributions another profile owns."
+        }
+      ],
+      "notes": "cargo-ci passed at 12f572914. Round-1 budget findings verified closed at HEAD (claim/record budgets scale with the repository's record count; RECORD_CAPTURE_BUDGET removed; depth derived from construction). Lead determination: converge on the shared validator, fail by name on mismatch rather than treating as absent, unit test the mismatched-record case."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
