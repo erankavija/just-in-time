@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-13T13:46:34.522464488Z",
+  "dependencies": [],
+  "description": "A fixture-receipt test fails on a process-cwd race roughly a third of full-suite runs, so a gate verdict can depend on test scheduling rather than the tree.\n\n## Background\n\n`test_utils::tests::test_profiled_repository_fixture_receipt_binds_setup_and_consumer_to_shared_runtime_target` panics intermittently under `cargo test --workspace`:\n\n    thread '...' panicked at crates/jit/src/test_utils.rs:1745:9:\n    compile the consumer artifact: error: Unable to proceed. Could not locate working directory.: No such file or directory (os error 2)\n\nThe failure is a race against another test's `TempDir`: the panicking test's cargo invocation resolves its working directory while a concurrently finishing test tears its temporary directory down. Observed during the `5a3ecba0` wave on 2026-08-13: roughly one failure per three `cargo test --workspace` runs on a 24-core host. Reproduced on a stashed base commit (two failures in six runs), so it predates that wave's changes and is not theirs.\n\nA test that fails on scheduling is the same defect class `0708d692` removed from the gate scripts: a verdict decided by the machine rather than the tree. The suite runs under nextest in gate runs (process-per-test), where the exposure may differ from `cargo test`'s in-process threading — whether the gate path is affected must be established, not assumed.\n\n## Success Criteria\n\n- [hard] REQ-01: The fixture-receipt test passes deterministically under repeated whole-suite runs on a multi-core host, evidenced by a run count that previously reproduced the failure.\n- [hard] REQ-02: The fix removes the test's dependence on another test's working directory rather than retrying over it or widening timeouts.\n- [hard] REQ-03: Whether the nextest gate path was exposed is established and recorded with the fix.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-13T13:46:34.522464488Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-13T13:46:47.112767200Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-13T13:46:47.259699462Z",
+      "updated_by": null
+    }
+  },
+  "id": "d2b7d19b-3ffe-4fae-bb2b-2cc43847e491",
+  "labels": [
+    "epic:v1-release",
+    "milestone:v1.0",
+    "component:testing",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "A fixture-receipt test races another test's TempDir and flakes a third of suite runs",
+  "updated_at": "2026-08-13T13:46:47.259699462Z"
+}
