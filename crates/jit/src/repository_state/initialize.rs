@@ -38,11 +38,11 @@ use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext,
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
 use super::MaterializationDerivation;
+use super::RepositoryStateError;
 use super::{
-    AppliedProfileRecord, ContributionCompositionConflict, ProfileApplicationInput,
-    ProfileTargetDisposition, ProfileTargetMaterialization, ProfileThreeWayConflictError,
+    AppliedProfileRecord, ProfileApplicationInput, ProfileContributionMaterialization,
+    ProfileTargetDisposition, ProfileTargetMaterialization,
 };
-use super::{ProfileTargetConflictError, RepositoryStateError};
 
 /// Stable ownership identity for the neutral scaffold materialization.
 const SCAFFOLD_OWNER: &str = "repository-init";
@@ -146,15 +146,6 @@ pub enum InitializationError {
     /// Existing default-rule materialization could not be derived safely.
     #[error("failed to materialize initialization rules: {0}")]
     RuleMaterialization(String),
-    /// A profile asset would overwrite an unowned authored occupant.
-    #[error(transparent)]
-    ProfileTargetConflict(#[from] ProfileTargetConflictError),
-    /// A package replacement would overwrite a target changed after its base.
-    #[error(transparent)]
-    ProfileThreeWayConflict(#[from] Box<ProfileThreeWayConflictError>),
-    /// Resolved package definitions disagree for one semantic identity.
-    #[error(transparent)]
-    ContributionComposition(#[from] ContributionCompositionConflict),
     /// A scaffold path is occupied by an unexpected filesystem kind.
     #[error("initialization target '{path:?}' is occupied by an unsupported filesystem kind")]
     UnexpectedOccupant {
@@ -484,7 +475,7 @@ impl InitializationScaffold {
         let contribution_base = super::apply_overlay(
             &neutral,
             super::profile_contribution_overrides(&neutral, &contribution_context)
-                .map_err(profile_composition_error)?,
+                .map_err(rule_materialization_error)?,
         )
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
         profiles
@@ -499,9 +490,9 @@ impl InitializationScaffold {
 
     /// Overlay only the neutral scaffold files that initialization will actually
     /// publish, preserving existing `IfAbsent` authored files. This is the
-    /// repository view against which profile composition is both captured and
-    /// preflighted before the scaffold can publish.
-    pub(crate) fn profile_composition_base(
+    /// repository view profile composition is captured against before the
+    /// scaffold can publish.
+    fn profile_composition_base(
         &self,
         base: &RepositoryImage,
     ) -> Result<RepositoryImage, InitializationError> {
@@ -589,6 +580,7 @@ fn derive_initialization_with_profiles(
     Ok(
         MaterializationDerivation::new(delta, seed, MaterializationIntent::InitializeRepository)
             .with_profile_targets(applications.profile_targets)
+            .with_profile_contributions(applications.profile_contributions)
             .with_applied_profiles(applied_profiles),
     )
 }
@@ -680,25 +672,6 @@ fn desired_overrides(
             }
             Ok(overlay)
         })
-}
-
-fn profile_target_disposition(
-    base: &RepositoryImage,
-    path: &VirtualPath,
-    bytes: &[u8],
-    mode: FileMode,
-) -> Result<ProfileTargetDisposition, InitializationError> {
-    Ok(match base.entry(path)? {
-        RepositoryEntry::Absent => ProfileTargetDisposition::Create,
-        RepositoryEntry::File {
-            bytes: existing,
-            mode: existing_mode,
-            ..
-        } if existing.as_slice() == bytes && *existing_mode == mode => {
-            ProfileTargetDisposition::Unchanged
-        }
-        _ => ProfileTargetDisposition::Update,
-    })
 }
 
 fn profile_record_changed(
@@ -990,36 +963,57 @@ fn derive_profile_application_candidate(
         profile.claims.clone(),
         profile.contribution_context.clone(),
     )
-    .map_err(profile_composition_error)?;
+    .map_err(rule_materialization_error)?;
     let record = profile
         .record(&composed)
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))?;
-    let removals = composed.removals.clone();
-    let mut targets = Vec::with_capacity(composed.targets.len());
+    let removals = composed.removals().cloned().collect::<Vec<_>>();
+    // The composition already decided every target this profile participates in.
+    // Publication reads those decisions rather than re-deriving them, so what a
+    // difference report states and what this candidate writes are one answer.
+    let targets = composed
+        .decisions
+        .iter()
+        .map(|(path, decision)| ProfileTargetMaterialization {
+            owner: profile.id.clone(),
+            path: path.clone(),
+            disposition: decision.disposition.clone(),
+            mode: decision.mode,
+            owners: decision.owners.clone(),
+        })
+        .collect::<Vec<_>>();
+    let contributions = composed
+        .contribution_decisions
+        .iter()
+        .map(|(identity, decision)| ProfileContributionMaterialization {
+            owner: profile.id.clone(),
+            identity: identity.clone(),
+            disposition: decision.disposition.clone(),
+            owners: decision.owners.clone(),
+        })
+        .collect::<Vec<_>>();
+    let publishable = composed
+        .decisions
+        .iter()
+        .filter(|(_, decision)| {
+            matches!(
+                decision.disposition,
+                ProfileTargetDisposition::Create | ProfileTargetDisposition::Update
+            )
+        })
+        .map(|(path, _)| path.clone())
+        .collect::<std::collections::BTreeSet<_>>();
     let files = composed
         .targets
         .into_iter()
-        .map(|(path, (bytes, mode))| {
-            let disposition = profile_target_disposition(base, &path, &bytes, mode)?;
-            targets.push(ProfileTargetMaterialization {
-                owner: profile.id.clone(),
-                path: path.clone(),
-                disposition,
-                mode,
-            });
-            Ok(
-                (disposition != ProfileTargetDisposition::Unchanged).then_some(DesiredFile {
-                    path,
-                    bytes,
-                    mode,
-                    policy: WritePolicy::Always,
-                    owner: PROFILE_OWNER,
-                }),
-            )
+        .filter(|(path, _)| publishable.contains(path))
+        .map(|(path, (bytes, mode))| DesiredFile {
+            path,
+            bytes,
+            mode,
+            policy: WritePolicy::Always,
+            owner: PROFILE_OWNER,
         })
-        .collect::<Result<Vec<_>, InitializationError>>()?
-        .into_iter()
-        .flatten()
         .collect::<Vec<_>>();
     let mut actions = Vec::new();
     push_file_actions(base, &files, &mut actions)?;
@@ -1090,7 +1084,8 @@ fn derive_profile_application_candidate(
     )?;
     Ok(
         MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
-            .with_profile_targets(targets),
+            .with_profile_targets(targets)
+            .with_profile_contributions(contributions),
     )
 }
 
@@ -1112,6 +1107,7 @@ pub(super) fn derive_profile_applications(
     let mut proposed = base.clone();
     let mut actions = BTreeMap::new();
     let mut targets = Vec::new();
+    let mut contributions = Vec::new();
     let mut lifecycle_profiles = Vec::with_capacity(profiles.len());
     let mut applied_profiles = forced_changed.clone();
     let mut aggregate_changed = !forced_changed.is_empty();
@@ -1133,6 +1129,7 @@ pub(super) fn derive_profile_applications(
         }
         proposed = apply_action_overlay(&proposed, &candidate_actions)?;
         targets.extend(candidate.profile_targets);
+        contributions.extend(candidate.profile_contributions);
         if changed {
             applied_profiles.insert(profile.id.clone());
         }
@@ -1186,6 +1183,7 @@ pub(super) fn derive_profile_applications(
     Ok(
         MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
             .with_profile_targets(targets)
+            .with_profile_contributions(contributions)
             .with_applied_profiles(applied_profiles),
     )
 }
@@ -1259,13 +1257,10 @@ fn serialize_profile_record(record: &AppliedProfileRecord) -> Result<Vec<u8>, In
         .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
 
-fn profile_composition_error(error: RepositoryStateError) -> InitializationError {
-    match error {
-        RepositoryStateError::ProfileTargetConflict(error) => error.into(),
-        RepositoryStateError::ProfileThreeWayConflict(error) => error.into(),
-        RepositoryStateError::ContributionComposition(error) => error.into(),
-        error => InitializationError::RuleMaterialization(error.to_string()),
-    }
+/// Carry a producer failure raised while composing a profile's targets as an
+/// initialization failure.
+fn rule_materialization_error(error: RepositoryStateError) -> InitializationError {
+    InitializationError::RuleMaterialization(error.to_string())
 }
 
 /// Emit `CreateDirectory` actions for every ancestor directory of the written

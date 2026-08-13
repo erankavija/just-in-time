@@ -74,6 +74,15 @@ capturing:
 jit profile validate
 ```
 
+Report what a selection would change here, including the targets and registry
+declarations it could not publish and who claims each of them, before publishing
+any of it:
+
+```bash
+jit profile diff --profile path:packages/jit-dogfood
+jit profile diff --profile id:jit-dogfood
+```
+
 Preview and apply a profile to an existing JIT repository:
 
 ```bash
@@ -132,10 +141,12 @@ over the whole set before any of it is applied.
 
 A registry declaration or asset target that two packages state differently is
 refused for the same reason: neither package holds authority over the other's
-declarations. The failure names the package being applied, the declaration or
-target it carries, and who already holds it — the repository, or the package
-whose applied-profile record claims that target. Identical restatements merge,
-so a package and its dependency may declare the same thing.
+declarations. The refusal is taken from the same decision
+[`jit profile diff`](cli-commands.md#jit-profile-diff) reports, so it names the
+package being applied, the declaration or target it carries, and who already
+holds it — the repository, or the package whose applied-profile record claims
+it. Identical restatements merge, so a package and its dependency may declare
+the same thing.
 
 Profile enumeration and its handling of applied-profile records are defined in
 [Profile Commands](cli-commands.md#profile-commands).

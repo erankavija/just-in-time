@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-96268a98",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e9bf61b06fd63d2e75c832a153d56dc998d80846",
+  "completed_at": "2026-08-13T06:12:53.772453611Z",
+  "duration_ms": 206935,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/difference.rs",
+        "id": "F1",
+        "line": 52,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/96268a98/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "The report only exposes file-target decisions; semantic identity changes and conflicts are omitted or abort before reporting."
+      }
+    ],
+    "summary": "The difference report omits semantic identity decisions and cannot report semantic conflicts.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "96268a98-ef75-487d-acab-22a813ff7803",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d0965942-d1eb-4c5f-a9e9-b02a8f1a8c45",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T06:09:26.837197387Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17792 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-96268a98\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff9bd-6996-70f2-b14d-4bd374df49fa\n--------\nuser\n--- 17779 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 51543a257, e744476af, 46cdcee30, d70179123, dd9c68080, e9bf61b06\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/96268a98/requirement/REQ-01..REQ-04 (issue description); @/issue/c639cfb5/requirement/REQ-06 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T06:08:14Z); code-review pending\nTruncation recovery: bounded per-file reads for report, planner, composition, CLI, tests, and individual tagged patches\n\n1. [blocking][issue-impact] `jit profile diff` does not report semantic identity decisions. Its public `ProfileTargetChange` only exposes a rendered file path and action ([crates/jit/src/profile/difference.rs:52](crates/jit/src/profile/difference.rs:52)); semantic contributions are instead composed by identity, and differing definitions return `ContributionCompositionConflict` before a report can be built ([crates/jit/src/repository_state/profile_apply.rs:1987](crates/jit/src/repository_state/profile_apply.rs:1987)). Thus an adopter cannot inspect which semantic identities would update, conflict, retain, or remove, violating REQ-01.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The difference report omits semantic identity decisions and cannot report semantic conflicts.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The report only exposes file-target decisions; semantic identity changes and conflicts are omitted or abort before reporting.\",\"file\":\"crates/jit/src/profile/difference.rs\",\"line\":52,\"references\":[\"@/issue/96268a98/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

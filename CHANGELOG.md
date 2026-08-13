@@ -129,6 +129,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit profile diff` states what a selection would change before anything is
+  published.** The command family could report a package and it could publish
+  one, but nothing answered what publishing would do to this repository, so an
+  adopter learned a decision by making it. `jit profile diff --profile
+  <SELECTOR>...` now resolves the selection, closes it over the packages it
+  depends on, and plans it through the same preparation a publication runs, then
+  states every target and registry declaration each participating profile
+  decided: the values it would create or update, the ones already exact, the
+  recorded claims it would retain or remove, and the ones it cannot publish,
+  each beside the packages that claim it — an empty owner list being the
+  repository's own content and several owners naming every owner of shared
+  content. A declaration is named by its semantic identity, as in
+  `.jit/config.toml:map-entry:namespaces:workflow`, because that is how packages
+  compose declarations: several of them contribute to one registry file and each
+  declaration is decided on its own. The report writes nothing and exits `4`
+  when any profile decided a target or a declaration that cannot be published,
+  so it serves as a repository check; a package this repository has not applied
+  is reported from the location a `path:` selector names, which is what lets an
+  adopter inspect a package before applying it.
+
+  The decision behind it is now complete rather than first-failure, for
+  declarations as well as files. Composing a profile's targets used to stop at
+  the first target it could not publish, and composing its declarations aborted
+  on the first identity two owners defined differently — which meant a contested
+  declaration could not be reported at all, because no plan was ever built. Both
+  now decide everything they were asked about, the plan carries the whole
+  decision, and one refusal reads it: a selection with three unpublishable
+  targets reports three rather than revealing them one run at a time, and a
+  contested declaration is stated by the report and refused by the publication
+  from the same entry. The three single-conflict error shapes — including the
+  semantic-composition conflict, which no longer exists — are replaced by that
+  one refusal, and a refusal now renders its facts instead of debug-printing
+  them: a fingerprint reaches a reader as its leading digits, an owner as who it
+  is, and every refusal names what resolves it.
+
 - **`jit profile pack` and `jit profile add` move a package as one verifiable
   file.** Sharing a package meant copying a directory, with nothing stating what
   was copied and nothing confirming it arrived whole; a truncated copy became a

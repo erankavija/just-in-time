@@ -2989,6 +2989,56 @@ pub enum ProfileCommands {
         json: bool,
     },
 
+    /// Report what applying a selection would change in this repository
+    ///
+    /// Resolves the selection, closes it over the packages it depends on, and
+    /// plans it through the same preparation a publication runs, then states
+    /// what each participating profile decided: the targets it would create or
+    /// update, the registry declarations it would publish, the recorded claims
+    /// it would retain or remove, and the targets and declarations it cannot
+    /// publish, each named beside the packages that claim it. A target or
+    /// declaration no package claims is repository-authored content, and a
+    /// declaration is named by its semantic identity rather than by the
+    /// registry file holding it.
+    ///
+    /// A conflicting decision is reported rather than refused, which is the
+    /// difference from `--dry-run` on the lifecycle commands: a rehearsal fails
+    /// where its publication would, this report states the whole decision. A
+    /// package that is not installed is reported as readily as one that is, so
+    /// a `path:` selector inspects a package before applying it.
+    ///
+    /// The report writes nothing and exits 4 when any profile decided a target
+    /// or a declaration that cannot be published.
+    ///
+    /// Examples:
+    ///   jit profile diff --profile path:profiles/my-profile
+    ///   jit profile diff --profile id:my-profile --json
+    ///
+    /// JSON output uses the list envelope `{"count": N, "profiles": [...]}`.
+    Diff {
+        /// Select a recorded profile id or worktree package directory
+        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
+        #[arg(
+            long,
+            value_name = "SELECTOR",
+            action = ArgAction::Append,
+            required = true
+        )]
+        profile: Vec<String>,
+
+        /// Optional TOML file containing the `[variables]` value map.
+        #[arg(long, value_name = "PATH")]
+        values_file: Option<std::path::PathBuf>,
+
+        /// Set one declared profile variable; repeatable and last-wins.
+        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
+        set: Vec<String>,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Apply a profile package read from a repository location through one recoverable multi-target transaction
     Apply {
         /// Select a recorded profile id or worktree package directory
@@ -3265,7 +3315,9 @@ impl ProfileCommands {
             // root — so they dispatch recovery like every other mutating
             // profile operation.
             Self::Capture { .. } | Self::Pack { .. } | Self::Add { .. } => true,
-            Self::List { .. } | Self::Show { .. } | Self::Validate { .. } => false,
+            Self::List { .. } | Self::Show { .. } | Self::Validate { .. } | Self::Diff { .. } => {
+                false
+            }
         }
     }
 }
@@ -3437,6 +3489,7 @@ impl ProfileCommands {
             Self::List { .. }
             | Self::Show { .. }
             | Self::Validate { .. }
+            | Self::Diff { .. }
             | Self::Apply { .. }
             | Self::Capture { .. }
             | Self::Pack { .. }
@@ -3780,6 +3833,7 @@ mod recovery_dispatch_tests {
         "profile add",
         "profile apply",
         "profile capture",
+        "profile diff",
         "profile list",
         "profile pack",
         "profile reconfigure",

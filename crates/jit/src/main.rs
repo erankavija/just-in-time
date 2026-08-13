@@ -143,20 +143,11 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     // to its bare inner `ProjectionError`/`ManagedDocumentError`, which the checks
     // above classify identically.
     if let Some(state_error) = error.downcast_ref::<jit::repository_state::RepositoryStateError>() {
-        use jit::repository_state::{InitializationError, RepositoryStateError};
+        use jit::repository_state::RepositoryStateError;
         return match state_error {
             RepositoryStateError::Projection(_)
             | RepositoryStateError::ManagedDocument(_)
-            | RepositoryStateError::ProfileTargetConflict(_)
-            | RepositoryStateError::ProfileThreeWayConflict(_)
-            | RepositoryStateError::ContributionComposition(_)
-            | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(_))
-            | RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
-                _,
-            ))
-            | RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                _,
-            ))
+            | RepositoryStateError::ProfileTargetConflicts(_)
             | RepositoryStateError::AmbiguousOwnership(_)
             | RepositoryStateError::GateRegistryEdit(_)
             | RepositoryStateError::ArchiveExecution(_) => ErrorCode::ValidationFailed,
@@ -947,7 +938,7 @@ where
         if json {
             println!("{}", JsonOutput::success(&plans).to_json_string()?);
         } else {
-            print_profile_plans(plans);
+            print_profile_plans(&plans);
         }
     } else {
         let applied = profile_result(apply(executor, &selectors, &options), json)?;
@@ -960,23 +951,111 @@ where
     Ok(())
 }
 
-/// Render the rehearsal decisions every profile lifecycle command previews.
-fn print_profile_plans(plans: jit::profile::ProfilePlanResult) {
-    for plan in plans.profiles {
+/// Render the decisions every profile lifecycle command previews.
+fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
+    for plan in &plans.profiles {
         let status = match plan.status {
             jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
             jit::profile::ProfilePlanStatus::WouldApply => "would apply",
+            jit::profile::ProfilePlanStatus::WouldConflict => "would conflict",
         };
         println!("Profile {} {}: {}", plan.id, plan.version, status);
-        for target in plan.targets {
-            let action = match target.action {
-                jit::profile::ProfileTargetAction::Unchanged => "unchanged",
-                jit::profile::ProfileTargetAction::Create => "create",
-                jit::profile::ProfileTargetAction::Update => "update",
-            };
-            println!("  {action}: {}", target.path);
+        for target in &plan.targets {
+            print_profile_decision(
+                target.action,
+                &target.path,
+                &target.owners,
+                target.reason.as_deref(),
+            );
+        }
+        // A declaration is decided by its semantic identity rather than by the
+        // registry file holding it, so it is named by that identity and listed
+        // in its own right rather than folded into the registry's target line.
+        for contribution in &plan.contributions {
+            print_profile_decision(
+                contribution.action,
+                &contribution.identity,
+                &contribution.owners,
+                contribution.reason.as_deref(),
+            );
         }
     }
+}
+
+/// Render one decision: what it would do, what it is about, who claims it, and
+/// why it cannot be published when it cannot.
+fn print_profile_decision(
+    action: jit::profile::ProfileTargetAction,
+    subject: &str,
+    owners: &[String],
+    reason: Option<&str>,
+) {
+    // An empty owner list is the fact that no package claims the subject, which
+    // is what separates repository content from published content; it is not a
+    // claim by the repository.
+    let owners = if owners.is_empty() {
+        "claimed by no package".to_string()
+    } else {
+        format!("claimed by {}", owners.join(", "))
+    };
+    println!(
+        "  {}: {subject} ({owners})",
+        profile_target_action_label(action)
+    );
+    if let Some(reason) = reason {
+        println!("      {reason}");
+    }
+}
+
+/// Name what a profile decided about one target or declaration, for human
+/// output.
+fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'static str {
+    use jit::profile::ProfileTargetAction;
+    match action {
+        ProfileTargetAction::Unchanged => "unchanged",
+        ProfileTargetAction::Create => "create",
+        ProfileTargetAction::Update => "update",
+        ProfileTargetAction::Retain => "retain",
+        ProfileTargetAction::Remove => "remove",
+        ProfileTargetAction::Conflict => "conflict",
+    }
+}
+
+/// Render the difference report and terminate on an unpublishable decision.
+///
+/// The report is the answer either way, exactly as the profile-agreement check
+/// is: a conflicting decision is stated in full before the process exits, and
+/// the exit status carries the repository-check contract — `0` when every
+/// participating profile can be published, [`ExitCode::ValidationFailed`] when
+/// one cannot. Nothing is written in either case.
+fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool) -> Result<()> {
+    let conflicted = plans.conflicted().count();
+    if json {
+        let details = serde_json::to_value(plans)?;
+        let message = if conflicted == 0 {
+            format!("{} profile(s) can be published", plans.count)
+        } else {
+            format!(
+                "{conflicted} of {} profile(s) decided targets that cannot be published",
+                plans.count
+            )
+        };
+        return render_validation_json(
+            details,
+            message,
+            (conflicted > 0).then_some(ErrorCode::ValidationFailed),
+        );
+    }
+
+    print_profile_plans(plans);
+    if conflicted == 0 {
+        return Ok(());
+    }
+    eprintln!(
+        "{conflicted} of {} profile(s) decided targets that cannot be published",
+        plans.count
+    );
+    std::process::exit(jit::ExitCode::ValidationFailed.code());
 }
 
 /// Render what a profile lifecycle command published, naming a changed profile
@@ -1073,7 +1152,7 @@ fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &
 
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
-    use jit::repository_state::{InitializationError, RepositoryStateError};
+    use jit::repository_state::RepositoryStateError;
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
         return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
@@ -1109,29 +1188,14 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         );
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
-    // repository-state error: a profile target conflict (raised directly or through
-    // initialization) and a profile registry contribution conflict are conflicts; an
+    // repository-state error: every refused profile decision — a target or a
+    // declaration, raised directly or through initialization — is a conflict; an
     // unreadable or unparseable profile registry is a generic profile error. Every
     // other variant keeps the generic profile-error code.
     if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
-        let is_conflict = matches!(
-            state_error,
-            RepositoryStateError::ProfileTargetConflict(_)
-                | RepositoryStateError::ProfileThreeWayConflict(_)
-                | RepositoryStateError::ContributionComposition(_)
-                | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                    _
-                ))
-                | RepositoryStateError::Initialization(
-                    InitializationError::ProfileThreeWayConflict(_),
-                )
-                | RepositoryStateError::Initialization(
-                    InitializationError::ContributionComposition(_),
-                )
-        );
-        if is_conflict {
+        if matches!(state_error, RepositoryStateError::ProfileTargetConflicts(_)) {
             return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
-        };
+        }
         return JsonError::new(ErrorCode::ProfileError, error.to_string());
     }
     JsonError::new(ErrorCode::ProfileError, error.to_string())
@@ -2435,6 +2499,31 @@ fn run() -> Result<()> {
                 }
                 Err(error) => return Err(error),
             },
+            ProfileCommands::Diff {
+                profile,
+                values_file,
+                set,
+                json,
+            } => {
+                let selectors = parse_profile_selectors(&profile, json)?;
+                let assignments = parse_profile_variable_assignments(&set, json)?;
+                if selectors.is_empty() {
+                    return Err(invalid_argument(
+                        "profile diff requires at least one --profile id:ID or path:DIR selector"
+                            .to_string(),
+                        json,
+                    ));
+                }
+                let options = ProfileVariableOptions {
+                    values_file,
+                    assignments,
+                };
+                let plans = profile_result(
+                    executor.diff_profiles_from_sources(&selectors, &options),
+                    json,
+                )?;
+                render_profile_difference(&plans, json)?;
+            }
             ProfileCommands::Apply {
                 profile,
                 values_file,
@@ -8701,10 +8790,10 @@ mod repository_state_classifier_tests {
     use super::{error_to_exit_code, profile_json_error};
     use jit::profile::ThreeWayValue;
     use jit::repository_state::{
-        AmbiguousOwnershipError, ArchiveExecutionError, Contribution,
-        ContributionCompositionConflict, GateRegistryEditError, InitializationError,
-        ManagedDocumentError, ProducerError, ProfileBaseFingerprint, ProfileConflictOccupant,
-        ProfilePackageId, ProfileTargetConflictError, ProfileThreeWayConflictError,
+        AmbiguousOwnershipError, ArchiveExecutionError, Contribution, ContributionConflictOwner,
+        GateRegistryEditError, InitializationError, ManagedDocumentError, ProducerError,
+        ProfileBaseFingerprint, ProfileConflictOccupant, ProfilePackageId, ProfileTargetConflict,
+        ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject,
         ProjectionError, RepositoryLayoutError, RepositoryStateError, ScalarTarget, VirtualPath,
     };
 
@@ -8712,31 +8801,52 @@ mod repository_state_classifier_tests {
         VirtualPath::data("issues/abc123.json").unwrap()
     }
 
-    fn contribution_conflict() -> ContributionCompositionConflict {
-        ContributionCompositionConflict {
-            identity: Contribution::Scalar {
-                target: ScalarTarget::ValidationDefaultType,
-                value: "task".to_string(),
-            }
-            .semantic_identity(),
-            owners: Vec::new(),
-        }
-    }
-
-    fn three_way_conflict() -> ProfileThreeWayConflictError {
+    /// A refusal carrying every conflict reason, which is what a selection with
+    /// an occupied target, a concurrently edited one, and a declaration two
+    /// packages define differently produces.
+    fn target_conflicts() -> ProfileTargetConflictsError {
         let fingerprint = || {
             serde_json::from_str::<ProfileBaseFingerprint>(
                 "\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"",
             )
             .unwrap()
         };
-        ProfileThreeWayConflictError {
-            target: path(),
-            owner: ProfilePackageId::new("candidate"),
-            base: ThreeWayValue::Present(fingerprint()),
-            current: ThreeWayValue::Present(fingerprint()),
-            candidate: ThreeWayValue::Present(fingerprint()),
-        }
+        ProfileTargetConflictsError::new(vec![
+            ProfileTargetConflictEntry {
+                owner: "candidate".try_into().expect("a canonical profile id"),
+                subject: ProfileTargetSubject::File(path()),
+                conflict: ProfileTargetConflict::Occupied {
+                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("occupant")),
+                },
+            },
+            ProfileTargetConflictEntry {
+                owner: "candidate".try_into().expect("a canonical profile id"),
+                subject: ProfileTargetSubject::File(
+                    VirtualPath::data("issues/def456.json").unwrap(),
+                ),
+                conflict: ProfileTargetConflict::Diverged {
+                    base: ThreeWayValue::Present(fingerprint()),
+                    current: ThreeWayValue::Present(fingerprint()),
+                    candidate: ThreeWayValue::Absent,
+                },
+            },
+            ProfileTargetConflictEntry {
+                owner: "candidate".try_into().expect("a canonical profile id"),
+                subject: ProfileTargetSubject::Contribution(
+                    Contribution::Scalar {
+                        target: ScalarTarget::ValidationDefaultType,
+                        value: "task".to_string(),
+                    }
+                    .semantic_identity(),
+                ),
+                conflict: ProfileTargetConflict::Contested {
+                    owners: vec![
+                        ContributionConflictOwner::Repository,
+                        ContributionConflictOwner::Package(ProfilePackageId::new("occupant")),
+                    ],
+                },
+            },
+        ])
     }
 
     /// Each repository-state variant paired with the exit code the exhaustive match
@@ -8750,39 +8860,7 @@ mod repository_state_classifier_tests {
                 ManagedDocumentError::DuplicateRegionIdentity("r".into()).into(),
                 4,
             ),
-            (
-                ProfileTargetConflictError {
-                    path: path(),
-                    candidate: ProfilePackageId::new("candidate"),
-                    occupant: ProfileConflictOccupant::Repository,
-                }
-                .into(),
-                4,
-            ),
-            (
-                RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                    ProfileTargetConflictError {
-                        path: path(),
-                        candidate: ProfilePackageId::new("candidate"),
-                        occupant: ProfileConflictOccupant::Repository,
-                    },
-                )),
-                4,
-            ),
-            (Box::new(three_way_conflict()).into(), 4),
-            (
-                RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
-                    Box::new(three_way_conflict()),
-                )),
-                4,
-            ),
-            (contribution_conflict().into(), 4),
-            (
-                RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                    contribution_conflict(),
-                )),
-                4,
-            ),
+            (target_conflicts().into(), 4),
             (
                 AmbiguousOwnershipError::DuplicateRuleName("dup".into()).into(),
                 4,
@@ -8817,32 +8895,10 @@ mod repository_state_classifier_tests {
 
     #[test]
     fn test_profile_json_error_classifies_repository_state_variants() {
-        // A profile target conflict and a registry contribution conflict are
-        // profile conflicts (validation exit 4); an unreadable registry and an
+        // Every refused profile decision — a target or a declaration — is a
+        // profile conflict (validation exit 4); an unreadable registry and an
         // unrelated variant keep the generic profile-error code (exit 1).
-        let conflict_cases: Vec<RepositoryStateError> = vec![
-            ProfileTargetConflictError {
-                path: path(),
-                candidate: ProfilePackageId::new("candidate"),
-                occupant: ProfileConflictOccupant::Repository,
-            }
-            .into(),
-            RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                ProfileTargetConflictError {
-                    path: path(),
-                    candidate: ProfilePackageId::new("candidate"),
-                    occupant: ProfileConflictOccupant::Repository,
-                },
-            )),
-            Box::new(three_way_conflict()).into(),
-            RepositoryStateError::Initialization(InitializationError::ProfileThreeWayConflict(
-                Box::new(three_way_conflict()),
-            )),
-            contribution_conflict().into(),
-            RepositoryStateError::Initialization(InitializationError::ContributionComposition(
-                contribution_conflict(),
-            )),
-        ];
+        let conflict_cases: Vec<RepositoryStateError> = vec![target_conflicts().into()];
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);
             let json = profile_json_error(&error);

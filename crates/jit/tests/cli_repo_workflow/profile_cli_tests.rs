@@ -1964,18 +1964,21 @@ fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict()
         .as_str()
         .expect("a conflict states what diverged")
         .to_string();
-    for expected in [
-        format!("docs/{id}-templated.txt"),
-        id.to_string(),
-        "base".to_string(),
-        "current".to_string(),
-        "candidate".to_string(),
-    ] {
+    for expected in [format!("docs/{id}-templated.txt"), id.to_string()] {
         assert!(
             message.contains(&expected),
             "the conflict omits '{expected}': {message}"
         );
     }
+    // The refusal names the values that no longer agree and what resolves it,
+    // and it names them as facts rather than as the Rust types carrying them.
+    assert!(
+        ["recorded", "now", "would publish", "jit profile capture"]
+            .iter()
+            .all(|stated| message.contains(stated))
+            && !message.contains("ProfileBaseFingerprint"),
+        "a conflict states the values that disagree and a remedy: {message}"
+    );
     assert_eq!(
         fs::read_to_string(&target).unwrap(),
         "greeting=edited in place\n"

@@ -726,6 +726,58 @@ What each divergence means for the package that owns it, and which of
 [`capture`](#jit-profile-capture) resolves it, is described in
 [Repository Profiles](profiles.md#publication-rollback-and-recovery).
 
+### `jit profile diff`
+
+Report what applying a selection would change in this repository, before
+anything is published:
+
+```bash
+jit profile diff --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--json]
+```
+
+The selection is resolved, closed over the packages it depends on, and planned
+through the same preparation a publication runs, so the report is the decision
+the publication would act on rather than a second opinion about it. For each
+participating profile it states every target that profile decided: the values it
+would `create` or `update`, the ones already `unchanged`, the recorded claims it
+would `retain` or `remove`, and the targets it cannot publish at all
+(`conflict`), each with the reason and the remedy.
+
+Beside those targets it states the registry declarations that profile decided,
+in the same vocabulary and each named by its semantic identity — the registry,
+declaration kind and target, and local name, as in
+`.jit/config.toml:map-entry:namespaces:workflow`. A package composes its
+declarations by identity rather than by the registry file holding them, so
+several packages contribute to one registry and each declaration is decided on
+its own.
+
+Every target and declaration names the packages that claim it. An empty owner
+list means no package claims it, so its content is the repository's own; more
+than one owner names every owner of shared content.
+
+A package this repository has not applied is reported as readily as one it has:
+select it with a `path:` selector to inspect it before applying it.
+
+`--values-file` and `--set` supply the same variable inputs as
+[`jit profile apply`](#jit-profile-apply).
+
+Human output shows one line per profile with its status, then one line per
+decision with its action and owners — targets first, then declarations — and the
+reason beneath one that cannot be published. JSON returns the count-wrapped `ProfilePlanResult` collection
+`{"count": N, "profiles": [...]}`, the same shape the lifecycle rehearsals
+return, with `status` additionally reporting `would_conflict`.
+
+The report writes nothing: no target, no provenance record, and no audit event.
+It exits `0` when every participating profile can be published and `4` when any
+decided a target or a declaration that cannot be, so it serves as a repository
+check. The report
+is the answer either way, carried by the shared typed error envelope when the
+command exits `4`.
+
+This is where `diff` differs from `--dry-run` on the lifecycle commands: a
+rehearsal fails exactly where its publication would, while this report states
+the whole decision including the parts that would fail.
+
 ### `jit profile apply`
 
 Apply a profile package read from a repository location through one
@@ -740,8 +792,10 @@ jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VAL
 the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}` with one `ProfilePlanEntry` per selector
 occurrence in selector order. Each entry includes `status` (`would_apply` or
-`unchanged`), `plan_hash`, and the sorted target list with each action (`create`,
-`update`, or `unchanged`) and executable intent.
+`unchanged`), `plan_hash`, and the sorted target and declaration lists in the
+vocabulary [`jit profile diff`](#jit-profile-diff) documents. A rehearsal fails
+where its publication would, so it never reports a `conflict`; read
+`jit profile diff` to see one.
 
 `--dry-run` previews each selected package. Applying selectors applies the
 packages each declares a dependency on as well, so a preview accounts for the

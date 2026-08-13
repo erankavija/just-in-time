@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T07:01:00.987591590Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T07:06:09.127635370Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "96268a98-ef75-487d-acab-22a813ff7803",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Report what an operation would change before it runs",
-  "updated_at": "2026-08-13T04:45:15.331067660Z"
+  "updated_at": "2026-08-13T07:06:09.127635370Z"
 }

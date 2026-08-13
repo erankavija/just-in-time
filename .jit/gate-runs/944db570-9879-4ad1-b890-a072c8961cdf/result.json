@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-96268a98",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "e9bf61b06fd63d2e75c832a153d56dc998d80846",
+  "completed_at": "2026-08-13T06:08:39.690857918Z",
+  "duration_ms": 24781,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "73c0a93856df730802bd9cc63e4aefa37c7e98618d92536f476cd9a90339879a",
+  "issue_id": "96268a98-ef75-487d-acab-22a813ff7803",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "944db570-9879-4ad1-b890-a072c8961cdf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T06:08:14.909026798Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-preflight: ok (37 ms)\n  ✓ fmt: ok (1527 ms)\n  ✓ clippy: ok (198 ms)\n  ✓ suite-build: ok (352 ms)\n  ✓ test: 4507 passed, 0 failed, 7 skipped (17725 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4497 ms)\n  ✓ suite-clock: 22239 ms\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1587603344/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=22239ms (226 ms)\n  ✓ incremental-state: ok (38 ms)\n\n",
+  "tree_dirty": false
+}
