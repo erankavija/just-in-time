@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T17:40:28.598697049Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Show that two lifecycle operations issued against one repository at the same time\nserialize rather than interleave.\n\n## Background\n\nRepository mutation is guarded, and the lifecycle adds operations that plan against\na captured image before publishing. A second caller arriving between capture and\npublication is the case that has to be demonstrated rather than assumed. The suite\nis a module of the existing workflow target.\n\n## Success Criteria\n\n- [hard] REQ-01: Two lifecycle operations issued concurrently against one repository complete in some serial order, and neither observes a state the other left partially written.\n- [hard] REQ-02: A caller that loses the race either waits and proceeds against the updated state or fails with a message naming the contention, and never publishes a plan built on a stale capture.\n- [hard] REQ-03: The suite is a module of an existing integration-test target.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T17:40:52.508209429Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +25,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Prove concurrent lifecycle callers serialize",
-  "updated_at": "2026-08-10T15:43:43.254163154Z"
+  "updated_at": "2026-08-13T17:41:01.813895311Z"
 }

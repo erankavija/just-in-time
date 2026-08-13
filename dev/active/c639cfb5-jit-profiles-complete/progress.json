@@ -273,7 +273,8 @@
           "short_id": "d7558ef6",
           "title": "Prove concurrent lifecycle callers serialize",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched at the strongest tier because deterministic two-caller orchestration must prove locking, recapture-after-wait, and serial equivalence without weakening the existing publication/recovery contract. Test-only is expected; any new production coordination seam requires escalation."
         }
       ]
     },
