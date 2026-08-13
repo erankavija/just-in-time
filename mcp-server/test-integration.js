@@ -97,6 +97,22 @@ function sourcesPackageFromRepository(text) {
   return /\bpackages?\b/i.test(text) && /\brepositor(?:y|ies)\b/i.test(text);
 }
 
+// Find tagged profile-origin shapes after the bridge has flattened the CLI
+// schema. Requiring both `source` and `location` keeps unrelated source fields
+// outside this lifecycle contract.
+function profileOriginSourceEnums(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(profileOriginSourceEnums);
+  }
+  if (value === null || typeof value !== 'object') {
+    return [];
+  }
+  const local = value.properties?.source?.enum && value.properties?.location
+    ? [value.properties.source.enum]
+    : [];
+  return [...local, ...Object.values(value).flatMap(profileOriginSourceEnums)];
+}
+
 // The checked-in profile-package fixture the profile tools are exercised over.
 // A package is applied from inside the worktree it is applied to, so each case
 // stages a copy of this tree in its own test repository.
@@ -134,13 +150,14 @@ function stagePackage(repo, location, id, dependencies = []) {
 // ---------------------------------------------------------------------------
 
 class MCPTester {
-  constructor() {
+  constructor(responseMode = 'content') {
     this.server = null;
     this.responseBuffer = '';
     this.pendingRequests = new Map();
     this.nextId = 1;
     this.testDir = null;
     this.stderr = '';
+    this.responseMode = responseMode;
   }
 
   async start() {
@@ -153,7 +170,11 @@ class MCPTester {
       this.server = spawn('node', [serverPath], {
         stdio: ['pipe', 'pipe', 'pipe'],
         cwd: this.testDir,
-        env: { ...process.env, JIT_ALLOW_DELETION: '1' },
+        env: {
+          ...process.env,
+          JIT_ALLOW_DELETION: '1',
+          JIT_MCP_RESPONSE_MODE: this.responseMode,
+        },
       });
 
       this.server.stdout.on('data', (data) => {
@@ -422,6 +443,25 @@ async function main() {
           .map(input => input.name);
         assert.deepStrictEqual(tool.inputSchema.required, declaredRequired,
           `${tool.name} required inputs must derive from its CLI command definition`);
+      }
+    });
+
+    await runTest('structured tools/list exposes only directory profile origins', async () => {
+      const structured = new MCPTester('structured');
+      try {
+        await structured.start();
+        const listed = await structured.request('tools/list');
+        const profileOriginEnums = listed.result.tools
+          .filter(tool => tool.name.startsWith('jit_profile_'))
+          .flatMap(tool => profileOriginSourceEnums(tool.outputSchema));
+        assert.ok(profileOriginEnums.length > 0,
+          'flattened profile output schemas should expose the generated profile origin contract');
+        for (const sources of profileOriginEnums) {
+          assert.deepStrictEqual(sources, ['directory'],
+            'flattened profile output origins must expose only the repository-directory source');
+        }
+      } finally {
+        await structured.stop();
       }
     });
 

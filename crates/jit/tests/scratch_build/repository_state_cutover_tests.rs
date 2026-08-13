@@ -212,6 +212,254 @@ fn generated_event_tags() -> Vec<String> {
         .collect()
 }
 
+fn enum_body<'a>(source: &'a str, declaration: &str) -> Option<&'a str> {
+    let start = source.find(declaration)? + declaration.len();
+    let open = source[start..].find('{')? + start;
+    let mut depth = 0usize;
+    source[open..]
+        .char_indices()
+        .find_map(|(offset, character)| {
+            match character {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&source[open + 1..open + offset]);
+                    }
+                }
+                _ => {}
+            }
+            None
+        })
+}
+
+fn top_level_enum_entries(body: &str) -> Vec<String> {
+    let body = body
+        .lines()
+        .filter(|line| {
+            let line = line.trim_start();
+            !line.starts_with("//") && !line.starts_with('#')
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut depth = 0usize;
+    let mut start = 0usize;
+    let mut entries = Vec::new();
+    for (index, character) in body.char_indices() {
+        match character {
+            '(' | '{' | '[' => depth += 1,
+            ')' | '}' | ']' => depth = depth.saturating_sub(1),
+            ',' if depth == 0 => {
+                let entry = body[start..index].trim();
+                if !entry.is_empty() {
+                    entries.push(entry.to_string());
+                }
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    entries
+}
+
+fn top_level_enum_variants(body: &str) -> Vec<String> {
+    top_level_enum_entries(body)
+        .into_iter()
+        .map(|entry| {
+            entry
+                .split(|character: char| {
+                    character == '(' || character == '{' || character.is_whitespace()
+                })
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect()
+}
+
+fn functions_with_shape<'a>(source: &'a str, required: &[&str]) -> Vec<&'a str> {
+    let mut starts = source
+        .match_indices('\n')
+        .map(|(index, _)| index + 1)
+        .chain(std::iter::once(0))
+        .filter(|start| {
+            let line = source[*start..]
+                .split_once('\n')
+                .map_or(&source[*start..], |(line, _)| line)
+                .trim_start();
+            [
+                "fn ",
+                "pub fn ",
+                "pub(crate) fn ",
+                "pub(super) fn ",
+                "async fn ",
+                "pub async fn ",
+            ]
+            .into_iter()
+            .any(|prefix| line.starts_with(prefix))
+        })
+        .collect::<Vec<_>>();
+    starts.sort_unstable();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(index, start)| {
+            &source[*start..starts.get(index + 1).copied().unwrap_or(source.len())]
+        })
+        .filter(|function| required.iter().all(|needle| function.contains(needle)))
+        .collect()
+}
+
+fn profile_origin_schema_definitions(value: &serde_json::Value) -> Vec<&serde_json::Value> {
+    match value {
+        serde_json::Value::Array(values) => values
+            .iter()
+            .flat_map(profile_origin_schema_definitions)
+            .collect(),
+        serde_json::Value::Object(values) => values
+            .iter()
+            .flat_map(|(key, value)| {
+                let mut definitions = (key == "ProfileOrigin")
+                    .then_some(value)
+                    .into_iter()
+                    .collect::<Vec<_>>();
+                definitions.extend(profile_origin_schema_definitions(value));
+                definitions
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn tagged_source_values(value: &serde_json::Value) -> Vec<String> {
+    match value {
+        serde_json::Value::Array(values) => values.iter().flat_map(tagged_source_values).collect(),
+        serde_json::Value::Object(values) => {
+            let local = values
+                .get("properties")
+                .and_then(serde_json::Value::as_object)
+                .and_then(|properties| properties.get("source"))
+                .and_then(|source| source.get("enum"))
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(serde_json::Value::as_str)
+                .map(str::to_string);
+            local
+                .chain(values.values().flat_map(tagged_source_values))
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn assert_directory_only_profile_sources(
+    domain: &str,
+    package: &str,
+    commands: &str,
+    schema: &serde_json::Value,
+) -> Result<(), String> {
+    for (surface, declaration, source) in [
+        ("applied profile origin", "pub enum ProfileOrigin", domain),
+        (
+            "runtime profile package source",
+            "pub enum ProfilePackageSource",
+            package,
+        ),
+    ] {
+        let body = enum_body(source, declaration)
+            .ok_or_else(|| format!("{surface} declaration disappeared: {declaration}"))?;
+        let variants = top_level_enum_variants(body);
+        if variants != ["Directory"] {
+            return Err(format!(
+                "forbidden non-directory {surface}: found variants {variants:?}; profile packages and their applied records have one repository-directory source"
+            ));
+        }
+    }
+
+    let resolution_errors = enum_body(commands, "pub enum ProfileResolutionError")
+        .ok_or_else(|| "profile resolution error declaration disappeared".to_string())?;
+    let record_only_errors = top_level_enum_entries(resolution_errors)
+        .into_iter()
+        .filter(|entry| {
+            entry.contains("record: String")
+                && !entry.contains("location: String")
+                && !entry.contains("source: ProfilePackageError")
+        })
+        .collect::<Vec<_>>();
+    if !record_only_errors.is_empty() {
+        return Err(format!(
+            "forbidden record-only profile resolver error returned ({record_only_errors:?}); an unsupported package source is not a resolver case and must fail at strict applied-record decoding"
+        ));
+    }
+    let retired_error_terms = ["embedded", "compiled", "provenance"]
+        .into_iter()
+        .filter(|term| resolution_errors.to_ascii_lowercase().contains(term))
+        .collect::<Vec<_>>();
+    if !retired_error_terms.is_empty() {
+        return Err(format!(
+            "forbidden source-only profile resolver error returned ({retired_error_terms:?}); unsupported origins must fail at strict applied-record decoding"
+        ));
+    }
+
+    let exclusion_scans =
+        functions_with_shape(commands, &["capture_applied_records(", "record.origin"]);
+    if !exclusion_scans.is_empty() {
+        return Err(
+            "forbidden applied-record source exclusion scan returned; every applied record must resolve through recorded_package".to_string(),
+        );
+    }
+    let graph_routes = functions_with_shape(
+        commands,
+        &[
+            "Result<ResolvedProfileGraph>",
+            "self.resolve_profile_graph_with_applied(",
+        ],
+    );
+    if graph_routes.len() != 1 {
+        return Err(format!(
+            "forbidden profile graph resolver bypass: found {} graph entry points feeding the applied-package graph, expected the one canonical route",
+            graph_routes.len()
+        ));
+    }
+
+    let origins = profile_origin_schema_definitions(schema);
+    if origins.is_empty() {
+        return Err("generated CommandSchema exposes no ProfileOrigin definitions, so its source contract cannot be verified".to_string());
+    }
+    for origin in origins {
+        let mut sources = tagged_source_values(origin);
+        sources.sort();
+        sources.dedup();
+        if sources != ["directory"] {
+            return Err(format!(
+                "forbidden generated ProfileOrigin source options {sources:?}; every live CommandSchema occurrence must expose only `directory`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn assert_no_compiled_profile_package_source(
+    sources: impl IntoIterator<Item = (PathBuf, String)>,
+) -> Result<(), String> {
+    let violations = sources
+        .into_iter()
+        .filter(|(_, source)| {
+            source.contains("ProfilePackage")
+                && ["include_bytes!", "include_str!", "include_dir!"]
+                    .into_iter()
+                    .any(|capability| source.contains(capability))
+        })
+        .map(|(path, _)| path.display().to_string())
+        .collect::<Vec<_>>();
+    violations.is_empty().then_some(()).ok_or_else(|| {
+        format!(
+            "forbidden compiled profile package source returned in {violations:?}; production package bytes enter only through repository directories"
+        )
+    })
+}
+
 /// Find a positive secret/sensitive classification while accepting the one
 /// deliberate vocabulary for this contract: an input may be described as
 /// *non-secret* or *non-sensitive*. Splitting into words makes this independent
@@ -492,6 +740,30 @@ fn test_profile_lifecycle_has_no_retired_profile_applied_event_contract() {
     .unwrap_or_else(|error| panic!("{error}"));
 }
 
+/// Profile packages enter through one worktree-relative directory contract.
+/// The source enums prove the runtime and record vocabularies, the graph shape
+/// proves mutations cannot silently omit records based on provenance, and the
+/// live command schema proves every CLI/MCP output projection carries the same
+/// single wire option. The archive plan's separately scoped `Embedded` variant
+/// is intentionally outside these semantic profile surfaces.
+#[test]
+fn test_profile_lifecycle_has_only_the_repository_directory_package_source() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let source_root = crate_root.join("src");
+    let schema = serde_json::to_value(jit::CommandSchema::generate())
+        .expect("the generated command schema serializes");
+
+    assert_directory_only_profile_sources(
+        &production_source(&source_root.join("domain/types.rs")),
+        &production_source(&source_root.join("profile/package.rs")),
+        &production_source(&source_root.join("commands/profile.rs")),
+        &schema,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+    assert_no_compiled_profile_package_source(production_sources(&source_root.join("profile")))
+        .unwrap_or_else(|error| panic!("{error}"));
+}
+
 /// Inputs reach users through the manifest and CLI, machine clients through
 /// the generated schema and bridge inventory, and later readers through the
 /// lifecycle audit projection. Every one must say the same thing: values are
@@ -651,6 +923,128 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
     assert!(
         bridge_error.contains("forbidden secret profile input description")
             && bridge_error.contains("clean-cut lifecycle contract")
+    );
+
+    let directory_domain = "pub enum ProfileOrigin { Directory(RootRelativePath), }";
+    let directory_package = "pub enum ProfilePackageSource { Directory(PathBuf), }";
+    let canonical_commands = r#"
+pub enum ProfileResolutionError { UnresolvableRecordedLocation { record: String, location: String, source: ProfilePackageError }, }
+    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
+        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
+    }
+"#;
+    let directory_schema = serde_json::json!({
+        "definitions": {
+            "ProfileOrigin": {
+                "properties": {
+                    "source": { "type": "string", "enum": ["directory"] },
+                    "location": { "type": "string" }
+                }
+            }
+        }
+    });
+    assert!(assert_directory_only_profile_sources(
+        directory_domain,
+        directory_package,
+        canonical_commands,
+        &directory_schema,
+    )
+    .is_ok());
+
+    for (domain, package, commands, schema, expected) in [
+        (
+            "pub enum ProfileOrigin { Directory(RootRelativePath), BinaryResident, }",
+            directory_package,
+            canonical_commands,
+            directory_schema.clone(),
+            "forbidden non-directory applied profile origin",
+        ),
+        (
+            directory_domain,
+            "pub enum ProfilePackageSource { Directory(PathBuf), StaticBundle, }",
+            canonical_commands,
+            directory_schema.clone(),
+            "forbidden non-directory runtime profile package source",
+        ),
+        (
+            directory_domain,
+            directory_package,
+            r#"
+pub enum ProfileResolutionError { StaticRecordCannotResolve { record: String }, }
+    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
+        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
+    }
+"#,
+            directory_schema.clone(),
+            "forbidden record-only profile resolver error returned",
+        ),
+        (
+            directory_domain,
+            directory_package,
+            r#"
+pub enum ProfileResolutionError { UnresolvableRecordedLocation { source: ProfilePackageError }, }
+    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
+        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
+    }
+    fn collect_ownership_only_ids(&self) -> Result<BTreeSet<String>> {
+        capture_applied_records(session, path)?;
+        read(record.origin)
+    }
+"#,
+            directory_schema.clone(),
+            "forbidden applied-record source exclusion scan returned",
+        ),
+        (
+            directory_domain,
+            directory_package,
+            r#"
+pub enum ProfileResolutionError { UnresolvableRecordedLocation { source: ProfilePackageError }, }
+    fn resolve_profile_graph(&self) -> Result<ResolvedProfileGraph> {
+        self.resolve_profile_graph_with_applied(selected, self.resolve_applied_profile_packages()?)
+    }
+    fn resolve_mutating_graph(&self) -> Result<ResolvedProfileGraph> {
+        self.resolve_profile_graph_with_applied(selected, filtered_applied()?)
+    }
+"#,
+            directory_schema.clone(),
+            "forbidden profile graph resolver bypass",
+        ),
+        (
+            directory_domain,
+            directory_package,
+            canonical_commands,
+            serde_json::json!({
+                "definitions": {
+                    "ProfileOrigin": {
+                        "oneOf": [
+                            { "properties": { "source": { "enum": ["directory"] } } },
+                            { "properties": { "source": { "enum": ["binary"] } } }
+                        ]
+                    }
+                }
+            }),
+            "forbidden generated ProfileOrigin source options",
+        ),
+    ] {
+        let error = assert_directory_only_profile_sources(domain, package, commands, &schema)
+            .err()
+            .unwrap_or_else(|| {
+                panic!("the adversarial mutation for `{expected}` must be rejected")
+            });
+        assert!(error.contains(expected), "{error}");
+    }
+
+    let compiled_source = assert_no_compiled_profile_package_source([(
+        PathBuf::from("profile/static_bundle.rs"),
+        "static WORKFLOW: &[u8] = include_bytes!(\"workflow.tar\"); fn package() -> ProfilePackage { decode(WORKFLOW) }".to_string(),
+    )])
+    .unwrap_err();
+    assert!(
+        compiled_source.contains("forbidden compiled profile package source returned")
+            && compiled_source.contains("profile/static_bundle.rs")
+            && compiled_source
+                .contains("production package bytes enter only through repository directories"),
+        "{compiled_source}"
     );
 }
 

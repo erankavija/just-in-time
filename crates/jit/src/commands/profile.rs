@@ -240,15 +240,6 @@ pub enum ProfileResolutionError {
         /// Package-reader failure.
         source: ProfilePackageError,
     },
-    /// An embedded-origin record has no package discovery surface in this
-    /// binary.
-    #[error(
-        "applied profile record '{record}' has embedded provenance, which is unavailable for package resolution"
-    )]
-    EmbeddedProvenanceUnavailable {
-        /// Repository-relative applied-record path.
-        record: String,
-    },
 }
 
 /// Failure composing the set of packages one application applies.
@@ -1177,9 +1168,7 @@ impl CommandExecutor<JsonFileStorage> {
         if selected.is_empty() {
             return Ok(ProfilePlanResult::new(Vec::new()));
         }
-        let packages = self
-            .resolve_profile_graph_for_mutation(&selected)?
-            .selected_packages();
+        let packages = self.resolve_profile_graph(&selected)?.selected_packages();
         validate_variable_inputs(&packages, inputs)?;
         let resolved = packages
             .iter()
@@ -1212,8 +1201,7 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph_for_mutation(&selected)?
-                .selected_packages()
+            self.resolve_profile_graph(&selected)?.selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -1297,9 +1285,7 @@ impl CommandExecutor<JsonFileStorage> {
         if selected.is_empty() {
             return Ok(ProfileComposedApplyResult::new(Vec::new()));
         }
-        let packages = self
-            .resolve_profile_graph_for_mutation(&selected)?
-            .selected_packages();
+        let packages = self.resolve_profile_graph(&selected)?.selected_packages();
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         let applied = self.apply_profile_selection(&packages, inputs, &contribution_context)?;
@@ -1356,8 +1342,7 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph_for_mutation(&selected)?
-                .selected_packages()
+            self.resolve_profile_graph(&selected)?.selected_packages()
         };
         let inputs = load_profile_variable_inputs(
             &packages,
@@ -1564,9 +1549,7 @@ impl CommandExecutor<JsonFileStorage> {
             .iter()
             .map(|package| package.model().id.clone())
             .collect::<BTreeSet<_>>();
-        let packages = self
-            .resolve_profile_graph_for_mutation(&selected)?
-            .selected_packages();
+        let packages = self.resolve_profile_graph(&selected)?.selected_packages();
         let inputs = load_profile_variable_inputs(
             &packages,
             options.values_file.as_deref(),
@@ -1646,9 +1629,8 @@ impl CommandExecutor<JsonFileStorage> {
         self.resolve_profile_graph_with_applied(selected, applied)
     }
 
-    /// Mutating profile application may retain embedded provenance as ownership
-    /// evidence without trying to rediscover a package that no longer exists.
-    /// Ordinary graph reads never take this route.
+    /// Compose selected and applied packages through the one recorded-package
+    /// resolution route.
     fn resolve_profile_graph_with_applied(
         &self,
         selected: &[ProfilePackage],
@@ -1689,16 +1671,6 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Load every package the repository's applied records currently name.
     fn resolve_applied_profile_packages(&self) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
-        self.resolve_applied_profile_packages_except(&BTreeSet::new())
-    }
-
-    /// Resolve current records for one mutating application while excluding
-    /// provenance-only Embedded records. The application image still supplies
-    /// their ownership claims; this does not synthesize configuration from them.
-    fn resolve_applied_profile_packages_except(
-        &self,
-        excluded: &BTreeSet<String>,
-    ) -> Result<BTreeMap<ProfileId, ProfilePackage>> {
         let layout = self.require_layout()?;
         with_mutation_session(self.storage(), &layout, "profile graph read", |session| {
             let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
@@ -1707,9 +1679,6 @@ impl CommandExecutor<JsonFileStorage> {
             };
             let mut packages = BTreeMap::new();
             for id in ids {
-                if excluded.contains(&id) {
-                    continue;
-                }
                 let record_path = applied_record_path(&id)?;
                 let record = read_applied_record(&image, &record_path, &id)?.ok_or_else(|| {
                     anyhow::anyhow!(
@@ -1728,61 +1697,6 @@ impl CommandExecutor<JsonFileStorage> {
             }
             Ok(SessionStep::Done(packages))
         })
-    }
-
-    fn provenance_only_profile_ids_for_mutation(&self) -> Result<BTreeSet<String>> {
-        let layout = self.require_layout()?;
-        with_mutation_session(
-            self.storage(),
-            &layout,
-            "profile application provenance",
-            |session| {
-                let Some((image, ids)) = capture_applied_records(session, &VirtualPath::PROFILES)?
-                else {
-                    return Ok(SessionStep::Retry);
-                };
-                let provenance_only = ids
-                    .into_iter()
-                    .map(|id| {
-                        let path = applied_record_path(&id)?;
-                        let RepositoryEntry::File { .. } = image.entry(&path)? else {
-                            return Ok(None);
-                        };
-                        let Some(record) = read_applied_record(&image, &path, &id)? else {
-                            return Ok(None);
-                        };
-                        Ok(matches!(record.origin, ProfileOrigin::Embedded).then_some(id))
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .into_iter()
-                    .flatten()
-                    .collect::<BTreeSet<_>>();
-                Ok(SessionStep::Done(provenance_only))
-            },
-        )
-    }
-
-    fn resolve_profile_closure_for_mutation(
-        &self,
-        package: &ProfilePackage,
-    ) -> Result<Vec<ProfilePackage>> {
-        self.resolve_profile_graph_for_mutation(std::slice::from_ref(package))
-            .map(|graph| graph.selected_packages())
-    }
-
-    /// Resolve a package graph for a pending repository mutation.
-    ///
-    /// Current embedded records remain ownership evidence in the materialization
-    /// image, but do not describe rediscoverable packages. Ordinary graph
-    /// readers intentionally continue through [`Self::resolve_profile_graph`]
-    /// and reject those records.
-    pub(crate) fn resolve_profile_graph_for_mutation(
-        &self,
-        selected: &[ProfilePackage],
-    ) -> Result<ResolvedProfileGraph> {
-        let provenance_only = self.provenance_only_profile_ids_for_mutation()?;
-        let applied = self.resolve_applied_profile_packages_except(&provenance_only)?;
-        self.resolve_profile_graph_with_applied(selected, applied)
     }
 
     /// Extend `packages` with dependencies in canonical id order.
@@ -1878,21 +1792,6 @@ impl CommandExecutor<JsonFileStorage> {
         }
     }
 
-    /// Prove a pending profile mutation can resolve without accepting embedded
-    /// provenance as a package source. Strict validation remains available
-    /// through [`Self::validate_profile_selection`].
-    pub fn validate_profile_selection_for_mutation(
-        &self,
-        selectors: &[ProfileSelector],
-    ) -> Result<()> {
-        let selected = self.resolve_profile_selectors(selectors)?;
-        if selected.is_empty() {
-            Ok(())
-        } else {
-            self.resolve_profile_graph_for_mutation(&selected).map(drop)
-        }
-    }
-
     /// Apply one validated package together with the packages it depends on.
     ///
     /// The whole closure is resolved and ordered first
@@ -1915,7 +1814,7 @@ impl CommandExecutor<JsonFileStorage> {
         package: &ProfilePackage,
         inputs: &VariableInputs,
     ) -> Result<ProfileComposedApplyResult> {
-        let packages = self.resolve_profile_closure_for_mutation(package)?;
+        let packages = self.resolve_profile_closure(package)?;
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         self.apply_profile_selection(&packages, inputs, &contribution_context)
@@ -2757,12 +2656,7 @@ pub(super) fn recorded_package(
     record_path: &VirtualPath,
     layout: &RepositoryLayout,
 ) -> Result<ProfilePackage> {
-    let ProfileOrigin::Directory(location) = &record.origin else {
-        return Err(ProfileResolutionError::EmbeddedProvenanceUnavailable {
-            record: record_path.repository_relative(),
-        }
-        .into());
-    };
+    let ProfileOrigin::Directory(location) = &record.origin;
     let requested = layout.worktree_root().join(location.as_path());
     let package = match fs::canonicalize(&requested) {
         Ok(_) => {
@@ -4036,90 +3930,6 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_profile_package_refuses_embedded_provenance_without_restoring_discovery() {
-        let (temp, _storage, executor, _package) = fixture();
-        let id = fixture_id();
-        store_record(
-            &temp,
-            &AppliedProfileRecord::new(
-                id.clone()
-                    .try_into()
-                    .expect("fixture profile id is canonical"),
-                "1.0.0",
-                ">=1.0.0, <2.0.0",
-                ProfileOrigin::Embedded,
-                "a".repeat(64),
-                ResolvedVariables::default(),
-                BTreeSet::new(),
-            ),
-        );
-
-        let error = executor
-            .resolve_profile_package(&ProfileSelector::id(&id).unwrap())
-            .unwrap_err();
-        assert!(matches!(
-            error.downcast_ref::<ProfileResolutionError>(),
-            Some(ProfileResolutionError::EmbeddedProvenanceUnavailable { record })
-                if record == &format!(".jit/profiles/{id}.json")
-        ));
-    }
-
-    #[test]
-    fn test_apply_profile_package_keeps_embedded_provenance_as_ownership_only_on_later_mutations() {
-        let (temp, _storage, executor, _package) = fixture();
-        store_record(
-            &temp,
-            &AppliedProfileRecord::new(
-                "jit-dogfood"
-                    .try_into()
-                    .expect("fixture profile id is canonical"),
-                "1.0.0",
-                ">=1.0.0, <2.0.0",
-                ProfileOrigin::Embedded,
-                "a".repeat(64),
-                ResolvedVariables::default(),
-                BTreeSet::new(),
-            ),
-        );
-        let later =
-            package_publishing(&temp, "vendor/later", "later", "notes/later.txt", "later\n");
-
-        let applied = executor
-            .apply_profile_package(&later)
-            .expect("a later mutation does not resolve Embedded provenance as configuration");
-        assert_eq!(applied.profiles.len(), 1);
-        assert!(temp.path().join("notes/later.txt").is_file());
-    }
-
-    #[test]
-    fn test_apply_profile_from_sources_keeps_embedded_provenance_out_of_mutating_graph_resolution()
-    {
-        let (temp, _storage, executor, _package) = fixture();
-        store_record(
-            &temp,
-            &AppliedProfileRecord::new(
-                "jit-dogfood"
-                    .try_into()
-                    .expect("fixture profile id is canonical"),
-                "1.0.0",
-                ">=1.0.0, <2.0.0",
-                ProfileOrigin::Embedded,
-                "a".repeat(64),
-                ResolvedVariables::default(),
-                BTreeSet::new(),
-            ),
-        );
-
-        let result = executor
-            .apply_profile_from_sources(
-                &[ProfileSelector::path(FIXTURE_LOCATION)],
-                &ProfileVariableOptions::default(),
-            )
-            .expect("a mutation treats Embedded provenance as ownership only");
-        assert_eq!(result.profiles.len(), 1);
-    }
-
-    #[test]
     fn test_apply_profile_package_retains_an_adopted_managed_region_across_reapplication() {
         let (temp, _storage, executor, _package) = fixture();
         let package_root = temp.path().join("vendor/managed-region");
@@ -4550,10 +4360,7 @@ placement = "append"
         // The stored location resolves, from the worktree root alone, back to
         // the directory whose bytes were applied — which is the whole point of
         // recording it.
-        let location = match stored_record(&temp).origin {
-            ProfileOrigin::Directory(location) => location,
-            ProfileOrigin::Embedded => panic!("fixture records a directory package"),
-        };
+        let ProfileOrigin::Directory(location) = stored_record(&temp).origin;
         assert_eq!(
             ProfilePackage::from_directory(&temp.path().join(location.as_path()))
                 .expect("the recorded location names a readable package")

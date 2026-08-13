@@ -136,8 +136,7 @@ impl CommandExecutor<JsonFileStorage> {
         let packages = if selected.is_empty() {
             Vec::new()
         } else {
-            self.resolve_profile_graph_for_mutation(&selected)?
-                .selected_packages()
+            self.resolve_profile_graph(&selected)?.selected_packages()
         };
         let inputs = super::profile::load_profile_variable_inputs(
             &packages,
@@ -167,9 +166,7 @@ impl CommandExecutor<JsonFileStorage> {
             (Vec::new(), Vec::new())
         } else {
             let selected = self.resolve_profile_selectors(selectors)?;
-            let packages = self
-                .resolve_profile_graph_for_mutation(&selected)?
-                .selected_packages();
+            let packages = self.resolve_profile_graph(&selected)?.selected_packages();
             (selected, packages)
         };
         validate_variable_inputs(&packages, variable_inputs)?;
@@ -589,7 +586,7 @@ fn git_events_pattern(relative: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::{ProfileSelector, ProfileVariableOptions};
+    use crate::commands::ProfileSelector;
     use crate::profile::ProfileOrigin;
     use crate::repository_state::{AppliedProfileRecord, Contribution, MapEntryTarget};
     use crate::storage::{discover_repository_layout, IssueStore, RepositoryStateStore};
@@ -831,24 +828,6 @@ source-of-truth = \"registry-first\"\n";
         crate::test_utils::profile_package_fixture("planner-asset-only")
     }
 
-    fn write_embedded_record(repo: &TempDir, id: &str) {
-        let record = AppliedProfileRecord::new(
-            id.try_into().expect("fixture profile id is canonical"),
-            "1.0.0",
-            "*",
-            ProfileOrigin::Embedded,
-            "a".repeat(64),
-            Default::default(),
-            Default::default(),
-        );
-        fs::create_dir_all(repo.path().join(".jit/profiles")).unwrap();
-        fs::write(
-            repo.path().join(format!(".jit/profiles/{id}.json")),
-            record.to_bytes().unwrap(),
-        )
-        .unwrap();
-    }
-
     fn composition_package_with_namespace(
         repository: &TempDir,
         location: &str,
@@ -961,37 +940,6 @@ source-of-truth = \"registry-first\"\n";
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-    }
-
-    #[test]
-    fn test_profiled_init_from_sources_keeps_embedded_provenance_out_of_mutating_graph_resolution()
-    {
-        let repo = TempDir::new().unwrap();
-        let storage = JsonFileStorage::new(repo.path().join(".jit"));
-        executor_with_layout(&storage, repo.path())
-            .initialize_fresh_repository(repo.path(), None)
-            .unwrap();
-        write_embedded_record(&repo, "jit-dogfood");
-        let location = repo.path().join("packages/later");
-        crate::test_utils::write_package_declaring(&composition_package(), &location, "later", &[]);
-
-        let result = executor_with_layout(&storage, repo.path())
-            .initialize_profiled_repository_from_sources(
-                repo.path(),
-                &[ProfileSelector::path(&location)],
-                &ProfileVariableOptions::default(),
-            )
-            .expect("profiled init treats Embedded provenance as ownership only");
-
-        assert_eq!(
-            result
-                .profile
-                .expect("profiled init reports the package")
-                .profiles
-                .len(),
-            1
-        );
-        assert!(repo.path().join(".jit/profiles/later.json").is_file());
     }
 
     #[test]

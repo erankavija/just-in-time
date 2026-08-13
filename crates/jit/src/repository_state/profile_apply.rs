@@ -3546,6 +3546,13 @@ mod tests {
         }
     }
 
+    fn fixture_profile_origin() -> ProfileOrigin {
+        ProfileOrigin::Directory(
+            crate::repository_state::RootRelativePath::parse("profiles/example")
+                .expect("fixture package source is canonical"),
+        )
+    }
+
     /// The definitions `outcomes` agreed on, in the order they were decided.
     fn agreed_definitions(outcomes: Vec<ContributionOutcome>) -> Vec<ComposedContribution> {
         outcomes
@@ -3649,7 +3656,7 @@ mod tests {
             "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
-            ProfileOrigin::Embedded,
+            fixture_profile_origin(),
             "a".repeat(64),
             ResolvedVariables::default(),
             BTreeSet::from([claim]),
@@ -3670,7 +3677,7 @@ mod tests {
             "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
-            ProfileOrigin::Embedded,
+            fixture_profile_origin(),
             "a".repeat(64),
             ResolvedVariables::default(),
             BTreeSet::new(),
@@ -3692,7 +3699,7 @@ mod tests {
             "example".try_into().expect("test profile id is canonical"),
             "1.0.0",
             "*",
-            ProfileOrigin::Embedded,
+            fixture_profile_origin(),
             "a".repeat(64),
             ResolvedVariables::default(),
             BTreeSet::new(),
@@ -3732,7 +3739,7 @@ mod tests {
             package_hash: "a".repeat(64),
             variables: ResolvedVariables::default(),
             target_hashes: BTreeMap::new(),
-            origin: ProfileOrigin::Embedded,
+            origin: fixture_profile_origin(),
             claims,
             contribution_context: Vec::new(),
             record_path: VirtualPath::data("profiles/example.json").expect("record path"),

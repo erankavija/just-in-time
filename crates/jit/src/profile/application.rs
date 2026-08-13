@@ -424,14 +424,14 @@ mod tests {
     }
 
     #[test]
-    fn test_installed_record_round_trips_shipped_embedded_provenance_without_configuration() {
-        let stored = record(ProfileOrigin::Embedded).to_bytes().unwrap();
+    fn test_installed_record_rejects_pre_release_embedded_origin_through_strict_decoding() {
+        let mut stored: serde_json::Value =
+            serde_json::from_slice(&record_at("profiles/example").to_bytes().unwrap()).unwrap();
+        stored["origin"] = serde_json::json!({ "source": "embedded" });
 
-        assert_eq!(
-            serde_json::from_slice::<AppliedProfileRecord>(&stored)
-                .expect("embedded provenance remains a valid v2 record")
-                .origin,
-            ProfileOrigin::Embedded
+        assert!(
+            serde_json::from_value::<AppliedProfileRecord>(stored).is_err(),
+            "the retired pre-release source tag must fail at the ordinary strict wire boundary"
         );
     }
 
