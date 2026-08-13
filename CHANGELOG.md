@@ -88,6 +88,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **The build gate decides on the tree rather than on build-cache state.** Two
+  of its steps read the machine instead of the change. `incremental-preflight`
+  refused to run at all while `target/*/incremental` was non-empty — which any
+  editor's rust-analyzer makes true continuously, in every checkout it has open
+  — so a gate reported a policy breach for a directory no gate run produced, and
+  the standing remedy was to clear that directory inside a lock before every
+  run. It is replaced by a comparison: `incremental-baseline` records what is
+  already there before the first compilation, and `incremental-state` fails only
+  on what this run's own compilation added to that baseline. The gate-run ban on
+  incremental compilation is unchanged and still enforced in the same three
+  places. Separately, the same commit's suite clocked 57,019 ms on a fresh
+  target directory and 22,541 ms on a warm one, failing and passing the
+  30,000 ms suite budget with 4512 tests passing either way; the documented
+  remedy was folklore, to re-run and read the second number. Most of that gap
+  was compilation the gate believed it had already taken out of the clock: a
+  cargo-nextest setup script selected `-p jit` where the gate's build selects
+  the workspace, and Cargo unifies features over the packages an invocation
+  selects, so the suite resolved a second variant of its whole dependency graph
+  and compiled 60 crates mid-run — 24,677 ms inside the measured span, on every
+  fresh target. Setup scripts now reuse the workspace build's resolution, a
+  policy test holds them to it, and the `suite-build` step additionally reads
+  the executables it linked into the page cache. The same commit now measures
+  27,723 ms cold against 22,571 ms warm and passes both, with the residual
+  attributed to the suite's own first-run fixture construction
+  (`dev/benchmarks/cold-warm-verdict-0708d692/`). Both steps' failures now name
+  what they observed and what they compared it against.
+
 - **A concurrency property decides on coordination rather than on how busy the
   host was.** The claim coordinator's concurrent-acquisition tests spawned a
   thread per issue and asserted every one was granted, but a thread reached the

@@ -1,0 +1,66 @@
+=== run C (fixed gate, WARM tree, suite deliberately lengthened by 48x10s tests) start 2026-08-13T13:18:04+03:00
+--- fmt diff ---
+Diff in /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/crates/jit/tests/fast_rules/main.rs:16:
+ mod label_strategic_tests;
+ mod local_rule_enforcement_tests;
+ mod project_render_harness_tests;
+[31m-mod type_hierarchy_schema_regen_tests;
+[m mod temporary_suite_lengthening_tests;
+[32m+mod type_hierarchy_schema_regen_tests;
+[m mod type_taxonomy_custom_strategic_tests;
+ mod type_taxonomy_warnings_tests;
+ mod undeclared_taxonomy_tests;
+Diff in /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/crates/jit/tests/fast_rules/temporary_suite_lengthening_tests.rs:241:
+ fn test_temporary_suite_lengthening_case_48_occupies_a_thread() {
+     std::thread::sleep(std::time::Duration::from_secs(10));
+ }
+[31m-
+[m 
+Diff in /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/crates/jit/tests/scratch_build/build_profile_policy_tests.rs:158:
+     let first_step_pos = script
+         .find("run_step fmt")
+         .expect("scripts/cargo-ci.sh must run the fmt step");
+[31m-    let verdict_pos = script.find("run_step incremental-state").unwrap_or_else(|| {
+[m[31m-        panic!(
+[m[31m-            "scripts/cargo-ci.sh must run a deterministic \"incremental-state\" \
+[m[32m+    let verdict_pos = script
+[m[32m+        .find("run_step incremental-state")
+[m[32m+        .unwrap_or_else(|| {
+[m[32m+            panic!(
+[m[32m+                "scripts/cargo-ci.sh must run a deterministic \"incremental-state\" \
+[m              gate step; exporting CARGO_INCREMENTAL=0 alone does not verify \
+              that no incremental state came back"
+[31m-        )
+[m[31m-    });
+[m[32m+            )
+[m[32m+        });
+[m     let test_step_pos = script
+         .find("run_step test ")
+         .expect("scripts/cargo-ci.sh must run the test step");
+Diff in /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/crates/jit/tests/scratch_build/build_profile_policy_tests.rs:184:
+     let baseline_impl = shell_function_body(&script, "capture_incremental_baseline");
+     let verdict_impl = shell_function_body(&script, "check_incremental_state_from_this_run");
+     assert!(
+[31m-        baseline_impl.contains("incremental_entries") && verdict_impl.contains("incremental_entries"),
+[m[32m+        baseline_impl.contains("incremental_entries")
+[m[32m+            && verdict_impl.contains("incremental_entries"),
+[m         "both steps must read the target directory through one snapshot helper, \
+          so the two snapshots they compare are taken the same way \
+          (@/inv/convention-convergence)"
+--- budget diagnostics ---
+rust-build-budget: FAILED
+  - test suite duration: observed 45901 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').
+--- suite-clock scope ---
+suite-clock 45901 ms spans the test and doctest substeps only.
+Excluded, and reported by the suite-build step: built in 24366 ms, warmed 17 executables (1918088112 bytes) in 64 ms.
+  ✓ incremental-baseline: 103 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/target, none of them this run's (46 ms)
+  ✗ fmt: FAILED (exit 1) (1538 ms)
+  ✓ clippy: ok (27643 ms)
+  ✓ suite-build: built in 24366 ms, warmed 17 executables (1918088112 bytes) in 64 ms (24433 ms)
+  ✓ test: 4561 passed, 0 failed, 7 skipped (41281 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4603 ms)
+  ✓ suite-clock: 45901 ms
+  ✗ budget: FAILED (exit 1) (81 ms)
+  ✓ incremental-state: no incremental state created by this run (103 pre-existing entries ignored) (46 ms)
+
+=== exit=1 end 2026-08-13T13:19:44+03:00

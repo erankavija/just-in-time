@@ -1,0 +1,12 @@
+=== run A2 (baseline, unmodified gate, WARM tree, same commit) start 2026-08-13T13:05:08+03:00
+  ✓ incremental-preflight: ok (31 ms)
+  ✓ fmt: ok (1532 ms)
+  ✓ clippy: ok (1687 ms)
+  ✓ suite-build: ok (360 ms)
+  ✓ test: 4512 passed, 0 failed, 7 skipped (17972 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4552 ms)
+  ✓ suite-clock: 22541 ms
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1595949216/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=22541ms (227 ms)
+  ✓ incremental-state: ok (33 ms)
+
+=== exit=0 end 2026-08-13T13:05:35+03:00
