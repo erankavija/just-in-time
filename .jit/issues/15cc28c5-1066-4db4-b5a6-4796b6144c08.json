@@ -13,7 +13,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Threat Model",
-      "path": "dev/active/15cc28c5/15cc28c5-threat-model.md"
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/active/15cc28c5/15cc28c5-threat-model.md"
     }
   ],
   "done_at": "2026-08-11T13:16:29.034321952Z",
@@ -61,5 +61,5 @@
   "priority": "high",
   "state": "done",
   "title": "Pack a package into a verifiable archive",
-  "updated_at": "2026-08-11T13:16:29.034321952Z"
+  "updated_at": "2026-08-13T20:37:02.294440178Z"
 }

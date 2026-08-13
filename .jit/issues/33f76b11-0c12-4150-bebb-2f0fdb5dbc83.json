@@ -12,54 +12,28 @@
       "doc_type": "research",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md"
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/active/c639cfb5-research.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "38d7cbc1ffe7d64c83fb7fac4b1134fc69668624ee32e99bf5ce7440a420433b",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "c639cfb5-research.md",
-          "resolved_path": "dev/active/c639cfb5-jit-profiles-complete/c639cfb5-research.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "b7a0e35d23e80def8646d7beb6348e10cc4ef4b5d959b573d39219c63596f8eb",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "d06326a74d047d7722ec4516f277c4587ce744aa5ad79ccc740df928088664c6",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/c639cfb5-jit-profiles-complete/investigation.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Implementation plan",
-      "path": "dev/active/c639cfb5-jit-profiles-complete/plan.md"
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/active/plan.md"
     },
     {
       "commit": null,
       "doc_type": "research",
       "format": "markdown",
       "label": "Current-system investigation",
-      "path": "dev/active/c639cfb5-jit-profiles-complete/investigation.md"
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/active/investigation.md"
     },
     {
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": "Authoritative breakdown manifest",
-      "path": "dev/active/c639cfb5-jit-profiles-complete/breakdown.json"
+      "path": "dev/archive/c639cfb5-jit-profiles-complete/active/breakdown.json"
     }
   ],
   "done_at": "2026-08-08T23:10:45.777078245Z",
@@ -86,5 +60,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-10T15:42:11.446303608Z"
+  "updated_at": "2026-08-13T20:37:02.294440178Z"
 }
