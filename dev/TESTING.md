@@ -261,8 +261,8 @@ the enforced `@/inv/bounded-rust-build-footprint` project invariant.
 `cargo-ci`'s `budget` step (`scripts/rust-build-budget.sh`) enforces three budgets on every
 gate run. Two are derived from `cargo metadata` and `cargo test --workspace --no-run
 --message-format=json` rather than a `target/` directory scan (stale per-hash artifacts
-there cannot describe the current build): at most 12 integration-test targets and at most
-2 GiB of unique active test-executable bytes. The third is derived from the measured
+there cannot describe the current build): a bounded count of integration-test targets and
+a bounded total of unique active test-executable bytes. The third is derived from the measured
 nextest-plus-doctest suite duration, which `scripts/cargo-ci.sh` passes in as
 `--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. All three
 constants are declared once, in the script's own header comment
