@@ -71,10 +71,10 @@ and `compatible-jit` is a semantic-version requirement for the JIT binary. The
 version discriminator, identity, package version, and compatibility requirement
 are all required. New packages use version 2: it has the `compatible-jit`
 spelling above and hashes the authored manifest bytes as part of package
-identity. The decoder also recognizes the older version-1 wire used by released
-packages, but its `jit` compatibility spelling, bare dependency IDs, and lack
-of variables, incompatibilities, and template opt-in are not this authoring
-contract.
+identity. The decoder continues to accept version-1 manifests already present
+in package content, but their `jit` compatibility spelling, bare dependency
+IDs, and lack of variables, incompatibilities, and template opt-in are not this
+authoring contract.
 
 The rest of the top-level declarations are optional arrays of tables. Omit a
 family to declare none of it; repeat `[[...]]` to declare several entries in
@@ -132,11 +132,12 @@ the declared environment variable, then repeated `--set NAME=VALUE` (the last
 `--set` wins).
 
 Use `{{jit:var:NAME}}` only in a templated asset or region body, or in the
-free-form prose fields of a supported semantic contribution. A templated body
-must be UTF-8; an untemplated body may be binary but cannot contain that token.
-Paths, IDs, versions, modes, targets, and constrained contribution fields are
-literal and reject variable references. A reference with no resolved value
-refuses the operation.
+following contribution fields: a namespace entry's `description`; a gate's
+`title`, `description`, or `checker.prompt`; or an invariant, rule, or template
+entry's `description`. A templated body must be UTF-8; an untemplated body may
+be binary but cannot contain that token. All other contribution strings, plus
+paths, IDs, versions, modes, and targets, are literal and reject variable
+references. A reference with no resolved value refuses the operation.
 
 ### Files, regions, and capture roots
 
@@ -184,15 +185,16 @@ dogfood configuration.
 | `scalar` | `target`, non-empty string `value` | `target` is one of `documentation-development-root`, `documentation-archive-root`, `validation-strictness`, or `validation-default-type`; it selects that scalar configuration setting. |
 | `map-entry` | `target`, non-empty `identity`, `value` | `target` is `type-hierarchy-types`, `label-associations`, `namespaces`, or `item-kinds`; `value` must be the complete value for that configuration entry (a positive integer for a type-hierarchy entry, a string for a label association, and a complete table for a namespace or item kind). |
 | `set-string` | `target`, non-empty string `value` | `target` is `strategic-types`, `documentation-managed-paths`, `documentation-permanent-paths`, or `documentation-issue-scoped-areas`; it adds one member to that configured string collection. |
-| `keyed-array` | `target`, `identity`, complete-table `value` | `target` is `gates`, `invariants`, `rules`, or `templates`. The value must carry the same identity: `key` for a gate, `id` for an invariant, and `name` for a rule or template. The corresponding registry reference defines the rest of that table. |
+| `keyed-array` | `target`, `identity`, complete-table `value` | `target` is `gates`, `invariants`, `rules`, or `templates`. The value must carry the same identity: `key` for a [gate](storage-format.md#gate-registry), `id` for an [invariant](storage-format.md#invariants-registry), and `name` for a [rule](storage-format.md#validation-rules-registry) or [template](storage-format.md#graph-template-registry). The linked registry references define the rest of each table; [Author Validation Rules](../how-to/validation-rules.md#anatomy-of-a-rule) gives rule anatomy. |
 | `projection` | `name`, table `value` | `value` requires `kind`, `mode`, `target`, and `style`, in the same shape as a [`[projection.<name>]` declaration](configuration.md#projectionname). Its `target` is a safe repository-relative path. |
 
 Contributions have unique semantic identities within a package. In particular,
-two entries cannot publish the same target and identity. Use the configuration
-reference to author the complete table for a namespace, item kind, gate,
-invariant, rule, template, or projection; the manifest carries that declared
-value whole so it can be composed, validated, and captured without treating
-repository-local vocabulary as an engine default.
+two entries cannot publish the same target and identity. Use the
+[Configuration reference](configuration.md) for namespaces, item kinds,
+hierarchy, documentation, and projections; use the linked registry references
+above for gates, invariants, rules, and templates. The manifest carries each
+declared value whole so it can be composed, validated, and captured without
+treating repository-local vocabulary as an engine default.
 
 ## Commands
 
@@ -274,12 +276,10 @@ inside the repository, the output path may be at most 128 path components below
 the repository root; choose an external path if a deeper output location is
 needed. An existing output or add destination is never overwritten.
 
-Packages may declare non-secret variables. Supply a TOML values file containing
-`[variables]` or repeat `--set NAME=VALUE`; precedence is declaration default,
-values file, declared environment variable, then `--set`, with the last
-`--set` winning. Variable references are available in templated asset and
-region bodies and declared free-form prose fields; package paths, identities,
-modes, and other constrained fields reject them.
+For a declared profile variable, supply a TOML values file containing
+`[variables]` or repeat `--set NAME=VALUE`. See [Package identity,
+compatibility, and variables](#package-identity-compatibility-and-variables)
+for declaration, reference, and precedence semantics.
 
 The selector syntax and package-resolution contract are defined in [Profile
 Commands](cli-commands.md#profile-commands). This page
