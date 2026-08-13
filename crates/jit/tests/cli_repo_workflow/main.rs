@@ -24,6 +24,7 @@ mod profile_cli_tests;
 mod profile_concurrency_tests;
 mod profile_edit_refresh_cli_tests;
 mod profile_interruption_tests;
+mod profile_no_git_lifecycle_tests;
 mod project_config_tests;
 mod repo_discovery_tests;
 mod serve_cli_tests;
