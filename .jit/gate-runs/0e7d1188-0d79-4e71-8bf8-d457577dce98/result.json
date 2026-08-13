@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "686306243f54f580dc550902f36dc850e5ca4b5c",
+  "completed_at": "2026-08-13T04:24:27.077938902Z",
+  "duration_ms": 195116,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The 30-second suite budget, per-step timing, enforcement, coverage exception, and cost attribution satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0e7d1188-0d79-4e71-8bf8-d457577dce98",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T04:21:11.961571789Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 33 commits tagged `jit:4b7c06d0`, individually inspected\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint and @/invariant/single-source-prose (.jit/invariants.toml); @/issue/4b7c06d0/requirement/REQ-04 and REQ-05 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T00:03:36Z); repo-validate passed (exit 0, 2026-08-13T00:04:01Z)\nTruncation recovery: Re-read individual tagged diff statistics and relevant patches/current sources in bounded path and line-range calls\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 30-second suite budget, per-step timing, enforcement, coverage exception, and cost attribution satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

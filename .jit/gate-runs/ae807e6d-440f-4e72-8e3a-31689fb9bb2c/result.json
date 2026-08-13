@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "88932890011eea8eff6c35529f9ab083887a0ac3",
+  "completed_at": "2026-08-13T00:08:32.318002291Z",
+  "duration_ms": 242879,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 1359,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/4b7c06d0/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "REQ-04 is violated: stale-binary coverage was removed rather than preserved."
+      }
+    ],
+    "summary": "The suite budget work deletes covered stale-binary assertions, violating unchanged REQ-04.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ae807e6d-440f-4e72-8e3a-31689fb9bb2c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T00:04:29.438369363Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 34497 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff86f-453b-75b3-a524-2eae45d37486\n--------\nuser\n--- 34484 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 32 commits tagged `jit:4b7c06d0` (794def735 through 889328900), individually inspected\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml); @/invariant/bounded-rust-build-footprint and @/invariant/single-source-prose (.jit/invariants.toml); @/issue/4b7c06d0/requirement/REQ-04 and REQ-05 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T00:03:36Z); repo-validate passed (exit 0, 2026-08-13T00:04:01Z)\nTruncation recovery: Re-read profile identity delta and current source in bounded calls; omitted overlong session-history portions as records of the past\n\n1. [blocking][issue-impact] REQ-04 is unmet. The tagged reprofiling commit reduces the default-suite identity count from 4,515 to 4,481 and removes stale-binary guard tests. The current gate execution proceeds directly to running an external checker without that guard at [gate_check.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/gate_check.rs:1359). Deliberately removing the feature does not satisfy this epic’s unchanged requirement to meet the budget by retaining the same assertions; restore equivalent coverage or amend REQ-04. References: @/issue/4b7c06d0/requirement/REQ-04.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The suite budget work deletes covered stale-binary assertions, violating unchanged REQ-04.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-04 is violated: stale-binary coverage was removed rather than preserved.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":1359,\"references\":[\"@/issue/4b7c06d0/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

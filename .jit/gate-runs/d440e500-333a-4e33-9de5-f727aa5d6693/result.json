@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2ef01b3090beabc3e92cfdb9c2b7043bc45e6156",
+  "completed_at": "2026-08-12T23:53:01.230162295Z",
+  "duration_ms": 234919,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/TESTING.md",
+        "id": "F1",
+        "line": 415,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/76ecc11f/requirement/REQ-01",
+          "@/issue/4b7c06d0/requirement/REQ-05"
+        ],
+        "severity": "medium",
+        "summary": "The claim-coordinator attribution says default proptest cases took minutes, but the source says they took seconds; minutes applies only with fsync enabled."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/TESTING.md",
+        "id": "F2",
+        "line": 587,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/76ecc11f/requirement/REQ-04"
+        ],
+        "severity": "medium",
+        "summary": "The ignored-test explanation wrongly generalizes one thread-0 counter placeholder to all six ignored lock tests."
+      }
+    ],
+    "summary": "Two issue-introduced documentation statements inaccurately explain test-cost and ignored-test behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "76ecc11f-21e1-4280-b8cb-c06d10b9d820",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d440e500-333a-4e33-9de5-f727aa5d6693",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-12T23:49:06.310344884Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5138 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ff861-2f67-7da3-8f53-4981a73bb742\n--------\nuser\n--- 5125 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: e218f2cc, 2d5e0f9e, e2f7b670, d0ed0e57, 2ef01b30; uncommitted JIT records not attributed  \nPolicy sources: AGENTS.md  \nResolved items: @/invariant/bounded-rust-build-footprint and @/invariant/single-source-prose (.jit/invariants.toml); @/issue/4b7c06d0/requirement/REQ-05, @/issue/76ecc11f/requirement/REQ-01, and @/issue/76ecc11f/requirement/REQ-04 (issue Markdown)  \nGate evidence: cargo-ci passed (exit 0); code-review previously failed (exit 1); doc-review pending  \nTruncation recovery: narrowed the transaction artifact to its latest record, compared profile rows to documentation rows, and inspected focused source ranges after broad artifact/search output truncated  \n\n1. **[blocking, issue-impact, medium]** [dev/TESTING.md:415](dev/TESTING.md:415) says the claim-coordinator comment records that the default 256 cases made the tests take minutes. The source instead says 256 cases take seconds; only enabling fsync makes them take minutes. This remains an inaccurate explanation of the documented cost. References: `@/issue/76ecc11f/requirement/REQ-01`, `@/issue/4b7c06d0/requirement/REQ-05`.\n\n2. **[blocking, issue-impact, medium]** [dev/TESTING.md:587](dev/TESTING.md:587) attributes all six ignored lock tests’ passing behavior to the thread-0 counter placeholder. That applies only to `test_exclusive_lock_prevents_concurrent_writes`; the other placeholders either increment every thread, set a boolean, or contain no assertion. The documented reason for their exclusion is therefore inaccurate. References: `@/issue/76ecc11f/requirement/REQ-04`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two issue-introduced documentation statements inaccurately explain test-cost and ignored-test behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The claim-coordinator attribution says default proptest cases took minutes, but the source says they took seconds; minutes applies only with fsync enabled.\",\"file\":\"dev/TESTING.md\",\"line\":415,\"references\":[\"@/issue/76ecc11f/requirement/REQ-01\",\"@/issue/4b7c06d0/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The ignored-test explanation wrongly generalizes one thread-0 counter placeholder to all six ignored lock tests.\",\"file\":\"dev/TESTING.md\",\"line\":587,\"references\":[\"@/issue/76ecc11f/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

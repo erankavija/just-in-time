@@ -272,6 +272,15 @@ there rather than assuming any has changed. See
 for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
 Test Costs" below attributes what the measured suite duration is spent on.
 
+The first gate run in a worktree that has just absorbed a large merge does not measure the
+change. The `suite-build` step keeps compilation outside the clock, but the `test` step
+still pays first-touch I/O on artifacts written seconds earlier, and that is worth many
+seconds: one measured run read `suite-build` 36,966 ms and `suite-clock` 37,761 ms cold,
+against 353 ms and 22,218 ms for the same tree once warm. A suite-duration failure is
+therefore provisional until the run is repeated on a warm target and a quiet host — check
+`uptime` first, and pass `--force`, since `jit gate evaluate` reuses a recorded verdict
+over unchanged declared inputs and `target/` is not one of them.
+
 A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
@@ -412,8 +421,10 @@ proptest's default is 256 generated cases per property. `crates/jit/src/storage/
 runs its concurrency and rebuild properties against a real on-disk store, with real file
 locks and real threads per case. It sets `with_fsync(false)`: these properties verify index
 and rebuild invariants rather than crash durability, so the cost is the file and lock work
-itself. Its own comment records that the default case count pushed these tests to minutes,
-and caps I/O-bearing properties at 64 cases. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
+itself. Its own comment records that each case creates a temp directory and does several
+real filesystem writes and reads, so the default 256 cases pushed these tests to seconds —
+and to minutes with fsync on — and it caps the file-touching properties at 64 cases while
+leaving the pure-logic ones at the default. `crates/jit/tests/fast_docs_templates/template_apply_tests.rs`
 and `crates/jit/tests/fast_issue/readiness_coherence_tests.rs` run each case through a
 fresh in-memory `TestHarness`/`CommandExecutor` pipeline rather than a synthetic
 data structure, and cap at 48 cases for the same reason. Both caps trade case count for
@@ -585,9 +596,12 @@ Seven tests are marked `#[ignore]` and never run in the default `cargo nextest r
 | `worktree_cli_tests::test_validate_branch_drift_detects_drifted_branch` | 6 |
 
 Combined they run in 317 ms wall clock. That cost is not inherent, and the exclusion is not
-a performance decision: the six `lock_tests` are TDD placeholders whose real bodies are
-commented out, passing only because a placeholder body increments a shared counter for
-thread 0; the seventh has an empty body and asserts nothing (jit:abe2c2bd).
+a performance decision: the six `lock_tests` are TDD placeholders written before
+`FileLocker` existed, with their real bodies commented out. Three still assert, but only
+against the scaffolding that replaced the lock calls — a counter incremented for thread 0
+only, a counter every thread increments, two booleans set unconditionally — and three
+assert nothing, their assertions commented out along with the bodies. The seventh, the
+branch-drift test, has an empty body. None of the seven can fail (jit:abe2c2bd).
 
 ## Test Environment
 
