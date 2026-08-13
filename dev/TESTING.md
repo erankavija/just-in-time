@@ -272,6 +272,15 @@ there rather than assuming any has changed. See
 for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
 Test Costs" below attributes what the measured suite duration is spent on.
 
+The first gate run in a worktree that has just absorbed a large merge does not measure the
+change. The `suite-build` step keeps compilation outside the clock, but the `test` step
+still pays first-touch I/O on artifacts written seconds earlier, and that is worth many
+seconds: one measured run read `suite-build` 36,966 ms and `suite-clock` 37,761 ms cold,
+against 353 ms and 22,218 ms for the same tree once warm. A suite-duration failure is
+therefore provisional until the run is repeated on a warm target and a quiet host — check
+`uptime` first, and pass `--force`, since `jit gate evaluate` reuses a recorded verdict
+over unchanged declared inputs and `target/` is not one of them.
+
 A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
