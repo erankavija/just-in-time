@@ -14017,3 +14017,8 @@
 {"from":"in_progress","id":"83845e63-aa3f-40c6-8644-7ab76de36e6a","issue_id":"f2389b18-5ce3-4e55-ab22-c7807c2ab62c","timestamp":"2026-08-13T04:31:51.681074174Z","to":"done","type":"issue_state_changed"}
 {"id":"24434192-0707-443d-a56c-80e16707b07e","issue_id":"f2389b18-5ce3-4e55-ab22-c7807c2ab62c","timestamp":"2026-08-13T04:31:51.681074174Z","type":"issue_completed"}
 {"from":"backlog","id":"c1aebdf7-143f-41fb-b719-9f5c0c2ead9a","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T04:31:57.088972541Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"27124208-fa07-4acc-895a-4034973b6466","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T06:08:39.701903101Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"b0bde268-4558-48c3-9db2-095bf4a9eeec","issue_id":"5a3ecba0-9e2a-401c-9994-85066ddaba8f","priority":"high","timestamp":"2026-08-13T06:09:07.025187479Z","title":"Refresh declared contributions from the repository on capture","type":"issue_created"}
+{"gate_key":"code-review","id":"f6446f33-9166-4fae-8a65-b619ad4a4b65","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T06:12:54.076890329Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"02bb4e0d-279d-4dec-8209-269c31c06ec9","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T07:01:00.987591590Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"13709646-ed6b-4056-8f01-c4c5e0f47009","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T07:06:09.127635370Z","type":"gate_passed","updated_by":"auto:executor"}

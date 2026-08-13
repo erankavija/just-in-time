@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-96268a98",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4aa9e613ec90e0c0880d78e3d0c306441d4add81",
+  "completed_at": "2026-08-13T07:06:08.821896462Z",
+  "duration_ms": 276847,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior semantic-identity finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "96268a98-ef75-487d-acab-22a813ff7803",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "291eb167-a4d3-47dd-b211-218e3c45488d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T07:01:31.974555526Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e744476af, 46cdcee30, d70179123, dd9c68080, e9bf61b06, 4aa9e613\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/96268a98/requirement/REQ-01–REQ-04 (issue description); @/issue/c639cfb5/requirement/REQ-06 (epic issue); @/charter/D-8 (dev/vision/9db27a3a-charter.md); relevant invariants (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed on omitted semantic identities, addressed by 4aa9e613\nTruncation recovery: split broad commit output into bounded per-file patches and current source, test, CLI, and documentation reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior semantic-identity finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
