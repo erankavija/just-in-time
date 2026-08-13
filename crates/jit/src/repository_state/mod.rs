@@ -205,8 +205,16 @@ pub use profile_apply::{
     SetStringTarget,
 };
 pub(crate) use profile_apply::{
-    profile_capture_closure, profile_contribution_overrides, profile_contribution_target_paths,
+    contributed_toml_value, contribution_in_registry, profile_capture_closure,
+    profile_contribution_overrides, profile_contribution_target_paths,
+    validate_applied_record_path,
 };
+// The declared value of one contribution as JSON: the TOML spelling above is
+// what production needs, and the packaged-carrier comparison in
+// `profile::contribution_drift` — a repository-local check seam — is the only
+// caller of the JSON one in its own right.
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) use profile_apply::contributed_json_value;
 pub use projection::{
     render_id_anchor_rows, render_invariants_markdown, require_target, ProjectionError,
 };

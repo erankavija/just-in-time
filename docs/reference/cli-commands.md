@@ -920,11 +920,23 @@ edited in place therefore produces a tree whose package identity reflects that
 edit, which is what lets [`jit profile apply`](#jit-profile-apply) reconcile the
 repository from it.
 
+Each contribution the manifest declares is read back from the registry that
+holds it, and the captured manifest declares the value the registry states.
+Which declarations a capture may draw back is the repository's own
+applied-profile record for the package: it names what that package published, so
+a value the package put in a registry and the repository then changed is folded
+back, while a declaration no record of the package claims is the repository's own
+and is left as the manifest's author wrote it. No contribution the manifest does
+not already declare enters the package, and a declaration the package published
+that the repository no longer holds keeps its authored value rather than being
+dropped or defaulted.
+
 Publication is whole and recoverable. The destination ends up holding exactly
 the manifest, the declared asset sources, and the declared region sources: a
 source the manifest stopped declaring, and any other file the destination held,
-is removed in the same transaction. A capture that changes nothing publishes
-nothing.
+is removed in the same transaction. The manifest is republished whole, so a
+contribution it stopped declaring does not survive in the captured package. A
+capture that changes nothing publishes nothing.
 
 A declared target that is a symbolic link, resolves outside the worktree, or
 carries executable permission its declaration did not is refused before anything
@@ -935,7 +947,13 @@ JSON uses the standard list envelope `{"count": N, "files": [...]}` beside the
 captured package's `id`, `version`, `package_hash`, `source`, `destination`,
 `file_count`, `byte_size`, and `status`. Each `files` entry carries the
 repository-relative `path`, its `executable` mode intent, and an `action` of
-`unchanged`, `create`, `update`, or `remove`.
+`unchanged`, `create`, `update`, or `remove`. A `contributions` entry beside
+them carries each declared contribution's canonical `identity` and an `action`
+of `unchanged`, `refreshed` (the registry stated another value, which the
+captured manifest now declares), `absent` (this package published the
+declaration and the repository no longer holds it), or `unowned` (the repository
+states something else under a declaration no record of this package claims).
+Human output names the refreshed and absent ones.
 
 ### `jit profile pack`
 

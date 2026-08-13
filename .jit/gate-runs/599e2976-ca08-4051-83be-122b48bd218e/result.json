@@ -1,0 +1,42 @@
+{
+  "branch": "worktree-agent-5a3ecba0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6184bd79a2c81ca81fc5f79bbf2342734b4c258",
+  "completed_at": "2026-08-13T14:03:25.159814384Z",
+  "duration_ms": 233939,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 2343,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/5a3ecba0/requirement/REQ-07",
+          "@/charter/D-8"
+        ],
+        "severity": "high",
+        "summary": "The per-record capture budget assumes package-size bounds cover unbounded resolved variables and template-expanded owned targets, so valid applied profiles can later be unreadable."
+      }
+    ],
+    "summary": "Profile-agreement capture still bounds variable-expanded applied records and targets by the original package size.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "599e2976-ca08-4051-83be-122b48bd218e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T13:59:31.220596323Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10697 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5a3ecba0\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffb6b-c46f-76a0-b978-1d939121022a\n--------\nuser\n--- 10684 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 7210c625, f04c1cf6, 311daefd, 2a67ea81, d4e53287, bd7056aa, 290bd3ee, 4a9bd4b0, 6e1c414c, cd7a77a9, 3a6672d8, 12f57291, 7a2b40a2, d6184bd7\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md; issue description\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/domain-agnostic and @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/5a3ecba0/requirement/REQ-07 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T13:58:36Z); prior code-review failed on F1, addressed by d6184bd7 and rechecked here\nTruncation recovery: Re-read the truncated feature and follow-up diffs by affected file/current line range; inspected later fixes individually; excluded tracker/progress-only changes from behavioral review.\n\n1. [blocking][issue-impact] `recorded_profile_bytes` limits each record and its claimed targets to one 4 MiB package budget, but applied records retain unbounded resolved variable strings and template substitution can publish an owned asset or region larger than its package source. A valid application with such a value is therefore later refused by both `record_capture_budget` and `claim_capture_budget`, leaving profile agreement unable to read content the package legitimately owns. This violates REQ-07. [crates/jit/src/commands/profile.rs:2343](crates/jit/src/commands/profile.rs:2343)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Profile-agreement capture still bounds variable-expanded applied records and targets by the original package size.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The per-record capture budget assumes package-size bounds cover unbounded resolved variables and template-expanded owned targets, so valid applied profiles can later be unreadable.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":2343,\"references\":[\"@/issue/5a3ecba0/requirement/REQ-07\",\"@/charter/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

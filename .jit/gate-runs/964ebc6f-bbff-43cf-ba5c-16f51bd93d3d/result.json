@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-5a3ecba0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ab2aee8d46c597f13d8d7f2e419a640a2c93e033",
+  "completed_at": "2026-08-13T15:27:37.709154749Z",
+  "duration_ms": 165264,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria and the prior documentation finding are satisfied in the attributable current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "964ebc6f-bbff-43cf-ba5c-16f51bd93d3d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T15:24:52.444268157Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: tagged commits 7210c6257, f04c1cf68, 311daefed, 2a67ea810, d4e532870, bd7056aa9, 290bd3ee9, 4a9bd4b0, 6e1c414c6, cd7a77a9f, 3a6672d86, 12f572914, 7a2b40a22, d6184bd79, 5eca81456, b996e002d, b8572db93, 6405bab01, ab2aee8d4\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/5a3ecba0/requirement/REQ-01–REQ-07 (issue description); @/invariant/architecture-dependency-direction and @/invariant/convention-convergence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T15:24:19Z)\nTruncation recovery: recovered substantive package-capture, profile-command, repository-state, documentation, and later-fix patches by individual commit/path and current line ranges; excluded JIT history records from behavior review\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria and the prior documentation finding are satisfied in the attributable current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

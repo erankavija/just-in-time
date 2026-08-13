@@ -416,16 +416,8 @@ fn without(value: Value, fields: &BTreeSet<&str>) -> Value {
 
 /// The value the package contributes, as the manifest declares it.
 pub fn contributed_value(contribution: &Contribution) -> Value {
-    match contribution {
-        Contribution::KeyedArray { value, .. } | Contribution::MapEntry { value, .. } => {
-            value.clone()
-        }
-        Contribution::Projection { value, .. } => {
-            serde_json::to_value(value).expect("a projection configuration serializes")
-        }
-        Contribution::Scalar { value, .. } => Value::String(value.clone()),
-        Contribution::SetString { value, .. } => Value::String(value.clone()),
-    }
+    crate::repository_state::contributed_json_value(contribution)
+        .expect("a contribution's declared value is the value its own model carries")
 }
 
 /// How the repository's registry names the entry a contribution restates, with

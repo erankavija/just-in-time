@@ -88,6 +88,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- **A contributed value changed in place no longer wedges the repository.** A
+  profile contributes semantic values into a repository's declared
+  configuration, and the registry is the authority for what they mean — so an
+  adopter who changed one in place reached a state no sanctioned sequence
+  cleared: `jit profile validate` exited 4, `jit validate` failed the
+  profile-ownership rule permanently, `--fix` offered nothing, and capture,
+  apply, and reconfigure each reported the repository unchanged. Capture read
+  asset bytes back from the repository for a live-source declaration but read no
+  contribution at all, so the one class of profile-owned content whose author is
+  the repository was the one class it could not refresh. It now reads each
+  declared contribution back from the registry that holds it and republishes the
+  manifest carrying that value, so the loop closes: capture the package that
+  published the value, apply it, and both the profile check and whole-repository
+  validation agree while the registry keeps what the adopter chose. Which
+  declarations a capture may draw back is the repository's own applied-profile
+  record for the package, so a declaration no record of that package claims stays
+  the repository's own rather than being folded into a package that never
+  published it, and no contribution the manifest does not already declare enters
+  it. A declaration the package published that the repository no longer holds is
+  named in the capture's report rather than dropped or defaulted. The three
+  surfaces now answer alike, because they read one comparison: a declaration the
+  repository holds against what its owner recorded publishing decides
+  `jit profile diff`, the refusal an application makes, and the finding
+  `jit validate` reports, so a report consulted before acting can no longer call
+  a selection clean while validation fails on the same declaration. The
+  profile-agreement capture bounds only the shape of what it reads: one listing,
+  construction-derived path depth, declared target-path membership, and
+  CaptureSpec confinement. Record and claimed-target paths are explicitly named,
+  so their payload bytes are unbounded and no repository is refused a reading of
+  content its own profiles legitimately claim.
+
 - **The build gate decides on the tree rather than on build-cache state.** Two
   of its steps read the machine instead of the change. `incremental-preflight`
   refused to run at all while `target/*/incremental` was non-empty — which any

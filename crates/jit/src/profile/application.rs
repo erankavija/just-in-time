@@ -520,11 +520,42 @@ pub struct ProfileCaptureFile {
     pub executable: bool,
 }
 
+/// What a capture read back from the repository for one declared contribution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProfileContributionCaptureAction {
+    /// The registry declares the value the manifest already carried.
+    Unchanged,
+    /// This package published the declaration and the registry declares another
+    /// value, which the captured manifest now carries.
+    Refreshed,
+    /// This package published the declaration and the registry declares nothing
+    /// under it, so the captured manifest keeps the value its author wrote.
+    Absent,
+    /// The registry declares something other than the manifest under a
+    /// declaration no record of this package claims, so it is the repository's
+    /// own and the captured manifest keeps the value its author wrote.
+    Unowned,
+}
+
+/// One contribution the captured manifest declares, beside what the repository
+/// said about it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct ProfileCapturedContribution {
+    /// Canonical semantic identity of the declaration.
+    pub identity: String,
+    /// What the registry holding it said.
+    pub action: ProfileContributionCaptureAction,
+}
+
 /// Count-wrapped response of one package-tree capture.
 ///
 /// The collection is every path the capture decided about, including the ones
 /// it removed, so an adopter reading it sees what the destination stopped
-/// carrying as well as what it now carries.
+/// carrying as well as what it now carries. Beside it, the declarations the
+/// captured manifest carries are reported with what the repository said about
+/// each: a contributed value read back from the registry that owns it, and a
+/// declaration the repository no longer holds named rather than dropped.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileCaptureResult {
     /// Number of entries in [`Self::files`].
@@ -547,6 +578,8 @@ pub struct ProfileCaptureResult {
     pub status: ProfileApplicationStatus,
     /// Every path the capture decided about, in canonical path order.
     pub files: Vec<ProfileCaptureFile>,
+    /// Every contribution the captured manifest declares, in declaration order.
+    pub contributions: Vec<ProfileCapturedContribution>,
 }
 
 /// Response of packing one package into a portable archive.

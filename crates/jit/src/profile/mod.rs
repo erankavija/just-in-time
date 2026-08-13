@@ -46,10 +46,10 @@ pub use agreement::{
 pub(crate) use application::SelectionObservation;
 pub use application::{
     ProfileAddResult, ProfileApplicationStatus, ProfileApplicationWarning, ProfileApplyResult,
-    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
-    ProfileContributionChange, ProfileListResult, ProfilePackResult, ProfilePlanEntry,
-    ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary,
-    ProfileTargetAction, ProfileTargetChange,
+    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileCapturedContribution,
+    ProfileComposedApplyResult, ProfileContributionCaptureAction, ProfileContributionChange,
+    ProfileListResult, ProfilePackResult, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus,
+    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
@@ -72,7 +72,8 @@ pub use package_archive::{
     MAX_PROFILE_PACKAGE_ARCHIVE_BYTES, MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES,
 };
 pub use package_capture::{
-    capture_package_tree, CapturedFile, CapturedPackageTree, PackageCaptureError,
+    capture_package_tree, CapturedContribution, CapturedContributionState, CapturedFile,
+    CapturedPackageTree, PackageCaptureError,
 };
 pub use three_way::{
     decide_three_way, ThreeWayConflict, ThreeWayDecision, ThreeWayInput, ThreeWayValue,

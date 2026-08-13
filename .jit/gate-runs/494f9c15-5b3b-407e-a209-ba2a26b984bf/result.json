@@ -1,0 +1,41 @@
+{
+  "branch": "worktree-agent-5a3ecba0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "12f572914f87a6d283423796c57fd87115f44db5",
+  "completed_at": "2026-08-13T13:51:07.099100513Z",
+  "duration_ms": 218591,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/profile/package_capture.rs",
+        "id": "F1",
+        "line": 498,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8"
+        ],
+        "severity": "medium",
+        "summary": "Capture trusts claims from a misplaced applied-profile record and can refresh a package contribution it does not own."
+      }
+    ],
+    "summary": "Capture accepts ownership claims from a provenance record whose embedded profile ID does not match its canonical path.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "494f9c15-5b3b-407e-a209-ba2a26b984bf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T13:47:28.507608964Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13994 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5a3ecba0\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffb60-c3d4-7d71-aba3-7e2da2824184\n--------\nuser\n--- 13981 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:5a3ecba0` commits 7210c6257, f04c1cf68, 311daefed, 2a67ea810, d4e532870, bd7056aa9, 290bd3ee9, 4a9bd4b0b, 6e1c414c6, cd7a77a9f, 3a6672d86, 12f572914\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T13:45:54Z); prior code-review failed (exit 1) and its F1 budget finding was addressed\nTruncation recovery: per-commit stats/name-status and patches; affected implementation, test, documentation, and policy files reread in bounded path and line ranges\n\n1. **[blocking][issue-impact]** `published_identities` trusts claims from `.jit/profiles/<model-id>.json` after deserialization without verifying the record’s embedded ID matches its canonical path. A misplaced but otherwise valid record can therefore make capture classify another profile’s claim as owned and rewrite the manifest from the registry. Other ownership readers enforce this invariant through `validate_applied_record_path` or equivalent ID checking. Add that validation here and cover the mismatched-record case. [@/charter/D-8] ([crates/jit/src/profile/package_capture.rs:498](crates/jit/src/profile/package_capture.rs:498))\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Capture accepts ownership claims from a provenance record whose embedded profile ID does not match its canonical path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Capture trusts claims from a misplaced applied-profile record and can refresh a package contribution it does not own.\",\"file\":\"crates/jit/src/profile/package_capture.rs\",\"line\":498,\"references\":[\"@/charter/D-8\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
