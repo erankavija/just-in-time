@@ -16,7 +16,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Seven ignored tests assert nothing and are recorded as an excluded cost",
-  "updated_at": "2026-08-12T23:54:27.520689123Z"
+  "updated_at": "2026-08-13T00:03:33.961904151Z"
 }

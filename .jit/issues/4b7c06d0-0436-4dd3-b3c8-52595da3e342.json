@@ -39,10 +39,15 @@
     "repo-validate"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T00:00:17.867828818Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
-      "status": "pending",
-      "updated_at": "2026-08-11T16:32:02.508095795Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T00:00:20.503317932Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
@@ -56,5 +61,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-12T23:59:51.064296889Z"
+  "updated_at": "2026-08-13T00:00:20.503317932Z"
 }
