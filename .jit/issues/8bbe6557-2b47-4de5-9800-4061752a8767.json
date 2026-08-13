@@ -12,7 +12,23 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T20:18:32.034715631Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T20:22:02.852553736Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T20:19:01.816290791Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8bbe6557-2b47-4de5-9800-4061752a8767",
   "labels": [
     "epic:jit-profiles-complete",
@@ -28,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove unsupported embedded profile provenance",
-  "updated_at": "2026-08-13T19:48:07.880404856Z"
+  "updated_at": "2026-08-13T20:22:02.852553736Z"
 }
