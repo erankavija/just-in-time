@@ -4,6 +4,7 @@
   "context": {},
   "created_at": "2026-07-29T13:43:53.196219266Z",
   "dependencies": [
+    "0708d692-66d3-4536-ac75-739e759ac179",
     "7b29019c-7316-4991-87a5-3fbbe7264b73",
     "bb03df0a-65c7-496a-bb09-2620eb253fd5"
   ],
@@ -35,5 +36,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 release",
-  "updated_at": "2026-07-30T05:29:28.585199472Z"
+  "updated_at": "2026-08-13T09:51:52.039246499Z"
 }
