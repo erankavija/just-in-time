@@ -297,15 +297,15 @@
           "short_id": "b5bb4b9c",
           "title": "Remove the superseded profile_applied event contract",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Created from blocking holistic-review finding F1 and dispatched at the balanced tier. The bounded cutover removes the obsolete typed/tagged/catalogued/documented event path, migrates current tests to ProfileLifecycle, and hardens mechanical absence coverage; generic unknown-event handling remains generic and no compatibility boundary is added."
+          "status": "done",
+          "note": "Completed at the balanced tier. The bounded cutover removes the obsolete typed/tagged/catalogued/documented event path, migrates torn-tail and audit coverage to ProfileLifecycle, and hardens mechanical absence coverage; generic unknown-event handling remains generic and no compatibility boundary was added. Branch cargo-ci and two independent code-review runs passed; merged-main cargo-ci and the 78-test MCP suite pass."
         },
         {
           "short_id": "dd268d0f",
           "title": "Surface, documentation, and evidence",
           "classification": "checkpoint",
           "status": "in_progress",
-          "note": "repo-validate passed. Holistic-review run ece8c8cc failed on one blocking criterion finding: the superseded profile_applied variant/tag remains current in the event catalog/schema/docs. Focused remediation b5bb4b9c is now a dependency; the story will be re-reviewed after it lands."
+          "note": "The first repo-validate passed and holistic-review run ece8c8cc failed on one blocking criterion finding: the superseded profile_applied variant/tag remained current in the event catalog/schema/docs. Focused remediation b5bb4b9c is now done and merged; the exact integrated tree passes cargo-ci and MCP. The story is ready for fresh forced gate evaluation."
         }
       ]
     }
