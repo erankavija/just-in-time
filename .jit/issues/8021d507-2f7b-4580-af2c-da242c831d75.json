@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T17:59:59.164125110Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "Show every lifecycle operation working in a repository that has no version-control\ndirectory.\n\n## Background\n\nCore commands must work without Git, with claims and leases the documented\nexception. The lifecycle adds operations that read package directories and publish\nrepository content, none of which needs version control, so the guarantee has to be\nextended to them by evidence. The suite is a module of the existing workflow target.\n\n## Success Criteria\n\n- [hard] REQ-01: Selection, resolution, application, reconfiguration, upgrade, capture, packing, adding, difference reporting, and the profile check each complete in a repository with no version-control directory.\n- [hard] REQ-02: No lifecycle operation reports a version-control error or silently degrades when version control is absent.\n- [hard] REQ-03: The suite is a module of an existing integration-test target.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T17:59:45.843907839Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +25,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Prove the lifecycle runs without version control",
-  "updated_at": "2026-08-10T15:42:53.655942414Z"
+  "updated_at": "2026-08-13T17:59:59.164125110Z"
 }

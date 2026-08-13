@@ -285,7 +285,8 @@
           "short_id": "8021d507",
           "title": "Prove the lifecycle runs without version control",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched at the balanced tier as a bounded public-CLI acceptance matrix over all ten profile lifecycle operations in a repository that never has a .git directory. Expected scope is test-only; any production Git decoupling is a criterion defect and must be escalated before implementation."
         }
       ]
     },
