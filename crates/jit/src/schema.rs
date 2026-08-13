@@ -487,6 +487,14 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfileAgreementResult>()),
                 "ProfileAgreementResult",
             ),
+            // The difference report is the decision a publication would act on,
+            // so it answers in the preview shape the lifecycle rehearsals do,
+            // with the conflict outcomes a rehearsal fails on instead of
+            // reporting.
+            "profile_diff" => (
+                Some(schema_to_value::<crate::profile::ProfilePlanResult>()),
+                "ProfilePlanResult",
+            ),
             "profile_capture" => (
                 Some(schema_to_value::<crate::profile::ProfileCaptureResult>()),
                 "ProfileCaptureResult",

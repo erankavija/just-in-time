@@ -7,6 +7,7 @@
 mod agreement;
 mod application;
 mod apply_claims;
+mod difference;
 mod graph;
 mod manifest;
 mod nofollow;
@@ -53,6 +54,7 @@ pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
     build_resolved_contribution_claims, ProfileClaimError,
 };
+pub(crate) use difference::{ensure_publishable_targets, profile_plan_entry};
 pub use graph::{EngineVersion, ProfileGraphError, ResolvedProfileGraph};
 pub use manifest::{
     profile_package_model_schema, AssetDeclaration, EnvironmentVariableName, LiveSourceDeclaration,

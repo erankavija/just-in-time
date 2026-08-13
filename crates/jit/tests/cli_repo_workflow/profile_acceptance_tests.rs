@@ -805,6 +805,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "add",
             "apply",
             "capture",
+            "diff",
             "list",
             "pack",
             "reconfigure",
@@ -1000,7 +1001,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     );
     assert_eq!(
         property_keys(by_title["ProfilePlanResult"], "ProfileTargetChange"),
-        expected_keys(&["action", "executable", "path"])
+        expected_keys(&["action", "executable", "owners", "path", "reason"])
     );
 }
 

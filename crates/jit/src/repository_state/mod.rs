@@ -201,7 +201,8 @@ pub use profile_apply::{
     ContributionRegistry, ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget,
     ProfileApplicationInput, ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims,
     ProfileConflictOccupant, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
-    ProfileTargetConflictError, ProfileThreeWayConflictError, ScalarTarget, SetStringTarget,
+    ProfileTargetConflict, ProfileTargetConflictEntry, ProfileTargetConflictsError, ScalarTarget,
+    SetStringTarget,
 };
 pub(crate) use profile_apply::{
     preflight_profile_contributions, profile_capture_closure, profile_contribution_overrides,
@@ -584,11 +585,28 @@ pub struct MaterializationPlan {
     applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// What one profile decided about one target it participates in.
+///
+/// The vocabulary is the shared three-way decision's: a value the profile
+/// publishes is created, updated, or already exact; a recorded claim the
+/// profile stopped contributing is retained or removed; and a value that cannot
+/// be changed safely is a conflict carrying its own reason. A publication acts
+/// on this vocabulary and a difference report states it, so neither can
+/// describe an outcome the other would not.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ProfileTargetDisposition {
+    /// The repository already holds the value this profile would publish.
     Unchanged,
+    /// The target is absent and would be created.
     Create,
+    /// The target holds another value this profile may safely replace.
     Update,
+    /// This profile stopped contributing the target and its value survives.
+    Retain,
+    /// This profile stopped contributing unchanged, solely owned content.
+    Remove,
+    /// The target cannot be published, for the reason it carries.
+    Conflict(ProfileTargetConflict),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -603,6 +621,11 @@ pub(crate) struct ProfileTargetMaterialization {
     pub(crate) path: VirtualPath,
     pub(crate) disposition: ProfileTargetDisposition,
     pub(crate) mode: FileMode,
+    /// Packages whose applied records claim this target, in package-id order.
+    ///
+    /// Empty means no package owns it, which is what separates
+    /// repository-authored content from content a package published.
+    pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
 /// Complete producer output awaiting the shared plan-identity tail.
@@ -923,12 +946,9 @@ pub enum RepositoryStateError {
     /// Projection declaration or source resolution failed.
     #[error(transparent)]
     Projection(#[from] ProjectionError),
-    /// A profile asset would overwrite an unowned authored occupant.
+    /// A profile selection decided targets it cannot publish.
     #[error(transparent)]
-    ProfileTargetConflict(#[from] ProfileTargetConflictError),
-    /// A package replacement would overwrite a target changed after its base.
-    #[error(transparent)]
-    ProfileThreeWayConflict(#[from] Box<ProfileThreeWayConflictError>),
+    ProfileTargetConflicts(#[from] ProfileTargetConflictsError),
     /// Resolved package definitions disagree for one semantic identity.
     #[error(transparent)]
     ContributionComposition(#[from] ContributionCompositionConflict),

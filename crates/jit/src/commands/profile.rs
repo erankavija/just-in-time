@@ -7,23 +7,22 @@ use crate::profile::{
     ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
     ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackResult,
     ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
-    ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction,
-    ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority,
-    ResolvedProfileContent, ResolvedProfileGraph, ResolvedVariables, SelectionObservation,
-    VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
+    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileVariableAssignment,
+    ProfileVariableName, RecordedValueAuthority, ResolvedProfileContent, ResolvedProfileGraph,
+    ResolvedVariables, SelectionObservation, VariableInputs, MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
 };
 use crate::profile::{
-    claimed_target_divergences, unowned_target_divergences, ProfileAgreement,
+    claimed_target_divergences, profile_plan_entry, unowned_target_divergences, ProfileAgreement,
     ProfileAgreementResult, ProfileDivergence,
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
     finalize_package_tree_capture, AppliedProfileRecord, CaptureBudget, CaptureSpec,
     CapturedTreeFile, FileMode, MaterializationPlan, MaterializationRequest, MutationContext,
-    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim,
-    ProfileTargetDisposition, RepositoryEntry, RepositoryExportDestination, RepositoryExportIntent,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RootRelativePath, TreeFileDisposition, TreeFileOutcome, VirtualPath,
+    PackageTreeCapture, ProfileApplicationInput, ProfileContributionClaim, RepositoryEntry,
+    RepositoryExportDestination, RepositoryExportIntent, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RepositoryRootClass, RepositoryStateError, RootRelativePath,
+    TreeFileDisposition, TreeFileOutcome, VirtualPath,
 };
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
@@ -92,6 +91,20 @@ fn selection_observations<Observation: Clone + SelectionObservation>(
         observations.push(observation);
     }
     Ok(observations)
+}
+
+/// What a prepared selection does with a decision it cannot publish.
+///
+/// The two answers are the whole difference between a rehearsal and a
+/// difference report: both derive the same decision from the same session, and
+/// only one of them is allowed to carry a conflict back to its caller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProfileConflictResponse {
+    /// Fail the preparation, exactly where the publication it precedes would.
+    Refuse,
+    /// Return the decision, conflicts included, for a caller that publishes
+    /// nothing.
+    Report,
 }
 
 /// One ordered profile selection from the command boundary.
@@ -1091,22 +1104,16 @@ impl CommandExecutor<JsonFileStorage> {
                 &contribution_context,
                 &context,
                 ProfileLifecycleOperation::Apply,
+                ProfileConflictResponse::Refuse,
             )?
             else {
                 return Ok(SessionStep::Retry);
             };
-            let changes = profile_target_changes(&plan, &metadata.id);
-            Ok(SessionStep::Done(ProfilePlanEntry {
-                id: metadata.id.to_string(),
-                version: metadata.version.clone(),
-                status: if plan.delta().actions().is_empty() {
-                    ProfilePlanStatus::Unchanged
-                } else {
-                    ProfilePlanStatus::WouldApply
-                },
-                plan_hash: plan.hash().to_string(),
-                targets: changes,
-            }))
+            Ok(SessionStep::Done(profile_plan_entry(
+                &plan,
+                &metadata.id,
+                &metadata.version,
+            )))
         })
     }
 
@@ -1200,6 +1207,70 @@ impl CommandExecutor<JsonFileStorage> {
             &options.assignments,
         )?;
         self.apply_profile_with_inputs(selectors, &inputs)
+    }
+
+    /// Report what applying a selection would do to this repository, without
+    /// publishing any of it.
+    ///
+    /// The report is the decision itself: the selection is resolved, closed
+    /// over its dependencies, and planned through the same preparation a
+    /// publication runs, and every target each participating profile decided is
+    /// then stated — the values it would create or update, the recorded claims
+    /// it would retain or remove, and the targets it cannot publish, each named
+    /// beside the packages that claim it. A conflict is reported rather than
+    /// refused, which is the whole difference from the rehearsal the lifecycle
+    /// commands run, so an adopter can read a conflicting decision before it
+    /// decides whether to publish one.
+    ///
+    /// A package that is not installed is reported as readily as one that is:
+    /// the selection is resolved from the location a `path:` selector names, so
+    /// an adopter inspects a package before applying it rather than after.
+    ///
+    /// Nothing is written. The capture runs under the same session guard the
+    /// publication would, so the answer describes the repository the
+    /// publication would act on.
+    ///
+    /// # Errors
+    ///
+    /// Every failure that would refuse the publication for a reason other than
+    /// its targets: an unresolvable selector, an unsatisfiable dependency
+    /// graph, a variable input the packages do not declare, and a repository
+    /// that cannot be read.
+    pub fn diff_profiles_from_sources(
+        &self,
+        selectors: &[ProfileSelector],
+        options: &ProfileVariableOptions,
+    ) -> Result<ProfilePlanResult> {
+        let selected = self.resolve_profile_selectors(selectors)?;
+        if selected.is_empty() {
+            return Ok(ProfilePlanResult::new(Vec::new()));
+        }
+        let packages = self.resolve_profile_graph(&selected)?.selected_packages();
+        let inputs = load_profile_variable_inputs(
+            &packages,
+            options.values_file.as_deref(),
+            &options.assignments,
+        )?;
+        validate_variable_inputs(&packages, &inputs)?;
+        let resolved = packages
+            .iter()
+            .map(|package| {
+                resolve_package(
+                    package,
+                    &inputs.for_declarations(&package.model().variables),
+                )
+                .map_err(anyhow::Error::from)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
+        self.preview_resolved_profile_selection(
+            &selected,
+            &packages,
+            &resolved,
+            &contribution_context,
+            ProfileLifecycleOperation::Apply,
+            ProfileConflictResponse::Report,
+        )
     }
 
     /// Re-render already installed packages from their recorded values and
@@ -1737,6 +1808,7 @@ impl CommandExecutor<JsonFileStorage> {
                 contribution_context,
                 &context,
                 operation,
+                ProfileConflictResponse::Refuse,
             )?
             else {
                 return Ok(SessionStep::Retry);
@@ -1802,6 +1874,30 @@ impl CommandExecutor<JsonFileStorage> {
         contribution_context: &[ProfileContributionClaim],
         operation: ProfileLifecycleOperation,
     ) -> Result<ProfilePlanResult> {
+        self.preview_resolved_profile_selection(
+            selected,
+            packages,
+            resolved,
+            contribution_context,
+            operation,
+            ProfileConflictResponse::Refuse,
+        )
+    }
+
+    /// Preview an aggregate lifecycle selection, deciding what a conflict does.
+    ///
+    /// A rehearsal and a difference report reach this one preview with
+    /// different answers to that question and nothing else, so their entries
+    /// stay comparable entry for entry.
+    fn preview_resolved_profile_selection(
+        &self,
+        selected: &[ProfilePackage],
+        packages: &[ProfilePackage],
+        resolved: &[ResolvedProfileContent],
+        contribution_context: &[ProfileContributionClaim],
+        operation: ProfileLifecycleOperation,
+        response: ProfileConflictResponse,
+    ) -> Result<ProfilePlanResult> {
         let layout = self.require_layout()?;
         let context = MutationContext::preview();
         with_mutation_session(self.storage(), &layout, "profile planning", |session| {
@@ -1812,22 +1908,15 @@ impl CommandExecutor<JsonFileStorage> {
                 contribution_context,
                 &context,
                 operation,
+                response,
             )?
             else {
                 return Ok(SessionStep::Retry);
             };
             let rehearsed = packages
                 .iter()
-                .map(|package| ProfilePlanEntry {
-                    id: package.model().id.to_string(),
-                    version: package.model().version.clone(),
-                    status: if plan.applied_profiles().contains(&package.model().id) {
-                        ProfilePlanStatus::WouldApply
-                    } else {
-                        ProfilePlanStatus::Unchanged
-                    },
-                    plan_hash: plan.hash().to_string(),
-                    targets: profile_target_changes(&plan, &package.model().id),
+                .map(|package| {
+                    profile_plan_entry(&plan, &package.model().id, &package.model().version)
                 })
                 .collect::<Vec<_>>();
             let plans = selection_observations(rehearsed, selected)?;
@@ -1842,7 +1931,12 @@ impl CommandExecutor<JsonFileStorage> {
         session: &mut (dyn RepositoryMutationSession + '_),
         package: &ProfilePackage,
         context: &MutationContext,
-    ) -> Result<Option<(MaterializationPlan, Vec<ProfileTargetChange>)>> {
+    ) -> Result<
+        Option<(
+            MaterializationPlan,
+            Vec<crate::profile::ProfileTargetChange>,
+        )>,
+    > {
         let resolved = resolve_package(package, &VariableInputs::default())?;
         let contribution_context = self.profile_contribution_candidates(
             std::slice::from_ref(package),
@@ -1855,9 +1949,11 @@ impl CommandExecutor<JsonFileStorage> {
             &contribution_context,
             context,
             ProfileLifecycleOperation::Apply,
+            ProfileConflictResponse::Refuse,
         )?;
         Ok(plan.map(|plan| {
-            let changes = profile_target_changes(&plan, &package.model().id);
+            let changes =
+                profile_plan_entry(&plan, &package.model().id, &package.model().version).targets;
             (plan, changes)
         }))
     }
@@ -1865,6 +1961,13 @@ impl CommandExecutor<JsonFileStorage> {
     /// Capture and close the complete selection once. A retry restarts from a
     /// fresh held session image; no member of the selection is published until
     /// the final aggregate plan reaches `session.apply`.
+    ///
+    /// `response` decides what a decision that cannot be published does here.
+    /// Every route that publishes or rehearses a publication refuses it, and
+    /// the difference report is the sole reader that carries it through, so a
+    /// conflicting target reaches an adopter as a report entry exactly once and
+    /// as a refusal everywhere else.
+    #[allow(clippy::too_many_arguments)]
     fn prepare_profile_selection(
         &self,
         session: &mut (dyn RepositoryMutationSession + '_),
@@ -1873,6 +1976,7 @@ impl CommandExecutor<JsonFileStorage> {
         contribution_context: &[ProfileContributionClaim],
         context: &MutationContext,
         operation: ProfileLifecycleOperation,
+        response: ProfileConflictResponse,
     ) -> Result<Option<MaterializationPlan>> {
         if packages.len() != resolved.len() {
             anyhow::bail!("profile selection packages and resolved content differ in length");
@@ -2005,6 +2109,10 @@ impl CommandExecutor<JsonFileStorage> {
         }) {
             return Ok(None);
         }
+        if response == ProfileConflictResponse::Refuse {
+            crate::profile::ensure_publishable_targets(&plan)
+                .map_err(RepositoryStateError::from)?;
+        }
         Ok(Some(plan))
     }
 
@@ -2028,34 +2136,6 @@ impl CommandExecutor<JsonFileStorage> {
             )?))
         })
     }
-}
-
-/// Project the targets `owner` decided in a prepared plan into the public
-/// dry-run vocabulary.
-///
-/// Every profile command that reports targets reads them from the plan it
-/// prepared, so what an adopter is shown and what the transaction would publish
-/// come from one derivation. One plan composes every member of its selection,
-/// so the answer is scoped to the profile the caller is reporting: an entry
-/// carries the decisions its own profile made and no others. A target more than
-/// one selected profile contributes is decided by each of them, so it appears
-/// under each — attributing it to one owner would misreport the others.
-fn profile_target_changes(
-    plan: &MaterializationPlan,
-    owner: &ProfileId,
-) -> Vec<ProfileTargetChange> {
-    plan.profile_targets()
-        .iter()
-        .filter(|target| &target.owner == owner)
-        .map(|target| {
-            let action = match target.disposition {
-                ProfileTargetDisposition::Unchanged => ProfileTargetAction::Unchanged,
-                ProfileTargetDisposition::Create => ProfileTargetAction::Create,
-                ProfileTargetDisposition::Update => ProfileTargetAction::Update,
-            };
-            ProfileTargetChange::new(target.path.repository_relative(), action, target.mode)
-        })
-        .collect()
 }
 
 /// Insert one package image without allowing selector or dependency traversal
@@ -2841,11 +2921,12 @@ pub(super) fn reject_reserved_application_targets<'a>(
 mod tests {
     use super::*;
     use crate::domain::{Event, ProfileLifecycleOperation, ProfileLifecycleStatus};
+    use crate::profile::{ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionCompositionConflict, ContributionConflictOwner,
         InitializationError, MapEntryTarget, ProfileConflictOccupant, ProfilePackageId,
-        ProfileTargetConflictError, ProfileThreeWayConflictError, RepositoryStateError,
-        RootRelativePath, ScalarTarget, SetStringTarget,
+        ProfileTargetConflict, ProfileTargetConflictEntry, RepositoryStateError, RootRelativePath,
+        ScalarTarget, SetStringTarget,
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
@@ -3451,31 +3532,44 @@ mod tests {
         )
     }
 
-    /// The asset-target conflict `error` reports, whichever variant carries it.
+    /// Every target `error` refused, in the order the plan decided them.
     ///
-    /// Composition raises one conflict value; the profile-application producer
-    /// re-wraps it under initialization on its way out. A test asserting what a
-    /// conflict reports reads that value rather than the variant that carried
-    /// it (`@/invariant/semantic-test-assertions`).
-    fn target_conflict(error: &anyhow::Error) -> &ProfileTargetConflictError {
+    /// A selection is refused as a whole and carries every target that refused
+    /// it, so a test reads that set rather than the variant that carried it
+    /// (`@/invariant/semantic-test-assertions`).
+    fn refused_targets(error: &anyhow::Error) -> &[ProfileTargetConflictEntry] {
         match error.downcast_ref::<RepositoryStateError>() {
-            Some(
-                RepositoryStateError::ProfileTargetConflict(conflict)
-                | RepositoryStateError::Initialization(InitializationError::ProfileTargetConflict(
-                    conflict,
-                )),
-            ) => conflict,
-            _ => panic!("a colliding asset target fails as a target conflict: {error:#}"),
+            Some(RepositoryStateError::ProfileTargetConflicts(refusal)) => &refusal.conflicts,
+            _ => panic!("an unpublishable profile target fails as a target conflict: {error:#}"),
         }
     }
 
-    /// The safe-change conflict carried by real profile application.
-    fn three_way_conflict(error: &anyhow::Error) -> &ProfileThreeWayConflictError {
-        match error.downcast_ref::<RepositoryStateError>() {
-            Some(RepositoryStateError::Initialization(
-                InitializationError::ProfileThreeWayConflict(conflict),
-            )) => conflict,
-            _ => panic!("a concurrent profile edit fails as a three-way conflict: {error:#}"),
+    /// The one target `error` refused, for a case that states exactly one.
+    fn refused_target(error: &anyhow::Error) -> &ProfileTargetConflictEntry {
+        let refused = refused_targets(error);
+        assert_eq!(
+            refused.len(),
+            1,
+            "this selection states one unpublishable target: {refused:?}"
+        );
+        &refused[0]
+    }
+
+    /// The recorded, observed, and resolved values a diverged refusal reports.
+    fn diverged_values(
+        entry: &ProfileTargetConflictEntry,
+    ) -> (
+        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
+        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
+        &crate::profile::ThreeWayValue<crate::repository_state::ProfileBaseFingerprint>,
+    ) {
+        match &entry.conflict {
+            ProfileTargetConflict::Diverged {
+                base,
+                current,
+                candidate,
+            } => (base, current, candidate),
+            other => panic!("a concurrent profile edit refuses as a divergence: {other:?}"),
         }
     }
 
@@ -4862,21 +4956,16 @@ placement = "append"
 
         let error = executor.apply_profile_package(&replacement).unwrap_err();
 
-        let conflict = three_way_conflict(&error);
+        let conflict = refused_target(&error);
         assert_eq!(conflict.target.repository_relative(), "docs/profile.txt");
         assert_eq!(conflict.owner.as_str(), "planner-asset-only");
-        assert!(matches!(
-            conflict.base,
-            crate::profile::ThreeWayValue::Present(_)
-        ));
-        assert!(matches!(
-            conflict.current,
-            crate::profile::ThreeWayValue::Present(_)
-        ));
-        assert!(matches!(
-            conflict.candidate,
-            crate::profile::ThreeWayValue::Present(_)
-        ));
+        let (base, current, candidate) = diverged_values(conflict);
+        for observed in [base, current, candidate] {
+            assert!(matches!(
+                observed,
+                crate::profile::ThreeWayValue::Present(_)
+            ));
+        }
         let message = error.to_string();
         for expected in [
             "docs/profile.txt",
@@ -5578,18 +5667,17 @@ template = true
 
         let error = executor.apply_profile_package(&candidate).unwrap_err();
 
-        let conflict = target_conflict(&error);
+        let conflict = refused_target(&error);
         assert_eq!(
-            conflict.occupant,
-            ProfileConflictOccupant::Package(ProfilePackageId::new(
-                occupant.model().id.to_string()
-            ))
+            conflict.conflict,
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new(
+                    occupant.model().id.to_string()
+                ))
+            }
         );
-        assert_eq!(
-            conflict.candidate,
-            ProfilePackageId::new(candidate.model().id.to_string())
-        );
-        assert_eq!(conflict.path.repository_relative(), target);
+        assert_eq!(conflict.owner.as_str(), candidate.model().id.as_str());
+        assert_eq!(conflict.target.repository_relative(), target);
         // The occupant's bytes stand: a conflict applies nothing.
         assert_eq!(
             fs::read_to_string(temp.path().join(target)).unwrap(),
@@ -5693,9 +5781,14 @@ template = true
 
         let error = executor.apply_profile_package(&candidate).unwrap_err();
 
-        let conflict = target_conflict(&error);
-        assert_eq!(conflict.occupant, ProfileConflictOccupant::Repository);
-        assert_eq!(conflict.path.repository_relative(), target);
+        let conflict = refused_target(&error);
+        assert_eq!(
+            conflict.conflict,
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Repository
+            }
+        );
+        assert_eq!(conflict.target.repository_relative(), target);
         assert_eq!(fs::read_to_string(&authored).unwrap(), "authored here\n");
     }
 
@@ -6350,10 +6443,22 @@ template = true
                     "the rehearsal called {} unchanged",
                     target.path
                 ),
-                ProfileTargetAction::Create | ProfileTargetAction::Update => assert_ne!(
+                ProfileTargetAction::Create
+                | ProfileTargetAction::Update
+                | ProfileTargetAction::Remove => assert_ne!(
                     before.get(&path),
                     after.get(&path),
                     "the rehearsal said it would publish {}",
+                    target.path
+                ),
+                ProfileTargetAction::Retain => assert_eq!(
+                    before.get(&path),
+                    after.get(&path),
+                    "the rehearsal said {} survives its departing owner",
+                    target.path
+                ),
+                ProfileTargetAction::Conflict => panic!(
+                    "a rehearsal refuses an unpublishable decision rather than reporting {}",
                     target.path
                 ),
             }
@@ -6464,15 +6569,16 @@ template = true
             )
             .unwrap_err();
 
-        let conflict = three_way_conflict(&error);
+        let conflict = refused_target(&error);
         assert_eq!(conflict.target.repository_relative(), "docs/templated.txt");
         assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
+        let (base, current, candidate) = diverged_values(conflict);
         assert_ne!(
-            conflict.current, conflict.base,
+            current, base,
             "the conflict reports current diverging from the recorded base"
         );
         assert_ne!(
-            conflict.current, conflict.candidate,
+            current, candidate,
             "the conflict reports current diverging from the resolved candidate"
         );
         assert_eq!(
@@ -6665,11 +6771,12 @@ template = true
             .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
             .unwrap_err();
 
-        let conflict = three_way_conflict(&error);
+        let conflict = refused_target(&error);
         assert_eq!(conflict.target.repository_relative(), "docs/fixed.txt");
         assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
-        assert_ne!(conflict.current, conflict.base);
-        assert_ne!(conflict.current, conflict.candidate);
+        let (base, current, candidate) = diverged_values(conflict);
+        assert_ne!(current, base);
+        assert_ne!(current, candidate);
         assert_eq!(
             repository_files(&temp),
             before,

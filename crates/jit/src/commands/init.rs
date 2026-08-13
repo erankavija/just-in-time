@@ -283,6 +283,12 @@ impl CommandExecutor<JsonFileStorage> {
                 }) {
                     return Ok(SessionStep::Retry);
                 }
+                // A profiled initialization publishes through the same profile
+                // decision every lifecycle command does, so it refuses the same
+                // unpublishable targets rather than writing part of a selection
+                // it cannot complete.
+                crate::profile::ensure_publishable_targets(&plan)
+                    .map_err(crate::repository_state::RepositoryStateError::from)?;
                 let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
                 let validation = crate::validation::repository::validate_repository(&proposed)
                     .map_err(init_validation_error)?;

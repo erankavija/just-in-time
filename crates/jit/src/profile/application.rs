@@ -187,7 +187,12 @@ impl ProfileShowResult {
     }
 }
 
-/// Planned target operation exposed by profile dry-run output.
+/// What one profile would do to one target it participates in.
+///
+/// The vocabulary is the whole three-way decision a profile selection makes, so
+/// a reader of a rehearsal and a reader of a difference report name the same
+/// outcomes. A rehearsal fails on [`Self::Conflict`] rather than reporting it,
+/// which is the only difference between the two surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileTargetAction {
@@ -197,9 +202,15 @@ pub enum ProfileTargetAction {
     Create,
     /// Existing target would be replaced by the package projection.
     Update,
+    /// The profile stopped contributing the target and its value survives.
+    Retain,
+    /// The profile stopped contributing unchanged, solely owned content.
+    Remove,
+    /// The target cannot be published, for the reason the change carries.
+    Conflict,
 }
 
-/// One deterministic profile target in a dry-run plan.
+/// One deterministic profile target decision.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileTargetChange {
     /// Repository-relative target path.
@@ -208,21 +219,39 @@ pub struct ProfileTargetChange {
     pub action: ProfileTargetAction,
     /// Platform-neutral file-mode intent.
     pub executable: bool,
+    /// Packages whose applied records claim this target, in package-id order.
+    ///
+    /// An empty list states that no package owns the target, so an adopter
+    /// reading a conflict knows whether to edit its own content or resolve a
+    /// package's claim; more than one entry names every owner of shared
+    /// content.
+    pub owners: Vec<String>,
+    /// Why an unpublishable target cannot be published, absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 impl ProfileTargetChange {
     /// Construct a public target projection from canonical repository-state
     /// vocabulary.
-    pub(crate) fn new(path: String, action: ProfileTargetAction, mode: FileMode) -> Self {
+    pub(crate) fn new(
+        path: String,
+        action: ProfileTargetAction,
+        mode: FileMode,
+        owners: Vec<String>,
+        reason: Option<String>,
+    ) -> Self {
         Self {
             path,
             action,
             executable: mode == FileMode::Executable,
+            owners,
+            reason,
         }
     }
 }
 
-/// Whether a dry-run found work to publish.
+/// Whether a preview found work to publish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfilePlanStatus {
@@ -230,6 +259,12 @@ pub enum ProfilePlanStatus {
     Unchanged,
     /// Applying the plan would publish at least one change.
     WouldApply,
+    /// The profile decided at least one target that cannot be published.
+    ///
+    /// A rehearsal of a publication fails before it can report this; a
+    /// difference report states it, which is what lets an adopter inspect the
+    /// decision before publishing it.
+    WouldConflict,
 }
 
 /// One deterministic, non-mutating profile application preview.
@@ -251,6 +286,18 @@ pub struct ProfilePlanEntry {
     pub targets: Vec<ProfileTargetChange>,
 }
 
+impl ProfilePlanEntry {
+    /// The targets this profile decided `action` about, in report order.
+    pub fn decided(
+        &self,
+        action: ProfileTargetAction,
+    ) -> impl Iterator<Item = &ProfileTargetChange> {
+        self.targets
+            .iter()
+            .filter(move |target| target.action == action)
+    }
+}
+
 /// Count-wrapped profile application previews.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfilePlanResult {
@@ -268,6 +315,13 @@ impl ProfilePlanResult {
             count: profiles.len(),
             profiles,
         }
+    }
+
+    /// Whether any reported profile decided a target that cannot be published.
+    pub fn has_conflicts(&self) -> bool {
+        self.profiles
+            .iter()
+            .any(|profile| profile.status == ProfilePlanStatus::WouldConflict)
     }
 }
 
