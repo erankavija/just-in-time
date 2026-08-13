@@ -10,13 +10,15 @@
 //! disables incremental compilation for every Rust compilation step the gate
 //! runs, so broad gate builds do not accumulate incremental state.
 //! REQ-04: the gate makes that property deterministic itself — a dedicated
-//! step fails the run on incremental state the run's own compilation left under
-//! the target directory it actually used, rather than relying on a one-off
-//! manual isolated-run observation. jit:0708d692 made that step a comparison
-//! against a baseline the gate records before compiling, because the target
-//! directory is shared with every other process that compiles the checkout;
-//! `scripts/cargo-ci-selftest.sh` runs the shipped gate over seeded incremental
-//! state and asserts which of it the gate attributes to itself.
+//! step judges the ban rather than relying on a one-off manual isolated-run
+//! observation. jit:0708d692 settled what that step judges: the ban's value in
+//! its own environment, which every compilation the run performed inherited.
+//! The target directory is shared with every other process that compiles the
+//! checkout, and no filesystem comparison can attribute a write to a writer, so
+//! entries that appear during a run are reported as an observation about the
+//! machine instead of deciding the verdict. `scripts/cargo-ci-selftest.sh` runs
+//! the shipped gate over incremental state seeded before and during a run, and
+//! a mutant gate whose export is gone, and asserts which of the three fails.
 //!
 //! jit:6d10e5d4 added two more policies this file covers. First, the
 //! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
@@ -148,7 +150,7 @@ fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
 }
 
 #[test]
-fn test_cargo_ci_judges_incremental_state_against_its_own_pre_compilation_baseline() {
+fn test_cargo_ci_judges_the_incremental_ban_by_its_runtime_value() {
     let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
         .expect("read scripts/cargo-ci.sh");
 
@@ -184,7 +186,7 @@ fn test_cargo_ci_judges_incremental_state_against_its_own_pre_compilation_baseli
     );
 
     let baseline_impl = shell_function_body(&script, "capture_incremental_baseline");
-    let verdict_impl = shell_function_body(&script, "check_incremental_state_from_this_run");
+    let verdict_impl = shell_function_body(&script, "check_gate_incremental_policy");
     assert!(
         baseline_impl.contains("incremental_entries")
             && verdict_impl.contains("incremental_entries"),
@@ -193,11 +195,19 @@ fn test_cargo_ci_judges_incremental_state_against_its_own_pre_compilation_baseli
          (@/inv/convention-convergence)"
     );
     assert!(
+        verdict_impl.contains("CARGO_INCREMENTAL"),
+        "the verdict must be the ban's value in the step's own environment — the \
+         condition every compilation this run performed inherited — because that \
+         is the only thing about the ban a gate run can establish. A shared \
+         target directory cannot attribute a write to a writer"
+    );
+    assert!(
         verdict_impl.contains("$INCREMENTAL_BASELINE") && verdict_impl.contains("comm -13"),
-        "the verdict must be the state this run added to the baseline, not an \
-         emptiness assertion: the target directory is shared with every other \
-         process that compiles the checkout, and an editor's rust-analyzer \
-         repopulates `incremental` within seconds of it being cleared"
+        "what appeared since the baseline must still be reported alongside that \
+         verdict, as an observation about the machine: the target directory is \
+         shared with every other process that compiles the checkout, and an \
+         editor's rust-analyzer repopulates `incremental` within seconds of it \
+         being cleared"
     );
 }
 

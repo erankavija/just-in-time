@@ -94,11 +94,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   editor's rust-analyzer makes true continuously, in every checkout it has open
   — so a gate reported a policy breach for a directory no gate run produced, and
   the standing remedy was to clear that directory inside a lock before every
-  run. It is replaced by a comparison: `incremental-baseline` records what is
-  already there before the first compilation, and `incremental-state` fails only
-  on what this run's own compilation added to that baseline. The gate-run ban on
-  incremental compilation is unchanged and still enforced in the same three
-  places. Separately, the same commit's suite clocked 57,019 ms on a fresh
+  run. What replaces it judges the ban instead of the directory:
+  `incremental-state` asserts `CARGO_INCREMENTAL=0` in its own environment, the
+  condition every compilation the run performed inherited, and fails when it
+  does not hold. Entries that appear under the target directory — before the run
+  or while it works — are reported against the baseline `incremental-baseline`
+  records and decide nothing, because no filesystem comparison can attribute a
+  write to a writer. The gate-run ban on incremental compilation is unchanged
+  and still enforced in three places, now including that runtime assertion. Separately, the same commit's suite clocked 57,019 ms on a fresh
   target directory and 22,541 ms on a warm one, failing and passing the
   30,000 ms suite budget with 4512 tests passing either way; the documented
   remedy was folklore, to re-run and read the second number. Most of that gap
@@ -680,10 +683,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
   step and now runs a dedicated
-  `incremental-state` step afterward that fails the gate on incremental state
-  the run's own compilation left under the target directory it used:
-  a gate run compiles once and exits, so incremental state has no later
-  rebuild to amortize its cost against.
+  `incremental-state` step afterward that fails the gate when that ban was not
+  in force for the compilation it performed: a gate run compiles once and exits,
+  so incremental state has no later rebuild to amortize its cost against.
 
 - **Documentation projections are declared generically and rendered by one
   command.** A single `[projection.<name>]` config registry (fields `kind`,

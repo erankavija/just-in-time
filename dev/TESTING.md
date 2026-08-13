@@ -318,12 +318,17 @@ harness that produces both.
   ordinary interactive development, where the cost amortizes across many rebuilds of the same
   tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
   since a gate run compiles once and exits with no later rebuild to amortize against; a
-  dedicated `incremental-state` gate step then fails the run on what this run's own
-  compilation added to the target directory, measured against the baseline the
-  `incremental-baseline` step records before the first compilation. Incremental state another
-  process wrote is reported and ignored — an editor's rust-analyzer writes that directory
-  continuously and repopulates it within seconds of it being cleared — so there is nothing to
-  clear before a gate run.
+  dedicated `incremental-state` gate step then fails the run when that ban was not in force,
+  asserting `CARGO_INCREMENTAL=0` in its own environment — the condition every compilation
+  the run performed inherited. Incremental state that appears under the target directory,
+  whether before the run or during it, is reported against the baseline the
+  `incremental-baseline` step records and does not decide the verdict: the directory is
+  shared with everything else that compiles the checkout, an editor's rust-analyzer writes it
+  continuously and repopulates it within seconds of it being cleared, and no filesystem
+  comparison can attribute a write to a writer. So there is nothing to clear before a gate
+  run. The residual that leaves is a child process the gate spawns which overrides the ban
+  against the same target directory; `scripts/cargo-ci.sh` states it where the assertion
+  lives.
 - **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
   `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
   run that must bypass the cache. Opting an existing target directory into a wrapper changes

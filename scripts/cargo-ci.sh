@@ -333,17 +333,37 @@ gate_target_dir() {
   cargo metadata --format-version=1 --no-deps 2>/dev/null | jq -r '.target_directory'
 }
 
-# REQ-04 (jit:57d0eb79): CARGO_INCREMENTAL=0 above is the mechanism; the paired
-# steps below are the deterministic check that it held.
+# REQ-04 (jit:57d0eb79): CARGO_INCREMENTAL=0 above is the mechanism; the step
+# below is the deterministic check that it held.
 #
-# REQ-03 (jit:0708d692): the check is a comparison, not an emptiness assertion.
-# The target directory is shared with everything else that compiles this
-# checkout — an editor's rust-analyzer writes `<target>/debug/incremental`
-# continuously and repopulates it within seconds of being cleared — so an
-# occupied directory is a fact about the machine and says nothing about the tree
-# under judgement. Snapshotting before the first compilation and again after the
-# last one attributes each entry to the run that created it, so this gate fails
-# only on incremental state its own compilation produced.
+# REQ-03 (jit:0708d692): what that step judges is the ban's runtime value, not
+# the contents of a directory. The target directory is shared with everything
+# else that compiles this checkout — an editor's rust-analyzer writes
+# `<target>/debug/incremental` continuously and repopulates it within seconds of
+# being cleared — and no filesystem comparison can attribute a write to a
+# writer. An entry that appears between the pre-compilation snapshot and the
+# final one is equally consistent with this run's compilation and with the
+# editor's next index, so failing on that difference hands the verdict to
+# whatever else happens to be running: the same commit passes or fails according
+# to whether an editor has the checkout open, which is the defect this issue
+# names.
+#
+# The judgement is therefore the value itself. This step asserts
+# CARGO_INCREMENTAL=0 in its own environment — the condition every compilation
+# this run performed inherited — and fails when it does not hold. Entries that
+# appeared after the baseline are reported as what they can be known to be: an
+# observation about the machine, which the assertion above places outside this
+# run's compilation. They do not decide the verdict.
+#
+# Residual, stated rather than hidden: a child process this gate spawns — a test
+# or a setup script — that explicitly overrides the ban against this same target
+# directory, by `CARGO_INCREMENTAL=1` in its own environment or an explicit
+# `-Cincremental=DIR`, is reported as an observation and does not fail the run.
+# Nothing available to a shell separates that write from a concurrent editor's.
+# The accidental regression this policy exists to catch — the export
+# disappearing from this script — stays a hard failure at three points: the
+# assertion below at runtime, and the script's text through
+# scripts/rust-build-budget.sh and build_profile_policy_tests.rs.
 #
 # An entry is a path at most two levels below an `incremental` directory. rustc
 # writes one session directory per compilation: under a per-crate directory
@@ -380,29 +400,53 @@ capture_incremental_baseline() {
   echo "$(wc -l <"$INCREMENTAL_BASELINE") entries already present under $target_dir, none of them this run's"
 }
 
-check_incremental_state_from_this_run() {
+# How many appeared entries the observation names before summarizing the rest.
+# The observation is one summary line in stored gate evidence, so it names
+# enough to identify the writer and bounds what an indexing editor can add to it.
+readonly OBSERVED_ENTRIES_NAMED=5
+
+check_gate_incremental_policy() {
   local -a added=()
-  local target_dir current baseline_count
+  local target_dir current baseline_count setting names noun
+
+  setting="${CARGO_INCREMENTAL-<unset>}"
+  [ -n "$setting" ] || setting="<empty>"
+  if [ "$setting" != "0" ]; then
+    {
+      echo "this run compiled without its incremental-compilation ban in force."
+      echo "  observed: CARGO_INCREMENTAL=$setting in this step's own environment"
+      echo "  compared against: the CARGO_INCREMENTAL=0 this script exports before its first step"
+      echo "  every Rust compilation this run performed inherited the observed value, so this run's own builds were free to accumulate incremental state. This is a regression in the gate's conduct, not a condition of the machine."
+    } >&2
+    return 1
+  fi
+
   target_dir=$(resolved_target_dir) || return 1
   if [ ! -r "$INCREMENTAL_BASELINE" ]; then
-    echo "no pre-compilation baseline was captured, so incremental state cannot be attributed to this run" >&2
+    echo "no pre-compilation baseline was captured, so what appeared under the target directory during this run cannot be reported" >&2
     return 1
   fi
   current="$WORK/incremental-current"
   incremental_entries "$target_dir" >"$current"
   baseline_count=$(wc -l <"$INCREMENTAL_BASELINE")
   mapfile -t added < <(comm -13 "$INCREMENTAL_BASELINE" "$current")
-  if [ "${#added[@]}" -ne 0 ]; then
-    {
-      echo "this run's own compilation created incremental state under $target_dir."
-      echo "  observed: ${#added[@]} incremental entries that the incremental-baseline step did not see before any compilation ran:"
-      printf '    %s\n' "${added[@]}"
-      echo "  compared against: the $baseline_count entries already present when this run started, which another process wrote and this check ignores."
-      echo "  CARGO_INCREMENTAL=0 did not hold for every compilation step. This is a policy regression in the tree under judgement, not a condition of the machine."
-    } >&2
-    return 1
+  if [ "${#added[@]}" -eq 0 ]; then
+    echo "ban in force (CARGO_INCREMENTAL=0), nothing appeared under $target_dir during this run ($baseline_count pre-existing entries ignored)"
+    return 0
   fi
-  echo "no incremental state created by this run ($baseline_count pre-existing entries ignored)"
+
+  # Paths are reported relative to the target directory the run resolved, which
+  # the line already names: the entry that identifies the writer is the crate
+  # and session directory, not the prefix shared by every entry.
+  names=$(printf '%s, ' "${added[@]:0:OBSERVED_ENTRIES_NAMED}")
+  names="${names%, }"
+  names="${names//"$target_dir"\//}"
+  if [ "${#added[@]}" -gt "$OBSERVED_ENTRIES_NAMED" ]; then
+    names="$names (+$(( ${#added[@]} - OBSERVED_ENTRIES_NAMED )) more)"
+  fi
+  noun="entries"
+  [ "${#added[@]}" -eq 1 ] && noun="entry"
+  echo "ban in force (CARGO_INCREMENTAL=0), so the ${#added[@]} $noun that appeared under $target_dir during this run came from another process sharing it, not from this run's compilation: $names ($baseline_count pre-existing entries ignored)"
 }
 
 # Deprioritize the build/test work so an interactive shell preempts it under
@@ -422,7 +466,8 @@ fi
 # Run all steps (continue through failures so every problem is reported, unlike
 # a short-circuiting `&&` chain). Same checks the inline gate ran.
 # Record what is already there before paying for any compilation, so the final
-# incremental-state step can tell this run's output from the machine's. The only
+# incremental-state step reports what appeared while this run was working rather
+# than everything the machine was already holding. The only
 # failure this step can report is a target directory Cargo will not name, which
 # leaves the policy unjudgeable for the whole run — so it stops here rather than
 # after the expensive steps.
@@ -550,11 +595,12 @@ run_budget_check() {
 }
 run_step budget run_budget_check
 
-# REQ-04 (jit:57d0eb79): fail the gate itself if the compilation steps above
-# left behind incremental state, rather than trusting that CARGO_INCREMENTAL=0
-# held. What counts as "left behind" is what was not there before those steps
-# ran, per the baseline the first step recorded (REQ-03, jit:0708d692).
-run_step incremental-state check_incremental_state_from_this_run
+# REQ-04 (jit:57d0eb79): fail the gate itself when the incremental ban was not
+# in force for the compilation steps above, rather than trusting the export at
+# the top of this script. It runs here, after those steps, so it reports what
+# appeared under the target directory alongside the verdict (REQ-03,
+# jit:0708d692).
+run_step incremental-state check_gate_incremental_policy
 
 echo "$summary"
 

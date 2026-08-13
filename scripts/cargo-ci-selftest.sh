@@ -32,13 +32,19 @@ set -uo pipefail
 # tree: that is the recorded reason a build-only merge guard was vacuous, kept
 # here as a regression so the distinction cannot quietly be lost again.
 #
-# Two further scenarios (jit:0708d692) assert what the gate attributes to
-# itself, since a verdict about the machine is not a verdict about the tree:
+# Three further scenarios (jit:0708d692) assert how the gate judges its
+# incremental-compilation ban, since a verdict about the machine is not a
+# verdict about the tree. What decides that verdict is the ban's runtime value,
+# not the contents of a shared directory no shell can attribute to a writer:
 #
 #   incremental-pre-existing incremental state another process wrote before the
-#                            run          -> the gate records and ignores it
-#   incremental-run-produced incremental state this run's own compilation wrote
-#                                         -> the incremental verdict fails
+#                            run              -> recorded, ignored, gate passes
+#   incremental-concurrent   incremental state that appears while the run works,
+#                            as an editor indexing the same checkout writes it
+#                                              -> reported, gate passes
+#   incremental-ban-lifted   a gate whose CARGO_INCREMENTAL=0 export is gone,
+#                            run with the ban lifted in its environment
+#                                              -> the incremental verdict fails
 #
 # Cost: every fixture is a dependency-free two-module crate in a throwaway git
 # repo with its own target directory. This workspace is never rebuilt.
@@ -431,14 +437,20 @@ stale_expect_worker() { signature_worker "$1"; }
 # directory this run inherited, and the host-wide build lock is skipped: this
 # self-test itself runs inside a gate run that already holds that lock, and the
 # fixture is far too small to need it.
-run_gate() { # run_gate <repo> <output-file> [VAR=value ...]
-  local repo="$1" out="$2"
-  shift 2
+run_gate_script() { # run_gate_script <script> <repo> <output-file> [VAR=value ...]
+  local script="$1" repo="$2" out="$3"
+  shift 3
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR
-    env CARGO_CI_NO_LOCK=1 "$@" "$gate"
+    env CARGO_CI_NO_LOCK=1 "$@" "$script"
   ) >"$out" 2>&1
+}
+
+run_gate() { # run_gate <repo> <output-file> [VAR=value ...]
+  local repo="$1" out="$2"
+  shift 2
+  run_gate_script "$gate" "$repo" "$out" "$@"
 }
 
 # The removed merge guard's command, run over the same tree.
@@ -508,7 +520,7 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
   fi
 }
 
-# --- what the gate attributes to its own compilation (jit:0708d692) ----------
+# --- how the gate judges its incremental ban (jit:0708d692) ------------------
 
 # The incremental state another process leaves in a target directory it shares
 # with the gate: one per-crate directory holding one session directory, the
@@ -554,37 +566,120 @@ test_pre_existing_incremental_state_does_not_fail_the_gate() {
     foreign_incremental_state_survives "$repo"
 }
 
-# The regression the policy exists to catch: this run's own compilation writing
-# incremental state. The gate exports CARGO_INCREMENTAL=0 itself, and an
-# exported value cannot be overridden from outside it, so the fixture reproduces
-# the state the way a regression would put it on disk — an explicit
-# `-Cincremental=DIR` naming the same directory the check walks. The foreign
-# state is seeded here too, so what is asserted is attribution rather than
-# non-emptiness.
-test_run_produced_incremental_state_fails_the_gate() {
-  local name="incremental-run-produced"
-  local repo="$scratch/$name" out="$scratch/$name.gate.out" rc
+# A worker side whose test writes incremental state into the target directory
+# while the gate's own suite runs — after the baseline snapshot, before the
+# verdict. That is the ordering an editor's rust-analyzer produces by indexing
+# the checkout the gate is working in, reproduced without a sleep or a race: the
+# gate itself runs the writer. The directory is named through the environment so
+# the fixture holds no assumption about where the gate resolved its target.
+concurrent_writer_worker() {
+  cat >"$1/src/omega.rs" <<'EOF'
+pub fn label() -> &'static str {
+    "omega"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::label;
+
+    #[test]
+    fn test_label_names_the_module() {
+        assert_eq!(label(), "omega");
+    }
+
+    #[test]
+    fn test_another_process_writes_incremental_state_while_this_suite_runs() {
+        let Ok(session) = std::env::var("SELFTEST_INJECT_INCREMENTAL") else {
+            return;
+        };
+        std::fs::create_dir_all(&session).expect("create the injected session directory");
+        std::fs::write(
+            std::path::Path::new(&session).join("dep-graph.bin"),
+            b"written by another process while the gate was running\n",
+        )
+        .expect("write the injected session file");
+    }
+}
+EOF
+}
+
+# The concurrent case the filesystem comparison could not tell from a regression
+# of the gate's own: state that appears mid-run. The ban held for every
+# compilation this run performed, so the entries came from elsewhere, and a
+# verdict that failed here would be decided by whether an editor happened to
+# have the checkout open.
+test_concurrent_incremental_state_is_observed_without_failing_the_gate() {
+  local name="incremental-concurrent"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out"
+  local session="target/debug/incremental/concurrent-crate-9f8e7d/s-concurrent-session-working"
 
   echo
-  echo "== $name: state this run's own compilation wrote must fail it =="
+  echo "== $name: state that appears while the run works must not decide it =="
+  if ! build_merge "$repo" "healthy_mainline" "concurrent_writer_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  run_gate "$repo" "$out" "SELFTEST_INJECT_INCREMENTAL=$repo/$session"
+
+  check "$name: the injected state really was written during the run" \
+    test -f "$repo/$session/dep-graph.bin"
+  check "$name: the gate reaches and passes its build-and-test step" \
+    step_passed "$out" test
+  check "$name: the incremental verdict passes over state this run did not compile" \
+    step_passed "$out" incremental-state
+  check "$name: the observation names the entries that appeared" \
+    grep -q "concurrent-crate-9f8e7d" "$out"
+  check "$name: the observation states the ban that places them outside this run" \
+    grep -q 'ban in force (CARGO_INCREMENTAL=0)' "$out"
+}
+
+# The regression the policy exists to catch: a gate that compiles without its
+# incremental ban in force. The shipped script exports CARGO_INCREMENTAL=0
+# itself, and an exported value cannot be overridden from outside it, so the
+# only way to observe the assertion firing is to run a gate whose export is
+# gone. The mutant is derived from the shipped file at run time by deleting that
+# one line — no logic is copied here, and a rename of the export makes this
+# fixture fail loudly rather than silently stop testing anything.
+gate_without_the_incremental_ban() { # gate_without_the_incremental_ban <destination>
+  local dest="$1" export_line='export CARGO_INCREMENTAL=0'
+  grep -qxF "$export_line" "$gate" || return 1
+  grep -vxF "$export_line" "$gate" >"$dest" || return 1
+  chmod +x "$dest"
+}
+
+test_lifted_incremental_ban_fails_the_gate() {
+  local name="incremental-ban-lifted"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out" rc
+  local mutant="$scratch/$name-cargo-ci.sh"
+
+  echo
+  echo "== $name: a run that compiled without the ban must fail =="
   if ! build_merge "$repo" "healthy_mainline" "healthy_worker"; then
     echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
     fail=1
     return
   fi
-  seed_foreign_incremental_state "$repo"
-  run_gate "$repo" "$out" "RUSTFLAGS=-Cincremental=$repo/target/debug/incremental"
+  if ! gate_without_the_incremental_ban "$mutant"; then
+    echo "FAIL: $name: the shipped gate has no 'export CARGO_INCREMENTAL=0' line to remove"
+    fail=1
+    return
+  fi
+  check "$name: the mutant gate no longer exports the ban" \
+    test -z "$(grep -xF 'export CARGO_INCREMENTAL=0' "$mutant")"
+
+  run_gate_script "$mutant" "$repo" "$out" CARGO_INCREMENTAL=1
   rc=$?
 
-  check "$name: the incremental verdict fails on state this run created" \
+  check "$name: the incremental verdict fails when the ban was not in force" \
     step_failed "$out" incremental-state
   check "$name: the gate exits nonzero" test "$rc" -ne 0
-  check "$name: the diagnostic says the state came from this run's own compilation" \
-    grep -q "this run's own compilation created incremental state" "$out"
-  check "$name: the diagnostic names the entries it observed" \
-    grep -Eq 'observed: [0-9]+ incremental entries' "$out"
-  check "$name: the diagnostic names the pre-existing state it compared against" \
-    grep -Eq 'compared against: the [0-9]+ entries already present' "$out"
+  check "$name: the diagnostic names the value it observed" \
+    grep -q 'observed: CARGO_INCREMENTAL=1' "$out"
+  check "$name: the diagnostic names the value it compared against" \
+    grep -q 'compared against: the CARGO_INCREMENTAL=0' "$out"
+  check "$name: the diagnostic separates the gate's conduct from the machine's state" \
+    grep -q "regression in the gate's conduct" "$out"
 }
 
 echo
@@ -597,7 +692,8 @@ run_scenario signature "signature_mainline" "signature_worker" fail build-only-p
 run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
 
 test_pre_existing_incremental_state_does_not_fail_the_gate
-test_run_produced_incremental_state_fails_the_gate
+test_concurrent_incremental_state_is_observed_without_failing_the_gate
+test_lifted_incremental_ban_fails_the_gate
 
 echo
 if [ "$fail" -eq 0 ]; then
