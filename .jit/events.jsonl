@@ -14188,3 +14188,7 @@
 {"gate_key":"code-review","id":"fa3803b1-9470-4958-a003-08e66bbc7e5f","issue_id":"b5bb4b9c-1992-463d-a534-6b93698e63ac","timestamp":"2026-08-13T18:44:28.971715918Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"4f52049c-89f4-4159-affe-12921767f817","issue_id":"b5bb4b9c-1992-463d-a534-6b93698e63ac","timestamp":"2026-08-13T18:44:59.302399165Z","to":"done","type":"issue_state_changed"}
 {"id":"07fae7ce-04aa-4f21-89ed-7d90b114cbb9","issue_id":"b5bb4b9c-1992-463d-a534-6b93698e63ac","timestamp":"2026-08-13T18:44:59.302399165Z","type":"issue_completed"}
+{"gate_key":"repo-validate","id":"382251ef-780c-434d-8076-eaac301ed1aa","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-13T18:49:40.139842714Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"77556c48-3dc0-41a7-84bf-25cd8b5e8ae9","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-13T18:51:58.014727430Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"511fa0bc-22e4-49ad-a85d-58cc3187d60c","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-13T18:52:20.357839232Z","to":"done","type":"issue_state_changed"}
+{"id":"215acfb0-cc2c-4aea-9a18-30dce61592e6","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-13T18:52:20.357839232Z","type":"issue_completed"}

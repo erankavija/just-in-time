@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 22,
+  "current_wave": 23,
   "waves": [
     {
       "wave_number": 1,
@@ -304,8 +304,8 @@
           "short_id": "dd268d0f",
           "title": "Surface, documentation, and evidence",
           "classification": "checkpoint",
-          "status": "in_progress",
-          "note": "The first repo-validate passed and holistic-review run ece8c8cc failed on one blocking criterion finding: the superseded profile_applied variant/tag remained current in the event catalog/schema/docs. Focused remediation b5bb4b9c is now done and merged; the exact integrated tree passes cargo-ci and MCP. The story is ready for fresh forced gate evaluation."
+          "status": "done",
+          "note": "Completed after one container-level rework cycle. The first holistic review found the superseded profile_applied contract; focused remediation b5bb4b9c removed it. Fresh forced repo-validate and holistic-review now pass on the merged tree, with the reviewer confirming the command, aggregate event, adopter documentation, acceptance coverage, and clean cut satisfy the hard criterion."
         }
       ]
     }
