@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
-fn jit(dir: &std::path::Path, args: &[&str]) -> Output {
+pub(super) fn jit(dir: &std::path::Path, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_jit"))
         .args(args)
         .current_dir(dir)
@@ -104,11 +104,11 @@ fn package_with_shared_namespace<'a>(
     location
 }
 
-fn path_selector(location: &str) -> String {
+pub(super) fn path_selector(location: &str) -> String {
     format!("path:{location}")
 }
 
-fn id_selector(id: &str) -> String {
+pub(super) fn id_selector(id: &str) -> String {
     format!("id:{id}")
 }
 
@@ -182,7 +182,7 @@ fn declare_dependency(repo: &Path, location: &str, id: &str) {
     fs::write(&manifest, declared).unwrap();
 }
 
-fn json(output: &Output) -> Value {
+pub(super) fn json(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
             "invalid JSON: {error}\nstdout={}\nstderr={}",
@@ -1796,7 +1796,7 @@ fn test_existing_partial_profiled_init_atomically_completes_neutral_scaffold() {
 
 /// Write a versioned package whose one templated asset and one fixed asset
 /// separate what a supplied value reaches from what it does not.
-fn write_lifecycle_package(repo: &Path, location: &str, id: &str, version: &str) {
+pub(super) fn write_lifecycle_package(repo: &Path, location: &str, id: &str, version: &str) {
     let root = repo.join(location);
     fs::create_dir_all(root.join("assets")).unwrap();
     fs::write(
@@ -1853,7 +1853,7 @@ fn assert_count_envelope(response: &Value, collection: &str) {
 
 /// The single profile entry returned by one-package authoring and exchange
 /// operations.
-fn only_profile(response: &Value) -> &Value {
+pub(super) fn only_profile(response: &Value) -> &Value {
     assert_count_envelope(response, "profiles");
     assert_eq!(response["count"], 1);
     &response["profiles"][0]
@@ -2041,7 +2041,7 @@ fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict()
 /// A package directory whose live assets are absent from it and present in the
 /// repository, so a captured live asset's bytes can only have come from the
 /// repository file its declaration targets.
-fn capture_sources(repo: &Path, location: &str) -> String {
+pub(super) fn capture_sources(repo: &Path, location: &str) -> String {
     let root = repo.join(location);
     fs::create_dir_all(root.join("assets/install")).unwrap();
     fs::write(
