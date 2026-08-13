@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8269f207e39f78292095470ec5bffc7b25cd17b",
+  "completed_at": "2026-08-13T19:19:31.386640693Z",
+  "duration_ms": 164457,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 2761,
+        "origin": "issue-impact",
+        "references": [
+          "REQ-01",
+          "REQ-09",
+          "REQ-12"
+        ],
+        "severity": "high",
+        "summary": "Embedded profile provenance is explicitly rejected during package resolution, so the embedded jit-dogfood package cannot satisfy the required lifecycle surface."
+      }
+    ],
+    "summary": "The required embedded jit-dogfood profile is deliberately unsupported; only repository-directory packages can be resolved.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "13149c1f-70b1-42a7-b854-2ed310640f9f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T19:16:46.929447262Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7798 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffc8e-39c1-70e0-91c5-167c2e49f4a8\n--------\nuser\n--- 7785 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — high, blocking:** Embedded profiles are no longer operable. The resolver explicitly rejects `ProfileOrigin::Embedded` as unavailable for package resolution, while the supported surface and MCP contract require packages to be repository directories. This fails REQ-01 and REQ-09’s required embedded-package support and leaves legacy embedded provenance as a partial compatibility path, contrary to REQ-12.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required embedded jit-dogfood profile is deliberately unsupported; only repository-directory packages can be resolved.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Embedded profile provenance is explicitly rejected during package resolution, so the embedded jit-dogfood package cannot satisfy the required lifecycle surface.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":2761,\"references\":[\"REQ-01\",\"REQ-09\",\"REQ-12\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

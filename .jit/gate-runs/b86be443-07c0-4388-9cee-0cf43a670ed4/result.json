@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8269f207e39f78292095470ec5bffc7b25cd17b",
+  "completed_at": "2026-08-13T19:16:32.563218312Z",
+  "duration_ms": 92212,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The completed profile-lifecycle documentation is accurate, discoverable, and resolves the prior manifest-authoring finding.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b86be443-07c0-4388-9cee-0cf43a670ed4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T19:15:00.350465219Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: epic container plus all 33 DAG-resolved delivered descendants; inspected 304 individually tagged reachable commit patches. No included issue lacked commit attribution. Current docs are clean.\n\nThe prior manifest-authoring finding is addressed in [profiles.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/profiles.md:55). The combined lifecycle reference and command reference accurately cover authoring, composition, variables, capture/exchange, ownership, drift, reconfiguration, and upgrades.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The completed profile-lifecycle documentation is accurate, discoverable, and resolves the prior manifest-authoring finding.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

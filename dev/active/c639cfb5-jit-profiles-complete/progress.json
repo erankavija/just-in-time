@@ -444,6 +444,16 @@
       "options_presented": "A: unbound named-path payload reads, bound shape only (recommended); B: amend REQ-07 and derive ceilings from observed file sizes; C: A now plus a follow-up issue for observed-size ceilings",
       "owner_decision": "A \u2014 unbound named-path reads.",
       "lead_resolution": "Ruling appended to the issue description so the reviewer reads it as an owner ruling. Rework dispatched: byte ceilings removed from record and claimed-target reads with the listing's no-discovery documentation; shape bounds retained."
+    },
+    {
+      "date": "2026-08-13",
+      "category": "epic-success-criteria-conflict-with-completed-architecture",
+      "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
+      "status": "open",
+      "question": "Should the lifecycle contract follow the completed domain-agnostic extraction (repository-directory packages only) or reintroduce an embedded jit-dogfood package path?",
+      "evidence": "Final holistic-review run 13149c1f failed F1: c639cfb5 REQ-01, REQ-06, REQ-09, REQ-11, D-01, and D-02 still promise embedded profiles, but ff1bbada REQ-01/03/05 deliberately removed every compiled-in package, the compiled-in origin, and the fallback resolver. Current recorded_package rejects the provenance-only ProfileOrigin::Embedded variant at commands/profile.rs:2760-2764. Charter D-8 now specifies offline packages discovered from declared locations and two shipped package directories, not binary embedding.",
+      "options_presented": "A (recommended): owner-authorize a clean contract correction to repository-directory packages and a bounded remediation deleting the reintroduced provenance-only Embedded variant/error/tests; B: reintroduce a compiled-in package and embedded resolver across the complete lifecycle, which reverses ff1bbada and conflicts with domain-agnostic/canonical-cutover; C: amend criteria only while retaining the unsupported Embedded provenance token, which leaves the reviewer's REQ-12 finding open and is not recommended.",
+      "lead_recommendation": "A. It preserves the north star (create, refresh, share repository-local packages), the completed domain-agnostic extraction, and one resolver. Re-embedding is a substantial cross-container architectural reversal with no adopter benefit over the shipped repository-local package directories."
     }
   ],
   "rework_counts": {
@@ -471,7 +481,7 @@
     "b5bb4b9c": 0,
     "dd268d0f": 1,
     "08883a21": 1,
-    "c639cfb5": 1
+    "c639cfb5": 2
   },
   "review_verdicts": [
     {
