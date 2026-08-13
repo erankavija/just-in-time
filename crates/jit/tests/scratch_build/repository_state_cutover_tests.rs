@@ -40,24 +40,92 @@ fn definition_owners(root: &Path, definition: &str) -> Vec<PathBuf> {
     owners
 }
 
-/// Require one declaration to remain in the canonical module.
+/// Require one capability shape to remain in the canonical module.
 ///
-/// This deliberately identifies declarations rather than every call site:
-/// package-local helpers may consume the canonical reader for a known path,
-/// but a second decoder, model, or inventory reader is a second authority.
-fn assert_canonical_owner(
-    definition: &str,
+/// This deliberately identifies authorities by the data they decode, model, or
+/// enumerate rather than their function/type spelling: a renamed parallel
+/// implementation is still a parallel authority. Package-local helpers that
+/// consume the canonical reader for a known path do not have the complete
+/// inventory shape and therefore remain permitted.
+fn assert_canonical_authority(
+    authority: &str,
     mut owners: Vec<PathBuf>,
     expected: PathBuf,
 ) -> Result<(), String> {
     owners.sort();
     (owners == [expected.clone()]).then_some(()).ok_or_else(|| {
         format!(
-            "forbidden duplicate authority for {definition}: found {owners:?}, expected only \
+            "forbidden duplicate {authority} authority: found {owners:?}, expected only \
              {expected:?}; the clean-cut lifecycle contract has one canonical package decoder, model, and \
              applied-record inventory reader rather than parallel formats or readers"
         )
     })
+}
+
+fn authority_owners_from_sources<'a>(
+    sources: impl IntoIterator<Item = (&'a Path, &'a str)>,
+    is_authority: fn(&str) -> bool,
+) -> Vec<PathBuf> {
+    let mut owners = sources
+        .into_iter()
+        .filter(|(_, source)| is_authority(source))
+        .map(|(path, _)| path.to_path_buf())
+        .collect::<Vec<_>>();
+    owners.sort();
+    owners
+}
+
+fn authority_owners(root: &Path, is_authority: fn(&str) -> bool) -> Vec<PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut sources = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                let relative = path.strip_prefix(root).unwrap().to_path_buf();
+                let source = production_source(&path);
+                sources.push((relative, source));
+            }
+        }
+    }
+    authority_owners_from_sources(
+        sources
+            .iter()
+            .map(|(path, source)| (path.as_path(), source.as_str())),
+        is_authority,
+    )
+}
+
+/// A manifest wire authority both parses TOML and decides the versioned
+/// `manifest-version` representation that becomes `ProfilePackageModel`.
+fn is_manifest_decoder(source: &str) -> bool {
+    source.contains("toml::from_str")
+        && source.contains("manifest-version")
+        && source.contains("ProfilePackageModel")
+}
+
+/// A package model authority carries the manifest's complete semantic
+/// contribution vocabulary, not merely a view or a resolved copy of it.
+fn is_package_model(source: &str) -> bool {
+    [
+        "compatible_jit:",
+        "variables: Vec<ProfileVariableDeclaration>",
+        "contributions: Vec<Contribution>",
+        "assets: Vec<AssetDeclaration>",
+        "regions: Vec<RegionDeclaration>",
+    ]
+    .into_iter()
+    .all(|field| source.contains(field))
+}
+
+/// An applied-record inventory authority lists the profile directory and
+/// returns the records that listing names. Known-path readers do neither: they
+/// receive a path from a caller and only decode that one record.
+fn is_applied_record_inventory_reader(source: &str) -> bool {
+    source.contains("Result<Vec<(VirtualPath, AppliedProfileRecord)>")
+        && source.contains("listing_fingerprints()")
 }
 
 /// Reject a predecessor declaration rather than its harmless mentions in tests,
@@ -111,6 +179,24 @@ fn assert_profile_input_surface_is_non_sensitive(
             )
         })
         .map_or(Ok(()), Err)
+}
+
+/// The bridge maps every generated tool into exactly one curation section.
+/// Lifecycle input descriptions can therefore move between `include` and
+/// `exclude` without falling outside this check; membership is the generated
+/// init command plus the profile command family, not its current curation.
+fn lifecycle_bridge_inventory(inventory: &serde_json::Value) -> Vec<&serde_json::Value> {
+    ["include", "exclude"]
+        .into_iter()
+        .flat_map(|section| {
+            inventory[section]
+                .as_object()
+                .expect("bridge inventory keeps every curation section as a generated-tool map")
+                .iter()
+        })
+        .filter(|(name, _)| *name == "jit_init" || name.starts_with("jit_profile_"))
+        .map(|(_, description)| description)
+        .collect()
 }
 
 fn profile_generated_schema_text() -> String {
@@ -284,17 +370,22 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
 #[test]
 fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    for (definition, expected) in [
-        ("pub(crate) fn decode_manifest(", "profile/wire.rs"),
-        ("pub struct ProfilePackageModel", "profile/manifest.rs"),
+    for (authority, expected, classify) in [
         (
-            "pub fn applied_profile_records(",
+            "manifest decoder",
+            "profile/wire.rs",
+            is_manifest_decoder as fn(&str) -> bool,
+        ),
+        ("package model", "profile/manifest.rs", is_package_model),
+        (
+            "applied-record inventory reader",
             "repository_state/profile_apply.rs",
+            is_applied_record_inventory_reader,
         ),
     ] {
-        assert_canonical_owner(
-            definition,
-            definition_owners(&source_root, definition),
+        assert_canonical_authority(
+            authority,
+            authority_owners(&source_root, classify),
             PathBuf::from(expected),
         )
         .unwrap_or_else(|error| panic!("{error}"));
@@ -347,13 +438,7 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
     let bridge_inventory =
         std::fs::read_to_string(workspace_root.join("mcp-server/curated-tools.json")).unwrap();
     let bridge_inventory = serde_json::from_str::<serde_json::Value>(&bridge_inventory).unwrap();
-    let bridge_profile_inventory = bridge_inventory["include"]
-        .as_object()
-        .expect("bridge inventory keeps its generated-tool include map")
-        .iter()
-        .filter(|(name, _)| name.starts_with("jit_profile_"))
-        .map(|(_, description)| description)
-        .collect::<Vec<_>>();
+    let bridge_lifecycle_inventory = lifecycle_bridge_inventory(&bridge_inventory);
 
     for (surface, description) in [
         ("profile manifest model", manifest),
@@ -364,8 +449,8 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
             profile_audit_inputs.to_string(),
         ),
         (
-            "MCP profile inventory",
-            serde_json::to_string(&bridge_profile_inventory).unwrap(),
+            "MCP init and profile lifecycle inventory",
+            serde_json::to_string(&bridge_lifecycle_inventory).unwrap(),
         ),
     ] {
         assert_profile_input_surface_is_non_sensitive(surface, &description)
@@ -379,19 +464,46 @@ fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values
 /// suite to a temporary working-tree rewrite.
 #[test]
 fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
-    let duplicate_decoder = assert_canonical_owner(
-        "pub(crate) fn decode_manifest(",
-        vec![
-            PathBuf::from("profile/wire.rs"),
-            PathBuf::from("profile/alternate_wire.rs"),
-        ],
-        PathBuf::from("profile/wire.rs"),
-    )
-    .unwrap_err();
-    assert!(
-        duplicate_decoder.contains("forbidden duplicate authority")
-            && duplicate_decoder.contains("clean-cut lifecycle contract")
-    );
+    for (authority, expected, classify, canonical, renamed_duplicate) in [
+        (
+            "manifest decoder",
+            "profile/wire.rs",
+            is_manifest_decoder as fn(&str) -> bool,
+            "fn decode_manifest() { toml::from_str(text); manifest-version; ProfilePackageModel; }",
+            "fn reconstruct_package_wire() { toml::from_str(text); manifest-version; ProfilePackageModel; }",
+        ),
+        (
+            "package model",
+            "profile/manifest.rs",
+            is_package_model,
+            "struct ProfilePackageModel { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
+            "struct AlternatePackageShape { compatible_jit: String, variables: Vec<ProfileVariableDeclaration>, contributions: Vec<Contribution>, assets: Vec<AssetDeclaration>, regions: Vec<RegionDeclaration> }",
+        ),
+        (
+            "applied-record inventory reader",
+            "repository_state/profile_apply.rs",
+            is_applied_record_inventory_reader,
+            "fn applied_profile_records() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
+            "fn collect_installed_provenance() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
+        ),
+    ] {
+        let duplicate = assert_canonical_authority(
+            authority,
+            authority_owners_from_sources(
+                [
+                    (Path::new(expected), canonical),
+                    (Path::new("profile/renamed_parallel.rs"), renamed_duplicate),
+                ],
+                classify,
+            ),
+            PathBuf::from(expected),
+        )
+        .unwrap_err();
+        assert!(
+            duplicate.contains(&format!("forbidden duplicate {authority} authority"))
+                && duplicate.contains("clean-cut lifecycle contract")
+        );
+    }
 
     let retired_bypass = assert_retired_lifecycle_entry_point_absent(
         "pub(super) fn apply_one_profile_package() {}",
@@ -419,6 +531,20 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
         "a non-secret and non-sensitive profile input"
     )
     .is_ok());
+
+    let omitted_init = serde_json::json!({
+        "include": { "jit_profile_apply": "ordinary profile inputs" },
+        "exclude": { "jit_init": "accepts a secret initialization input" },
+    });
+    let bridge_error = assert_profile_input_surface_is_non_sensitive(
+        "injected MCP lifecycle inventory",
+        &serde_json::to_string(&lifecycle_bridge_inventory(&omitted_init)).unwrap(),
+    )
+    .unwrap_err();
+    assert!(
+        bridge_error.contains("forbidden secret profile input description")
+            && bridge_error.contains("clean-cut lifecycle contract")
+    );
 }
 
 /// A package read must resolve each source once, at the open, and take
