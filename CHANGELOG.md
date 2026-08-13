@@ -679,8 +679,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
   step and now runs a dedicated
-  `incremental-state` step afterward that fails the gate if any non-empty
-  `incremental` directory remains under the target directory the run used:
+  `incremental-state` step afterward that fails the gate on incremental state
+  the run's own compilation left under the target directory it used:
   a gate run compiles once and exits, so incremental state has no later
   rebuild to amortize its cost against.
 

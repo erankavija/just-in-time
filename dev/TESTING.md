@@ -316,8 +316,12 @@ for the measured comparison.
   ordinary interactive development, where the cost amortizes across many rebuilds of the same
   tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
   since a gate run compiles once and exits with no later rebuild to amortize against; a
-  dedicated `incremental-state` gate step fails the run if a non-empty `incremental` directory
-  remains under the target directory afterward.
+  dedicated `incremental-state` gate step then fails the run on what this run's own
+  compilation added to the target directory, measured against the baseline the
+  `incremental-baseline` step records before the first compilation. Incremental state another
+  process wrote is reported and ignored — an editor's rust-analyzer writes that directory
+  continuously and repopulates it within seconds of it being cleared — so there is nothing to
+  clear before a gate run.
 - **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
   `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
   run that must bypass the cache. Opting an existing target directory into a wrapper changes
