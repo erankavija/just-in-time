@@ -611,7 +611,8 @@ impl std::fmt::Display for ProfilePackageId {
 /// differently: an occupied target names who holds it, a diverged target names
 /// the values that no longer agree. The values are domain-separated
 /// fingerprints: the durable provenance this layer records, without turning
-/// provenance into configuration authority.
+/// provenance into configuration authority. [`Self::message`] is how either
+/// reason reaches a reader.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileTargetConflict {
     /// The target holds content this package never published.
@@ -631,33 +632,65 @@ pub enum ProfileTargetConflict {
 }
 
 impl ProfileTargetConflict {
-    /// A human clause naming why the target cannot be published, read by both
-    /// the refusal message and the difference report so an adopter acts on one
-    /// sentence whichever surface showed it.
+    /// A human clause naming why the target cannot be published and what
+    /// resolves it.
+    ///
+    /// The refusal message and the difference report's reason are both this
+    /// sentence, so an adopter who inspected a decision and an adopter whose
+    /// publication refused it act on the same words. Every value it names is
+    /// rendered rather than debug-printed: a fingerprint reaches a reader as its
+    /// leading digits, never as the wrapper types that carry it.
     pub fn message(&self) -> String {
         match self {
-            Self::Occupied { occupant } => {
-                format!("is held by {occupant} with content this profile did not publish")
-            }
+            Self::Occupied { occupant } => format!(
+                "is held by {occupant} with content this profile did not publish: {}",
+                match occupant {
+                    ProfileConflictOccupant::Repository => CAPTURE_OR_SET_ASIDE,
+                    ProfileConflictOccupant::Package(_) =>
+                        "stop one of the two packages from declaring it, or apply only one of them",
+                }
+            ),
             Self::Diverged {
                 base,
                 current,
                 candidate,
             } => format!(
-                "changed after the base this profile recorded (base {}, current {}, candidate {})",
+                "changed after this profile published it (recorded {}, now {}, would publish {}): \
+                 {CAPTURE_OR_RESTORE}",
                 fingerprint_label(base),
                 fingerprint_label(current),
-                fingerprint_label(candidate)
+                fingerprint_label(candidate),
             ),
         }
     }
 }
 
-/// Name one observed fingerprint, including the absence of a value.
+/// What resolves a target the repository holds and no package published.
+const CAPTURE_OR_SET_ASIDE: &str = "fold it into the package with 'jit profile capture --source \
+                                    <package-dir> --destination <package-dir>', or move it aside \
+                                    before applying";
+
+/// What resolves a profile-owned target edited after its owner published it.
+const CAPTURE_OR_RESTORE: &str = "fold the edit into the package with 'jit profile capture \
+                                  --source <package-dir> --destination <package-dir>', or restore \
+                                  the value this profile published";
+
+/// How many leading digits of a fingerprint a message names.
+///
+/// The whole digest is the decision's own evidence and stays on the typed
+/// conflict; a reader comparing three of them in one sentence needs only enough
+/// to tell them apart.
+const FINGERPRINT_MESSAGE_DIGITS: usize = 12;
+
+/// Name one observed fingerprint for a reader, including the absence of a value.
 fn fingerprint_label(value: &ThreeWayValue<ProfileBaseFingerprint>) -> String {
     match value {
         ThreeWayValue::Absent => "absent".to_string(),
-        ThreeWayValue::Present(fingerprint) => fingerprint.to_string(),
+        ThreeWayValue::Present(fingerprint) => fingerprint
+            .to_string()
+            .chars()
+            .take(FINGERPRINT_MESSAGE_DIGITS)
+            .collect(),
     }
 }
 
@@ -2921,10 +2954,16 @@ mod tests {
     };
     use std::collections::{BTreeMap, BTreeSet};
 
-    fn image_with_profile_owner(
-        target: &VirtualPath,
-        target_bytes: &[u8],
-        package_owns_target: bool,
+    /// A captured image holding each named target, with the applied records
+    /// that claim it.
+    ///
+    /// Each entry is one repository file, its bytes, and the packages whose
+    /// applied records claim it: no package for repository-authored content,
+    /// one for a target a package published, several for shared content. Every
+    /// ownership shape a composition decides against is stated through this one
+    /// builder rather than a second image (`@/invariant/shared-test-contracts`).
+    fn image_owning(
+        targets: &[(VirtualPath, &[u8], &[&str])],
     ) -> (RepositoryImage, RepositoryLayout) {
         let layout = super::super::RepositoryLayout::new(
             super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
@@ -2933,47 +2972,65 @@ mod tests {
         .unwrap();
         let config_bytes = b"";
         let config_identity = EntryIdentity::for_bytes("config", config_bytes).unwrap();
-        let claims = package_owns_target
-            .then(|| AppliedProfileClaim::asset(target, target_bytes, FileMode::Regular, false))
+        let owners = targets
+            .iter()
+            .flat_map(|(_, _, owners)| owners.iter().copied())
+            .collect::<BTreeSet<_>>();
+        let records = owners
             .into_iter()
-            .collect();
-        let record = AppliedProfileRecord::new(
-            "base-package"
-                .try_into()
-                .expect("test profile id is canonical"),
-            "1.0.0",
-            "*",
-            ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("packages/base-package")
-                    .expect("a canonical package location"),
-            ),
-            "package-hash",
-            ResolvedVariables::default(),
-            claims,
-        );
-        let record_bytes = record.to_bytes().unwrap();
-        let record_path = VirtualPath::data("profiles/base-package.json").unwrap();
+            .map(|owner| {
+                let claims = targets
+                    .iter()
+                    .filter(|(_, _, target_owners)| target_owners.contains(&owner))
+                    .map(|(target, bytes, _)| {
+                        AppliedProfileClaim::asset(target, bytes, FileMode::Regular, false)
+                    })
+                    .collect();
+                let record = AppliedProfileRecord::new(
+                    owner.try_into().expect("test profile id is canonical"),
+                    "1.0.0",
+                    "*",
+                    ProfileOrigin::Directory(
+                        crate::repository_state::RootRelativePath::parse(format!(
+                            "packages/{owner}"
+                        ))
+                        .expect("a canonical package location"),
+                    ),
+                    "package-hash",
+                    ResolvedVariables::default(),
+                    claims,
+                );
+                let bytes = record.to_bytes().unwrap();
+                let identity = EntryIdentity::for_bytes("record", &bytes).unwrap();
+                (
+                    format!("{owner}.json"),
+                    VirtualPath::data(format!("profiles/{owner}.json")).unwrap(),
+                    bytes,
+                    identity,
+                )
+            })
+            .collect::<Vec<_>>();
         let profiles = VirtualPath::PROFILES;
+        let mut requested = vec![
+            VirtualPath::CONFIG,
+            VirtualPath::GATES,
+            VirtualPath::INVARIANTS,
+            VirtualPath::RULES,
+            VirtualPath::TEMPLATES,
+            profiles.clone(),
+        ];
+        requested.extend(records.iter().map(|(_, path, _, _)| path.clone()));
+        requested.extend(targets.iter().map(|(target, _, _)| target.clone()));
         let mut spec = CaptureSpec::phase_one(
-            [
-                VirtualPath::CONFIG,
-                VirtualPath::GATES,
-                VirtualPath::INVARIANTS,
-                VirtualPath::RULES,
-                VirtualPath::TEMPLATES,
-                profiles.clone(),
-                record_path.clone(),
-                target.clone(),
-            ],
+            requested,
             CaptureBudget {
                 max_listings: 1,
-                max_bytes: 4096,
+                max_bytes: 65536,
                 max_depth: 8,
             },
         )
         .unwrap();
         spec.discover_listing(profiles.clone()).unwrap();
-        let record_identity = EntryIdentity::for_bytes("record", &record_bytes).unwrap();
         let mut entries = BTreeMap::from([
             (
                 VirtualPath::CONFIG,
@@ -2990,23 +3047,27 @@ mod tests {
                     mode: FileMode::Regular,
                 },
             ),
+        ]);
+        entries.extend(records.iter().map(|(_, path, bytes, identity)| {
             (
-                record_path,
+                path.clone(),
                 RepositoryEntry::File {
-                    identity: record_identity.clone(),
-                    bytes: record_bytes,
+                    identity: identity.clone(),
+                    bytes: bytes.clone(),
                     mode: FileMode::Regular,
                 },
-            ),
+            )
+        }));
+        entries.extend(targets.iter().map(|(target, bytes, _)| {
             (
                 target.clone(),
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes("target", target_bytes).unwrap(),
-                    bytes: target_bytes.to_vec(),
+                    identity: EntryIdentity::for_bytes("target", bytes).unwrap(),
+                    bytes: bytes.to_vec(),
                     mode: FileMode::Regular,
                 },
-            ),
-        ]);
+            )
+        }));
         entries.extend(
             [
                 VirtualPath::GATES,
@@ -3019,10 +3080,12 @@ mod tests {
         );
         let listings = BTreeMap::from([(
             profiles,
-            ListingFingerprint::new(BTreeMap::from([(
-                "base-package.json".to_string(),
-                record_identity,
-            )]))
+            ListingFingerprint::new(
+                records
+                    .iter()
+                    .map(|(name, _, _, identity)| (name.clone(), identity.clone()))
+                    .collect(),
+            )
             .unwrap(),
         )]);
         (
@@ -3037,6 +3100,21 @@ mod tests {
             .unwrap(),
             layout,
         )
+    }
+
+    /// A captured image whose one target is repository-authored or published by
+    /// the base package.
+    fn image_with_profile_owner(
+        target: &VirtualPath,
+        target_bytes: &[u8],
+        package_owns_target: bool,
+    ) -> (RepositoryImage, RepositoryLayout) {
+        let owners: &[&str] = if package_owns_target {
+            &["base-package"]
+        } else {
+            &[]
+        };
+        image_owning(&[(target.clone(), target_bytes, owners)])
     }
 
     /// Render one contribution that has already passed semantic composition.
@@ -3509,6 +3587,212 @@ mod tests {
                     ))
                 }
             ))
+        );
+    }
+
+    /// One asset claim per target, all with bytes that differ from what the
+    /// image holds, so every one of them is a decision a publication refuses.
+    fn colliding_asset_claims(
+        layout: &RepositoryLayout,
+        package: &str,
+        targets: &[VirtualPath],
+    ) -> ProfileClaims {
+        ProfileClaims {
+            package_id: ProfilePackageId::new(package),
+            contributions: Vec::new(),
+            assets: targets
+                .iter()
+                .map(|target| ProfileAssetClaim {
+                    claim: TargetClaim::new(
+                        layout,
+                        target.clone(),
+                        format!("profile-asset:{}", target.repository_relative()),
+                    )
+                    .unwrap(),
+                    bytes: b"bytes this package would publish".to_vec(),
+                    mode: FileMode::Regular,
+                    replace_owned: false,
+                })
+                .collect(),
+            regions: Vec::new(),
+        }
+    }
+
+    /// Every target the decision refused, beside why it refused it.
+    fn refused_decisions(
+        composition: &ProfileTargetComposition,
+    ) -> BTreeMap<String, ProfileTargetConflict> {
+        composition
+            .decisions
+            .iter()
+            .filter_map(|(path, decision)| match &decision.disposition {
+                ProfileTargetDisposition::Conflict(conflict) => {
+                    Some((path.repository_relative(), conflict.clone()))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Every reason a target can be refused reaches a reader as rendered facts
+    /// and a remedy, never as the Rust types that carry them.
+    #[test]
+    fn test_profile_target_conflict_message_states_a_remedy_without_debug_formatted_values() {
+        let fingerprint = |seed: &str| {
+            ThreeWayValue::Present(
+                serde_json::from_str::<ProfileBaseFingerprint>(&format!("\"{}\"", seed.repeat(64)))
+                    .expect("a canonical fingerprint"),
+            )
+        };
+        let entries = [
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Repository,
+            },
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("base-package")),
+            },
+            ProfileTargetConflict::Diverged {
+                base: fingerprint("a"),
+                current: fingerprint("b"),
+                candidate: ThreeWayValue::Absent,
+            },
+        ]
+        .map(|conflict| ProfileTargetConflictEntry {
+            owner: "workflow".try_into().expect("a canonical profile id"),
+            target: VirtualPath::data("custom.txt").unwrap(),
+            conflict,
+        });
+
+        for entry in &entries {
+            let message = entry.to_string();
+            for leaked in [
+                "Present(",
+                "Absent",
+                "ProfileBaseFingerprint",
+                "ThreeWayValue",
+                "ProfileConflictOccupant",
+                "{",
+            ] {
+                assert!(
+                    !message.contains(leaked),
+                    "a refusal names facts, not Rust syntax: {message}"
+                );
+            }
+            assert!(
+                message.contains(", or "),
+                "a refusal offers the adopter a choice of remedy: {message}"
+            );
+            assert!(
+                message.contains(&entry.target.repository_relative())
+                    && message.contains(entry.owner.as_str()),
+                "a refusal names the profile and the target it is about: {message}"
+            );
+        }
+        assert_eq!(
+            entries
+                .iter()
+                .filter(|entry| entry.to_string().contains("jit profile capture"))
+                .count(),
+            2,
+            "capture is named wherever folding the repository's own content resolves the refusal"
+        );
+        let diverged = entries.last().expect("the diverged entry").to_string();
+        assert!(
+            diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS))
+                && diverged.contains(&"b".repeat(FINGERPRINT_MESSAGE_DIGITS))
+                && !diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS + 1)),
+            "the values that disagree reach the reader as their leading digits: {diverged}"
+        );
+    }
+
+    /// A composition decides every target it was asked about, so a package
+    /// colliding with three repository files answers with three refusals rather
+    /// than the first one it reached (REQ-01).
+    #[test]
+    fn test_compose_profile_targets_refuses_every_colliding_target_rather_than_only_the_first() {
+        let targets = ["first.txt", "second.txt", "third.txt"]
+            .map(|name| VirtualPath::data(name).unwrap())
+            .to_vec();
+        let occupants = targets
+            .iter()
+            .map(|target| {
+                (
+                    target.clone(),
+                    b"authored by the repository".as_slice(),
+                    &[][..],
+                )
+            })
+            .collect::<Vec<_>>();
+        let (image, layout) = image_owning(&occupants);
+        let claims = colliding_asset_claims(&layout, "workflow-package", &targets);
+
+        let composition = compose_profile_targets(&image, claims)
+            .expect("a colliding target is decided, not refused, by composition");
+
+        assert_eq!(
+            refused_decisions(&composition)
+                .into_keys()
+                .collect::<BTreeSet<_>>(),
+            targets
+                .iter()
+                .map(VirtualPath::repository_relative)
+                .collect::<BTreeSet<_>>(),
+            "every colliding target is decided, not only the first one reached"
+        );
+    }
+
+    /// A decision names the packages that claim each target it reports, so a
+    /// reader separates repository-authored content from published content and
+    /// sees every owner of shared content (REQ-02).
+    #[test]
+    fn test_compose_profile_targets_names_every_package_that_claims_a_decided_target() {
+        let shared = VirtualPath::data("shared.txt").unwrap();
+        let authored = VirtualPath::data("authored.txt").unwrap();
+        let bytes = b"content two packages published".as_slice();
+        let (image, layout) = image_owning(&[
+            (shared.clone(), bytes, &["base-package", "other-package"]),
+            (authored.clone(), b"authored by the repository", &[]),
+        ]);
+        let claims = colliding_asset_claims(
+            &layout,
+            "workflow-package",
+            &[shared.clone(), authored.clone()],
+        );
+
+        let composition = compose_profile_targets(&image, claims)
+            .expect("a colliding target is decided, not refused, by composition");
+
+        let owners = |target: &VirtualPath| {
+            composition
+                .decisions
+                .get(target)
+                .map(|decision| {
+                    decision
+                        .owners
+                        .iter()
+                        .map(ProfilePackageId::as_str)
+                        .map(str::to_string)
+                        .collect::<BTreeSet<_>>()
+                })
+                .expect("the composition decided this target")
+        };
+        assert_eq!(
+            owners(&shared),
+            BTreeSet::from(["base-package".to_string(), "other-package".to_string()]),
+            "shared content names every package that claims it"
+        );
+        assert!(
+            owners(&authored).is_empty(),
+            "a target no package claims is the repository's own content"
+        );
+        assert!(
+            matches!(
+                refused_decisions(&composition).get(&authored.repository_relative()),
+                Some(ProfileTargetConflict::Occupied {
+                    occupant: ProfileConflictOccupant::Repository
+                })
+            ),
+            "an unowned occupant is distinguished from an owned one"
         );
     }
 

@@ -129,6 +129,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **`jit profile diff` states what a selection would change before anything is
+  published.** The command family could report a package and it could publish
+  one, but nothing answered what publishing would do to this repository, so an
+  adopter learned a decision by making it. `jit profile diff --profile
+  <SELECTOR>...` now resolves the selection, closes it over the packages it
+  depends on, and plans it through the same preparation a publication runs, then
+  states every target each participating profile decided: the values it would
+  create or update, the ones already exact, the recorded claims it would retain
+  or remove, and the targets it cannot publish, each beside the packages that
+  claim it — an empty owner list being the repository's own content and several
+  owners naming every owner of shared content. The report writes nothing and
+  exits `4` when any profile decided a target that cannot be published, so it
+  serves as a repository check; a package this repository has not applied is
+  reported from the location a `path:` selector names, which is what lets an
+  adopter inspect a package before applying it.
+
+  The decision behind it is now complete rather than first-failure. Composing a
+  profile's targets used to stop at the first target it could not publish and
+  raise it as one of two single-target errors; it now decides every target it
+  was asked about and the publication reads that same decision, so a selection
+  with three unpublishable targets reports three rather than revealing them one
+  run at a time. Both single-conflict error shapes are replaced by one refusal
+  carrying the whole set, and a refusal now renders its facts instead of
+  debug-printing them: a fingerprint reaches a reader as its leading digits and
+  every refusal names what resolves it.
+
 - **`jit profile pack` and `jit profile add` move a package as one verifiable
   file.** Sharing a package meant copying a directory, with nothing stating what
   was copied and nothing confirming it arrived whole; a truncated copy became a

@@ -74,6 +74,14 @@ capturing:
 jit profile validate
 ```
 
+Report what a selection would change here, including the targets it could not
+publish and who claims each of them, before publishing any of it:
+
+```bash
+jit profile diff --profile path:packages/jit-dogfood
+jit profile diff --profile id:jit-dogfood
+```
+
 Preview and apply a profile to an existing JIT repository:
 
 ```bash

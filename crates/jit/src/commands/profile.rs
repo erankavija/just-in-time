@@ -3418,14 +3418,16 @@ mod tests {
     /// Every file this repository holds, keyed by its path below the worktree.
     ///
     /// A rehearsal writes nothing, which is a statement about the whole
-    /// repository rather than about the targets a plan happens to name.
+    /// repository rather than about the targets a plan happens to name. The
+    /// coordination locks a held session creates are machine-local rather than
+    /// repository content, so holding a session is not a write.
     fn repository_files(temp: &TempDir) -> BTreeMap<PathBuf, Vec<u8>> {
         fn collect(directory: &Path, root: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
             for entry in fs::read_dir(directory).expect("read a repository directory") {
                 let path = entry.expect("a readable directory entry").path();
                 if path.is_dir() {
                     collect(&path, root, files);
-                } else {
+                } else if path.extension().is_none_or(|extension| extension != "lock") {
                     files.insert(
                         path.strip_prefix(root)
                             .expect("every file sits below the worktree")
@@ -6463,6 +6465,260 @@ template = true
                 ),
             }
         }
+    }
+
+    // =======================================================================
+    // jit:96268a98 — `jit profile diff` states what a selection would change
+    // before anything is published.
+    // =======================================================================
+
+    /// A package publishing one file per named target, authored so a case can
+    /// state exactly how many targets a selection decides.
+    fn package_publishing_each(
+        temp: &TempDir,
+        relative: &str,
+        id: &str,
+        targets: &[(&str, &str)],
+    ) -> ProfilePackage {
+        let manifest = targets
+            .iter()
+            .enumerate()
+            .map(|(index, (target, _))| {
+                format!("\n[[asset]]\nsource = \"assets/{index}.txt\"\ntarget = \"{target}\"\n")
+            })
+            .collect::<String>();
+        let sources = targets
+            .iter()
+            .enumerate()
+            .map(|(index, (_, content))| (format!("assets/{index}.txt"), (*content).to_string()))
+            .collect::<Vec<_>>();
+        authored_manifest_package(
+            temp,
+            relative,
+            &format!(
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
+                 compatible-jit = \"*\"\n{manifest}"
+            ),
+            &sources
+                .iter()
+                .map(|(source, content)| (source.as_str(), content.as_str()))
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// The one entry a report carries for `id`.
+    fn reported(report: &ProfilePlanResult, id: &str) -> ProfilePlanEntry {
+        report
+            .profiles
+            .iter()
+            .find(|entry| entry.id == id)
+            .unwrap_or_else(|| panic!("the report names profile {id}: {report:?}"))
+            .clone()
+    }
+
+    /// The targets `entry` decided `action` about, by repository-relative name.
+    fn decided_targets(entry: &ProfilePlanEntry, action: ProfileTargetAction) -> BTreeSet<String> {
+        entry
+            .decided(action)
+            .map(|target| target.path.clone())
+            .collect()
+    }
+
+    /// Write repository-authored content at each worktree-relative path.
+    fn author_repository_files(temp: &TempDir, files: &[(&str, &str)]) {
+        for (relative, content) in files {
+            let path = temp.path().join(relative);
+            fs::create_dir_all(path.parent().expect("a target has a parent")).unwrap();
+            fs::write(path, content).expect("author repository content");
+        }
+    }
+
+    /// The report states every target the selection cannot publish, not the
+    /// first one it reached, and the publication it precedes refuses exactly
+    /// that set — while the report itself writes nothing (REQ-01, REQ-03).
+    #[test]
+    fn test_diff_profiles_from_sources_states_every_unpublishable_target_the_apply_refuses() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let targets = ["docs/first.txt", "docs/second.txt", "docs/third.txt"];
+        author_repository_files(&temp, &targets.map(|target| (target, "authored by hand\n")));
+        let package = package_publishing_each(
+            &temp,
+            "packages/collider",
+            "collider",
+            &targets.map(|target| (target, "the package's own bytes\n")),
+        );
+        let selectors = [package_selector(&package)];
+        let before = repository_files(&temp);
+
+        let report = executor
+            .diff_profiles_from_sources(&selectors, &supplied_values(&[]))
+            .expect("a conflicting selection is reported, not refused");
+
+        let entry = reported(&report, "collider");
+        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(
+            decided_targets(&entry, ProfileTargetAction::Conflict),
+            targets.map(str::to_string).into_iter().collect(),
+            "the report states every target the selection cannot publish"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "the report publishes nothing"
+        );
+
+        let error = executor
+            .apply_profile_from_sources(&selectors, &supplied_values(&[]))
+            .expect_err("the publication refuses what the report reported");
+        assert_eq!(
+            entry
+                .decided(ProfileTargetAction::Conflict)
+                .map(|target| (
+                    target.path.clone(),
+                    target
+                        .reason
+                        .clone()
+                        .expect("a refused target says why it was refused")
+                ))
+                .collect::<BTreeMap<_, _>>(),
+            refused_targets(&error)
+                .iter()
+                .map(|refused| (
+                    refused.target.repository_relative(),
+                    refused.conflict.message()
+                ))
+                .collect::<BTreeMap<_, _>>(),
+            "the report and the refusal describe each target in one vocabulary"
+        );
+    }
+
+    /// A refused target names the package that already claims it, so an adopter
+    /// separates a package's claim from its own content (REQ-02).
+    #[test]
+    fn test_diff_profiles_from_sources_names_the_package_that_claims_a_contested_target() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let target = "docs/shared.txt";
+        let occupant = package_publishing(&temp, "vendor/base", "base", target, "first\n");
+        let candidate =
+            package_publishing(&temp, "vendor/workflow", "workflow", target, "second\n");
+        executor.apply_profile_package(&occupant).unwrap();
+
+        let report = executor
+            .diff_profiles_from_sources(&[package_selector(&candidate)], &supplied_values(&[]))
+            .expect("a contested target is reported, not refused");
+
+        let contested = reported(&report, "workflow")
+            .decided(ProfileTargetAction::Conflict)
+            .find(|decided| decided.path == target)
+            .cloned()
+            .unwrap_or_else(|| panic!("the report states the contested target: {report:?}"));
+        assert_eq!(
+            contested.owners,
+            vec!["base".to_string()],
+            "the report names the package that claims the target"
+        );
+        assert!(
+            contested
+                .reason
+                .is_some_and(|reason| reason.contains("base")),
+            "the refusal reason names the occupant"
+        );
+    }
+
+    /// A selection this repository has not applied is reported from the
+    /// location it was selected at, so an adopter inspects a package before
+    /// applying it (REQ-04).
+    #[test]
+    fn test_diff_profiles_from_sources_reports_a_package_this_repository_has_not_applied() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let package = package_publishing_each(
+            &temp,
+            "packages/unapplied",
+            "unapplied",
+            &[("docs/unapplied.txt", "the package's own bytes\n")],
+        );
+        let before = repository_files(&temp);
+
+        let report = executor
+            .diff_profiles_from_sources(&[package_selector(&package)], &supplied_values(&[]))
+            .expect("an unapplied package is reported from its location");
+
+        let entry = reported(&report, "unapplied");
+        assert_eq!(entry.status, ProfilePlanStatus::WouldApply);
+        assert!(
+            decided_targets(&entry, ProfileTargetAction::Create).contains("docs/unapplied.txt"),
+            "the report states the target the package would publish: {entry:?}"
+        );
+        assert!(
+            executor
+                .list_recorded_profiles()
+                .expect("the recorded inventory is readable")
+                .profiles
+                .iter()
+                .all(|recorded| recorded.id != "unapplied"),
+            "the report does not record the package it inspected"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "the report publishes nothing"
+        );
+    }
+
+    /// The report states the decision the publication then makes, target for
+    /// target, because both read one decision (REQ-03).
+    #[test]
+    fn test_diff_profiles_from_sources_decides_the_targets_the_apply_it_precedes_publishes() {
+        let (temp, _storage, executor, fixture_package) = fixture();
+        let selectors = [package_selector(&fixture_package)];
+
+        let report = executor
+            .diff_profiles_from_sources(&selectors, &supplied_values(&[]))
+            .expect("the selection is reportable");
+
+        let before = repository_files(&temp);
+        executor
+            .apply_profile_from_sources(&selectors, &supplied_values(&[]))
+            .expect("the reported selection applies");
+        let after = repository_files(&temp);
+
+        assert_planned_targets_match_published(&before, &after, &report);
+    }
+
+    /// A recorded claim the selection stops contributing is reported in its own
+    /// right, so an adopter sees what the repository would stop carrying
+    /// (REQ-01).
+    #[test]
+    fn test_diff_profiles_from_sources_reports_a_departing_claim_the_apply_would_remove() {
+        let (temp, _storage, executor, fixture_package) = fixture();
+        let published = fixture_package
+            .model()
+            .assets
+            .first()
+            .expect("the fixture package declares one asset")
+            .target
+            .clone();
+        executor.apply_profile_package(&fixture_package).unwrap();
+        let departing = package_without_assets(&temp, FIXTURE_LOCATION, fixture_id().as_str());
+        let before = repository_files(&temp);
+
+        let report = executor
+            .diff_profiles_from_sources(&[package_selector(&departing)], &supplied_values(&[]))
+            .expect("a departing claim is reportable");
+
+        assert!(
+            decided_targets(
+                &reported(&report, fixture_id().as_str()),
+                ProfileTargetAction::Remove
+            )
+            .contains(&published),
+            "the report states the target the selection would stop carrying: {report:?}"
+        );
+        assert_eq!(
+            repository_files(&temp),
+            before,
+            "the report publishes nothing"
+        );
     }
 
     #[test]

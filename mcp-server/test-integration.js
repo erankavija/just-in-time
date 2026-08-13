@@ -382,6 +382,7 @@ async function main() {
         'jit_gate_status-all',
         'jit_profile_list',
         'jit_profile_show',
+        'jit_profile_diff',
         'jit_profile_apply',
         'jit_profile_reconfigure',
         'jit_profile_upgrade',
@@ -392,7 +393,6 @@ async function main() {
         'jit_profile_install',
         'jit_profile_compose',
         'jit_profile_remove',
-        'jit_profile_diff',
       ]) {
         assert.ok(!names.has(deferred), `deferred profile lifecycle tool leaked: ${deferred}`);
       }
@@ -405,10 +405,13 @@ async function main() {
       // `profile` names an ordered selector; enumeration and the agreement
       // check take none, because both follow the repository's own records;
       // capture works between two named directories rather than over a
-      // selected profile.
+      // selected profile. The difference report takes the lifecycle selection
+      // surface without the rehearsal flag: it publishes nothing, so there is
+      // nothing for it to rehearse.
       assert.deepStrictEqual(profileInputKeys, {
         jit_profile_apply: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_capture: ['destination', 'json', 'source'],
+        jit_profile_diff: ['json', 'profile', 'set', 'values-file'],
         jit_profile_list: ['json'],
         jit_profile_reconfigure: ['dry-run', 'json', 'profile', 'set', 'values-file'],
         jit_profile_show: ['json', 'profile'],
@@ -425,6 +428,10 @@ async function main() {
       );
       assert.deepStrictEqual(
         tools.find(tool => tool.name === 'jit_profile_show').inputSchema.required,
+        ['profile']
+      );
+      assert.deepStrictEqual(
+        tools.find(tool => tool.name === 'jit_profile_diff').inputSchema.required,
         ['profile']
       );
       assert.deepStrictEqual(
