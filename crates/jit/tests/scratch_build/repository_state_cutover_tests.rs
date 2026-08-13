@@ -40,6 +40,112 @@ fn definition_owners(root: &Path, definition: &str) -> Vec<PathBuf> {
     owners
 }
 
+/// Require one declaration to remain in the canonical module.
+///
+/// This deliberately identifies declarations rather than every call site:
+/// package-local helpers may consume the canonical reader for a known path,
+/// but a second decoder, model, or inventory reader is a second authority.
+fn assert_canonical_owner(
+    definition: &str,
+    mut owners: Vec<PathBuf>,
+    expected: PathBuf,
+) -> Result<(), String> {
+    owners.sort();
+    (owners == [expected.clone()]).then_some(()).ok_or_else(|| {
+        format!(
+            "forbidden duplicate authority for {definition}: found {owners:?}, expected only \
+             {expected:?}; the clean-cut lifecycle contract has one canonical package decoder, model, and \
+             applied-record inventory reader rather than parallel formats or readers"
+        )
+    })
+}
+
+/// Reject a predecessor declaration rather than its harmless mentions in tests,
+/// documentation, or a historical event parser.
+fn assert_retired_lifecycle_entry_point_absent(
+    production: &str,
+    definition: &str,
+) -> Result<(), String> {
+    (!production.contains(definition))
+        .then_some(())
+        .ok_or_else(|| {
+            format!(
+                "forbidden retired lifecycle entry point returned: {definition}; it violates the \
+             clean-cut lifecycle contract by restoring a single-profile selector, per-package \
+             publication bypass, or pre-aggregate audit constructor"
+            )
+        })
+}
+
+/// Find a positive secret/sensitive classification while accepting the one
+/// deliberate vocabulary for this contract: an input may be described as
+/// *non-secret* or *non-sensitive*. Splitting into words makes this independent
+/// of JSON, Rust comments, and prose punctuation without maintaining a field
+/// inventory for every public surface.
+fn sensitive_profile_input_description(source: &str) -> Option<&'static str> {
+    let words = source
+        .split(|character: char| !character.is_ascii_alphabetic())
+        .map(str::to_ascii_lowercase)
+        .collect::<Vec<_>>();
+    words.iter().enumerate().find_map(|(index, word)| {
+        matches!(word.as_str(), "secret" | "sensitive")
+            .then(|| (index == 0 || words[index - 1] != "non").then_some(word.as_str()))
+            .flatten()
+            .map(|word| match word {
+                "secret" => "secret",
+                _ => "sensitive",
+            })
+    })
+}
+
+fn assert_profile_input_surface_is_non_sensitive(
+    surface: &str,
+    description: &str,
+) -> Result<(), String> {
+    sensitive_profile_input_description(description)
+        .map(|term| {
+            format!(
+                "forbidden {term} profile input description in {surface}; it violates the \
+                 clean-cut lifecycle contract because profile inputs must remain non-secret and \
+                 their values must not gain a sensitive-data channel"
+            )
+        })
+        .map_or(Ok(()), Err)
+}
+
+fn profile_generated_schema_text() -> String {
+    let schema = jit::CommandSchema::generate();
+    let profile = schema
+        .commands
+        .get("profile")
+        .expect("generated schema retains the profile command family");
+    let init = schema
+        .commands
+        .get("init")
+        .expect("generated schema retains initialization's profile inputs");
+    let manifest = schema
+        .types
+        .get("ProfilePackageModel")
+        .expect("generated schema retains the canonical manifest model");
+    let lifecycle_events = schema
+        .events
+        .iter()
+        .filter(|event| event.tag.as_str() == "profile_lifecycle")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        lifecycle_events.len(),
+        1,
+        "the generated schema must carry one canonical profile lifecycle audit event"
+    );
+    serde_json::json!({
+        "init": init,
+        "profile": profile,
+        "manifest": manifest,
+        "profile_lifecycle_events": lifecycle_events,
+    })
+    .to_string()
+}
+
 fn contains_cargo_manifest(root: &Path) -> bool {
     std::fs::read_dir(root).unwrap().any(|entry| {
         let path = entry.unwrap().path();
@@ -168,6 +274,151 @@ fn test_known_projection_renderer_definitions_keep_canonical_owners() {
             "known renderer ownership changed: {definition}"
         );
     }
+}
+
+/// The package lifecycle has one decoder, one runtime model, and one reader
+/// for the repository's applied-record inventory. A helper that reads a known
+/// record path is not another inventory: its caller already chose that path.
+/// These ownership checks therefore guard only declarations that can become a
+/// competing format authority.
+#[test]
+fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    for (definition, expected) in [
+        ("pub(crate) fn decode_manifest(", "profile/wire.rs"),
+        ("pub struct ProfilePackageModel", "profile/manifest.rs"),
+        (
+            "pub fn applied_profile_records(",
+            "repository_state/profile_apply.rs",
+        ),
+    ] {
+        assert_canonical_owner(
+            definition,
+            definition_owners(&source_root, definition),
+            PathBuf::from(expected),
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// The selection stream and aggregate lifecycle event replaced three public
+/// predecessor shapes. Keeping their names absent is more precise than
+/// banning the legitimate `apply_profile_package*` closure wrappers: those
+/// wrappers resolve one package's dependency closure and enter the one
+/// aggregate seam rather than publishing per package.
+#[test]
+fn test_profile_lifecycle_has_no_retired_selector_bypass_or_event_constructor() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    for (relative, definition) in [
+        ("commands/init.rs", "struct ProfileSelection"),
+        ("commands/profile.rs", "fn apply_one_profile_package("),
+        ("domain/types.rs", "fn draft_profile_applied("),
+    ] {
+        assert_retired_lifecycle_entry_point_absent(
+            &production_source(&source_root.join(relative)),
+            definition,
+        )
+        .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// Inputs reach users through the manifest and CLI, machine clients through
+/// the generated schema and bridge inventory, and later readers through the
+/// lifecycle audit projection. Every one must say the same thing: values are
+/// ordinary non-secret inputs, not credentials carried by profile lifecycle.
+#[test]
+fn test_profile_lifecycle_input_surfaces_do_not_offer_secret_or_sensitive_values() {
+    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = crate_root.join("../..");
+    let manifest = production_source(&crate_root.join("src/profile/manifest.rs"));
+    let cli = production_source(&crate_root.join("src/cli.rs"));
+    let profile_cli = cli
+        .split_once("/// Repository profile commands.")
+        .expect("profile CLI declaration remains a separately documented command family")
+        .1;
+    let audit_types = production_source(&crate_root.join("src/domain/types.rs"));
+    let profile_audit_inputs = audit_types
+        .split_once("/// One variable's non-sensitive provenance in a lifecycle event.")
+        .expect("profile lifecycle audit retains its variable provenance type")
+        .1
+        .split_once("/// System event types for audit log")
+        .expect("profile lifecycle audit inputs remain separate from unrelated event types")
+        .0;
+    let bridge_inventory =
+        std::fs::read_to_string(workspace_root.join("mcp-server/curated-tools.json")).unwrap();
+    let bridge_inventory = serde_json::from_str::<serde_json::Value>(&bridge_inventory).unwrap();
+    let bridge_profile_inventory = bridge_inventory["include"]
+        .as_object()
+        .expect("bridge inventory keeps its generated-tool include map")
+        .iter()
+        .filter(|(name, _)| name.starts_with("jit_profile_"))
+        .map(|(_, description)| description)
+        .collect::<Vec<_>>();
+
+    for (surface, description) in [
+        ("profile manifest model", manifest),
+        ("profile command-line definitions", profile_cli.to_string()),
+        ("generated profile schema", profile_generated_schema_text()),
+        (
+            "profile lifecycle audit record",
+            profile_audit_inputs.to_string(),
+        ),
+        (
+            "MCP profile inventory",
+            serde_json::to_string(&bridge_profile_inventory).unwrap(),
+        ),
+    ] {
+        assert_profile_input_surface_is_non_sensitive(surface, &description)
+            .unwrap_or_else(|error| panic!("{error}"));
+    }
+}
+
+/// Red-first proof for the structural predicates above. These are deliberately
+/// small source fragments rather than mutations of production files: each
+/// proves the corresponding guard has a failing path without coupling the
+/// suite to a temporary working-tree rewrite.
+#[test]
+fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
+    let duplicate_decoder = assert_canonical_owner(
+        "pub(crate) fn decode_manifest(",
+        vec![
+            PathBuf::from("profile/wire.rs"),
+            PathBuf::from("profile/alternate_wire.rs"),
+        ],
+        PathBuf::from("profile/wire.rs"),
+    )
+    .unwrap_err();
+    assert!(
+        duplicate_decoder.contains("forbidden duplicate authority")
+            && duplicate_decoder.contains("clean-cut lifecycle contract")
+    );
+
+    let retired_bypass = assert_retired_lifecycle_entry_point_absent(
+        "pub(super) fn apply_one_profile_package() {}",
+        "fn apply_one_profile_package(",
+    )
+    .unwrap_err();
+    assert!(
+        retired_bypass.contains("forbidden retired lifecycle entry point")
+            && retired_bypass.contains("clean-cut lifecycle contract")
+    );
+
+    for term in ["secret", "sensitive"] {
+        let error = assert_profile_input_surface_is_non_sensitive(
+            "injected profile input surface",
+            &format!("a {term} profile input"),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(&format!("forbidden {term} profile input description"))
+                && error.contains("clean-cut lifecycle contract")
+        );
+    }
+    assert!(assert_profile_input_surface_is_non_sensitive(
+        "affirmative contract",
+        "a non-secret and non-sensitive profile input"
+    )
+    .is_ok());
 }
 
 /// A package read must resolve each source once, at the open, and take
