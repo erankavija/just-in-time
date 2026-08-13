@@ -179,12 +179,6 @@
       "wave_number": 14,
       "issues": [
         {
-          "short_id": "f6a17e0d",
-          "title": "Package authoring and offline exchange",
-          "classification": "checkpoint",
-          "status": "pending"
-        },
-        {
           "short_id": "f2389b18",
           "title": "Check applied profiles against their packages and the repository",
           "classification": "implementation",
@@ -207,15 +201,46 @@
       "wave_number": 16,
       "issues": [
         {
+          "short_id": "5a3ecba0",
+          "title": "Refresh declared contributions from the repository on capture",
+          "classification": "implementation",
+          "status": "in_progress",
+          "note": "dispatched session 13 (worker-5a3ecba0, worktree agent-5a3ecba0, base 2a67ea810)"
+        }
+      ]
+    },
+    {
+      "wave_number": 17,
+      "issues": [
+        {
           "short_id": "cb26de35",
           "title": "Give the profile subcommands one presentation contract",
+          "classification": "implementation",
+          "status": "pending",
+          "note": "owner-serialized behind 5a3ecba0: standardizes a surface that must stop moving first"
+        },
+        {
+          "short_id": "acf49914",
+          "title": "End-to-end edit-and-refresh regression test",
           "classification": "implementation",
           "status": "pending"
         }
       ]
     },
     {
-      "wave_number": 17,
+      "wave_number": 18,
+      "issues": [
+        {
+          "short_id": "f6a17e0d",
+          "title": "Surface, documentation, and evidence (story checkpoint)",
+          "classification": "review",
+          "status": "pending",
+          "note": "moved from stale wave 14; deps 5a3ecba0 + cf42d08b"
+        }
+      ]
+    },
+    {
+      "wave_number": 19,
       "issues": [
         {
           "short_id": "b3d92595",
@@ -238,7 +263,7 @@
       ]
     },
     {
-      "wave_number": 18,
+      "wave_number": 20,
       "issues": [
         {
           "short_id": "d7558ef6",
@@ -249,7 +274,7 @@
       ]
     },
     {
-      "wave_number": 19,
+      "wave_number": 21,
       "issues": [
         {
           "short_id": "8021d507",
@@ -260,7 +285,7 @@
       ]
     },
     {
-      "wave_number": 20,
+      "wave_number": 22,
       "issues": [
         {
           "short_id": "dd268d0f",
