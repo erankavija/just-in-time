@@ -205,7 +205,7 @@
           "title": "Refresh declared contributions from the repository on capture",
           "classification": "implementation",
           "status": "in_progress",
-          "note": "dispatched session 13 (worker-5a3ecba0, worktree agent-5a3ecba0, base 2a67ea810)"
+          "note": "code-review rounds 1-3 each FAILED on a REQ-07 budget variant; rounds 1-2 fixed and verified; owner ruled after round 3 (unbound named-path reads, on the issue description). R3 rework NOT dispatched \u2014 next session dispatches it into worktree agent-5a3ecba0 at b8572db93, then round-4 gates, merge, done."
         }
       ]
     },
@@ -1677,7 +1677,7 @@
       "cleanup": "The 1.8 GiB of incremental state produced by this measurement was removed; that worktree's target went 9.0 -> 7.3 GiB. It remains above its 5.3 GiB pre-measurement size because the CARGO_INCREMENTAL=1 fingerprint rebuilt artifacts alongside the originals."
     }
   ],
-  "last_handoff": "handoff-12.md",
+  "last_handoff": "handoff-13.md",
   "session_11_summary": {
     "date": "2026-08-13",
     "waves_closed": [
@@ -1692,5 +1692,20 @@
     "gates_run": "cf42d08b cargo-ci (2 cold-fail, 2 warm-pass) + code-review (pass, 0 findings); f2389b18 cargo-ci (1 cold-fail, 1 warm-pass) + mcp-ci (1 fail on stale installed binary, 1 pass under worktree PATH) + code-review (pass); combined tree cargo-ci (1 cold-fail, 1 warm-pass at 22314 ms, 4497 tests)",
     "integration_defect": "The combined tree did not compile: f2389b18 added two CaptureBudget construction sites while cf42d08b removed the max_paths field. Both branches were individually green and the merge was textually clean. Fixed lead-side in 95460dfe5. Merging both to main separately would have left main broken between the merges.",
     "blocking_questions_for_next_session": 4
+  },
+  "session_13_summary": {
+    "completed": [
+      "0708d692 (out-of-epic): done, merged 2103a5e7a, both gates on branch and merged tree"
+    ],
+    "in_flight": [
+      "5a3ecba0: rounds 1-2 rework landed (b8572db93); R3 rework pending dispatch per owner ruling"
+    ],
+    "filed": [
+      "d2b7d19b: fixture-receipt TempDir race flake, epic:v1-release, high"
+    ],
+    "owner_decisions": 4,
+    "held": [
+      "cb26de35 behind 5a3ecba0 (standing serialization)"
+    ]
   }
 }
