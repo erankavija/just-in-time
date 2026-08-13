@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T12:06:12.168431019Z",
   "context": {},
   "created_at": "2026-08-13T06:09:07.025187479Z",
   "dependencies": [
@@ -36,7 +37,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Refresh declared contributions from the repository on capture",
-  "updated_at": "2026-08-13T09:55:30.645064412Z"
+  "updated_at": "2026-08-13T12:06:12.168431019Z"
 }
