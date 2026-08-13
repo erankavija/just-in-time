@@ -145,6 +145,73 @@ fn assert_retired_lifecycle_entry_point_absent(
         })
 }
 
+/// Reject every production and generated-contract spelling of the retired
+/// per-package profile audit event. Unknown event records remain generic parser
+/// input; this guard concerns only the current typed vocabulary and the schema
+/// projected from it.
+fn assert_retired_profile_applied_contract_absent(
+    production_sources: impl IntoIterator<Item = (PathBuf, String)>,
+    generated_event_tags: impl IntoIterator<Item = String>,
+) -> Result<(), String> {
+    let mut violations = production_sources
+        .into_iter()
+        .flat_map(|(path, source)| {
+            [
+                ("ProfileApplied", "typed Event::ProfileApplied variant"),
+                (
+                    "profile_applied",
+                    "retired profile_applied tag or constructor",
+                ),
+            ]
+            .into_iter()
+            .filter(move |(needle, _)| source.contains(needle))
+            .map(move |(_, surface)| format!("{surface} in {}", path.display()))
+        })
+        .collect::<Vec<_>>();
+    violations.extend(
+        generated_event_tags
+            .into_iter()
+            .filter(|tag| tag == "profile_applied")
+            .map(|tag| format!("generated schema event tag `{tag}`")),
+    );
+
+    violations.is_empty().then_some(()).ok_or_else(|| {
+        format!(
+            "forbidden retired profile-applied event contract returned: {}; use only \
+             Event::ProfileLifecycle and the `profile_lifecycle` schema tag; generic unknown-event \
+             retention must not restore a profile-specific decoder or compatibility path",
+            violations.join(", ")
+        )
+    })
+}
+
+fn production_sources(root: &Path) -> Vec<(PathBuf, String)> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut sources = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                sources.push((
+                    path.strip_prefix(root).unwrap().to_path_buf(),
+                    production_source(&path),
+                ));
+            }
+        }
+    }
+    sources
+}
+
+fn generated_event_tags() -> Vec<String> {
+    jit::CommandSchema::generate()
+        .events
+        .into_iter()
+        .map(|event| event.tag.as_str().to_string())
+        .collect()
+}
+
 /// Find a positive secret/sensitive classification while accepting the one
 /// deliberate vocabulary for this contract: an input may be described as
 /// *non-secret* or *non-sensitive*. Splitting into words makes this independent
@@ -392,18 +459,17 @@ fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
     }
 }
 
-/// The selection stream and aggregate lifecycle event replaced three public
+/// The selection stream and aggregate lifecycle event replaced two public
 /// predecessor shapes. Keeping their names absent is more precise than
 /// banning the legitimate `apply_profile_package*` closure wrappers: those
 /// wrappers resolve one package's dependency closure and enter the one
 /// aggregate seam rather than publishing per package.
 #[test]
-fn test_profile_lifecycle_has_no_retired_selector_bypass_or_event_constructor() {
+fn test_profile_lifecycle_has_no_retired_selector_bypass() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for (relative, definition) in [
         ("commands/init.rs", "struct ProfileSelection"),
         ("commands/profile.rs", "fn apply_one_profile_package("),
-        ("domain/types.rs", "fn draft_profile_applied("),
     ] {
         assert_retired_lifecycle_entry_point_absent(
             &production_source(&source_root.join(relative)),
@@ -411,6 +477,19 @@ fn test_profile_lifecycle_has_no_retired_selector_bypass_or_event_constructor() 
         )
         .unwrap_or_else(|error| panic!("{error}"));
     }
+}
+
+/// The typed Event vocabulary, its fieldless tag mirror, and `jit --schema`
+/// are one current contract. The retired per-package audit representation must
+/// not return through any of those surfaces after the aggregate cutover.
+#[test]
+fn test_profile_lifecycle_has_no_retired_profile_applied_event_contract() {
+    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    assert_retired_profile_applied_contract_absent(
+        production_sources(&source_root),
+        generated_event_tags(),
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
 }
 
 /// Inputs reach users through the manifest and CLI, machine clients through
@@ -514,6 +593,34 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
         retired_bypass.contains("forbidden retired lifecycle entry point")
             && retired_bypass.contains("clean-cut lifecycle contract")
     );
+
+    let retired_event_contract = assert_retired_profile_applied_contract_absent(
+        [
+            (
+                PathBuf::from("domain/types.rs"),
+                "enum Event { ProfileApplied { id: String } }".to_string(),
+            ),
+            (
+                PathBuf::from("domain/event_catalog.rs"),
+                "EventTag::ProfileApplied => \"profile_applied\"; \
+                 Event::draft_profile_applied()"
+                    .to_string(),
+            ),
+        ],
+        ["profile_applied".to_string()],
+    )
+    .unwrap_err();
+    for expected in [
+        "typed Event::ProfileApplied variant",
+        "retired profile_applied tag or constructor",
+        "generated schema event tag `profile_applied`",
+        "use only Event::ProfileLifecycle",
+    ] {
+        assert!(
+            retired_event_contract.contains(expected),
+            "{retired_event_contract}"
+        );
+    }
 
     for term in ["secret", "sensitive"] {
         let error = assert_profile_input_surface_is_non_sensitive(

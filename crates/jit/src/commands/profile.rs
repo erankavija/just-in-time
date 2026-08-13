@@ -6762,14 +6762,15 @@ template = true
     #[test]
     fn test_profile_application_does_not_mark_valid_unterminated_event_as_torn() {
         let (temp, storage, executor, package) = fixture();
-        let prior_event = Event::ProfileApplied {
+        let prior_event = Event::ProfileLifecycle {
             id: String::new(),
             timestamp: chrono::DateTime::UNIX_EPOCH,
-            profile_id: "prior".to_string(),
-            version: "1.0.0".to_string(),
-            origin: ProfileOrigin::Directory(RootRelativePath::parse("vendor/prior").unwrap()),
-            package_hash: "prior-package".to_string(),
-            target_hashes: BTreeMap::new(),
+            operation: ProfileLifecycleOperation::Apply,
+            profiles: vec![crate::domain::ProfileLifecycleProfile {
+                id: "prior".try_into().unwrap(),
+                status: ProfileLifecycleStatus::Installed,
+                variables: Vec::new(),
+            }],
             isolated_torn_tail: false,
         };
         fs::write(

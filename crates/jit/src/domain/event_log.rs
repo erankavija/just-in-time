@@ -35,7 +35,7 @@ pub enum EventLogError {
 /// Parse current-vocabulary events while retaining retired/unknown records.
 ///
 /// Invalid JSON is rejected except for exactly one physical line immediately
-/// followed by a valid [`Event::ProfileApplied`] or [`Event::ProfileLifecycle`] whose
+/// followed by a valid [`Event::ProfileLifecycle`] whose
 /// `isolated_torn_tail` flag is true. That marker is written in the same
 /// transaction as the preserved prefix, making the exception explicit and
 /// auditable rather than broadly accepting malformed history.
@@ -81,10 +81,7 @@ fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
         .is_some_and(|event| {
             matches!(
                 event,
-                Event::ProfileApplied {
-                    isolated_torn_tail: true,
-                    ..
-                } | Event::ProfileLifecycle {
+                Event::ProfileLifecycle {
                     isolated_torn_tail: true,
                     ..
                 }
@@ -95,21 +92,19 @@ fn certifies_preceding_torn_tail(next_line: Option<&&str>) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::ProfileOrigin;
-    use std::collections::BTreeMap;
 
     fn marker(isolated_torn_tail: bool) -> Event {
-        Event::ProfileApplied {
+        Event::ProfileLifecycle {
             id: String::new(),
             timestamp: chrono::DateTime::UNIX_EPOCH,
-            profile_id: "example".to_string(),
-            version: "1.0.0".to_string(),
-            origin: ProfileOrigin::Directory(
-                crate::repository_state::RootRelativePath::parse("packages/example")
-                    .expect("a canonical package location"),
-            ),
-            package_hash: "package".to_string(),
-            target_hashes: BTreeMap::new(),
+            operation: crate::domain::ProfileLifecycleOperation::Apply,
+            profiles: vec![crate::domain::ProfileLifecycleProfile {
+                id: "example"
+                    .try_into()
+                    .expect("the profile marker has a canonical identifier"),
+                status: crate::domain::ProfileLifecycleStatus::Installed,
+                variables: Vec::new(),
+            }],
             isolated_torn_tail,
         }
     }

@@ -4567,18 +4567,18 @@ fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
     }
 }
 
-fn provenance_event() -> Event {
-    Event::ProfileApplied {
+fn lifecycle_event() -> Event {
+    Event::ProfileLifecycle {
         id: String::new(),
         timestamp: req01_instant(),
-        profile_id: "example".into(),
-        version: "1.0".into(),
-        origin: crate::domain::ProfileOrigin::Directory(
-            crate::repository_state::RootRelativePath::parse("packages/example")
-                .expect("a canonical package location"),
-        ),
-        package_hash: "hash".into(),
-        target_hashes: std::collections::BTreeMap::new(),
+        operation: crate::domain::ProfileLifecycleOperation::Apply,
+        profiles: vec![crate::domain::ProfileLifecycleProfile {
+            id: "example"
+                .try_into()
+                .expect("the conformance profile id is canonical"),
+            status: crate::domain::ProfileLifecycleStatus::Installed,
+            variables: Vec::new(),
+        }],
         isolated_torn_tail: false,
     }
 }
@@ -4629,7 +4629,7 @@ fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
             },
             MutationIntent::RecordEvent {
                 phase: 5,
-                event: Box::new(provenance_event()),
+                event: Box::new(lifecycle_event()),
             },
         ]
     };

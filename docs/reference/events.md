@@ -18,7 +18,6 @@ to shared state. The tags whose records carry no `issue_id` are exactly:
 - `gate_definition_created` (registry)
 - `gate_definition_removed` (registry)
 - `lifecycle_timestamps_backfilled` (repository)
-- `profile_applied` (repository)
 - `profile_lifecycle` (repository)
 
 A `jit events query --issue-id <ID>` filter therefore never returns them.
@@ -45,7 +44,6 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_definition_created` | registry | no | `jit gate define` registered a gate. |
 | `gate_definition_removed` | registry | no | `jit gate remove` unregistered a gate. |
 | `lifecycle_timestamps_backfilled` | repository | no | The one-time `jit migrate lifecycle-timestamps` backfill wrote derived lifecycle timestamps; the record carries the number of issues it updated. |
-| `profile_applied` | repository | no | A profile package, its canonical provenance record, and this audit event reached one durable transaction commit point. |
 | `profile_lifecycle` | repository | no | A profile lifecycle operation reached one durable transaction commit point; the record summarizes per-profile actions and variable source kinds without resolved values or rendered content. |
 
 For the commands that read the log, see
