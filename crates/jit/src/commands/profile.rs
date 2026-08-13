@@ -2346,13 +2346,14 @@ fn recorded_profile_bytes(profiles: usize) -> u64 {
 /// Root-relative depth of the paths an applied-record reading touches.
 ///
 /// Every record is published and read at the one path [`applied_record_path`]
-/// builds — one name below the `.jit/profiles/` listing — so the reading
-/// reaches that listing and its children and nothing below them. The bound sits
-/// above that derived depth deliberately: nothing in this reading grows with the
-/// allowance, because every path it holds is one this construction produced, so
-/// the slack can refuse nothing while leaving the record location free to gain a
-/// component without a bound having to be found and changed.
-const APPLIED_RECORD_DEPTH: usize = 4;
+/// builds — one name below the `.jit/profiles/` listing — so the reading reaches
+/// that listing and its children and nothing below them. The bound is that
+/// construction rather than a number stated beside it: the listing's own depth
+/// plus the record name it holds, which moves with the record location instead
+/// of having to be found and changed when it moves.
+fn applied_record_depth() -> usize {
+    VirtualPath::PROFILES.relative().depth().saturating_add(1)
+}
 
 /// Bounds for the listing-only capture that learns how many records there are.
 ///
@@ -2368,7 +2369,7 @@ fn record_listing_capture_budget() -> CaptureBudget {
     CaptureBudget {
         max_listings: 1,
         max_bytes: u64::MAX,
-        max_depth: APPLIED_RECORD_DEPTH,
+        max_depth: applied_record_depth(),
     }
 }
 
@@ -2383,7 +2384,7 @@ fn record_capture_budget(records: usize) -> CaptureBudget {
     CaptureBudget {
         max_listings: 1,
         max_bytes: recorded_profile_bytes(records),
-        max_depth: APPLIED_RECORD_DEPTH,
+        max_depth: applied_record_depth(),
     }
 }
 
