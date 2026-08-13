@@ -2,9 +2,10 @@ use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionSte
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
-    read_package_archive, resolve_package, resolve_package_from_record, CapturedPackageTree,
-    EngineVersion, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
-    ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult, ProfileComposedApplyResult,
+    read_package_archive, resolve_package, resolve_package_from_record, CapturedContributionState,
+    CapturedPackageTree, EngineVersion, ProfileAddResult, ProfileApplicationStatus,
+    ProfileApplyResult, ProfileCaptureAction, ProfileCaptureFile, ProfileCaptureResult,
+    ProfileCapturedContribution, ProfileComposedApplyResult, ProfileContributionCaptureAction,
     ProfileGraphError, ProfileId, ProfileListResult, ProfileOrigin, ProfilePackResult,
     ProfilePackage, ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
     ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileVariableAssignment,
@@ -742,6 +743,23 @@ impl CommandExecutor<JsonFileStorage> {
                 executable: outcome.mode == FileMode::Executable,
             })
             .collect::<Vec<_>>();
+        let contributions = captured
+            .contributions()
+            .iter()
+            .map(|contribution| ProfileCapturedContribution {
+                identity: contribution.identity.to_string(),
+                action: match contribution.state {
+                    CapturedContributionState::Unchanged => {
+                        ProfileContributionCaptureAction::Unchanged
+                    }
+                    CapturedContributionState::Refreshed => {
+                        ProfileContributionCaptureAction::Refreshed
+                    }
+                    CapturedContributionState::Absent => ProfileContributionCaptureAction::Absent,
+                    CapturedContributionState::Unowned => ProfileContributionCaptureAction::Unowned,
+                },
+            })
+            .collect::<Vec<_>>();
         Ok(ProfileCaptureResult {
             count: files.len(),
             id: captured.model().id.to_string(),
@@ -753,6 +771,7 @@ impl CommandExecutor<JsonFileStorage> {
             byte_size: captured.byte_size(),
             status,
             files,
+            contributions,
         })
     }
 
@@ -2438,19 +2457,41 @@ fn capture_applied_records_covering(
     Ok(Some((image, recorded)))
 }
 
+/// How many package-model byte budgets one profile-agreement capture may read.
+///
+/// A recorded profile's claimed content is package content: its bytes are what
+/// that package published, so one budget covers one recorded profile, and this
+/// many of them is how many profiles a repository may record before the reading
+/// is refused for its size.
+const CLAIM_MODEL_BUDGETS: usize = 32;
+
 /// Bounds for the profile-agreement capture.
 ///
-/// The records plus every target they claim, which a package's own size bounds
-/// rather than the record count.
+/// The records plus every target they claim. Every bound is derived from what
+/// the package model admits, for the reason
+/// [`package_tree_capture_budget`] states: the model bounds a package's file
+/// count and total size and says nothing about how deep or how long its paths
+/// are, so a bound assuming a path shape refuses a repository whose profile
+/// legitimately claims a target the model admits — an application that
+/// succeeded, followed by a check that will not read what it published.
 ///
-/// No path count appears here: a claimed target is one path a record already
-/// names, not growth a capture discovers, so its count is bounded by what the
-/// records declare. `max_depth` bounds how deep a claimed target may sit below
-/// the repository root, and nothing a package publishes reaches it.
+/// * **Listings.** One, the `.jit/profiles/` listing that names the records. A
+///   claimed target is a path a record already names rather than growth a
+///   capture discovers, so nothing here enumerates a directory.
+/// * **Depth.** A claimed target's path is one a manifest declared, and the
+///   manifest names every path the package publishes without naming one twice,
+///   so the declared path lengths sum below the manifest's own size — itself
+///   within a package byte budget. A path's component count is strictly below
+///   its byte length, so no claimed target sits a package byte budget's worth of
+///   components below its root.
+/// * **Bytes.** One package byte budget per recorded profile, which is what its
+///   claimed content can hold, times the profiles a repository may record.
+///
+/// [`MAX_PROFILE_PACKAGE_BYTES`]: crate::profile::MAX_PROFILE_PACKAGE_BYTES
 const CLAIM_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
     max_listings: 1,
-    max_bytes: 128 * 1024 * 1024,
-    max_depth: 32,
+    max_bytes: (CLAIM_MODEL_BUDGETS * crate::profile::MAX_PROFILE_PACKAGE_BYTES) as u64,
+    max_depth: crate::profile::MAX_PROFILE_PACKAGE_BYTES,
 };
 
 /// One record and every repository path its ownership claims name.
@@ -3615,6 +3656,92 @@ mod tests {
             .into_iter()
             .next()
             .expect("the refused declaration")
+    }
+
+    /// Rewrite the description this repository's configuration declares for
+    /// label namespace `namespace`, leaving everything else it declares alone.
+    ///
+    /// This is one contributed value edited in place, which is what an adopter
+    /// does when a package's wording does not suit their repository.
+    fn edit_contributed_description(temp: &TempDir, published: &str, adopted: &str) {
+        let config_path = temp.path().join(".jit/config.toml");
+        let config = fs::read_to_string(&config_path).unwrap();
+        assert!(
+            config.contains(published),
+            "the published wording is not what this repository holds"
+        );
+        fs::write(config_path, config.replace(published, adopted)).unwrap();
+    }
+
+    /// The description the package at `relative` contributes for label namespace
+    /// `namespace`.
+    fn contributed_description(temp: &TempDir, relative: &str, namespace: &str) -> String {
+        ProfilePackage::from_directory(&temp.path().join(relative))
+            .expect("the package reads back")
+            .model()
+            .contributions
+            .iter()
+            .find_map(|contribution| match contribution {
+                crate::repository_state::Contribution::MapEntry {
+                    identity, value, ..
+                } if identity == namespace => Some(value["description"].as_str()?.to_string()),
+                _ => None,
+            })
+            .expect("the package contributes the namespace")
+    }
+
+    /// Every whole-repository validation finding naming `subject`.
+    ///
+    /// A finding reaches an adopter as the sentence it renders, so the test asks
+    /// the report the question an adopter asks it — does anything say this
+    /// declaration needs attention — rather than which rule produced it.
+    fn repository_findings_naming(
+        executor: &CommandExecutor<JsonFileStorage>,
+        subject: &str,
+    ) -> Vec<String> {
+        let report = match executor
+            .validate_repository_report()
+            .expect("the repository is readable")
+        {
+            Ok(report) => report,
+            Err(failure) => panic!("repository validation failed structurally: {failure:?}"),
+        };
+        report
+            .rule_report
+            .findings
+            .into_iter()
+            .filter(|finding| finding.message.contains(subject))
+            .map(|finding| finding.message)
+            .collect()
+    }
+
+    /// Every divergence the profile check reports naming `subject`.
+    fn recorded_divergences_naming(
+        executor: &CommandExecutor<JsonFileStorage>,
+        subject: &str,
+    ) -> Vec<String> {
+        executor
+            .validate_recorded_profiles()
+            .expect("the profiles are readable")
+            .profiles
+            .into_iter()
+            .flat_map(|profile| profile.divergences)
+            .map(|divergence| divergence.message())
+            .filter(|message| message.contains(subject))
+            .collect()
+    }
+
+    /// What the difference report says about the declaration named `subject`.
+    fn reported_contribution_actions(
+        entry: &ProfilePlanEntry,
+        subject: &str,
+    ) -> Vec<ProfileTargetAction> {
+        entry
+            .contributions
+            .iter()
+            .filter(|contribution| contribution.identity.contains(subject))
+            .map(|contribution| contribution.action)
+            .collect()
     }
 
     /// Store `record` as this repository's applied-profile record for its id.
@@ -8105,6 +8232,194 @@ target = "docs/guide.md"
         assert_eq!(publications.count(), 0);
     }
 
+    /// The label namespace the contribution-refresh scenarios publish, and the
+    /// two wordings the package and the adopter give it.
+    const REFRESH_NAMESPACE: &str = "reviewed";
+    const PUBLISHED_WORDING: &str = "The wording this package published.";
+    const ADOPTED_WORDING: &str = "The wording this repository chose instead.";
+
+    /// Apply a package contributing [`REFRESH_NAMESPACE`], then edit the value
+    /// it published in place, and answer the package location.
+    fn applied_then_edited_contribution(
+        temp: &TempDir,
+        executor: &CommandExecutor<JsonFileStorage>,
+    ) -> &'static str {
+        let location = "vendor/workflow";
+        let package = package_contributing(
+            temp,
+            location,
+            "workflow",
+            REFRESH_NAMESPACE,
+            PUBLISHED_WORDING,
+        );
+        executor.apply_profile_package(&package).unwrap();
+        edit_contributed_description(temp, PUBLISHED_WORDING, ADOPTED_WORDING);
+        location
+    }
+
+    /// A contributed value this package published and the repository then
+    /// changed in place is drawn back into the package, so the value the
+    /// repository holds becomes the value the package declares.
+    #[test]
+    fn test_capture_profile_package_refreshes_a_contributed_value_edited_after_it_was_applied() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let location = applied_then_edited_contribution(&temp, &executor);
+        assert_eq!(
+            contributed_description(&temp, location, REFRESH_NAMESPACE),
+            PUBLISHED_WORDING
+        );
+
+        let result = executor
+            .capture_profile_package(
+                temp.path(),
+                Path::new(location),
+                &temp.path().join(location),
+            )
+            .expect("the applied package captures over itself");
+
+        assert_eq!(
+            contributed_description(&temp, location, REFRESH_NAMESPACE),
+            ADOPTED_WORDING,
+            "the repository's value did not reach the package that published it"
+        );
+        assert_eq!(
+            result
+                .contributions
+                .iter()
+                .filter(|contribution| contribution.action
+                    == ProfileContributionCaptureAction::Refreshed)
+                .map(|contribution| contribution.identity.clone())
+                .collect::<Vec<_>>()
+                .len(),
+            1,
+            "the capture reported no single refreshed declaration: {:?}",
+            result.contributions
+        );
+    }
+
+    /// The whole loop an adopter walks: a contributed value changed in place,
+    /// captured into the package that published it, and re-applied. Both the
+    /// profile check and whole-repository validation then agree the repository
+    /// needs nothing.
+    #[test]
+    fn test_apply_profile_package_agrees_after_a_capture_of_a_contribution_edited_in_place() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let location = applied_then_edited_contribution(&temp, &executor);
+        assert!(!recorded_divergences_naming(&executor, REFRESH_NAMESPACE).is_empty());
+
+        executor
+            .capture_profile_package(
+                temp.path(),
+                Path::new(location),
+                &temp.path().join(location),
+            )
+            .expect("the applied package captures over itself");
+        let reapplied = executor
+            .apply_profile_package(
+                &ProfilePackage::from_directory(&temp.path().join(location)).unwrap(),
+            )
+            .expect("the captured package applies");
+
+        assert_eq!(
+            reapplied.requested().unwrap().status,
+            ProfileApplicationStatus::Applied,
+            "re-applying the captured package reconciled nothing"
+        );
+        assert_eq!(
+            recorded_divergences_naming(&executor, REFRESH_NAMESPACE),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            repository_findings_naming(&executor, REFRESH_NAMESPACE),
+            Vec::<String>::new()
+        );
+        // The registry keeps the adopter's value: the package agreed with the
+        // repository rather than the repository being overwritten.
+        assert!(fs::read_to_string(temp.path().join(".jit/config.toml"))
+            .unwrap()
+            .contains(ADOPTED_WORDING));
+    }
+
+    /// A contributed value changed in place is one repository state, so the
+    /// report an adopter consults, the profile check, and whole-repository
+    /// validation all say the same declaration needs attention.
+    #[test]
+    fn test_diff_profiles_from_sources_agrees_with_validation_on_an_edited_contribution() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let location = applied_then_edited_contribution(&temp, &executor);
+
+        let reported = executor
+            .diff_profiles_from_sources(
+                &[ProfileSelector::path(temp.path().join(location))],
+                &ProfileVariableOptions::default(),
+            )
+            .expect("the difference report reads the repository");
+
+        let entry = reported
+            .profiles
+            .iter()
+            .find(|entry| entry.id == "workflow")
+            .expect("the selection reports the package");
+        assert_eq!(
+            reported_contribution_actions(entry, REFRESH_NAMESPACE),
+            vec![ProfileTargetAction::Conflict],
+            "the report called a declaration clean that validation fails on"
+        );
+        assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
+        assert_eq!(
+            recorded_divergences_naming(&executor, REFRESH_NAMESPACE).len(),
+            1
+        );
+        assert_eq!(
+            repository_findings_naming(&executor, REFRESH_NAMESPACE).len(),
+            1
+        );
+        // The refusal the report states is the refusal a publication makes.
+        let refused = executor
+            .apply_profile_package(
+                &ProfilePackage::from_directory(&temp.path().join(location)).unwrap(),
+            )
+            .expect_err("a diverged declaration cannot be published");
+        assert!(refused_targets(&refused).iter().any(
+            |entry| matches!(&entry.subject, ProfileTargetSubject::Contribution(identity)
+                if identity.to_string().contains(REFRESH_NAMESPACE))
+        ));
+    }
+
+    /// Once the capture has folded the edit in, the same report says the
+    /// selection would publish, so the loop the refusal points at is walkable.
+    #[test]
+    fn test_diff_profiles_from_sources_reports_a_publishable_selection_after_the_capture() {
+        let (temp, _storage, executor, _fixture) = fixture();
+        let location = applied_then_edited_contribution(&temp, &executor);
+        executor
+            .capture_profile_package(
+                temp.path(),
+                Path::new(location),
+                &temp.path().join(location),
+            )
+            .expect("the applied package captures over itself");
+
+        let reported = executor
+            .diff_profiles_from_sources(
+                &[ProfileSelector::path(temp.path().join(location))],
+                &ProfileVariableOptions::default(),
+            )
+            .expect("the difference report reads the repository");
+
+        let entry = reported
+            .profiles
+            .iter()
+            .find(|entry| entry.id == "workflow")
+            .expect("the selection reports the package");
+        assert_eq!(
+            reported_contribution_actions(entry, REFRESH_NAMESPACE),
+            vec![ProfileTargetAction::Update],
+            "a captured package still had nothing to reconcile"
+        );
+        assert_eq!(entry.status, ProfilePlanStatus::WouldApply);
+    }
+
     /// One repository serves any package directory and any destination its
     /// caller names, so nothing about which package or which location is fixed.
     #[test]
@@ -8287,6 +8602,61 @@ target = "docs/guide.md"
             budget.max_bytes >= model_bytes as u64,
             "a publication reads the whole tree the package carries"
         );
+    }
+
+    /// Every dimension of the profile-agreement budget clears what the package
+    /// model can demand of it.
+    ///
+    /// A claimed target is package content: its path is one a manifest declared
+    /// and its bytes are what that package published. The model bounds a
+    /// package's total size and says nothing about how deep its paths are, so a
+    /// bound assuming a path shape refuses a repository whose profile claims a
+    /// target the model admits — an application that succeeded, followed by a
+    /// check that will not read what it published.
+    #[test]
+    fn test_claim_capture_budget_clears_what_the_package_model_can_demand() {
+        let model_bytes = crate::profile::MAX_PROFILE_PACKAGE_BYTES;
+
+        assert!(
+            CLAIM_CAPTURE_BUDGET.max_depth >= model_bytes,
+            "a package can claim a target with a component per byte its paths can hold"
+        );
+        assert!(
+            CLAIM_CAPTURE_BUDGET.max_bytes >= model_bytes as u64,
+            "one recorded profile's claimed content is a whole package's worth of bytes"
+        );
+    }
+
+    /// The reading the agreement check actually asks for — the record listing
+    /// plus a claimed target as deep as a manifest may declare one — is a
+    /// reading its budget admits.
+    ///
+    /// This is the shape a bound stating a path depth refuses: a record claiming
+    /// a target the package model admits, left unreadable by the check that is
+    /// supposed to judge it.
+    #[test]
+    fn test_claim_capture_budget_admits_the_reading_the_agreement_check_asks_for() {
+        /// Directory levels a declared asset target may sit below, beyond what
+        /// a bound assuming a shallow repository would allow.
+        const DEPTH: usize = 64;
+
+        let deep = RootRelativePath::parse(
+            (0..DEPTH)
+                .map(|level| format!("d{level}/"))
+                .chain(std::iter::once("published.txt".to_string()))
+                .collect::<String>(),
+        )
+        .expect("a safe relative path");
+
+        let mut spec = CaptureSpec::phase_one([], CLAIM_CAPTURE_BUDGET)
+            .expect("the agreement capture begins with the records it discovers");
+        spec.discover_listing(VirtualPath::PROFILES)
+            .expect("the records are read through the listing that names them");
+        spec.discover_paths([
+            applied_record_path("workflow").expect("a canonical record path"),
+            VirtualPath::from_root(RepositoryRootClass::Worktree, deep).expect("a worktree target"),
+        ])
+        .expect("the agreement budget admits a claimed target the package model admits");
     }
 
     /// A package the model admits whose cost is driven by its directories rather

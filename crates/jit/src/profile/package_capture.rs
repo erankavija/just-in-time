@@ -9,6 +9,28 @@
 //! directory. Which side owns a source is therefore data in the manifest rather
 //! than an inventory this module keeps.
 //!
+//! A declared contribution is the same arrangement one level in. Its value is a
+//! semantic declaration inside a registry the repository owns, so the registry
+//! is its authority and a capture reads it back from there: a contributed value
+//! an adopter changed in place becomes the value the captured manifest declares,
+//! exactly as an edited live asset becomes the bytes the captured package
+//! carries.
+//!
+//! Which declarations a capture may take is data in the repository rather than
+//! an inventory this module keeps, exactly as which sources it draws from is
+//! data in the manifest. The repository's own applied-profile record for this
+//! package states the declarations it published, and those are the ones whose
+//! registry value is this package's to fold back. A declaration no record of
+//! this package claims is the repository's own, so a capture reports it and
+//! leaves the authored value alone rather than appropriating repository policy
+//! into a package that never published it.
+//!
+//! Only the contributions the manifest already declares are read, and an owned
+//! declaration whose registry entry is gone keeps its authored value and is
+//! reported by name rather than dropped or defaulted. The refreshed values reach
+//! the tree through the manifest itself, which the capture republishes whole, so
+//! a contribution the manifest stopped declaring leaves the package with it.
+//!
 //! What a capture produces is exactly what the manifest declares: a source the
 //! manifest stopped declaring is absent from the result, and the tree is
 //! validated as a package before a caller publishes it. Because a live asset's
@@ -33,12 +55,17 @@ use super::{
     ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageModel,
     LIVE_ASSET_SOURCE_PREFIX, MANIFEST_FILE_NAME,
 };
-use crate::repository_state::{FileMode, RepositoryLayout, RepositoryLayoutError, VirtualPath};
+use crate::repository_state::{
+    contribution_in_registry, AppliedProfileClaimIdentity, AppliedProfileRecord, Contribution,
+    ContributionIdentity, FileMode, RepositoryLayout, RepositoryLayoutError, RepositoryStateError,
+    VirtualPath,
+};
 use cap_std::ambient_authority;
 use cap_std::fs::Dir as CapDir;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use toml_edit::{DocumentMut, Item, Value};
 
 /// Which side owns the bytes of one declared package source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,6 +97,33 @@ pub struct CapturedFile {
     pub mode: FileMode,
 }
 
+/// What a capture read back from the repository for one declared contribution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapturedContributionState {
+    /// The registry declares the value the manifest already carried.
+    Unchanged,
+    /// This package published the declaration and the registry declares another
+    /// value, which the captured manifest now carries.
+    Refreshed,
+    /// This package published the declaration and the registry declares nothing
+    /// under it, so the manifest keeps the value its author wrote.
+    Absent,
+    /// The registry declares something other than the manifest under a
+    /// declaration no record of this package claims, so it is the repository's
+    /// own and the manifest keeps the value its author wrote.
+    Unowned,
+}
+
+/// One contribution the captured manifest declares, and what the repository
+/// said about it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapturedContribution {
+    /// Canonical semantic identity of the declaration.
+    pub identity: ContributionIdentity,
+    /// What the registry holding it said.
+    pub state: CapturedContributionState,
+}
+
 /// A validated package tree drawn from the sources its manifest declares.
 ///
 /// Holding one means the composed content already validated as a package, so a
@@ -79,12 +133,22 @@ pub struct CapturedPackageTree {
     model: ProfilePackageModel,
     hashes: ProfilePackageHashes,
     files: BTreeMap<String, CapturedFile>,
+    contributions: Vec<CapturedContribution>,
 }
 
 impl CapturedPackageTree {
     /// Canonical package model the captured manifest declares.
     pub fn model(&self) -> &ProfilePackageModel {
         &self.model
+    }
+
+    /// Every contribution the manifest declares, beside what the repository said
+    /// about it, in declaration order.
+    ///
+    /// A tree that was not drawn from a repository — one extracted from a
+    /// portable archive — reads nothing back and reports nothing here.
+    pub fn contributions(&self) -> &[CapturedContribution] {
+        &self.contributions
     }
 
     /// Canonical package and per-repository-target hashes of the captured tree.
@@ -171,6 +235,38 @@ pub enum PackageCaptureError {
     /// from it.
     #[error("the captured package tree is not a valid package: {0}")]
     InvalidCapturedTree(#[source] ProfilePackageError),
+    /// The registry a declared contribution names cannot be read back as the
+    /// declaration that contribution's identity addresses.
+    #[error("contribution '{identity}' cannot be read from its registry: {source}")]
+    UnreadableContribution {
+        /// Canonical semantic identity of the declaration.
+        identity: String,
+        /// Why the registry could not answer for it.
+        source: Box<RepositoryStateError>,
+    },
+    /// The applied-profile record stating what this package published does not
+    /// parse, so which declarations a capture may draw back is unanswerable.
+    #[error("applied profile record '{path}' does not parse: {source}")]
+    UnreadableRecord {
+        /// Repository-relative path of the record.
+        path: String,
+        /// The underlying deserialization error.
+        source: serde_json::Error,
+    },
+    /// The manifest is not a document the value its declared contribution holds
+    /// can be written back into.
+    #[error(
+        "package manifest '{path}' cannot carry the value the repository holds for \
+         contribution '{identity}': {reason}"
+    )]
+    UnrefreshableManifest {
+        /// Repository-relative path the manifest was read from.
+        path: String,
+        /// Canonical semantic identity of the declaration.
+        identity: String,
+        /// What stopped the value from reaching the manifest.
+        reason: String,
+    },
 }
 
 /// Every source a manifest declares, in canonical package-relative order,
@@ -255,6 +351,8 @@ pub fn capture_package_tree(
             source,
         }
     })?;
+    let refreshed = refresh_contributions(&model, layout, &worktree)?;
+    let manifest_bytes = republished_manifest(&manifest.bytes, &manifest_path, &model, &refreshed)?;
 
     let drawn = declared_sources(&model)
         .into_iter()
@@ -287,7 +385,7 @@ pub fn capture_package_tree(
     let files = std::iter::once((
         MANIFEST_FILE_NAME.to_string(),
         CapturedFile {
-            bytes: manifest.bytes,
+            bytes: manifest_bytes,
             mode: FileMode::Regular,
         },
     ))
@@ -295,7 +393,256 @@ pub fn capture_package_tree(
     .collect::<BTreeMap<_, _>>();
 
     compose_captured_tree(files, observed_executable)
+        .map(|tree| CapturedPackageTree {
+            contributions: refreshed
+                .into_iter()
+                .map(|refresh| refresh.captured)
+                .collect(),
+            ..tree
+        })
         .map_err(PackageCaptureError::InvalidCapturedTree)
+}
+
+/// One declared contribution, what the repository said about it, and the
+/// declaration a refreshed manifest carries in its place.
+struct ContributionRefresh {
+    captured: CapturedContribution,
+    /// The declaration the registry holds, absent when the manifest already
+    /// declares it and when the registry declares nothing.
+    held: Option<Contribution>,
+}
+
+/// Read every contribution the manifest declares back from the registry that
+/// holds it, and take the value of each one this package published.
+///
+/// Only the declared contributions are read, and each is read at its own
+/// identity, so nothing the repository declares beside them can enter the
+/// package: capture refreshes what a manifest already says and widens no
+/// manifest.
+fn refresh_contributions(
+    model: &ProfilePackageModel,
+    layout: &RepositoryLayout,
+    worktree: &CapDir,
+) -> Result<Vec<ContributionRefresh>, PackageCaptureError> {
+    let owned = published_identities(model, layout, worktree)?;
+    let registries = model
+        .contributions
+        .iter()
+        .map(Contribution::registry_path)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(|registry| Ok((registry, read_registry(registry, layout, worktree)?)))
+        .collect::<Result<BTreeMap<_, _>, PackageCaptureError>>()?;
+
+    model
+        .contributions
+        .iter()
+        .map(|contribution| {
+            let identity = contribution.semantic_identity();
+            let held = registries
+                .get(contribution.registry_path())
+                .and_then(Option::as_ref)
+                .map(|text| contribution_in_registry(&identity, text))
+                .transpose()
+                .map_err(|source| PackageCaptureError::UnreadableContribution {
+                    identity: identity.to_string(),
+                    source: Box::new(source),
+                })?
+                .flatten();
+            let (state, held) = match held {
+                Some(held) if &held == contribution => (CapturedContributionState::Unchanged, None),
+                _ if !owned.contains(&identity) => (CapturedContributionState::Unowned, None),
+                None => (CapturedContributionState::Absent, None),
+                Some(held) => (CapturedContributionState::Refreshed, Some(held)),
+            };
+            Ok(ContributionRefresh {
+                captured: CapturedContribution { identity, state },
+                held,
+            })
+        })
+        .collect()
+}
+
+/// The semantic declarations this repository records `model`'s package as having
+/// published.
+///
+/// The record is the repository's own statement of what this package put in its
+/// registries, so it is what says which declarations a capture may draw from
+/// them. A repository that records nothing for the package — one that never
+/// applied it, or whose records a confined read cannot reach — states no such
+/// declaration, and a capture then takes none: everything its registries hold
+/// under a declared identity is the repository's own.
+fn published_identities(
+    model: &ProfilePackageModel,
+    layout: &RepositoryLayout,
+    worktree: &CapDir,
+) -> Result<BTreeSet<ContributionIdentity>, PackageCaptureError> {
+    let relative = format!("profiles/{}.json", model.id);
+    let path = VirtualPath::data(&relative).map_err(|source| {
+        PackageCaptureError::UnaddressableTarget {
+            declared: relative.clone(),
+            target: relative.clone(),
+            source,
+        }
+    })?;
+    let bytes = match read_confined(&relative, &path, layout, worktree) {
+        Ok(read) => read.bytes,
+        Err(PackageCaptureError::UnreadableSource { ref source, .. })
+            if source.kind() == std::io::ErrorKind::NotFound =>
+        {
+            return Ok(BTreeSet::new())
+        }
+        Err(PackageCaptureError::SourceOutsideWorktree { .. }) => return Ok(BTreeSet::new()),
+        Err(other) => return Err(other),
+    };
+    let record: AppliedProfileRecord =
+        serde_json::from_slice(&bytes).map_err(|source| PackageCaptureError::UnreadableRecord {
+            path: path.repository_relative(),
+            source,
+        })?;
+    Ok(record
+        .claims
+        .into_iter()
+        .filter_map(|claim| match claim.identity {
+            AppliedProfileClaimIdentity::Semantic { identity } => Some(identity),
+            AppliedProfileClaimIdentity::Asset { .. }
+            | AppliedProfileClaimIdentity::ManagedRegion { .. } => None,
+        })
+        .collect())
+}
+
+/// The authored text of one registry a contribution names, or `None` when the
+/// repository holds no such file.
+///
+/// The registry is read through the same confined open every declared source
+/// takes, so a link at its name, an entry of another kind, or a resolution
+/// leaving the worktree is refused here exactly as it is for an asset.
+fn read_registry(
+    registry: &str,
+    layout: &RepositoryLayout,
+    worktree: &CapDir,
+) -> Result<Option<Vec<u8>>, PackageCaptureError> {
+    let path = layout
+        .classify_repository_relative(registry)
+        .map_err(|source| PackageCaptureError::UnaddressableTarget {
+            declared: registry.to_string(),
+            target: registry.to_string(),
+            source,
+        })?;
+    match read_confined(registry, &path, layout, worktree) {
+        Ok(read) => Ok(Some(read.bytes)),
+        Err(PackageCaptureError::UnreadableSource { ref source, .. })
+            if source.kind() == std::io::ErrorKind::NotFound =>
+        {
+            Ok(None)
+        }
+        Err(PackageCaptureError::SourceOutsideWorktree { .. }) => Ok(None),
+        Err(other) => Err(other),
+    }
+}
+
+/// The manifest a capture publishes: the authored bytes, carrying the value the
+/// repository holds for every contribution whose registry moved.
+///
+/// The authored document is edited rather than re-rendered, so everything the
+/// manifest says beside those values — its declarations, their order, its
+/// comments and its spelling — reaches the captured package as its author wrote
+/// it, and a manifest already agreeing with the repository is republished byte
+/// for byte.
+///
+/// The result is read back as a package model and held against the values that
+/// went in, so a manifest whose shape the edit could not reach is reported by
+/// the contribution it failed rather than published carrying a stale value.
+fn republished_manifest(
+    authored: &[u8],
+    manifest_path: &VirtualPath,
+    model: &ProfilePackageModel,
+    refreshed: &[ContributionRefresh],
+) -> Result<Vec<u8>, PackageCaptureError> {
+    // What the captured manifest must declare: the registry's value wherever it
+    // moved, the author's wherever it did not.
+    let intended = refreshed
+        .iter()
+        .zip(&model.contributions)
+        .map(|(refresh, authored)| refresh.held.as_ref().unwrap_or(authored))
+        .collect::<Vec<_>>();
+    let Some(first_refreshed) = refreshed
+        .iter()
+        .find(|refresh| refresh.held.is_some())
+        .map(|refresh| refresh.captured.identity.clone())
+    else {
+        return Ok(authored.to_vec());
+    };
+    let unrefreshable = |identity: &ContributionIdentity, reason: String| {
+        PackageCaptureError::UnrefreshableManifest {
+            path: manifest_path.repository_relative(),
+            identity: identity.to_string(),
+            reason,
+        }
+    };
+
+    let values = refreshed
+        .iter()
+        .map(|refresh| {
+            refresh
+                .held
+                .as_ref()
+                .map(crate::repository_state::contributed_toml_value)
+                .transpose()
+                .map_err(|source| unrefreshable(&refresh.captured.identity, source.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut document = std::str::from_utf8(authored)
+        .map_err(|error| error.to_string())
+        .and_then(|text| {
+            text.parse::<DocumentMut>()
+                .map_err(|error| error.to_string())
+        })
+        .map_err(|reason| unrefreshable(&first_refreshed, reason))?;
+    write_contribution_values(&mut document, &values);
+    let bytes = document.to_string().into_bytes();
+
+    let republished = ProfilePackage::parse_manifest(&bytes)
+        .map_err(|source| unrefreshable(&first_refreshed, source.to_string()))?;
+    intended
+        .iter()
+        .enumerate()
+        .try_for_each(|(position, intended)| {
+            (republished.contributions.get(position) == Some(*intended))
+                .then_some(())
+                .ok_or_else(|| {
+                    unrefreshable(
+                        &intended.semantic_identity(),
+                        "the manifest does not declare it where its author did".to_string(),
+                    )
+                })
+        })?;
+    Ok(bytes)
+}
+
+/// Write each refreshed value into the contribution the manifest declares it
+/// under, in either shape a TOML document states a contribution array with.
+///
+/// Nothing here refuses a shape it cannot reach: the caller reads the result
+/// back and reports the contribution whose value did not arrive, so one check
+/// covers a manifest this writer missed and a manifest it wrote wrongly alike.
+fn write_contribution_values(document: &mut DocumentMut, values: &[Option<Value>]) {
+    let Some(item) = document.get_mut("contribution") else {
+        return;
+    };
+    if let Some(tables) = item.as_array_of_tables_mut() {
+        tables.iter_mut().zip(values).for_each(|(table, value)| {
+            if let Some(value) = value {
+                table.insert("value", Item::Value(value.clone()));
+            }
+        });
+    } else if let Some(array) = item.as_array_mut() {
+        array.iter_mut().zip(values).for_each(|(entry, value)| {
+            if let (Some(table), Some(value)) = (entry.as_inline_table_mut(), value) {
+                table.insert("value", value.clone());
+            }
+        });
+    }
 }
 
 /// Validate composed package content and close it into a captured tree.
@@ -322,6 +669,9 @@ pub(super) fn compose_captured_tree(
         model,
         hashes,
         files,
+        // Validating composed content says nothing about a repository: the one
+        // route that reads a registry back fills this in for what it read.
+        contributions: Vec::new(),
     })
 }
 
@@ -511,6 +861,12 @@ source = "assets/regions/guidance.md"
 target = "AGENTS.md"
 region-id = "guidance"
 placement = "append"
+
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "widget"
+value = 3
 "#;
 
     /// The declaration of the live asset a test drops to observe a capture that
@@ -520,6 +876,48 @@ placement = "append"
 source = "assets/live/docs/guide.md"
 target = "docs/guide.md"
 "#;
+
+    /// The contribution a test drops to observe a manifest republished whole.
+    const DROPPED_CONTRIBUTION: &str = r#"
+[[contribution]]
+kind = "map-entry"
+target = "type-hierarchy-types"
+identity = "widget"
+value = 3
+"#;
+
+    /// The semantic identity `SYNTHETIC_MANIFEST` contributes.
+    fn contributed_identity() -> ContributionIdentity {
+        ContributionIdentity {
+            registry: crate::repository_state::ContributionRegistry::Config,
+            target: crate::repository_state::ContributionIdentityTarget::MapEntry {
+                target: crate::repository_state::MapEntryTarget::TypeHierarchyTypes,
+                name: "widget".to_string(),
+            },
+        }
+    }
+
+    /// The hierarchy level `captured` declares for the contributed identity.
+    fn contributed_level(captured: &CapturedPackageTree) -> Option<&serde_json::Value> {
+        captured
+            .model()
+            .contributions
+            .iter()
+            .find(|contribution| contribution.semantic_identity() == contributed_identity())
+            .map(|contribution| match contribution {
+                crate::repository_state::Contribution::MapEntry { value, .. } => value,
+                other => panic!("the fixture contributes a map entry, not {other:?}"),
+            })
+    }
+
+    /// What the capture said about the contributed identity.
+    fn contributed_state(captured: &CapturedPackageTree) -> Option<CapturedContributionState> {
+        captured
+            .contributions()
+            .iter()
+            .find(|contribution| contribution.identity == contributed_identity())
+            .map(|contribution| contribution.state)
+    }
 
     /// Write one file, creating its parents, with the mode its role calls for.
     fn write_file(path: &Path, bytes: &[u8], executable: bool) {
@@ -585,6 +983,59 @@ target = "docs/guide.md"
 
         fn capture(&self) -> Result<CapturedPackageTree, PackageCaptureError> {
             capture_package_tree(&self.package, &self.layout)
+        }
+
+        /// Declare `entries` as the hierarchy types this repository's
+        /// configuration holds.
+        fn declaring_types(self, entries: &str) -> Self {
+            write_file(
+                &self.worktree.join(".jit/config.toml"),
+                format!("[type_hierarchy]\ntypes = {{ {entries} }}\n").as_bytes(),
+                false,
+            );
+            self
+        }
+
+        /// Record this repository as carrying the synthetic package, having
+        /// published `claimed`.
+        ///
+        /// The recorded fingerprint is deliberately not the one the claimed
+        /// declaration would produce: which declarations a capture may draw
+        /// back is a question about identities, and a record that answered it
+        /// by value would answer differently for a value an adopter changed —
+        /// which is the very case the capture exists to fold back.
+        fn recording(self, claimed: &[ContributionIdentity]) -> Self {
+            let unrelated_fingerprint: crate::repository_state::ProfileBaseFingerprint =
+                serde_json::from_value(serde_json::json!("0".repeat(64)))
+                    .expect("64 hexadecimal characters are a fingerprint");
+            let record = AppliedProfileRecord::new(
+                crate::profile::ProfileId::try_from("synthetic-capture")
+                    .expect("a canonical package id"),
+                "1.0.0",
+                ">=1.0.0",
+                crate::profile::ProfileOrigin::Directory(
+                    crate::repository_state::RootRelativePath::parse("profiles/synthetic")
+                        .expect("a canonical package location"),
+                ),
+                "package-hash",
+                crate::profile::ResolvedVariables::default(),
+                claimed
+                    .iter()
+                    .map(|identity| crate::repository_state::AppliedProfileClaim {
+                        identity: AppliedProfileClaimIdentity::Semantic {
+                            identity: identity.clone(),
+                        },
+                        base_fingerprint: unrelated_fingerprint.clone(),
+                        retain_if_unowned: false,
+                    })
+                    .collect(),
+            );
+            write_file(
+                &self.worktree.join(".jit/profiles/synthetic-capture.json"),
+                &record.to_bytes().expect("the record serializes"),
+                false,
+            );
+            self
         }
     }
 
@@ -898,6 +1349,168 @@ target = "docs/guide.md"
         assert_eq!(
             edited.files()["assets/live/docs/guide.md"].bytes,
             b"# Edited in place\n"
+        );
+    }
+
+    /// A contributed value this package published and the repository then
+    /// changed in place is drawn back into the manifest that declares it, so the
+    /// identity of what was captured moves with the change.
+    #[test]
+    fn test_capture_package_tree_refreshes_a_contributed_value_changed_in_place() {
+        let published = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 3")
+            .recording(&[contributed_identity()]);
+        let agreeing = published.capture().expect("the published package captures");
+        assert_eq!(contributed_level(&agreeing), Some(&serde_json::json!(3)));
+        assert_eq!(
+            contributed_state(&agreeing),
+            Some(CapturedContributionState::Unchanged)
+        );
+
+        let edited = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5")
+            .recording(&[contributed_identity()]);
+        let captured = edited.capture().expect("the edited package captures");
+
+        assert_eq!(
+            contributed_level(&captured),
+            Some(&serde_json::json!(5)),
+            "the captured manifest declares a value the repository no longer holds"
+        );
+        assert_eq!(
+            contributed_state(&captured),
+            Some(CapturedContributionState::Refreshed)
+        );
+        assert_ne!(
+            captured.hashes().package,
+            agreeing.hashes().package,
+            "a contributed value changed in place left the package identity unchanged"
+        );
+    }
+
+    /// Only the contributions the manifest already declares are read, so a
+    /// declaration the repository holds beside them cannot widen the package.
+    #[test]
+    fn test_capture_package_tree_declares_no_contribution_the_manifest_did_not() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5, gadget = 7")
+            .recording(&[contributed_identity()]);
+
+        let captured = fixture.capture().expect("the package captures");
+
+        let declared = |model: &ProfilePackageModel| {
+            model
+                .contributions
+                .iter()
+                .map(Contribution::semantic_identity)
+                .collect::<BTreeSet<_>>()
+        };
+        let authored = ProfilePackage::parse_manifest(SYNTHETIC_MANIFEST.as_bytes())
+            .expect("the authored manifest parses");
+        assert_eq!(
+            declared(captured.model()),
+            declared(&authored),
+            "the capture declared a contribution the manifest did not"
+        );
+        assert!(
+            !String::from_utf8(captured.files()[MANIFEST_FILE_NAME].bytes.clone())
+                .expect("the captured manifest is UTF-8")
+                .contains("gadget")
+        );
+    }
+
+    /// A declaration this package published that the repository no longer holds
+    /// is named rather than dropped from the manifest or replaced by a default.
+    #[test]
+    fn test_capture_package_tree_reports_a_published_contribution_the_repository_dropped() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("gadget = 7")
+            .recording(&[contributed_identity()]);
+
+        let captured = fixture.capture().expect("the package captures");
+
+        assert_eq!(
+            contributed_state(&captured),
+            Some(CapturedContributionState::Absent)
+        );
+        assert_eq!(
+            contributed_level(&captured),
+            Some(&serde_json::json!(3)),
+            "a declaration the repository dropped was itself dropped or defaulted"
+        );
+    }
+
+    /// A contribution the manifest stopped declaring is absent from the next
+    /// capture, and the value the repository holds for it does not reappear.
+    #[test]
+    fn test_capture_package_tree_omits_a_contribution_the_manifest_stopped_declaring() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5")
+            .recording(&[contributed_identity()]);
+        assert!(contributed_state(&fixture.capture().expect("the package captures")).is_some());
+
+        let reduced = SYNTHETIC_MANIFEST.replace(DROPPED_CONTRIBUTION, "\n");
+        assert_ne!(reduced, SYNTHETIC_MANIFEST);
+        fs::write(
+            fixture.worktree.join("profiles/synthetic/manifest.toml"),
+            &reduced,
+        )
+        .unwrap();
+
+        let captured = fixture.capture().expect("the reduced package captures");
+
+        assert!(captured.model().contributions.is_empty());
+        assert_eq!(contributed_state(&captured), None);
+        assert!(
+            !String::from_utf8(captured.files()[MANIFEST_FILE_NAME].bytes.clone())
+                .expect("the captured manifest is UTF-8")
+                .contains("widget")
+        );
+    }
+
+    /// A declaration no record of this package claims is the repository's own,
+    /// so the capture reports it and leaves the authored value alone.
+    #[test]
+    fn test_capture_package_tree_leaves_a_declaration_this_package_never_published() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST).declaring_types("widget = 5");
+
+        let captured = fixture.capture().expect("the package captures");
+
+        assert_eq!(
+            contributed_state(&captured),
+            Some(CapturedContributionState::Unowned)
+        );
+        assert_eq!(
+            contributed_level(&captured),
+            Some(&serde_json::json!(3)),
+            "a capture took a declaration the repository authored for itself"
+        );
+    }
+
+    /// Capturing a manifest that already declares what the repository holds
+    /// republishes it byte for byte, so a refresh settles rather than churning.
+    #[test]
+    fn test_capture_package_tree_republishes_an_agreeing_manifest_unchanged() {
+        let fixture = Fixture::new(SYNTHETIC_MANIFEST)
+            .declaring_types("widget = 5")
+            .recording(&[contributed_identity()]);
+
+        let refreshed = fixture.capture().expect("the edited package captures");
+        fs::write(
+            fixture.worktree.join("profiles/synthetic/manifest.toml"),
+            &refreshed.files()[MANIFEST_FILE_NAME].bytes,
+        )
+        .unwrap();
+        let settled = fixture.capture().expect("the refreshed package captures");
+
+        assert_eq!(
+            settled.files()[MANIFEST_FILE_NAME].bytes,
+            refreshed.files()[MANIFEST_FILE_NAME].bytes
+        );
+        assert_eq!(settled.hashes().package, refreshed.hashes().package);
+        assert_eq!(
+            contributed_state(&settled),
+            Some(CapturedContributionState::Unchanged)
         );
     }
 

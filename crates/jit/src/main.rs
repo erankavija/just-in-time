@@ -1150,6 +1150,31 @@ fn profile_capture_action_label(action: jit::profile::ProfileCaptureAction) -> &
     }
 }
 
+/// Report what a capture read back for the contributions its manifest declares.
+///
+/// A declaration the capture took nothing from says nothing an adopter acts on,
+/// so the lines name the declarations whose value moved into the package and the
+/// ones this package published that the repository no longer holds. The count
+/// states the whole set those lines came out of, which is what keeps a quiet
+/// report readable as "nothing to act on" rather than as "nothing was read".
+fn print_captured_contributions(contributions: &[jit::profile::ProfileCapturedContribution]) {
+    use jit::profile::ProfileContributionCaptureAction;
+
+    if contributions.is_empty() {
+        return;
+    }
+    println!("Contributions: {}", contributions.len());
+    for contribution in contributions {
+        let label = match contribution.action {
+            ProfileContributionCaptureAction::Unchanged
+            | ProfileContributionCaptureAction::Unowned => continue,
+            ProfileContributionCaptureAction::Refreshed => "refreshed",
+            ProfileContributionCaptureAction::Absent => "not held ",
+        };
+        println!("  {label} {}", contribution.identity);
+    }
+}
+
 fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     use jit::output::{ErrorCode, JsonError};
     use jit::repository_state::RepositoryStateError;
@@ -2569,6 +2594,7 @@ fn run() -> Result<()> {
                                     file.path
                                 );
                             }
+                            print_captured_contributions(&result.contributions);
                         }
                     }
                     Err(error) if json => {

@@ -2131,54 +2131,35 @@ fn compose_profile_contributions(
                 None,
             ),
             ContributionOutcome::Agreed(contribution) => {
-                let expected = fingerprint_semantic_contribution(&contribution.definition)
+                let candidate = fingerprint_semantic_contribution(&contribution.definition)
                     .map_err(ProducerError::ProfileClaimFingerprint)?;
-                // A recorded claim states the definition its package published.
-                // One that disagrees with the definition composing now is a
-                // second definition of the same identity, so it contests it
-                // exactly as a differing candidate does.
-                let superseded = recorded
+                let claimed = recorded
                     .iter()
                     .filter(|claim| claim.identity == contribution.identity)
-                    .filter(|claim| claim.base_fingerprint != expected)
-                    .map(|claim| claim.package_id.clone())
-                    .collect::<BTreeSet<_>>();
-                if superseded.is_empty() {
-                    let identity = contribution.identity.clone();
-                    let disposition = contribution_disposition(base, &identity)?;
-                    (
-                        identity,
-                        disposition,
-                        Some(ComposedContribution {
-                            owners: contribution
-                                .owners
-                                .iter()
-                                .cloned()
-                                .chain(owners.iter().cloned())
-                                .collect::<BTreeSet<_>>()
-                                .into_iter()
-                                .collect(),
-                            ..contribution
-                        }),
-                    )
-                } else {
-                    let contested = contribution
-                        .owners
-                        .iter()
-                        .cloned()
-                        .chain(superseded)
-                        .map(ContributionConflictOwner::Package)
-                        .collect::<BTreeSet<_>>()
-                        .into_iter()
-                        .collect();
-                    (
-                        contribution.identity,
-                        ProfileTargetDisposition::Conflict(ProfileTargetConflict::Contested {
-                            owners: contested,
-                        }),
-                        None,
-                    )
-                }
+                    .collect::<Vec<_>>();
+                let disposition = contribution_disposition(
+                    base,
+                    &contribution.identity,
+                    &contribution.owners,
+                    &candidate,
+                    &claimed,
+                )?;
+                let publishable = !matches!(disposition, ProfileTargetDisposition::Conflict(_));
+                (
+                    contribution.identity.clone(),
+                    disposition,
+                    publishable.then(|| ComposedContribution {
+                        owners: contribution
+                            .owners
+                            .iter()
+                            .cloned()
+                            .chain(owners.iter().cloned())
+                            .collect::<BTreeSet<_>>()
+                            .into_iter()
+                            .collect(),
+                        ..contribution
+                    }),
+                )
             }
         };
         definitions.extend(definition);
@@ -2196,20 +2177,94 @@ fn compose_profile_contributions(
     })
 }
 
-/// What publishing one agreed definition would do to the registry holding it.
+/// What publishing one agreed definition would do to the declaration the
+/// repository holds under its identity.
 ///
-/// A registry render publishes a declaration only where the registry has none:
-/// [`render_composed_contribution`] preserves an entry that is already there,
-/// whatever its value. A declaration the registry already carries therefore
-/// publishes nothing, and one it does not carry is created.
+/// Three values decide it, exactly as they decide a file target: the value each
+/// record claiming the identity published, the value the registry holds now, and
+/// the value this composition would publish. The registry is the authority for
+/// the effective value — [`render_composed_contribution`] preserves an entry
+/// that is already there, whatever it says — so what a publication can still put
+/// right is the record, and what it cannot is a registry holding something else.
+///
+/// * A declaration the registry does not carry is created.
+/// * A registry already holding the composing definition publishes nothing, and
+///   is [`ProfileTargetDisposition::Unchanged`] when every record claiming it
+///   recorded that same definition. A record that recorded another value is
+///   stale provenance over a registry the package now agrees with, so the
+///   publication refreshes the record and the decision is
+///   [`ProfileTargetDisposition::Update`].
+/// * A registry holding a value a record published, against a composing
+///   definition that moved, is [`ProfileTargetConflict::Contested`]: the package
+///   states one definition and a record states another, and no publication can
+///   pick between them.
+/// * A registry holding a value no owner ever published is
+///   [`ProfileTargetConflict::Diverged`], the same refusal an asset edited after
+///   its owner published it receives, and with the same remedy — restore the
+///   published value, or capture the edit into the package that owns it.
+///
+/// The last case is why this reads the registry rather than the record alone:
+/// repository-wide validation reports exactly that declaration as diverged, so a
+/// decision calling it unchanged would let a difference report call a selection
+/// clean while validation fails on the same declaration.
 fn contribution_disposition(
     base: &RepositoryImage,
     identity: &ContributionIdentity,
+    definers: &[ProfilePackageId],
+    candidate: &ProfileBaseFingerprint,
+    claimed: &[&RecordedSemanticClaim],
 ) -> Result<ProfileTargetDisposition, RepositoryStateError> {
-    Ok(match repository_definition(base, identity)? {
-        Some(_) => ProfileTargetDisposition::Unchanged,
-        None => ProfileTargetDisposition::Create,
-    })
+    let Some(held) = repository_definition(base, identity)? else {
+        return Ok(ProfileTargetDisposition::Create);
+    };
+    let current =
+        fingerprint_semantic_contribution(&held).map_err(ProducerError::ProfileClaimFingerprint)?;
+    if &current == candidate {
+        return Ok(
+            if claimed
+                .iter()
+                .all(|claim| &claim.base_fingerprint == candidate)
+            {
+                ProfileTargetDisposition::Unchanged
+            } else {
+                ProfileTargetDisposition::Update
+            },
+        );
+    }
+    let holding = claimed
+        .iter()
+        .any(|claim| claim.base_fingerprint == current);
+    Ok(ProfileTargetDisposition::Conflict(if holding {
+        ProfileTargetConflict::Contested {
+            owners: definers
+                .iter()
+                .cloned()
+                .chain(
+                    claimed
+                        .iter()
+                        .filter(|claim| &claim.base_fingerprint != candidate)
+                        .map(|claim| claim.package_id.clone()),
+                )
+                .map(ContributionConflictOwner::Package)
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect(),
+        }
+    } else {
+        // One recorded base names what this declaration's owners published.
+        // Owners that recorded different values already disagree with each
+        // other, and every one of them disagrees with what the registry holds,
+        // so the earliest is as complete an answer as any of them.
+        ProfileTargetConflict::Diverged {
+            base: claimed
+                .iter()
+                .map(|claim| claim.base_fingerprint.clone())
+                .min()
+                .map_or(ThreeWayValue::Absent, ThreeWayValue::Present),
+            current: ThreeWayValue::Present(current),
+            candidate: ThreeWayValue::Present(candidate.clone()),
+        }
+    }))
 }
 
 /// The packages whose applied records claim `identity`, in package-id order.
@@ -2633,9 +2688,9 @@ fn repository_definition(
 ) -> Result<Option<Contribution>, RepositoryStateError> {
     let registry = identity.registry.path();
     let path = base.layout().classify_repository_relative(registry)?;
-    let existing = match base.entry(&path).map_err(ProducerError::from)? {
+    let bytes = match base.entry(&path).map_err(ProducerError::from)? {
         RepositoryEntry::Absent => return Ok(None),
-        RepositoryEntry::File { bytes, mode, .. } => Some((bytes.clone(), *mode)),
+        RepositoryEntry::File { bytes, .. } => bytes.clone(),
         _ => {
             return Err(ProducerError::ProfileRegistryNotFile {
                 target: registry.to_string(),
@@ -2643,7 +2698,30 @@ fn repository_definition(
             .into())
         }
     };
-    let document = MergeDocument::load(registry, existing)?;
+    contribution_in_registry(identity, &bytes)
+}
+
+/// The declaration one semantic identity addresses inside a registry's authored
+/// text, if that registry declares it.
+///
+/// This is where a registry's text answers an identity, and it is deliberately
+/// separate from where the text comes from: composition and the ownership check
+/// read it out of a captured image, while a package capture reads it out of the
+/// registry file its own confined open returned. Both therefore agree about what
+/// the repository declares without a second interpretation of a registry's shape
+/// (`@/inv/convention-convergence`).
+///
+/// # Errors
+///
+/// Returns [`RepositoryStateError`] when `text` is not the UTF-8 TOML document
+/// its registry is read from, or when the declaration the identity addresses is
+/// not the shape its target describes.
+pub(crate) fn contribution_in_registry(
+    identity: &ContributionIdentity,
+    text: &[u8],
+) -> Result<Option<Contribution>, RepositoryStateError> {
+    let registry = identity.registry.path();
+    let document = MergeDocument::load(registry, Some((text.to_vec(), FileMode::Regular)))?;
     let semantic = semantic_document(registry, &document.document)?;
     match &identity.target {
         ContributionIdentityTarget::Scalar { target } => {
@@ -3160,6 +3238,57 @@ fn json_object_to_table(value: &JsonValue, registry: &str) -> Result<Table, Repo
             table.insert(key, json_to_item(value, registry)?);
             Ok(table)
         })
+}
+
+/// The value one contribution declares, as its own model states it.
+///
+/// Every variant carries its declaration in one `value`, so this is the single
+/// answer to "what does this contribution say", shared by the packaged-carrier
+/// comparison and by the capture that writes a repository's value back into the
+/// manifest that declared it.
+///
+/// # Errors
+///
+/// Returns [`RepositoryStateError`] when a projection configuration does not
+/// serialize.
+pub(crate) fn contributed_json_value(
+    contribution: &Contribution,
+) -> Result<JsonValue, RepositoryStateError> {
+    match contribution {
+        Contribution::KeyedArray { value, .. } | Contribution::MapEntry { value, .. } => {
+            Ok(value.clone())
+        }
+        Contribution::Scalar { value, .. } | Contribution::SetString { value, .. } => {
+            Ok(JsonValue::String(value.clone()))
+        }
+        Contribution::Projection { value, .. } => serde_json::to_value(value).map_err(|error| {
+            profile_registry_error(
+                contribution.registry_path(),
+                ProfileRegistryParseError::ProjectionDefinition(error.to_string()),
+            )
+        }),
+    }
+}
+
+/// The value one contribution declares, in the TOML spelling a manifest carries
+/// it with.
+///
+/// A capture writes the value a registry holds back into the manifest that
+/// declared it, and it reaches that document through the same JSON-to-TOML
+/// rendering that writes a composed contribution into a registry, so the two
+/// carriers of one declaration cannot spell one value differently.
+///
+/// # Errors
+///
+/// Returns [`RepositoryStateError`] when the declared value has no TOML
+/// spelling — a null, or a number outside what TOML carries.
+pub(crate) fn contributed_toml_value(
+    contribution: &Contribution,
+) -> Result<Value, RepositoryStateError> {
+    json_to_edit_value(
+        &contributed_json_value(contribution)?,
+        contribution.registry_path(),
+    )
 }
 
 fn json_to_item(value: &JsonValue, registry: &str) -> Result<Item, RepositoryStateError> {
