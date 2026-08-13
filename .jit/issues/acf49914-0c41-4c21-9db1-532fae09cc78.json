@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T15:36:27.537274604Z",
   "context": {},
   "created_at": "2026-08-13T05:31:40.379911348Z",
   "dependencies": [
@@ -35,7 +36,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Prove an in-place edit refreshes back into agreement",
-  "updated_at": "2026-08-13T15:32:43.454480834Z"
+  "updated_at": "2026-08-13T15:36:27.537274604Z"
 }

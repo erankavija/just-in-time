@@ -216,14 +216,15 @@
           "short_id": "cb26de35",
           "title": "Give the profile subcommands one presentation contract",
           "classification": "implementation",
-          "status": "pending",
-          "note": "owner-serialized behind 5a3ecba0: standardizes a surface that must stop moving first"
+          "status": "in_progress",
+          "note": "Dependency serialization cleared after 5a3ecba0 completed. Dispatched in Wave 17 with the strongest model tier because it crosses CLI rendering, generated schema, and MCP inventory."
         },
         {
           "short_id": "acf49914",
           "title": "End-to-end edit-and-refresh regression test",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress",
+          "note": "Dispatched in Wave 17 with the balanced model tier as a bounded test-only integration journey."
         }
       ]
     },
