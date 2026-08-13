@@ -965,13 +965,16 @@ fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
         };
         println!("Profile {} {}: {}", plan.id, plan.version, status);
         for target in &plan.targets {
+            // An empty owner list is the fact that no package claims the
+            // target, which is what separates repository content from
+            // published content; it is not a claim by the repository.
             let owners = if target.owners.is_empty() {
-                "the repository".to_string()
+                "claimed by no package".to_string()
             } else {
-                format!("package {}", target.owners.join(", "))
+                format!("claimed by {}", target.owners.join(", "))
             };
             println!(
-                "  {}: {} (owned by {owners})",
+                "  {}: {} ({owners})",
                 profile_target_action_label(target.action),
                 target.path
             );

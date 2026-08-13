@@ -645,7 +645,7 @@ impl ProfileTargetConflict {
             Self::Occupied { occupant } => format!(
                 "is held by {occupant} with content this profile did not publish: {}",
                 match occupant {
-                    ProfileConflictOccupant::Repository => CAPTURE_OR_SET_ASIDE,
+                    ProfileConflictOccupant::Repository => SET_ASIDE_OR_CAPTURE,
                     ProfileConflictOccupant::Package(_) =>
                         "stop one of the two packages from declaring it, or apply only one of them",
                 }
@@ -656,7 +656,7 @@ impl ProfileTargetConflict {
                 candidate,
             } => format!(
                 "changed after this profile published it (recorded {}, now {}, would publish {}): \
-                 {CAPTURE_OR_RESTORE}",
+                 {RESTORE_OR_CAPTURE}",
                 fingerprint_label(base),
                 fingerprint_label(current),
                 fingerprint_label(candidate),
@@ -666,14 +666,19 @@ impl ProfileTargetConflict {
 }
 
 /// What resolves a target the repository holds and no package published.
-const CAPTURE_OR_SET_ASIDE: &str = "fold it into the package with 'jit profile capture --source \
-                                    <package-dir> --destination <package-dir>', or move it aside \
-                                    before applying";
+///
+/// The remedy that always applies comes first. Capture redraws a declaration
+/// whose source is a live one, so it folds the repository's content into the
+/// package only for those; naming that condition keeps the second remedy from
+/// promising an outcome a plain packaged asset would not get.
+const SET_ASIDE_OR_CAPTURE: &str = "move it aside before applying, or fold it into a live-source \
+                                    package with 'jit profile capture --source <package-dir> \
+                                    --destination <package-dir>'";
 
 /// What resolves a profile-owned target edited after its owner published it.
-const CAPTURE_OR_RESTORE: &str = "fold the edit into the package with 'jit profile capture \
-                                  --source <package-dir> --destination <package-dir>', or restore \
-                                  the value this profile published";
+const RESTORE_OR_CAPTURE: &str = "restore the value this profile published, or fold the edit into \
+                                  a live-source package with 'jit profile capture --source \
+                                  <package-dir> --destination <package-dir>'";
 
 /// How many leading digits of a fingerprint a message names.
 ///
