@@ -15,14 +15,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-13T07:10:26.408855068Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T13:59:30.733512294Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-13T07:10:26.561684252Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-13T14:03:25.466143472Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Refresh declared contributions from the repository on capture",
-  "updated_at": "2026-08-13T13:12:55.122142083Z"
+  "updated_at": "2026-08-13T14:03:25.466143472Z"
 }

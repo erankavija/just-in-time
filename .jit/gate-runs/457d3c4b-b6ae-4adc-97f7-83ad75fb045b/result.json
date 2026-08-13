@@ -1,0 +1,38 @@
+{
+  "branch": "worktree-agent-5a3ecba0",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4a9bd4b0b2b6a86c30462c26fc61107a2e49e6a2",
+  "completed_at": "2026-08-13T13:19:34.949091415Z",
+  "duration_ms": 244844,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 2466,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Arbitrary CLAIM_MODEL_BUDGETS=32 can reject valid repositories with more applied profile payloads than the capture budget admits."
+      }
+    ],
+    "summary": "REQ-07 is not satisfied because profile-agreement capture retains an arbitrary 32-profile byte cap.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a3ecba0-9e2a-401c-9994-85066ddaba8f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "457d3c4b-b6ae-4adc-97f7-83ad75fb045b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T13:15:30.104325704Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11611 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5a3ecba0\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffb43-7cf0-7c71-8ac3-12b74fadc8b8\n--------\nuser\n--- 11598 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4a9bd4b0, 290bd3ee, bd7056aa, d4e53287, 2a67ea81, 311daefe, f04c1cf6, 7210c625 (`jit:5a3ecba0`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T13:13:58Z)\nTruncation recovery: partitioned capture, composition, test, documentation, and merge-conflict patches; unrelated 0708 build-gate changes are outside this issue’s impact cone.\n\n1. **[blocking][issue-impact] F1 — REQ-07 remains unmet.** [crates/jit/src/commands/profile.rs:2466](/home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-5a3ecba0/crates/jit/src/commands/profile.rs:2466) introduces the arbitrary `CLAIM_MODEL_BUDGETS = 32`, and `CLAIM_CAPTURE_BUDGET.max_bytes` derives from it at line 2493. The package model does not bound the number of applied profiles, so a valid repository with more than 32 independently owned, model-valid package payloads can exceed this capture budget and make agreement validation refuse to read its claims. The added test verifies only one package’s budget, not the unbounded profile count.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-07 is not satisfied because profile-agreement capture retains an arbitrary 32-profile byte cap.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Arbitrary CLAIM_MODEL_BUDGETS=32 can reject valid repositories with more applied profile payloads than the capture budget admits.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":2466,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
