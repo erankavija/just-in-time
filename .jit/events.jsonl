@@ -14112,3 +14112,14 @@
 {"gate_key":"cargo-ci","id":"198001d9-4e2c-4f9d-ae9e-3fb5a109d9db","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:36:56.071349786Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"mcp-ci","id":"59bb31f0-51b8-4d0d-b5ad-1d5442ad3ded","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:37:11.564596969Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"4a90ca70-25f5-489d-bb06-c4fce203dd21","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:40:52.838867566Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"d0faaa22-0308-48b9-afd7-d6f2633d6814","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:44:19.168429107Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"dcbafca1-a51e-488b-bdb9-746c8d7659f5","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:47:36.969521498Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"cd662ee6-df04-4689-8ac3-cbd31ae8881f","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:48:17.599597963Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"mcp-ci","id":"c856d21c-2ffb-467a-8adf-1ca02486d797","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:48:33.377426997Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"6d50b5be-4f08-4377-90ed-3955e7f0ff2e","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:49:00.209612684Z","to":"done","type":"issue_state_changed"}
+{"id":"b8f107ec-90f6-426a-a8df-f3e5afa58f7c","issue_id":"cb26de35-de6b-4297-983b-00aa8ef4c64f","timestamp":"2026-08-13T16:49:00.209612684Z","type":"issue_completed"}
+{"from":"backlog","id":"407b9f32-f89d-4e2b-8541-fa4190f9c2a1","issue_id":"3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3","timestamp":"2026-08-13T16:49:05.923153468Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"bf0ae5fe-393c-4168-a4f4-45d68d1ceef2","issue_id":"6574f951-ec39-4952-80e0-b02005d08b04","timestamp":"2026-08-13T16:49:11.635664583Z","to":"ready","type":"issue_state_changed"}
+{"from":"backlog","id":"f64c7558-b7e2-44db-90b3-5179877d010e","issue_id":"b3d92595-a878-478c-825d-529b9a15572e","timestamp":"2026-08-13T16:49:17.359408360Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"b0304847-97a1-40d2-adc8-a837638212a4","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T16:49:32.609370233Z","to":"done","type":"issue_state_changed"}
+{"id":"12a010e3-c7d1-4893-8a16-0913d1a968e1","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T16:49:32.609370233Z","type":"issue_completed"}

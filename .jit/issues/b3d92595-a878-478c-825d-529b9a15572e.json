@@ -8,6 +8,7 @@
   ],
   "description": "Make the canonical profile reference describe the lifecycle that now ships, and\nkeep neighbouring pages citing it rather than restating it.\n\n## Background\n\nThe canonical reference currently states an apply-only boundary and lists the\ncapabilities this container delivers as explicitly absent. Several other pages\ndescribe obtaining and applying a package, so the facts have to move as one set.\n\n## Success Criteria\n\n- [hard] REQ-01: The canonical profile reference describes authoring, capture, exchange, composition, variables, ownership, drift, reconfiguration, and upgrade as current behavior, and the section declaring those capabilities absent is gone.\n- [hard] REQ-02: Pages that mention profiles link to the canonical reference instead of restating lifecycle facts, and volatile inventories are generated or cited rather than hand-copied.\n- [hard] REQ-03: Documentation states current behavior only, with no narration of what the surface used to do.\n- [hard] REQ-04: Every path and command named in the changed pages resolves, and the repository's citation check reports no missing target.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T16:49:17.359408360Z",
   "gates_required": [
     "docs-mechanical",
     "doc-review"
@@ -24,7 +25,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Document the completed profile lifecycle for adopters",
-  "updated_at": "2026-08-10T15:43:21.835629776Z"
+  "updated_at": "2026-08-13T16:49:17.359408360Z"
 }

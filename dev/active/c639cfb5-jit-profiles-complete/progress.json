@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 17,
+  "current_wave": 18,
   "waves": [
     {
       "wave_number": 1,
@@ -216,15 +216,15 @@
           "short_id": "cb26de35",
           "title": "Give the profile subcommands one presentation contract",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Dependency serialization cleared after 5a3ecba0 completed. Dispatched in Wave 17 with the strongest model tier because it crosses CLI rendering, generated schema, and MCP inventory."
+          "status": "done",
+          "note": "Completed on main after one substantive review rework. All profile commands share the profiles collection envelope; six mutators rehearse through their execution planning seams; human/JSON decisions use one vocabulary; generated schema drives MCP inventory and arguments. Final branch and merged-main Rust/MCP gates passed."
         },
         {
           "short_id": "acf49914",
           "title": "End-to-end edit-and-refresh regression test",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Dispatched in Wave 17 with the balanced model tier as a bounded test-only integration journey."
+          "status": "done",
+          "note": "Completed with a public CLI journey covering divergence, full-repository no-write refusal, capture refresh, same-version reapply, and restored agreement. Independent gates passed; the merged tree adapted the test to cb26de35's shared envelope and passed 4535 tests."
         }
       ]
     },
@@ -233,7 +233,7 @@
       "issues": [
         {
           "short_id": "f6a17e0d",
-          "title": "Surface, documentation, and evidence (story checkpoint)",
+          "title": "Package authoring and offline exchange (story checkpoint)",
           "classification": "review",
           "status": "pending",
           "note": "moved from stale wave 14; deps 5a3ecba0 + cf42d08b"
@@ -425,7 +425,9 @@
     "6a479c58": 1,
     "15cc28c5": 2,
     "0708d692": 1,
-    "5a3ecba0": 5
+    "5a3ecba0": 5,
+    "cb26de35": 1,
+    "acf49914": 1
   },
   "review_verdicts": [
     {
@@ -1384,6 +1386,32 @@
         "REQ-07": "Named applied-record and claimed-target payload reads have no byte ceiling; capture remains bounded by one directory listing, construction-derived depth, and declared-path membership. Oversized adopter-variable records and template-expanded targets are covered end to end."
       },
       "notes": "Lead re-read every prior finding at final HEAD: the arbitrary profile-count ceiling is absent, applied-record path validation is shared and tested, and both valid oversized payload classes are accepted. Active-surface stale sweep was clean after ab2aee8d4; historical dev/active and dev/archive records were excluded. The issue has no linked documentation. Holistic scope and architecture review found no residual issue."
+    },
+    {
+      "issue": "acf49914",
+      "round": "lead review and code-review gate",
+      "session": 14,
+      "date": "2026-08-13",
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "passed warm with 4532 tests after a cold-worktree timing-only failure",
+        "code-review": "passed with 0 findings"
+      },
+      "notes": "Lead review required full-repository byte equality around the refused unrefreshed apply; rework closed that evidence gap. The test asserts every observable step, unchanged id/version, and final agreement. Merged-tree envelope adaptation is recorded in 7e7a79d2a."
+    },
+    {
+      "issue": "cb26de35",
+      "round": "final code-review gate",
+      "session": 14,
+      "date": "2026-08-13",
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "passed on final branch and merged main (4535 tests)",
+        "mcp-ci": "passed on final branch and merged main (65 unit + 13 integration)",
+        "code-review": "passed with 0 findings after one substantive repair"
+      },
+      "finding_closed": "External pack rehearsal initially checked only the leaf while publication opened the parent without following links. b4819dcdb converged rehearsal on the shared external-publication preflight and added missing/symlinked-parent no-write regressions.",
+      "notes": "The first review attempt was operationally empty and was retried. The final review verified all four criteria, active documentation, schema-derived MCP arguments, and no residual finding. The shared profiles envelope required one lead-side adaptation to acf49914 after merge; the combined tree then passed."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1418,7 +1446,7 @@
     {
       "subject": "apply --dry-run rehearsal/run asymmetry",
       "detail": "jit profile apply --dry-run plans each selector's package alone, so its rehearsal reports one entry per selector while its run reports closure members plus root occurrences. Same class as the REQ-04 findings on reconfigure/upgrade but on a command this issue does not own. Closing it means switching apply onto plan_resolved_profile_selection (one aggregate preview instead of N per-package previews) plus re-merging the two doc statements at cli-commands.md:703 and profiles.md:117.",
-      "status": "assigned-cb26de35"
+      "status": "resolved-by-cb26de35"
     },
     {
       "subject": "lead triage: findings supplied one at a time",
@@ -1455,12 +1483,12 @@
     {
       "subject": "TreeFileDisposition / ProfileCaptureAction 1:1 duplication",
       "detail": "repository_state::TreeFileDisposition and profile::ProfileCaptureAction have identical variants with a mapping at commands/profile.rs:670-675. Defensible layering (domain type vs Serialize/JsonSchema wire type), recorded for cb26de35 rather than failed.",
-      "status": "assigned-cb26de35"
+      "status": "resolved-by-cb26de35"
     },
     {
       "subject": "ProfileCaptureResult flattens package facts beside the envelope",
       "detail": "count (entries in files, incl. removals) sits beside file_count (files in the captured package). Both load-bearing; the worker proposes nesting the package's own facts under \"package\". Deferred to cb26de35, which owns one presentation contract, because ProfileShowEntry flattens the same fields today.",
-      "status": "assigned-cb26de35"
+      "status": "resolved-by-cb26de35"
     },
     {
       "subject": "ProfileApplyError::PackageOutsideWorktree serves two callers",
@@ -1748,14 +1776,19 @@
   "session_14_summary": {
     "date": "2026-08-13",
     "waves_closed": [
-      16
+      16,
+      17
     ],
     "issues_completed": [
-      "5a3ecba0"
+      "5a3ecba0",
+      "cb26de35",
+      "acf49914"
     ],
     "rework_dispatches": 2,
     "gates_run": "Final worktree cargo-ci passed; code-review first found one stale CHANGELOG statement and then passed with zero findings; merged-main cargo-ci passed before completion.",
     "implementation": "Agreement capture now reads only explicitly named records and claimed targets, bounds discovery and shape rather than valid adopter-derived bytes, preserves ownership/path validation, and refreshes declared contributions from repository state.",
-    "next": "Wave 17: cb26de35 and acf49914, after dependency and conflict preflight."
+    "wave_17": "One shared presentation contract and one public edit-refresh regression completed. Branch gates passed independently; merged integration exposed and fixed the expected envelope-test seam, then 4535 Rust tests and all MCP tests passed.",
+    "gf2_feedback": "The only adopter confirmed semantic contribution capture solves its live drift dead end and reported separate linked-worktree state-fork, gate persistence, and selector-discovery hazards. Owner authorized separate customer epic 4a559332, bracketed behind planning 629c3d73 and breakdown bf79b3bc; no scope was added here.",
+    "next": "Wave 18: f6a17e0d story checkpoint, then the remaining documentation and reliability waves."
   }
 }

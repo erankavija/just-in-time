@@ -8,6 +8,7 @@
   ],
   "description": "Add mechanical checks that fail if a second package reader, a compatibility shim,\nor a superseded lifecycle path reappears.\n\n## Background\n\nThe container forbids adapters, dual formats, fallback behavior, and duplicated\ninventories, and this repository already enforces one such absence with a\nstructural contract test. That mechanism is the way the constraint stays true\nafter the work lands.\n\n## Success Criteria\n\n- [hard] REQ-01: A structural check fails if a second package decoder, package model, or applied-record reader is present alongside the canonical one.\n- [hard] REQ-02: A structural check fails if the superseded single-profile selection argument, the per-package application entry point, or the prior application event constructor reappears.\n- [hard] REQ-03: A structural check fails if any input is described as secret or sensitive across the manifest, the command line, the generated schema, the bridge inventory, or the audit trail.\n- [hard] REQ-04: The checks name what they forbid and why, so a failure tells a reader which constraint was breached rather than only which symbol matched.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T16:49:05.923153468Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Prove no superseded lifecycle path survives",
-  "updated_at": "2026-08-10T15:42:16.679303105Z"
+  "updated_at": "2026-08-13T16:49:05.923153468Z"
 }

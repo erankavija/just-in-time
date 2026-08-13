@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "7e7a79d2abd198f76f6ced3b1feaa9a01eabce5b",
+  "completed_at": "2026-08-13T16:47:36.958028475Z",
+  "duration_ms": 86926,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "aeb10934c3a43b7040765ca53b773dade6558da62853b916e8726a489daa6a65",
+  "issue_id": "cb26de35-de6b-4297-983b-00aa8ef4c64f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5a5a3136-7429-4bc6-8499-ef1d175e379f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:46:10.031416165Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 30171 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 30171 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 25537 ms, warmed 17 executables (1926642384 bytes) in 65 ms.\n  ✓ incremental-baseline: 57 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (149 ms)\n  ✓ fmt: ok (1593 ms)\n  ✓ clippy: ok (29038 ms)\n  ✓ suite-build: built in 25537 ms, warmed 17 executables (1926642384 bytes) in 65 ms (25605 ms)\n  ✓ test: 4535 passed, 0 failed, 7 skipped (20449 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (9703 ms)\n  ✓ suite-clock: 30171 ms\n  ✗ budget: FAILED (exit 1) (88 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (57 pre-existing entries ignored) (149 ms)\n\n",
+  "tree_dirty": true
+}
