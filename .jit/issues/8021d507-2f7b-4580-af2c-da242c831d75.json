@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:11:23.346965746Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:14:36.874384085Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8021d507-2f7b-4580-af2c-da242c831d75",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prove the lifecycle runs without version control",
-  "updated_at": "2026-08-13T17:59:59.164125110Z"
+  "updated_at": "2026-08-13T18:14:36.874384085Z"
 }

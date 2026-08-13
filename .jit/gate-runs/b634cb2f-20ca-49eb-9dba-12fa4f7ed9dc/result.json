@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-8021d507",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b612c9ad440d2bed25645c5fc1767f01e6c97adc",
+  "completed_at": "2026-08-13T18:14:36.561358095Z",
+  "duration_ms": 185330,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The Git-free lifecycle integration coverage satisfies all issue-scoped criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8021d507-2f7b-4580-af2c-da242c831d75",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b634cb2f-20ca-49eb-9dba-12fa4f7ed9dc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T18:11:31.230505872Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b612c9ad4 (implementation); ff60a4240 (issue-state records only)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-4 and @/charter/D-8 — dev/vision/9db27a3a-charter.md; @/issue/c639cfb5/requirement/REQ-11 — .jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json; @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint — .jit/invariants.toml; @/gate/cargo-ci and @/gate/code-review — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T18:10:55.457754907+00:00); code-review pending (no prior run)\nTruncation recovery: reread the new lifecycle test in bounded line ranges; used zero-context per-commit diffs; narrowly read the parent REQ-11 and governing item sources\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The Git-free lifecycle integration coverage satisfies all issue-scoped criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
