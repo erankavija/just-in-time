@@ -1480,6 +1480,33 @@
       "cold": "suite-build 36,704 ms, suite-clock 43,285 ms - FAILED the 30,000 ms budget",
       "warm": "suite-build 358 ms, suite-clock 22,669 ms - passed",
       "note": "Textbook instance of the cold-tree trap: same commit, same 4512 passing tests, budget verdict flipped on suite-build alone. Also hit the rust-analyzer incremental-preflight failure on main; cleared inside the CPU lock immediately before the run, per the standing remedy."
+    },
+    {
+      "date": "2026-08-13",
+      "subject": "gate-run incremental ban, re-measured against the current topology",
+      "why": "The owner noted that every measurement in dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md is obsoleted by the test-suite speedup work, and asked for the incremental ban's premise to be re-measured rather than re-argued. Measured directly, no issue filed.",
+      "obsolete_baseline_2026_07_14": {
+        "target_total": "92 GiB",
+        "target_debug_incremental": "19 GiB",
+        "integration_targets": 140,
+        "accumulated_executables": 712
+      },
+      "current_topology": {
+        "integration_targets": "10 of 12",
+        "active_executables": 14,
+        "active_executable_bytes": "1595946592 of 2147483648"
+      },
+      "measured": {
+        "protocol": "cargo test --workspace --all-targets --no-run with CARGO_INCREMENTAL=1, run once in the merged, idle agent-96268a98 worktree, nice 15, while the 0708d692 worker was compiling",
+        "target_before": "5.3 GiB",
+        "target_after": "9.0 GiB",
+        "incremental_state_after_ONE_build": "1.8 GiB",
+        "host_disk": "912 GiB volume, 86% full, 128-129 GiB free, 14 worktrees"
+      },
+      "verdict": "KEEP the gate-run ban. The 19 GiB figure is obsolete, but the conclusion it supported survives re-measurement: one --all-targets build costs 1.8 GiB of incremental state on the CURRENT 10-target topology, and a gate run compiles once and exits, so that 1.8 GiB buys nothing unless the same tree is gated again against a small delta. At 14 worktrees and 86% disk, gating every tree once with incremental on is roughly 25 GiB against 128 GiB free.",
+      "counterweight_recorded_not_acted_on": "Incremental WOULD pay for the one access pattern this workflow has plenty of: re-gating one worker worktree across rework rounds. 96268a98 was gated twice, each round paying ~37 s suite-build and ~27 s clippy from scratch. If disk pressure eases, the case to revisit is per-worktree incremental for rework rounds specifically, not a blanket lift.",
+      "caveat": "Wall-clock was NOT measured: the host was compiling for 0708d692 throughout (load 4.6 rising to 10.8), and the archived protocol itself requires an isolated repeated protocol rather than timings taken under load. Disk is load-independent, which is why the disk half was taken now. Any decision resting on the wall-clock half still needs a quiet host.",
+      "cleanup": "The 1.8 GiB of incremental state produced by this measurement was removed; that worktree's target went 9.0 -> 7.3 GiB. It remains above its 5.3 GiB pre-measurement size because the CARGO_INCREMENTAL=1 fingerprint rebuilt artifacts alongside the originals."
     }
   ],
   "last_handoff": "handoff-11.md",
