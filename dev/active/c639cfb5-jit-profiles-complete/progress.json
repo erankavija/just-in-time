@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 21,
+  "current_wave": 22,
   "waves": [
     {
       "wave_number": 1,
@@ -285,8 +285,8 @@
           "short_id": "8021d507",
           "title": "Prove the lifecycle runs without version control",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Dispatched at the balanced tier as a bounded public-CLI acceptance matrix over all ten profile lifecycle operations in a repository that never has a .git directory. Expected scope is test-only; any production Git decoupling is a criterion defect and must be escalated before implementation."
+          "status": "done",
+          "note": "Completed test-only at the balanced tier. One public CLI journey begins in a directory that never has .git and proves selection/show, dependency resolution, apply, reconfigure, upgrade, capture, pack, add, diff, profile validation, and whole-repository validation all succeed with semantic effects while .git remains absent. Branch cargo-ci/code-review and combined-main cargo-ci pass."
         }
       ]
     },
@@ -436,7 +436,8 @@
     "b3d92595": 2,
     "6574f951": 0,
     "3dcce8a8": 1,
-    "d7558ef6": 0
+    "d7558ef6": 0,
+    "8021d507": 0
   },
   "review_verdicts": [
     {
