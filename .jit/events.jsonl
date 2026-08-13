@@ -14021,3 +14021,9 @@
 {"assignee":"agent:worker","id":"87cc5122-3849-487f-bfc3-4104e8abeaaa","issue_id":"96268a98-ef75-487d-acab-22a813ff7803","timestamp":"2026-08-13T04:45:15.331067660Z","type":"issue_claimed"}
 {"gate_key":"repo-validate","id":"d7e34166-fe54-4807-9c0c-8707f0dd1782","issue_id":"f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0","timestamp":"2026-08-13T04:49:24.195755690Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"backlog","id":"1d39c2a6-872f-48e5-b0ce-ed93c8143b86","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T04:49:41.996206973Z","to":"in_progress","type":"issue_state_changed"}
+{"id":"53187051-fb9c-4068-8035-e337b5278a45","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","priority":"high","timestamp":"2026-08-13T05:31:40.379911348Z","title":"Prove an in-place edit refreshes back into agreement","type":"issue_created"}
+{"gate_key":"cargo-ci","id":"fa679aba-f09a-4852-86a6-fa894d7c53ae","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T05:31:49.049107229Z","type":"gate_added"}
+{"gate_key":"code-review","id":"1e65936b-979b-4473-b67a-ed88b8b69252","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T05:31:49.218583337Z","type":"gate_added"}
+{"from":"ready","id":"226aaf82-f4ef-4899-85f3-eac8364a126d","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T05:31:52.874612273Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"0161362b-9ea6-4c28-afd9-6d3eb1df865b","issue_id":"acf49914-0c41-4c21-9db1-532fae09cc78","timestamp":"2026-08-13T05:31:52.874612273Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"b07038ce-dcc5-4ba5-809b-b422b1049c02","issue_id":"dd268d0f-2656-4e85-8527-990dc6aea0b4","timestamp":"2026-08-13T05:31:58.299024945Z","type":"issue_updated","updated_by":"dependency-add"}

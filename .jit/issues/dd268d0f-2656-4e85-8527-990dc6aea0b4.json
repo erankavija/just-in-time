@@ -5,6 +5,7 @@
   "dependencies": [
     "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
     "8021d507-2f7b-4580-af2c-da242c831d75",
+    "acf49914-0c41-4c21-9db1-532fae09cc78",
     "b3d92595-a878-478c-825d-529b9a15572e"
   ],
   "description": "The completed lifecycle reaches adopters through one command surface, one\ncanonical reference, and evidence that the surface behaves as documented.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands the profile command surface, its audit event, the canonical adopter reference, behavioural acceptance coverage, and mechanical proof that no superseded lifecycle path survives.\n",
@@ -34,5 +35,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Surface, documentation, and evidence",
-  "updated_at": "2026-08-10T15:43:48.626262871Z"
+  "updated_at": "2026-08-13T05:31:58.299024945Z"
 }
