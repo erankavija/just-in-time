@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-12T23:59:41.910320990Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "cf42d08b-ce12-4038-987c-bbb0c0950fc8",
   "labels": [
     "component:storage",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A deep package packs but cannot be published",
-  "updated_at": "2026-08-12T22:26:07.901866640Z"
+  "updated_at": "2026-08-12T23:59:41.910320990Z"
 }
