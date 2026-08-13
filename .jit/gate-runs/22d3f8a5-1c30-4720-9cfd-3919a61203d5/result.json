@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-6574f951",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "640fcb995d09d889e68f646e784b4e4da5f313a0",
+  "completed_at": "2026-08-13T17:30:57.723116370Z",
+  "duration_ms": 163712,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are covered by the attributable integration-test module; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6574f951-ec39-4952-80e0-b02005d08b04",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "22d3f8a5-1c30-4720-9cfd-3919a61203d5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:28:14.010309641Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2bd70825c, 640fcb995\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-13T17:27:40Z); later success supersedes two earlier failures\nTruncation recovery: narrowed the accidental parent-worktree AGENTS search to this workspace and reduced gate history to status metadata\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are covered by the attributable integration-test module; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
