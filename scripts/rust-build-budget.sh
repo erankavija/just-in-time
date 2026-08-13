@@ -20,8 +20,11 @@
 #                        --message-format=json`; default: run it live under
 #                        --root. Executable paths are read from this stream and
 #                        their on-disk sizes summed.
-#   --test-suite-ms INTEGER measured nextest-plus-doctest suite duration;
-#                        absent: skip this check.
+#   --test-suite-ms INTEGER measured nextest-plus-doctest suite duration, taken
+#                        over a target the caller has already built and read
+#                        into the page cache, so the value is the suite's
+#                        execution cost rather than compilation or first-touch
+#                        artifact I/O; absent: skip this check.
 #
 # Exit codes:
 #   0 — every budget and policy holds
@@ -164,7 +167,7 @@ if [ "$TEST_SUITE_MS_PROVIDED" = true ]; then
   if [ "${#measured_ms}" -gt "${#suite_duration_threshold_ms}" ] \
     || { [ "${#measured_ms}" -eq "${#suite_duration_threshold_ms}" ] \
       && (( measured_ms >= suite_duration_threshold_ms )); }; then
-    errors+=("test suite duration: observed ${TEST_SUITE_MS} ms, threshold ${suite_duration_threshold_ms} ms (must be below threshold).")
+    errors+=("test suite duration: observed ${TEST_SUITE_MS} ms, threshold ${suite_duration_threshold_ms} ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').")
   else
     suite_duration_status="${TEST_SUITE_MS}ms"
   fi

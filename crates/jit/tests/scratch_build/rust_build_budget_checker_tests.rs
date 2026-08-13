@@ -512,6 +512,39 @@ fn test_checker_fails_for_at_threshold_test_suite_duration() {
     );
 }
 
+/// REQ-05 (jit:0708d692): a red suite-duration verdict has to tell a reader
+/// whether the suite got slower or the machine did. The checker owns the
+/// threshold and the span its input is required to cover, so its diagnostic
+/// names both rather than leaving the reader to re-run the gate and compare.
+#[test]
+fn test_checker_duration_failure_names_the_span_it_measured_and_the_limit_it_compared_against() {
+    if !jq_available() {
+        eprintln!("SKIP: jq not on PATH");
+        return;
+    }
+    let (fx, metadata, artifacts) = suite_duration_fixture();
+
+    let out = fx.run_with_suite_ms(&metadata, &artifacts, "45000");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "45000 ms must fail: {stderr}");
+    assert!(
+        stderr.contains("45000") && stderr.contains("threshold"),
+        "the diagnostic must name the observed duration and that it was \
+         compared against a threshold: {stderr}"
+    );
+    assert!(
+        stderr.contains("warm") && stderr.contains("first-touch"),
+        "the diagnostic must name the span the observation covers — an \
+         already-built, page-cache-warm target — so a reader can tell a slower \
+         suite from a colder machine without re-running the gate: {stderr}"
+    );
+    assert!(
+        stderr.contains("Corrective area"),
+        "the duration diagnostic must name a corrective area like every other \
+         check this script enforces: {stderr}"
+    );
+}
+
 #[test]
 fn test_checker_fails_for_over_threshold_test_suite_duration() {
     if !jq_available() {

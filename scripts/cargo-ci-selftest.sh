@@ -32,6 +32,14 @@ set -uo pipefail
 # tree: that is the recorded reason a build-only merge guard was vacuous, kept
 # here as a regression so the distinction cannot quietly be lost again.
 #
+# Two further scenarios (jit:0708d692) assert what the gate attributes to
+# itself, since a verdict about the machine is not a verdict about the tree:
+#
+#   incremental-pre-existing incremental state another process wrote before the
+#                            run          -> the gate records and ignores it
+#   incremental-run-produced incremental state this run's own compilation wrote
+#                                         -> the incremental verdict fails
+#
 # Cost: every fixture is a dependency-free two-module crate in a throwaway git
 # repo with its own target directory. This workspace is never rebuilt.
 #
@@ -100,6 +108,30 @@ all_step_summaries_have_integer_milliseconds() {
 
 suite_clock_is_reported() {
   grep -Eq '^  ✓ suite-clock: [0-9]+ ms$' "$1"
+}
+
+# jit:0708d692: the step that prepares the measured suite keeps the costs of
+# getting there out of the clock — compiling the suite, and reading the
+# executables it linked back into the page cache — and reports both. A run that
+# warmed nothing is the regression this predicate catches; the counts come from
+# the gate's own report of what it did, not from a fixed expectation about a
+# fixture's size.
+suite_preparation_warms_the_linked_executables() {
+  local report warmed bytes
+  report=$(grep -E '^  ✓ suite-build: ' "$1" | tail -1)
+  warmed=$(grep -oP 'warmed \K[0-9]+(?= executables)' <<<"$report")
+  bytes=$(grep -oP 'warmed [0-9]+ executables \(\K[0-9]+' <<<"$report")
+  [ -n "$warmed" ] && [ -n "$bytes" ] && [ "$warmed" -gt 0 ] && [ "$bytes" -gt 0 ]
+}
+
+# Those costs must be paid before the clock starts, which the reported order of
+# the summary lines records: the summary is accumulated step by step.
+suite_preparation_precedes_the_clock() {
+  awk '
+    /^  ✓ suite-build: built in [0-9]+ ms.*warmed [0-9]+ executables/ { prepared = NR }
+    /^  ✓ suite-clock: [0-9]+ ms$/ { clock = NR }
+    END { exit !(prepared && clock && prepared < clock) }
+  ' "$1"
 }
 
 # The scope is a source-order contract rather than an elapsed-time assertion:
@@ -399,12 +431,13 @@ stale_expect_worker() { signature_worker "$1"; }
 # directory this run inherited, and the host-wide build lock is skipped: this
 # self-test itself runs inside a gate run that already holds that lock, and the
 # fixture is far too small to need it.
-run_gate() { # run_gate <repo> <output-file>
+run_gate() { # run_gate <repo> <output-file> [VAR=value ...]
   local repo="$1" out="$2"
+  shift 2
   (
     cd "$repo" || exit 3
     unset CARGO_TARGET_DIR
-    CARGO_CI_NO_LOCK=1 "$gate"
+    env CARGO_CI_NO_LOCK=1 "$@" "$gate"
   ) >"$out" 2>&1
 }
 
@@ -450,6 +483,10 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
         suite_clock_is_reported "$out"
       check "$name: the suite clock brackets only nextest and doctests" \
         suite_clock_has_exact_substep_scope
+      check "$name: the suite preparation reads the executables it linked into the page cache" \
+        suite_preparation_warms_the_linked_executables "$out"
+      check "$name: the suite is compiled and warmed before the clock starts" \
+        suite_preparation_precedes_the_clock "$out"
       ;;
     fail)
       check "$name: the gate reports its build-and-test step failing" \
@@ -471,6 +508,85 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
   fi
 }
 
+# --- what the gate attributes to its own compilation (jit:0708d692) ----------
+
+# The incremental state another process leaves in a target directory it shares
+# with the gate: one per-crate directory holding one session directory, the
+# shape rustc writes. An editor's rust-analyzer writes exactly this, in every
+# checkout it has open, and repopulates it within seconds of it being cleared.
+seed_foreign_incremental_state() { # seed_foreign_incremental_state <repo>
+  local session="$1/target/debug/incremental/foreign-crate-1a2b3c/s-foreign-session-working"
+  mkdir -p "$session"
+  printf 'written by another process before the gate ran\n' >"$session/dep-graph.bin"
+}
+
+foreign_incremental_state_survives() { # foreign_incremental_state_survives <repo>
+  test -f "$1/target/debug/incremental/foreign-crate-1a2b3c/s-foreign-session-working/dep-graph.bin"
+}
+
+# A healthy merge whose target directory already holds another process's
+# incremental state. The gate must judge the tree, so it records that state and
+# proceeds; before jit:0708d692 it refused at a preflight step and never reached
+# the tests, which is the failure mode these assertions pin.
+test_pre_existing_incremental_state_does_not_fail_the_gate() {
+  local name="incremental-pre-existing"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out"
+
+  echo
+  echo "== $name: state another process wrote must not decide this gate =="
+  if ! build_merge "$repo" "healthy_mainline" "healthy_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  seed_foreign_incremental_state "$repo"
+  run_gate "$repo" "$out"
+
+  check "$name: the gate records the pre-existing state as a baseline instead of refusing to run" \
+    step_passed "$out" incremental-baseline
+  check "$name: the gate reaches and passes its build-and-test step" \
+    step_passed "$out" test
+  check "$name: the incremental verdict passes over state this run did not create" \
+    step_passed "$out" incremental-state
+  check "$name: the verdict says how much pre-existing state it ignored" \
+    grep -Eq '✓ incremental-state: .*[0-9]+ pre-existing entries ignored' "$out"
+  check "$name: the gate leaves another process's state alone" \
+    foreign_incremental_state_survives "$repo"
+}
+
+# The regression the policy exists to catch: this run's own compilation writing
+# incremental state. The gate exports CARGO_INCREMENTAL=0 itself, and an
+# exported value cannot be overridden from outside it, so the fixture reproduces
+# the state the way a regression would put it on disk — an explicit
+# `-Cincremental=DIR` naming the same directory the check walks. The foreign
+# state is seeded here too, so what is asserted is attribution rather than
+# non-emptiness.
+test_run_produced_incremental_state_fails_the_gate() {
+  local name="incremental-run-produced"
+  local repo="$scratch/$name" out="$scratch/$name.gate.out" rc
+
+  echo
+  echo "== $name: state this run's own compilation wrote must fail it =="
+  if ! build_merge "$repo" "healthy_mainline" "healthy_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  seed_foreign_incremental_state "$repo"
+  run_gate "$repo" "$out" "RUSTFLAGS=-Cincremental=$repo/target/debug/incremental"
+  rc=$?
+
+  check "$name: the incremental verdict fails on state this run created" \
+    step_failed "$out" incremental-state
+  check "$name: the gate exits nonzero" test "$rc" -ne 0
+  check "$name: the diagnostic says the state came from this run's own compilation" \
+    grep -q "this run's own compilation created incremental state" "$out"
+  check "$name: the diagnostic names the entries it observed" \
+    grep -Eq 'observed: [0-9]+ incremental entries' "$out"
+  check "$name: the diagnostic names the pre-existing state it compared against" \
+    grep -Eq 'compared against: the [0-9]+ entries already present' "$out"
+}
+
 echo
 echo "== wrong-nextest-version: the gate must fail before its first step =="
 test_wrong_nextest_version_fails_fast
@@ -479,6 +595,9 @@ run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
 run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
 run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
+
+test_pre_existing_incremental_state_does_not_fail_the_gate
+test_run_produced_incremental_state_fails_the_gate
 
 echo
 if [ "$fail" -eq 0 ]; then
