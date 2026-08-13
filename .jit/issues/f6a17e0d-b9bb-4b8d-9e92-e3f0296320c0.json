@@ -7,6 +7,7 @@
   ],
   "description": "A configured repository becomes a package, and a package reaches another\nrepository as one verifiable file.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands capture from declared repository targets and an offline pack/add pair, so a package can be authored, refreshed, and handed to another repository without network access.\n",
   "documents": [],
+  "first_ready_at": "2026-08-13T04:31:45.369019318Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
@@ -29,7 +30,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Package authoring and offline exchange",
-  "updated_at": "2026-08-11T12:05:40.646430819Z"
+  "updated_at": "2026-08-13T04:31:45.369019318Z"
 }

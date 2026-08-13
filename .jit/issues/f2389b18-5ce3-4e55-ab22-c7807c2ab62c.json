@@ -8,6 +8,7 @@
   ],
   "description": "Report whether the profiles this repository records still agree with the packages\nthey came from and with the repository content they own.\n\n## Background\n\nRepository-wide validation reports profile provenance and derived-state drift\namong everything else it checks. Once profiles carry per-identity ownership and a\nbase fingerprint, a profile-scoped check can say which profile diverged and how,\nwhich is what an adopter needs before choosing to reconfigure or upgrade.\n\n## Success Criteria\n\n- [hard] REQ-01: The check reports, per recorded profile, whether its package is readable at the location the record names, whether the package still matches the recorded identity, and whether each owned target still matches its recorded base.\n- [hard] REQ-02: An ownership claim naming a target that no longer exists, and a target claimed by a record whose package is gone, are each reported rather than ignored.\n- [hard] REQ-03: The check writes nothing and reports a non-zero status when any profile diverges, so it is usable as a repository check.\n- [hard] REQ-04: Repository-wide validation keeps reporting the same divergences through the shared logic, with no second implementation of the comparison.\n",
   "documents": [],
+  "done_at": "2026-08-13T04:31:51.681074174Z",
   "first_ready_at": "2026-08-11T13:16:41.335114531Z",
   "gates_required": [
     "cargo-ci",
@@ -42,7 +43,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Check applied profiles against their packages and the repository",
-  "updated_at": "2026-08-13T00:11:37.180703531Z"
+  "updated_at": "2026-08-13T04:31:51.681074174Z"
 }

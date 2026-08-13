@@ -8,6 +8,7 @@
   ],
   "description": "A package whose paths are deep enough packs successfully but cannot be published, so `jit profile add` refuses an archive `jit profile pack` just wrote.\n\n## Background\n\n`publish_package_tree` (`crates/jit/src/commands/profile.rs`) declares `CaptureBudget { max_paths: 8 * MAX_PROFILE_PACKAGE_FILES, .. }`. The path count a publication needs is roughly file count multiplied by path depth, because the destination closure enumerates every ancestor directory. The package model bounds file count (`MAX_PROFILE_PACKAGE_FILES`) and total size (`MAX_PROFILE_PACKAGE_BYTES`) but places no cap on path depth or path length: `is_safe_relative_path` (`crates/jit/src/domain/repository_inputs.rs:456`) rejects traversal, absolute paths, and control characters, and nothing else. So the budget's multiplier is an assumed shape rather than a derived bound, the same defect class that `15cc28c5` fixed in the archive bounds.\n\nObserved against a built binary, with a package of 511 assets at nine path components and no shared prefixes:\n\n```\njit profile pack    exit 0, archive_bytes 593920, file_count 512\njit profile add     exit 1, \"capture requested 5114 paths but the maximum is 4096\", nothing published\njit profile capture exit 1, same message, nothing published\n```\n\nThe archive bounds hold comfortably for that shape (594 KB against a roughly 9 MiB bound), so this is not the exchange surface's bound. `capture` fails identically, which places the limitation in package-tree publication, where it has been since `6a479c58` merged; the exchange surface inherited it by correctly reusing the one publication path rather than adding a second.\n\nThe failure is a bounded refusal that publishes nothing, not corruption or partial state. Such a package also cannot be produced by `capture`, so reaching it requires a hand-authored manifest.\n\n## Success Criteria\n\n- [hard] REQ-01: A package the package model accepts can be published, or the model rejects it at authoring time; a package cannot be accepted by `pack` and refused by `add` for its path shape.\n- [hard] REQ-02: Whatever bound remains is derived from what the package model constrains, and its documentation states the derivation rather than an assumed shape.\n- [hard] REQ-03: A test publishes a package at whatever the binding limit turns out to be, asserting against the constants rather than literals.\n\n## Notes\n\nTwo directions were considered and neither is chosen here. Capping path depth or path length in the package model bounds the budget by construction, but changes what a package is and would reject manifests that validate today. Deriving the budget from total path bytes yields a number in the millions, which stops being a budget. The choice belongs with whoever owns the package model.\n\nFound during epic `c639cfb5` while reviewing `15cc28c5`. Not folded into that issue: its criteria concern the archive, the limitation predates it, and fixing it there would have hidden a publication-layer defect inside an exchange-layer change.\n",
   "documents": [],
+  "done_at": "2026-08-13T04:31:40.086113166Z",
   "first_ready_at": "2026-08-11T12:03:49.118078050Z",
   "gates_required": [
     "cargo-ci",
@@ -35,7 +36,7 @@
     "component:cli"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "A deep package packs but cannot be published",
-  "updated_at": "2026-08-13T00:08:19.972057019Z"
+  "updated_at": "2026-08-13T04:31:40.086113166Z"
 }
