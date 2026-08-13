@@ -3652,7 +3652,6 @@ mod tests {
         let mut spec = CaptureSpec::phase_one(
             [VirtualPath::CONFIG],
             CaptureBudget {
-                max_paths: 16,
                 max_listings: 0,
                 max_bytes: 64 * 1024,
                 max_depth: 8,

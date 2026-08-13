@@ -2361,9 +2361,13 @@ fn capture_applied_records_covering(
 /// Bounds for the profile-agreement capture.
 ///
 /// The records plus every target they claim, which a package's own size bounds
-/// rather than the record count, at whatever depth those targets sit.
+/// rather than the record count.
+///
+/// No path count appears here: a claimed target is one path a record already
+/// names, not growth a capture discovers, so its count is bounded by what the
+/// records declare. `max_depth` bounds how deep a claimed target may sit below
+/// the repository root, and nothing a package publishes reaches it.
 const CLAIM_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
-    max_paths: 1 << 14,
     max_listings: 1,
     max_bytes: 128 * 1024 * 1024,
     max_depth: 32,
