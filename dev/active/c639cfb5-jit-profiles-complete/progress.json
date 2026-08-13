@@ -1192,6 +1192,29 @@
         }
       ],
       "note": "Tier 2.5 sweep clean over the superseded vocabulary. No linked docs, so Tier 2.75 is n/a. Both gate records verified as derivation 'executed' rather than reused."
+    },
+    {
+      "issue": "0708d692",
+      "round": 1,
+      "verdict": "FAIL then FIXED, gates incomplete",
+      "date": "2026-08-13",
+      "gates": {
+        "cargo-ci": "passed at 0ad02adb5 (derivation executed); STALE - three commits landed after it",
+        "code-review": "NOT RUN - owner assigned this session's gates to the next session"
+      },
+      "criteria": {
+        "REQ-01": "MET on the evidence: cold 26,832 ms passed vs warm 22,677 ms passed, same commit; before the fix, cold 57,019 FAILED vs warm 22,541 passed",
+        "REQ-02": "MET: 48 tests sleeping 10 s -> 45,901 ms -> budget FAILED, then removed",
+        "REQ-03": "MET: seeded rust-analyzer lookalike ignored, gate exit 0, file survives; forced -Cincremental caught 12 added entries",
+        "REQ-04": "MET and strengthened: the old guard test PASSED with the export commented out, which the worker found and fixed",
+        "REQ-05": "MET: before/after wording recorded in the benchmark README"
+      },
+      "findings": [
+        "Tier 2.5: dev/TESTING.md 'Incremental compilation' bullet still stated the deleted predicate. Fixed at ba84bb960. Worker's own sweep found CHANGELOG.md's jit:57d0eb79 entry as a second site and fixed it too."
+      ],
+      "lead_diagnosis_corrected": "The issue blamed first-touch page-cache I/O. The worker measured the real dominant cause: cargo nextest runs setup scripts inside the suite clock, and setup-recorded-failure-corpus.sh selected 'cargo test -p jit --test cli_issue', so Cargo feature unification resolved a second dependency-graph variant and compiled 60 crates, 24,677 ms, inside the measured clock on every fresh target. --workspace makes it 131 ms / 0 units.",
+      "accepted_scope_widening": "The worker changed scripts/setup-recorded-failure-corpus.sh, which is workspace test infrastructure rather than the checker. It flagged this itself. Accepted: REQ-01's property could not hold otherwise, and it is now guarded by test_nextest_setup_scripts_reuse_the_workspace_build_resolution.",
+      "residual": "Cold margin is 3,168 ms (26,832 against 30,000). ~4.3 s of first-run fixture construction remains inside the clock, so REQ-01 holds by subtraction rather than by construction. Raised as an open question in handoff-12."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1335,6 +1358,13 @@
       "status": "assigned-5a3ecba0",
       "owner": "lead",
       "note": "Not 96268a98's defect: its criteria are about stating the decision and it states it correctly. Belongs with the contribution-refresh work. Lead proposed adding a criterion to 5a3ecba0 requiring the three commands to agree on whether a repository needs attention; raised with the owner, no reply yet, so 5a3ecba0's criteria are unchanged."
+    },
+    {
+      "subject": "three enforced build budgets rest on obsolete measurements",
+      "detail": "scripts/rust-build-budget.sh:34-37 states that the justification for MAX_INTEGRATION_TARGETS=12, MAX_EXECUTABLE_BYTES=2 GiB and MAX_TEST_SUITE_SECONDS=30 lives in dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, not in the script. The owner confirmed on 2026-08-13 that every measurement in that document is obsoleted by the test-suite speedup work: it records 92 GiB target/, 19 GiB incremental, 140 integration targets and 712 executables, against a current 10 targets and 14 executables. scripts/cargo-ci.sh:152 and dev/TESTING.md:288 cite it as well. Five sites justify enforced constants with evidence that no longer describes the tree (@/inv/single-source-prose).",
+      "status": "open-question-for-owner",
+      "owner": "invoker",
+      "note": "0708d692's worker was explicitly told not to re-derive the constants and not to add citations to that document; its criteria do not cover them. Recommendation recorded in handoff-12: file separately under epic:v1-release rather than widening a passed issue."
     }
   ],
   "scope_changes": [
@@ -1509,7 +1539,7 @@
       "cleanup": "The 1.8 GiB of incremental state produced by this measurement was removed; that worktree's target went 9.0 -> 7.3 GiB. It remains above its 5.3 GiB pre-measurement size because the CARGO_INCREMENTAL=1 fingerprint rebuilt artifacts alongside the originals."
     }
   ],
-  "last_handoff": "handoff-11.md",
+  "last_handoff": "handoff-12.md",
   "session_11_summary": {
     "date": "2026-08-13",
     "waves_closed": [
