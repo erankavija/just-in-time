@@ -148,8 +148,9 @@ ensure_pinned_nextest
 # ordinary interactive builds, where it earns back its disk cost across many
 # rebuilds of the same tree. A gate run compiles once and exits, so it has no
 # later rebuild to amortize that cost against; left on, incremental state
-# accumulated without bound across gate runs (baseline measurement:
-# dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, Baseline table). The
+# accumulated without bound across gate runs (the measurement behind this
+# policy is placed under "Provenance" in
+# dev/benchmarks/rust-build-budgets/README.md). The
 # `incremental-state` step below turns "should be disabled" into a checked
 # fact rather than an assumption.
 export CARGO_INCREMENTAL=0

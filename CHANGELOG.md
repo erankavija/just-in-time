@@ -671,10 +671,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Debug info and incremental compilation are bounded by policy instead of
   Cargo's undocumented defaults.** Full debug sections dominated a
   representative test executable's size, and incremental state accumulated
-  without bound across gate runs (baseline measured in
-  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`). The workspace manifest's
-  `[profile.dev]` and `[profile.test]` now set `debug = "line-tables-only"`,
-  keeping line-number backtraces without the full debugger payload, and both
+  without bound across gate runs (the measurements behind both policies are
+  placed under "Provenance" in `dev/benchmarks/rust-build-budgets/README.md`).
+  The workspace manifest's `[profile.dev]` and `[profile.test]` now set
+  `debug = "line-tables-only"`, keeping line-number backtraces without the
+  full debugger payload, and both
   state `incremental = true` explicitly so ordinary interactive builds and
   test runs keep Cargo's incremental cache on purpose rather than by
   accident. `scripts/cargo-ci.sh` exports `CARGO_INCREMENTAL=0` for every
@@ -757,13 +758,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sizes from `cargo test --workspace --no-run --message-format=json` (fails
   above 2 GiB), and it asserts the debug-profile, gate-incremental, and
   dependency-feature (no remote JSON Schema resolution, one TLS backend)
-  policies against the committed manifests and gate script. The budgets and
-  their evidence are defined once in the checker and
-  `dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md`. `scripts/cargo-ci.sh` runs it
-  as a `budget` step after its test step, reusing warm Cargo artifacts (no
-  second cold build), and folds a concise footprint summary into the persisted
-  gate summary; over-budget or policy-drift runs fail with a diagnostic naming
-  the observed value, the limit, and the corrective area. Each failure mode has
+  policies against the committed manifests and gate script. The budgets are
+  declared once in the checker and derived from a measurement of the tree they
+  are enforced against in `dev/benchmarks/rust-build-budgets/README.md`.
+  `scripts/cargo-ci.sh` runs it as a `budget` step after its test step, reusing
+  warm Cargo artifacts (no second cold build), and folds a concise footprint
+  summary into the persisted gate summary; over-budget or policy-drift runs
+  fail with a diagnostic naming the observed value, the limit, and the
+  corrective area. Each failure mode has
   an injectable-input regression fixture in
   `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that runs
   without compilation.

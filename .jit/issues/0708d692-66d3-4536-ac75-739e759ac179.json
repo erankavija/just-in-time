@@ -11,6 +11,31 @@
       "format": "markdown",
       "label": "Cold and warm suite-clock verdicts, with the attribution of the cold penalty",
       "path": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../rust-build-efficiency/report.md",
+          "resolved_path": "dev/benchmarks/rust-build-efficiency/report.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "b31238e91ee7bed867b363705ea8906e6c1d50ceef1a99ed0db9da77d8207ea0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../cold-warm-verdict-0708d692/README.md",
+          "resolved_path": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "benchmark-report",
+      "format": "markdown",
+      "label": "Budget derivation",
+      "path": "dev/benchmarks/rust-build-budgets/README.md"
     }
   ],
   "first_ready_at": "2026-08-13T09:51:35.291061297Z",
@@ -40,5 +65,5 @@
   "priority": "high",
   "state": "ready",
   "title": "The build gate decides on build-cache state instead of the tree",
-  "updated_at": "2026-08-13T11:29:37.856538262Z"
+  "updated_at": "2026-08-13T11:45:33.249337082Z"
 }
