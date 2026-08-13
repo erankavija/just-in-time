@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 18,
+  "current_wave": 19,
   "waves": [
     {
       "wave_number": 1,
@@ -235,8 +235,8 @@
           "short_id": "f6a17e0d",
           "title": "Package authoring and offline exchange (story checkpoint)",
           "classification": "review",
-          "status": "pending",
-          "note": "moved from stale wave 14; deps 5a3ecba0 + cf42d08b"
+          "status": "done",
+          "note": "Repository validation and independent holistic review passed over the complete authoring, contribution-refresh, capture, pack/add, and bounds surface. The reviewer found one low documentation advisory about the 128-component repository-local pack-output depth, assigned to b3d92595."
         }
       ]
     },
@@ -1412,10 +1412,28 @@
       },
       "finding_closed": "External pack rehearsal initially checked only the leaf while publication opened the parent without following links. b4819dcdb converged rehearsal on the shared external-publication preflight and added missing/symlinked-parent no-write regressions.",
       "notes": "The first review attempt was operationally empty and was retried. The final review verified all four criteria, active documentation, schema-derived MCP arguments, and no residual finding. The shared profiles envelope required one lead-side adaptation to acf49914 after merge; the combined tree then passed."
+    },
+    {
+      "issue": "f6a17e0d",
+      "round": "story checkpoint",
+      "session": 14,
+      "date": "2026-08-13",
+      "verdict": "PASS",
+      "gates": {
+        "repo-validate": "passed on main",
+        "holistic-review": "passed with no blocking findings"
+      },
+      "notes": "The story's only hard criterion is met by current capture (including declared contribution refresh) plus verifiable offline pack/add. The reviewer recorded one low advisory: repository-local pack output is capped at 128 path components while active docs implied any writable output path. Routed to the already-ready adopter documentation issue b3d92595."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
   "surfaced_pitfalls": [
+    {
+      "subject": "repository-local pack output depth is bounded while documentation says any writable path",
+      "detail": "f6a17e0d holistic review found the capture budget caps repository-local --output at 128 components, while the active profile reference described the destination without that bound. The implementation bound is deliberate and the story criteria pass; adopter wording must not promise more.",
+      "status": "assigned-b3d92595",
+      "owner": "b3d92595"
+    },
     {
       "subject": "v1.0 applied-record migration boundary",
       "detail": "is_shipped_v1_candidate authenticates only the pinned embedded jit-dogfood record; a real v1.0 repository (gf2, two directory-package records) is rejected outright by jit validate. Bears on epic REQ-09 and REQ-12. RESOLVED: 9a81ab12 deleted the boundary; the owner settled it as a clean cut and capture (6a479c58) is the recovery path for a repository holding pre-release state.",

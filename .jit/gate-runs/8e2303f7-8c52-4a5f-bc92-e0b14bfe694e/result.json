@@ -1,0 +1,37 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3b37e1e58bf86e97b070db63e1e96ee43b19cd7e",
+  "completed_at": "2026-08-13T16:54:14.722458486Z",
+  "duration_ms": 148300,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/profile.rs",
+        "id": "F1",
+        "line": 1099,
+        "severity": "low",
+        "summary": "Repository-local profile-pack output paths deeper than 128 components conflict with documentation promising any writable output path."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met; one advisory output-depth documentation mismatch remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8e2303f7-8c52-4a5f-bc92-e0b14bfe694e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T16:51:46.421731097Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [low, advisory] `jit profile pack` documents that `--output` may be anywhere writable, but repository-local outputs deeper than 128 components are refused by its fixed `max_depth: 128` capture budget. This is a documentation/edge-case mismatch, not a failure of the offline exchange criterion.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; one advisory output-depth documentation mismatch remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"summary\":\"Repository-local profile-pack output paths deeper than 128 components conflict with documentation promising any writable output path.\",\"file\":\"crates/jit/src/commands/profile.rs\",\"line\":1099}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
