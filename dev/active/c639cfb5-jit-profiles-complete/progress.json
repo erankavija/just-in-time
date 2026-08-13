@@ -369,7 +369,8 @@
     "9f493686": 2,
     "7156f64b": 5,
     "6a479c58": 1,
-    "15cc28c5": 2
+    "15cc28c5": 2,
+    "0708d692": 1
   },
   "review_verdicts": [
     {
@@ -1192,6 +1193,22 @@
         }
       ],
       "note": "Tier 2.5 sweep clean over the superseded vocabulary. No linked docs, so Tier 2.75 is n/a. Both gate records verified as derivation 'executed' rather than reused."
+    },
+    {
+      "issue": "0708d692",
+      "round": "code-review gate round 1",
+      "session": 13,
+      "date": "2026-08-13",
+      "verdict": "FAIL",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "high",
+          "disposition": "blocking",
+          "summary": "scripts/cargo-ci.sh:394 attributes every post-baseline incremental entry to the gate; a concurrent external writer (rust-analyzer) during the run is falsely diagnosed as the run's own compilation. REQ-03 unmet; the self-test seeds state only before the run, not during it."
+        }
+      ],
+      "lead_determination": "Judgment moves to a runtime CARGO_INCREMENTAL=0 assertion (step fails on assertion breach); post-baseline additions become a named environmental observation when the assertion held, keeping the verdict deterministic per REQ-01. Residual recorded openly: a child process explicitly overriding CARGO_INCREMENTAL against the shared target surfaces as a warning, not a failure. If a later round flags the residual as a REQ-03/REQ-04 breach, escalate rather than argue."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
