@@ -1455,8 +1455,9 @@
     {
       "subject": "repository-local pack output depth is bounded while documentation says any writable path",
       "detail": "f6a17e0d holistic review found the capture budget caps repository-local --output at 128 components, while the active profile reference described the destination without that bound. The implementation bound is deliberate and the story criteria pass; adopter wording must not promise more.",
-      "status": "assigned-b3d92595",
-      "owner": "b3d92595"
+      "status": "resolved-by-b3d92595",
+      "owner": "b3d92595",
+      "resolution": "The canonical profile reference now states the repository-local output limit of 128 path components."
     },
     {
       "subject": "v1.0 applied-record migration boundary",
@@ -1472,13 +1473,14 @@
     {
       "subject": "fail-fast conflict reporting",
       "detail": "The three-way seam reports the first conflicting target only. REQ-03 says 'reports a conflict' so 7156f64b passes literally; reporting all would change apply's error type (shared seam).",
-      "status": "open",
-      "reconciliation_2026_08_13": "Candidate against epic REQ-07 ('concurrent user/profile changes produce actionable conflicts', plural). The three-way seam reports the first conflicting target only. Reporting all would change apply's error type on a shared seam. Needs a decision before the container gate: either REQ-07 is satisfied by one actionable conflict at a time, or a remediation task reports the full set."
+      "status": "reconciled-not-a-criterion-violation",
+      "reconciliation_2026_08_13": "Epic-final audit against REQ-07: the three-way seam fails before publication and identifies the concrete conflicting target, current state, and required resolution. The adopter can resolve it and re-run; no content is stranded or silently won by order. REQ-07 requires actionable conflicts, not an exhaustive batch. Both the ownership-story holistic review and the final integrated behavior support this reading."
     },
     {
       "subject": "profiles.md stale deferral",
       "detail": "'semantic shared ownership' still listed as deferred though wave 6 landed it. Covered by b3d92595 REQ-01.",
-      "status": "assigned-b3d92595"
+      "status": "resolved-by-b3d92595",
+      "resolution": "The canonical profile reference no longer describes semantic shared ownership as deferred."
     },
     {
       "subject": "ProfileTargetMaterialization carries no owner",
@@ -1508,9 +1510,9 @@
     {
       "subject": "empty directories survive a capture removal",
       "detail": "RepositoryAction (repository_state/image.rs:1274) has DeleteFile and no DeleteDirectory, so a directory left empty by a whole-tree republication remains. No undeclared FILE survives, which is what REQ-01 states, and ProfilePackage::from_directory ignores empty directories. Bears on 15cc28c5 (pack), which archives a package directory and would carry the empty directory into the archive.",
-      "status": "open",
+      "status": "reconciled-not-a-criterion-violation",
       "owner": "15cc28c5",
-      "reconciliation_2026_08_13": "Downstream half closed: 15cc28c5 writes no directory entries into the archive at all, so an empty directory cannot be carried into a pack. Residual is repository-side only \u2014 a directory left empty by a whole-tree republication remains, because RepositoryAction has DeleteFile and no DeleteDirectory. Epic REQ-13 forbids a 'source the manifest stopped declaring' surviving; an empty directory is not a declared source, so this reads as a follow-up rather than a REQ-13 violation. Recorded rather than assumed."
+      "reconciliation_2026_08_13": "Epic-final audit against REQ-13 and REQ-14: no undeclared file or package source survives whole-tree republication; ProfilePackage::from_directory ignores empty directories, and pack writes no directory entries. The residual empty filesystem directory carries neither bytes nor a package declaration, so it is not a surviving source and does not enter an archive."
     },
     {
       "subject": "gate verdict memoisation hides an environmental failure",
@@ -1535,7 +1537,8 @@
     {
       "subject": "ProfileApplyError::PackageOutsideWorktree serves two callers",
       "detail": "It now reports both 'a package's bytes were read from outside the worktree' and 'a caller named a capture source/destination that is not worktree content', while living on ProfileApplyError though capture is not an apply. A shared ProfilePathError would read better. Worker-reported.",
-      "status": "open"
+      "status": "reconciled-naming-debt-not-a-criterion-violation",
+      "reconciliation_2026_08_13": "Epic-final audit against REQ-06 and REQ-12: this is one shared typed error used by two callers, not a second resolver, package format, ownership model, or publication path. Its name is imperfect internal taxonomy but does not create a duplicated or superseded lifecycle surface."
     },
     {
       "subject": "codex luna rewrote the epic's historical audit trail",
@@ -1601,9 +1604,9 @@
     {
       "subject": "three enforced build budgets rest on obsolete measurements",
       "detail": "scripts/rust-build-budget.sh:34-37 states that the justification for MAX_INTEGRATION_TARGETS=12, MAX_EXECUTABLE_BYTES=2 GiB and MAX_TEST_SUITE_SECONDS=30 lives in dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, not in the script. The owner confirmed on 2026-08-13 that every measurement in that document is obsoleted by the test-suite speedup work: it records 92 GiB target/, 19 GiB incremental, 140 integration targets and 712 executables, against a current 10 targets and 14 executables. scripts/cargo-ci.sh:152 and dev/TESTING.md:288 cite it as well. Five sites justify enforced constants with evidence that no longer describes the tree (@/inv/single-source-prose).",
-      "status": "open-question-for-owner",
+      "status": "resolved-by-0708d692",
       "owner": "invoker",
-      "note": "0708d692's worker was explicitly told not to re-derive the constants and not to add citations to that document; its criteria do not cover them. Recommendation recorded in handoff-12: file separately under epic:v1-release rather than widening a passed issue."
+      "note": "The owner later expanded 0708d692 with REQ-06. That issue is done: dev/benchmarks/rust-build-budgets/README.md now holds fresh measurements and the headroom rule, while the checker and current guidance cite the new authority. The archived 73482aa1 document remains identified only as the obsolete baseline it supersedes."
     }
   ],
   "scope_changes": [
