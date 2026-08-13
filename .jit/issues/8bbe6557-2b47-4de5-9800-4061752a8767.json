@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Remove the provenance-only embedded profile origin that remains after compiled profile packages and their resolver were removed, so applied profile records have one resolvable repository-directory origin.\n\n## Background\n\nIssue `ff1bbada` removed profile packages compiled into the executable, their presets, and every production resolution path for an embedded package. Later ownership-record work reintroduced `ProfileOrigin::Embedded`, an `EmbeddedProvenanceUnavailable` error, and command bypasses that tolerate such a record without providing a package source. The epic's final holistic review found that this dead representation contradicts the canonical-cutover contract and makes a serialized origin promise that no lifecycle command can fulfill. The owner selected repository-directory packages as the sole package-source contract.\n\n## Success Criteria\n\n- [hard] REQ-01: The current applied-profile wire model and generated schema expose only a worktree-relative directory origin; a record containing `source: \"embedded\"` is rejected by normal strict decoding, and human and JSON output expose no embedded profile-origin option.\n- [hard] REQ-02: Profile command planning, ownership lookup, mutation eligibility, and recorded-package resolution contain no embedded-provenance error, provenance-only exclusion scan, bypass, or special branch. Every applied record resolves through the canonical repository-directory package route, whose existing behavior remains unchanged.\n- [hard] REQ-03: Existing ownership, aggregate planning, initialization, capture, reconfiguration, and upgrade tests use directory-origin fixtures without weakening their semantic assertions. The generated CLI schema and MCP schema-derived inventory contain no embedded profile-origin value.\n- [hard] REQ-04: The existing semantic lifecycle cutover guard is extended to reject reintroduction of a compiled profile package source, embedded profile origin or wire tag, embedded-only resolver error, or resolver bypass in production and generated schema, with adversarial self-tests that prove actionable diagnostics rather than relying only on exact symbol names.\n- [hard] REQ-05: The cutover adds no migration decoder, compatibility adapter, record rewrite, fallback package, or second resolver. A pre-release record with an unsupported origin fails through the ordinary strict wire boundary; a repository that needs to adopt current provenance re-derives its package through capture as specified by the epic.\n\n## Notes\n\nThe unrelated archive-plan use of the word `Embedded` describes bytes stored inside an archive plan and is not a profile package source. It is outside this task.\n",
   "documents": [],
+  "done_at": "2026-08-13T20:22:36.311715689Z",
   "first_ready_at": "2026-08-13T19:47:19.259120355Z",
   "gates_required": [
     "cargo-ci",
@@ -42,7 +43,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove unsupported embedded profile provenance",
-  "updated_at": "2026-08-13T20:22:02.852553736Z"
+  "updated_at": "2026-08-13T20:22:36.311715689Z"
 }

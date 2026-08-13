@@ -328,8 +328,8 @@
           "short_id": "8bbe6557",
           "title": "Remove unsupported embedded profile provenance",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "Owner-approved Option A remediation after the epic completion review found a provenance-only embedded origin with no package resolver. Scope is the clean deletion of that dead wire/command/schema surface plus semantic cutover coverage; no new package source or migration path."
+          "status": "done",
+          "note": "Owner-approved Option A remediation completed on main at 71e55d82d. ProfileOrigin and ProfilePackageSource are directory-only; the embedded error, provenance exclusion scan, mutation-only graph route, and human/schema option are gone. Strict wire, live CommandSchema, structured MCP, and adversarial semantic guards pass. All required gates passed with zero review findings."
         }
       ]
     }
@@ -1498,6 +1498,25 @@
         "holistic-review": "passed with no blocking findings"
       },
       "notes": "The story's only hard criterion is met by current capture (including declared contribution refresh) plus verifiable offline pack/add. The reviewer recorded one low advisory: repository-local pack output is capped at 128 path components while active docs implied any writable output path. Routed to the already-ready adopter documentation issue b3d92595."
+    },
+    {
+      "issue": "8bbe6557",
+      "round": "final code-review gate",
+      "date": "2026-08-13",
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "passed on merged main; 4540 tests, 63 doctests, 23704 ms warm suite clock",
+        "mcp-ci": "passed against the exact merged binary; 65 unit + 14 integration",
+        "code-review": "passed with 0 findings"
+      },
+      "criteria": {
+        "REQ-01": "Applied-profile wire and generated schema expose only the tagged repository-directory origin; the retired embedded tag fails strict decoding.",
+        "REQ-02": "The embedded resolver error, source exclusion scan, and mutation-only graph bypass are deleted; every lifecycle route uses the canonical recorded directory-package graph.",
+        "REQ-03": "Ownership, initialization, command, repository-state, CLI, and schema-derived MCP suites pass with directory origins.",
+        "REQ-04": "The semantic cutover guard rejects renamed non-directory sources, compiled profile bytes, record-only resolver errors, provenance exclusion scans, duplicate graph routes, and schema alternatives while excluding unrelated archive/web meanings.",
+        "REQ-05": "No migration decoder, rewrite, fallback, adapter, or second resolver was added."
+      },
+      "notes": "Red-first tests proved the old wire accepted source:embedded and the old live origin enum had two variants. The final independent review confirmed the bounded clean cut and reported no residual risk."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1768,6 +1787,15 @@
       "scope": "early reconciliation of surfaced_pitfalls against the epic's 14 hard criteria, run at wave 15 rather than at the container gate",
       "why_early": "The peer epic 4b7c06d0 failed its container code-review on REQ-04 three waves after the work that invalidated it. Its REQ-04 was correct when written; 355565c2, pursued for REQ-01, deleted a feature whose tests REQ-04 protected, and the two criteria became jointly unsatisfiable \u2014 restoring the feature would have put the suite back near 193 s. Nothing in either criterion's text would reveal that had happened, and only the reviewer surfaced it. This epic has 14 hard criteria and 6 waves left; REQ-12 is the same shape.",
       "result": "24 pitfalls reviewed. 5 were open. Pitfall 22 closed by re-measurement. Pitfall 8's downstream half closed by 15cc28c5's implementation; residual is a follow-up, not a REQ-13 violation. Pitfall 7 is half-closed and half-live, and the live half is a REQ-12 candidate that needs resolution before the story checkpoints. Pitfall 2 is a REQ-07 candidate needing a decision. Pitfall 13 is an error-taxonomy follow-up."
+    },
+    {
+      "container": "c639cfb5",
+      "date": "2026-08-13",
+      "criterion": "REQ-12: one canonical directory-package resolver and no provenance-only source variant or compatibility path survives the cutover.",
+      "prior_finding": "Epic holistic-review run 13149c1f found ProfileOrigin::Embedded and EmbeddedProvenanceUnavailable promised an origin that no lifecycle resolver could fulfill, contradicting the then-stale embedded-profile criteria.",
+      "owner_resolution": "Option A approved: correct the epic to repository-directory packages and remove the unsupported embedded residue rather than reintroducing compiled packages.",
+      "evidence": "c639cfb5 and eac6ec13 now state the directory-only contract; 8bbe6557 deletes the dead wire/error/bypass, rejects the pre-release tag strictly, and mechanically guards source enums, compiled capabilities, resolver shape, live CommandSchema, and structured MCP output. Rust, MCP, and independent code-review gates pass.",
+      "status": "closed"
     }
   ],
   "coordination": [
