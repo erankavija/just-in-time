@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T17:54:56.775198766Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T17:58:14.571575506Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d7558ef6-fffe-43ac-9bc7-27f914295c47",
   "labels": [
     "type:task",
@@ -27,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Prove concurrent lifecycle callers serialize",
-  "updated_at": "2026-08-13T17:41:01.813895311Z"
+  "updated_at": "2026-08-13T17:58:14.571575506Z"
 }
