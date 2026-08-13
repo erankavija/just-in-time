@@ -316,8 +316,8 @@
           "short_id": "08883a21",
           "title": "Document the profile manifest authoring contract",
           "classification": "documentation",
-          "status": "in_progress",
-          "note": "Created from epic doc-review finding F1. The canonical guide explains the authoring workflow but does not expose the required versioned TOML contract; this bounded remediation supplies a parser-checked v2 skeleton and complete declaration-family reference without changing the package model or creating a second canonical home."
+          "status": "done",
+          "note": "Completed after one lead-review rework. The canonical guide now includes a parser-checked v2 skeleton, strict field/declaration semantics for every family, the exact contribution templating allowlist, and links to the actual registry authorities without copying dogfood vocabulary. Docs mechanics and independent doc review pass with no findings."
         }
       ]
     }
@@ -470,7 +470,7 @@
     "8021d507": 0,
     "b5bb4b9c": 0,
     "dd268d0f": 1,
-    "08883a21": 0,
+    "08883a21": 1,
     "c639cfb5": 1
   },
   "review_verdicts": [
