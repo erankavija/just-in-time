@@ -20,9 +20,9 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-13T09:51:48.253067455Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-13T10:59:19.191432658Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "pending",
@@ -40,5 +40,5 @@
   "priority": "high",
   "state": "ready",
   "title": "The build gate decides on build-cache state instead of the tree",
-  "updated_at": "2026-08-13T10:56:30.168396450Z"
+  "updated_at": "2026-08-13T10:59:19.191432658Z"
 }
