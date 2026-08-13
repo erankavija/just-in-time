@@ -6,6 +6,7 @@
   "dependencies": [
     "08883a21-571d-4b00-a639-6e21309dee31",
     "42c8c9c1-737d-48a6-b8b4-911aafa1a263",
+    "8bbe6557-2b47-4de5-9800-4061752a8767",
     "dd268d0f-2656-4e85-8527-990dc6aea0b4",
     "f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0",
     "f73d54a2-14bd-4641-bcfe-be5f1431c133"
@@ -59,5 +60,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-13T19:45:59.697959643Z"
+  "updated_at": "2026-08-13T19:47:38.725027075Z"
 }

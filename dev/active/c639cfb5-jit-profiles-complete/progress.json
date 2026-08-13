@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 23,
+  "current_wave": 24,
   "waves": [
     {
       "wave_number": 1,
@@ -320,9 +320,26 @@
           "note": "Completed after one lead-review rework. The canonical guide now includes a parser-checked v2 skeleton, strict field/declaration semantics for every family, the exact contribution templating allowlist, and links to the actual registry authorities without copying dogfood vocabulary. Docs mechanics and independent doc review pass with no findings."
         }
       ]
+    },
+    {
+      "wave_number": 24,
+      "issues": [
+        {
+          "short_id": "8bbe6557",
+          "title": "Remove unsupported embedded profile provenance",
+          "classification": "implementation",
+          "status": "in_progress",
+          "note": "Owner-approved Option A remediation after the epic completion review found a provenance-only embedded origin with no package resolver. Scope is the clean deletion of that dead wire/command/schema surface plus semantic cutover coverage; no new package source or migration path."
+        }
+      ]
     }
   ],
   "created_during_execution": [
+    {
+      "short_id": "8bbe6557",
+      "title": "Remove unsupported embedded profile provenance",
+      "reason": "The final epic holistic review found that ownership-record work had reintroduced an embedded origin and bypass after the domain-agnostic package-source cutover removed all compiled profile packages and resolvers. The owner approved Option A: correct the epic to repository-directory packages and delete the unsupported residue. This directly repairs REQ-12 and the failed gate rather than expanding product capability."
+    },
     {
       "short_id": "08883a21",
       "title": "Document the profile manifest authoring contract",
@@ -449,11 +466,13 @@
       "date": "2026-08-13",
       "category": "epic-success-criteria-conflict-with-completed-architecture",
       "issue_id": "c639cfb5-8356-4c54-b45c-860064432560",
-      "status": "open",
+      "status": "resolved",
       "question": "Should the lifecycle contract follow the completed domain-agnostic extraction (repository-directory packages only) or reintroduce an embedded jit-dogfood package path?",
       "evidence": "Final holistic-review run 13149c1f failed F1: c639cfb5 REQ-01, REQ-06, REQ-09, REQ-11, D-01, and D-02 still promise embedded profiles, but ff1bbada REQ-01/03/05 deliberately removed every compiled-in package, the compiled-in origin, and the fallback resolver. Current recorded_package rejects the provenance-only ProfileOrigin::Embedded variant at commands/profile.rs:2760-2764. Charter D-8 now specifies offline packages discovered from declared locations and two shipped package directories, not binary embedding.",
       "options_presented": "A (recommended): owner-authorize a clean contract correction to repository-directory packages and a bounded remediation deleting the reintroduced provenance-only Embedded variant/error/tests; B: reintroduce a compiled-in package and embedded resolver across the complete lifecycle, which reverses ff1bbada and conflicts with domain-agnostic/canonical-cutover; C: amend criteria only while retaining the unsupported Embedded provenance token, which leaves the reviewer's REQ-12 finding open and is not recommended.",
-      "lead_recommendation": "A. It preserves the north star (create, refresh, share repository-local packages), the completed domain-agnostic extraction, and one resolver. Re-embedding is a substantial cross-container architectural reversal with no adopter benefit over the shipped repository-local package directories."
+      "lead_recommendation": "A. It preserves the north star (create, refresh, share repository-local packages), the completed domain-agnostic extraction, and one resolver. Re-embedding is a substantial cross-container architectural reversal with no adopter benefit over the shipped repository-local package directories.",
+      "owner_decision": "A — correct the contract to repository-directory packages and remove the provenance-only embedded residue.",
+      "lead_resolution": "Updated c639cfb5 and eac6ec13 to remove the retired embedded premise, recorded directory-only package discovery as D-10, and created direct epic dependency 8bbe6557 for the clean-cut production/schema/test removal before the final gates rerun."
     }
   ],
   "rework_counts": {
@@ -481,7 +500,8 @@
     "b5bb4b9c": 0,
     "dd268d0f": 1,
     "08883a21": 1,
-    "c639cfb5": 2
+    "c639cfb5": 2,
+    "8bbe6557": 0
   },
   "review_verdicts": [
     {

@@ -14210,3 +14210,7 @@
 {"gate_key":"holistic-review","id":"5cc5574a-94c7-4da7-919e-eea528a281f4","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T19:19:32.189173243Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["description"],"id":"c3d2e54a-11aa-41fd-ad37-0af2c0f2ebcc","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T19:45:59.697959643Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["description"],"id":"d61c9488-e7c6-4a36-bb92-4257da977291","issue_id":"eac6ec13-2c8b-4249-9ed4-372416bca255","timestamp":"2026-08-13T19:46:08.909846538Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"09a0c901-699f-4d12-a5f7-78a9da4f212e","issue_id":"8bbe6557-2b47-4de5-9800-4061752a8767","priority":"high","timestamp":"2026-08-13T19:47:19.259120355Z","title":"Remove unsupported embedded profile provenance","type":"issue_created"}
+{"fields":["dependencies"],"id":"7688467a-2f69-4220-a401-f73ec9489113","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-13T19:47:38.725027075Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"5dc0eea7-d655-4113-a3c0-b7d14d54ab4f","issue_id":"8bbe6557-2b47-4de5-9800-4061752a8767","timestamp":"2026-08-13T19:48:07.880404856Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker-8bbe6557","id":"9a376685-7349-42c9-ba05-2b105ab83df8","issue_id":"8bbe6557-2b47-4de5-9800-4061752a8767","timestamp":"2026-08-13T19:48:07.880404856Z","type":"issue_claimed"}
