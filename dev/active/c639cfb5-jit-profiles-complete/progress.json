@@ -1236,9 +1236,12 @@
     {
       "subject": "live-asset classification encoded twice",
       "detail": "Whether a package asset draws its bytes from the repository is answered by a package-relative source path prefix (JIT_DOGFOOD_LIVE_SOURCE_PREFIX = \"assets/live/\", crates/jit/src/profile/repository_package.rs:5, consumed in production only at package_assembly.rs:190) while the manifest separately declares [[live-source]] roots (manifest.rs:149, LiveSourceDeclaration at :346). Two encodings of one convention (@/inv/convention-convergence), and the constant names one package for a rule applied to every package (@/inv/domain-agnostic). The epic plan fixes the prefix convention for REQ-13, so 6a479c58 is directed to rename the constant only; converging on a declared per-asset marker would be a manifest-schema change beyond the plan.",
-      "status": "partially-resolved-still-open",
+      "status": "resolved-not-a-violation",
       "owner": "invoker",
-      "reconciliation_2026_08_13": "Half fixed, half live. The domain-agnostic half is closed: the constant no longer names one package (JIT_DOGFOOD_LIVE_SOURCE_PREFIX renamed to LIVE_ASSET_SOURCE_PREFIX, manifest.rs:20), so no site names a particular package for a rule applied to every package. The convention-convergence half is live and load-bearing in production: whether an asset draws its bytes from the repository is decided BOTH by a hardcoded path prefix (package_capture.rs:187 'authority: if asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX)', repository_package.rs:334 and :347 filtering on the same prefix) AND by the manifest's declared [[live-source]] roots (manifest.rs:159, LiveSourceDeclaration at :357). Two encodings of one convention, both live. Bears on epic REQ-12 ('no adapter, dual format, fallback behavior, temporary compatibility code, or duplicated workflow inventory') and on @/inv/convention-convergence. Per lead-review-protocol, the plan deferring it binds the fan-out shape only and cannot make an unmet criterion met: this needs either a remediation task inside the container or positive evidence it is not a REQ-12 violation, BEFORE the f6a17e0d/dd268d0f checkpoints and the epic gate."
+      "reconciliation_2026_08_13": "Half fixed, half live. The domain-agnostic half is closed: the constant no longer names one package (JIT_DOGFOOD_LIVE_SOURCE_PREFIX renamed to LIVE_ASSET_SOURCE_PREFIX, manifest.rs:20), so no site names a particular package for a rule applied to every package. The convention-convergence half is live and load-bearing in production: whether an asset draws its bytes from the repository is decided BOTH by a hardcoded path prefix (package_capture.rs:187 'authority: if asset.source.starts_with(LIVE_ASSET_SOURCE_PREFIX)', repository_package.rs:334 and :347 filtering on the same prefix) AND by the manifest's declared [[live-source]] roots (manifest.rs:159, LiveSourceDeclaration at :357). Two encodings of one convention, both live. Bears on epic REQ-12 ('no adapter, dual format, fallback behavior, temporary compatibility code, or duplicated workflow inventory') and on @/inv/convention-convergence. Per lead-review-protocol, the plan deferring it binds the fan-out shape only and cannot make an unmet criterion met: this needs either a remediation task inside the container or positive evidence it is not a REQ-12 violation, BEFORE the f6a17e0d/dd268d0f checkpoints and the epic gate.",
+      "resolution": "Owner accepted the lead's finding, 2026-08-13. The 'encoded twice' framing was wrong. PRODUCTION HAS ONE CLASSIFIER: crates/jit/src/profile/package_capture.rs:187, inside declared_sources, keying on the assets/live/ prefix; capture_package_tree reads only declared_sources(&model) and consults live_sources nowhere. The two other sites handoff-11 cited, repository_package.rs:334 and :347, are inside #[cfg(test)] mod tests - that module opens at repository_package.rs:3 - so they are this repository's own dogfood conformance suite, not a production decision. Every PRODUCTION read of model.live_sources is package.rs:761-788 (validate_live_source_roots, non-overlap only), variables.rs:575 (rejecting variable references in roots and exclusions), and wire.rs:97/:153 (pass-through). None classifies an asset. The two mechanisms answer different questions: the prefix decides which side owns a declared asset's bytes; the declared roots bound a completeness walk over repository directories that must be fully packaged. REQ-12 forbids an adapter, dual format, fallback, temporary compatibility code, or duplicated workflow inventory; none is present, because there is no second decision path to remove.",
+      "residual": "One real but separate observation, not a REQ-12 violation: nothing in the package model requires a live asset's target to fall under a declared [[live-source]] root. That correspondence is asserted only by test_declared_live_source_roots_claim_every_live_asset_target_exactly_once, a dogfood conformance test over this repository's own package. An adopter manifest could declare a live asset outside every declared root and nothing would reject it. Recorded rather than assumed.",
+      "caveat": "Rests on the lead's own trace. The independent cross-check dispatched for it hung on stdin - the known codex-exec-blocks-on-stdin pitfall - and was killed after four hours without producing output."
     },
     {
       "subject": "empty directories survive a capture removal",
@@ -1290,8 +1293,9 @@
     {
       "subject": "7793b8b7 is dissolved but out of epic scope",
       "detail": "type:bug, milestone:v1.1, no epic label. Its subject - the process-global shipped_v1 conversion counter and the order-dependent test asserting on it - is deleted by 9a81ab12, so it is unreproducible. Not transitioned: transitioning an out-of-epic issue is the invoker's call.",
-      "status": "open",
-      "owner": "invoker"
+      "status": "rejected-2026-08-13",
+      "owner": "invoker",
+      "resolution": "Owner decision: rejected as dissolved. Description carries the reason; 9a81ab12 removed its subject."
     },
     {
       "subject": "Tier 2.5 sweep patterns missed the removed mechanism's own vocabulary",
@@ -1367,6 +1371,13 @@
       "change": "Added REQ-06 requiring the difference report, the profile check, and whole-repository validation to agree on whether a repository needs attention for a declared contribution.",
       "approved_by": "owner, 2026-08-13",
       "reason": "Verified: on a repository whose contributed value was edited in place, jit profile diff reports 'unchanged' and exits 0 while jit profile validate exits 4 and jit validate fails with a profile-ownership rule error. Capture's blindness to contributions and the three commands' disagreement are one defect; closing only the first would leave a report that calls a failing repository clean."
+    },
+    {
+      "date": "2026-08-13",
+      "issue": "5a3ecba0",
+      "change": "Added REQ-07 requiring the profile-agreement capture's bounds to be derived rather than asserted.",
+      "approved_by": "owner, 2026-08-13",
+      "reason": "CLAIM_CAPTURE_BUDGET's max_depth: 32 is the same defect class the owner ruled on for cf42d08b, in code this epic added, in a file 5a3ecba0 already changes. Folded in rather than dispatched separately."
     }
   ],
   "container_reconciliations": [
