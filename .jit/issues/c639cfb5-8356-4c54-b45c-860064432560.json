@@ -20,10 +20,30 @@
     "holistic-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:55:45.341188369Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-08-13T18:58:13.868282883Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:55:55.526448263Z",
+      "updated_by": "auto:executor"
+    },
     "holistic-review": {
       "status": "pending",
       "updated_at": "2026-08-09T12:07:31.383889512Z",
       "updated_by": null
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:55:51.952271840Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "c639cfb5-8356-4c54-b45c-860064432560",
@@ -38,5 +58,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-13T04:49:41.996206973Z"
+  "updated_at": "2026-08-13T18:58:13.868282883Z"
 }
