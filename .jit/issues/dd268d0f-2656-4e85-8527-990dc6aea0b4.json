@@ -7,7 +7,8 @@
     "3dcce8a8-3344-4aff-bbc5-8a3a3e3a95a3",
     "8021d507-2f7b-4580-af2c-da242c831d75",
     "acf49914-0c41-4c21-9db1-532fae09cc78",
-    "b3d92595-a878-478c-825d-529b9a15572e"
+    "b3d92595-a878-478c-825d-529b9a15572e",
+    "b5bb4b9c-1992-463d-a534-6b93698e63ac"
   ],
   "description": "The completed lifecycle reaches adopters through one command surface, one\ncanonical reference, and evidence that the surface behaves as documented.\n\n## Success Criteria\n\n- [hard] REQ-01: The child work lands the profile command surface, its audit event, the canonical adopter reference, behavioural acceptance coverage, and mechanical proof that no superseded lifecycle path survives.\n",
   "documents": [],
@@ -18,9 +19,14 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "status": "pending",
-      "updated_at": "2026-08-09T12:07:32.226321813Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-13T18:21:13.729886526Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-08-13T18:18:48.617243689Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "dd268d0f-2656-4e85-8527-990dc6aea0b4",
@@ -37,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Surface, documentation, and evidence",
-  "updated_at": "2026-08-13T18:17:40.451573457Z"
+  "updated_at": "2026-08-13T18:22:21.793638859Z"
 }

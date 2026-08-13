@@ -1,0 +1,30 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-13T18:22:27.401692514Z",
+  "context": {},
+  "created_at": "2026-08-13T18:22:06.464706764Z",
+  "dependencies": [],
+  "description": "Remove the obsolete per-package `profile_applied` event from the current product contract so the aggregate lifecycle has one event representation.\n\n## Background\n\nThe lifecycle now emits one `profile_lifecycle` event per operation, but the old `ProfileApplied` variant remains in the typed event enum, generated catalog/schema, parser marker handling, documentation, and tests. The repository is greenfield and `@/inv/canonical-cutover` permits no compatibility path without a named migration boundary. Generic unknown-event retention is sufficient; no event-specific compatibility or migration is required.\n\n## Success Criteria\n\n- [hard] REQ-01: The `ProfileApplied` variant and `profile_applied` tag are absent from the current typed event vocabulary, generated catalog/schema, and adopter documentation.\n- [hard] REQ-02: Torn-tail certification and all current profile audit tests use only the aggregate `ProfileLifecycle` event without weakening recovery or audit semantics.\n- [hard] REQ-03: Mechanical cutover coverage fails if the retired variant, tag, or constructor reappears in production or generated lifecycle contracts.\n- [hard] REQ-04: No migration, compatibility adapter, or profile-specific retired-event decoder is introduced; generic unknown-event behavior remains generic.",
+  "documents": [],
+  "first_ready_at": "2026-08-13T18:22:06.464706764Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b5bb4b9c-1992-463d-a534-6b93698e63ac",
+  "labels": [
+    "epic:jit-profiles-complete",
+    "per:@/charter/D-8",
+    "story:surface-and-evidence",
+    "component:storage",
+    "component:docs",
+    "satisfies:REQ-12",
+    "milestone:v1.0",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Remove the superseded profile_applied event contract",
+  "updated_at": "2026-08-13T18:22:27.401692514Z"
+}

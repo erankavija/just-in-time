@@ -294,16 +294,28 @@
       "wave_number": 22,
       "issues": [
         {
+          "short_id": "b5bb4b9c",
+          "title": "Remove the superseded profile_applied event contract",
+          "classification": "implementation",
+          "status": "in_progress",
+          "note": "Created from blocking holistic-review finding F1 and dispatched at the balanced tier. The bounded cutover removes the obsolete typed/tagged/catalogued/documented event path, migrates current tests to ProfileLifecycle, and hardens mechanical absence coverage; generic unknown-event handling remains generic and no compatibility boundary is added."
+        },
+        {
           "short_id": "dd268d0f",
           "title": "Surface, documentation, and evidence",
           "classification": "checkpoint",
           "status": "in_progress",
-          "note": "All four dependencies are done and individually gated. Lead is running the story's authoritative repository-validation and independent holistic-review checkpoints over the complete command surface, aggregate audit contract, canonical adopter reference, behavioral evidence, and structural cutover guards."
+          "note": "repo-validate passed. Holistic-review run ece8c8cc failed on one blocking criterion finding: the superseded profile_applied variant/tag remains current in the event catalog/schema/docs. Focused remediation b5bb4b9c is now a dependency; the story will be re-reviewed after it lands."
         }
       ]
     }
   ],
   "created_during_execution": [
+    {
+      "short_id": "b5bb4b9c",
+      "title": "Remove the superseded profile_applied event contract",
+      "reason": "The final surface-story holistic review found that production emits only aggregate profile_lifecycle events while ProfileApplied/profile_applied remained in the typed event enum, generated catalog/schema, parser-specific marker handling, tests, and adopter documentation. This is a direct violation of dd268d0f's no-superseded-path criterion and @/inv/canonical-cutover, not optional follow-up scope. Wired as a dependency of dd268d0f before its re-review."
+    },
     {
       "short_id": "cf42d08b",
       "title": "A deep package packs but cannot be published",
@@ -438,7 +450,8 @@
     "6574f951": 0,
     "3dcce8a8": 1,
     "d7558ef6": 0,
-    "8021d507": 0
+    "8021d507": 0,
+    "b5bb4b9c": 0
   },
   "review_verdicts": [
     {
