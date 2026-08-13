@@ -1,7 +1,7 @@
 {
   "epic_id": "c639cfb5-8356-4c54-b45c-860064432560",
   "epic_short_id": "c639cfb5",
-  "current_wave": 16,
+  "current_wave": 17,
   "waves": [
     {
       "wave_number": 1,
@@ -204,8 +204,8 @@
           "short_id": "5a3ecba0",
           "title": "Refresh declared contributions from the repository on capture",
           "classification": "implementation",
-          "status": "in_progress",
-          "note": "code-review rounds 1-3 each FAILED on a REQ-07 budget variant; rounds 1-2 fixed and verified; owner ruled after round 3 (unbound named-path reads, on the issue description). R3 rework NOT dispatched \u2014 next session dispatches it into worktree agent-5a3ecba0 at b8572db93, then round-4 gates, merge, done."
+          "status": "done",
+          "note": "Completed on main at c6ca43310 after the owner-ruled shape-only agreement-capture model landed in 6405bab01, the stale adopter-facing CHANGELOG claim was corrected in ab2aee8d4, final branch evidence was committed in f733962c4, and the branch merged in dcb946edf. Both required gates passed; merged-main cargo-ci passed before completion."
         }
       ]
     },
@@ -424,7 +424,7 @@
     "6a479c58": 1,
     "15cc28c5": 2,
     "0708d692": 1,
-    "5a3ecba0": 3
+    "5a3ecba0": 5
   },
   "review_verdicts": [
     {
@@ -1347,6 +1347,42 @@
         }
       ],
       "notes": "cargo-ci passed at d6184bd79; rounds 1-2 findings stayed closed. Root cause structural; escalated to the owner, who ruled for unbounded named-path payload reads bounded by shape."
+    },
+    {
+      "issue": "5a3ecba0",
+      "round": "code-review gate round 4",
+      "session": 14,
+      "date": "2026-08-13",
+      "verdict": "FAIL",
+      "gates": {
+        "cargo-ci": "passed in the exact worktree",
+        "code-review": "failed on one stale adopter-facing statement"
+      },
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "medium",
+          "disposition": "blocking",
+          "summary": "CHANGELOG.md still claimed agreement-capture bounds derived from the package model and record count after the implementation had deliberately removed byte ceilings from named-path payload reads."
+        }
+      ],
+      "notes": "Rounds 1-3 stayed closed. The implementation regressions proved that adopter-variable applied records and template-expanded claimed targets may exceed the package byte budget while agreement capture remains complete. Rework was confined to the stale active narrative."
+    },
+    {
+      "issue": "5a3ecba0",
+      "round": "code-review gate round 5",
+      "session": 14,
+      "date": "2026-08-13",
+      "verdict": "PASS",
+      "gates": {
+        "cargo-ci": "passed in the final worktree and forced on merged main at dcb946edf",
+        "code-review": "passed in the final worktree with 0 findings"
+      },
+      "criteria": {
+        "REQ-01_to_REQ-06": "Owner-scoped contribution capture, manifest-only membership, post-refresh validation, absent-owned reporting, stopped-declaration omission, and agreement among diff/profile validate/repo validate are covered by focused unit and end-to-end regressions.",
+        "REQ-07": "Named applied-record and claimed-target payload reads have no byte ceiling; capture remains bounded by one directory listing, construction-derived depth, and declared-path membership. Oversized adopter-variable records and template-expanded targets are covered end to end."
+      },
+      "notes": "Lead re-read every prior finding at final HEAD: the arbitrary profile-count ceiling is absent, applied-record path validation is shared and tested, and both valid oversized payload classes are accepted. Active-surface stale sweep was clean after ab2aee8d4; historical dev/active and dev/archive records were excluded. The issue has no linked documentation. Holistic scope and architecture review found no residual issue."
     }
   ],
   "started_at": "2026-08-09T04:36:58+03:00",
@@ -1487,9 +1523,9 @@
     {
       "subject": "diff, profile validate and repo validate disagree on a drifted contribution",
       "detail": "On one repository state - a profile-contributed value edited in place - jit profile diff reports status 'unchanged' and exits 0, while jit profile validate exits 4 and jit validate fails with a profile-ownership rule error. diff is truthful: contribution rendering publishes only where the registry has no entry and overwrites none, so applying really would change nothing. The gap is that the report an adopter consults before acting says the selection is clean while repository validation is failing on that declaration. Verified by running the reworked binary against a scratch repository.",
-      "status": "assigned-5a3ecba0",
+      "status": "resolved-by-5a3ecba0",
       "owner": "lead",
-      "note": "Not 96268a98's defect: its criteria are about stating the decision and it states it correctly. Belongs with the contribution-refresh work. Lead proposed adding a criterion to 5a3ecba0 requiring the three commands to agree on whether a repository needs attention; raised with the owner, no reply yet, so 5a3ecba0's criteria are unchanged."
+      "note": "Capture now refreshes declared contributions from repository state, and focused regressions assert that diff, profile validate, and repository validate agree before and after refresh. The issue was completed only after the full contribution-refresh and reapply journey passed."
     },
     {
       "subject": "three enforced build budgets rest on obsolete measurements",
@@ -1707,5 +1743,18 @@
     "held": [
       "cb26de35 behind 5a3ecba0 (standing serialization)"
     ]
+  },
+  "session_14_summary": {
+    "date": "2026-08-13",
+    "waves_closed": [
+      16
+    ],
+    "issues_completed": [
+      "5a3ecba0"
+    ],
+    "rework_dispatches": 2,
+    "gates_run": "Final worktree cargo-ci passed; code-review first found one stale CHANGELOG statement and then passed with zero findings; merged-main cargo-ci passed before completion.",
+    "implementation": "Agreement capture now reads only explicitly named records and claimed targets, bounds discovery and shape rather than valid adopter-derived bytes, preserves ownership/path validation, and refreshes declared contributions from repository state.",
+    "next": "Wave 17: cb26de35 and acf49914, after dependency and conflict preflight."
   }
 }
