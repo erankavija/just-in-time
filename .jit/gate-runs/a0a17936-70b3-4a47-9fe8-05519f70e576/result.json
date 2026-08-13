@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-cf42d08b",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b9f2ea15164bb238a70d4eef83d55272ad4eebf8",
+  "completed_at": "2026-08-13T00:08:19.667712512Z",
+  "duration_ms": 271757,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The deep-package publication fix meets all hard requirements with model-derived bounds and focused end-to-end coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cf42d08b-ce12-4038-987c-bbb0c0950fc8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a0a17936-70b3-4a47-9fe8-05519f70e576",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T00:03:47.910203451Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:cf42d08b` commits 4cf7989e, c2b40f8e, 73210f24, c4587775, b4a981b4, e525b7f5, 68e4fcd9, 8363980f, b9f2ea15\nPolicy sources: AGENTS.md\nResolved items: @/issue/cf42d08b/requirement/REQ-01–03 (.jit/issues/cf42d08b-ce12-4038-987c-bbb0c0950fc8.json); @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint, @/invariant/convention-convergence, @/invariant/atomic-writes, @/invariant/derived-state-coherence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-12T23:59:17.117209387+00:00)\nTruncation recovery: bounded rereads of policy sources, package-model validation, publication closure, focused tests, and individual patches; historical gate records excluded from behavior judgment\n\n1. No blocking or advisory findings. The final publication budget derives its listing, byte, and depth limits from package-model bounds in `crates/jit/src/commands/profile.rs:2163`, while `crates/jit/src/repository_state/image.rs:524` removes the incompatible generic path-count cap. The model-limit integration test covers `pack → add → in-place capture` in `crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs:2559`.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The deep-package publication fix meets all hard requirements with model-derived bounds and focused end-to-end coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

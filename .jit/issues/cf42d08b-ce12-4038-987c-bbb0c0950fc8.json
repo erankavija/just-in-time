@@ -18,6 +18,11 @@
       "status": "passed",
       "updated_at": "2026-08-12T23:59:41.910320990Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-13T00:08:19.972057019Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "cf42d08b-ce12-4038-987c-bbb0c0950fc8",
@@ -32,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "A deep package packs but cannot be published",
-  "updated_at": "2026-08-12T23:59:41.910320990Z"
+  "updated_at": "2026-08-13T00:08:19.972057019Z"
 }
