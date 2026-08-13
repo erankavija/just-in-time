@@ -113,11 +113,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `jit profile diff`, the refusal an application makes, and the finding
   `jit validate` reports, so a report consulted before acting can no longer call
   a selection clean while validation fails on the same declaration. The
-  profile-agreement capture's bounds are derived from two sources a reader can
-  check — the package model for what one recorded profile can demand, and the
-  repository's own record listing for how many demand it — instead of assuming a
-  path shape or a profile count, so no repository is refused a reading of the
-  targets its own profiles legitimately claim.
+  profile-agreement capture bounds only the shape of what it reads: one listing,
+  construction-derived path depth, declared target-path membership, and
+  CaptureSpec confinement. Record and claimed-target paths are explicitly named,
+  so their payload bytes are unbounded and no repository is refused a reading of
+  content its own profiles legitimately claim.
 
 - **The build gate decides on the tree rather than on build-cache state.** Two
   of its steps read the machine instead of the change. `incremental-preflight`
