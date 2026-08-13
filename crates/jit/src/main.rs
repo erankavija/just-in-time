@@ -1003,11 +1003,7 @@ fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'s
 /// participating profile can be published, [`ExitCode::ValidationFailed`] when
 /// one cannot. Nothing is written in either case.
 fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool) -> Result<()> {
-    let conflicted = plans
-        .profiles
-        .iter()
-        .filter(|plan| plan.status == jit::profile::ProfilePlanStatus::WouldConflict)
-        .count();
+    let conflicted = plans.conflicted().count();
     if json {
         let details = serde_json::to_value(plans)?;
         let message = if conflicted == 0 {

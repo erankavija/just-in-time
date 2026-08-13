@@ -317,11 +317,12 @@ impl ProfilePlanResult {
         }
     }
 
-    /// Whether any reported profile decided a target that cannot be published.
-    pub fn has_conflicts(&self) -> bool {
+    /// The profiles that decided a target that cannot be published, in report
+    /// order.
+    pub fn conflicted(&self) -> impl Iterator<Item = &ProfilePlanEntry> {
         self.profiles
             .iter()
-            .any(|profile| profile.status == ProfilePlanStatus::WouldConflict)
+            .filter(|profile| profile.status == ProfilePlanStatus::WouldConflict)
     }
 }
 
