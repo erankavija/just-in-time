@@ -1,0 +1,28 @@
+{
+  "branch": "worktree-agent-d7558ef6",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "67510cad5d2ef26f2df6cd047ac003b1527d96f3",
+  "completed_at": "2026-08-13T17:58:14.264858848Z",
+  "duration_ms": 175193,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The concurrent apply integration test deterministically demonstrates lock contention, complete winner publication, and stale-plan avoidance.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d7558ef6-fffe-43ac-9bc7-27f914295c47",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3b08fbb0-65af-4a3d-a97d-cc92fe3d46fb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:55:19.071770995Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5ed907e78, 67510cad5\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/c639cfb5/requirement/REQ-11 (.jit/issues/c639cfb5-8356-4c54-b45c-860064432560.json); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: targeted per-commit patches and narrow current-session/storage reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The concurrent apply integration test deterministically demonstrates lock contention, complete winner publication, and stale-plan avoidance.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,24 @@
+{
+  "branch": "worktree-agent-d7558ef6",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "67510cad5d2ef26f2df6cd047ac003b1527d96f3",
+  "completed_at": "2026-08-13T17:54:56.764845493Z",
+  "duration_ms": 103843,
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "8deb62d18a5ca4b65f02bcc02316ffa62439c7b37adb99af62104aa19bb348cb",
+  "issue_id": "d7558ef6-fffe-43ac-9bc7-27f914295c47",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "83cb7c1f-266f-4a0d-958e-811088f3e368",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-13T17:53:12.921579153Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-baseline: 81 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-d7558ef6/target, none of them this run's (37 ms)\n  ✓ fmt: ok (1555 ms)\n  ✓ clippy: ok (28108 ms)\n  ✓ suite-build: built in 43956 ms, warmed 17 executables (1993900688 bytes) in 64 ms (44023 ms)\n  ✓ test: 4541 passed, 0 failed, 7 skipped (24216 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4889 ms)\n  ✓ suite-clock: 29124 ms\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1668839968/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=29124ms (715 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-d7558ef6/target during this run (81 pre-existing entries ignored) (45 ms)\n\n",
+  "tree_dirty": false
+}
