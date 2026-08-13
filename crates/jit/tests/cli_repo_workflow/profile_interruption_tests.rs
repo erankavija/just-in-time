@@ -13,7 +13,7 @@ use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
 const PROFILE_ID: &str = "lifecycle-interruption";
-const PACKAGE_LOCATION: &str = "packages/lifecycle-interruption";
+pub(super) const PACKAGE_LOCATION: &str = "packages/lifecycle-interruption";
 const RECORD_PATH: &str = ".jit/profiles/lifecycle-interruption.json";
 const EVENT_PATH: &str = ".jit/events.jsonl";
 const MANAGED_TARGETS: [&str; 3] = [
@@ -61,7 +61,7 @@ const EXPECTED_PROFILE_PUBLICATION_STAGES: [&str; 28] = [
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct LifecycleState {
+pub(super) struct LifecycleState {
     worktree_bytes: BTreeMap<&'static str, Option<Vec<u8>>>,
     ownership_bytes: Vec<u8>,
     ownership: Value,
@@ -70,7 +70,7 @@ struct LifecycleState {
 }
 
 impl LifecycleState {
-    fn capture(repository: &Path) -> Self {
+    pub(super) fn capture(repository: &Path) -> Self {
         let worktree_bytes = MANAGED_TARGETS
             .into_iter()
             .map(|path| {
@@ -105,7 +105,7 @@ impl LifecycleState {
         }
     }
 
-    fn is_semantically_equivalent_to(&self, other: &Self) -> bool {
+    pub(super) fn is_semantically_equivalent_to(&self, other: &Self) -> bool {
         self.worktree_bytes == other.worktree_bytes
             && self.ownership_bytes == other.ownership_bytes
             && self.ownership == other.ownership
@@ -231,11 +231,11 @@ fn stage_name(point: &TransactionFailurePoint) -> &'static str {
     }
 }
 
-fn selector() -> ProfileSelector {
+pub(super) fn selector() -> ProfileSelector {
     ProfileSelector::path(PathBuf::from(PACKAGE_LOCATION))
 }
 
-fn executor_with_failures(
+pub(super) fn executor_with_failures(
     repository: &Path,
     failures: Arc<dyn TransactionFailureInjector>,
 ) -> CommandExecutor<JsonFileStorage> {
@@ -245,7 +245,7 @@ fn executor_with_failures(
     CommandExecutor::new(storage).with_layout(layout)
 }
 
-fn ordinary_executor(repository: &Path) -> CommandExecutor<JsonFileStorage> {
+pub(super) fn ordinary_executor(repository: &Path) -> CommandExecutor<JsonFileStorage> {
     let data = repository.join(".jit");
     let storage = JsonFileStorage::new(&data);
     let layout = discover_repository_layout(repository, &data).unwrap();
@@ -287,7 +287,7 @@ fn write_package(repository: &Path, version: &str) {
     }
 }
 
-fn changed_profile_fixture() -> (TempDir, LifecycleState) {
+pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
     let (repository, _storage) = jit::test_utils::setup_test_repo().unwrap();
     write_package(repository.path(), "1.0.0");
     let initial = ordinary_executor(repository.path())
