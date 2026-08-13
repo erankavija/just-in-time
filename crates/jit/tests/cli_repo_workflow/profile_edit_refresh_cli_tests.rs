@@ -37,6 +37,15 @@ fn requested(application: &Value) -> &Value {
         .expect("an application reports its requested profile")
 }
 
+fn only_profile(collection: &Value) -> &Value {
+    assert_eq!(collection["count"], 1);
+    collection["profiles"]
+        .as_array()
+        .expect("a profile collection reports profiles")
+        .first()
+        .expect("a one-entry collection reports its profile")
+}
+
 fn profile_record(repo: &Path) -> Value {
     serde_json::from_slice(
         &fs::read(repo.join(format!(".jit/profiles/{PROFILE}.json")))
@@ -121,6 +130,7 @@ fn test_profile_capture_refreshes_an_edited_owned_target_back_into_agreement() {
     );
     assert!(capture.status.success(), "{capture:?}");
     let capture = json(&capture);
+    let capture = only_profile(&capture);
     assert_eq!(capture["id"], PROFILE);
     assert_eq!(capture["version"], "1.0.0");
     assert_eq!(capture["status"], "applied");
@@ -182,11 +192,12 @@ fn test_profile_capture_refreshes_an_edited_owned_target_back_into_agreement() {
     );
     assert!(refreshed.status.success(), "{refreshed:?}");
     let refreshed = json(&refreshed);
+    let refreshed = only_profile(&refreshed);
     assert_eq!(refreshed["id"], capture["id"]);
     assert_eq!(refreshed["version"], capture["version"]);
     assert_eq!(refreshed["status"], "applied");
     assert_ne!(refreshed["package_hash"], capture["package_hash"]);
-    assert!(refreshed["files"]
+    assert!(refreshed["targets"]
         .as_array()
         .expect("a capture reports file decisions")
         .iter()
