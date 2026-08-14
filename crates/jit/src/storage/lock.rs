@@ -399,7 +399,7 @@ mod tests {
     use super::*;
     use crate::storage::contention_probe::{admitted_when_reached, Contenders};
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier, Mutex};
+    use std::sync::Arc;
     use std::thread;
     use tempfile::TempDir;
 
@@ -653,40 +653,52 @@ mod tests {
         );
     }
 
+    /// Shared holds coexist: while one is live the lock grants a second, and
+    /// the exclusive lock is refused until the last of them is released.
+    ///
+    /// Every fact is asked of the lock by a caller that already holds it, so a
+    /// host that runs the requests one after another proves the property as
+    /// well as one that interleaves them. The exclusive requests are what
+    /// separate a shared lock from no lock at all: an implementation that
+    /// granted every request would satisfy the two shared grants alone.
     #[test]
-    fn test_shared_locks_allow_concurrent_reads() {
+    fn test_lock_shared_is_granted_to_a_second_caller_while_a_shared_hold_is_live() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.lock");
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
 
-        let path = Arc::new(file_path);
-        let barrier = Arc::new(Barrier::new(3));
-        let success_count = Arc::new(Mutex::new(0));
+        let first = locker
+            .try_lock_shared(&file_path)
+            .unwrap()
+            .expect("nobody holds the lock yet, so the shared lock is free");
+        let second = locker
+            .try_lock_shared(&file_path)
+            .unwrap()
+            .expect("a live shared hold does not exclude a second shared caller");
 
-        let handles: Vec<_> = (0..3)
-            .map(|_| {
-                let path = Arc::clone(&path);
-                let barrier = Arc::clone(&barrier);
-                let success_count = Arc::clone(&success_count);
+        assert!(
+            locker.try_lock_exclusive(&file_path).unwrap().is_none(),
+            "the exclusive lock is granted while two shared holds are live, so \
+             those holds exclude nobody"
+        );
 
-                thread::spawn(move || {
-                    barrier.wait();
+        drop(first);
+        assert!(
+            locker.try_lock_exclusive(&file_path).unwrap().is_none(),
+            "the exclusive lock is granted while one shared hold remains, so the \
+             refusal above came from the released hold alone"
+        );
 
-                    let locker = FileLocker::new(Duration::from_millis(500));
-                    if let Ok(_guard) = locker.lock_shared(&path) {
-                        thread::sleep(Duration::from_millis(100));
-                        *success_count.lock().unwrap() += 1;
-                    }
-                })
-            })
-            .collect();
-
-        for handle in handles {
-            handle.join().unwrap();
-        }
-
-        // All threads should acquire shared lock
-        let count = *success_count.lock().unwrap();
-        assert_eq!(count, 3, "All threads should acquire shared lock");
+        drop(second);
+        assert!(
+            locker.try_lock_shared(&file_path).unwrap().is_some(),
+            "the shared lock is refused after every hold on it was released"
+        );
+        assert!(
+            locker.try_lock_exclusive(&file_path).unwrap().is_some(),
+            "the exclusive lock is still refused after the last shared hold was \
+             released, so something other than those holds refuses it"
+        );
     }
 
     #[test]
