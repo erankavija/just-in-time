@@ -24,7 +24,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Worktree write policy configuration key",
-  "updated_at": "2026-08-14T06:15:59.039394718Z"
+  "updated_at": "2026-08-14T06:33:04.023700488Z"
 }

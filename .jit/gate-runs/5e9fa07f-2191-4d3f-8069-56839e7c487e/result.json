@@ -1,0 +1,36 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "70f7cc195251d757fcd18ae97552c77226c73a9e",
+  "completed_at": "2026-08-14T06:32:35.015446279Z",
+  "duration_ms": 440181,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "id": "F2",
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Six unrelated pre-existing strategic membership labels are not backed by the dependency DAG."
+      }
+    ],
+    "summary": "The current breakdown exactly matches the authoritative manifest; one unrelated pre-existing DAG-label divergence remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "bf79b3bc-06ce-47c8-abdc-09def1478dde",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5e9fa07f-2191-4d3f-8069-56839e7c487e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T06:25:14.833878762Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "The authoritative manifest passes validation with zero errors or warnings. Renderer `--check`, native batch dry-run (19 issues, 14 edges), and `jit validate` all pass. Stored records and graph geometry match exactly; `planning` is neither persisted nor batch-exported. Prior blocking F1 is resolved by the MCP footprint, label, criterion, and `mcp-ci` gate.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| worktree-detection-convergence | Yes | Worktree detection callers | Storage layout coverage | Yes, 5 touches | Yes | Yes | Yes | Pass |\n| worktree-write-policy-config | Yes | Configuration readers | Configuration parsing | Yes, 3 touches | Yes | Yes | Yes | Pass |\n| mutation-context-factory | Yes | Mutation-context callers | Factory/unit and existing suites | Yes, mechanical convergence | Yes | Yes | Yes | Pass |\n| worktree-override-audit-event | Yes | Event-log readers | Event model tests | Yes, 3 touches | Yes | Yes | Yes | Pass |\n| worktree-override-audit-publication | Yes | Mutation-session callers | Failure injection | Yes, 4 touches | Yes | Yes | Yes | Pass |\n| worktree-write-guard | Yes | Command dispatch | Linked-checkout CLI tests | Yes, 4 touches | Yes | Yes | Yes | Pass |\n| exact-store-read | Yes | Storage consumers | Storage unit tests | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| worktree-divergence-detection | Yes | Worktree introspection | Divergence CLI tests | Yes, 6 touches; uncertainty bounded | Yes | Yes | Yes | Pass |\n| worktree-delete-guard-convergence | Yes | Command dispatch | Deletion CLI tests | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| worktree-guide-stance | Yes | Adopter guides | Documentation checks | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| worktree-recovery-guidance | Yes | Coordination guides | Documentation checks | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| gate-durability-regression-test | Yes | Gate callers | Persistence failure injection | Yes, 1 create/1 touch | Yes | Yes | Yes | Pass |\n| postcheck-error-surfacing | Yes | Transition callers | Postcheck harness | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| profile-remedy-model | Yes | Profile conflict reporters | Domain unit tests | Yes, 2 touches | Yes | Yes | Yes | Pass |\n| profile-conflict-json-details | Yes | Profile JSON consumers | CLI JSON tests | Yes, 4 touches | Yes | Yes | Yes | Pass |\n| profile-guidance-reference | Yes | Profile guidance readers | Docs and MCP checks | Yes, 3 touches; uncertainty bounded | Yes | Yes | Yes | Pass |\n| profile-show-positional | Yes | Profile-show callers | CLI argument tests | Yes, 5 touches | Yes | Yes | Yes | Pass |\n| worktree-policy-journey | Yes | Adopter command boundary | Live linked-checkout suite | Yes, 1 create/1 touch | Yes | Yes | Yes | Pass |\n| worktree-divergence-journey | Yes | Adopter command boundary | Divergence journey suite | Yes, 1 create/1 touch | Yes | Yes | Yes | Pass |\n\n1. F2 — Low; advisory; pre-existing. Six unrelated pre-existing strategic membership labels remain unbacked by the dependency DAG. This is unchanged from the prior review and does not affect the created graph.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The current breakdown exactly matches the authoritative manifest; one unrelated pre-existing DAG-label divergence remains advisory.\",\"findings\":[{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Six unrelated pre-existing strategic membership labels are not backed by the dependency DAG.\"}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

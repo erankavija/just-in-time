@@ -21,7 +21,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Surface swallowed postcheck failures",
-  "updated_at": "2026-08-14T06:16:26.442928158Z"
+  "updated_at": "2026-08-14T06:33:14.391962135Z"
 }

@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for gf2 adopter reliability: safe worktrees, durable gates, actionable profiles (4a559332) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-08-14T06:32:58.829569022Z",
   "first_ready_at": "2026-08-14T06:14:37.801060255Z",
   "gates_required": [
     "coverage-preview",
@@ -15,8 +16,8 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "failed",
-      "updated_at": "2026-08-14T06:24:10.646441568Z",
+      "status": "passed",
+      "updated_at": "2026-08-14T06:32:35.373763481Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
@@ -35,7 +36,7 @@
     "brackets:4a559332"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-14T06:24:10.646441568Z"
+  "updated_at": "2026-08-14T06:32:58.829569022Z"
 }

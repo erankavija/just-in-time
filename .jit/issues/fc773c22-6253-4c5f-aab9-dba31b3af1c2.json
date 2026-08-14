@@ -21,7 +21,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Exact single-store read for cross-checkout comparison",
-  "updated_at": "2026-08-14T06:16:15.496318636Z"
+  "updated_at": "2026-08-14T06:33:45.586967410Z"
 }

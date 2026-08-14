@@ -25,7 +25,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Positional profile id for the show command",
-  "updated_at": "2026-08-14T06:16:37.350508849Z"
+  "updated_at": "2026-08-14T06:33:09.207360551Z"
 }

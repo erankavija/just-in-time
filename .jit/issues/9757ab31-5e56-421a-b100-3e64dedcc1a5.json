@@ -21,7 +21,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Converge worktree detection on one primitive",
-  "updated_at": "2026-08-14T06:15:53.567902773Z"
+  "updated_at": "2026-08-14T06:33:24.776222036Z"
 }

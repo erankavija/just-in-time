@@ -21,7 +21,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Converge mutation-context construction onto one factory",
-  "updated_at": "2026-08-14T06:16:04.510080593Z"
+  "updated_at": "2026-08-14T06:33:35.170526279Z"
 }

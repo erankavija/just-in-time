@@ -23,7 +23,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Regression coverage for gate evaluation durability",
-  "updated_at": "2026-08-14T06:16:20.978229725Z"
+  "updated_at": "2026-08-14T06:33:19.584931880Z"
 }
