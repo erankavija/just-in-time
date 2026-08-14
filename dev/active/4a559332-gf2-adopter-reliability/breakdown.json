@@ -1,0 +1,547 @@
+[
+  {
+    "key": "worktree-detection-convergence",
+    "title": "Converge worktree detection on one primitive",
+    "description": "Worktree detection and primary-checkout discovery answer from one primitive instead of five\nindependent implementations.\n\n## Background\n\nFive separate implementations currently decide whether the current checkout is a linked\nnon-primary worktree and where the primary checkout lives: a version-control layout probe\ncomputed before every dispatch, a test for whether the repository pointer is a file in the\nJSON storage backend, a library-level path comparison in index loading, an inline\nversion-control invocation in issue loading, and a linked-checkout fallback in the\nrepository-state store. They can disagree, and nothing names one of them as authoritative.\nThe layout probe is the most complete and is already computed before dispatch, so it becomes\nthe single answer.\n\n## Success Criteria\n\n- [hard] REQ-01: One primitive answers whether the selected data root sits inside a linked non-primary checkout and where the primary checkout's store is; no second implementation of either question survives in storage or command code.\n- [hard] REQ-02: Outside version control the primitive reports a non-linked checkout rather than failing, so repositories without version control keep working.\n- [hard] REQ-03: When an environment override selects the data root, classification follows that selected root's location rather than the process working directory, and that behaviour is covered.\n- [hard] REQ-04: The layered issue read fallback, the deletion policy, and worktree introspection keep their current observable behaviour while reading the converged primitive.\n\n## Notes\n\nThe read-side layered issue resolution (local store, then version-control history, then the\nprimary checkout) is documented adopter-facing behaviour and is unchanged here; only the\ndetection question underneath it converges.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "One primitive answers whether this checkout is linked and where the primary store lives.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "worktree-authority"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-5"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "worktree detection call sites",
+        "test_boundary": "storage worktree-layout coverage",
+        "worker_sized_reason": "Five known implementations converge onto one primitive that already runs before every dispatch, adding no new behaviour outside the storage and dispatch layers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/worktree_paths.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/repository_state_store.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-write-policy-config",
+    "title": "Worktree write policy configuration key",
+    "description": "Repository configuration declares whether state-mutating commands may run inside a linked\nnon-primary checkout, and resolves to refusal when nothing is declared.\n\n## Background\n\nThe configuration already carries a worktree section whose lease-enforcement key is typed,\nparsed at load, and defaulted in one place. A write-policy stance follows that same shape: a\ntyped value with a stated default, so a repository chooses its stance in version-controlled\nconfiguration rather than through an undeclared environment convention. The shipped default\nrefuses, because the adopter who never considered the question is the one the divergent-store\nhazard hurts.\n\n## Success Criteria\n\n- [hard] REQ-01: A typed write-policy value parses from the worktree configuration section and rejects unknown tokens at load time with a message naming the accepted ones.\n- [hard] REQ-02: With no declared value, and with no worktree section at all, the resolved stance refuses state-mutating commands inside a linked non-primary checkout.\n- [hard] REQ-03: A declared permissive stance resolves to permitting those commands, and the precedence between the declared stance and a per-invocation override is stated once and covered by tests.\n- [hard] REQ-04: This repository declares the permissive stance in its own tracker configuration, so its linked agent checkouts keep mutating their local stores.\n- [hard] REQ-05: The configuration reference states the key, its accepted values, its default, and how an absent section resolves, worded as the repository's declared stance rather than as a promise of enforcement.\n\n## Notes\n\nThe neighbouring lease-enforcement key resolves differently depending on whether the section\nis present at all. The write-policy key states its own resolution explicitly rather than\ninheriting that asymmetry.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "component:docs",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A typed worktree policy key resolves the mutation stance for linked checkouts, defaulting to refusal.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "worktree-write-policy"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-1"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "repository configuration readers",
+        "test_boundary": "configuration parsing coverage",
+        "worker_sized_reason": "One typed key parsed beside an existing key in the same configuration section, with its default resolution and its reference entry.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/config.rs",
+            ".jit/config.toml",
+            "docs/reference/configuration.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-write-guard",
+    "title": "Refuse state-mutating commands in linked worktrees",
+    "description": "A state-mutating invocation inside a linked non-primary checkout refuses before any repository\nwrite unless the declared stance or an explicit override permits it, and the adopter guides\nthat teach the linked-checkout workflow state the stance that now governs it.\n\n## Background\n\nThe command enumeration already classifies every invocation by whether it must open a\nrepository mutation session. That classification is exhaustive over the command families that\ndelegate to a sub-enum classifier; five read-only families match their inner enum with a\nwildcard, so a new mutating leaf under one of them must be classified deliberately rather than\ninherited silently. That predicate, combined with the worktree primitive computed before\ndispatch, is exactly the condition a write policy needs, and evaluating it before the\nrepository mutation session is opened leaves a refusal with no partial state and no event\nbehind. One command — issue deletion — already carries an unconditional secondary-checkout\nrefusal of its own, which becomes a case of the general policy rather than a parallel variant.\n\nThe parallel-work tutorial and the multi-agent coordination guide teach mutation from a linked\ncheckout as the sanctioned workflow, so those pages must state the stance and where a\nrepository declares it, or they contradict the behaviour an adopter observes.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, an invocation that would open a repository mutation session inside a linked non-primary checkout fails before any repository write, leaving that checkout's store and event log untouched.\n- [hard] REQ-02: The refusal names the linked checkout, the stance that refused it, and how to permit the operation; its machine-readable form carries the same three facts.\n- [hard] REQ-03: A permissive declared stance and an explicit per-invocation override each permit the invocation, and a permitted override leaves a durable record a later reader finds in the repository's own history.\n- [hard] REQ-04: Read-only invocations, invocations in the primary checkout, and invocations outside version control succeed under either stance.\n- [hard] REQ-05: The unconditional deletion refusal is replaced by the general policy, and deletion keeps its current outcome under the refusing stance.\n- [hard] REQ-06: Existing coverage that mutates from a linked checkout declares the stance it relies on rather than depending on an unstated default.\n- [hard] REQ-07: The parallel-work tutorial and the multi-agent coordination guide state the stance that governs mutation inside a linked checkout and where a repository declares it, so every step they instruct succeeds under the stance the reader's repository declares.\n\n## Notes\n\nThe condition is evaluated at dispatch, before the repository mutation session is opened, so a\nrefused invocation is not a state change and appends nothing: the append-on-state-change\nguarantee is preserved rather than excepted.\n\nThe session predicate is deliberately broader than the divergent-history hazard: an invocation\nthat writes only the shared control plane or machine-local runtime state still classifies as\nmutating and refuses under the refusing stance. An over-refusal of that kind is the chosen\nbehaviour, not a defect.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:cli",
+      "component:storage",
+      "component:docs",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "worktree-detection-convergence",
+      "worktree-write-policy-config"
+    ],
+    "planning": {
+      "outcome": "State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it.",
+      "contract_refs": [
+        "worktree-authority",
+        "worktree-write-policy"
+      ],
+      "produces_contracts": [
+        "worktree-refusal-audit"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-1",
+        "OD-5"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "command dispatch",
+        "test_boundary": "linked-checkout CLI coverage",
+        "worker_sized_reason": "One dispatch-site guard over an existing exhaustive predicate plus the stance statement in the two guides that teach the governed workflow; the doc edits describe this task's own behaviour change and are not independently deliverable without contradiction.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/src/cli.rs",
+            "crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
+            "docs/tutorials/parallel-work-worktrees.md",
+            "docs/how-to/multi-agent-coordination.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-divergence-detection",
+    "title": "Report divergent checkout stores",
+    "description": "A read-only check reports the issue records and event history one checkout's store holds and\nthe other does not, in both directions.\n\n## Background\n\nNo command compares two checkouts' tracker stores today. The two existing names that sound\nlike they might belong to unrelated concepts: one reports membership labels disagreeing with\nthe dependency graph, the other checks branch ancestry against the upstream default. An\nadopter recovering a divergent store therefore has no way to see what diverged. Issue records\ndo fall back across the local store, version-control history, and the primary checkout when\nread, but the event log has no fallback at all, so a linked checkout's events are visible only\nfrom inside it.\n\n## Success Criteria\n\n- [hard] REQ-01: The check names issue records present in one checkout's store and absent from the other, in both directions, and writes to neither store.\n- [hard] REQ-02: The check names event records held by one checkout's log and missing from the other, since event history has no cross-checkout read path.\n- [hard] REQ-03: Records present in both stores but holding conflicting values are reported as conflicts, distinct from records present in only one place.\n- [hard] REQ-04: The check reports no findings in the primary checkout, in a linked checkout whose store agrees with the primary, and outside version control.\n- [hard] REQ-05: Machine-readable output carries the same findings as the rendered output, wrapped in the repository's list envelope.\n- [hard] REQ-06: The worktree command reference states the check, its output shape, and what each finding class means.\n\n## Notes\n\nThe check reads only. Recovering from a reported divergence is a separate concern, and this\nsurface deliberately offers no reconciliation.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:cli",
+      "component:storage",
+      "component:docs",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "worktree-detection-convergence"
+    ],
+    "planning": {
+      "outcome": "A read-only check reports the issue records and events one checkout holds without the other.",
+      "contract_refs": [
+        "worktree-authority"
+      ],
+      "produces_contracts": [
+        "store-divergence-report"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "OD-2"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "worktree introspection surface",
+        "test_boundary": "divergence-check CLI coverage",
+        "worker_sized_reason": "One read-only comparison over two store locations the detection primitive already resolves, with no mutation path to design.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
+            "docs/reference/worktree-validate.md"
+          ],
+          "uncertainty": "whether the comparison lands inside the existing worktree command module or beside it is left to implementation"
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-recovery-guidance",
+    "title": "Recovery guidance for divergent checkout stores",
+    "description": "Adopter guidance states a lossless recovery procedure for a divergent checkout store, and the\ncleanup recipe for an abandoned checkout looks for unmerged tracker state before anything is\ndiscarded.\n\n## Background\n\nThe published cleanup recipe removes an abandoned checkout with a single version-control\ncommand and then says only that leases expire. It says nothing about whether that checkout\nholds tracker records committed nowhere else, which is the most plausible mechanical route to\npermanently losing the only copy of issue and event history. Existing recovery material covers\nmerge conflicts inside one checkout, but nothing covers two checkouts whose stores diverged.\nThe event log already carries a union merge declaration, so disjoint event history survives a\nmerge; issue records do not, and need a stated decision point.\n\n## Success Criteria\n\n- [hard] REQ-01: The procedure preserves both checkouts' issue records and both event logs before any reconciliation step, so no step can leave a record with a single copy.\n- [hard] REQ-02: The procedure states how the event log's union merge behaviour keeps disjoint event history, and where issue records need a human decision instead.\n- [hard] REQ-03: The procedure directs the reader to the read-only divergence check as its first step and states how to read each finding class.\n- [hard] REQ-04: The cleanup recipe for an abandoned checkout checks for unmerged tracker state before removal and states what to do when that check reports findings.\n- [hard] REQ-05: The parallel-work material links to the procedure from where it describes per-checkout tracker state, with each fact stated in one place rather than restated.\n\n## Notes\n\nThe procedure composes version-control behaviour the repository already declares with the\nread-only check; it introduces no reconciliation command of its own.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:docs",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "worktree-divergence-detection"
+    ],
+    "planning": {
+      "outcome": "Adopters recover a divergent checkout store losslessly and screen for unmerged state before discarding one.",
+      "contract_refs": [
+        "store-divergence-report"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02",
+        "OD-2"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "adopter coordination guides",
+        "test_boundary": "documentation mechanical checks",
+        "worker_sized_reason": "Two existing pages gain one procedure and one recipe safeguard over capabilities that already exist, with no code surface left open.",
+        "footprint": {
+          "touches": [
+            "docs/how-to/multi-agent-coordination.md",
+            "docs/tutorials/parallel-work-worktrees.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "gate-durability-regression-test",
+    "title": "Regression coverage for gate evaluation durability",
+    "description": "An injected persistence failure during an automated gate evaluation proves that success is\nreported only once the gate run, the issue gate status, and the event are durably recorded.\n\n## Background\n\nAn adopter reported a gate evaluation printing success without a durable gate-run record. The\ncurrent automated path builds the issue update, the gate-run record, and the event into one\nplan and applies them through the recovering two-phase-commit kernel before returning, so the\nguarantee holds on that path; what is missing is coverage that would catch its regression.\nFailure injection through the transaction kernel already exists and is used where gates are\ndefined, but never where a gate is run. The existing crashed-fixture helper is\ninitialization-specific and the command subprocess exposes no injector, so the coverage drives\nthe gate path in process with injected storage and then inspects the recovered repository from\na separate process.\n\n## Success Criteria\n\n- [hard] REQ-01: A persistence failure injected during an automated gate evaluation returns failure rather than success.\n- [hard] REQ-02: After that injected failure, a freshly opened repository reports the gate as not passed and holds no gate-run record for the failed attempt.\n- [hard] REQ-03: A separate process reading the same repository after recovery reports the same gate status, proving the guarantee at the boundary an adopter uses rather than in process only.\n- [hard] REQ-04: On the successful path, the gate run, the issue gate status, and the event are all readable once the evaluation returns.\n- [hard] REQ-05: The manual attestation branch of gate evaluation is confirmed to propagate a persistence failure rather than reporting success, with coverage proving it.\n\n## Notes\n\nThis adds no production code: the durability primitive already exists, and the value delivered\nis the coverage that fails if it regresses.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:gates",
+      "component:testing",
+      "satisfies:REQ-03",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Injected persistence failure during a gate evaluation returns failure and leaves no passing gate record.",
+      "contract_refs": [
+        "gate-durability-boundary"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-03",
+        "REQ-06",
+        "D-02"
+      ],
+      "landing_group": "gate-durability",
+      "terminal": {
+        "consumer_family": "gate evaluation callers",
+        "test_boundary": "gate persistence failure injection",
+        "worker_sized_reason": "One failure-injection case follows an existing gate-definition pattern into the gate-run path, with no production change to design.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_gate/gate_durability_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_gate/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "postcheck-error-surfacing",
+    "title": "Surface swallowed postcheck failures",
+    "description": "An automated postcheck whose evaluation fails to persist surfaces that failure instead of\nleaving the transition indistinguishable from a clean run.\n\n## Background\n\nThe postcheck loop discards each checker result through an ignored return value, and the\ncomment above it claims failures are logged where the code at that site emits nothing. The\nstate machine stays correct — an unpassed gate keeps the issue out of the terminal state — but\nthe invocation returns ordinary success, so a persistence failure inside a postcheck leaves no\nevidence anywhere. Which invocations reach this loop is not established: the primary\nstate-update path is a different function, and the one direct caller found transitions to a\nrejected state.\n\n## Success Criteria\n\n- [hard] REQ-01: The invocations that reach the postcheck loop are enumerated as part of this change, and the loop distinguishes a persistence failure from an ordinary checker failure.\n- [hard] REQ-02: A persistence failure inside a postcheck reaches the caller rather than being discarded, and the invocation does not report unqualified success.\n- [hard] REQ-03: An ordinary failing checker keeps its current outcome: the issue stays out of the terminal state and the invocation succeeds.\n- [hard] REQ-04: The comment describing the loop's error handling matches what the code does.\n\n## Notes\n\nWhether the surfacing is a returned error or a reported warning depends on which invocations\nreach the loop, so the enumeration settles that question before the surfacing is written.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:gates",
+      "satisfies:REQ-03"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A postcheck persistence failure reaches the caller instead of being silently discarded.",
+      "contract_refs": [
+        "gate-durability-boundary"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-03",
+        "D-02"
+      ],
+      "landing_group": "gate-durability",
+      "terminal": {
+        "consumer_family": "issue transition callers",
+        "test_boundary": "postcheck harness coverage",
+        "worker_sized_reason": "One error path in one loop, with its caller set enumerated first so the surfacing shape is decided from evidence rather than guessed.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/issue.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-remedy-model",
+    "title": "Typed remedy data on profile conflicts",
+    "description": "Each profile target conflict and each profile divergence carries a serializable remedy value\nnaming which resolutions apply, instead of encoding that knowledge only in the prose it\nrenders.\n\n## Background\n\nThe conflict type already distinguishes its remedies exhaustively: it selects a different\nprose constant per variant, and for at least one real adopter case one of the two candidate\nremedies is invalid rather than merely less preferred. That knowledge exists as an exhaustive\nmatch over typed values and is discarded the moment it becomes a sentence. The divergence type\nis already serializable and schema-described; the conflict type is neither.\n\n## Success Criteria\n\n- [hard] REQ-01: A typed remedy value names each resolution that applies to a conflict or a divergence, distinguishing restoring recorded content from capturing repository content, and marking capture as applicable only where capture is valid.\n- [hard] REQ-02: The conflict type serializes, carrying its remedy beside the values that identify the conflict.\n- [hard] REQ-03: The rendered prose derives from that same typed remedy, so a reader of the sentence and a reader of the data act on identical resolutions.\n- [hard] REQ-04: Existing coverage asserting the rendered prose keeps passing, including the assertion that capture is named only where it applies.\n\n## Notes\n\nThe remedy vocabulary is domain data on the conflict and divergence types. How it reaches a\ncommand's output is a separate concern.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:core",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Profile conflicts and divergences carry a serializable remedy naming which resolutions apply.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "profile-remedy-data"
+      ],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "landing_group": "profile-guidance",
+      "terminal": {
+        "consumer_family": "profile conflict reporters",
+        "test_boundary": "profile domain unit coverage",
+        "worker_sized_reason": "One exhaustive match already distinguishes the remedies, so the change turns existing branching into a typed value the prose then derives from.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/profile/agreement.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-conflict-json-details",
+    "title": "Profile conflict output carries its remedy",
+    "description": "Profile refusals and divergences reach machine consumers as structured details and suggested\nresolutions rather than as one flat sentence.\n\n## Background\n\nTwo failure branches build their machine-readable output from the error's rendered text alone,\ndiscarding the typed value behind it. The same output type already supports attached details\nand suggestions, and two neighbouring profile subcommands already use it to carry structured\nfindings — so the pattern is proven on this exact surface and needs extending to the refusal\npaths rather than inventing.\n\n## Success Criteria\n\n- [hard] REQ-01: A refused profile publication emits its conflict code together with structured details naming each conflicting target, its conflict class, and its typed remedy.\n- [hard] REQ-02: A reported divergence emits structured details naming each diverged target, its divergence class, and its typed remedy.\n- [hard] REQ-03: Suggested resolutions accompany the details and name capture only where the remedy marks capture applicable.\n- [hard] REQ-04: The failure code, the exit status, and the rendered human message of both paths keep their current content.\n- [hard] REQ-05: Existing coverage reading these failures asserts the structured fields rather than the sentence alone.\n\n## Notes\n\nCoverage for this surface lives in the command-boundary suites, so the assertions run against\nthe process an adopter actually invokes.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:cli",
+      "satisfies:REQ-04",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-remedy-model"
+    ],
+    "planning": {
+      "outcome": "Profile refusals and divergences reach machine consumers with structured details plus suggested resolutions.",
+      "contract_refs": [
+        "profile-remedy-data"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "REQ-06"
+      ],
+      "landing_group": "profile-guidance",
+      "terminal": {
+        "consumer_family": "profile JSON error consumers",
+        "test_boundary": "profile CLI JSON coverage",
+        "worker_sized_reason": "Two failure branches gain the attachment pattern two neighbouring subcommands already use, with the pinned assertions extended alongside them.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_edit_refresh_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-guidance-reference",
+    "title": "Profile recovery guidance reference",
+    "description": "The canonical profile reference and the bridge's tool descriptions state the machine-readable\nremedy contract, so an adopter reading prose and an agent reading data find the same\nresolutions.\n\n## Background\n\nThe profile reference already gives restore-versus-capture guidance in prose. Once that\ndistinction is available as data on refusals and divergences, the reference states the\ncontract rather than restating advice, and the error-code entry for a refused publication\npoints at it instead of carrying its own copy. The bridge's curated tool descriptions already\nmention divergence and capture as a recovery choice, so they name where the structured remedy\nappears.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile reference states the remedy vocabulary, which resolutions each conflict and divergence class carries, and where the structured form appears in machine-readable output.\n- [hard] REQ-02: The error-code entry for a refused publication points at that guidance rather than repeating it.\n- [hard] REQ-03: The bridge's tool descriptions name the structured remedy as the resolution source for a divergence and for a refusal.\n- [hard] REQ-04: Each guidance fact has one home, with other pages citing it instead of restating it.\n\n## Notes\n\nThe contract described here is already shipped by the time this lands, so no behaviour is\ndecided in prose.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:docs",
+      "component:mcp",
+      "satisfies:REQ-04"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical",
+      "mcp-ci"
+    ],
+    "depends_on": [
+      "profile-conflict-json-details"
+    ],
+    "planning": {
+      "outcome": "The profile reference and the bridge tool descriptions state the machine-readable remedy contract.",
+      "contract_refs": [
+        "profile-remedy-data"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "landing_group": "profile-guidance",
+      "terminal": {
+        "consumer_family": "adopter profile guidance",
+        "test_boundary": "documentation mechanical checks",
+        "worker_sized_reason": "Three prose surfaces state one contract that already ships, with no behaviour decided and no code path to design.",
+        "footprint": {
+          "touches": [
+            "docs/reference/profiles.md",
+            "docs/reference/error-codes.md",
+            "mcp-server/curated-tools.json"
+          ],
+          "uncertainty": "whether the bridge's pinned tool-inventory assertions cover the edited description strings is unconfirmed"
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-show-positional",
+    "title": "Positional profile id for the show command",
+    "description": "The profile show command accepts an unambiguous positional profile id, translating it to an\nidentity selector inside its own dispatch.\n\n## Background\n\nSelecting a profile requires a tagged, repeatable selector naming either a recorded identity\nor a package directory. A first invocation passing a bare profile id is rejected by the\nargument parser's generic unexpected-argument message, which names the required flag but not\nthe tag syntax, so the correct form is not discoverable from the failure. The shared selector\nparser serves the other lifecycle commands, whose contracts assert that they expose the\nrepeatable flag and nothing else, so the change stays inside this one command's arguments and\ndispatch.\n\n## Success Criteria\n\n- [hard] REQ-01: A single bare positional argument to the show command selects the recorded profile of that identity.\n- [hard] REQ-02: A positional argument given together with the tagged selector flag is refused with a message naming both forms.\n- [hard] REQ-03: An invalid positional value fails with a message naming the accepted selector forms rather than the parser's generic unexpected-argument text.\n- [hard] REQ-04: The shared selector parser is unchanged, and the other lifecycle commands still expose the repeatable tagged selector alone.\n- [hard] REQ-05: The command reference states the positional form beside the tagged form.\n\n## Notes\n\nThe tagged form stays the general contract. The positional form is a first-invocation\nconvenience on the one read-only command where a bare identity is unambiguous.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:cli",
+      "component:docs",
+      "satisfies:REQ-05",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A bare positional id selects a recorded profile on the show command without touching the shared grammar.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "OD-4"
+      ],
+      "landing_group": "profile-guidance",
+      "terminal": {
+        "consumer_family": "profile show callers",
+        "test_boundary": "profile CLI argument coverage",
+        "worker_sized_reason": "One command's argument definition plus its own dispatch translation, with the schema assertion that pins its current shape updated in the same change.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/cli.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/integration_schema.rs",
+            "docs/reference/cli-commands.md"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-policy-journey",
+    "title": "Linked checkout journey coverage",
+    "description": "A linked checkout created by the test itself proves the write policy, the divergence check,\nand the recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout and ended with issue and event\nhistory recoverable only from a dangling commit. No artefact of that repository is preserved\nanywhere, so the reproduction is built rather than restored. An existing integration suite\nalready creates real linked checkouts with version-control commands, and it is also the target\nwith the most room for new modules under the repository's test-target budget, so the coverage\nlands there rather than claiming a scarce target slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under the permitting stance and leaves the durable override record behind.\n- [hard] REQ-03: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-04: The recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories.\n- [hard] REQ-05: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured build-footprint and duration budgets.\n\n## Notes\n\nThe scenario runs the same binary an adopter runs, so the assertions describe adopter-visible\noutcomes rather than internal state.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:testing",
+      "component:storage",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "worktree-write-guard",
+      "worktree-recovery-guidance"
+    ],
+    "planning": {
+      "outcome": "A live linked checkout proves the write policy, the divergence check, and the recovery procedure end to end.",
+      "contract_refs": [
+        "worktree-write-policy",
+        "worktree-refusal-audit",
+        "store-divergence-report"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "OD-1",
+        "OD-3"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "adopter command boundary",
+        "test_boundary": "linked-checkout integration suite",
+        "worker_sized_reason": "One journey over capabilities its prerequisites already ship, following an existing pattern for creating real linked checkouts inside tests.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/worktree_policy_journey_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/main.rs"
+          ]
+        }
+      }
+    }
+  }
+]
