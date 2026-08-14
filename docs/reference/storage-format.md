@@ -52,8 +52,14 @@ complete the fixed set. Their paths come from the
 [`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
 implementations. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
 their inodes for advisory-lock race safety; they are opened with
-create-if-absent semantics and are not unlinked. The claims lock belongs to the
-separate recovery-aware control plane described below.
+create-if-absent semantics and are not unlinked. A shared read never makes write
+access a precondition: where it cannot create or open the lock file for writing
+it opens an existing one read-only, which still excludes a writer, and where no
+regular lock file can be opened at all it reads without an advisory lock and
+records a storage warning. Publication is atomic, so such a read still observes
+a complete version rather than a partial one. An exclusive acquisition still
+fails when it cannot open its lock file. The claims lock belongs to the separate
+recovery-aware control plane described below.
 
 Issue reads do not create per-issue lock files. On the first read-all through a
 storage instance, JIT removes empty UUID-shaped `.lock` sidecars left in

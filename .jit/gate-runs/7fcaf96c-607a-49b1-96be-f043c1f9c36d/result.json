@@ -1,0 +1,51 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ae1d31250cce12c3f5c1869d69162a878875ba1f",
+  "completed_at": "2026-08-14T22:52:29.629160708Z",
+  "duration_ms": 70678,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/rules-and-gates.md",
+        "id": "F1",
+        "line": 38,
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/cargo-ci",
+          "@/invariant/no-ignored-tests"
+        ],
+        "severity": "high",
+        "summary": "The cargo-ci reference omits the new excluded-tests failure condition."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F2",
+        "line": 53,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The storage reference omits shared-read fallback behavior on non-writable lock paths."
+      }
+    ],
+    "summary": "The issue's new cargo-ci exclusion enforcement and read-only shared-lock behavior are not fully documented in their canonical references.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "a36b91ff-0fc0-4a4f-8112-632fee4f38ed",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7fcaf96c-607a-49b1-96be-f043c1f9c36d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T22:51:18.950268687Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 29187 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00278-fee3-7130-8540-b79f9f968021\n--------\nuser\n--- 29174 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a maximum-level leaf with no DAG-resolved children. I reviewed the five reachable `jit:a36b91ff` commits individually and verified their combined behavior in the current tree. No prior review run exists.\n\nThe issue adds two user-visible contracts: `cargo-ci` rejects held-out tests, and shared read locks tolerate a non-writable filesystem. Both lack required adopter-facing reference updates.\n\n1. **F1 — blocking, issue-impact, high:** [`docs/reference/rules-and-gates.md:38`](/home/vkaskivuo/Projects/just-in-time/docs/reference/rules-and-gates.md:38) omits the new `excluded-tests` requirement from the `@/gate/cargo-ci` contract. Update it to state that the gate fails when nextest reports skipped tests or doctests report ignored tests, citing `@/invariant/no-ignored-tests`.\n\n2. **F2 — blocking, issue-impact, medium:** [`docs/reference/storage-format.md:53`](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:53) describes fixed storage locks solely as create-if-absent, but shared reads now fall back to an existing read-only lock file—or proceed with a warning when no usable lock file can be opened—while exclusive locks still fail. Document this read-only behavior and its advisory-lock limitation.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue's new cargo-ci exclusion enforcement and read-only shared-lock behavior are not fully documented in their canonical references.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The cargo-ci reference omits the new excluded-tests failure condition.\",\"file\":\"docs/reference/rules-and-gates.md\",\"line\":38,\"references\":[\"@/gate/cargo-ci\",\"@/invariant/no-ignored-tests\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The storage reference omits shared-read fallback behavior on non-writable lock paths.\",\"file\":\"docs/reference/storage-format.md\",\"line\":53}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
