@@ -82,6 +82,11 @@ pub enum StorageWarning {
         /// New root path.
         to: String,
     },
+    /// A shared read could not create or open its advisory lock file.
+    SharedLockUnavailable {
+        /// Path of the lock file that could not be opened.
+        path: PathBuf,
+    },
 }
 
 impl fmt::Display for StorageWarning {
@@ -126,6 +131,11 @@ impl fmt::Display for StorageWarning {
             StorageWarning::WorktreeRelocated { from, to } => {
                 write!(f, "Worktree relocated: {} -> {}", from, to)
             }
+            StorageWarning::SharedLockUnavailable { path } => write!(
+                f,
+                "Could not open shared lock file; proceeding without an OS lock: {}",
+                path.display()
+            ),
         }
     }
 }

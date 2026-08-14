@@ -3,12 +3,14 @@
 //! This module provides cross-platform file locking using advisory locks
 //! to prevent race conditions when multiple processes access `.jit/` concurrently.
 
+use super::warnings::StorageWarning;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use fs4::fs_std::FileExt as Fs4FileExt;
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// The access a caller was waiting for when its lock wait expired.
@@ -75,7 +77,7 @@ pub struct LockMetadata {
 /// Optionally tracks lock metadata for diagnostics when claim coordination is active.
 #[derive(Debug)]
 pub struct LockGuard {
-    file: File,
+    file: Option<File>,
     #[allow(dead_code)]
     path: PathBuf,
     /// Path to metadata file (if tracking enabled)
@@ -85,7 +87,15 @@ pub struct LockGuard {
 impl LockGuard {
     fn new(file: File, path: PathBuf) -> Self {
         Self {
-            file,
+            file: Some(file),
+            path,
+            meta_path: None,
+        }
+    }
+
+    fn new_without_os_lock(path: PathBuf) -> Self {
+        Self {
+            file: None,
             path,
             meta_path: None,
         }
@@ -93,7 +103,7 @@ impl LockGuard {
 
     fn new_with_metadata(file: File, path: PathBuf, meta_path: PathBuf) -> Self {
         Self {
-            file,
+            file: Some(file),
             path,
             meta_path: Some(meta_path),
         }
@@ -109,7 +119,9 @@ impl LockGuard {
 impl Drop for LockGuard {
     fn drop(&mut self) {
         // fs4 automatically unlocks on file close (drop)
-        let _ = Fs4FileExt::unlock(&self.file);
+        if let Some(file) = self.file.as_ref() {
+            let _ = Fs4FileExt::unlock(file);
+        }
 
         // Clean up metadata file if it exists
         if let Some(ref meta_path) = self.meta_path {
@@ -126,6 +138,7 @@ impl Drop for LockGuard {
 #[derive(Debug, Clone)]
 pub struct FileLocker {
     timeout: Duration,
+    warnings: Arc<Mutex<Vec<StorageWarning>>>,
 }
 
 impl FileLocker {
@@ -135,7 +148,18 @@ impl FileLocker {
     ///
     /// * `timeout` - Maximum time to wait for lock acquisition
     pub fn new(timeout: Duration) -> Self {
-        Self { timeout }
+        Self {
+            timeout,
+            warnings: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    /// Return the non-fatal warnings recorded by this locker and its clones.
+    pub fn warnings(&self) -> Vec<StorageWarning> {
+        self.warnings
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     /// Acquire an exclusive (write) lock on the file
@@ -186,11 +210,13 @@ impl FileLocker {
     ///
     /// # Errors
     ///
-    /// Returns an error if:
-    /// - The file cannot be opened
-    /// - The lock cannot be acquired within the timeout
+    /// Returns an error if the lock cannot be acquired within the timeout.
+    /// If the lock file cannot be created or opened for reading, the shared
+    /// request succeeds without an OS lock and records a storage warning.
     pub fn lock_shared(&self, path: &Path) -> Result<LockGuard> {
-        let file = self.open_or_create(path)?;
+        let Some(file) = self.open_for_shared(path) else {
+            return Ok(LockGuard::new_without_os_lock(path.to_path_buf()));
+        };
 
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
@@ -244,10 +270,14 @@ impl FileLocker {
     ///
     /// # Errors
     ///
-    /// Returns an error only if the file cannot be opened.
+    /// Returns an error only if the OS reports an error while acquiring the
+    /// lock. If the lock file cannot be created or opened for reading, this
+    /// returns an unlocked guard and records a storage warning.
     #[allow(dead_code)]
     pub fn try_lock_shared(&self, path: &Path) -> Result<Option<LockGuard>> {
-        let file = self.open_or_create(path)?;
+        let Some(file) = self.open_for_shared(path) else {
+            return Ok(Some(LockGuard::new_without_os_lock(path.to_path_buf())));
+        };
 
         match Fs4FileExt::try_lock_shared(&file) {
             Ok(true) => Ok(Some(LockGuard::new(file, path.to_path_buf()))),
@@ -338,6 +368,29 @@ impl FileLocker {
             .open(path)
             .with_context(|| format!("Failed to open file for locking: {}", path.display()))
     }
+
+    /// Open a shared lock without making write access a prerequisite.
+    fn open_for_shared(&self, path: &Path) -> Option<File> {
+        if let Ok(file) = self.open_or_create(path) {
+            return Some(file);
+        }
+
+        if let Ok(file) = OpenOptions::new().read(true).open(path) {
+            return Some(file);
+        }
+
+        // A missing lock file that cannot be created leaves this reader with no
+        // OS lock, but publication is still atomic: it observes a complete
+        // previous or next version rather than torn bytes either way. Record the
+        // degraded advisory protection through the storage warning channel.
+        self.warnings
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(StorageWarning::SharedLockUnavailable {
+                path: path.to_path_buf(),
+            });
+        None
+    }
 }
 
 /// Remove orphaned per-issue read-lock sidecar files from an issues directory.
@@ -398,6 +451,7 @@ pub(crate) fn remove_orphaned_issue_read_sidecars(issues_dir: &Path) -> Result<u
 mod tests {
     use super::*;
     use crate::storage::contention_probe::{admitted_when_reached, Contenders};
+    use crate::storage::StorageWarning;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::thread;
@@ -651,6 +705,170 @@ mod tests {
             locker.try_lock_shared(&file_path).unwrap().is_some(),
             "a shared lock succeeds after the exclusive lock is released"
         );
+    }
+
+    /// True when the mode just set on `path` actually denies this process the
+    /// write the test needs denied.
+    ///
+    /// The tests below express their precondition as a file mode, and a mode
+    /// does not bind every caller — root ignores it, and so does any platform
+    /// without Unix permissions. Asking the filesystem directly skips exactly
+    /// the runs where the precondition could not be established, where asking
+    /// who the process is would only approximate that and would need a
+    /// dependency feature of its own to answer.
+    fn write_is_denied(path: &Path) -> bool {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)
+            .is_err()
+    }
+
+    fn skip_unless_write_is_denied(test_name: &str, path: &Path) -> bool {
+        if write_is_denied(path) {
+            return false;
+        }
+        eprintln!(
+            "skipping {test_name}: this process writes {} regardless of its mode, \
+             so the precondition cannot be established here",
+            path.display()
+        );
+        true
+    }
+
+    #[test]
+    fn test_lock_shared_is_granted_when_the_lock_file_cannot_be_opened_for_writing() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("read-only.lock");
+        std::fs::write(&file_path, b"").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o444)).unwrap();
+        }
+
+        if skip_unless_write_is_denied(
+            "test_lock_shared_is_granted_when_the_lock_file_cannot_be_opened_for_writing",
+            &file_path,
+        ) {
+            return;
+        }
+
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+        let guard = locker.lock_shared(&file_path).unwrap();
+
+        assert_eq!(guard.path(), file_path);
+        assert!(locker.warnings().is_empty());
+    }
+
+    #[test]
+    fn test_lock_shared_is_granted_when_the_lock_file_cannot_be_created() {
+        let temp_dir = TempDir::new().unwrap();
+        let denied_dir = temp_dir.path().join("denied");
+        std::fs::create_dir(&denied_dir).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&denied_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+        }
+
+        let file_path = denied_dir.join("missing.lock");
+        if skip_unless_write_is_denied(
+            "test_lock_shared_is_granted_when_the_lock_file_cannot_be_created",
+            &file_path,
+        ) {
+            return;
+        }
+
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+        let guard = locker.lock_shared(&file_path).unwrap();
+
+        assert_eq!(guard.path(), file_path);
+        assert!(
+            locker.warnings().iter().any(|warning| matches!(
+                warning,
+                StorageWarning::SharedLockUnavailable { path } if path == &file_path
+            )),
+            "a shared read with no lock file must record its advisory warning"
+        );
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&denied_dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+        }
+
+        assert!(
+            locker.try_lock_exclusive(&file_path).unwrap().is_some(),
+            "the shared fallback must not have retained an OS lock on an absent file"
+        );
+    }
+
+    #[test]
+    fn test_lock_exclusive_fails_when_it_cannot_open_its_lock_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let denied_dir = temp_dir.path().join("denied");
+        std::fs::create_dir(&denied_dir).unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&denied_dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+        }
+
+        let file_path = denied_dir.join("missing.lock");
+        if skip_unless_write_is_denied(
+            "test_lock_exclusive_fails_when_it_cannot_open_its_lock_file",
+            &file_path,
+        ) {
+            return;
+        }
+
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+
+        assert!(
+            locker.lock_exclusive(&file_path).is_err(),
+            "exclusive acquisition must still fail when it cannot create its lock file"
+        );
+    }
+
+    #[test]
+    fn test_lock_shared_is_refused_while_the_exclusive_lock_is_held_when_only_read_open_is_possible(
+    ) {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("read-only.lock");
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+        let held = locker
+            .try_lock_exclusive(&file_path)
+            .unwrap()
+            .expect("the exclusive lock must report that it was acquired");
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o444)).unwrap();
+        }
+
+        if skip_unless_write_is_denied(
+            "test_lock_shared_is_refused_while_the_exclusive_lock_is_held_when_only_read_open_is_possible",
+            &file_path,
+        ) {
+            return;
+        }
+
+        let shared_try = FileLocker::new(EXPIRING_LOCK_WAIT)
+            .try_lock_shared(&file_path)
+            .unwrap();
+        assert!(
+            shared_try.is_none(),
+            "a read-only-open shared request is refused while the exclusive lock is held"
+        );
+
+        drop(held);
     }
 
     /// Shared holds coexist: while one is live the lock grants a second, and
