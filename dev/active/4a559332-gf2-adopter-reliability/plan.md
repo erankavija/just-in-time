@@ -49,9 +49,10 @@ constructed is what keeps the append-on-state-change guarantee intact rather tha
 
 ### `context-construction-boundary` [implementation-produced] — One production-context factory
 
-Production mutation contexts — today constructed by twenty-two independent
-`MutationContext::production()` calls across fourteen command modules — are constructed
-through one factory carrying an optional dispatch-scoped annotation slot, empty by default
+Production mutation contexts — today constructed by twenty-three independent
+`MutationContext::production()` calls across fourteen command modules and one
+integration-test helper — are constructed through one factory carrying an optional
+dispatch-scoped annotation slot, empty by default
 and behaviour-preserving when empty. It exists so a fact decided once at dispatch can reach
 every finalized plan through the context the finalizer already receives
 (`crates/jit/src/repository_state/mutation.rs:665`), without per-command threading; both
@@ -109,7 +110,7 @@ and restore is not (investigation §2).
 |---|---|---|---|---|---|---|---|---|
 | worktree-detection-convergence | Converge worktree detection on one primitive | task | One primitive answers whether this checkout is linked and where the primary store lives. | — | REQ-01, OD-5 | touches 5 | worktree-safety | — |
 | worktree-write-policy-config | Worktree write policy configuration key | task | A typed worktree policy key resolves the mutation stance for linked checkouts, defaulting to refusal. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
-| mutation-context-factory | Converge mutation-context construction onto one factory | task | One factory owns production mutation-context construction, replacing twenty-two scattered constructor calls. | — | REQ-01, OD-1, OD-5 | touches 15 | worktree-safety | — |
+| mutation-context-factory | Converge mutation-context construction onto one factory | task | One factory owns production mutation-context construction, replacing twenty-three scattered constructor calls. | — | REQ-01, OD-1 | touches 16 | worktree-safety | — |
 | worktree-override-audit-event | Override audit event for linked-checkout mutations | task | The closed event vocabulary carries a distinct override-audit variant with catalog and reference conformance. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
 | worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | context-construction-boundary | REQ-01, OD-1 | touches 4 | worktree-safety | worktree-override-audit-event, mutation-context-factory |
 | worktree-write-guard | Refuse state-mutating commands in linked worktrees | task | State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it. | worktree-authority, worktree-write-policy, worktree-override-record | REQ-01, OD-1, OD-5 | touches 4 | worktree-safety | worktree-detection-convergence, worktree-write-policy-config, worktree-override-audit-publication |

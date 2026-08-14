@@ -89,7 +89,7 @@
   {
     "key": "mutation-context-factory",
     "title": "Converge mutation-context construction onto one factory",
-    "description": "Production mutation contexts are constructed through one factory instead of twenty-two\nindependent constructor calls spread across fourteen command modules, with behaviour\nunchanged.\n\n## Background\n\nThe production mutation context — the injected authority and clock a finalized plan derives\nits identifiers and timestamp from — is constructed independently wherever a command needs\none. A fact decided once at dispatch has no way to reach those contexts without either\nthreading through the modules one by one or converging their construction first. Convergence\nis the shared-convention remedy: one factory owns production-context construction and carries\nan optional dispatch-scoped annotation slot, empty by default, so a later change can set a\nfact in one place and have it reach the finalizer through the context it already receives.\n\n## Success Criteria\n\n- [hard] REQ-01: One factory constructs the production mutation context, the per-module constructor calls route through it, and the direct constructor is no longer callable from command modules.\n- [hard] REQ-02: The factory carries an optional dispatch-scoped annotation slot that is empty by default, and an empty slot changes no behaviour: no new events, identical outputs, identical persisted bytes for the same inputs.\n- [hard] REQ-03: The full test suite passes unchanged apart from construction-site mechanics, demonstrating the convergence is behaviour-preserving.\n",
+    "description": "Production mutation contexts are constructed through one factory instead of twenty-three\nindependent constructor calls spread across fourteen command modules and one\nintegration-test helper, with behaviour unchanged.\n\n## Background\n\nThe production mutation context — the injected authority and clock a finalized plan derives\nits identifiers and timestamp from — is constructed independently wherever a command needs\none. A fact decided once at dispatch has no way to reach those contexts without either\nthreading through the modules one by one or converging their construction first. Convergence\nis the shared-convention remedy: one factory owns production-context construction and carries\nan optional dispatch-scoped annotation slot, empty by default, so a later change can set a\nfact in one place and have it reach the finalizer through the context it already receives.\n\n## Success Criteria\n\n- [hard] REQ-01: One factory constructs the production mutation context, the per-module constructor calls and the integration-test helper route through it, and the direct constructor is no longer callable from command modules or integration tests.\n- [hard] REQ-02: The factory carries an optional dispatch-scoped annotation slot that is empty by default, and an empty slot changes no behaviour: no new events, identical outputs, identical persisted bytes for the same inputs.\n- [hard] REQ-03: The full test suite passes unchanged apart from construction-site mechanics, demonstrating the convergence is behaviour-preserving.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -103,21 +103,20 @@
     ],
     "depends_on": [],
     "planning": {
-      "outcome": "One factory owns production mutation-context construction, replacing twenty-two scattered constructor calls.",
+      "outcome": "One factory owns production mutation-context construction, replacing twenty-three scattered constructor calls.",
       "contract_refs": [],
       "produces_contracts": [
         "context-construction-boundary"
       ],
       "source_refs": [
         "REQ-01",
-        "OD-1",
-        "OD-5"
+        "OD-1"
       ],
       "landing_group": "worktree-safety",
       "terminal": {
         "consumer_family": "command modules constructing mutation contexts",
         "test_boundary": "existing suite unchanged plus factory unit coverage",
-        "worker_sized_reason": "Twenty-two mechanical constructor swaps onto one factory whose empty slot is behaviour-preserving; a single deliverable class with the existing suite pinning the no-change property.",
+        "worker_sized_reason": "Twenty-three mechanical constructor swaps onto one factory whose empty slot is behaviour-preserving; a single deliverable class with the existing suite pinning the no-change property.",
         "footprint": {
           "touches": [
             "crates/jit/src/commands/mod.rs",
@@ -134,7 +133,8 @@
             "crates/jit/src/commands/migrate.rs",
             "crates/jit/src/commands/profile.rs",
             "crates/jit/src/commands/template.rs",
-            "crates/jit/src/repository_state/mutation.rs"
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/tests/cli_issue/recover_command_tests.rs"
           ]
         }
       }
@@ -185,7 +185,7 @@
   {
     "key": "worktree-override-audit-publication",
     "title": "Publish the override audit record with the mutation it permits",
-    "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. The carrier therefore spans the whole path: the dispatch site that decides an\noverride permitted the invocation sets the fact once; the mutation context carries it to the\nfinalizer, whose event pass composes the audit append; and because the second finalizer path used for\ninitialization-style audit appends shares that same event-pass helper, one edit covers both\npaths, so no materialization path can emit its events while omitting the record. This avoids threading the fact through the fourteen\ncommand modules that construct production contexts.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n- [hard] REQ-05: The dispatch-set override fact reaches both finalizer paths that compose audit appends, with coverage that fails if a materialization path omits the record.\n\n## Notes\n\nThe finalizer documents that a no-transition plan carries an empty delta and emits no bytes.\nThe audit record accompanies real events only: an override in effect during a no-op mutation\nproduces no record, preserving that documented property.\n",
+    "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. The carrier spans the whole path through the converged construction boundary: the\ndispatch site that decides an override permitted the invocation sets the fact once into the\nfactory's dispatch-scoped annotation slot; the factory stamps it into the production context\nwherever one is constructed; the context carries it to the finalizer, whose event pass\ncomposes the audit append; and because the second finalizer path used for\ninitialization-style audit appends shares that same event-pass helper, one edit covers both\npaths, so no materialization path can emit its events while omitting the record.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n- [hard] REQ-05: The dispatch-set override fact reaches both finalizer paths that compose audit appends, with coverage that fails if a materialization path omits the record.\n\n## Notes\n\nThe finalizer documents that a no-transition plan carries an empty delta and emits no bytes.\nThe audit record accompanies real events only: an override in effect during a no-op mutation\nproduces no record, preserving that documented property.\n",
     "type": "task",
     "priority": "high",
     "labels": [
