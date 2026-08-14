@@ -89,7 +89,7 @@
   {
     "key": "worktree-override-audit-event",
     "title": "Override audit event for linked-checkout mutations",
-    "description": "A permitted override of the linked-checkout write stance leaves a distinct, durable event\nin the repository's own history, defined in the closed event vocabulary with its catalog and\nreference conformance.\n\n## Background\n\nThe event vocabulary is a closed, serde-tagged model mirrored by a fieldless tag set, and a\nfreshness guard fails when a variant is missing from the catalog or the rendered event\nreference. Recording a permitted override therefore needs its own variant, its catalog and\nreference rows, and stated append semantics — none of which an existing mutation event can\ncarry, because ordinary mutation events cannot show that an invocation was permitted\nspecifically by an override rather than by a permissive stance.\n\n## Success Criteria\n\n- [hard] REQ-01: A distinct event variant records a permitted override of the linked-checkout write stance, naming the linked checkout, the stance that would have refused, and the override that permitted the invocation.\n- [hard] REQ-02: The variant appears in the event catalog and the rendered event reference, and the existing freshness guard fails if either is missing.\n- [hard] REQ-03: The append semantics are stated and covered: the audit record becomes durable through the same transactional publication as the mutation it permitted, so the mutation and its audit record land together or not at all.\n- [hard] REQ-04: The variant round-trips through serialization with a stable type tag, and existing event-log readers tolerate and report it.\n\n## Notes\n\nThis defines the record and its semantics; the dispatch-time policy that decides when one is\nemitted consumes this definition.\n",
+    "description": "A permitted override of the linked-checkout write stance has its own event variant in the\nclosed event vocabulary, with the catalog and rendered-reference rows the freshness guard\nrequires.\n\n## Background\n\nThe event vocabulary is a closed, serde-tagged model mirrored by a fieldless tag set, and a\nfreshness guard fails when a variant is missing from the catalog or the rendered event\nreference. An ordinary mutation event cannot show that an invocation was permitted\nspecifically by an override rather than by a permissive stance, so the record needs a\ndistinct variant. This leaf defines the vocabulary only; how a record of this kind becomes\ndurable alongside the mutation it permits is a separate publication concern.\n\n## Success Criteria\n\n- [hard] REQ-01: A distinct event variant records a permitted override of the linked-checkout write stance, naming the linked checkout, the stance that would have refused, and the override that permitted the invocation.\n- [hard] REQ-02: The variant appears in the event catalog, the rendered event reference is regenerated from that catalog rather than edited by hand, and the existing freshness guard fails if either is missing.\n- [hard] REQ-03: The variant round-trips through serialization with a stable type tag, and existing event-log readers tolerate and report it.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -106,11 +106,9 @@
     ],
     "depends_on": [],
     "planning": {
-      "outcome": "A permitted override of the linked-checkout write stance leaves a distinct durable event with catalog and reference conformance.",
+      "outcome": "The closed event vocabulary carries a distinct override-audit variant with catalog and reference conformance.",
       "contract_refs": [],
-      "produces_contracts": [
-        "worktree-override-record"
-      ],
+      "produces_contracts": [],
       "source_refs": [
         "REQ-01",
         "OD-1"
@@ -119,7 +117,7 @@
       "terminal": {
         "consumer_family": "event log readers",
         "test_boundary": "domain event-model unit tests",
-        "worker_sized_reason": "One event variant with its catalog row, reference row, and append-semantics coverage, following the conformance guard the event model already enforces.",
+        "worker_sized_reason": "One event variant with its catalog row and reference row, following the conformance guard the event model already enforces; publication semantics are owned elsewhere.",
         "footprint": {
           "touches": [
             "crates/jit/src/domain/types.rs",
@@ -131,28 +129,68 @@
     }
   },
   {
+    "key": "worktree-override-audit-publication",
+    "title": "Publish the override audit record with the mutation it permits",
+    "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. Recording that an override permitted a mutation therefore needs the override fact to reach\nthe finalizer. The seam is the mutation context: the fact is set once, where the dispatch-time\ndecision is made, and read by the finalizer's event pass, so the audit intent enters every\nfinalized plan without threading through the fourteen command modules that construct\nproduction contexts. The mutation and its record land in one delta and recovery treats them\nas one.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "worktree-override-audit-event"
+    ],
+    "planning": {
+      "outcome": "An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "worktree-override-record"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-1"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "mutation-session callers",
+        "test_boundary": "transaction failure-injection coverage",
+        "worker_sized_reason": "One intent-plumbing change through the existing finalizer and one failure-injection suite, reusing the injector and recovery machinery already proven on neighbouring paths.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "worktree-write-guard",
     "title": "Refuse state-mutating commands in linked worktrees",
-    "description": "A state-mutating invocation inside a linked non-primary checkout refuses before any repository\nwrite unless the declared stance or an explicit override permits it, and the adopter guides\nthat teach the linked-checkout workflow state the stance that now governs it.\n\n## Background\n\nThe command enumeration already classifies every invocation by whether it must open a\nrepository mutation session. That classification is exhaustive over the command families that\ndelegate to a sub-enum classifier; five read-only families match their inner enum with a\nwildcard, so a new mutating leaf under one of them must be classified deliberately rather than\ninherited silently. That predicate, combined with the worktree primitive computed before\ndispatch, is exactly the condition a write policy needs, and evaluating it before the\nrepository mutation session is opened leaves a refusal with no partial state and no event\nbehind. One command — issue deletion — already carries an unconditional secondary-checkout\nrefusal of its own, which becomes a case of the general policy rather than a parallel variant.\n\nThe parallel-work tutorial and the multi-agent coordination guide teach mutation from a linked\ncheckout as the sanctioned workflow, so those pages must state the stance and where a\nrepository declares it, or they contradict the behaviour an adopter observes.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, an invocation that would open a repository mutation session inside a linked non-primary checkout fails before any repository write, leaving that checkout's store and event log untouched.\n- [hard] REQ-02: The refusal names the linked checkout, the stance that refused it, and how to permit the operation; its machine-readable form carries the same three facts.\n- [hard] REQ-03: A permissive declared stance and an explicit per-invocation override each permit the invocation, and a permitted override leaves a durable record a later reader finds in the repository's own history.\n- [hard] REQ-04: Read-only invocations, invocations in the primary checkout, and invocations outside version control succeed under either stance.\n- [hard] REQ-05: The unconditional deletion refusal is replaced by the general policy, and deletion keeps its current outcome under the refusing stance.\n- [hard] REQ-06: Existing coverage that mutates from a linked checkout declares the stance it relies on rather than depending on an unstated default.\n- [hard] REQ-07: The parallel-work tutorial and the multi-agent coordination guide state the stance that governs mutation inside a linked checkout and where a repository declares it, so every step they instruct succeeds under the stance the reader's repository declares.\n\n## Notes\n\nThe condition is evaluated at dispatch, before the repository mutation session is opened, so a\nrefused invocation is not a state change and appends nothing: the append-on-state-change\nguarantee is preserved rather than excepted.\n\nThe session predicate is deliberately broader than the divergent-history hazard: an invocation\nthat writes only the shared control plane or machine-local runtime state still classifies as\nmutating and refuses under the refusing stance. An over-refusal of that kind is the chosen\nbehaviour, not a defect.\n",
+    "description": "A state-mutating invocation inside a linked non-primary checkout refuses before any repository\nwrite unless the declared stance or an explicit override permits it.\n\n## Background\n\nThe command enumeration already classifies every invocation by whether it must open a\nrepository mutation session. That classification is exhaustive over the command families that\ndelegate to a sub-enum classifier; five read-only families match their inner enum with a\nwildcard, so a new mutating leaf under one of them must be classified deliberately rather than\ninherited silently. That predicate, combined with the worktree primitive computed before\ndispatch, is exactly the condition a write policy needs, and evaluating it before the\nrepository mutation session is opened leaves a refusal with no partial state and no event\nbehind. One command — issue deletion — already refuses in secondary checkouts today, evidence\nthat the dispatch site is where such a condition belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, an invocation that would open a repository mutation session inside a linked non-primary checkout fails before any repository write, leaving that checkout's store and event log untouched.\n- [hard] REQ-02: The refusal names the linked checkout, the stance that refused it, and how to permit the operation; its machine-readable form carries the same three facts.\n- [hard] REQ-03: A permissive declared stance and an explicit per-invocation override each permit the invocation, and a permitted override leaves its durable audit record behind.\n- [hard] REQ-04: Read-only invocations, invocations in the primary checkout, and invocations outside version control succeed under either stance.\n- [hard] REQ-05: Existing coverage that mutates from a linked checkout declares the stance it relies on rather than depending on an unstated default.\n\n## Notes\n\nThe condition is evaluated at dispatch, before the repository mutation session is opened, so a\nrefused invocation is not a state change and appends nothing: the append-on-state-change\nguarantee is preserved rather than excepted.\n\nThe session predicate is deliberately broader than the divergent-history hazard: an invocation\nthat writes only the shared control plane or machine-local runtime state still classifies as\nmutating and refuses under the refusing stance. An over-refusal of that kind is the chosen\nbehaviour, not a defect.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:gf2-adopter-reliability",
       "component:cli",
       "component:storage",
-      "component:docs",
       "satisfies:REQ-01"
     ],
     "gates": [
       "cargo-ci",
-      "code-review",
-      "doc-review",
-      "docs-mechanical"
+      "code-review"
     ],
     "depends_on": [
       "worktree-detection-convergence",
       "worktree-write-policy-config",
-      "worktree-override-audit-event"
+      "worktree-override-audit-publication"
     ],
     "planning": {
       "outcome": "State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it.",
@@ -173,15 +211,53 @@
       "terminal": {
         "consumer_family": "command dispatch",
         "test_boundary": "linked-checkout CLI coverage",
-        "worker_sized_reason": "One dispatch-site guard over an existing exhaustive predicate plus the stance statement in the two guides that teach the governed workflow; the doc edits describe this task's own behaviour change and are not independently deliverable without contradiction.",
+        "worker_sized_reason": "One dispatch-site condition consuming the already-produced detection, policy, and audit-record contracts, plus the focused new coverage and the stance declarations the refusing default forces onto existing linked-checkout tests.",
         "footprint": {
           "touches": [
             "crates/jit/src/main.rs",
             "crates/jit/src/cli.rs",
             "crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
-            "docs/tutorials/parallel-work-worktrees.md",
-            "docs/how-to/multi-agent-coordination.md"
+            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exact-store-read",
+    "title": "Exact single-store read for cross-checkout comparison",
+    "description": "Storage owns a read that returns exactly the records one checkout's store holds — its issue\nrecords and its event log — with no aggregation from version-control history or another\ncheckout.\n\n## Background\n\nThe ordinary issue and index readers deliberately union the local store, versioned history,\nand the primary checkout, which is the documented adopter-facing read model. A divergence\ncomparison needs the opposite: the records one store actually holds, because the union masks\nexactly the one-sided records such a comparison exists to surface. Persistence access belongs\nto the storage layer, so the exact read is a storage-owned operation that a command consumes.\n\n## Success Criteria\n\n- [hard] REQ-01: A storage-owned read returns exactly the issue records and event records one checkout's store holds, with no fallback to versioned history or another checkout's store.\n- [hard] REQ-02: A record held only by a different checkout's store does not appear in the read's result, proven by a test that would fail under the aggregating readers.\n- [hard] REQ-03: The read is read-only, and it works against a checkout store other than the one the process runs in.\n- [hard] REQ-04: The existing aggregated readers keep their documented behaviour unchanged.\n\n## Notes\n\nThe exact read is a storage-owned operation addressed at an explicit store location, not a\nmethod on the shared issue-store interface, so the in-memory implementation and its shared\nbehavioural contract are not engaged.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "satisfies:REQ-02"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Storage returns exactly what one checkout's store holds, unmasked by the aggregating read model.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "exact-store-snapshot"
+      ],
+      "source_refs": [
+        "REQ-02",
+        "OD-2"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "storage interface consumers",
+        "test_boundary": "storage unit coverage",
+        "worker_sized_reason": "One read-only storage operation beside readers whose aggregation it deliberately omits, with its non-masking property unit-proven.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/mod.rs",
+            "crates/jit/src/storage/json.rs"
           ]
         }
       }
@@ -190,7 +266,7 @@
   {
     "key": "worktree-divergence-detection",
     "title": "Report divergent checkout stores",
-    "description": "A read-only check reports the issue records and event history one checkout's store holds and\nthe other does not, in both directions.\n\n## Background\n\nNo command compares two checkouts' tracker stores today. The two existing names that sound\nlike they might belong to unrelated concepts: one reports membership labels disagreeing with\nthe dependency graph, the other checks branch ancestry against the upstream default. An\nadopter recovering a divergent store therefore has no way to see what diverged. Issue records\ndo fall back across the local store, version-control history, and the primary checkout when\nread, but the event log has no fallback at all, so a linked checkout's events are visible only\nfrom inside it.\n\n## Success Criteria\n\n- [hard] REQ-01: The check names issue records present in one checkout's store and absent from the other, in both directions, and writes to neither store.\n- [hard] REQ-02: The check names event records held by one checkout's log and missing from the other, since event history has no cross-checkout read path.\n- [hard] REQ-03: Records present in both stores but holding conflicting values are reported as conflicts, distinct from records present in only one place.\n- [hard] REQ-04: The check reports no findings in the primary checkout, in a linked checkout whose store agrees with the primary, and outside version control.\n- [hard] REQ-05: Machine-readable output carries the same findings as the rendered output, wrapped in the repository's list envelope.\n- [hard] REQ-06: The worktree command reference states the check, its output shape, and what each finding class means.\n\n## Notes\n\nThe check reads only. Recovering from a reported divergence is a separate concern, and this\nsurface deliberately offers no reconciliation.\n",
+    "description": "A read-only check reports the issue records and event history one checkout's store holds and\nthe other does not, in both directions.\n\n## Background\n\nNo command compares two checkouts' tracker stores today. The two existing names that sound\nlike they might belong to unrelated concepts: one reports membership labels disagreeing with\nthe dependency graph, the other checks branch ancestry against the upstream default. An\nadopter recovering a divergent store therefore has no way to see what diverged. Issue records\ndo fall back across the local store, version-control history, and the primary checkout when\nread, but the event log has no fallback at all, so a linked checkout's events are visible only\nfrom inside it.\n\n## Success Criteria\n\n- [hard] REQ-01: The check names issue records present in one checkout's store and absent from the other, in both directions, and writes to neither store.\n- [hard] REQ-02: The check names event records held by one checkout's log and missing from the other, since event history has no cross-checkout read path.\n- [hard] REQ-03: Records present in both stores but holding conflicting values are reported as conflicts, distinct from records present in only one place.\n- [hard] REQ-04: The check reports no findings in the primary checkout, in a linked checkout whose store agrees with the primary, and outside version control.\n- [hard] REQ-05: Machine-readable output carries the same findings as the rendered output, wrapped in the repository's list envelope.\n- [hard] REQ-06: The worktree command reference states the check, its output shape, and what each finding class means.\n\n## Notes\n\nThe comparison consumes the storage-owned exact single-store read; the command layer\nperforms no direct persistence access of its own. The check reads only. Recovering from a reported divergence is a separate concern, and this\nsurface deliberately offers no reconciliation.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -207,12 +283,14 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "worktree-detection-convergence"
+      "worktree-detection-convergence",
+      "exact-store-read"
     ],
     "planning": {
       "outcome": "A read-only check reports the issue records and events one checkout holds without the other.",
       "contract_refs": [
-        "worktree-authority"
+        "worktree-authority",
+        "exact-store-snapshot"
       ],
       "produces_contracts": [
         "store-divergence-report"
@@ -235,6 +313,91 @@
             "docs/reference/worktree-validate.md"
           ],
           "uncertainty": "whether the comparison lands inside the existing worktree command module or beside it is left to implementation"
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-delete-guard-convergence",
+    "title": "Converge the deletion refusal into the write policy",
+    "description": "The standalone secondary-checkout deletion refusal becomes a case of the general\nlinked-checkout write policy rather than a parallel variant.\n\n## Background\n\nIssue deletion carries its own unconditional secondary-checkout refusal, checked independently\nof any policy and with its own detection mechanism. With a general write policy governing\nstate-mutating dispatch, a second, private refusal for one command is exactly the parallel\nvariant the repository's convention-convergence invariant names a defect.\n\n## Success Criteria\n\n- [hard] REQ-01: Deletion inside a linked non-primary checkout is governed by the general write policy, and the independent unconditional check no longer exists as a separate mechanism.\n- [hard] REQ-02: Under the refusing stance, deletion inside a linked checkout keeps its current outcome: it is refused with an explanation before any write.\n- [hard] REQ-03: Under a permitting stance or an explicit override, deletion follows the general policy like every other state-mutating invocation.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:cli",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "worktree-write-guard"
+    ],
+    "planning": {
+      "outcome": "The standalone deletion refusal dissolves into the general linked-checkout write policy.",
+      "contract_refs": [
+        "worktree-write-policy"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "OD-1",
+        "OD-5"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "command dispatch",
+        "test_boundary": "linked-checkout deletion CLI coverage",
+        "worker_sized_reason": "One special case removed in favour of a policy that already exists when this task starts, with the pinned deletion tests updated to declare their stance.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-guide-stance",
+    "title": "State the linked-checkout write stance in the worktree guides",
+    "description": "The adopter guides that teach the linked-checkout workflow state the write stance that\ngoverns it and where a repository declares that stance.\n\n## Background\n\nThe parallel-work tutorial and the multi-agent coordination guide teach mutation from a linked\ncheckout as the sanctioned workflow. With a refusing default governing that workflow, a reader\nfollowing either page in a repository that has declared nothing meets a refusal the pages\nnever mention, and the opt-in path the refusal names is undiscoverable from the only pages\nthat teach the workflow it governs.\n\n## Success Criteria\n\n- [hard] REQ-01: The parallel-work tutorial states the stance that governs mutation inside a linked checkout and where a repository declares it, and every step it instructs succeeds under the stance it tells the reader to declare.\n- [hard] REQ-02: The multi-agent coordination guide states the same stance where it presents linked-checkout writes as the sanctioned path.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:docs",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "worktree-write-guard"
+    ],
+    "planning": {
+      "outcome": "The worktree guides state the write stance and its declaration point, so their steps succeed as instructed.",
+      "contract_refs": [
+        "worktree-write-policy"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "OD-1"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "adopter worktree guides",
+        "test_boundary": "documentation mechanical checks",
+        "worker_sized_reason": "One fact stated in the two pages that teach the governed workflow, against behaviour that already exists when this task starts.",
+        "footprint": {
+          "touches": [
+            "docs/tutorials/parallel-work-worktrees.md",
+            "docs/how-to/multi-agent-coordination.md"
+          ]
         }
       }
     }
@@ -544,7 +707,7 @@
   {
     "key": "worktree-policy-journey",
     "title": "Linked checkout journey coverage",
-    "description": "A linked checkout created by the test itself proves the write policy, the divergence check,\nand the recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout and ended with issue and event\nhistory recoverable only from a dangling commit. No artefact of that repository is preserved\nanywhere, so the reproduction is built rather than restored. An existing integration suite\nalready creates real linked checkouts with version-control commands, and it is also the target\nwith the most room for new modules under the repository's test-target budget, so the coverage\nlands there rather than claiming a scarce target slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under the permitting stance and leaves the durable override record behind.\n- [hard] REQ-03: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-04: The recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories.\n- [hard] REQ-05: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured build-footprint and duration budgets.\n\n## Notes\n\nThe scenario runs the same binary an adopter runs, so the assertions describe adopter-visible\noutcomes rather than internal state.\n",
+    "description": "A linked checkout created by the test itself proves the write policy, the divergence check,\nand the recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout and ended with issue and event\nhistory recoverable only from a dangling commit. No artefact of that repository is preserved\nanywhere, so the reproduction is built rather than restored. An existing integration suite\nalready creates real linked checkouts with version-control commands, and it is also the target\nwith the most room for new modules under the repository's test-target budget, so the coverage\nlands there rather than claiming a scarce target slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under a permitting declared stance and emits no override record, and succeeds under an explicit per-invocation override leaving the durable override record behind.\n- [hard] REQ-03: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-04: The recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories.\n- [hard] REQ-05: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured build-footprint and duration budgets.\n\n## Notes\n\nThe scenario runs the same binary an adopter runs, so the assertions describe adopter-visible\noutcomes rather than internal state.\n",
     "type": "task",
     "priority": "high",
     "labels": [

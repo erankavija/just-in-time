@@ -15,7 +15,7 @@ question to a choice between three worktree authority models, settled below as O
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
 | REQ-01 | The per-invocation mutation classifier already on the command enumeration — exhaustive over its delegating command families, with five wildcard-matched read-only families a new mutating leaf must join deliberately — combined with one converged worktree primitive, becomes a dispatch-time condition evaluated before the repository mutation session is opened. The stance is a typed configuration key defaulting to refusal, with an explicit per-invocation override, and the adopter guides that teach the linked-checkout workflow state the stance. | Classifier: `crates/jit/src/cli.rs:3232-3270`. Layout computed on every dispatch: `crates/jit/src/main.rs:2265-2279`; mutation session opens at `:2286-2303`. Narrow precedent already shipped for one command: `crates/jit/src/main.rs:3546-3550`. Key shape to follow: `crates/jit/src/config.rs:1308-1313`. Guides teaching the governed workflow: `docs/tutorials/parallel-work-worktrees.md:28-35,134-152`, `docs/how-to/multi-agent-coordination.md:193-203`. |
-| REQ-02 | A new read-only check in the worktree command family compares issue records and event logs across two checkouts, and a documented procedure preserves both sides before any reconciliation. No merge subsystem (OD-2). | Both plausible names are taken by unrelated concepts (investigation §1 claim 7). Events have no cross-checkout read path: `crates/jit/src/storage/json.rs:1216-1227`. Union merge already declared for the event log: `.gitattributes`. The unguarded cleanup recipe: `docs/how-to/multi-agent-coordination.md:303-312`. |
+| REQ-02 | A new read-only check in the worktree command family compares issue records and event logs across two checkouts over a storage-owned exact single-store read, because the ordinary readers deliberately union local, versioned, and primary sources and would mask one-sided records. A documented procedure preserves both sides before any reconciliation. No merge subsystem (OD-2). | Both plausible names are taken by unrelated concepts (investigation §1 claim 7). Aggregating readers: `crates/jit/src/storage/json.rs:539-543,1178`. Events have no cross-checkout read path: `crates/jit/src/storage/json.rs:1216-1227`. Union merge already declared for the event log: `.gitattributes`. The unguarded cleanup recipe: `docs/how-to/multi-agent-coordination.md:303-312`. |
 | REQ-03 | The durability guarantee already holds end to end on the automated path, so the remaining work is the missing regression coverage plus a separately-scoped fix for the postcheck loop that discards checker errors. | Coupled plan applied before success: `crates/jit/src/commands/gate_check.rs:1016-1034`. Discarded result: `:1618`. Injection pattern to follow: `crates/jit/src/commands/gate.rs:1884-1955`. |
 | REQ-04 | The exhaustive remedy match already inside the conflict type becomes a serializable value, and the two refusal branches attach it using the details-and-suggestions pattern two neighbouring subcommands already prove. | Typed remedy match: `crates/jit/src/repository_state/profile_apply.rs:673-701`. Branches discarding the typed value: `crates/jit/src/main.rs:1174-1181`, `:1201-1210`. Proven attachment pattern: `:1121-1135`. |
 | REQ-05 | A bare positional id is accepted on the show command alone and translated to an identity selector inside that command's own dispatch (OD-4). | Required repeatable selector: `crates/jit/src/cli.rs:2951-2960`. Other lifecycle commands pinned to flag-only: `crates/jit/tests/cli_repo_workflow/integration_schema.rs:144-185`. |
@@ -56,6 +56,15 @@ rendered-reference freshness guard (`crates/jit/src/domain/event_catalog.rs`), a
 durable through the same transactional publication as the mutation it permitted, so the
 mutation and its audit record land together or not at all.
 
+### `exact-store-snapshot` [implementation-produced] — Exact single-store read
+
+The storage-owned read returning exactly the records one checkout's store holds — its issue
+records and its event log — with no aggregation from version-control history or another
+checkout's store, usable against a store other than the process's own. It exists because the
+ordinary readers deliberately union local, versioned, and primary sources
+(`crates/jit/src/storage/json.rs:539-543,1178`), which would mask exactly the one-sided
+records a divergence comparison must surface.
+
 ### `store-divergence-report` [implementation-produced] — Cross-checkout divergence findings
 
 The read-only finding model: issue records present in one checkout's store and absent from the
@@ -88,9 +97,13 @@ and restore is not (investigation §2).
 |---|---|---|---|---|---|---|---|---|
 | worktree-detection-convergence | Converge worktree detection on one primitive | task | One primitive answers whether this checkout is linked and where the primary store lives. | — | REQ-01, OD-5 | touches 5 | worktree-safety | — |
 | worktree-write-policy-config | Worktree write policy configuration key | task | A typed worktree policy key resolves the mutation stance for linked checkouts, defaulting to refusal. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
-| worktree-override-audit-event | Override audit event for linked-checkout mutations | task | A permitted override of the linked-checkout write stance leaves a distinct durable event with catalog and reference conformance. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
-| worktree-write-guard | Refuse state-mutating commands in linked worktrees | task | State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it. | worktree-authority, worktree-write-policy, worktree-override-record | REQ-01, OD-1, OD-5 | touches 6 | worktree-safety | worktree-detection-convergence, worktree-write-policy-config, worktree-override-audit-event |
-| worktree-divergence-detection | Report divergent checkout stores | task | A read-only check reports the issue records and events one checkout holds without the other. | worktree-authority | REQ-02, OD-2 | touches 5, uncertain | worktree-safety | worktree-detection-convergence |
+| worktree-override-audit-event | Override audit event for linked-checkout mutations | task | The closed event vocabulary carries a distinct override-audit variant with catalog and reference conformance. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
+| worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | — | REQ-01, OD-1 | touches 3 | worktree-safety | worktree-override-audit-event |
+| worktree-write-guard | Refuse state-mutating commands in linked worktrees | task | State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it. | worktree-authority, worktree-write-policy, worktree-override-record | REQ-01, OD-1, OD-5 | touches 4 | worktree-safety | worktree-detection-convergence, worktree-write-policy-config, worktree-override-audit-publication |
+| exact-store-read | Exact single-store read for cross-checkout comparison | task | Storage returns exactly what one checkout's store holds, unmasked by the aggregating read model. | — | REQ-02, OD-2 | touches 2 | worktree-safety | — |
+| worktree-divergence-detection | Report divergent checkout stores | task | A read-only check reports the issue records and events one checkout holds without the other. | worktree-authority, exact-store-snapshot | REQ-02, OD-2 | touches 5, uncertain | worktree-safety | worktree-detection-convergence, exact-store-read |
+| worktree-delete-guard-convergence | Converge the deletion refusal into the write policy | task | The standalone deletion refusal dissolves into the general linked-checkout write policy. | worktree-write-policy | REQ-01, OD-1, OD-5 | touches 2 | worktree-safety | worktree-write-guard |
+| worktree-guide-stance | State the linked-checkout write stance in the worktree guides | task | The worktree guides state the write stance and its declaration point, so their steps succeed as instructed. | worktree-write-policy | REQ-01, OD-1 | touches 2 | worktree-safety | worktree-write-guard |
 | worktree-recovery-guidance | Recovery guidance for divergent checkout stores | task | Adopters recover a divergent checkout store losslessly and screen for unmerged state before discarding one. | store-divergence-report | REQ-02, OD-2 | touches 2 | worktree-safety | worktree-divergence-detection |
 | gate-durability-regression-test | Regression coverage for gate evaluation durability | task | Injected persistence failure during a gate evaluation returns failure and leaves no passing gate record. | gate-durability-boundary | REQ-03, REQ-06, D-02 | creates 1, touches 1 | gate-durability | — |
 | postcheck-error-surfacing | Surface swallowed postcheck failures | task | A postcheck persistence failure reaches the caller instead of being silently discarded. | gate-durability-boundary | REQ-03, D-02 | touches 2 | gate-durability | — |
@@ -105,25 +118,33 @@ flowchart LR
     N0["worktree-detection-convergence: Converge worktree detection on one primitive"]
     N1["worktree-write-policy-config: Worktree write policy configuration key"]
     N2["worktree-override-audit-event: Override audit event for linked-checkout mutations"]
-    N3["worktree-write-guard: Refuse state-mutating commands in linked worktrees"]
-    N4["worktree-divergence-detection: Report divergent checkout stores"]
-    N5["worktree-recovery-guidance: Recovery guidance for divergent checkout stores"]
-    N6["gate-durability-regression-test: Regression coverage for gate evaluation durability"]
-    N7["postcheck-error-surfacing: Surface swallowed postcheck failures"]
-    N8["profile-remedy-model: Typed remedy data on profile conflicts"]
-    N9["profile-conflict-json-details: Profile conflict output carries its remedy"]
-    N10["profile-guidance-reference: Profile recovery guidance reference"]
-    N11["profile-show-positional: Positional profile id for the show command"]
-    N12["worktree-policy-journey: Linked checkout journey coverage"]
-    N0 --> N3
-    N1 --> N3
+    N3["worktree-override-audit-publication: Publish the override audit record with the mutation it permits"]
+    N4["worktree-write-guard: Refuse state-mutating commands in linked worktrees"]
+    N5["exact-store-read: Exact single-store read for cross-checkout comparison"]
+    N6["worktree-divergence-detection: Report divergent checkout stores"]
+    N7["worktree-delete-guard-convergence: Converge the deletion refusal into the write policy"]
+    N8["worktree-guide-stance: State the linked-checkout write stance in the worktree guides"]
+    N9["worktree-recovery-guidance: Recovery guidance for divergent checkout stores"]
+    N10["gate-durability-regression-test: Regression coverage for gate evaluation durability"]
+    N11["postcheck-error-surfacing: Surface swallowed postcheck failures"]
+    N12["profile-remedy-model: Typed remedy data on profile conflicts"]
+    N13["profile-conflict-json-details: Profile conflict output carries its remedy"]
+    N14["profile-guidance-reference: Profile recovery guidance reference"]
+    N15["profile-show-positional: Positional profile id for the show command"]
+    N16["worktree-policy-journey: Linked checkout journey coverage"]
     N2 --> N3
     N0 --> N4
-    N4 --> N5
-    N8 --> N9
-    N9 --> N10
-    N3 --> N12
-    N5 --> N12
+    N1 --> N4
+    N3 --> N4
+    N0 --> N6
+    N5 --> N6
+    N4 --> N7
+    N4 --> N8
+    N6 --> N9
+    N12 --> N13
+    N13 --> N14
+    N4 --> N16
+    N9 --> N16
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -139,6 +160,7 @@ flowchart LR
 | D-02 — reproduce before remediating | Held. The investigation reproduced each defect at the planning tier and found REQ-03's durability property already satisfied on the automated path, which is why that criterion's work is coverage plus a separately-scoped postcheck fix rather than new durability machinery. |
 | Risk — a refusing default breaks this repository's own agent fleet | The dogfood opt-in is declared in this repository's tracker configuration by the task that introduces the key, which the guard task depends on, so no ordering exists in which the fleet runs against a refusing default. |
 | Risk — convergence narrows documented read-side fallback behaviour | The layered issue read fallback is adopter-facing documented behaviour with a known test and documentation blast radius (investigation §6). Its observable behaviour is held fixed; only the detection question underneath converges. |
+| Risk — the worktree guides lag the guard by one ordered wave | Accepted deliberately for leaf purity: the stance statement is its own docs leaf, ordered by an explicit edge, in the guard's landing group. The lag is bounded because the container cannot complete before that leaf lands; scheduling should dispatch it in the wave immediately following the guard. |
 | Risk — the postcheck swallow's reachability from today's CLI is unestablished | Enumerating the invocations that reach that loop is the first criterion of the task that fixes it, so the surfacing shape is chosen from evidence rather than assumed. |
 | Risk — profile prose is pinned by unit assertions, including capture-only-where-applicable | The prose derives from the typed remedy rather than being replaced by it, so those assertions stay meaningful; the pinned command-boundary assertions are extended by the same tasks that change the surfaces (investigation §3.d). |
 
