@@ -47,6 +47,18 @@ naming the linked checkout, the stance that refused it, and how to permit the op
 both the rendered and the machine-readable form. Refusing before any repository delta is
 constructed is what keeps the append-on-state-change guarantee intact rather than excepted.
 
+### `context-construction-boundary` [implementation-produced] — One production-context factory
+
+Production mutation contexts — today constructed by twenty-two independent
+`MutationContext::production()` calls across fourteen command modules — are constructed
+through one factory carrying an optional dispatch-scoped annotation slot, empty by default
+and behaviour-preserving when empty. It exists so a fact decided once at dispatch can reach
+every finalized plan through the context the finalizer already receives
+(`crates/jit/src/repository_state/mutation.rs:665`), without per-command threading; both
+finalizer paths converge on the shared event-pass helper
+(`crates/jit/src/repository_state/mutation.rs:1092-1094`), so a context-borne fact reaches
+each of them.
+
 ### `worktree-override-record` [implementation-produced] — Durable override audit event
 
 The distinct event variant recording that a permitted override, not a permissive stance,
@@ -97,8 +109,9 @@ and restore is not (investigation §2).
 |---|---|---|---|---|---|---|---|---|
 | worktree-detection-convergence | Converge worktree detection on one primitive | task | One primitive answers whether this checkout is linked and where the primary store lives. | — | REQ-01, OD-5 | touches 5 | worktree-safety | — |
 | worktree-write-policy-config | Worktree write policy configuration key | task | A typed worktree policy key resolves the mutation stance for linked checkouts, defaulting to refusal. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
+| mutation-context-factory | Converge mutation-context construction onto one factory | task | One factory owns production mutation-context construction, replacing twenty-two scattered constructor calls. | — | REQ-01, OD-1, OD-5 | touches 15 | worktree-safety | — |
 | worktree-override-audit-event | Override audit event for linked-checkout mutations | task | The closed event vocabulary carries a distinct override-audit variant with catalog and reference conformance. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
-| worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | — | REQ-01, OD-1 | touches 4 | worktree-safety | worktree-override-audit-event |
+| worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | context-construction-boundary | REQ-01, OD-1 | touches 4 | worktree-safety | worktree-override-audit-event, mutation-context-factory |
 | worktree-write-guard | Refuse state-mutating commands in linked worktrees | task | State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it. | worktree-authority, worktree-write-policy, worktree-override-record | REQ-01, OD-1, OD-5 | touches 4 | worktree-safety | worktree-detection-convergence, worktree-write-policy-config, worktree-override-audit-publication |
 | exact-store-read | Exact single-store read for cross-checkout comparison | task | Storage returns exactly what one checkout's store holds, unmasked by the aggregating read model. | — | REQ-02, OD-2 | touches 2 | worktree-safety | — |
 | worktree-divergence-detection | Report divergent checkout stores | task | A read-only check reports the issue records and events one checkout holds without the other. | worktree-authority, exact-store-snapshot | REQ-02, OD-2 | touches 5, uncertain | worktree-safety | worktree-detection-convergence, exact-store-read |
@@ -118,35 +131,37 @@ and restore is not (investigation §2).
 flowchart LR
     N0["worktree-detection-convergence: Converge worktree detection on one primitive"]
     N1["worktree-write-policy-config: Worktree write policy configuration key"]
-    N2["worktree-override-audit-event: Override audit event for linked-checkout mutations"]
-    N3["worktree-override-audit-publication: Publish the override audit record with the mutation it permits"]
-    N4["worktree-write-guard: Refuse state-mutating commands in linked worktrees"]
-    N5["exact-store-read: Exact single-store read for cross-checkout comparison"]
-    N6["worktree-divergence-detection: Report divergent checkout stores"]
-    N7["worktree-delete-guard-convergence: Converge the deletion refusal into the write policy"]
-    N8["worktree-guide-stance: State the linked-checkout write stance in the worktree guides"]
-    N9["worktree-recovery-guidance: Recovery guidance for divergent checkout stores"]
-    N10["gate-durability-regression-test: Regression coverage for gate evaluation durability"]
-    N11["postcheck-error-surfacing: Surface swallowed postcheck failures"]
-    N12["profile-remedy-model: Typed remedy data on profile conflicts"]
-    N13["profile-conflict-json-details: Profile conflict output carries its remedy"]
-    N14["profile-guidance-reference: Profile recovery guidance reference"]
-    N15["profile-show-positional: Positional profile id for the show command"]
-    N16["worktree-policy-journey: Linked-checkout write-policy journey"]
-    N17["worktree-divergence-journey: Divergence and recovery journey"]
-    N2 --> N3
-    N0 --> N4
-    N1 --> N4
+    N2["mutation-context-factory: Converge mutation-context construction onto one factory"]
+    N3["worktree-override-audit-event: Override audit event for linked-checkout mutations"]
+    N4["worktree-override-audit-publication: Publish the override audit record with the mutation it permits"]
+    N5["worktree-write-guard: Refuse state-mutating commands in linked worktrees"]
+    N6["exact-store-read: Exact single-store read for cross-checkout comparison"]
+    N7["worktree-divergence-detection: Report divergent checkout stores"]
+    N8["worktree-delete-guard-convergence: Converge the deletion refusal into the write policy"]
+    N9["worktree-guide-stance: State the linked-checkout write stance in the worktree guides"]
+    N10["worktree-recovery-guidance: Recovery guidance for divergent checkout stores"]
+    N11["gate-durability-regression-test: Regression coverage for gate evaluation durability"]
+    N12["postcheck-error-surfacing: Surface swallowed postcheck failures"]
+    N13["profile-remedy-model: Typed remedy data on profile conflicts"]
+    N14["profile-conflict-json-details: Profile conflict output carries its remedy"]
+    N15["profile-guidance-reference: Profile recovery guidance reference"]
+    N16["profile-show-positional: Positional profile id for the show command"]
+    N17["worktree-policy-journey: Linked-checkout write-policy journey"]
+    N18["worktree-divergence-journey: Divergence and recovery journey"]
     N3 --> N4
-    N0 --> N6
-    N5 --> N6
-    N4 --> N7
-    N4 --> N8
-    N6 --> N9
-    N12 --> N13
+    N2 --> N4
+    N0 --> N5
+    N1 --> N5
+    N4 --> N5
+    N0 --> N7
+    N6 --> N7
+    N5 --> N8
+    N5 --> N9
+    N7 --> N10
     N13 --> N14
-    N4 --> N16
-    N9 --> N17
+    N14 --> N15
+    N5 --> N17
+    N10 --> N18
 ```
 <!-- jit:breakdown-overview:end -->
 

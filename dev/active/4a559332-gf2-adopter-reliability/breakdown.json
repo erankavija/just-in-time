@@ -87,6 +87,60 @@
     }
   },
   {
+    "key": "mutation-context-factory",
+    "title": "Converge mutation-context construction onto one factory",
+    "description": "Production mutation contexts are constructed through one factory instead of twenty-two\nindependent constructor calls spread across fourteen command modules, with behaviour\nunchanged.\n\n## Background\n\nThe production mutation context — the injected authority and clock a finalized plan derives\nits identifiers and timestamp from — is constructed independently wherever a command needs\none. A fact decided once at dispatch has no way to reach those contexts without either\nthreading through the modules one by one or converging their construction first. Convergence\nis the shared-convention remedy: one factory owns production-context construction and carries\nan optional dispatch-scoped annotation slot, empty by default, so a later change can set a\nfact in one place and have it reach the finalizer through the context it already receives.\n\n## Success Criteria\n\n- [hard] REQ-01: One factory constructs the production mutation context, the per-module constructor calls route through it, and the direct constructor is no longer callable from command modules.\n- [hard] REQ-02: The factory carries an optional dispatch-scoped annotation slot that is empty by default, and an empty slot changes no behaviour: no new events, identical outputs, identical persisted bytes for the same inputs.\n- [hard] REQ-03: The full test suite passes unchanged apart from construction-site mechanics, demonstrating the convergence is behaviour-preserving.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "One factory owns production mutation-context construction, replacing twenty-two scattered constructor calls.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "context-construction-boundary"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-1",
+        "OD-5"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "command modules constructing mutation contexts",
+        "test_boundary": "existing suite unchanged plus factory unit coverage",
+        "worker_sized_reason": "Twenty-two mechanical constructor swaps onto one factory whose empty slot is behaviour-preserving; a single deliverable class with the existing suite pinning the no-change property.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/commands/batch_create.rs",
+            "crates/jit/src/commands/bulk_update.rs",
+            "crates/jit/src/commands/claim.rs",
+            "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/src/commands/gate.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/init.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/migrate.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/repository_state/mutation.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "worktree-override-audit-event",
     "title": "Override audit event for linked-checkout mutations",
     "description": "A permitted override of the linked-checkout write stance has its own event variant in the\nclosed event vocabulary, with the catalog and rendered-reference rows the freshness guard\nrequires.\n\n## Background\n\nThe event vocabulary is a closed, serde-tagged model mirrored by a fieldless tag set, and a\nfreshness guard fails when a variant is missing from the catalog or the rendered event\nreference. An ordinary mutation event cannot show that an invocation was permitted\nspecifically by an override rather than by a permissive stance, so the record needs a\ndistinct variant. This leaf defines the vocabulary only; how a record of this kind becomes\ndurable alongside the mutation it permits is a separate publication concern.\n\n## Success Criteria\n\n- [hard] REQ-01: A distinct event variant records a permitted override of the linked-checkout write stance, naming the linked checkout, the stance that would have refused, and the override that permitted the invocation.\n- [hard] REQ-02: The variant appears in the event catalog, the rendered event reference is regenerated from that catalog rather than edited by hand, and the existing freshness guard fails if either is missing.\n- [hard] REQ-03: The variant round-trips through serialization with a stable type tag, and existing event-log readers tolerate and report it.\n",
@@ -144,11 +198,14 @@
       "code-review"
     ],
     "depends_on": [
-      "worktree-override-audit-event"
+      "worktree-override-audit-event",
+      "mutation-context-factory"
     ],
     "planning": {
       "outcome": "An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands.",
-      "contract_refs": [],
+      "contract_refs": [
+        "context-construction-boundary"
+      ],
       "produces_contracts": [
         "worktree-override-record"
       ],
