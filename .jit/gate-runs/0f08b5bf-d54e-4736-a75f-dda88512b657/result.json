@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "82a1beea25394660b7509482d93dffbe1bd65e70",
+  "completed_at": "2026-08-14T22:58:00.197231084Z",
+  "duration_ms": 45253,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue's cargo-ci exclusion enforcement and shared-read lock fallback are accurately documented in their canonical references.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "a36b91ff-0fc0-4a4f-8112-632fee4f38ed",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0f08b5bf-d54e-4736-a75f-dda88512b657",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T22:57:14.944147147Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf issue `a36b91ff`; inspected six individually tagged commits reachable on `main`, with no descendants. The latest documentation commit addresses both prior blocking findings.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's cargo-ci exclusion enforcement and shared-read lock fallback are accurately documented in their canonical references.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
