@@ -707,13 +707,6 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/invariants.toml"), registry)
                     .expect("write dangling invariant registry");
             }
-            SetupStep::IndexLockDirectory => {
-                let lock = self.root().join(".jit/.index.lock");
-                if lock.exists() {
-                    fs::remove_file(&lock).expect("remove initial index lock file");
-                }
-                fs::create_dir(&lock).expect("replace index lock with directory");
-            }
             SetupStep::MissingFile(path) => {
                 assert!(
                     !self.root().join(path).exists(),
@@ -782,7 +775,6 @@ enum SetupStep {
     ActiveClaimIndex,
     DuplicateGate(String),
     DanglingInvariant(String),
-    IndexLockDirectory,
     MissingFile(String),
     MissingIssue(String),
     UnknownGate(String),
@@ -813,7 +805,6 @@ impl SetupStep {
             "git:repository-without-head" => Ok(Self::GitRepositoryWithoutHead),
             "git:absent" => Ok(Self::GitAbsent),
             "claim:index-with-active-lease" => Ok(Self::ActiveClaimIndex),
-            "index-lock-directory" => Ok(Self::IndexLockDirectory),
             "no-ready-issue" => Ok(Self::MissingReadyIssue),
             "worktree:primary" => Ok(Self::PrimaryWorktree),
             _ => prefixed("env-unset:")
@@ -863,7 +854,7 @@ impl SetupStep {
             | Self::DuplicateGate(_)
             | Self::DanglingInvariant(_)
             | Self::BuiltinPreset(_) => SetupClass::SeededDomainState,
-            Self::IndexLockDirectory | Self::MissingFile(_) => SetupClass::FilesystemState,
+            Self::MissingFile(_) => SetupClass::FilesystemState,
             Self::PrimaryWorktree => SetupClass::WorktreeTopology,
             Self::InvalidRegex(_) => SetupClass::InvocationInput,
             Self::MissingIssue(_)

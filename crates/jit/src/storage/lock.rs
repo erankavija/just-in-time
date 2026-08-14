@@ -375,8 +375,15 @@ impl FileLocker {
             return Some(file);
         }
 
+        // A read-only open is enough for a shared `flock`, so a lock file this
+        // caller may read but not write still yields real exclusion against a
+        // writer. The descriptor has to name a regular file to mean that: a
+        // directory opens for reading on Unix and accepts a lock that excludes
+        // nobody, since a writer cannot open it at all.
         if let Ok(file) = OpenOptions::new().read(true).open(path) {
-            return Some(file);
+            if file.metadata().is_ok_and(|meta| meta.is_file()) {
+                return Some(file);
+            }
         }
 
         // A missing lock file that cannot be created leaves this reader with no
@@ -762,6 +769,32 @@ mod tests {
 
         assert_eq!(guard.path(), file_path);
         assert!(locker.warnings().is_empty());
+    }
+
+    /// A lock path occupied by a directory holds no lock, and says so.
+    ///
+    /// A directory opens for reading on Unix, so the read-only fallback would
+    /// otherwise report a guard that excludes nobody: a writer cannot open that
+    /// path at all, so there is no holder for the shared side to be excluded
+    /// by. The reader proceeds — publication is atomic either way — and the
+    /// warning records that it did so unprotected.
+    #[test]
+    fn test_lock_shared_takes_no_os_lock_when_the_lock_path_is_not_a_regular_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let lock_path = temp_dir.path().join("occupied.lock");
+        std::fs::create_dir(&lock_path).unwrap();
+
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+        let guard = locker.lock_shared(&lock_path).unwrap();
+
+        assert_eq!(guard.path(), lock_path);
+        assert!(
+            locker.warnings().iter().any(|warning| matches!(
+                warning,
+                StorageWarning::SharedLockUnavailable { path } if path == &lock_path
+            )),
+            "a shared read over a lock path that is no regular file records that it holds no lock"
+        );
     }
 
     #[test]

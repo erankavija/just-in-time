@@ -884,11 +884,11 @@ confirmation = "invoked"
 [[arms]]
 path = "status"
 argv = ["status", "--json"]
-setup = ["init", "index-lock-directory"]
-setup_notes = "After initialization, replace .jit/.index.lock with an empty directory before invoking the arm."
-expected_failure = "Opening the status read lock fails because .jit/.index.lock is a directory."
-expected_code = "IO_ERROR"
-expected_exit = 10
+setup = ["init", "malformed-index"]
+setup_notes = "Initialize a repository, then replace .jit/index.json with malformed JSON before invoking the arm."
+expected_failure = "failed to parse index"
+expected_code = "PARSE_ERROR"
+expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
