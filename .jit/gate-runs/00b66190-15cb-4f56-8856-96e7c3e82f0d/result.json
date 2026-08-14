@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b1f2c6aafcd49d35a63f44a562e1d265c7a2b2fe",
+  "completed_at": "2026-08-14T21:25:56.784833054Z",
+  "duration_ms": 190688,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/lock.rs",
+        "id": "F1",
+        "line": 687,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-test-assertions"
+        ],
+        "severity": "high",
+        "summary": "The retained shared-lock test permits fully serialized acquisitions and therefore does not prove concurrent shared access."
+      }
+    ],
+    "summary": "Shared-lock concurrency is not actually tested, leaving REQ-01 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe2c2bd-96ef-4297-a535-cf3fe65b690e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "00b66190-15cb-4f56-8856-96e7c3e82f0d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T21:22:46.096094587Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4250 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00227-f295-78f1-a3ae-4516614436e3\n--------\nuser\n--- 4237 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b79b7d6e, ddd83b541, 2d5e0f9e, f361011c, b1f2c6aa (`jit:abe2c2bd`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/canonical-cutover, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-14T21:21:13Z); code-review pending; doc-review pending\nTruncation recovery: narrowed the ignored-test scan to crates/**/*.rs and reread relevant lock, CLI-test, and testing-document line ranges after excluding historical/vendor output outside the impact cone\n\n1. F1 — high, blocking, issue-impact: `test_shared_locks_allow_concurrent_reads` does not prove concurrent shared access. An implementation that serializes the three callers exclusively still lets each hold for 100 ms and increment before the 500 ms timeout, so the count assertion passes at `crates/jit/src/storage/lock.rs:687`. Because the attributable commit deletes the ignored test while relying on this as its replacement, REQ-01 remains unmet. References: @/invariant/semantic-test-assertions.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Shared-lock concurrency is not actually tested, leaving REQ-01 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The retained shared-lock test permits fully serialized acquisitions and therefore does not prove concurrent shared access.\",\"file\":\"crates/jit/src/storage/lock.rs\",\"line\":687,\"references\":[\"@/invariant/semantic-test-assertions\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

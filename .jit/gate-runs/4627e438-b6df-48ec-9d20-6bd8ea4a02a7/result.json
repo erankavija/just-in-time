@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c717bf281d7694e9bdca9079964d8d249a3d6e1c",
+  "completed_at": "2026-08-14T21:37:56.675106666Z",
+  "duration_ms": 42694,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Leaf issue changes test coverage only; no adopter-facing documentation impact requires an update.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "abe2c2bd-96ef-4297-a535-cf3fe65b690e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4627e438-b6df-48ec-9d20-6bd8ea4a02a7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T21:37:13.980505111Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `bug` is a leaf type (level 4) with no resolved children. I inspected the five reachable `jit:abe2c2bd` commits individually with rename detection. They change tests and the contributor-only `dev/TESTING.md`; no adopter-facing behavior or documentation impact was introduced.\n\nDocumentation impact: no update is required in `docs/`, README files, or installation guidance. The updated contributor test note accurately reflects the current tree.\n\nFindings:\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf issue changes test coverage only; no adopter-facing documentation impact requires an update.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c717bf281d7694e9bdca9079964d8d249a3d6e1c",
+  "completed_at": "2026-08-14T21:37:12.394428347Z",
+  "duration_ms": 223808,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All seven inert tests are removed or replaced by default-suite coverage, and the prior shared-lock finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "abe2c2bd-96ef-4297-a535-cf3fe65b690e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e9182f79-1d73-44a9-a4ae-ecd0a1b8732f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T21:33:28.586381915Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b79b7d6e, ddd83b541, f361011c, 2d5e0f9e, b1f2c6aa, c717bf28 (`jit:abe2c2bd`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-1; @/invariant/canonical-cutover, @/invariant/gate-semantics, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts; @/gate/jit-validate; @/issue/4b7c06d0/requirement/REQ-05\nGate evidence: cargo-ci passed (exit 0, c717bf28); code-review failed previously (exit 1, b1f2c6aa) and its shared-lock finding is addressed by c717bf28; doc-review pending\nTruncation recovery: reread the c717bf28 lock patch, current affected line ranges, and the 2d5e0f9e documentation patch individually; narrowed the REQ-05 lookup to its resolved parent issue\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All seven inert tests are removed or replaced by default-suite coverage, and the prior shared-lock finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
