@@ -87,6 +87,50 @@
     }
   },
   {
+    "key": "worktree-override-audit-event",
+    "title": "Override audit event for linked-checkout mutations",
+    "description": "A permitted override of the linked-checkout write stance leaves a distinct, durable event\nin the repository's own history, defined in the closed event vocabulary with its catalog and\nreference conformance.\n\n## Background\n\nThe event vocabulary is a closed, serde-tagged model mirrored by a fieldless tag set, and a\nfreshness guard fails when a variant is missing from the catalog or the rendered event\nreference. Recording a permitted override therefore needs its own variant, its catalog and\nreference rows, and stated append semantics — none of which an existing mutation event can\ncarry, because ordinary mutation events cannot show that an invocation was permitted\nspecifically by an override rather than by a permissive stance.\n\n## Success Criteria\n\n- [hard] REQ-01: A distinct event variant records a permitted override of the linked-checkout write stance, naming the linked checkout, the stance that would have refused, and the override that permitted the invocation.\n- [hard] REQ-02: The variant appears in the event catalog and the rendered event reference, and the existing freshness guard fails if either is missing.\n- [hard] REQ-03: The append semantics are stated and covered: the audit record becomes durable through the same transactional publication as the mutation it permitted, so the mutation and its audit record land together or not at all.\n- [hard] REQ-04: The variant round-trips through serialization with a stable type tag, and existing event-log readers tolerate and report it.\n\n## Notes\n\nThis defines the record and its semantics; the dispatch-time policy that decides when one is\nemitted consumes this definition.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "component:docs",
+      "satisfies:REQ-01"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "A permitted override of the linked-checkout write stance leaves a distinct durable event with catalog and reference conformance.",
+      "contract_refs": [],
+      "produces_contracts": [
+        "worktree-override-record"
+      ],
+      "source_refs": [
+        "REQ-01",
+        "OD-1"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "event log readers",
+        "test_boundary": "domain event-model unit tests",
+        "worker_sized_reason": "One event variant with its catalog row, reference row, and append-semantics coverage, following the conformance guard the event model already enforces.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/types.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "docs/reference/events.md"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "worktree-write-guard",
     "title": "Refuse state-mutating commands in linked worktrees",
     "description": "A state-mutating invocation inside a linked non-primary checkout refuses before any repository\nwrite unless the declared stance or an explicit override permits it, and the adopter guides\nthat teach the linked-checkout workflow state the stance that now governs it.\n\n## Background\n\nThe command enumeration already classifies every invocation by whether it must open a\nrepository mutation session. That classification is exhaustive over the command families that\ndelegate to a sub-enum classifier; five read-only families match their inner enum with a\nwildcard, so a new mutating leaf under one of them must be classified deliberately rather than\ninherited silently. That predicate, combined with the worktree primitive computed before\ndispatch, is exactly the condition a write policy needs, and evaluating it before the\nrepository mutation session is opened leaves a refusal with no partial state and no event\nbehind. One command — issue deletion — already carries an unconditional secondary-checkout\nrefusal of its own, which becomes a case of the general policy rather than a parallel variant.\n\nThe parallel-work tutorial and the multi-agent coordination guide teach mutation from a linked\ncheckout as the sanctioned workflow, so those pages must state the stance and where a\nrepository declares it, or they contradict the behaviour an adopter observes.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, an invocation that would open a repository mutation session inside a linked non-primary checkout fails before any repository write, leaving that checkout's store and event log untouched.\n- [hard] REQ-02: The refusal names the linked checkout, the stance that refused it, and how to permit the operation; its machine-readable form carries the same three facts.\n- [hard] REQ-03: A permissive declared stance and an explicit per-invocation override each permit the invocation, and a permitted override leaves a durable record a later reader finds in the repository's own history.\n- [hard] REQ-04: Read-only invocations, invocations in the primary checkout, and invocations outside version control succeed under either stance.\n- [hard] REQ-05: The unconditional deletion refusal is replaced by the general policy, and deletion keeps its current outcome under the refusing stance.\n- [hard] REQ-06: Existing coverage that mutates from a linked checkout declares the stance it relies on rather than depending on an unstated default.\n- [hard] REQ-07: The parallel-work tutorial and the multi-agent coordination guide state the stance that governs mutation inside a linked checkout and where a repository declares it, so every step they instruct succeeds under the stance the reader's repository declares.\n\n## Notes\n\nThe condition is evaluated at dispatch, before the repository mutation session is opened, so a\nrefused invocation is not a state change and appends nothing: the append-on-state-change\nguarantee is preserved rather than excepted.\n\nThe session predicate is deliberately broader than the divergent-history hazard: an invocation\nthat writes only the shared control plane or machine-local runtime state still classifies as\nmutating and refuses under the refusing stance. An over-refusal of that kind is the chosen\nbehaviour, not a defect.\n",
@@ -107,13 +151,15 @@
     ],
     "depends_on": [
       "worktree-detection-convergence",
-      "worktree-write-policy-config"
+      "worktree-write-policy-config",
+      "worktree-override-audit-event"
     ],
     "planning": {
       "outcome": "State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it.",
       "contract_refs": [
         "worktree-authority",
-        "worktree-write-policy"
+        "worktree-write-policy",
+        "worktree-override-record"
       ],
       "produces_contracts": [
         "worktree-refusal-audit"
@@ -520,7 +566,8 @@
       "contract_refs": [
         "worktree-write-policy",
         "worktree-refusal-audit",
-        "store-divergence-report"
+        "store-divergence-report",
+        "worktree-override-record"
       ],
       "produces_contracts": [],
       "source_refs": [
