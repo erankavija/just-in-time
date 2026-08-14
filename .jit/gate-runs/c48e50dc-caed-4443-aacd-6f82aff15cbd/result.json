@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1091db1b1b9be3599dfd267d5ac3c2bfcdb46d68",
+  "completed_at": "2026-08-14T05:12:00.096092848Z",
+  "duration_ms": 282286,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F1",
+        "line": 118,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/event-log",
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The worktree guard promises a durable per-invocation override audit record without the event-model producer or footprint required to create it."
+      }
+    ],
+    "summary": "The worktree override audit contract has no implementable producer in the declared decomposition.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "629c3d73-2448-40d6-9519-ce48b897f4ff",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c48e50dc-caed-4443-aacd-6f82aff15cbd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T05:07:17.809846585Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15261 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffeaa-db65-7a70-822c-643cb922d879\n--------\nuser\n--- 15248 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Required validation passed: manifest validation (all six REQs, warnings denied), renderer check, and native batch dry-run.\n\n1. **F1 — blocking, issue-impact:** `worktree-write-guard` claims to produce the durable `worktree-refusal-audit` contract, including an auditable per-invocation override, but its footprint contains only dispatch, CLI, tests, and docs ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:118)). The current closed event model has no generic worktree-override event ([types.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:1175)); adding one also requires catalog/reference conformance. Existing mutation events cannot prove that a general command was permitted specifically by an override. Thus the contract stated in [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/plan.md:43) cannot be delivered as written. Replace this leaf with a separately scoped audit-model task that defines event timing/atomicity and owns event/catalog/reference footprints, then make the dispatch guard depend on and consume it. This preserves `@/inv/event-log` and keeps the guard worker-sized.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The worktree override audit contract has no implementable producer in the declared decomposition.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The worktree guard promises a durable per-invocation override audit record without the event-model producer or footprint required to create it.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":118,\"references\":[\"@/inv/event-log\",\"@/inv/architecture-dependency-direction\"]}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

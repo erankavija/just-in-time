@@ -1,0 +1,64 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7259e481c6623d90b6ae07145704522bf02e8c62",
+  "completed_at": "2026-08-14T05:17:36.899542428Z",
+  "duration_ms": 200563,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F1",
+        "line": 90,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/event-log",
+          "@/inv/derived-state-coherence",
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The declared override-audit producer defines an event vocabulary but has no transaction-finalizer producer for the required atomic durable record."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F2",
+        "line": 229,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The divergence-check footprint lacks a storage-owned exact-store read path, while the existing issue reader aggregates fallback sources and masks one-sided records."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F3",
+        "line": 136,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The worktree guard combines universal implementation, deletion-policy migration, existing-test migration, and two documentation deliverables in one leaf."
+      }
+    ],
+    "summary": "The manifest leaves the override audit and raw-store divergence contracts unimplementable, and retains one materially mixed leaf.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "629c3d73-2448-40d6-9519-ce48b897f4ff",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c3bdc031-d6c6-4630-a3fe-b7f91a8c4a3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T05:14:16.336055856Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10527 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffeb1-3e4c-7b83-8731-d1d2be4ae811\n--------\nuser\n--- 10514 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact.** The prior override-audit finding remains unresolved: [the plan’s contract](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/plan.md:50) requires an override record in the same transaction as the permitted mutation, but its declared producer only touches the event enum, catalog, and reference ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:90)). The guard consumes that contract without any transaction-finalizer footprint ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:134)). Events become durable only when mutation intents are finalized into one materialization plan ([mutation.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:665), [mutation.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:1067)); adding a variant cannot publish it. Split the vocabulary work from a transaction-owned audit-publication leaf, make the latter the sole producer of `worktree-override-record`, include finalizer/intent-plumbing footprints and atomic-failure coverage, and make the guard consume that leaf.\n\n2. **F2 — blocking, issue-impact.** The divergence-check leaf cannot deliver its raw two-store comparison through its declared footprint ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:191)). Its only implementation paths are CLI/command/output files ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:229)), while existing issue enumeration deliberately aggregates local, Git, and primary-worktree state ([json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:539), [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:1178)). That masks the very one-sided records the criterion must report and invites command-layer persistence access. Add a storage-owned exact-store snapshot/read contract (with `storage` interface and JSON implementation footprints), then make the command leaf consume and compare those snapshots.\n\n3. **F3 — blocking, issue-impact.** `worktree-write-guard` is materially over-sized: one leaf combines universal dispatch enforcement, structured refusal output, explicit-override auditing, deletion-policy replacement, migration of existing linked-worktree coverage, and edits to two adopter guides ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:136), [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:170)). This mixes implementation, deletion migration, and documentation across seven hard acceptance clusters, so it is not one focused worker cycle. Keep a code-only guard leaf, isolate deletion convergence and guide updates into dependent leaves, and retain focused tests with their respective code changes.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest leaves the override audit and raw-store divergence contracts unimplementable, and retains one materially mixed leaf.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The declared override-audit producer defines an event vocabulary but has no transaction-finalizer producer for the required atomic durable record.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":90,\"references\":[\"@/inv/event-log\",\"@/inv/derived-state-coherence\",\"@/inv/architecture-dependency-direction\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The divergence-check footprint lacks a storage-owned exact-store read path, while the existing issue reader aggregates fallback sources and masks one-sided records.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":229,\"references\":[\"@/inv/architecture-dependency-direction\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The worktree guard combines universal implementation, deletion-policy migration, existing-test migration, and two documentation deliverables in one leaf.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":136}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

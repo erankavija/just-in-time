@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "07a8f23513a39bfff003052b83d69d4401e71785",
+  "completed_at": "2026-08-14T06:05:01.624358360Z",
+  "duration_ms": 228003,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F1",
+        "line": 134,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/event-log",
+          "@/inv/derived-state-coherence",
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The override-audit producer does not define or footprint a carrier from dispatch to every independently created mutation context and finalizer, leaving permitted mutations able to omit the required durable audit record."
+      }
+    ],
+    "summary": "The override-audit producer still lacks a complete dispatch-to-finalizer carrier for every permitted mutation.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "629c3d73-2448-40d6-9519-ce48b897f4ff",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8e4ebee0-ee82-42b2-81b5-91473e0160bb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T06:01:13.620563918Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9249 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffedc-3d85-79f3-97b9-2a92a5769039\n--------\nuser\n--- 9236 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** The override-audit producer remains incomplete. The manifest says dispatch sets an override fact and `MutationContext` carries it to both finalizers, but production contexts are independently created across command modules (for example [commands/mod.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:2062), [issue.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/issue.rs:550), and [profile.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/profile.rs:1859)); dispatch only constructs the executor ([main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2307)). The proposed leaf neither names a shared carrier reachable by every finalizer nor includes the required call sites in its footprint ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:134)). Consequently, an override-permitted mutation can publish its normal event without the required durable override record, violating the cited audit and derived-state contracts. Replace the asserted `MutationContext` path with one common, explicitly documented carrier available to every finalizer (or enumerate and cover every context constructor), add all required paths to the footprint, and prove both normal-finalize and initialization audit-append paths.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The override-audit producer still lacks a complete dispatch-to-finalizer carrier for every permitted mutation.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The override-audit producer does not define or footprint a carrier from dispatch to every independently created mutation context and finalizer, leaving permitted mutations able to omit the required durable audit record.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":134,\"references\":[\"@/inv/event-log\",\"@/inv/derived-state-coherence\",\"@/inv/architecture-dependency-direction\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

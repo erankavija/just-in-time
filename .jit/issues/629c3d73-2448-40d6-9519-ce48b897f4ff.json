@@ -1,19 +1,61 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead",
+  "claimed_at": "2026-08-13T22:25:14.328952284Z",
   "context": {},
   "created_at": "2026-08-13T16:32:19.514034042Z",
   "dependencies": [],
   "description": "Plan gf2 adopter reliability: safe worktrees, durable gates, actionable profiles (4a559332) against every hard success criterion, write the concise design at dev/active/4a559332-gf2-adopter-reliability/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4a559332-gf2-adopter-reliability/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8c23c2d3a961b9a48a13076185eabb163568453b84df317703226b1c0c339b7e",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "230ea32960bff6f86ccac5d1a7379e669e6009ff6f444723171d7a2fcde1d1d8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/4a559332-gf2-adopter-reliability/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4a559332-gf2-adopter-reliability/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json"
+    }
+  ],
+  "done_at": "2026-08-14T06:14:32.389489407Z",
   "first_ready_at": "2026-08-13T16:32:19.514034042Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-08-13T16:32:19.514034042Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-14T06:14:12.425564166Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "629c3d73-2448-40d6-9519-ce48b897f4ff",
@@ -25,7 +67,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-13T16:32:19.514034042Z"
+  "updated_at": "2026-08-14T06:14:32.389489407Z"
 }

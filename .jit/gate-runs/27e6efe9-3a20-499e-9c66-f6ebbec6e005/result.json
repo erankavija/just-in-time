@@ -1,0 +1,52 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6061cb7eb4ccdfcd55fdc88f9d475d3f461e9f5d",
+  "completed_at": "2026-08-14T05:33:17.417550662Z",
+  "duration_ms": 256836,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F1",
+        "line": 132,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/event-log",
+          "@/inv/derived-state-coherence",
+          "@/inv/architecture-dependency-direction"
+        ],
+        "severity": "high",
+        "summary": "The override-audit producer omits the dispatch and layout paths required to carry an explicit override into every transaction finalizer, so the required durable audit record is not implementable for all permitted mutations."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json",
+        "id": "F2",
+        "line": 708,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The linked-checkout journey combines write-policy/audit, divergence detection, recovery, and budget verification across four contracts; split it into focused test leaves."
+      }
+    ],
+    "summary": "The override audit lacks a complete producer path, and the end-to-end worktree journey remains materially oversized.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "629c3d73-2448-40d6-9519-ce48b897f4ff",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "27e6efe9-3a20-499e-9c66-f6ebbec6e005",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T05:29:00.581140171Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7443 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 019ffebe-bd16-77c1-ad76-2eb4119dac1d\n--------\nuser\n--- 7430 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** The override-audit producer has no complete data path from dispatch to every mutation finalizer. The manifest says the dispatch decision is set once and read by the finalizer, but its footprint omits the dispatch and layout seams; `finalize` only receives layout, context, and intents. Add an explicit override-audit carrier through `main.rs`, `RepositoryLayout`/all finalizer paths (including `finalize_audit_append`), and tests, or redesign around one shared intent-construction boundary. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:132), [main.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:2214), [mutation.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:665), [path.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/path.rs:404)\n\n2. **F2 — blocking, issue-impact:** `worktree-policy-journey` is materially oversized: one leaf combines refusal/permissive/override-audit behavior, cross-store divergence detection, lossless recovery, and build-budget verification across four produced contracts. Split it into focused write-policy and divergence/recovery journeys with separate test boundaries and footprints. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/4a559332-gf2-adopter-reliability/breakdown.json:708)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The override audit lacks a complete producer path, and the end-to-end worktree journey remains materially oversized.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The override-audit producer omits the dispatch and layout paths required to carry an explicit override into every transaction finalizer, so the required durable audit record is not implementable for all permitted mutations.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":132,\"references\":[\"@/inv/event-log\",\"@/inv/derived-state-coherence\",\"@/inv/architecture-dependency-direction\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The linked-checkout journey combines write-policy/audit, divergence detection, recovery, and budget verification across four contracts; split it into focused test leaves.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/breakdown.json\",\"line\":708,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
