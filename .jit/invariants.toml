@@ -86,6 +86,12 @@ kind = "enforced"
 enforced-by = "@/gate/cargo-ci"
 
 [[invariants]]
+id = "no-ignored-tests"
+statement = "Every test in the workspace runs in the default suite, so a test that exists can fail: the Rust sources declare no ignored test and no ignored doctest. A test held out of the default run holds the name of a property nobody checks, and the exclusion outlives whatever unfinished state motivated it."
+kind = "enforced"
+enforced-by = "@/gate/cargo-ci"
+
+[[invariants]]
 id = "semantic-types"
 statement = "Every identity, constrained token, closed vocabulary, and protocol sentinel has one canonical semantic type; raw strings exist only at parsing and serialization boundaries."
 kind = "advisory"

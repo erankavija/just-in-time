@@ -214,7 +214,7 @@ summarize_pass() {
       grep -o 'rust-build-budget: integration-targets=.*' "$WORK/$name.out" \
         | tail -1 | sed 's/^rust-build-budget: //'
       ;;
-    suite-build | incremental-baseline | incremental-state)
+    suite-build | incremental-baseline | incremental-state | excluded-tests)
       # These steps end their output with the one observation they made — what
       # was built and warmed, what incremental state was present, what this run
       # added to it. The persisted summary carries that observation rather than
@@ -449,6 +449,42 @@ check_gate_incremental_policy() {
   echo "ban in force (CARGO_INCREMENTAL=0), so the ${#added[@]} $noun that appeared under $target_dir during this run came from another process sharing it, not from this run's compilation: $names ($baseline_count pre-existing entries ignored)"
 }
 
+# REQ-02 (jit:a36b91ff, @/invariant/no-ignored-tests): judge whether the run
+# itself held out any suite tests or doctests. The reporter counts are the
+# authoritative measurement because they describe what this run actually
+# skipped; searching Rust sources would only be a proxy and would also match
+# attributes or fences that do not hold a test out of the default run.
+check_no_excluded_tests() {
+  local reporter skipped ignored
+
+  reporter=$(grep -E 'Summary .* [0-9]+ tests run:' "$WORK/test.out" | tail -1 || true)
+  skipped=$(grep -oP '\K[0-9]+(?= skipped)' <<<"$reporter" | tail -1 || true)
+  if [ -z "$reporter" ] || ! grep -qP '[0-9]+ passed' <<<"$reporter"; then
+    echo "cargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement" >&2
+    return 1
+  fi
+  skipped=${skipped:-0}
+
+  ignored=$(grep -oP '\K[0-9]+(?= ignored)' "$WORK/doctest.out" \
+    | awk '{s+=$1} END {print s+0}')
+
+  if [ "$skipped" -eq 0 ] && [ "$ignored" -eq 0 ]; then
+    echo "excluded-tests: nextest skipped=0, doctest ignored=0"
+    return 0
+  fi
+
+  echo "excluded-tests: nextest skipped=$skipped test(s); doctest ignored=$ignored test(s)"
+  if [ "$skipped" -ne 0 ]; then
+    echo "nextest tests held out of the default suite:"
+    cargo nextest list --workspace --run-ignored ignored-only || return 1
+  fi
+  if [ "$ignored" -ne 0 ]; then
+    echo "doctests held out of the default suite:"
+    grep -E '^test .* ignored$' "$WORK/doctest.out" || true
+  fi
+  return 1
+}
+
 # Deprioritize the build/test work so an interactive shell preempts it under
 # contention — this is what keeps the host responsive while the gate runs, not
 # just the serialization above. nice -n 19 = lowest CPU priority; ionice -c2 -n7
@@ -564,6 +600,12 @@ run_step test    "${NICE_PREFIX[@]}" cargo nextest run --workspace
 run_step doctest "${NICE_PREFIX[@]}" cargo test --doc --workspace
 suite_clock_ms=$(( $(epoch_milliseconds) - suite_clock_started_ms ))
 summary+="  ✓ suite-clock: ${suite_clock_ms} ms"$'\n'
+
+# This judges the run's own skipped/ignored counts, because those reporter
+# measurements answer what the suite actually held out rather than what a
+# source search merely appears to declare (jit:a36b91ff,
+# @/invariant/no-ignored-tests).
+run_step excluded-tests check_no_excluded_tests
 
 # Build-footprint budget enforcement (jit:3f73423b). The checker derives the
 # integration-target count from `cargo metadata` (which performs no build) and

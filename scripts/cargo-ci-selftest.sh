@@ -27,10 +27,13 @@ set -uo pipefail
 #   signature    a merge whose #[cfg(test)] caller lost its arg -> step fails
 #   stale-expect a merge that compiles, carrying a test that
 #                asserts the pre-merge value                    -> step fails
+#   ignored-test a merge holding out a test with #[ignore]       -> excluded-tests fails
+#   ignored-doctest a merge holding out an ```ignore``` doctest  -> excluded-tests fails
 #
-# The last two also assert that `cargo build --workspace` SUCCEEDS on the same
-# tree: that is the recorded reason a build-only merge guard was vacuous, kept
-# here as a regression so the distinction cannot quietly be lost again.
+# The signature and stale-expect scenarios also assert that `cargo build
+# --workspace` SUCCEEDS on the same tree: that is the recorded reason a
+# build-only merge guard was vacuous, kept here as a regression so the
+# distinction cannot quietly be lost again.
 #
 # Three further scenarios (jit:0708d692) assert how the gate judges its
 # incremental-compilation ban, since a verdict about the machine is not a
@@ -356,6 +359,57 @@ mod tests {
 EOF
 }
 
+ignored_test_worker() {
+  cat >"$1/src/omega.rs" <<'EOF'
+pub fn label() -> &'static str {
+    "omega"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::label;
+
+    #[test]
+    fn test_label_names_the_module() {
+        assert_eq!(label(), "omega");
+    }
+
+    #[test]
+    #[ignore]
+    fn test_held_out_by_ignore_attribute() {
+        assert_eq!(label(), "held out");
+    }
+}
+EOF
+}
+
+ignored_doctest_worker() {
+  cat >"$1/src/omega.rs" <<'EOF'
+pub fn label() -> &'static str {
+    "omega"
+}
+
+/// A doctest held out of the default run.
+///
+/// ```ignore
+/// assert_eq!(ignored_doctest_is_named(), 42);
+/// ```
+pub fn ignored_doctest_is_named() -> u32 {
+    42
+}
+
+#[cfg(test)]
+mod tests {
+    use super::label;
+
+    #[test]
+    fn test_label_names_the_module() {
+        assert_eq!(label(), "omega");
+    }
+}
+EOF
+}
+
 # Resurrection: the mainline deletes the dead file, the worker starts declaring
 # it. The merge commit names a module whose file is gone (error[E0583]).
 resurrection_mainline() { git -C "$1" rm -q src/claims_log.rs; }
@@ -491,6 +545,8 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
         nextest_success_reported "$out"
       check "$name: the gate reports its separate doctest step passing" \
         step_passed "$out" doctest
+      check "$name: the gate reports its excluded-tests step passing" \
+        step_passed "$out" excluded-tests
       check "$name: the gate reports the named suite clock" \
         suite_clock_is_reported "$out"
       check "$name: the suite clock brackets only nextest and doctests" \
@@ -518,6 +574,46 @@ run_scenario() { # run_scenario <name> <main-fn> <worker-fn> <pass|fail> [build-
     check "$name: the nextest failure reporter preserves the failing test and totals" \
       nextest_runtime_failure_reported "$out"
   fi
+}
+
+test_ignored_test_is_rejected() {
+  local name="ignored-test" repo="$scratch/ignored-test" out="$scratch/ignored-test.gate.out" rc
+
+  echo
+  echo "== $name: an ignored test must fail the excluded-tests step =="
+  if ! build_merge "$repo" "healthy_mainline" "ignored_test_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  run_gate "$repo" "$out"
+  rc=$?
+
+  check "$name: the test step still passes" step_passed "$out" test
+  check "$name: the excluded-tests step fails" step_failed "$out" excluded-tests
+  check "$name: the gate exits nonzero" test "$rc" -ne 0
+  check "$name: the diagnostic names the held-out test" \
+    grep -qF "test_held_out_by_ignore_attribute" "$out"
+}
+
+test_ignored_doctest_is_rejected() {
+  local name="ignored-doctest" repo="$scratch/ignored-doctest" out="$scratch/ignored-doctest.gate.out" rc
+
+  echo
+  echo "== $name: an ignored doctest must fail the excluded-tests step =="
+  if ! build_merge "$repo" "healthy_mainline" "ignored_doctest_worker"; then
+    echo "FAIL: $name: expected a textually clean merge, git reported a conflict"
+    fail=1
+    return
+  fi
+  run_gate "$repo" "$out"
+  rc=$?
+
+  check "$name: the test step still passes" step_passed "$out" test
+  check "$name: the excluded-tests step fails" step_failed "$out" excluded-tests
+  check "$name: the gate exits nonzero" test "$rc" -ne 0
+  check "$name: the diagnostic names the held-out doctest" \
+    grep -qF "ignored_doctest_is_named" "$out"
 }
 
 # --- how the gate judges its incremental ban (jit:0708d692) ------------------
@@ -690,6 +786,8 @@ run_scenario healthy "healthy_mainline" "healthy_worker" pass
 run_scenario resurrection "resurrection_mainline" "resurrection_worker" fail
 run_scenario signature "signature_mainline" "signature_worker" fail build-only-passes
 run_scenario stale-expect "stale_expect_mainline" "stale_expect_worker" fail build-only-passes runtime-reporter
+test_ignored_test_is_rejected
+test_ignored_doctest_is_rejected
 
 test_pre_existing_incremental_state_does_not_fail_the_gate
 test_concurrent_incremental_state_is_observed_without_failing_the_gate

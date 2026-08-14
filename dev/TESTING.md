@@ -180,8 +180,8 @@ model and subsystem:
 | `scratch_build` | heavyweight | tests that build scratch `cargo` projects (the merged-tree gate self-test), plus the build-footprint budget-checker fixtures and the manifest/source policy checks |
 
 The `cargo-ci` gate runs `scripts/rust-build-budget.sh` as a `budget` step after
-its test step, on warm Cargo artifacts, pointing it with `--root` at the
-workspace that run compiled. The checker derives the integration-test
+its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
+pointing it with `--root` at the workspace that run compiled. The checker derives the integration-test
 target count and unique active test-executable bytes from `cargo metadata` and
 `cargo test --workspace --no-run --message-format=json`, and asserts the debug
 profile, gate incremental, and dependency-feature policies, failing the gate when
@@ -196,15 +196,18 @@ dependency-feature policy they check, and how to diagnose a failure.
 `scripts/cargo-ci-selftest.sh`, which is what keeps the `cargo-ci` gate honest as
 the post-merge check (jit:3019eacd). A textually clean merge can leave `main`
 broken in ways no per-issue gate saw, so the worktree dispatch protocol runs the
-gate on the merged tree. The self-test seeds four merges in throwaway git repos —
-one healthy, one declaring a deleted module, one whose `#[cfg(test)]` caller lost
-an argument, one that compiles and fails at test time — runs the shipped
-`scripts/cargo-ci.sh` against each, and asserts the verdict its build-and-test
-step reports. The last two also assert that `cargo build --workspace` still
-succeeds on the same tree: that is why a build-only merge check was vacuous, and
-substituting one makes the self-test fail. Every fixture is a dependency-free
-two-module crate with its own target directory, so the whole self-test costs
-seconds and never rebuilds this workspace.
+gate on the merged tree. The self-test seeds merges in throwaway git repos, runs
+the shipped `scripts/cargo-ci.sh` against each, and asserts the verdict it
+reports. Three break the build or the tests — a declaration of a deleted module,
+a `#[cfg(test)]` caller that lost an argument, a tree that compiles and fails at
+test time — and two hold a test out of the default run, by an ignore attribute
+and by an ignored doctest, so the `test` step passes and the `excluded-tests`
+step is what catches them. A healthy merge is the control every one of those is
+read against. The signature and stale-expect trees also assert that `cargo build
+--workspace` still succeeds on them: that is why a build-only merge check was
+vacuous, and substituting one makes the self-test fail. Every fixture is a
+dependency-free two-module crate with its own target directory, so the whole
+self-test costs seconds and never rebuilds this workspace.
 
 Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
 they never surface as their own test targets. Add a new integration case to the file that
@@ -598,8 +601,10 @@ the slowest of the group, which repeats a failing gate to exercise history compa
 
 ### Default run coverage
 
-No test is marked `#[ignore]`, so `cargo nextest run --workspace` runs the whole suite and
-nothing sits outside the scope `suite-profile.json` measures (jit:abe2c2bd).
+What the default run covers is fixed by `@/invariant/no-ignored-tests`. The `excluded-tests`
+step of `scripts/cargo-ci.sh` enforces it from the counts the run itself reports — nextest's
+skipped tally and the doctest step's ignored tally — so the verdict describes the suite that
+ran rather than what the sources appear to declare.
 
 ## Test Environment
 
