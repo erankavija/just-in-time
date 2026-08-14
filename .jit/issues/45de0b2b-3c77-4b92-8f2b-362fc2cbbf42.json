@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-14T06:15:34.269849091Z",
+  "dependencies": [
+    "bf79b3bc-06ce-47c8-abdc-09def1478dde"
+  ],
+  "description": "The profile show command accepts an unambiguous positional profile id, translating it to an\nidentity selector inside its own dispatch.\n\n## Background\n\nSelecting a profile requires a tagged, repeatable selector naming either a recorded identity\nor a package directory. A first invocation passing a bare profile id is rejected by the\nargument parser's generic unexpected-argument message, which names the required flag but not\nthe tag syntax, so the correct form is not discoverable from the failure. The shared selector\nparser serves the other lifecycle commands, whose contracts assert that they expose the\nrepeatable flag and nothing else, so the change stays inside this one command's arguments and\ndispatch.\n\n## Success Criteria\n\n- [hard] REQ-01: A single bare positional argument to the show command selects the recorded profile of that identity.\n- [hard] REQ-02: A positional argument given together with the tagged selector flag is refused with a message naming both forms.\n- [hard] REQ-03: An invalid positional value fails with a message naming the accepted selector forms rather than the parser's generic unexpected-argument text.\n- [hard] REQ-04: The shared selector parser is unchanged, and the other lifecycle commands still expose the repeatable tagged selector alone.\n- [hard] REQ-05: The command reference states the positional form beside the tagged form.\n\n## Notes\n\nThe tagged form stays the general contract. The positional form is a first-invocation\nconvenience on the one read-only command where a bare identity is unambiguous.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-14T06:15:34.269849091Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
+  "labels": [
+    "type:task",
+    "epic:gf2-adopter-reliability",
+    "component:cli",
+    "component:docs",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Positional profile id for the show command",
+  "updated_at": "2026-08-14T06:16:37.350508849Z"
+}

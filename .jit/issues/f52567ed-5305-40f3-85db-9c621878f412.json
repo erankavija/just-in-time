@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-14T06:15:34.269849091Z",
+  "dependencies": [
+    "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
+    "1c8f00bd-dfb3-434f-b800-b0e58348fec5",
+    "9757ab31-5e56-421a-b100-3e64dedcc1a5"
+  ],
+  "description": "A state-mutating invocation inside a linked non-primary checkout refuses before any repository\nwrite unless the declared stance or an explicit override permits it.\n\n## Background\n\nThe command enumeration already classifies every invocation by whether it must open a\nrepository mutation session. That classification is exhaustive over the command families that\ndelegate to a sub-enum classifier; five read-only families match their inner enum with a\nwildcard, so a new mutating leaf under one of them must be classified deliberately rather than\ninherited silently. That predicate, combined with the worktree primitive computed before\ndispatch, is exactly the condition a write policy needs, and evaluating it before the\nrepository mutation session is opened leaves a refusal with no partial state and no event\nbehind. One command — issue deletion — already refuses in secondary checkouts today, evidence\nthat the dispatch site is where such a condition belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, an invocation that would open a repository mutation session inside a linked non-primary checkout fails before any repository write, leaving that checkout's store and event log untouched.\n- [hard] REQ-02: The refusal names the linked checkout, the stance that refused it, and how to permit the operation; its machine-readable form carries the same three facts.\n- [hard] REQ-03: A permissive declared stance and an explicit per-invocation override each permit the invocation, and a permitted override leaves its durable audit record behind.\n- [hard] REQ-04: Read-only invocations, invocations in the primary checkout, and invocations outside version control succeed under either stance.\n- [hard] REQ-05: Existing coverage that mutates from a linked checkout declares the stance it relies on rather than depending on an unstated default.\n\n## Notes\n\nThe condition is evaluated at dispatch, before the repository mutation session is opened, so a\nrefused invocation is not a state change and appends nothing: the append-on-state-change\nguarantee is preserved rather than excepted.\n\nThe session predicate is deliberately broader than the divergent-history hazard: an invocation\nthat writes only the shared control plane or machine-local runtime state still classifies as\nmutating and refuses under the refusing stance. An over-refusal of that kind is the chosen\nbehaviour, not a defect.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f52567ed-5305-40f3-85db-9c621878f412",
+  "labels": [
+    "type:task",
+    "epic:gf2-adopter-reliability",
+    "component:cli",
+    "component:storage",
+    "satisfies:REQ-01"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Refuse state-mutating commands in linked worktrees",
+  "updated_at": "2026-08-14T06:15:34.269849091Z"
+}

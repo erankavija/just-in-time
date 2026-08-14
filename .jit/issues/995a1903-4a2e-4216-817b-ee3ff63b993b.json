@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-14T06:15:34.269849091Z",
+  "dependencies": [
+    "f52567ed-5305-40f3-85db-9c621878f412"
+  ],
+  "description": "A linked checkout created by the test itself proves refusal, stance-based permission, and\nthe override audit record from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout whose mutations silently built\na divergent store. An existing integration suite already creates real linked checkouts with\nversion-control commands, and it is the target with the most room for new modules under the\nrepository's test-target budget, so this coverage lands there rather than claiming a scarce\ntarget slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under a permitting declared stance and emits no override record, and succeeds under an explicit per-invocation override leaving the durable override record behind.\n- [hard] REQ-03: The refusal observed at this boundary carries the machine-readable facts the policy promises: the linked checkout, the refusing stance, and how to permit the operation.\n- [hard] REQ-04: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "995a1903-4a2e-4216-817b-ee3ff63b993b",
+  "labels": [
+    "type:task",
+    "epic:gf2-adopter-reliability",
+    "component:testing",
+    "component:storage",
+    "satisfies:REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Linked-checkout write-policy journey",
+  "updated_at": "2026-08-14T06:15:34.269849091Z"
+}

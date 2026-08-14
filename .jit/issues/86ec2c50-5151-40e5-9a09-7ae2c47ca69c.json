@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-14T06:15:34.269849091Z",
+  "dependencies": [
+    "176cc9ed-e5f4-41a7-9944-06c1775cf29f"
+  ],
+  "description": "A linked checkout with a deliberately diverged store proves the divergence report and the\nlossless recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident ended with issue and event history recoverable only from a\ndangling commit. No artefact of that repository is preserved anywhere, so the reproduction is\nbuilt rather than restored: a test-created linked checkout diverges its store on purpose, and\nthe check and the documented procedure are then exercised exactly as an adopter would run\nthem.\n\n## Success Criteria\n\n- [hard] REQ-01: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-02: The documented recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories, with neither side overwritten.\n- [hard] REQ-03: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+  "labels": [
+    "type:task",
+    "epic:gf2-adopter-reliability",
+    "component:storage",
+    "component:cli",
+    "satisfies:REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Divergence and recovery journey",
+  "updated_at": "2026-08-14T06:15:34.269849091Z"
+}

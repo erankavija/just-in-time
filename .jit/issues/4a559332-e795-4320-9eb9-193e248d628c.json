@@ -3,7 +3,14 @@
   "context": {},
   "created_at": "2026-08-13T16:31:53.180589008Z",
   "dependencies": [
-    "bf79b3bc-06ce-47c8-abdc-09def1478dde"
+    "03678c53-371e-410c-801f-19b502025a7e",
+    "1b6925a9-7e01-4bc2-9215-26d08c3970a9",
+    "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
+    "6a489764-9d04-4672-a266-b5dcabe22609",
+    "7ca9a0dd-4dca-4294-9212-278d22b013ac",
+    "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+    "995a1903-4a2e-4216-817b-ee3ff63b993b",
+    "dd3d4a07-684b-4e9f-af81-deffb5e5ac28"
   ],
   "description": "Field evidence from gf2, JIT's only current adopter, shows that ordinary agent workflows can still lose or obscure authoritative state and can leave recovery actions undiscoverable. The epic owns the adopter-facing reliability boundary; it does not prescribe a storage architecture before planning compares the alternatives.\n\n## Background\n\nOn 2026-08-13, gf2 recovered an issue and disjoint event history from a dangling commit after mutating JIT commands ran from a linked worker worktree. The primary checkout and linked checkout each held `.jit/` state the other lacked. The same adopter also reported a gate evaluation that printed success without a durable gate-run record, profile drift that JIT 1.0.0 could diagnose but not bless, and first-guess selector friction in `jit profile show`.\n\nThe linked-worktree incident is the highest-severity failure because routine cleanup could permanently delete the only visible copy of repository issue state. Current-main profile capture already repairs the semantic-drift dead end; this epic must preserve that recovery guidance as part of the machine contract while addressing the remaining adopter hazards.\n\n## Success Criteria\n\n- [hard] REQ-01: A state-mutating JIT command invoked from a linked non-primary worktree cannot silently create a divergent authoritative `.jit/` history; it either operates on one proven canonical store or refuses before writes with an explicit, auditable opt-in path.\n- [hard] REQ-02: JIT can detect an already-divergent checkout store and offers a documented recovery path that preserves disjoint issue and event history, reports semantic conflicts, and never overwrites the only copy of a record.\n- [hard] REQ-03: A gate evaluation reports success only after its run evidence and issue gate status are durably readable; any persistence failure returns failure, and a regression test reproduces the success-without-record class reported by gf2.\n- [hard] REQ-04: Profile divergence and refusal JSON retain actionable resolution guidance, including restore-versus-capture advice where capture is valid, rather than placing the remedy only in human prose.\n- [hard] REQ-05: `jit profile show` gives the correct selector form on the first invalid positional invocation, or accepts an unambiguous positional profile id without weakening the ordered selector contract.\n- [hard] REQ-06: End-to-end checks against a backed-up gf2 fixture or equivalent linked-worktree reproduction prove the selected worktree policy, gate durability, profile recovery guidance, and selector discovery from the adopter's command boundary.\n\n## Planning Decisions\n\n- D-01: Compare refuse-by-default outside the primary worktree, a repository-shared canonical store, and explicit store reconciliation before choosing the worktree authority model. Prefer the smallest design that prevents silent forking without weakening Git-optional core commands.\n- D-02: Treat gf2's recovered history and commands as field evidence, not as implementation instructions; reproduce each defect on current main before assigning remediation work.\n\n## Risks\n\n- A shared store can conflict with repository-local, Git-versioned storage and linked-checkout isolation.\n- A refusal policy can break existing multi-agent workflows unless primary-worktree detection and opt-in semantics are precise.\n- Event-log reconciliation must preserve append-only history while detecting records whose meanings conflict despite distinct timestamps.\n",
   "documents": [],
@@ -29,5 +36,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-13T16:32:19.514034042Z"
+  "updated_at": "2026-08-14T06:16:48.157246201Z"
 }

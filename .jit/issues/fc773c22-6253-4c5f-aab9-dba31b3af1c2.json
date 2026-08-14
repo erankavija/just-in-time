@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-14T06:15:34.269849091Z",
+  "dependencies": [
+    "bf79b3bc-06ce-47c8-abdc-09def1478dde"
+  ],
+  "description": "Storage owns a read that returns exactly the records one checkout's store holds — its issue\nrecords and its event log — with no aggregation from version-control history or another\ncheckout.\n\n## Background\n\nThe ordinary issue and index readers deliberately union the local store, versioned history,\nand the primary checkout, which is the documented adopter-facing read model. A divergence\ncomparison needs the opposite: the records one store actually holds, because the union masks\nexactly the one-sided records such a comparison exists to surface. Persistence access belongs\nto the storage layer, so the exact read is a storage-owned operation that a command consumes.\n\n## Success Criteria\n\n- [hard] REQ-01: A storage-owned read returns exactly the issue records and event records one checkout's store holds, with no fallback to versioned history or another checkout's store.\n- [hard] REQ-02: A record held only by a different checkout's store does not appear in the read's result, proven by a test that would fail under the aggregating readers.\n- [hard] REQ-03: The read is read-only, and it works against a checkout store other than the one the process runs in.\n- [hard] REQ-04: The existing aggregated readers keep their documented behaviour unchanged.\n\n## Notes\n\nThe exact read is a storage-owned operation addressed at an explicit store location, not a\nmethod on the shared issue-store interface, so the in-memory implementation and its shared\nbehavioural contract are not engaged.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-14T06:15:34.269849091Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "fc773c22-6253-4c5f-aab9-dba31b3af1c2",
+  "labels": [
+    "type:task",
+    "epic:gf2-adopter-reliability",
+    "component:storage",
+    "satisfies:REQ-02"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Exact single-store read for cross-checkout comparison",
+  "updated_at": "2026-08-14T06:16:15.496318636Z"
+}
