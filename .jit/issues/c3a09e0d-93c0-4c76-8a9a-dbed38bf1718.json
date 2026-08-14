@@ -3,7 +3,7 @@
   "context": {},
   "created_at": "2026-08-10T13:24:58.139687030Z",
   "dependencies": [],
-  "description": "`scripts/cargo-ci.sh` re-runs itself under `flock \"$BUILD_LOCK\"`, which passes the lock's file descriptor to the child and every descendant. A descendant that daemonises keeps holding it after the run exits — `sccache` double-forks to PPID 1 and does exactly that — so the lock is never released and the next caller blocks forever against a run that finished long ago.\n\nObserved three times in one session on 2026-08-10; one occurrence blocked a dispatched worker for 9 minutes. The failure is silent: no output, no error, no diagnostic, indistinguishable from a hung or dead process.\n\nThe lock path is host-wide (`${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`) and shared with the sibling gf2 checkout, whose wrapper carries the same defect, so a daemon leaked by either repository wedges the other.\n\n## Success Criteria\n\n- [hard] REQ-01: The build lock is released when a run exits, even when that run leaves a daemonised descendant behind.\n- [hard] REQ-02: The lock is still held for the whole duration of a run, so host-wide build serialization is unchanged.\n- [hard] REQ-03: A run that cannot acquire the lock reports what holds it instead of blocking silently, and a bounded wait ends in a named error distinguishable from the wrapped command's own exit status.\n",
+  "description": "`scripts/cargo-ci.sh` re-runs itself under `flock \"$BUILD_LOCK\"`, which passes the lock's file descriptor to the child and every descendant. A descendant that daemonises keeps holding it after the run exits — `sccache` double-forks to PPID 1 and does exactly that — so the lock is never released and the next caller blocks forever against a run that finished long ago.\n\nObserved three times in one session on 2026-08-10; one occurrence blocked a dispatched worker for 9 minutes. The failure is silent: no output, no error, no diagnostic, indistinguishable from a hung or dead process.\n\nThe lock path is host-wide (`${XDG_RUNTIME_DIR:-/tmp}/cargo-ci.lock`) and shared with the sibling gf2 checkout, whose wrapper carries the same defect, so a daemon leaked by either repository wedges the other.\n\n## Success Criteria\n\n- [hard] REQ-01: The build lock is released when a run exits, even when that run leaves a daemonised descendant behind.\n- [hard] REQ-02: The lock is still held for the whole duration of a run, so host-wide build serialization is unchanged.\n- [hard] REQ-03: A run that cannot acquire the lock reports what holds it instead of blocking silently, and a bounded wait ends in a named error distinguishable from the wrapped command's own exit status.\n\n\n## Resolution\n\nRejected 2026-08-14 as already delivered. Commit `4ce920633` filed this issue and fixed it in\nthe same change: `flock -o` closes the lock descriptor before exec, so a daemonised descendant\nno longer inherits it (REQ-01); the waiting `flock` parent holds the lock for the run's whole\nduration (REQ-02); and a non-blocking probe reports the current holders, the wait is bounded,\nand `-E 75` separates a lock failure from the wrapped command's own status (REQ-03). The issue\nwas left ready rather than closed.\n",
   "documents": [],
   "first_ready_at": "2026-08-10T13:24:58.139687030Z",
   "gates_required": [],
@@ -14,7 +14,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "rejected",
   "title": "cargo-ci build lock survives its run through a daemonising child",
-  "updated_at": "2026-08-10T13:24:58.139687030Z"
+  "updated_at": "2026-08-14T21:49:44.360194456Z"
 }
