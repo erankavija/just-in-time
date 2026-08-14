@@ -14330,3 +14330,7 @@
 {"gate_key":"doc-review","id":"6b5efffc-6d80-4697-9ecc-9dc549a1d2de","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-14T21:37:57.090917895Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"a9b5acff-74f5-41a4-b204-b925b1a442ac","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-14T21:38:57.864712742Z","to":"done","type":"issue_state_changed"}
 {"id":"448c5f67-3a2e-47e9-b650-d6e4e67fe6c8","issue_id":"abe2c2bd-96ef-4297-a535-cf3fe65b690e","timestamp":"2026-08-14T21:38:57.864712742Z","type":"issue_completed"}
+{"id":"157116e4-4aa6-4917-aa99-e5f1e1286df8","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","priority":"normal","timestamp":"2026-08-14T21:42:22.121719971Z","title":"Every test runs in the default suite","type":"issue_created"}
+{"fields":["dependencies"],"id":"30fe8b55-6d2b-40aa-b735-a9c2f9a6448d","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T21:42:35.952904788Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"e53422c5-44b8-408e-b87b-7c8ef161d95c","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T21:42:41.314210242Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"3cb17b01-a7e1-4603-b1b1-1d696505bce1","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T21:42:41.314210242Z","type":"issue_claimed"}
