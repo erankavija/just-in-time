@@ -6,7 +6,7 @@
   "dependencies": [
     "abe2c2bd-96ef-4297-a535-cf3fe65b690e"
   ],
-  "description": "Every test in the workspace runs in the default suite. The property holds today but nothing keeps it: the pipeline measures how many tests were held out and reports the number without deciding on it.\n\n## Background\n\nTests held out of the default run are unobserved by construction. A held-out test keeps the name of a property, so a reader scanning for coverage finds one and stops looking, while nothing runs the body that would fail. The exclusion also outlives its reason: an exclusion added for an unfinished implementation stays after the implementation lands, and the recorded reason keeps describing a state that no longer exists.\n\nThe Rust CI pipeline already takes both measurements this needs. The pinned nextest reporter parses a skipped count from the suite summary, and the doctest step sums an ignored count across binaries. Both are folded into the persisted step summary — `4542 passed, 0 failed, 0 skipped` and `63 passed, 0 failed, 0 ignored` — and both are currently zero. Neither number is compared against anything.\n\nA doctest that cannot compile has fenced alternatives that keep it in the run or state plainly that it is prose, so holding one out is a choice rather than a necessity.\n\n## Success Criteria\n\n- [hard] REQ-01: The project invariant registry declares that every test in the workspace runs in the default suite, and the projected invariant list carries the entry.\n- [hard] REQ-02: The Rust CI pipeline fails when a test is held out of the default run, whether by an ignore attribute on a test or by an ignored doctest.\n- [hard] REQ-03: The failure names how many tests were held out and in which measurement, so a reader can locate them without re-running anything.\n- [hard] REQ-04: A pipeline self-test scenario seeds a tree that holds a test out of the default run and observes the pipeline failing that tree, alongside a clean tree it passes.\n- [hard] REQ-05: The invariant records the gate that enforces it, and the enforcement-drift report agrees.\n\n## Notes\n\nThe measurements the pipeline already takes are the authoritative ones: a count of what the run actually skipped answers the property directly, where a search of the sources for the attribute answers a proxy for it and matches text that is not a test.\n",
+  "description": "Every test in the workspace runs in the default suite. The property holds today but nothing keeps it: the pipeline measures how many tests were held out and reports the number without deciding on it.\n\n## Background\n\nTests held out of the default run are unobserved by construction. A held-out test keeps the name of a property, so a reader scanning for coverage finds one and stops looking, while nothing runs the body that would fail. The exclusion also outlives its reason: an exclusion added for an unfinished implementation stays after the implementation lands, and the recorded reason keeps describing a state that no longer exists.\n\nThe Rust CI pipeline already takes both measurements this needs. The pinned nextest reporter parses a skipped count from the suite summary, and the doctest step sums an ignored count across binaries. Both are folded into the persisted step summary — `4542 passed, 0 failed, 0 skipped` and `63 passed, 0 failed, 0 ignored` — and both are currently zero. Neither number is compared against anything.\n\nA doctest that cannot compile has fenced alternatives that keep it in the run or state plainly that it is prose, so holding one out is a choice rather than a necessity.\n\n## Success Criteria\n\n- [hard] REQ-01: The project invariant registry declares that every test in the workspace runs in the default suite, and the projected invariant list carries the entry.\n- [hard] REQ-02: The Rust CI pipeline fails when a test is held out of the default run, whether by an ignore attribute on a test or by an ignored doctest.\n- [hard] REQ-03: The failure names how many tests were held out and in which measurement, so a reader can locate them without re-running anything.\n- [hard] REQ-04: A pipeline self-test scenario seeds a tree that holds a test out of the default run and observes the pipeline failing that tree, alongside a clean tree it passes.\n- [hard] REQ-05: The invariant records the gate that enforces it, and the enforcement-drift report agrees.\n\n## Notes\n\nThe measurements the pipeline already takes are the authoritative ones: a count of what the run actually skipped answers the property directly, where a search of the sources for the attribute answers a proxy for it and matches text that is not a test.\n\n\n- [hard] REQ-06: A shared lock taken to read succeeds on a filesystem the caller cannot write to, so a read-only command reports the repository's own state instead of a lock-file failure. The exclusive path still fails loudly when it cannot take its lock.\n\n## Amendment\n\nREQ-06 was added after the enforcement-drift report in REQ-05 was found to be unobservable\nfrom a read-only filesystem: every gate-bound invariant, the three predating this work\nincluded, is reported unenforced there, because loading the gate registry takes a shared lock\nand every lock file is opened for writing. The review that observes this invariant runs\nread-only, so REQ-05 cannot be met while that holds.\n",
   "documents": [],
   "first_ready_at": "2026-08-14T21:42:22.121719971Z",
   "gates_required": [
@@ -14,7 +14,18 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-14T21:59:51.902120345Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-08-14T22:02:24.830643829Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "a36b91ff-0fc0-4a4f-8112-632fee4f38ed",
   "labels": [
     "type:task",
@@ -23,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Every test runs in the default suite",
-  "updated_at": "2026-08-14T21:42:41.314210242Z"
+  "updated_at": "2026-08-14T22:21:07.995000918Z"
 }

@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b31f0dbeb118b3e72db5374eeb016447f28e56ff",
+  "completed_at": "2026-08-14T22:02:24.475965237Z",
+  "duration_ms": 152076,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/invariants.toml",
+        "id": "F1",
+        "line": 92,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/no-ignored-tests",
+          "@/gate/cargo-ci",
+          "@/gate/jit-validate"
+        ],
+        "severity": "high",
+        "summary": "The new no-ignored-tests enforcement link is reported as unloadable by enforcement-drift validation, leaving REQ-05 unmet."
+      }
+    ],
+    "summary": "The invariant’s enforcement declaration fails the required enforcement-drift check.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "a36b91ff-0fc0-4a4f-8112-632fee4f38ed",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5fc32bec-5844-402f-b1f5-cc51e96150d2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-14T21:59:52.399613028Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4243 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00249-e75c-7373-88f2-1c00fa71be95\n--------\nuser\n--- 4230 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: ad32b1b2e8f1055d31200c0f8d2dc2bfbe96c926, b31f0dbeb118b3e72db5374eeb016447f28e56ff\nPolicy sources: AGENTS.md\nResolved items: @/invariant/no-ignored-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending; doc-review pending\nTruncation recovery: Narrowed reads of the affected scripts, registry, projection, gate definition, and testing documentation after a broad search truncated.\n\n1. **[blocking, issue-impact] F1:** The new enforcement declaration at `.jit/invariants.toml:92` fails the required enforcement-drift check: `jit invariant check --json` reports `no-ignored-tests → @/gate/cargo-ci` as unloadable. This leaves hard REQ-05 unmet, even though the invariant projection itself matches the registry. References: @/invariant/no-ignored-tests, @/gate/cargo-ci, @/gate/jit-validate.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The invariant’s enforcement declaration fails the required enforcement-drift check.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new no-ignored-tests enforcement link is reported as unloadable by enforcement-drift validation, leaving REQ-05 unmet.\",\"file\":\".jit/invariants.toml\",\"line\":92,\"references\":[\"@/invariant/no-ignored-tests\",\"@/gate/cargo-ci\",\"@/gate/jit-validate\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
