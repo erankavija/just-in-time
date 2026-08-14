@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-14T21:01:09.404712581Z",
   "context": {},
   "created_at": "2026-08-12T23:02:30.641081906Z",
   "dependencies": [
@@ -8,15 +9,35 @@
   "description": "Seven tests excluded from the default suite assert nothing, and their exclusion is recorded as if it were a cost decision.\n\n## Background\n\n`cargo nextest run --workspace --run-ignored ignored-only` at `cb8d42c3` runs all seven in 0.317 s combined, the slowest at 308 ms:\n\n    test_validate_branch_drift_detects_drifted_branch   6 ms\n    lock_tests::test_lock_released_on_drop              7 ms\n    lock_tests::test_try_lock_non_blocking              7 ms\n    lock_tests::test_exclusive_lock_prevents_concurrent_writes  7 ms\n    lock_tests::test_shared_locks_allow_concurrent_reads        7 ms\n    lock_tests::test_exclusive_lock_blocks_shared_locks       209 ms\n    lock_tests::test_timeout_on_lock_contention               308 ms\n\nThey are fast because they exercise nothing. The six in `crates/jit/tests/fast_docs_templates/lock_tests.rs` are TDD placeholders whose real bodies are commented out. They fail to test anything in two distinct ways, and a fix must address both. Three still assert, but only against the scaffolding that replaced the lock calls: `test_exclusive_lock_prevents_concurrent_writes` increments a counter for thread 0 only and asserts the count is 1; `test_shared_locks_allow_concurrent_reads` has every thread increment unconditionally and asserts the count is 3; `test_exclusive_lock_blocks_shared_locks` sets two booleans unconditionally and asserts both. The other three — `test_lock_released_on_drop`, `test_timeout_on_lock_contention`, `test_try_lock_non_blocking` — assert nothing at all, their assertions commented out along with the bodies. The first kind:\n\n    // TODO: Use FileLocker once implemented\n    // let locker = FileLocker::new(Duration::from_millis(100));\n    // if let Ok(_guard) = locker.lock_exclusive(&_path) { ... }\n\n    // For now, placeholder\n    if i == 0 { *success_count.lock().unwrap() += 1; }\n    ...\n    assert_eq!(count, 1, \"Only one thread should acquire exclusive lock\");\n\nThe assertion passes because the placeholder increments a counter for thread 0. It tests an `if`. Their stated removal condition — `#[ignore] // Remove once FileLocker is implemented` — was met: `lock_exclusive` is live in `crates/jit/src/storage/claim_coordinator.rs` and four other modules.\n\nThe seventh, `worktree_cli_tests::test_validate_branch_drift_detects_drifted_branch`, has an empty body and a comment stating that real coverage would need a remote repository.\n\nA passing `#[ignore]`d test that proves nothing is worse than no test: it occupies the name of a property nobody is checking, and `--run-ignored` reports it green.\n\n## Success Criteria\n\n- [hard] REQ-01: Every one of the seven is either given a body that proves the property its name claims, or deleted with the reason recorded. A placeholder assertion that passes on its own scaffolding does not satisfy this.\n- [hard] REQ-02: For each one implemented rather than deleted, the test runs in the default suite unless there is a stated reason it cannot, and that reason is a property of the test rather than of its unfinished state.\n- [hard] REQ-03: `dev/TESTING.md`'s account of the excluded set matches what remains after this change.\n- [hard] REQ-04: The full workspace suite passes, `cargo fmt --all -- --check` is clean, and `cargo clippy --workspace --all-targets -- -D warnings` reports zero warnings.\n\n## Notes\n\nFile locking behaviour is already covered elsewhere — `storage::claim_coordinator` carries property-based concurrency tests (`prop_concurrent_claims_exclusive`, `prop_concurrent_different_issues_succeed`). Establish what those already prove before writing anything new; the honest outcome for some or all six may be deletion rather than implementation, per `@/inv/canonical-cutover`.\n\nFound while measuring the excluded set for `76ecc11f`, which documents it. The measurement is in that issue's evidence.\n",
   "documents": [],
   "first_ready_at": "2026-08-12T23:02:30.641081906Z",
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-08-14T21:04:31.774794940Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-08-14T21:04:31.774794940Z",
+      "updated_by": null
+    },
+    "doc-review": {
+      "status": "pending",
+      "updated_at": "2026-08-14T21:04:31.774794940Z",
+      "updated_by": null
+    }
+  },
   "id": "abe2c2bd-96ef-4297-a535-cf3fe65b690e",
   "labels": [
     "component:testing",
     "type:bug"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Seven ignored tests assert nothing and are recorded as an excluded cost",
-  "updated_at": "2026-08-13T00:03:33.961904151Z"
+  "updated_at": "2026-08-14T21:04:31.774794940Z"
 }
