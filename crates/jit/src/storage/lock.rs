@@ -620,6 +620,39 @@ mod tests {
         );
     }
 
+    /// Releasing the exclusive hold before the final acquisition proves the
+    /// earlier refusals came from that hold rather than from the lock file.
+    #[test]
+    fn test_lock_shared_is_refused_while_the_exclusive_lock_is_held() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.lock");
+        let locker = FileLocker::new(EXPIRING_LOCK_WAIT);
+
+        let held = locker
+            .try_lock_exclusive(&file_path)
+            .unwrap()
+            .expect("the exclusive lock must report that it was acquired");
+
+        let shared_try = locker.try_lock_shared(&file_path).unwrap();
+        assert!(
+            shared_try.is_none(),
+            "a shared lock request is refused while the exclusive lock is held"
+        );
+
+        let shared_wait = locker.lock_shared(&file_path);
+        assert!(
+            shared_wait.as_ref().err().is_some_and(is_lock_timeout),
+            "a shared lock wait expires while the exclusive lock is held"
+        );
+
+        drop(held);
+
+        assert!(
+            locker.try_lock_shared(&file_path).unwrap().is_some(),
+            "a shared lock succeeds after the exclusive lock is released"
+        );
+    }
+
     #[test]
     fn test_shared_locks_allow_concurrent_reads() {
         let temp_dir = TempDir::new().unwrap();

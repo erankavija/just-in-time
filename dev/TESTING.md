@@ -596,29 +596,10 @@ the slowest of the group, which repeats a failing gate to exercise history compa
 | `commands::gate_check::tests::test_check_all_gates_stable_sort_same_priority` | 537 |
 | `commands::gate_check::tests::test_check_gate_executes_again_after_declared_inputs_change` | 515 |
 
-### Excluded from the default run
+### Default run coverage
 
-Seven tests are marked `#[ignore]` and never run in the default `cargo nextest run
---workspace`, so `suite-profile.json` does not cover them; `cargo nextest run --workspace
---run-ignored ignored-only` at `cb8d42c3` measures them directly:
-
-| Test | Warm (ms) |
-| --- | ---: |
-| `lock_tests::test_timeout_on_lock_contention` | 308 |
-| `lock_tests::test_exclusive_lock_blocks_shared_locks` | 209 |
-| `lock_tests::test_lock_released_on_drop` | 7 |
-| `lock_tests::test_try_lock_non_blocking` | 7 |
-| `lock_tests::test_exclusive_lock_prevents_concurrent_writes` | 7 |
-| `lock_tests::test_shared_locks_allow_concurrent_reads` | 7 |
-| `worktree_cli_tests::test_validate_branch_drift_detects_drifted_branch` | 6 |
-
-Combined they run in 317 ms wall clock. That cost is not inherent, and the exclusion is not
-a performance decision: the six `lock_tests` are TDD placeholders written before
-`FileLocker` existed, with their real bodies commented out. Three still assert, but only
-against the scaffolding that replaced the lock calls — a counter incremented for thread 0
-only, a counter every thread increments, two booleans set unconditionally — and three
-assert nothing, their assertions commented out along with the bodies. The seventh, the
-branch-drift test, has an empty body. None of the seven can fail (jit:abe2c2bd).
+No test is marked `#[ignore]`, so `cargo nextest run --workspace` runs the whole suite and
+nothing sits outside the scope `suite-profile.json` measures (jit:abe2c2bd).
 
 ## Test Environment
 

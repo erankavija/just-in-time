@@ -61,6 +61,38 @@ fn setup_repo() -> TempDir {
     temp
 }
 
+/// Attach a local bare repository as `origin` and publish the current `HEAD`.
+fn attach_origin_remote(repo: &Path) -> TempDir {
+    let remote = TempDir::new().unwrap();
+
+    Command::new("git")
+        .current_dir(remote.path())
+        .args(["init", "--bare"])
+        .assert()
+        .success();
+
+    let remote_path = remote.path().to_str().unwrap();
+    Command::new("git")
+        .current_dir(repo)
+        .args(["remote", "add", "origin", remote_path])
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(repo)
+        .args(["push", "origin", "HEAD:refs/heads/main"])
+        .assert()
+        .success();
+
+    Command::new("git")
+        .current_dir(repo)
+        .args(["fetch", "origin"])
+        .assert()
+        .success();
+
+    remote
+}
+
 /// Create a git worktree with a unique name
 fn create_worktree(base_repo: &Path, worktree_name: &str) -> std::path::PathBuf {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -480,24 +512,73 @@ fn test_validate_json_output() {
 }
 
 #[test]
-fn test_validate_branch_drift_success() {
+fn test_validate_branch_drift_accepts_a_branch_that_matches_origin_main() {
     let temp = setup_repo();
+    let _remote = attach_origin_remote(temp.path());
 
-    // `--branch-drift` compares against origin/main, so it needs a remote.
-    // Here we assert only that a plain `validate` run succeeds.
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
-        .args(["validate"])
+        .args(["validate", "--branch-drift"])
         .assert()
         .success();
 }
 
 #[test]
-#[ignore = "requires git remote origin/main which is complex to set up in tests"]
 fn test_validate_branch_drift_detects_drifted_branch() {
-    // This test would require setting up a remote repository
-    // which is complex in a temp directory. Branch-drift
-    // validation is tested manually and in CI with real remotes.
+    let temp = setup_repo();
+    let _remote = attach_origin_remote(temp.path());
+
+    let initial_commit = Command::new("git")
+        .current_dir(temp.path())
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .unwrap();
+    assert!(initial_commit.status.success());
+    let initial_commit = String::from_utf8(initial_commit.stdout).unwrap();
+    let initial_commit = initial_commit.trim();
+
+    fs::write(temp.path().join("README.md"), "# Test\nUpdated\n").unwrap();
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["add", "README.md"])
+        .assert()
+        .success();
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["commit", "-m", "Advance main"])
+        .assert()
+        .success();
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["push", "origin", "HEAD:refs/heads/main"])
+        .assert()
+        .success();
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["fetch", "origin"])
+        .assert()
+        .success();
+    Command::new("git")
+        .current_dir(temp.path())
+        .args(["checkout", "-b", "stale", initial_commit])
+        .assert()
+        .success();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["validate", "--branch-drift"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Branch has diverged from origin/main"),
+        "branch-drift failure explains the divergence: {stderr}"
+    );
+    assert!(
+        stderr.contains("Fix: git rebase origin/main"),
+        "branch-drift failure gives the rebase remedy: {stderr}"
+    );
 }
 
 #[test]

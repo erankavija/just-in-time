@@ -20,7 +20,6 @@ mod doc_review_policy_test;
 mod document_event_log_tests;
 mod git_revision_tests;
 mod harness_demo;
-mod lock_tests;
 mod planning_preset_tests;
 mod research_bracket_tests;
 mod schema_tests;
