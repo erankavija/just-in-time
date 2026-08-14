@@ -131,7 +131,7 @@
   {
     "key": "worktree-override-audit-publication",
     "title": "Publish the override audit record with the mutation it permits",
-    "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. Recording that an override permitted a mutation therefore needs the override fact to reach\nthe finalizer. The seam is the mutation context: the fact is set once, where the dispatch-time\ndecision is made, and read by the finalizer's event pass, so the audit intent enters every\nfinalized plan without threading through the fourteen command modules that construct\nproduction contexts. The mutation and its record land in one delta and recovery treats them\nas one.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n",
+    "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. The carrier therefore spans the whole path: the dispatch site that decides an\noverride permitted the invocation sets the fact once; the mutation context carries it to the\nfinalizer, whose event pass composes the audit append; and because the second finalizer path used for\ninitialization-style audit appends shares that same event-pass helper, one edit covers both\npaths, so no materialization path can emit its events while omitting the record. This avoids threading the fact through the fourteen\ncommand modules that construct production contexts.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n- [hard] REQ-05: The dispatch-set override fact reaches both finalizer paths that compose audit appends, with coverage that fails if a materialization path omits the record.\n\n## Notes\n\nThe finalizer documents that a no-transition plan carries an empty delta and emits no bytes.\nThe audit record accompanies real events only: an override in effect during a no-op mutation\nproduces no record, preserving that documented property.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -160,9 +160,10 @@
       "terminal": {
         "consumer_family": "mutation-session callers",
         "test_boundary": "transaction failure-injection coverage",
-        "worker_sized_reason": "One intent-plumbing change through the existing finalizer and one failure-injection suite, reusing the injector and recovery machinery already proven on neighbouring paths.",
+        "worker_sized_reason": "One override fact carried along one seam — set at dispatch, read by the two finalizer paths that compose audit appends — with failure-injection coverage reusing the proven injector; no per-command threading.",
         "footprint": {
           "touches": [
+            "crates/jit/src/main.rs",
             "crates/jit/src/repository_state/mutation.rs",
             "crates/jit/src/commands/mod.rs",
             "crates/jit/src/storage/repository_state_store_tests.rs"
@@ -706,8 +707,8 @@
   },
   {
     "key": "worktree-policy-journey",
-    "title": "Linked checkout journey coverage",
-    "description": "A linked checkout created by the test itself proves the write policy, the divergence check,\nand the recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout and ended with issue and event\nhistory recoverable only from a dangling commit. No artefact of that repository is preserved\nanywhere, so the reproduction is built rather than restored. An existing integration suite\nalready creates real linked checkouts with version-control commands, and it is also the target\nwith the most room for new modules under the repository's test-target budget, so the coverage\nlands there rather than claiming a scarce target slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under a permitting declared stance and emits no override record, and succeeds under an explicit per-invocation override leaving the durable override record behind.\n- [hard] REQ-03: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-04: The recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories.\n- [hard] REQ-05: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured build-footprint and duration budgets.\n\n## Notes\n\nThe scenario runs the same binary an adopter runs, so the assertions describe adopter-visible\noutcomes rather than internal state.\n",
+    "title": "Linked-checkout write-policy journey",
+    "description": "A linked checkout created by the test itself proves refusal, stance-based permission, and\nthe override audit record from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout whose mutations silently built\na divergent store. An existing integration suite already creates real linked checkouts with\nversion-control commands, and it is the target with the most room for new modules under the\nrepository's test-target budget, so this coverage lands there rather than claiming a scarce\ntarget slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under a permitting declared stance and emits no override record, and succeeds under an explicit per-invocation override leaving the durable override record behind.\n- [hard] REQ-03: The refusal observed at this boundary carries the machine-readable facts the policy promises: the linked checkout, the refusing stance, and how to permit the operation.\n- [hard] REQ-04: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -721,15 +722,13 @@
       "code-review"
     ],
     "depends_on": [
-      "worktree-write-guard",
-      "worktree-recovery-guidance"
+      "worktree-write-guard"
     ],
     "planning": {
-      "outcome": "A live linked checkout proves the write policy, the divergence check, and the recovery procedure end to end.",
+      "outcome": "A live linked checkout proves refusal, permission, and the override audit record end to end.",
       "contract_refs": [
         "worktree-write-policy",
         "worktree-refusal-audit",
-        "store-divergence-report",
         "worktree-override-record"
       ],
       "produces_contracts": [],
@@ -741,11 +740,57 @@
       "landing_group": "worktree-safety",
       "terminal": {
         "consumer_family": "adopter command boundary",
-        "test_boundary": "linked-checkout integration suite",
-        "worker_sized_reason": "One journey over capabilities its prerequisites already ship, following an existing pattern for creating real linked checkouts inside tests.",
+        "test_boundary": "linked-checkout write-policy suite",
+        "worker_sized_reason": "One journey over the write-policy behaviours its prerequisite already ships, following an existing pattern for creating real linked checkouts inside tests.",
         "footprint": {
           "creates": [
             "crates/jit/tests/cli_repo_workflow/worktree_policy_journey_tests.rs"
+          ],
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "worktree-divergence-journey",
+    "title": "Divergence and recovery journey",
+    "description": "A linked checkout with a deliberately diverged store proves the divergence report and the\nlossless recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident ended with issue and event history recoverable only from a\ndangling commit. No artefact of that repository is preserved anywhere, so the reproduction is\nbuilt rather than restored: a test-created linked checkout diverges its store on purpose, and\nthe check and the documented procedure are then exercised exactly as an adopter would run\nthem.\n\n## Success Criteria\n\n- [hard] REQ-01: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-02: The documented recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories, with neither side overwritten.\n- [hard] REQ-03: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:gf2-adopter-reliability",
+      "component:storage",
+      "component:cli",
+      "satisfies:REQ-06"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "worktree-recovery-guidance"
+    ],
+    "planning": {
+      "outcome": "A deliberately diverged linked checkout proves the divergence report and lossless recovery end to end.",
+      "contract_refs": [
+        "store-divergence-report"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-06",
+        "OD-2",
+        "OD-3"
+      ],
+      "landing_group": "worktree-safety",
+      "terminal": {
+        "consumer_family": "adopter command boundary",
+        "test_boundary": "linked-checkout divergence suite",
+        "worker_sized_reason": "One journey over the divergence and recovery capabilities its prerequisite chain already ships, following the existing linked-checkout test pattern.",
+        "footprint": {
+          "creates": [
+            "crates/jit/tests/cli_repo_workflow/worktree_divergence_journey_tests.rs"
           ],
           "touches": [
             "crates/jit/tests/cli_repo_workflow/main.rs"

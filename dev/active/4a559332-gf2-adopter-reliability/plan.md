@@ -98,7 +98,7 @@ and restore is not (investigation §2).
 | worktree-detection-convergence | Converge worktree detection on one primitive | task | One primitive answers whether this checkout is linked and where the primary store lives. | — | REQ-01, OD-5 | touches 5 | worktree-safety | — |
 | worktree-write-policy-config | Worktree write policy configuration key | task | A typed worktree policy key resolves the mutation stance for linked checkouts, defaulting to refusal. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
 | worktree-override-audit-event | Override audit event for linked-checkout mutations | task | The closed event vocabulary carries a distinct override-audit variant with catalog and reference conformance. | — | REQ-01, OD-1 | touches 3 | worktree-safety | — |
-| worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | — | REQ-01, OD-1 | touches 3 | worktree-safety | worktree-override-audit-event |
+| worktree-override-audit-publication | Publish the override audit record with the mutation it permits | task | An override-permitted mutation and its audit record become durable through one finalized plan, or neither lands. | — | REQ-01, OD-1 | touches 4 | worktree-safety | worktree-override-audit-event |
 | worktree-write-guard | Refuse state-mutating commands in linked worktrees | task | State-mutating dispatch refuses inside a linked checkout unless the stance or an explicit override permits it. | worktree-authority, worktree-write-policy, worktree-override-record | REQ-01, OD-1, OD-5 | touches 4 | worktree-safety | worktree-detection-convergence, worktree-write-policy-config, worktree-override-audit-publication |
 | exact-store-read | Exact single-store read for cross-checkout comparison | task | Storage returns exactly what one checkout's store holds, unmasked by the aggregating read model. | — | REQ-02, OD-2 | touches 2 | worktree-safety | — |
 | worktree-divergence-detection | Report divergent checkout stores | task | A read-only check reports the issue records and events one checkout holds without the other. | worktree-authority, exact-store-snapshot | REQ-02, OD-2 | touches 5, uncertain | worktree-safety | worktree-detection-convergence, exact-store-read |
@@ -111,7 +111,8 @@ and restore is not (investigation §2).
 | profile-conflict-json-details | Profile conflict output carries its remedy | task | Profile refusals and divergences reach machine consumers with structured details plus suggested resolutions. | profile-remedy-data | REQ-04, REQ-06 | touches 4 | profile-guidance | profile-remedy-model |
 | profile-guidance-reference | Profile recovery guidance reference | task | The profile reference and the bridge tool descriptions state the machine-readable remedy contract. | profile-remedy-data | REQ-04 | touches 3, uncertain | profile-guidance | profile-conflict-json-details |
 | profile-show-positional | Positional profile id for the show command | task | A bare positional id selects a recorded profile on the show command without touching the shared grammar. | — | REQ-05, REQ-06, OD-4 | touches 5 | profile-guidance | — |
-| worktree-policy-journey | Linked checkout journey coverage | task | A live linked checkout proves the write policy, the divergence check, and the recovery procedure end to end. | worktree-write-policy, worktree-refusal-audit, store-divergence-report, worktree-override-record | REQ-06, OD-1, OD-3 | creates 1, touches 1 | worktree-safety | worktree-write-guard, worktree-recovery-guidance |
+| worktree-policy-journey | Linked-checkout write-policy journey | task | A live linked checkout proves refusal, permission, and the override audit record end to end. | worktree-write-policy, worktree-refusal-audit, worktree-override-record | REQ-06, OD-1, OD-3 | creates 1, touches 1 | worktree-safety | worktree-write-guard |
+| worktree-divergence-journey | Divergence and recovery journey | task | A deliberately diverged linked checkout proves the divergence report and lossless recovery end to end. | store-divergence-report | REQ-06, OD-2, OD-3 | creates 1, touches 1 | worktree-safety | worktree-recovery-guidance |
 
 ```mermaid
 flowchart LR
@@ -131,7 +132,8 @@ flowchart LR
     N13["profile-conflict-json-details: Profile conflict output carries its remedy"]
     N14["profile-guidance-reference: Profile recovery guidance reference"]
     N15["profile-show-positional: Positional profile id for the show command"]
-    N16["worktree-policy-journey: Linked checkout journey coverage"]
+    N16["worktree-policy-journey: Linked-checkout write-policy journey"]
+    N17["worktree-divergence-journey: Divergence and recovery journey"]
     N2 --> N3
     N0 --> N4
     N1 --> N4
@@ -144,7 +146,7 @@ flowchart LR
     N12 --> N13
     N13 --> N14
     N4 --> N16
-    N9 --> N16
+    N9 --> N17
 ```
 <!-- jit:breakdown-overview:end -->
 
