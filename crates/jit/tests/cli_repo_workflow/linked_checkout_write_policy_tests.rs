@@ -583,3 +583,105 @@ fn test_mutating_invocation_outside_version_control_succeeds_under_either_stance
         create_issue_in(temp.path(), Some(stance)).success();
     }
 }
+
+// The write-policy journey (jit:995a1903): every fact above is proven in
+// isolation, each with its own freshly created checkout. This test instead
+// reuses ONE real-git-created linked checkout across all three stances in
+// sequence, which is what the isolated tests above cannot observe: that a
+// refusal leaves the checkout in a state where a later, permitted mutation
+// still lands cleanly (the refused invocation runs before the repository
+// mutation session opens, so it cannot poison what comes after — the shape
+// of the field incident this policy exists to prevent), and that a stance
+// change the adopter declares between invocations takes effect on an
+// already-existing checkout without recreating it.
+fn redeclare_stance(checkout: &Path, base_config: &str, stance: LinkedCheckoutWriteStance) {
+    let config = checkout.join(".jit/config.toml");
+    let declared = format!(
+        "{base_config}\n[worktree]\nwrite_policy = \"{}\"\n",
+        stance.as_token()
+    );
+    std::fs::write(&config, declared).expect("declare the repository's write stance");
+}
+
+#[test]
+fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_then_override_permit_on_one_checkout(
+) {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let config_path = linked.join(".jit/config.toml");
+    let base_config =
+        std::fs::read_to_string(&config_path).expect("read the base repository configuration");
+
+    // Leg 1: no declared stance (the refusing default), no invocation
+    // override. The invocation is refused and the checkout's store is
+    // byte-identical afterward.
+    let before_refusal = store_bytes(&linked);
+    create_issue_in(&linked, None).failure();
+    assert_eq!(
+        store_bytes(&linked),
+        before_refusal,
+        "a refused invocation must leave no partial state on the checkout for a later, \
+         permitted mutation on the same checkout to inherit"
+    );
+
+    // Leg 2: the checkout now declares the permitting stance. The same
+    // invocation, needing no override, lands cleanly and records no override.
+    redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Allow);
+    create_issue_in(&linked, None).success();
+    let events_after_declared_permit = durable_events(&linked);
+    assert!(
+        events_tagged(
+            &events_after_declared_permit,
+            "linked_checkout_write_overridden"
+        )
+        .is_empty(),
+        "a mutation permitted by a stance declared after the checkout already existed must \
+         still record no override; events: {events_after_declared_permit:?}"
+    );
+    let declared_permit_creations =
+        events_tagged(&events_after_declared_permit, "issue_created").len();
+    assert_eq!(
+        declared_permit_creations, 1,
+        "the refused leg contributed no durable mutation, so only the declared-permit leg's own \
+         mutation is durable so far; events: {events_after_declared_permit:?}"
+    );
+
+    // Leg 3: the checkout's declaration flips back to refuse, so only the
+    // invocation's own override can permit the next mutation on this same
+    // checkout.
+    redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Refuse);
+    create_issue_in(&linked, Some("allow")).success();
+    let events_after_override = durable_events(&linked);
+    let override_records =
+        events_tagged(&events_after_override, "linked_checkout_write_overridden");
+    assert_eq!(
+        override_records.len(),
+        1,
+        "the override leg must leave exactly one durable audit record behind; events: \
+         {events_after_override:?}"
+    );
+    let record = override_records[0];
+    assert_eq!(
+        (&record["declared_stance"], &record["invocation_override"]),
+        (&serde_json::json!("refuse"), &serde_json::json!("allow")),
+        "the audit record must pair the re-declared refusal with the invocation stance that \
+         permitted it on this same checkout; record: {record}"
+    );
+    let recorded_checkout = std::fs::canonicalize(
+        record["checkout"]
+            .as_str()
+            .expect("the record names a checkout path"),
+    )
+    .expect("the recorded checkout exists");
+    assert_eq!(
+        recorded_checkout,
+        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        "the record must name the very checkout that carried all three legs of the journey"
+    );
+    assert_eq!(
+        events_tagged(&events_after_override, "issue_created").len(),
+        declared_permit_creations + 1,
+        "the override leg's mutation must land in addition to the earlier legs' durable state, \
+         proving the checkout accumulated state across the journey rather than being reset \
+         between legs; events: {events_after_override:?}"
+    );
+}
