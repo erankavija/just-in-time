@@ -193,11 +193,12 @@ Release your claim (if not expired):
 jit claim release <issue-id>
 ```
 
-Remove the worktree when done:
+Remove the worktree when done. `git worktree remove` must run from inside
+a git checkout, so return to your main worktree first:
 
 ```bash
-cd ..
-git worktree remove my-feature
+cd -
+git worktree remove ../my-feature
 ```
 
 ## How It All Works Together
