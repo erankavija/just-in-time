@@ -151,21 +151,21 @@
           "short_id": "1b6925a9",
           "title": "Converge the deletion refusal into the write policy",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "dd3d4a07-684b-4e9f-af81-deffb5e5ac28",
           "short_id": "dd3d4a07",
           "title": "State the linked-checkout write stance in the worktree guides",
           "classification": "documentation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "995a1903-4a2e-4216-817b-ee3ff63b993b",
           "short_id": "995a1903",
           "title": "Linked-checkout write-policy journey",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
