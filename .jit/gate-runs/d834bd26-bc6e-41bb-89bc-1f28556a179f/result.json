@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "256bf660ffa539d2564cfe581f958902d8cd0377",
+  "completed_at": "2026-08-16T11:46:27.923087722Z",
+  "duration_ms": 166701,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The factory convergence meets all issue-scoped requirements with passing Rust CI evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9ea7f672-3f2f-448a-90af-f61466cd5046",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d834bd26-bc6e-41bb-89bc-1f28556a179f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T11:43:41.221558258Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `256bf660`, `0891d1c6`, `a9bc0df3`, `7f66b881` tagged `jit:9ea7f672`, individually inspected; uncommitted `.jit` records excluded\nPolicy sources: `AGENTS.md`\nResolved items: @/issue/9ea7f672/requirement/REQ-01–REQ-03 (issue description, markdown-first); @/gate/cargo-ci (.jit/gates.toml); @/invariant/convention-convergence, architecture-dependency-direction, semantic-test-assertions, shared-test-contracts, bounded-rust-build-footprint, no-ignored-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T11:43:13Z); code-review pending\nTruncation recovery: bounded per-commit patch and current-file reads; excluded unrelated merge-parent worktree/claim changes outside the mutation-context impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The factory convergence meets all issue-scoped requirements with passing Rust CI evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

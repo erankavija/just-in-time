@@ -8,6 +8,7 @@
   ],
   "description": "Production mutation contexts are constructed through one factory instead of twenty-three\nindependent constructor calls spread across fourteen command modules and one\nintegration-test helper, with behaviour unchanged.\n\n## Background\n\nThe production mutation context — the injected authority and clock a finalized plan derives\nits identifiers and timestamp from — is constructed independently wherever a command needs\none. A fact decided once at dispatch has no way to reach those contexts without either\nthreading through the modules one by one or converging their construction first. Convergence\nis the shared-convention remedy: one factory owns production-context construction and carries\nan optional dispatch-scoped annotation slot, empty by default, so a later change can set a\nfact in one place and have it reach the finalizer through the context it already receives.\n\n## Success Criteria\n\n- [hard] REQ-01: One factory constructs the production mutation context, the per-module constructor calls and the integration-test helper route through it, and the direct constructor is no longer callable from command modules or integration tests.\n- [hard] REQ-02: The factory carries an optional dispatch-scoped annotation slot that is empty by default, and an empty slot changes no behaviour: no new events, identical outputs, identical persisted bytes for the same inputs.\n- [hard] REQ-03: The full test suite passes unchanged apart from construction-site mechanics, demonstrating the convergence is behaviour-preserving.\n",
   "documents": [],
+  "done_at": "2026-08-16T11:46:50.098305296Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
@@ -15,8 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-16T11:36:20.129191671Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T11:43:40.521217628Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T11:46:28.278227384Z",
       "updated_by": "auto:executor"
     }
   },
@@ -28,7 +34,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Converge mutation-context construction onto one factory",
-  "updated_at": "2026-08-16T11:36:20.129191671Z"
+  "updated_at": "2026-08-16T11:46:50.098305296Z"
 }
