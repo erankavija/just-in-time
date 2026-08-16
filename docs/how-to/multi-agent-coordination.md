@@ -176,14 +176,17 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 When merging branches with overlapping issue edits:
 
 ```bash
-# Git will show conflicts in .jit/issues/*.json
-# Resolve manually or use jit validate to check consistency
-
 git merge main
-# If conflicts in .jit/:
-jit validate --fix
-git add .jit/
+
+# Resolve the conflicts in the files themselves: git marks the .jit/issues/*.json
+# both branches edited, and .jit/index.json whenever both added issues.
+# `jit validate --fix` is not a resolver — it parses no file still holding
+# conflict markers.
+git add .jit/issues/ .jit/index.json
 git commit
+
+# Then check that the store is consistent:
+jit validate
 ```
 
 Merging one already-known-diverged branch, as above, is different from two
@@ -338,8 +341,10 @@ either checkout: git and the merge drivers this repository already declares
 do the actual merging; this procedure only sequences them safely.
 
 1. **Check for divergence first, from the linked checkout being inspected**
-   — not from the primary — before committing, merging, or removing
-   anything:
+   — or from anywhere with that checkout's store selected as the data root,
+   which is what an inspection run from the primary needs ([store
+   selection](../reference/worktree-validate.md#store-selection)) — before
+   committing, merging, or removing anything:
    ```bash
    jit worktree store-divergence
    ```
@@ -347,8 +352,9 @@ do the actual merging; this procedure only sequences them safely.
    worktree store-divergence`
    reference](../reference/worktree-validate.md#jit-worktree-store-divergence)
    for its finding classes and output shape. Read the `Reference store:` line
-   before trusting an empty result: the primary checkout and a location
-   outside version control have no second store to compare against and print
+   before trusting an empty result: a run that inspects the primary's own
+   store — a bare run there selects nothing else — and one outside version
+   control have no second store to compare against, and print
    `No divergent records.` regardless, so that combination proves nothing.
    Only a report naming a real `Reference store:` and showing
    `No divergent records.` means there is nothing to preserve here — proceed
@@ -363,8 +369,18 @@ do the actual merging; this procedure only sequences them safely.
    files, but `--force` does not. Commit every reported record in whichever
    checkout(s) still hold it uncommitted:
    ```bash
-   git add .jit/ && git commit
+   git add .jit/issues/ .jit/events.jsonl .jit/index.json && git commit
    ```
+   Stage the records and their index, not `.jit/` wholesale. A live store also
+   holds machine-local runtime files — the lock files and `worktree.json`
+   among the set the [Storage Format
+   reference](../reference/storage-format.md#directory-structure) names — and
+   `jit init` writes no ignore rule for them, so a wholesale `git add` commits
+   one machine's runtime state into a store every checkout shares. Ignore
+   those paths locally instead: left untracked, they are enough on their own
+   to make a plain `git worktree remove` refuse a checkout whose work is
+   fully committed.
+
    A commit only lands a record on the one branch you committed it to. That
    is enough to survive a plain `git worktree remove`, which checks for a
    clean working tree, not a merged branch — but it is not enough on its own:
@@ -386,37 +402,75 @@ do the actual merging; this procedure only sequences them safely.
    typically run from the primary checkout, `git merge <linked-branch>`.
    This is the step that actually preserves a record: landing it on a
    retained branch is what survives a later `git branch -D` of the
-   checkout's own branch, which committing alone (step 2) did not. If git
-   raises conflict markers in `.jit/issues/`, resolve them with the existing
-   [merge-conflict recovery steps](#conflict-merge-conflicts-in-jit). A
-   `conflicting` finding that merges silently — the two edits touched
+   checkout's own branch, which committing alone (step 2) did not.
+
+   Expect a conflict in `.jit/index.json` even when no record conflicts: each
+   side inserted its own ids into the same list over one common base, so git
+   leaves the decision to you every time. Resolve it to the
+   union of the ids present under `.jit/issues/` after the merge — keep every
+   id from both sides of the conflict, minding the commas the markers hid —
+   which is what step 3's one-sided rows already decided: keep both records.
+   Conflict markers inside a record under `.jit/issues/` mean the same id was
+   edited on both sides; resolve those files with the decision from step 3.
+   Then stage the resolution and commit the merge:
+   ```bash
+   git merge <linked-branch>
+   # Edit .jit/index.json: keep every id both sides list.
+   git add .jit/index.json && git commit --no-edit
+   ```
+
+   Verify with plain `jit validate`, not `jit validate --fix`: `--fix` parses
+   no file that still holds conflict markers, and on an index resolved to one
+   side alone it reports `No fixes needed` and exits 0 while the store is
+   still inconsistent. Plain `jit validate` names that disagreement —
+   `issue files disagree with .jit/index.json`, listing the ids it expected
+   against the record files it found — and the absence of *that* failure is
+   the confirmation, not a zero exit code: other rules fail the same run for
+   reasons this recovery did not cause, such as issues reported as isolated
+   in a repository whose graph has no edges yet.
+
+   Until the index agrees with the record files, the records you just
+   preserved are invisible to everything that reads through it: `jit list`
+   omits them and `jit issue show <id>` answers that the id is not found,
+   with the record file sitting right there.
+
+   A `conflicting` finding that merges silently — the two edits touched
    different lines, so git needed no markers — still needs the decision from
    step 3 applied by hand before you commit the merge.
 
-5. **Confirm agreement, from the same linked checkout:**
+5. **Bring the checkout onto the branch you kept** — from the linked
+   checkout, `git merge <retained-branch>`. Step 4 moved records one
+   direction only: the retained branch now holds both sides' records, while
+   the linked checkout's store still lacks everything only the primary held.
+   Do this even when you are about to remove the checkout; skip it and step 6
+   keeps reporting the primary's records as `reference_only`, which is
+   indistinguishable from a divergence the recovery failed to preserve.
+
+6. **Confirm agreement, with the same invocation as step 1:**
    ```bash
    jit worktree store-divergence
    ```
    A clean re-run — naming the same real `Reference store:` as step 1 —
    reports `No divergent records.` If it still reports findings, a
-   conflicting record still needs the decision from step 3. Only once this
-   passes, with step 4's merge already landed on the branch you are keeping,
-   is the checkout's own branch safe to delete.
+   conflicting record still needs the decision from step 3, or one of the two
+   merges has not landed. Only once this passes, with step 4's merge already
+   landed on the branch you are keeping, is the checkout's own branch safe to
+   delete.
 
 ### Orphaned Worktree
 
 Run the divergence check *inside* the worktree before removing it — once the
 worktree is gone there is no live checkout left to compare, only commit
 history. See [Divergent Checkout Stores](#divergent-checkout-stores) above;
-its step 1 explains why running the check from the primary instead proves
-nothing. Work through that procedure, including the merge in step 4, for
+its step 1 explains why a bare run in the primary — which inspects the
+primary's own store — proves nothing. Work through that procedure, including the merge in step 4, for
 anything it reports: a worktree can hold issue or event records committed
 nowhere else, and committing them (step 2) is not enough on its own — only a
 completed merge onto a branch you keep survives deleting the worktree's own
 branch afterward.
 
 ```bash
-# From INSIDE the worktree being removed, not the primary:
+# From INSIDE the worktree being removed, so its own store is the one inspected:
 jit worktree store-divergence
 
 # Once it names a real reference store and reports no divergent records

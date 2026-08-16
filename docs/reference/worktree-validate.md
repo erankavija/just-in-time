@@ -157,8 +157,8 @@ listed. For the code each failure exits with, see the
 
 ### jit worktree store-divergence
 
-Report the records this checkout's store and the primary checkout's store
-disagree about.
+Report the records the inspected checkout's store and the primary checkout's
+store disagree about.
 
 #### Synopsis
 
@@ -178,11 +178,32 @@ every event record they hold differently.
 The check reads only. It writes to neither store and repairs nothing; it reports
 what diverged so you can decide what to do about it.
 
-It reports nothing in three cases: in the primary checkout, which has no other
-store to compare against; in a linked checkout whose store agrees with the
-primary; and outside version control, where there is no second checkout at all.
-An empty report therefore means "nothing to report here" in every environment,
-and the `Reference store:` line says which case you are in.
+It reports nothing in three cases: when the inspected store is the primary
+checkout's, which has no other store to compare against; when it is a linked
+checkout's and agrees with the primary; and outside version control, where there
+is no second checkout at all. An empty report therefore means "nothing to report
+here" in every environment, and the `Reference store:` line says which case you
+are in.
+
+#### Store selection
+
+The inspected store is the selected data root, and the checkout holding that
+root is the checkout under inspection — the working directory the command runs
+in only supplies the default. That default is the running checkout's own
+`.jit/`; `JIT_DATA_DIR` names a data root explicitly and takes precedence over
+discovery. The reference store is then that same root resolved under the
+repository's primary checkout.
+
+Selecting a linked checkout's store therefore inspects that store against the
+primary's own, whichever directory the command runs from — including the primary
+checkout itself:
+
+```bash
+JIT_DATA_DIR=../feature-worktree/.jit jit worktree store-divergence
+```
+
+A selected root that is the primary checkout's own store, or one outside version
+control, has no counterpart to resolve and reports no reference store.
 
 #### Options
 
