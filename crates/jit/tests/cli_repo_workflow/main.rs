@@ -19,6 +19,7 @@ mod init_item_kinds_golden;
 mod init_tests;
 mod integration_schema;
 mod integration_test;
+mod linked_checkout_override_audit_tests;
 mod profile_acceptance_tests;
 mod profile_cli_tests;
 mod profile_concurrency_tests;

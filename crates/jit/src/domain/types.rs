@@ -1514,10 +1514,10 @@ pub enum Event {
     /// show that the invocation was permitted by an override rather than by a
     /// permissive declared stance: the pair of stances is the audit fact.
     ///
-    /// The vocabulary is declared ahead of the surface that appends it, like the
-    /// post-apply members of [`ProfileLifecycleOperation`], so the event contract
-    /// is stable before a mutation path publishes a record through it
-    /// (jit:0c8d38be).
+    /// The finalizer's event pass composes the record into the same
+    /// materialization plan as the mutation the override permitted, from the
+    /// invocation-scoped annotation the dispatch site installs, so the record and
+    /// the mutation it explains become durable together or not at all.
     LinkedCheckoutWriteOverridden {
         /// Event ID
         id: String,
@@ -1851,6 +1851,27 @@ impl Event {
             operation,
             profiles,
             isolated_torn_tail: false,
+        }
+    }
+
+    /// Draft the record of an override that permitted a mutation inside a linked
+    /// checkout.
+    ///
+    /// `checkout` is the linked checkout's root as reported by the selected-root
+    /// worktree authority; `declared_stance` is the repository's declaration and
+    /// `invocation_override` the per-invocation stance that outranked it under
+    /// [`LinkedCheckoutWriteStance::resolve`].
+    pub fn draft_linked_checkout_write_overridden(
+        checkout: std::path::PathBuf,
+        declared_stance: LinkedCheckoutWriteStance,
+        invocation_override: LinkedCheckoutWriteStance,
+    ) -> Self {
+        Event::LinkedCheckoutWriteOverridden {
+            id: String::new(),
+            timestamp: DateTime::UNIX_EPOCH,
+            checkout,
+            declared_stance,
+            invocation_override,
         }
     }
 
