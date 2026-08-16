@@ -7,6 +7,7 @@
   ],
   "description": "Profile refusals and divergences reach machine consumers as structured details and suggested\nresolutions rather than as one flat sentence.\n\n## Background\n\nTwo failure branches build their machine-readable output from the error's rendered text alone,\ndiscarding the typed value behind it. The same output type already supports attached details\nand suggestions, and two neighbouring profile subcommands already use it to carry structured\nfindings — so the pattern is proven on this exact surface and needs extending to the refusal\npaths rather than inventing.\n\n## Success Criteria\n\n- [hard] REQ-01: A refused profile publication emits its conflict code together with structured details naming each conflicting target, its conflict class, and its typed remedy.\n- [hard] REQ-02: A reported divergence emits structured details naming each diverged target, its divergence class, and its typed remedy.\n- [hard] REQ-03: Suggested resolutions accompany the details and name capture only where the remedy marks capture applicable.\n- [hard] REQ-04: The failure code, the exit status, and the rendered human message of both paths keep their current content.\n- [hard] REQ-05: Existing coverage reading these failures asserts the structured fields rather than the sentence alone.\n\n## Notes\n\nCoverage for this surface lives in the command-boundary suites, so the assertions run against\nthe process an adopter actually invokes.\n",
   "documents": [],
+  "first_ready_at": "2026-08-16T12:03:03.626453015Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -21,7 +22,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Profile conflict output carries its remedy",
-  "updated_at": "2026-08-14T06:15:34.269849091Z"
+  "updated_at": "2026-08-16T12:03:03.626453015Z"
 }

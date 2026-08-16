@@ -8,6 +8,7 @@
   ],
   "description": "Each profile target conflict and each profile divergence carries a serializable remedy value\nnaming which resolutions apply, instead of encoding that knowledge only in the prose it\nrenders.\n\n## Background\n\nThe conflict type already distinguishes its remedies exhaustively: it selects a different\nprose constant per variant, and for at least one real adopter case one of the two candidate\nremedies is invalid rather than merely less preferred. That knowledge exists as an exhaustive\nmatch over typed values and is discarded the moment it becomes a sentence. The divergence type\nis already serializable and schema-described; the conflict type is neither.\n\n## Success Criteria\n\n- [hard] REQ-01: A typed remedy value names each resolution that applies to a conflict or a divergence, distinguishing restoring recorded content from capturing repository content, and marking capture as applicable only where capture is valid.\n- [hard] REQ-02: The conflict type serializes, carrying its remedy beside the values that identify the conflict.\n- [hard] REQ-03: The rendered prose derives from that same typed remedy, so a reader of the sentence and a reader of the data act on identical resolutions.\n- [hard] REQ-04: Existing coverage asserting the rendered prose keeps passing, including the assertion that capture is named only where it applies.\n\n## Notes\n\nThe remedy vocabulary is domain data on the conflict and divergence types. How it reaches a\ncommand's output is a separate concern.\n",
   "documents": [],
+  "done_at": "2026-08-16T12:02:57.840784870Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
@@ -15,8 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-16T11:49:19.251865020Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T11:58:35.345002739Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T12:02:36.651545667Z",
       "updated_by": "auto:executor"
     }
   },
@@ -28,7 +34,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Typed remedy data on profile conflicts",
-  "updated_at": "2026-08-16T11:49:19.251865020Z"
+  "updated_at": "2026-08-16T12:02:57.840784870Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "22f125c08d73b7b69a8ec65f02f785f609f29a07",
+  "completed_at": "2026-08-16T12:02:36.300161907Z",
+  "duration_ms": 240246,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Typed remedies, serialization, schema coverage, and prose derivation satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd26c204-8907-4480-970f-a910d6407d32",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "df56e371-4656-413f-baaf-f306ca1e37aa",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T11:58:36.053264162Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7f66b881 (claim record), 9625b5da (implementation), 8ad970df (merge), 22f125c0 (historical gate record)\nPolicy sources: AGENTS.md\nResolved items: @/issue/dd26c204/requirement/REQ-04 (issue description, markdown-first); @/invariant/semantic-types, @/invariant/semantic-test-assertions, @/invariant/architecture-dependency-direction (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci: passed (exit 0, 2026-08-16T11:58:08Z)\nTruncation recovery: re-read affected patches, current implementations, callers, and tests in per-file ranges after combined output truncated\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Typed remedies, serialization, schema coverage, and prose derivation satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
