@@ -1,0 +1,21 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-16T19:59:30.376017117Z",
+  "dependencies": [],
+  "description": "`jit validate --fix` re-validates even when it applied zero fixes, so a repository whose\nissue files disagree with `.jit/index.json` cannot receive a false clean bill.\n\n## Background\n\nDiscovered while executing the documented divergence recovery procedure. On a repository\nwhose `.jit/index.json` disagrees with the issue files on disk (for example after a merge\nconflict in the index was resolved to one side), plain `jit validate` fails with exit 4\nnaming the disagreement, while `jit validate --fix` prints \"No fixes needed\" and exits 0:\n`validate_with_fix` re-runs validation only when it applied at least one fix, so the\nzero-fix path never observes the failure plain validation reports. `jit recover` does not\nrebuild the issue index either (its index line concerns the claims index), and a later\nordinary mutation appends to the stale index rather than rebuilding it, so an issue record\npresent on disk stays invisible to listing and lookup indefinitely. The recovery guidance\nroutes around this by instructing manual union resolution verified with plain `jit\nvalidate`; the command itself remains wrong.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit validate --fix` on a repository with a stale or one-sided `.jit/index.json` reports the disagreement (or repairs it) instead of exiting 0 with \"No fixes needed\"; its exit status never contradicts plain `jit validate` on the same repository state.\n- [hard] REQ-02: Coverage reproduces the false-clean case (index/issue-file disagreement with zero other fixable findings) and fails if the zero-fix path stops re-validating.\n- [hard] REQ-03: Whether index rebuilding becomes a `--fix` repair or stays a refusal with guidance is decided and documented where validate's behavior is documented.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-16T19:59:30.376017117Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "525bd61a-729d-4689-a554-57b4208614d4",
+  "labels": [
+    "component:cli",
+    "component:storage",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Re-validate after zero-fix jit validate --fix",
+  "updated_at": "2026-08-16T19:59:30.376017117Z"
+}

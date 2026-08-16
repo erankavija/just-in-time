@@ -180,9 +180,38 @@
           "status": "dispatched"
         }
       ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "62518095-2bb8-4c12-9828-3247ce22b7c6",
+          "short_id": "62518095",
+          "title": "Correct the divergent-store recovery procedure",
+          "classification": "documentation",
+          "status": "pending"
+        }
+      ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    {
+      "short_id": "62518095",
+      "title": "Correct the divergent-store recovery procedure",
+      "classification": "documentation",
+      "reason": "Journey execution (86ec2c50) found three defects in the 176cc9ed procedure; epic REQ-02 names the documented recovery path, so the fix is in-epic.",
+      "wave": 10,
+      "status": "pending"
+    },
+    {
+      "short_id": "525bd61a",
+      "title": "Re-validate after zero-fix jit validate --fix",
+      "classification": "implementation",
+      "reason": "Product defect discovered during journey execution; outside epic criteria, tracked standalone, cited in completion report.",
+      "wave": null,
+      "status": "tracked-outside-epic"
+    }
+  ],
   "completion_obligations": [
     "Write one coherent CHANGELOG.md Unreleased entry covering the epic's adopter-visible surface (write policy + guard + env override + audit event + deletion convergence + store-divergence + profile remedy output) before evaluating the epic gates; flagged by worker-1b6925a9.",
     "Epic gates: repo-validate AND holistic-review (added at invoker request); reconcile surfaced_pitfalls against epic criteria first per lead-review-protocol."

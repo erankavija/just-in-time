@@ -14507,3 +14507,11 @@
 {"id":"1becabac-9a96-41c1-82ca-e78fab9230bc","issue_id":"1b6925a9-7e01-4bc2-9215-26d08c3970a9","timestamp":"2026-08-16T19:49:36.016971060Z","type":"issue_completed"}
 {"from":"ready","id":"1597906a-e7ae-457b-96dd-6aa15cb42eab","issue_id":"86ec2c50-5151-40e5-9a09-7ae2c47ca69c","timestamp":"2026-08-16T19:50:04.597549177Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"b5be532f-0fda-4bd6-9642-6ab50c16bd38","issue_id":"86ec2c50-5151-40e5-9a09-7ae2c47ca69c","timestamp":"2026-08-16T19:50:04.597549177Z","type":"issue_claimed"}
+{"id":"79967e99-5e5b-4cc9-be52-6e04d04085f2","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","priority":"high","timestamp":"2026-08-16T19:59:12.609553184Z","title":"Correct the divergent-store recovery procedure","type":"issue_created"}
+{"from":"ready","id":"a5ac4c8a-71ff-469d-8e97-f045db133ce0","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:26.708313418Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"1aa539f4-c960-4032-ba21-aa14740ba8e8","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:26.708313418Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"3b609276-9d81-4084-9d29-83ee12203386","issue_id":"525bd61a-729d-4689-a554-57b4208614d4","priority":"high","timestamp":"2026-08-16T19:59:30.376017117Z","title":"Re-validate after zero-fix jit validate --fix","type":"issue_created"}
+{"assignee":"agent:jit-execution-lead","id":"c5abb9d8-3287-49b1-aca5-ce634029d4c8","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:36.448274185Z","type":"issue_claimed"}
+{"gate_key":"doc-review","id":"5313136a-8298-4946-b930-4acd582414b4","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:36.600144578Z","type":"gate_added"}
+{"gate_key":"docs-mechanical","id":"d8b1bec9-83d5-4437-9dea-fc14a8eca4f8","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:36.751193531Z","type":"gate_added"}
+{"fields":["dependencies"],"id":"9b9a1362-8580-4d57-9e45-2eb38352179a","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T20:00:05.612053158Z","type":"issue_updated","updated_by":"dependency-add"}
