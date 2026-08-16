@@ -462,15 +462,15 @@ do the actual merging; this procedure only sequences them safely.
 Run the divergence check *inside* the worktree before removing it — once the
 worktree is gone there is no live checkout left to compare, only commit
 history. See [Divergent Checkout Stores](#divergent-checkout-stores) above;
-its step 1 explains why running the check from the primary instead proves
-nothing. Work through that procedure, including the merge in step 4, for
+its step 1 explains why a bare run in the primary — which inspects the
+primary's own store — proves nothing. Work through that procedure, including the merge in step 4, for
 anything it reports: a worktree can hold issue or event records committed
 nowhere else, and committing them (step 2) is not enough on its own — only a
 completed merge onto a branch you keep survives deleting the worktree's own
 branch afterward.
 
 ```bash
-# From INSIDE the worktree being removed, not the primary:
+# From INSIDE the worktree being removed, so its own store is the one inspected:
 jit worktree store-divergence
 
 # Once it names a real reference store and reports no divergent records
