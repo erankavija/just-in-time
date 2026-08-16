@@ -420,14 +420,16 @@ do the actual merging; this procedure only sequences them safely.
    ```
 
    Verify with plain `jit validate`, not `jit validate --fix`: `--fix` parses
-   no file that still holds conflict markers, and on an index resolved to one
-   side alone it reports `No fixes needed` and exits 0 while the store is
-   still inconsistent. Plain `jit validate` names that disagreement —
+   no file that still holds conflict markers, and where it applies no fix it
+   reports `No fixes needed` and exits 0 without re-checking the repository,
+   so an index resolved to one side alone passes it while the store is still
+   inconsistent. Plain `jit validate` names that disagreement —
    `issue files disagree with .jit/index.json`, listing the ids it expected
    against the record files it found — and the absence of *that* failure is
    the confirmation, not a zero exit code: other rules fail the same run for
    reasons this recovery did not cause, such as issues reported as isolated
-   in a repository whose graph has no edges yet.
+   in a repository whose graph has no edges yet. Where the repository has no
+   such finding of its own, the union-resolved store validates as it stands.
 
    Until the index agrees with the record files, the records you just
    preserved are invisible to everything that reads through it: `jit list`
