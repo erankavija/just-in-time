@@ -1,0 +1,189 @@
+{
+  "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
+  "epic_short_id": "4a559332",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "9757ab31-5e56-421a-b100-3e64dedcc1a5",
+          "short_id": "9757ab31",
+          "title": "Converge worktree detection on one primitive",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "9ea7f672-3f2f-448a-90af-f61466cd5046",
+          "short_id": "9ea7f672",
+          "title": "Converge mutation-context construction onto one factory",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "dd26c204-8907-4480-970f-a910d6407d32",
+          "short_id": "dd26c204",
+          "title": "Typed remedy data on profile conflicts",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "fc773c22-6253-4c5f-aab9-dba31b3af1c2",
+          "short_id": "fc773c22",
+          "title": "Exact single-store read for cross-checkout comparison",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "6a489764-9d04-4672-a266-b5dcabe22609",
+          "short_id": "6a489764",
+          "title": "Surface swallowed postcheck failures",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
+          "short_id": "45de0b2b",
+          "title": "Positional profile id for the show command",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "1c8f00bd-dfb3-434f-b800-b0e58348fec5",
+          "short_id": "1c8f00bd",
+          "title": "Worktree write policy configuration key",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "99ac9679-dbb3-44f4-b108-ac52b4487ea7",
+          "short_id": "99ac9679",
+          "title": "Override audit event for linked-checkout mutations",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "7ca9a0dd-4dca-4294-9212-278d22b013ac",
+          "short_id": "7ca9a0dd",
+          "title": "Regression coverage for gate evaluation durability",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
+          "short_id": "0c8d38be",
+          "title": "Publish the override audit record with the mutation it permits",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "f980db67-ed74-4e89-89ef-fb72261a0a86",
+          "short_id": "f980db67",
+          "title": "Report divergent checkout stores",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "7b820ccc-1835-43f8-9a24-98c085a2e2c3",
+          "short_id": "7b820ccc",
+          "title": "Profile conflict output carries its remedy",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "f52567ed-5305-40f3-85db-9c621878f412",
+          "short_id": "f52567ed",
+          "title": "Refuse state-mutating commands in linked worktrees",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "176cc9ed-e5f4-41a7-9944-06c1775cf29f",
+          "short_id": "176cc9ed",
+          "title": "Recovery guidance for divergent checkout stores",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "03678c53-371e-410c-801f-19b502025a7e",
+          "short_id": "03678c53",
+          "title": "Profile recovery guidance reference",
+          "classification": "documentation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "1b6925a9-7e01-4bc2-9215-26d08c3970a9",
+          "short_id": "1b6925a9",
+          "title": "Converge the deletion refusal into the write policy",
+          "classification": "implementation",
+          "status": "pending"
+        },
+        {
+          "id": "dd3d4a07-684b-4e9f-af81-deffb5e5ac28",
+          "short_id": "dd3d4a07",
+          "title": "State the linked-checkout write stance in the worktree guides",
+          "classification": "documentation",
+          "status": "pending"
+        },
+        {
+          "id": "995a1903-4a2e-4216-817b-ee3ff63b993b",
+          "short_id": "995a1903",
+          "title": "Linked-checkout write-policy journey",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+          "short_id": "86ec2c50",
+          "title": "Divergence and recovery journey",
+          "classification": "implementation",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "started_at": "2026-08-16T11:55:30+03:00"
+}
