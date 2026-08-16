@@ -241,10 +241,32 @@ fn resolve_index_conflict_keeping_every_record(checkout: &Path) {
     .expect("write the resolved index");
 }
 
+/// Stage exactly what the procedure's commit steps stage in `checkout`: the
+/// records the check reports and the index that has to agree with them.
+///
+/// The page names these paths rather than `.jit/` wholesale, because a
+/// repository that has not gitignored the machine-local runtime files would
+/// otherwise commit one machine's lock and worktree state into the shared store
+/// — and `jit init` writes no ignore rule for them (jit:ea1745ee). Staging the
+/// same paths here keeps the witness performing the documented instruction
+/// rather than a wholesale add that only works where such an ignore file
+/// happens to exist.
+fn stage_documented_store_paths(checkout: &Path) {
+    git_ok(
+        checkout,
+        &[
+            "add",
+            ".jit/issues/",
+            ".jit/events.jsonl",
+            ".jit/index.json",
+        ],
+    );
+}
+
 /// Apply the procedure's commit step in `checkout`: make every record it holds
 /// durable enough to survive the checkout's removal.
 fn commit_store(checkout: &Path, message: &str) {
-    git_ok(checkout, &["add", ".jit/"]);
+    stage_documented_store_paths(checkout);
     git_ok(checkout, &["commit", "-qm", message]);
 }
 
@@ -438,7 +460,7 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
         // Step 4's index resolution; see
         // `resolve_index_conflict_keeping_every_record`.
         resolve_index_conflict_keeping_every_record(&primary);
-        git_ok(&primary, &["add", ".jit/"]);
+        stage_documented_store_paths(&primary);
         git_ok(&primary, &["commit", "-q", "--no-edit"]);
     }
 
