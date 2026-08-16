@@ -198,7 +198,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .enforcement_mode_from_config(&captured.config)?,
                 )
             };
-            let warnings = template_lease_warnings(lease_mode, &lease_targets)?;
+            let warnings = template_lease_warnings(
+                self.require_worktree_paths()?,
+                lease_mode,
+                &lease_targets,
+            )?;
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(image) =
@@ -282,34 +286,29 @@ fn existing_template_lease_targets(issues: &[Issue], targets: &[String]) -> Vec<
 }
 
 fn template_lease_warnings(
+    paths: &crate::storage::WorktreePaths,
     mode: crate::config::EnforcementMode,
     targets: &[String],
 ) -> Result<Vec<String>> {
     use crate::agent_config::resolve_agent_id;
     use crate::config::EnforcementMode;
     use crate::storage::claim_coordinator::ClaimsIndex;
-    use crate::storage::worktree_paths::WorktreePaths;
 
     if mode == EnforcementMode::Off {
         return Ok(Vec::new());
     }
-    let claims = WorktreePaths::detect()
-        .ok()
-        .map(|paths| ClaimsIndex::load(&paths))
-        .transpose()?;
+    let claims = ClaimsIndex::load(paths)?;
     let agent = resolve_agent_id(None).ok();
     let now = chrono::Utc::now();
     let mut warnings = Vec::new();
     for id in targets {
-        let active = claims.as_ref().is_some_and(|claims| {
-            claims.leases.iter().any(|lease| {
-                lease.issue_id == *id
-                    && lease.expires_at.is_none_or(|expires| expires > now)
-                    && !claims.is_stale(lease)
-                    && agent
-                        .as_ref()
-                        .is_none_or(|agent_id| lease.agent_id == *agent_id)
-            })
+        let active = claims.leases.iter().any(|lease| {
+            lease.issue_id == *id
+                && lease.expires_at.is_none_or(|expires| expires > now)
+                && !claims.is_stale(lease)
+                && agent
+                    .as_ref()
+                    .is_none_or(|agent_id| lease.agent_id == *agent_id)
         });
         if active {
             continue;

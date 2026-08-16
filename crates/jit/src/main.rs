@@ -2306,7 +2306,9 @@ fn run() -> Result<()> {
     } else {
         0
     };
-    let mut executor = CommandExecutor::new(storage.clone()).with_layout(executor_layout.clone());
+    let mut executor = CommandExecutor::new(storage.clone())
+        .with_layout(executor_layout.clone())
+        .with_worktree_paths(worktree_paths.clone());
 
     match &command {
         Commands::Init {
@@ -7644,7 +7646,7 @@ fn run() -> Result<()> {
                 return Ok(());
             }
 
-            match execute_recover(&storage) {
+            match execute_recover(&storage, &worktree_paths) {
                 Ok(report) => {
                     if json {
                         let msg = format!(
@@ -8007,6 +8009,7 @@ fn run() -> Result<()> {
 
                 match execute_claim_acquire(
                     &storage,
+                    &worktree_paths,
                     &issue_id,
                     ttl,
                     agent_id.as_deref(),
@@ -8048,7 +8051,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_release_by_issue;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_release_by_issue(&storage, &issue_id) {
+                match execute_claim_release_by_issue(&storage, &worktree_paths, &issue_id) {
                     Ok((released, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -8097,7 +8100,11 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_renew::<jit::JsonFileStorage>(&lease_id, extension) {
+                match execute_claim_renew::<jit::JsonFileStorage>(
+                    &worktree_paths,
+                    &lease_id,
+                    extension,
+                ) {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -8135,7 +8142,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_heartbeat;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_heartbeat(&lease_id) {
+                match execute_claim_heartbeat(&worktree_paths, &lease_id) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({
@@ -8169,6 +8176,7 @@ fn run() -> Result<()> {
                 use jit::output::{JsonOutput, OutputContext};
 
                 match execute_claim_status::<jit::JsonFileStorage>(
+                    &worktree_paths,
                     issue.as_deref(),
                     agent.as_deref(),
                 ) {
@@ -8256,7 +8264,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_list;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_list() {
+                match execute_claim_list(&worktree_paths) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} lease(s) found", leases.len());
@@ -8333,7 +8341,11 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_force_evict::<jit::JsonFileStorage>(&lease_id, &reason) {
+                match execute_claim_force_evict::<jit::JsonFileStorage>(
+                    &worktree_paths,
+                    &lease_id,
+                    &reason,
+                ) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({

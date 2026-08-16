@@ -13,15 +13,17 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-/// True when the current directory is inside a git working tree, regardless
+/// True when the selected worktree root is inside a git working tree, regardless
 /// of whether any commit exists yet.
 ///
 /// Used by [`get_current_branch`] to tell apart "no git repository" from "git
 /// repository with no commits" when `git rev-parse --abbrev-ref HEAD` fails —
 /// both fail identically, but only `--is-inside-work-tree` still succeeds in
 /// the latter case (it doesn't need a resolvable `HEAD`).
-fn is_inside_git_work_tree() -> bool {
+fn is_inside_git_work_tree(worktree_root: &Path) -> bool {
     Command::new("git")
+        .arg("-C")
+        .arg(worktree_root)
         .args(["rev-parse", "--is-inside-work-tree"])
         .output()
         .map(|output| output.status.success())
@@ -32,21 +34,23 @@ fn is_inside_git_work_tree() -> bool {
 ///
 /// # Errors
 ///
-/// Returns [`crate::errors::ClaimRequiresGitError`] when the current directory
+/// Returns [`crate::errors::ClaimRequiresGitError`] when the selected worktree
 /// is not inside a git repository, when git is not available, or when the
-/// directory is a git repository with no commits yet (so `HEAD` doesn't
+/// selected worktree is a git repository with no commits yet (so `HEAD` doesn't
 /// resolve to a branch) — the error's [`GitRequirementGap`](crate::errors::GitRequirementGap)
 /// distinguishes the two so the hint matches the actual gap (REQ-04). This
 /// typed error allows callers to classify the failure as an external
 /// dependency failure (exit code 10) rather than a generic error.
-fn get_current_branch() -> Result<String> {
+fn get_current_branch(worktree_root: &Path) -> Result<String> {
     let output = Command::new("git")
+        .arg("-C")
+        .arg(worktree_root)
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .context("Failed to execute git command for branch detection")?;
 
     if !output.status.success() {
-        let gap = if is_inside_git_work_tree() {
+        let gap = if is_inside_git_work_tree(worktree_root) {
             crate::errors::GitRequirementGap::NoCommits
         } else {
             crate::errors::GitRequirementGap::NoRepository
@@ -74,6 +78,7 @@ fn get_current_branch() -> Result<String> {
 /// cannot be acquired (e.g. it is already held by another agent).
 pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStore>(
     storage: &S,
+    paths: &WorktreePaths,
     issue_id: &str,
     ttl_secs: u64,
     agent_id: Option<&str>,
@@ -89,15 +94,11 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
         .load_issue(&full_id)
         .with_context(|| format!("Issue {} not found", full_id))?;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
@@ -230,20 +231,19 @@ where
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected or the heartbeat
-/// cannot be recorded (e.g. the lease does not exist).
-pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
+/// Returns an error if the selected worktree's branch cannot be resolved or the
+/// heartbeat cannot be recorded (e.g. the lease does not exist).
+pub fn execute_claim_heartbeat(
+    paths: &WorktreePaths,
+    lease_id: &str,
+) -> Result<Vec<StorageWarning>> {
     use crate::agent_config::resolve_agent_id;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -252,7 +252,7 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
     let locker = FileLocker::new(Duration::from_secs(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
     ));
-    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
 
     // Send heartbeat
     coordinator.heartbeat(lease_id)?;
@@ -304,7 +304,7 @@ fn sanitize_actor(name: Option<&str>) -> Option<String> {
 /// Returns an error (see [`crate::errors::no_acting_identity`]) when neither a
 /// configured agent id nor a git `user.name` is available. A release must be
 /// attributable, so no placeholder identity is invented.
-fn resolve_release_actor() -> Result<String> {
+fn resolve_release_actor(worktree_root: &Path) -> Result<String> {
     use crate::agent_config::resolve_agent_id;
 
     if let Ok(agent) = resolve_agent_id(None) {
@@ -312,6 +312,8 @@ fn resolve_release_actor() -> Result<String> {
     }
 
     let git_name = Command::new("git")
+        .arg("-C")
+        .arg(worktree_root)
         .args(["config", "user.name"])
         .output()
         .ok()
@@ -341,6 +343,7 @@ fn resolve_release_actor() -> Result<String> {
 /// eviction fails.
 pub fn execute_claim_release_by_issue<S: IssueStore>(
     storage: &S,
+    paths: &WorktreePaths,
     issue_id: &str,
 ) -> Result<(ReleasedLeaseInfo, Vec<StorageWarning>)> {
     // Resolve short ID to full ID (errors if the issue does not exist).
@@ -348,20 +351,16 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
         .resolve_issue_id(issue_id)
         .with_context(|| format!("Failed to resolve issue id {}", issue_id))?;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Resolve the acting identity for the audit trail BEFORE evicting anything,
     // so a release never happens without an attributable actor. This is
     // independent of lease ownership: any identified actor may release by issue id.
-    let actor = resolve_release_actor()
+    let actor = resolve_release_actor(&paths.worktree_root)
         .context("Cannot release lease without an attributable acting identity")?;
 
     // Create file locker and coordinator using the actor as the agent id.
@@ -429,23 +428,20 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected or the lease cannot
-/// be renewed (e.g. it does not exist).
+/// Returns an error if the selected worktree's branch cannot be resolved or the
+/// lease cannot be renewed (e.g. it does not exist).
 pub fn execute_claim_renew<S: IssueStore>(
+    paths: &WorktreePaths,
     lease_id: &str,
     extension_secs: u64,
 ) -> Result<(Lease, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -482,23 +478,20 @@ pub fn execute_claim_renew<S: IssueStore>(
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected or the leases cannot
-/// be read.
+/// Returns an error if the selected worktree's branch cannot be resolved or the
+/// leases cannot be read.
 pub fn execute_claim_status<S: IssueStore>(
+    paths: &WorktreePaths,
     issue_id: Option<&str>,
     agent_id: Option<&str>,
 ) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     use crate::agent_config::resolve_agent_id;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let current_agent_id = resolve_agent_id(None)?;
@@ -508,7 +501,7 @@ pub fn execute_claim_status<S: IssueStore>(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
     ));
     let coordinator = ClaimCoordinator::new(
-        paths,
+        paths.clone(),
         locker,
         identity.worktree_id,
         current_agent_id.clone(),
@@ -540,18 +533,14 @@ pub fn execute_claim_status<S: IssueStore>(
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected or the leases cannot
-/// be read.
-pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
+/// Returns an error if the selected worktree's branch cannot be resolved or the
+/// leases cannot be read.
+pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
     let agent = "system:list".to_string();
@@ -560,7 +549,7 @@ pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     let locker = FileLocker::new(Duration::from_secs(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
     ));
-    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
 
     // Get all active leases (no filters)
@@ -586,23 +575,18 @@ pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
 /// Returns an error only if active leases cannot be read once the coordinator
 /// is initialized.
 pub fn check_issue_lease(
+    paths: &WorktreePaths,
     issue_id: &str,
     current_agent: Option<&str>,
 ) -> Result<(Option<Lease>, Vec<StorageWarning>)> {
-    // Try to detect worktree context - if not in a git repo, no leases are active
-    let paths = match WorktreePaths::detect() {
-        Ok(p) => p,
-        Err(_) => return Ok((None, Vec::new())), // Not in a git repo, no lease system active
-    };
-
     // Get current branch for identity
-    let branch = match get_current_branch() {
+    let branch = match get_current_branch(&paths.worktree_root) {
         Ok(b) => b,
         Err(_) => return Ok((None, Vec::new())), // Can't determine branch, skip lease check
     };
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(&paths, &branch)
+    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(paths, &branch)
     {
         Ok(loaded) => loaded,
         Err(_) => return Ok((None, Vec::new())), // Can't load identity, skip lease check
@@ -613,7 +597,8 @@ pub fn check_issue_lease(
     let locker = FileLocker::new(Duration::from_secs(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
     ));
-    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent.clone());
+    let coordinator =
+        ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent.clone());
 
     // Don't fail if control plane doesn't exist yet
     if coordinator.init().is_err() {
@@ -648,21 +633,18 @@ pub fn check_issue_lease(
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected or the lease cannot
-/// be evicted.
+/// Returns an error if the selected worktree's branch cannot be resolved or the
+/// lease cannot be evicted.
 pub fn execute_claim_force_evict<S: IssueStore>(
+    paths: &WorktreePaths,
     lease_id: &str,
     reason: &str,
 ) -> Result<Vec<StorageWarning>> {
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // For force-evict, we use a system agent (admin operation)
     let agent = "system:admin".to_string();
@@ -671,7 +653,7 @@ pub fn execute_claim_force_evict<S: IssueStore>(
     let locker = FileLocker::new(Duration::from_secs(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
     ));
-    let coordinator = ClaimCoordinator::new(paths, locker, identity.worktree_id, agent);
+    let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
 
     // Force evict the lease
@@ -704,20 +686,19 @@ pub struct RecoveryReport {
 /// - Removes orphaned temp files (older than 1 hour)
 ///
 /// Safe to run at any time - only removes provably stale data.
-pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
+pub fn execute_recover<S: IssueStore>(
+    _storage: &S,
+    paths: &WorktreePaths,
+) -> Result<RecoveryReport> {
     use crate::storage::lock_cleanup;
     use crate::storage::temp_cleanup;
 
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
     // Get current branch for identity
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load worktree identity (surfacing any relocation as a typed warning)
     let (identity, identity_warnings) =
-        load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
+        load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Create claim coordinator
     let agent = "system:recovery".to_string();
@@ -1634,7 +1615,7 @@ mod tests {
             let _cwd = CurrentDirGuard::new(&temp).unwrap();
 
             // get_current_branch() should return an error, not "main"
-            get_current_branch()
+            get_current_branch(temp.path())
         };
 
         // Should fail, not return "main" as fallback

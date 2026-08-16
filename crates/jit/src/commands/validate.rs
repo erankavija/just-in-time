@@ -1753,7 +1753,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Validate claims index (if worktree mode is active and not in test mode)
         if std::env::var("JIT_TEST_MODE").is_err() {
-            let index_issues = validate_claims_index()
+            let index_issues = validate_claims_index_with_paths(self.require_worktree_paths()?)
                 .unwrap_or_else(|e| vec![format!("Failed to validate claims index: {}", e)]);
             if !index_issues.is_empty() {
                 return Err(anyhow!(
@@ -2644,14 +2644,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Vector of invalid lease descriptions with fix suggestions
     pub fn validate_leases(&self) -> Result<Vec<String>> {
         use crate::storage::claim_coordinator::ClaimsIndex;
-        use crate::storage::worktree_paths::WorktreePaths;
         use chrono::Utc;
-
-        let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
 
         // Load the active-lease index through storage (an absent index yields an
         // empty one, so there are no leases to validate).
-        let index = ClaimsIndex::load(&paths)?;
+        let index = ClaimsIndex::load(self.require_worktree_paths()?)?;
 
         let mut invalid_leases = Vec::new();
         let now = Utc::now();
@@ -2673,7 +2670,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             // Check if worktree still exists
-            if !check_worktree_exists(&lease.worktree_id)? {
+            if !check_worktree_exists(
+                &self.require_worktree_paths()?.worktree_root,
+                &lease.worktree_id,
+            )? {
                 invalid_leases.push(format!(
                     "Lease {} (Issue {}): Worktree {} no longer exists\n  Fix: jit claim force-evict {}",
                     lease.lease_id,
@@ -2842,12 +2842,14 @@ fn format_duration(duration: chrono::Duration) -> String {
 }
 
 /// Check if a worktree with the given ID still exists
-fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
+fn check_worktree_exists(repository_root: &std::path::Path, worktree_id: &str) -> Result<bool> {
     use std::path::PathBuf;
     use std::process::Command;
 
     // Get all git worktrees
     let output = Command::new("git")
+        .arg("-C")
+        .arg(repository_root)
         .args(["worktree", "list", "--porcelain"])
         .output()
         .context("Failed to execute git worktree list")?;
@@ -2881,24 +2883,6 @@ fn check_worktree_exists(worktree_id: &str) -> Result<bool> {
     }
 
     Ok(false)
-}
-
-/// Validate claims index consistency
-///
-/// Checks for structural corruption:
-/// - Duplicate leases for the same issue (invariant violation)
-/// - Schema version mismatches (incompatibility)
-/// - Sequence gaps (data loss indicator)
-///
-/// Note: Does NOT check for expired leases - those are normal state handled by
-/// evict_expired(). Use validate_leases() for expiration checks.
-///
-/// Returns vector of corruption issues found (empty if structurally valid)
-pub fn validate_claims_index() -> Result<Vec<String>> {
-    use crate::storage::worktree_paths::WorktreePaths;
-
-    let paths = WorktreePaths::detect().context("Failed to detect worktree paths")?;
-    validate_claims_index_with_paths(&paths)
 }
 
 /// Validate claims-index consistency for an explicitly selected repository.

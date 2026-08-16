@@ -288,7 +288,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             };
             let claims_guard = enforce_lease
-                .then(|| claims_mutation_guard(&layout))
+                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
@@ -420,7 +420,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             };
             let claims_guard = enforce_lease
-                .then(|| claims_mutation_guard(&layout))
+                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;

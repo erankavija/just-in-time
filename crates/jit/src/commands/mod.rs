@@ -569,28 +569,20 @@ fn captured_precheck_plan(
 }
 
 fn claims_mutation_guard(
-    layout: &crate::repository_state::RepositoryLayout,
+    paths: &crate::storage::WorktreePaths,
 ) -> Result<Option<crate::storage::claim_coordinator::ClaimsMutationGuard>> {
-    use crate::storage::worktree_paths::WorktreePaths;
     use crate::storage::{ClaimCoordinator, FileLocker};
     use std::time::Duration;
 
-    let in_git = std::process::Command::new("git")
-        .arg("-C")
-        .arg(layout.worktree_root())
-        .args(["rev-parse", "--is-inside-work-tree"])
-        .output()
-        .is_ok_and(|output| output.status.success());
-    if !in_git {
+    if !paths.is_git_repository() {
         return Ok(None);
     }
-    let paths = WorktreePaths::detect_from(layout.worktree_root())?;
     let agent = crate::agent_config::resolve_agent_id(None)
         .unwrap_or_else(|_| "system:lease-check".to_string());
-    let worktree_id = crate::storage::worktree_identity::read_worktree_id(layout.worktree_root())?
-        .unwrap_or_else(|| layout.worktree_root().display().to_string());
+    let worktree_id = crate::storage::worktree_identity::read_worktree_id(&paths.worktree_root)?
+        .unwrap_or_else(|| paths.worktree_root.display().to_string());
     let coordinator = ClaimCoordinator::new(
-        paths,
+        paths.clone(),
         FileLocker::new(Duration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         )),
@@ -1947,6 +1939,12 @@ pub struct CommandExecutor<S: IssueStore> {
     /// these call sites. `None` only when no layout was supplied; a session-opening
     /// command then reports a wiring error rather than proceeding.
     layout: Option<crate::repository_state::RepositoryLayout>,
+    /// Dispatch-owned worktree classification used by lifecycle lease checks.
+    ///
+    /// This is the same selected-data-root authority used by claim commands.
+    /// The CLI injects its dispatch-time value; non-dispatch library callers
+    /// lazily derive it from their selected repository layout.
+    worktree_paths: OnceLock<Result<crate::storage::WorktreePaths, String>>,
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
@@ -1961,6 +1959,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             config: OnceLock::new(),
             namespaces: OnceLock::new(),
             layout: None,
+            worktree_paths: OnceLock::new(),
         }
     }
 
@@ -1974,6 +1973,31 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.storage.configure_repository_layout(&layout);
         self.layout = Some(layout);
         self
+    }
+
+    /// Construct this executor with the selected data root's worktree authority.
+    pub fn with_worktree_paths(mut self, paths: crate::storage::WorktreePaths) -> Self {
+        self.worktree_paths = OnceLock::from(Ok(paths));
+        self
+    }
+
+    /// Return or lazily derive the selected-data-root worktree authority.
+    pub(crate) fn require_worktree_paths(&self) -> Result<&crate::storage::WorktreePaths> {
+        self.worktree_paths
+            .get_or_init(|| {
+                let (data_root, worktree_root) = self.layout.as_ref().map_or_else(
+                    || {
+                        let data_root = self.storage.root();
+                        let worktree_root = data_root.parent().unwrap_or(data_root);
+                        (data_root, worktree_root)
+                    },
+                    |layout| (layout.data_root(), layout.worktree_root()),
+                );
+                crate::storage::WorktreePaths::detect_for_data_root(data_root, worktree_root)
+                    .map_err(|error| error.to_string())
+            })
+            .as_ref()
+            .map_err(|message| anyhow!("{message}"))
     }
 
     /// The canonical mutation layout, or a typed error when none was supplied.
@@ -2384,7 +2408,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let claims_guard = request
                 .enforce_lease
-                .then(|| claims_mutation_guard(&layout))
+                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
@@ -2612,7 +2636,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 enforce_lease || matches!(request, CapturedLifecycleMutation::Claim { .. });
             if coordinate_claims {
                 let preflight_issues = captured_active_issues(&precheck_image)?;
-                let preliminary_guard = claims_mutation_guard(&layout)?;
+                let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
                     captured_lease_warnings(
                         expected_lease_mode,
@@ -2676,7 +2700,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             );
 
             let claims_guard = coordinate_claims
-                .then(|| claims_mutation_guard(&layout))
+                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
 
@@ -3126,20 +3150,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn check_active_lease(&self, issue_id: &str) -> Result<bool> {
         use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
-        use crate::storage::worktree_paths::WorktreePaths;
 
-        // Get worktree paths to access shared control plane
-        let paths = match WorktreePaths::detect() {
-            Ok(p) => p,
-            Err(_) => {
-                // Not in a git repository - no claims possible
-                return Ok(false);
-            }
-        };
+        let paths = self.require_worktree_paths()?;
 
         // Load the active-lease index through storage (an absent index yields an
         // empty one, i.e. no active leases).
-        let claims_index = ClaimsIndex::load(&paths)?;
+        let claims_index = ClaimsIndex::load(paths)?;
 
         // Resolve current agent identity (or None for single-user mode)
         let current_agent = resolve_agent_id(None).ok();
@@ -4044,7 +4060,9 @@ enforce_leases = "off"
         let issue_id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
-        let executor = CommandExecutor::new(storage);
+        let paths =
+            crate::storage::WorktreePaths::detect_from(storage.root()).expect("fixture paths");
+        let executor = CommandExecutor::new(storage).with_worktree_paths(paths);
 
         // No claims index - should return false
         let result = executor.check_active_lease(&issue_id);
@@ -4072,7 +4090,9 @@ enforce_leases = "strict"
 "#;
         std::fs::write(storage.root().join("config.toml"), config_toml).unwrap();
 
-        let executor = CommandExecutor::new(storage);
+        let paths =
+            crate::storage::WorktreePaths::detect_from(storage.root()).expect("fixture paths");
+        let executor = CommandExecutor::new(storage).with_worktree_paths(paths);
 
         // Should fail in strict mode without lease
         let result = executor.require_active_lease(&issue_id);
@@ -4158,7 +4178,7 @@ enforce_leases = "strict"
             .success());
         let paths = WorktreePaths::detect_from(repo.path()).unwrap();
         let coordinator = ClaimCoordinator::new(
-            paths,
+            paths.clone(),
             FileLocker::new(Duration::from_secs(1)),
             "wt:test".to_string(),
             "agent:test".to_string(),
@@ -4166,11 +4186,7 @@ enforce_leases = "strict"
         coordinator.init().unwrap();
         let issue_id = "abcd1111111111111111111111111111";
         coordinator.acquire_claim(issue_id, 600).unwrap();
-        let layout =
-            crate::storage::discover_repository_layout(repo.path(), repo.path().join(".jit"))
-                .unwrap();
-
-        let guard = claims_mutation_guard(&layout).unwrap().unwrap();
+        let guard = claims_mutation_guard(&paths).unwrap().unwrap();
 
         assert!(guard
             .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
