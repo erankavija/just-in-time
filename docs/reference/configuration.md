@@ -459,11 +459,14 @@ after adding or changing labels that are subject to uniqueness rules.
 
 ### `[worktree]` Section
 
-The active setting is lease enforcement for structural issue operations.
+The active settings are lease enforcement for structural issue operations
+and the write-policy stance for state-mutating commands run inside a linked
+non-primary checkout.
 
 ```toml
 [worktree]
 enforce_leases = "strict"  # Lease enforcement level
+write_policy = "refuse"    # Linked-checkout write-policy stance
 ```
 
 #### `enforce_leases`
@@ -476,6 +479,22 @@ enforce_leases = "strict"  # Lease enforcement level
 
 With no `[worktree]` section, command execution uses `off`. If the section is
 present but `enforce_leases` is omitted, it resolves to `strict`.
+
+#### `write_policy`
+
+| Value | Description |
+|-------|-------------|
+| `"refuse"` | Declares the refusing stance for state-mutating commands run inside a linked non-primary checkout |
+| `"allow"` | Declares the allowing stance for state-mutating commands run inside a linked non-primary checkout |
+
+With no `[worktree]` section, and with the section present but `write_policy`
+omitted, the declared stance is `"refuse"` — unlike `enforce_leases`, both
+cases resolve identically rather than diverging by section presence. A
+per-invocation override, where one is supplied, takes precedence over the
+declared stance.
+
+This repository declares the allowing stance (see `.jit/config.toml`), so its
+linked agent checkouts keep mutating their local `.jit/` stores.
 
 ### `[coordination]` Section
 
@@ -518,6 +537,13 @@ defaults are read from, so the values there never drift from the code.
 accepted and available to `jit config get` / `jit config show`, but no current
 command applies them as runtime controls. Do not use them to change worktree
 handling, branch policy, lock recovery, or event format.
+
+`worktree.write_policy` is parsed from the repository's own `.jit/config.toml`
+(see [`write_policy`](#write_policy) above) but is deliberately outside this
+merged system/user/repo introspection surface: the declared stance is a
+repository-scoped policy, not something a user- or system-level config should
+be able to override on the repository's behalf. No current command applies it
+as a runtime control; enforcement is a separate, not-yet-implemented issue.
 
 ## Agent Config (`~/.config/jit/agent.toml`)
 

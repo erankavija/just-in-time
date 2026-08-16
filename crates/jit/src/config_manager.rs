@@ -105,6 +105,40 @@ impl ConfigManager {
         }
     }
 
+    /// Get the worktree write-policy stance for state-mutating commands run
+    /// inside a linked non-primary checkout.
+    ///
+    /// Returns the configured stance from `.jit/config.toml`, defaulting to
+    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] (refuse) if not
+    /// configured.
+    ///
+    /// Unlike [`Self::get_enforcement_mode`], an absent `write_policy` key in
+    /// a present `[worktree]` section and an absent `[worktree]` section
+    /// altogether resolve identically — both refuse. This method states that
+    /// symmetry explicitly rather than inheriting the section-presence
+    /// asymmetry `enforce_leases` has.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if config.toml exists but cannot be parsed.
+    pub fn get_write_policy(&self) -> Result<crate::domain::LinkedCheckoutWriteStance> {
+        let config = self.load()?;
+        self.write_policy_from_config(&config)
+    }
+
+    /// Resolve the write-policy stance from an ALREADY-loaded config, without
+    /// re-reading `config.toml` from disk.
+    pub fn write_policy_from_config(
+        &self,
+        config: &JitConfig,
+    ) -> Result<crate::domain::LinkedCheckoutWriteStance> {
+        Ok(config
+            .worktree
+            .as_ref()
+            .map(crate::config::WorktreeConfig::write_policy)
+            .unwrap_or(crate::domain::LinkedCheckoutWriteStance::DEFAULT))
+    }
+
     /// Get the configured canonical project name.
     ///
     /// Returns the `[project] name` value from `.jit/config.toml`, or `None`
@@ -537,6 +571,97 @@ enforce_leases = "invalid"
         assert!(result.is_err());
         // Use the full error chain (anyhow's `{:#}`) to see through the
         // "Failed to parse config.toml" context wrapper.
+        let msg = format!("{:#}", result.unwrap_err());
+        assert!(
+            msg.contains("invalid"),
+            "error chain must mention invalidity: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_get_write_policy_default_when_missing() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(
+            config_mgr.get_write_policy().unwrap(),
+            crate::domain::LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_get_write_policy_default_when_section_absent() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[type_hierarchy]\ntypes = { task = 1 }\n",
+        )
+        .unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(
+            config_mgr.get_write_policy().unwrap(),
+            crate::domain::LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_get_write_policy_default_when_key_absent_in_present_section() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"strict\"\n",
+        )
+        .unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        // This is the same default as an absent [worktree] section; write policy
+        // has no section-presence asymmetry like enforce_leases does.
+        assert_eq!(
+            config_mgr.get_write_policy().unwrap(),
+            crate::domain::LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_get_write_policy_allow_from_config() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nwrite_policy = \"allow\"\n",
+        )
+        .unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        assert_eq!(
+            config_mgr.get_write_policy().unwrap(),
+            crate::domain::LinkedCheckoutWriteStance::Allow
+        );
+    }
+
+    #[test]
+    fn test_get_write_policy_invalid() {
+        let temp_dir = setup_test_dir();
+        let jit_dir = temp_dir.path().join(".jit");
+        fs::create_dir(&jit_dir).unwrap();
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nwrite_policy = \"invalid\"\n",
+        )
+        .unwrap();
+
+        let config_mgr = ConfigManager::new(&jit_dir);
+        let result = config_mgr.get_write_policy();
+
+        assert!(result.is_err());
         let msg = format!("{:#}", result.unwrap_err());
         assert!(
             msg.contains("invalid"),

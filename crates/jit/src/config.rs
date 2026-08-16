@@ -1217,6 +1217,10 @@ pub struct WorktreeConfig {
     pub mode: Option<WorktreeMode>,
     /// Lease enforcement mode (default: [`EnforcementMode::Strict`]).
     pub enforce_leases: Option<EnforcementMode>,
+    /// Write-policy stance for state-mutating commands run inside a linked
+    /// non-primary checkout (default:
+    /// [`LinkedCheckoutWriteStance::DEFAULT`](crate::domain::LinkedCheckoutWriteStance::DEFAULT)).
+    pub write_policy: Option<crate::domain::LinkedCheckoutWriteStance>,
 }
 
 /// Worktree detection mode.
@@ -1311,6 +1315,18 @@ impl WorktreeConfig {
     /// this method is infallible.
     pub fn enforcement_mode(&self) -> EnforcementMode {
         self.enforce_leases.unwrap_or(EnforcementMode::Strict)
+    }
+
+    /// Get the write-policy stance, defaulting to
+    /// [`LinkedCheckoutWriteStance::DEFAULT`](crate::domain::LinkedCheckoutWriteStance::DEFAULT)
+    /// when unset.
+    ///
+    /// The field is typed — invalid tokens are rejected at TOML parse time
+    /// (via the domain type's derived `Deserialize`), so this method is
+    /// infallible.
+    pub fn write_policy(&self) -> crate::domain::LinkedCheckoutWriteStance {
+        self.write_policy
+            .unwrap_or(crate::domain::LinkedCheckoutWriteStance::DEFAULT)
     }
 }
 
@@ -3323,6 +3339,67 @@ enforce_leases = "maybe"
         assert!(
             msg.contains("maybe"),
             "error must mention the bad value: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_worktree_write_policy_default_to_refuse() {
+        let config_toml = r#"
+[worktree]
+# No write_policy specified
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        assert_eq!(
+            config.worktree.unwrap().write_policy(),
+            crate::domain::LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_worktree_write_policy_explicit_refuse() {
+        let config_toml = r#"
+[worktree]
+write_policy = "refuse"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        assert_eq!(
+            config.worktree.unwrap().write_policy(),
+            crate::domain::LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_worktree_write_policy_allow() {
+        let config_toml = r#"
+[worktree]
+write_policy = "allow"
+"#;
+        let config: JitConfig = toml::from_str(config_toml).unwrap();
+        assert_eq!(
+            config.worktree.unwrap().write_policy(),
+            crate::domain::LinkedCheckoutWriteStance::Allow
+        );
+    }
+
+    #[test]
+    fn test_worktree_write_policy_invalid_token_names_accepted_values() {
+        let config_toml = r#"
+[worktree]
+write_policy = "sometimes"
+"#;
+        let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("sometimes"),
+            "error must mention bad value: {msg}"
+        );
+        assert!(
+            msg.contains("refuse"),
+            "error must name accepted value: {msg}"
+        );
+        assert!(
+            msg.contains("allow"),
+            "error must name accepted value: {msg}"
         );
     }
 

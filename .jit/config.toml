@@ -277,3 +277,9 @@ kind = "charter"
 mode = "region"
 target = "AGENTS.md"
 style = "id-anchor"
+
+[worktree]
+# Adopter agent checkouts run from linked worktrees under
+# .agents/worktrees/; allow lets each mutate its own local .jit/ store
+# (jit:1c8f00bd).
+write_policy = "allow"
