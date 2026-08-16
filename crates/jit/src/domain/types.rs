@@ -1166,6 +1166,42 @@ pub struct ProfileLifecycleProfile {
     pub variables: Vec<ProfileLifecycleVariable>,
 }
 
+/// The stance on state-mutating commands inside a linked non-primary checkout.
+///
+/// One vocabulary carries both the repository's declared stance and the
+/// per-invocation override that can outrank it, so an audit record names the
+/// two with one type instead of two parallel ones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkedCheckoutWriteStance {
+    /// State-mutating commands are refused inside a linked checkout.
+    Refuse,
+    /// State-mutating commands may run inside a linked checkout.
+    Allow,
+}
+
+impl LinkedCheckoutWriteStance {
+    /// Default stance when a repository declares none — whether because
+    /// `[worktree]` omits `write_policy` or the `[worktree]` section is
+    /// absent altogether. Refusing is the safe default: the adopter who
+    /// never considered the question is the one the divergent-store hazard
+    /// hurts.
+    pub const DEFAULT: LinkedCheckoutWriteStance = LinkedCheckoutWriteStance::Refuse;
+
+    /// Resolve the effective stance for one invocation.
+    ///
+    /// `invocation_override`, when present, always takes precedence over
+    /// `declared` — an explicit per-invocation choice overrides whatever the
+    /// repository declares. This is the ONE place this precedence is
+    /// stated; callers must not re-decide it themselves.
+    pub fn resolve(
+        declared: LinkedCheckoutWriteStance,
+        invocation_override: Option<LinkedCheckoutWriteStance>,
+    ) -> LinkedCheckoutWriteStance {
+        invocation_override.unwrap_or(declared)
+    }
+}
+
 /// System event types for audit log
 ///
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
@@ -1831,6 +1867,48 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_linked_checkout_write_stance_from_json_tokens() {
+        assert_eq!(
+            serde_json::from_str::<LinkedCheckoutWriteStance>("\"refuse\"").unwrap(),
+            LinkedCheckoutWriteStance::Refuse
+        );
+        assert_eq!(
+            serde_json::from_str::<LinkedCheckoutWriteStance>("\"allow\"").unwrap(),
+            LinkedCheckoutWriteStance::Allow
+        );
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_resolve_prefers_override_over_declared() {
+        assert_eq!(
+            LinkedCheckoutWriteStance::resolve(
+                LinkedCheckoutWriteStance::Refuse,
+                Some(LinkedCheckoutWriteStance::Allow)
+            ),
+            LinkedCheckoutWriteStance::Allow
+        );
+        assert_eq!(
+            LinkedCheckoutWriteStance::resolve(
+                LinkedCheckoutWriteStance::Allow,
+                Some(LinkedCheckoutWriteStance::Refuse)
+            ),
+            LinkedCheckoutWriteStance::Refuse
+        );
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_resolve_falls_back_to_declared_without_override() {
+        assert_eq!(
+            LinkedCheckoutWriteStance::resolve(LinkedCheckoutWriteStance::Refuse, None),
+            LinkedCheckoutWriteStance::Refuse
+        );
+        assert_eq!(
+            LinkedCheckoutWriteStance::resolve(LinkedCheckoutWriteStance::Allow, None),
+            LinkedCheckoutWriteStance::Allow
+        );
+    }
 
     #[test]
     fn test_new_issue_has_correct_defaults() {
