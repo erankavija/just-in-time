@@ -10,6 +10,7 @@
     "62518095-2bb8-4c12-9828-3247ce22b7c6",
     "6a489764-9d04-4672-a266-b5dcabe22609",
     "7ca9a0dd-4dca-4294-9212-278d22b013ac",
+    "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
     "995a1903-4a2e-4216-817b-ee3ff63b993b",
     "dd3d4a07-684b-4e9f-af81-deffb5e5ac28"
   ],
@@ -43,5 +44,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-16T20:00:05.612053158Z"
+  "updated_at": "2026-08-16T20:21:18.943022441Z"
 }
