@@ -70,19 +70,16 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
 ///
 /// # Arguments
 ///
-/// * `jit_dir` - Path to `.jit` directory
-/// * `worktree_root` - Current absolute path to worktree root
+/// * `paths` - Authoritative selected-store worktree paths
 /// * `branch` - Current git branch name
 pub fn load_or_create_worktree_identity(
-    jit_dir: &Path,
-    worktree_root: &Path,
+    paths: &crate::storage::worktree_paths::WorktreePaths,
     branch: &str,
 ) -> Result<WorktreeIdentity> {
     // Convenience wrapper that drops the non-fatal relocation warning. Callers
     // that want to surface relocation to the user (e.g. the `worktree` command)
     // use `load_or_create_worktree_identity_with_warnings` instead.
-    let (identity, _warnings) =
-        load_or_create_worktree_identity_with_warnings(jit_dir, worktree_root, branch)?;
+    let (identity, _warnings) = load_or_create_worktree_identity_with_warnings(paths, branch)?;
     Ok(identity)
 }
 
@@ -95,19 +92,15 @@ pub fn load_or_create_worktree_identity(
 ///
 /// # Arguments
 ///
-/// * `jit_dir` - Path to `.jit` directory
-/// * `worktree_root` - Current absolute path to worktree root
+/// * `paths` - Authoritative selected-store worktree paths
 /// * `branch` - Current git branch name
 pub fn load_or_create_worktree_identity_with_warnings(
-    jit_dir: &Path,
-    worktree_root: &Path,
+    paths: &crate::storage::worktree_paths::WorktreePaths,
     branch: &str,
 ) -> Result<(WorktreeIdentity, Vec<StorageWarning>)> {
-    use crate::storage::worktree_paths::WorktreePaths;
-
     let mut warnings = Vec::new();
 
-    let wt_file = jit_dir.join("worktree.json");
+    let wt_file = paths.local_jit.join("worktree.json");
 
     if wt_file.exists() {
         // Load existing identity
@@ -116,15 +109,10 @@ pub fn load_or_create_worktree_identity_with_warnings(
             serde_json::from_str(&content).context("Failed to parse worktree.json")?;
 
         // Check for path mismatch
-        let current_root = worktree_root.to_string_lossy().to_string();
+        let current_root = paths.worktree_root.to_string_lossy().to_string();
         if identity.root != current_root {
             // Path mismatch - could be relocation OR copied file from git worktree add
-            // Detect if we're in a git worktree (not main)
-            let is_secondary_worktree = WorktreePaths::detect()
-                .map(|paths| paths.is_worktree())
-                .unwrap_or(false);
-
-            if is_secondary_worktree {
+            if paths.is_worktree() {
                 // In a git worktree with wrong path - could be copied OR moved
                 // Check if old path still exists with the same ID
                 let old_path = PathBuf::from(&identity.root);
@@ -194,19 +182,19 @@ pub fn load_or_create_worktree_identity_with_warnings(
 
     // Create new identity (either no file existed, or we deleted a copied one)
     let now = Utc::now();
-    let worktree_id = generate_worktree_id(worktree_root, now);
+    let worktree_id = generate_worktree_id(&paths.worktree_root, now);
 
     let identity = WorktreeIdentity {
         schema_version: 1,
         worktree_id,
         branch: branch.to_string(),
-        root: worktree_root.to_string_lossy().to_string(),
+        root: paths.worktree_root.to_string_lossy().to_string(),
         created_at: now,
         relocated_at: None,
     };
 
     // Ensure .jit directory exists
-    fs::create_dir_all(jit_dir).context("Failed to create .jit directory")?;
+    fs::create_dir_all(&paths.local_jit).context("Failed to create .jit directory")?;
 
     // Write atomically
     write_identity_atomic(&wt_file, &identity)?;
@@ -335,8 +323,12 @@ mod tests {
         write_identity_atomic(&jit_dir.join("worktree.json"), &stored).unwrap();
 
         let new_root = temp.path().to_path_buf();
+        let paths = crate::storage::worktree_paths::WorktreePaths::detect_for_data_root(
+            &jit_dir, &new_root,
+        )
+        .unwrap();
         let (identity, warnings) =
-            load_or_create_worktree_identity_with_warnings(&jit_dir, &new_root, "main").unwrap();
+            load_or_create_worktree_identity_with_warnings(&paths, "main").unwrap();
 
         // The stable worktree_id is preserved across the relocation.
         assert_eq!(identity.worktree_id, "wt:deadbeef");
@@ -350,7 +342,7 @@ mod tests {
         );
 
         // The convenience wrapper drops the warning but yields the same identity.
-        let plain = load_or_create_worktree_identity(&jit_dir, &new_root, "main").unwrap();
+        let plain = load_or_create_worktree_identity(&paths, "main").unwrap();
         assert_eq!(plain.worktree_id, "wt:deadbeef");
     }
 }

@@ -13,6 +13,7 @@ use tempfile::TempDir;
 // Helper to set up a test coordinator
 fn setup_coordinator(temp_dir: &TempDir) -> ClaimCoordinator {
     let paths = WorktreePaths {
+        git_repository: true,
         common_dir: temp_dir.path().join(".git"),
         worktree_root: temp_dir.path().to_path_buf(),
         local_jit: temp_dir.path().join(".jit"),
