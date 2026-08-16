@@ -200,9 +200,9 @@ pub use profile_apply::{
     ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
     ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput,
     ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims, ProfileConflictOccupant,
-    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileTargetConflict,
-    ProfileTargetConflictEntry, ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget,
-    SetStringTarget,
+    ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileRemedy,
+    ProfileResolution, ProfileTargetConflict, ProfileTargetConflictEntry,
+    ProfileTargetConflictsError, ProfileTargetSubject, ScalarTarget, SetStringTarget,
 };
 pub(crate) use profile_apply::{
     contributed_toml_value, contribution_in_registry, profile_capture_closure,
