@@ -571,7 +571,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Claims coordination is acquired before repository serialization;
             // the target and policy are then re-resolved from the held image.
             let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
-                .then(|| claims_mutation_guard(&layout))
+                .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;

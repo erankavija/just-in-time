@@ -987,6 +987,8 @@ impl ClaimCoordinator {
         use std::process::Command;
 
         let output = Command::new("git")
+            .arg("-C")
+            .arg(&self.paths.worktree_root)
             .args(["rev-parse", "--abbrev-ref", "HEAD"])
             .output()
             .context("Failed to get current branch")?;

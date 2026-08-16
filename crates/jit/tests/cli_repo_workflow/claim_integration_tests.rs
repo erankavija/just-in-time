@@ -78,6 +78,151 @@ fn create_issue(repo_path: &Path, title: &str) -> String {
     json["id"].as_str().unwrap().to_string()
 }
 
+fn commit_repository(repo_path: &Path, message: &str) {
+    Command::new("git")
+        .current_dir(repo_path)
+        .args(["add", "."])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(repo_path)
+        .args(["commit", "-m", message])
+        .status()
+        .unwrap();
+}
+
+fn create_linked_worktree(repo_path: &Path, branch: &str) -> std::path::PathBuf {
+    let linked = repo_path
+        .parent()
+        .unwrap()
+        .join(format!("{branch}-{}", std::process::id()));
+    Command::new("git")
+        .current_dir(repo_path)
+        .args(["worktree", "add", linked.to_str().unwrap(), "-b", branch])
+        .status()
+        .unwrap();
+    linked
+}
+
+fn acquire_selected_linked_lease(
+    primary: &Path,
+    linked: &Path,
+    issue_id: &str,
+    agent_id: &str,
+) -> Output {
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(primary)
+        .env("JIT_DATA_DIR", linked.join(".jit"))
+        .args([
+            "claim",
+            "acquire",
+            issue_id,
+            "--ttl",
+            "600",
+            "--agent-id",
+            agent_id,
+            "--json",
+        ])
+        .output()
+        .expect("acquire selected linked lease")
+}
+
+#[test]
+fn test_claim_acquire_uses_selected_linked_worktree_identity_from_primary_cwd() {
+    let primary = setup_repo();
+    let issue_id = create_issue(primary.path(), "Selected linked claim");
+    commit_repository(primary.path(), "Add selected linked claim");
+    let linked_branch = format!("linked-claim-{}", std::process::id());
+    let linked = create_linked_worktree(primary.path(), &linked_branch);
+    let primary_identity_path = primary.path().join(".jit/worktree.json");
+    let primary_identity_before = fs::read(&primary_identity_path).unwrap();
+
+    let output =
+        acquire_selected_linked_lease(primary.path(), &linked, &issue_id, "agent:selected-linked");
+
+    assert!(
+        output.status.success(),
+        "claim acquire failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(&primary_identity_path).unwrap(),
+        primary_identity_before
+    );
+
+    let primary_identity: Value = serde_json::from_slice(&primary_identity_before).unwrap();
+    let linked_identity: Value =
+        serde_json::from_slice(&fs::read(linked.join(".jit/worktree.json")).unwrap()).unwrap();
+    assert_eq!(
+        Path::new(linked_identity["root"].as_str().unwrap()),
+        linked.as_path()
+    );
+    assert_eq!(linked_identity["branch"], linked_branch);
+    assert_ne!(
+        linked_identity["worktree_id"],
+        primary_identity["worktree_id"]
+    );
+
+    let claims: Value = serde_json::from_slice(
+        &fs::read(primary.path().join(".git/jit/claims.index.json")).unwrap(),
+    )
+    .unwrap();
+    let lease = claims["leases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|lease| lease["issue_id"] == issue_id)
+        .expect("selected issue has a lease");
+    assert_eq!(lease["worktree_id"], linked_identity["worktree_id"]);
+    assert_eq!(lease["branch"], linked_branch);
+}
+
+#[test]
+fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primary_cwd() {
+    let selected_primary = setup_repo();
+    let issue_id = create_issue(selected_primary.path(), "Selected linked lifecycle");
+    commit_repository(selected_primary.path(), "Add selected linked lifecycle");
+    let linked_branch = format!("linked-lifecycle-{}", std::process::id());
+    let linked = create_linked_worktree(selected_primary.path(), &linked_branch);
+    let agent_id = "agent:selected-linked-lifecycle";
+    let acquire =
+        acquire_selected_linked_lease(selected_primary.path(), &linked, &issue_id, agent_id);
+    assert!(
+        acquire.status.success(),
+        "claim acquire failed: {}",
+        String::from_utf8_lossy(&acquire.stderr)
+    );
+    let mut config = fs::read_to_string(linked.join(".jit/config.toml")).unwrap();
+    config.push_str("\n[worktree]\nenforce_leases = \"strict\"\n");
+    fs::write(linked.join(".jit/config.toml"), config).unwrap();
+    let foreign_primary = setup_repo();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(foreign_primary.path())
+        .env("JIT_DATA_DIR", linked.join(".jit"))
+        .env("JIT_AGENT_ID", agent_id)
+        .args([
+            "issue",
+            "assign",
+            &issue_id,
+            "human:selected-owner",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "selected-root lease was rejected: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let issue: Value = serde_json::from_slice(
+        &fs::read(linked.join(".jit/issues").join(format!("{issue_id}.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(issue["assignee"], "human:selected-owner");
+}
+
 fn assert_claim_failure_parity(plain: &Output, json: &Output, expected_code: ErrorCode) {
     let expected_status = Some(expected_code.exit_code().code());
     assert_eq!(plain.status.code(), expected_status);
