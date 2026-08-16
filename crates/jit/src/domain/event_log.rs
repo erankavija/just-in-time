@@ -140,4 +140,22 @@ mod tests {
             Err(EventLogError::InvalidJson { line: 1, .. })
         ));
     }
+
+    /// REQ-03: the log reader retains every record of the current vocabulary,
+    /// so a newly cataloged tag is read back rather than silently dropped.
+    #[test]
+    fn test_parse_known_events_retains_every_cataloged_tag() {
+        let samples: Vec<Event> = EventTag::ALL.iter().map(|tag| tag.sample()).collect();
+        let log = samples
+            .iter()
+            .map(|event| {
+                format!(
+                    "{}\n",
+                    serde_json::to_string(event).expect("a sample serializes")
+                )
+            })
+            .collect::<String>();
+
+        assert_eq!(parse_known_events(&log).unwrap(), samples);
+    }
 }

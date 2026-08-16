@@ -29,7 +29,7 @@ use chrono::{DateTime, Utc};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use super::types::{Assignee, Event, Priority, State};
+use super::types::{Assignee, Event, LinkedCheckoutWriteStance, Priority, State};
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -119,6 +119,8 @@ pub enum EventTag {
     LifecycleTimestampsBackfilled,
     /// `profile_lifecycle`
     ProfileLifecycle,
+    /// `linked_checkout_write_overridden`
+    LinkedCheckoutWriteOverridden,
 }
 
 impl EventTag {
@@ -126,7 +128,7 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 21] = [
+    pub const ALL: [EventTag; 22] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -148,6 +150,7 @@ impl EventTag {
         EventTag::GateDefinitionRemoved,
         EventTag::LifecycleTimestampsBackfilled,
         EventTag::ProfileLifecycle,
+        EventTag::LinkedCheckoutWriteOverridden,
     ];
 
     /// The tag as serde writes it into a record's `type` field.
@@ -174,6 +177,7 @@ impl EventTag {
             EventTag::GateDefinitionRemoved => "gate_definition_removed",
             EventTag::LifecycleTimestampsBackfilled => "lifecycle_timestamps_backfilled",
             EventTag::ProfileLifecycle => "profile_lifecycle",
+            EventTag::LinkedCheckoutWriteOverridden => "linked_checkout_write_overridden",
         }
     }
 
@@ -200,7 +204,8 @@ impl EventTag {
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
             EventTag::ArtifactArchiveExecuted
             | EventTag::LifecycleTimestampsBackfilled
-            | EventTag::ProfileLifecycle => EventScope::Repository,
+            | EventTag::ProfileLifecycle
+            | EventTag::LinkedCheckoutWriteOverridden => EventScope::Repository,
         }
     }
 
@@ -257,6 +262,11 @@ impl EventTag {
                 "A profile lifecycle operation reached one durable transaction commit point; \
                  the record summarizes per-profile actions and variable source kinds without \
                  resolved values or rendered content."
+            }
+            EventTag::LinkedCheckoutWriteOverridden => {
+                "An explicit per-invocation override permitted a state-mutating command inside a \
+                 linked checkout whose declared stance refuses them; the record names the \
+                 checkout, the refusing declared stance, and the permitting override."
             }
         }
     }
@@ -426,6 +436,13 @@ impl EventTag {
                 }],
                 isolated_torn_tail: false,
             },
+            EventTag::LinkedCheckoutWriteOverridden => Event::LinkedCheckoutWriteOverridden {
+                id,
+                timestamp,
+                checkout: std::path::PathBuf::from("/repo/.worktrees/feature"),
+                declared_stance: LinkedCheckoutWriteStance::Refuse,
+                invocation_override: LinkedCheckoutWriteStance::Allow,
+            },
         }
     }
 }
@@ -460,6 +477,7 @@ impl Event {
             Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
             Event::LifecycleTimestampsBackfilled { .. } => EventTag::LifecycleTimestampsBackfilled,
             Event::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
+            Event::LinkedCheckoutWriteOverridden { .. } => EventTag::LinkedCheckoutWriteOverridden,
         }
     }
 }
@@ -751,10 +769,9 @@ mod tests {
         }
     }
 
-    /// REQ-02: the records without an `issue_id` are exactly the archive execution record,
-    /// the three gate-definition registry edits, and
-    /// `lifecycle_timestamps_backfilled`, and profile lifecycle events. Asserted as a set equality, so a tag
-    /// that joins or leaves the no-issue set fails here.
+    /// REQ-02: repository- and registry-scoped records, including the linked
+    /// checkout override audit record, omit `issue_id`. Asserted as a set
+    /// equality, so a tag that joins or leaves the no-issue set fails here.
     #[test]
     fn test_no_issue_set_is_exactly_the_shared_state_events() {
         let no_issue: BTreeSet<&str> = event_catalog()
@@ -771,8 +788,70 @@ mod tests {
                 "gate_definition_removed",
                 "gate_definition_updated",
                 "lifecycle_timestamps_backfilled",
+                "linked_checkout_write_overridden",
                 "profile_lifecycle",
             ]),
+        );
+    }
+
+    /// REQ-03: every cataloged record survives a serialization round trip with
+    /// its tag intact — the property the event log depends on to read back what
+    /// it wrote.
+    #[test]
+    fn test_sample_round_trips_through_serialization_for_every_tag() {
+        for tag in EventTag::ALL {
+            let event = tag.sample();
+            let encoded = serde_json::to_string(&event).expect("a sample event serializes");
+            let decoded: Event = serde_json::from_str(&encoded).expect("a serialized event parses");
+            assert_eq!(decoded, event, "`{}` did not round-trip", tag.as_str());
+            assert_eq!(decoded.tag(), tag);
+        }
+    }
+
+    /// REQ-01: the override record names the linked checkout, the declared
+    /// stance that would have refused the invocation, and the per-invocation
+    /// override that permitted it. Asserted against the serialized record —
+    /// the form `events.jsonl` stores — because the three names are the whole
+    /// point of the variant.
+    #[test]
+    fn test_linked_checkout_write_overridden_names_checkout_stance_and_override() {
+        let event = EventTag::LinkedCheckoutWriteOverridden.sample();
+        let Event::LinkedCheckoutWriteOverridden {
+            checkout,
+            declared_stance,
+            invocation_override,
+            ..
+        } = &event
+        else {
+            panic!("the tag's sample is the override record");
+        };
+        assert_eq!(*declared_stance, LinkedCheckoutWriteStance::Refuse);
+        assert_eq!(*invocation_override, LinkedCheckoutWriteStance::Allow);
+
+        let record = serde_json::to_value(&event).expect("the override record serializes");
+        let object = record.as_object().expect("a record is a JSON object");
+        assert_eq!(
+            object.get("type").and_then(serde_json::Value::as_str),
+            Some("linked_checkout_write_overridden"),
+        );
+        assert_eq!(
+            object.get("checkout").and_then(serde_json::Value::as_str),
+            checkout.to_str(),
+            "the record names the linked checkout",
+        );
+        assert_eq!(
+            object
+                .get("declared_stance")
+                .and_then(serde_json::Value::as_str),
+            Some("refuse"),
+            "the record names the stance that would have refused",
+        );
+        assert_eq!(
+            object
+                .get("invocation_override")
+                .and_then(serde_json::Value::as_str),
+            Some("allow"),
+            "the record names the override that permitted the invocation",
         );
     }
 
