@@ -46,6 +46,11 @@ Call `Agent` with:
 - The prompt prefixed with the boilerplate emitted by the dispatch script. The boilerplate names the worktree path, the branch, and the path-discipline rules (no checkout-specific absolute paths, run every command from the worktree root).
 - `run_in_background: true` for parallel work. Background mode is required so the lead can dispatch the rest of the wave without waiting on each worker.
 
+Worker worktrees are linked checkouts, so jit's `worktree.write_policy`
+(refusing by default) governs state-mutating jit commands run from them. This
+composes with the protocol's division of labor — workers use the tracker
+read-only; the lead owns issue state from the primary.
+
 ### Step 4 — Post-completion leak check
 
 After all dispatched workers complete (or fail / time out), run:
@@ -80,6 +85,11 @@ The gate must compile **and run** the project's tests. A build-only check is not
 State what this does and does not establish. The gate judges a working tree, so its verdict is the merge commit's verdict only while that tree is clean — check `git status --porcelain` first, and read a gate run over uncommitted edits as evidence about those edits, not about any commit. Gating once after several merges judges only the final tree: an intermediate merge commit that does not build is never observed, so gate after each merge whenever per-merge attribution matters.
 
 If the gate reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
+
+When the check runs through the tracker's own gate evaluation (`jit gate
+evaluate`), an active lease on the issue is required and the default lease TTL
+(one hour) lapses across a long wave — re-acquire the lease immediately before
+each evaluation rather than relying on the dispatch-time claim.
 
 ### Step 6 — Reclaim worktrees once the wave closes
 

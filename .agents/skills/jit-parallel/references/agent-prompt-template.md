@@ -54,8 +54,14 @@ Cited concrete qualified addresses are resolvable project knowledge, not opaque 
 
 ## Return
 
-Return a summary of:
+Report:
 - Files modified or created
 - Tests added (names)
 - Confirmation of passing testing, linting, and formatting checks
 - Any issues encountered
+
+Deliver the report through the reporting channel your dispatch prompt names. In
+harnesses where a background sub-agent's final plain output is not shown to the
+dispatcher, a report merely printed is a report lost — send it via the
+dispatcher-reaching messaging mechanism the harness provides, and treat the
+report as undelivered until it has been sent through that channel.
