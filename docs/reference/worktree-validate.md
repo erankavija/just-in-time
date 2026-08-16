@@ -1,7 +1,7 @@
 # jit worktree and jit validate Command Reference
 
 > **Diátaxis Type:** Reference  
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-08-16
 
 CLI reference for worktree information and repository validation commands.
 
@@ -152,6 +152,115 @@ For JSON output (envelope also carries `message` and `warnings`):
 The command fails outside a git repository and when the worktrees cannot be
 listed. For the code each failure exits with, see the
 [Exit Codes reference](exit-codes.md).
+
+---
+
+### jit worktree store-divergence
+
+Report the records this checkout's store and the primary checkout's store
+disagree about.
+
+#### Synopsis
+
+```bash
+jit worktree store-divergence [OPTIONS]
+```
+
+#### Description
+
+Each checkout owns a store under its own `.jit/`. Issue records are read with a
+fallback across the local store, version-control history, and the primary
+checkout, but event history has no such fallback, so a linked checkout's events
+are visible only from inside it. This check compares the two stores as they
+physically sit — no fallback, no aggregation — and names every issue record and
+every event record they hold differently.
+
+The check reads only. It writes to neither store and repairs nothing; it reports
+what diverged so you can decide what to do about it.
+
+It reports nothing in three cases: in the primary checkout, which has no other
+store to compare against; in a linked checkout whose store agrees with the
+primary; and outside version control, where there is no second checkout at all.
+An empty report therefore means "nothing to report here" in every environment,
+and the `Reference store:` line says which case you are in.
+
+#### Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Output as JSON |
+
+#### Examples
+
+```bash
+# Report what this checkout's store and the primary's disagree about
+jit worktree store-divergence
+
+# JSON output for scripting
+jit worktree store-divergence --json
+```
+
+#### Finding classes
+
+Every finding names one record, the kind of record it is (`issue` or `event`),
+and how the two stores disagree about it:
+
+| Class | Meaning |
+|--------|---------|
+| `local_only` | This checkout's store holds the record; the primary checkout's store does not. |
+| `reference_only` | The primary checkout's store holds the record; this checkout's store does not. |
+| `conflicting` | Both stores hold the record under one identity, with values that differ. |
+
+Records both stores hold identically are agreement and produce no finding.
+Issue records are matched on issue id and event records on event id.
+
+#### Output
+
+The two compared stores, then one row per finding:
+
+```
+Checkout store:  /home/user/project-feature/.jit
+Reference store: /home/user/project/.jit
+
+RECORD   CLASS            ID
+------------------------------------------------------------------------
+issue    local_only       4a281416-0e75-4cec-aaaa-35c5b964512a
+issue    reference_only   452ce1ea-8833-411d-a5c6-baed654c9379
+event    conflicting      eee505cd-57e8-4ede-9606-e46cb75d5aba
+
+3 divergence(s)
+```
+
+A checkout with nothing to report prints `No divergent records.` in place of the
+table.
+
+JSON output uses the list envelope (which also carries `message`), plus the two
+compared stores; `reference_store` is `null` when the checkout has none:
+
+```json
+{
+  "count": 3,
+  "checkout_store": "/home/user/project-feature/.jit",
+  "reference_store": "/home/user/project/.jit",
+  "divergences": [
+    {
+      "record": "issue",
+      "class": "local_only",
+      "id": "4a281416-0e75-4cec-aaaa-35c5b964512a"
+    }
+  ]
+}
+```
+
+Findings are ordered by record kind, issues before events, and by id within each
+kind, so re-running against unchanged stores reports the same sequence.
+
+#### Failure modes
+
+Reporting a divergence is a success: the command exits `0` whether or not it
+finds anything. It fails when the primary checkout cannot be resolved, or when
+either store holds a record that cannot be read or parsed. For the code each
+failure exits with, see the [Exit Codes reference](exit-codes.md).
 
 ---
 

@@ -4099,7 +4099,7 @@ The collection key is command-specific:
 | `graph deps` | `nodes` |
 | `gate status --all`/`--limit` | `results` |
 | `gate status-all` | `gates` |
-| `query divergence` | `divergences` |
+| `query divergence`, `worktree store-divergence` | `divergences` |
 | `invariant check` (when no drift is found) | `findings` |
 
 Some envelopes carry additional metadata keys alongside `count` and the
