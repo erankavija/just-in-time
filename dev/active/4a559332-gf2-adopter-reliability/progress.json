@@ -63,21 +63,21 @@
           "short_id": "1c8f00bd",
           "title": "Worktree write policy configuration key",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "99ac9679-dbb3-44f4-b108-ac52b4487ea7",
           "short_id": "99ac9679",
           "title": "Override audit event for linked-checkout mutations",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "7ca9a0dd-4dca-4294-9212-278d22b013ac",
           "short_id": "7ca9a0dd",
           "title": "Regression coverage for gate evaluation durability",
           "classification": "implementation",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
