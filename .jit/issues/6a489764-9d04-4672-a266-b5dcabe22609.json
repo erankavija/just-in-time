@@ -8,12 +8,24 @@
   ],
   "description": "An automated postcheck whose evaluation fails to persist surfaces that failure instead of\nleaving the transition indistinguishable from a clean run.\n\n## Background\n\nThe postcheck loop discards each checker result through an ignored return value, and the\ncomment above it claims failures are logged where the code at that site emits nothing. The\nstate machine stays correct — an unpassed gate keeps the issue out of the terminal state — but\nthe invocation returns ordinary success, so a persistence failure inside a postcheck leaves no\nevidence anywhere. Which invocations reach this loop is not established: the primary\nstate-update path is a different function, and the one direct caller found transitions to a\nrejected state.\n\n## Success Criteria\n\n- [hard] REQ-01: The invocations that reach the postcheck loop are enumerated as part of this change, and the loop distinguishes a persistence failure from an ordinary checker failure.\n- [hard] REQ-02: A persistence failure inside a postcheck reaches the caller rather than being discarded, and the invocation does not report unqualified success.\n- [hard] REQ-03: An ordinary failing checker keeps its current outcome: the issue stays out of the terminal state and the invocation succeeds.\n- [hard] REQ-04: The comment describing the loop's error handling matches what the code does.\n\n## Notes\n\nWhether the surfacing is a returned error or a reported warning depends on which invocations\nreach the loop, so the enumeration settles that question before the surfacing is written.\n",
   "documents": [],
+  "done_at": "2026-08-16T12:39:26.402458832Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-16T12:35:16.383482061Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T12:39:12.992906516Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "6a489764-9d04-4672-a266-b5dcabe22609",
   "labels": [
     "type:task",
@@ -22,7 +34,7 @@
     "satisfies:REQ-03"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Surface swallowed postcheck failures",
-  "updated_at": "2026-08-16T12:05:25.475347618Z"
+  "updated_at": "2026-08-16T12:39:26.402458832Z"
 }
