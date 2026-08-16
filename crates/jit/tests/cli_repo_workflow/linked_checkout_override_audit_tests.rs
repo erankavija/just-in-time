@@ -2,6 +2,7 @@
 //! record and the mutation it permits become durable through one materialization plan, or
 //! neither does.
 
+use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
 use jit::domain::{Event, LinkedCheckoutWriteStance, Priority};
 use jit::storage::{
@@ -201,4 +202,201 @@ fn test_create_issue_under_dispatch_override_persistence_failure_leaves_neither_
             .any(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. })),
         "the audit record cannot outlive the mutation it explains"
     );
+}
+
+// The tests below drive the real production dispatch path — the installed `jit`
+// binary, its worktree detection, its declared-stance read, and the environment
+// variable carrying one invocation's stance — rather than installing the
+// annotation themselves.
+
+/// Environment variable carrying one invocation's linked-checkout write stance.
+const WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
+
+/// A linked non-primary checkout of a repository that declares no write stance,
+/// so the refusing default applies there.
+///
+/// Answers the temporary directory holding both checkouts (kept alive by the
+/// caller) and the linked checkout's root.
+fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+    let temp = tempfile::TempDir::new().expect("create a temporary directory");
+    let primary = temp.path().join("main");
+    std::fs::create_dir(&primary).expect("create the primary checkout directory");
+
+    for arguments in [
+        vec!["init", "-q"],
+        vec!["config", "user.email", "fixture@example.com"],
+        vec!["config", "user.name", "Fixture"],
+    ] {
+        std::process::Command::new("git")
+            .current_dir(&primary)
+            .args(&arguments)
+            .assert()
+            .success();
+    }
+    std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&primary)
+        .arg("init")
+        .assert()
+        .success();
+    for arguments in [vec!["add", "-A"], vec!["commit", "-qm", "track with jit"]] {
+        std::process::Command::new("git")
+            .current_dir(&primary)
+            .args(&arguments)
+            .assert()
+            .success();
+    }
+
+    let linked = temp.path().join("feature");
+    std::process::Command::new("git")
+        .current_dir(&primary)
+        .args([
+            "worktree",
+            "add",
+            "-q",
+            linked.to_str().expect("utf-8 path"),
+        ])
+        .assert()
+        .success();
+
+    (temp, linked)
+}
+
+/// Every event durable in `checkout`'s store, one per log line.
+fn durable_events(checkout: &Path) -> Vec<serde_json::Value> {
+    let log = std::fs::read_to_string(checkout.join(".jit/events.jsonl"))
+        .expect("read the checkout's event log");
+    log.lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| serde_json::from_str(line).expect("every event log line is one JSON record"))
+        .collect()
+}
+
+/// The events of `tag` among `events`.
+fn events_tagged<'a>(events: &'a [serde_json::Value], tag: &str) -> Vec<&'a serde_json::Value> {
+    events.iter().filter(|event| event["type"] == tag).collect()
+}
+
+/// Create one issue in `checkout`, optionally supplying an invocation stance.
+fn create_issue_in(checkout: &Path, invocation_stance: Option<&str>) -> assert_cmd::assert::Assert {
+    let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command.current_dir(checkout).args([
+        "issue",
+        "create",
+        "Permitted mutation",
+        "-d",
+        "Created inside a linked checkout",
+        "--json",
+    ]);
+    match invocation_stance {
+        Some(stance) => command.env(WRITE_STANCE_ENV, stance),
+        None => command.env_remove(WRITE_STANCE_ENV),
+    };
+    command.assert()
+}
+
+#[test]
+fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with_its_mutation() {
+    let (_temp, linked) = linked_checkout_fixture();
+    create_issue_in(&linked, Some("allow")).success();
+
+    let events = durable_events(&linked);
+    let records = events_tagged(&events, "linked_checkout_write_overridden");
+    assert_eq!(
+        records.len(),
+        1,
+        "the permitted mutation must record exactly one override; events: {events:?}"
+    );
+    let record = records[0];
+    assert_eq!(
+        (&record["declared_stance"], &record["invocation_override"]),
+        (&serde_json::json!("refuse"), &serde_json::json!("allow")),
+        "the record must pair the declaration that would have refused with the stance that \
+         permitted the invocation; record: {record}"
+    );
+    let recorded_checkout = std::fs::canonicalize(
+        record["checkout"]
+            .as_str()
+            .expect("the record names a checkout path"),
+    )
+    .expect("the recorded checkout exists");
+    assert_eq!(
+        recorded_checkout,
+        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        "the record must name the linked checkout the invocation actually mutated"
+    );
+
+    let creations = events_tagged(&events, "issue_created");
+    let creation = creations
+        .last()
+        .expect("the mutation's own event is durable too");
+    assert_eq!(
+        creation["timestamp"], record["timestamp"],
+        "sharing one mutation timestamp is what shows both records came from one plan; \
+         events: {events:?}"
+    );
+}
+
+#[test]
+fn test_linked_checkout_mutation_without_env_override_records_no_audit_event() {
+    let (_temp, linked) = linked_checkout_fixture();
+    create_issue_in(&linked, None).success();
+
+    let events = durable_events(&linked);
+    assert!(
+        events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
+        "an invocation supplying no override must record none; events: {events:?}"
+    );
+    assert!(
+        !events_tagged(&events, "issue_created").is_empty(),
+        "the mutation itself must still have happened; events: {events:?}"
+    );
+}
+
+#[test]
+fn test_linked_checkout_mutation_permitted_by_declared_stance_records_no_audit_event() {
+    // The repository's own declaration permits the mutation, so no override
+    // outranked a refusal and the record's "stance that would have refused" has
+    // no referent.
+    let (_temp, linked) = linked_checkout_fixture();
+    let config = linked.join(".jit/config.toml");
+    let declared = std::fs::read_to_string(&config).expect("read the repository configuration")
+        + "\n[worktree]\nwrite_policy = \"allow\"\n";
+    std::fs::write(&config, declared).expect("declare the allowing stance");
+
+    create_issue_in(&linked, Some("allow")).success();
+
+    let events = durable_events(&linked);
+    assert!(
+        events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
+        "a mutation permitted by the declared stance records no override; events: {events:?}"
+    );
+    assert!(
+        !events_tagged(&events, "issue_created").is_empty(),
+        "the mutation itself must still have happened; events: {events:?}"
+    );
+}
+
+#[test]
+fn test_invalid_env_write_stance_token_fails_the_invocation_naming_accepted_tokens() {
+    // The stance is parsed before any repository work, so an unusable token
+    // fails the invocation rather than being silently dropped.
+    let temp = tempfile::TempDir::new().expect("create a temporary directory");
+    let output = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .env(WRITE_STANCE_ENV, "sometimes")
+        .arg("list")
+        .output()
+        .expect("spawn the jit process");
+
+    assert!(
+        !output.status.success(),
+        "an unusable invocation stance must fail the invocation"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    for expected in ["sometimes", "refuse", "allow"] {
+        assert!(
+            stderr.contains(expected),
+            "the failure must name the offending token and every accepted one; stderr: {stderr}"
+        );
+    }
 }

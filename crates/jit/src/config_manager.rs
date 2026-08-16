@@ -12,6 +12,13 @@ use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// Environment variable carrying one invocation's linked-checkout write stance.
+///
+/// It is the per-invocation counterpart of the repository's declared
+/// `[worktree] write_policy`, named after that key the way
+/// `JIT_ENFORCE_LEASES` and `JIT_WORKTREE_MODE` are named after theirs.
+pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
+
 /// Manages configuration loading and access.
 ///
 /// ConfigManager provides a single point of access for all configuration data,
@@ -137,6 +144,40 @@ impl ConfigManager {
             .as_ref()
             .map(crate::config::WorktreeConfig::write_policy)
             .unwrap_or(crate::domain::LinkedCheckoutWriteStance::DEFAULT))
+    }
+
+    /// Read the per-invocation override of the linked-checkout write stance from
+    /// the environment.
+    ///
+    /// It takes no repository because an invocation's own stance is not repository
+    /// state; it sits beside [`Self::get_write_policy`] because the two are the
+    /// paired inputs of one resolution, and a caller needing one usually needs both.
+    ///
+    /// `None` means the invocation supplies no override, so
+    /// [`LinkedCheckoutWriteStance::resolve`](crate::domain::LinkedCheckoutWriteStance::resolve)
+    /// keeps whatever the repository declares. The token is parsed by the domain
+    /// type itself, the same parser the `write_policy` TOML key uses, so the two
+    /// sources accept the same tokens with the same case handling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error naming the accepted tokens when the variable is set to a
+    /// value outside the stance vocabulary. Reading it is a load-time check: an
+    /// unusable override is reported rather than silently ignored.
+    pub fn invocation_write_override() -> Result<Option<crate::domain::LinkedCheckoutWriteStance>> {
+        std::env::var(LINKED_CHECKOUT_WRITE_STANCE_ENV)
+            .ok()
+            .map(|token| {
+                token
+                    .parse::<crate::domain::LinkedCheckoutWriteStance>()
+                    .map_err(|error| {
+                        crate::errors::InvalidArgumentError::new(format!(
+                            "invalid {LINKED_CHECKOUT_WRITE_STANCE_ENV}: {error}"
+                        ))
+                        .into()
+                    })
+            })
+            .transpose()
     }
 
     /// Get the configured canonical project name.

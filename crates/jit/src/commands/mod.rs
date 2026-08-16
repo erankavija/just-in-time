@@ -132,10 +132,40 @@ thread_local! {
 /// Construct the operation-scoped production mutation context.
 ///
 /// Every command and integration helper uses this factory boundary. The context receives
-/// the annotation, if any, installed by [`with_dispatch_mutation_annotation`]; ordinary
-/// dispatch has no annotation and therefore preserves the previous mutation behaviour.
+/// whichever annotation dispatch installed, and an invocation whose dispatch found no fact
+/// worth annotating builds an unannotated context.
 pub fn production_mutation_context() -> crate::repository_state::MutationContext {
     PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| factory.borrow().create())
+}
+
+/// An annotation installed for as long as this guard lives.
+///
+/// This is the mechanism behind the dispatch-scoped annotation: dropping the guard
+/// restores the previously installed annotation, whether the scope ended by returning
+/// or by unwinding, so nested and repeated in-process invocations cannot leak facts
+/// into one another. Top-level CLI dispatch holds the guard, because its command match
+/// spans the remainder of the dispatch scope rather than a closure;
+/// [`with_dispatch_mutation_annotation`] is the closure form over this same guard.
+#[must_use = "the annotation is uninstalled as soon as the guard is dropped"]
+pub struct DispatchMutationAnnotation(Option<crate::repository_state::MutationContextAnnotation>);
+
+impl DispatchMutationAnnotation {
+    /// Install `annotation` for every production mutation context built until the
+    /// returned guard is dropped.
+    pub fn install(annotation: crate::repository_state::MutationContextAnnotation) -> Self {
+        Self(
+            PRODUCTION_MUTATION_CONTEXT_FACTORY
+                .with(|factory| factory.borrow_mut().replace_annotation(Some(annotation))),
+        )
+    }
+}
+
+impl Drop for DispatchMutationAnnotation {
+    fn drop(&mut self) {
+        PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| {
+            factory.borrow_mut().replace_annotation(self.0.take());
+        });
+    }
 }
 
 /// Run one dispatch with an annotation stamped into every production mutation context it
@@ -147,19 +177,7 @@ pub fn with_dispatch_mutation_annotation<T>(
     annotation: crate::repository_state::MutationContextAnnotation,
     dispatch: impl FnOnce() -> T,
 ) -> T {
-    struct AnnotationScope(Option<crate::repository_state::MutationContextAnnotation>);
-
-    impl Drop for AnnotationScope {
-        fn drop(&mut self) {
-            PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| {
-                factory.borrow_mut().replace_annotation(self.0.take());
-            });
-        }
-    }
-
-    let previous = PRODUCTION_MUTATION_CONTEXT_FACTORY
-        .with(|factory| factory.borrow_mut().replace_annotation(Some(annotation)));
-    let _scope = AnnotationScope(previous);
+    let _scope = DispatchMutationAnnotation::install(annotation);
     dispatch()
 }
 
