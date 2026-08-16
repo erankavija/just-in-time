@@ -255,7 +255,9 @@ $ jit profile apply jit-dogfood --dry-run --json
 { "error": { "code": "PROFILE_CONFLICT",
     "message": "profile package jit-dogfood asset target
       '.agents/skills/jit-breakdown/SKILL.md' conflicts with package
-      jit-dogfood and contains differing bytes" } }</code></pre>
+      jit-dogfood and contains differing bytes",
+    "details": { "conflicts": [ … ] },
+    "suggestions": [ "…jit profile capture…" ] } }</code></pre>
   <p>A target holding differing bytes is a conflict reported before anything is written.
      Application is one recoverable multi-target transaction: it validates the whole final
      state first, then publishes once.</p>
