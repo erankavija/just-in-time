@@ -459,9 +459,9 @@ after adding or changing labels that are subject to uniqueness rules.
 
 ### `[worktree]` Section
 
-The active settings are lease enforcement for structural issue operations
-and the write-policy stance for state-mutating commands run inside a linked
-non-primary checkout.
+This section carries lease enforcement for structural issue operations,
+which commands apply today, and the declared write-policy stance for
+state-mutating commands run inside a linked non-primary checkout.
 
 ```toml
 [worktree]
@@ -493,8 +493,9 @@ cases resolve identically rather than diverging by section presence. A
 per-invocation override, where one is supplied, takes precedence over the
 declared stance.
 
-This repository declares the allowing stance (see `.jit/config.toml`), so its
-linked agent checkouts keep mutating their local `.jit/` stores.
+This repository declares the allowing stance (see `.jit/config.toml`),
+recording its intent that linked agent checkouts continue to mutate their
+local `.jit/` stores.
 
 ### `[coordination]` Section
 
