@@ -8570,6 +8570,64 @@ fn run() -> Result<()> {
                     }
                 }
             }
+            jit::cli::WorktreeCommands::StoreDivergence { json } => {
+                use jit::commands::worktree::execute_worktree_store_divergence;
+                use jit::output::{JsonError, JsonOutput, WorktreeStoreDivergenceResponse};
+
+                match execute_worktree_store_divergence(&worktree_paths) {
+                    Ok(report) => {
+                        let count = report.divergences.len();
+                        if json {
+                            let response = WorktreeStoreDivergenceResponse {
+                                count,
+                                checkout_store: report.checkout_store,
+                                reference_store: report.reference_store,
+                                divergences: report.divergences,
+                            };
+                            let output = JsonOutput::success(serde_json::to_value(&response)?)
+                                .with_message(format!("{} divergence(s)", count));
+                            println!("{}", output.to_json_string()?);
+                        } else {
+                            println!("Checkout store:  {}", report.checkout_store);
+                            match &report.reference_store {
+                                Some(reference) => println!("Reference store: {}", reference),
+                                None => println!(
+                                    "Reference store: none (this checkout has no other store to compare against)"
+                                ),
+                            }
+                            println!();
+                            if report.divergences.is_empty() {
+                                println!("No divergent records.");
+                            } else {
+                                println!("{:<8} {:<16} ID", "RECORD", "CLASS");
+                                println!("{}", "-".repeat(72));
+                                for divergence in &report.divergences {
+                                    println!(
+                                        "{:<8} {:<16} {}",
+                                        divergence.record.as_str(),
+                                        divergence.class.as_str(),
+                                        divergence.id
+                                    );
+                                }
+                                println!();
+                                println!("{} divergence(s)", count);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        if json {
+                            let json_error = JsonError::new(
+                                ErrorCode::WorktreeStoreDivergenceError,
+                                e.to_string(),
+                            );
+                            println!("{}", json_error.to_json_string()?);
+                            std::process::exit(json_error.exit_code().code());
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
         },
         Commands::Snapshot(snapshot_cmd) => match snapshot_cmd {
             jit::cli::SnapshotCommands::Export {

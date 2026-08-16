@@ -2914,6 +2914,25 @@ pub enum WorktreeCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Report records this checkout's store and the primary's disagree about
+    ///
+    /// Compares the issue records and event history physically held by this
+    /// checkout's store against the primary checkout's store, naming what one
+    /// holds and the other does not and what both hold with conflicting values.
+    /// The check reads both stores and writes to neither; it reports nothing in
+    /// the primary checkout and outside version control.
+    ///
+    /// Examples:
+    ///   jit worktree store-divergence          # Report divergent records
+    ///   jit worktree store-divergence --json   # JSON output
+    ///
+    /// JSON output uses the list envelope `{"count": N, "divergences": [...]}`.
+    StoreDivergence {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Git hooks commands
@@ -3698,7 +3717,7 @@ impl ClaimCommands {
 impl WorktreeCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Info { .. } | Self::List { .. } => false,
+            Self::Info { .. } | Self::List { .. } | Self::StoreDivergence { .. } => false,
         }
     }
 }

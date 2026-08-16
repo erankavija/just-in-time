@@ -963,3 +963,108 @@ fn test_git_worktree_move_preserves_id() {
         "Worktree ID should be preserved after git worktree move"
     );
 }
+
+/// Create an issue in `checkout`, declaring the linked-checkout write stance so
+/// a linked checkout writes to its own store rather than refusing.
+///
+/// Answers the created issue's full id.
+fn create_issue_in_own_store(checkout: &Path, title: &str) -> String {
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(checkout)
+        .env("JIT_WORKTREE_WRITE_POLICY", "allow")
+        .args(["issue", "create", "--title", title, "--json"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "issue create failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    json["id"].as_str().unwrap().to_string()
+}
+
+/// Run `jit worktree store-divergence` in `checkout`, answering its stdout.
+fn store_divergence_output(checkout: &Path, json: bool) -> String {
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command
+        .current_dir(checkout)
+        .args(["worktree", "store-divergence"]);
+    if json {
+        command.arg("--json");
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "worktree store-divergence failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
+}
+
+#[test]
+fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_findings() {
+    let temp = setup_repo();
+    let linked = create_worktree(temp.path(), "store-divergence");
+
+    // Diverge the two stores in both directions: one record each store holds
+    // alone, each carrying its own creation event into that store's log.
+    create_issue(temp.path(), "Held by the primary checkout alone");
+    create_issue_in_own_store(&linked, "Held by the linked checkout alone");
+
+    let machine: Value = serde_json::from_str(&store_divergence_output(&linked, true)).unwrap();
+    let divergences = machine["divergences"].as_array().unwrap();
+
+    assert_eq!(
+        machine["count"].as_u64().unwrap() as usize,
+        divergences.len(),
+        "the list envelope's count is the length of its collection: {machine}"
+    );
+    assert!(
+        !divergences.is_empty(),
+        "the two diverged stores report findings: {machine}"
+    );
+
+    let rendered = store_divergence_output(&linked, false);
+    for divergence in divergences {
+        let record = divergence["record"].as_str().unwrap();
+        let class = divergence["class"].as_str().unwrap();
+        let id = divergence["id"].as_str().unwrap();
+        assert!(
+            rendered.lines().any(|line| line.contains(record)
+                && line.contains(class)
+                && line.contains(id)),
+            "the rendered output names the finding {record}/{class}/{id}:\n{rendered}"
+        );
+    }
+    assert!(
+        rendered.contains(&format!("{} divergence(s)", divergences.len())),
+        "the rendered output reports the same finding count as the envelope:\n{rendered}"
+    );
+
+    let tokens = |field: &str| -> Vec<String> {
+        divergences
+            .iter()
+            .map(|divergence| divergence[field].as_str().unwrap().to_string())
+            .collect()
+    };
+    let classes = tokens("class");
+    assert!(
+        classes.iter().any(|class| class == "local_only")
+            && classes.iter().any(|class| class == "reference_only"),
+        "a store divergence is reported in both directions: {machine}"
+    );
+    let records = tokens("record");
+    assert!(
+        records.iter().any(|record| record == "issue")
+            && records.iter().any(|record| record == "event"),
+        "both issue records and event records are compared: {machine}"
+    );
+
+    // Cleanup worktree before temp dir is dropped
+    let name = linked.file_name().unwrap().to_str().unwrap();
+    let _ = Command::new("git")
+        .current_dir(temp.path())
+        .args(["worktree", "remove", "--force", name])
+        .status();
+}

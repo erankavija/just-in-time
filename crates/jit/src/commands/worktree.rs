@@ -2,10 +2,11 @@
 //!
 //! Provides CLI interface for worktree information and operations.
 
+use crate::domain::store_divergence::{compare_stores, StoreDivergence, StoreRecords};
 use crate::storage::claim_coordinator::ClaimsIndex;
 use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::StorageWarning;
+use crate::storage::{read_exact_store, StorageWarning};
 use anyhow::{Context, Result};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -297,6 +298,69 @@ fn execute_worktree_list_at(
         .collect::<Result<Vec<_>>>()?;
 
     Ok((entries, warnings))
+}
+
+/// The outcome of comparing one checkout's store against its reference store.
+///
+/// A checkout with no reference store — the primary checkout, and any checkout
+/// outside version control — reports no divergences and no reference, so an
+/// empty [`Self::divergences`] means "nothing to report here" in every
+/// environment.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct StoreDivergenceReport {
+    /// The store the inspected checkout owns.
+    pub checkout_store: String,
+    /// The store it was compared against, absent when the checkout has none.
+    pub reference_store: Option<String>,
+    /// Every record the two stores disagree about, empty when they agree.
+    pub divergences: Vec<StoreDivergence>,
+}
+
+/// Execute `jit worktree store-divergence`.
+///
+/// Compares the records physically held by the selected checkout's store against
+/// those held by its primary checkout's store, naming every issue record and
+/// event record the two disagree about. The comparison is read-only: both stores
+/// are read exactly as they sit, without the aggregation, history, or
+/// primary-checkout fallback an ordinary issue read applies, and neither store is
+/// written.
+///
+/// A checkout with no primary counterpart to compare against — the primary
+/// checkout itself, and a store outside version control (`@/charter/D-4`) —
+/// reports no divergences rather than failing.
+///
+/// # Errors
+///
+/// Returns an error when the primary checkout cannot be resolved from `paths`, or
+/// when either store holds a record that cannot be read or parsed.
+pub fn execute_worktree_store_divergence(paths: &WorktreePaths) -> Result<StoreDivergenceReport> {
+    let checkout_store = paths.local_jit.to_string_lossy().into_owned();
+
+    let Some(reference_root) = paths.primary_data_root()? else {
+        return Ok(StoreDivergenceReport {
+            checkout_store,
+            reference_store: None,
+            divergences: Vec::new(),
+        });
+    };
+
+    let local = read_exact_store(&paths.local_jit)?;
+    let reference = read_exact_store(&reference_root)?;
+
+    Ok(StoreDivergenceReport {
+        checkout_store,
+        reference_store: Some(reference_root.to_string_lossy().into_owned()),
+        divergences: compare_stores(
+            StoreRecords {
+                issues: &local.issues,
+                events: &local.events,
+            },
+            StoreRecords {
+                issues: &reference.issues,
+                events: &reference.events,
+            },
+        ),
+    })
 }
 
 /// Check if current branch has diverged from origin/main.
@@ -679,6 +743,322 @@ mod tests {
             1,
             "expired lease excluded from list"
         );
+    }
+
+    mod store_divergence {
+        use super::*;
+        use crate::domain::store_divergence::{DivergenceClass, DivergentRecord};
+        use crate::domain::types::{fixture_issue, Priority};
+        use crate::domain::{Event, Issue};
+        use std::collections::BTreeMap;
+        use std::path::{Path, PathBuf};
+
+        /// Two checkouts of one repository, the second linked to the first.
+        ///
+        /// Answers the temporary directory holding both (kept alive by the
+        /// caller) and the linked checkout's authority. Path arithmetic over the
+        /// selected root is what decides primary-vs-linked identity, so this
+        /// fixture needs no git process.
+        fn linked_checkout_paths() -> (tempfile::TempDir, WorktreePaths) {
+            let temp = tempfile::TempDir::new().expect("create a temporary directory");
+            let primary = temp.path().join("main");
+            let linked = temp.path().join("feature");
+            std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
+            std::fs::create_dir_all(linked.join(".jit")).expect("create the linked store");
+
+            let paths = WorktreePaths {
+                git_repository: true,
+                common_dir: primary.join(".git"),
+                local_jit: linked.join(".jit"),
+                worktree_root: linked,
+                shared_jit: primary.join(".git/jit"),
+            };
+            assert!(paths.is_worktree(), "the fixture models a linked checkout");
+            (temp, paths)
+        }
+
+        /// Write `issue` into the store at `data_root`.
+        fn seed_issue(data_root: &Path, issue: &Issue) {
+            let issues = data_root.join("issues");
+            std::fs::create_dir_all(&issues).expect("create the issue directory");
+            std::fs::write(
+                issues.join(format!("{}.json", issue.id)),
+                crate::repository_state::serialize_issue(issue).expect("serialize the issue"),
+            )
+            .expect("write the issue record");
+        }
+
+        /// Write `events` into the log of the store at `data_root`.
+        fn seed_events(data_root: &Path, events: &[Event]) {
+            let log = events
+                .iter()
+                .map(|event| {
+                    format!(
+                        "{}\n",
+                        serde_json::to_string(event).expect("serialize the event")
+                    )
+                })
+                .collect::<String>();
+            std::fs::write(data_root.join("events.jsonl"), log).expect("write the event log");
+        }
+
+        /// An event carrying `id`, associated with `issue_id`.
+        fn event(id: &str, issue_id: &str, title: &str) -> Event {
+            Event::IssueCreated {
+                id: id.to_string(),
+                issue_id: issue_id.to_string(),
+                timestamp: chrono::DateTime::UNIX_EPOCH,
+                title: title.to_string(),
+                priority: Priority::Normal,
+            }
+        }
+
+        /// Every file under `root`, keyed by its path relative to `root`.
+        fn stored_bytes(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+            fn visit(root: &Path, current: &Path, files: &mut BTreeMap<PathBuf, Vec<u8>>) {
+                let entries = std::fs::read_dir(current).expect("read a store directory");
+                for entry in entries {
+                    let path = entry.expect("read a store entry").path();
+                    if path.is_dir() {
+                        visit(root, &path, files);
+                    } else {
+                        let relative = path
+                            .strip_prefix(root)
+                            .expect("entries sit under the store root")
+                            .to_path_buf();
+                        files.insert(relative, std::fs::read(&path).expect("read a store file"));
+                    }
+                }
+            }
+
+            let mut files = BTreeMap::new();
+            visit(root, root, &mut files);
+            files
+        }
+
+        /// The report's findings as (kind, class, id) triples.
+        fn findings(
+            report: &StoreDivergenceReport,
+        ) -> Vec<(DivergentRecord, DivergenceClass, &str)> {
+            report
+                .divergences
+                .iter()
+                .map(|divergence| (divergence.record, divergence.class, divergence.id.as_str()))
+                .collect()
+        }
+
+        /// Seed the two stores so each finding class is present, answering the
+        /// local-only issue, the reference-only issue, and the conflicting event.
+        fn seed_divergent_stores(
+            paths: &WorktreePaths,
+            reference_root: &Path,
+        ) -> (Issue, Issue, Event) {
+            let local_only = fixture_issue(
+                "Local only".to_string(),
+                "Held by the linked checkout alone".to_string(),
+            );
+            let reference_only = fixture_issue(
+                "Reference only".to_string(),
+                "Held by the primary checkout alone".to_string(),
+            );
+            let shared = fixture_issue(
+                "Shared".to_string(),
+                "Held by both stores identically".to_string(),
+            );
+
+            seed_issue(&paths.local_jit, &local_only);
+            seed_issue(&paths.local_jit, &shared);
+            seed_issue(reference_root, &reference_only);
+            seed_issue(reference_root, &shared);
+
+            let conflicting = event("shared-event", &shared.id, "The linked checkout's value");
+            seed_events(&paths.local_jit, std::slice::from_ref(&conflicting));
+            seed_events(
+                reference_root,
+                &[event(
+                    "shared-event",
+                    &shared.id,
+                    "The primary checkout's value",
+                )],
+            );
+
+            (local_only, reference_only, conflicting)
+        }
+
+        #[test]
+        fn test_execute_worktree_store_divergence_surfaces_every_finding_class_between_the_two_stores(
+        ) {
+            let (_temp, paths) = linked_checkout_paths();
+            let reference_root = paths
+                .primary_data_root()
+                .expect("resolve the primary store")
+                .expect("a linked checkout has a primary store");
+            let (local_only, reference_only, conflicting) =
+                seed_divergent_stores(&paths, &reference_root);
+
+            let report =
+                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+
+            let reported = findings(&report);
+            assert!(
+                reported.contains(&(
+                    DivergentRecord::Issue,
+                    DivergenceClass::LocalOnly,
+                    local_only.id.as_str()
+                )),
+                "the issue only this checkout holds is reported as local-only: {reported:?}"
+            );
+            assert!(
+                reported.contains(&(
+                    DivergentRecord::Issue,
+                    DivergenceClass::ReferenceOnly,
+                    reference_only.id.as_str()
+                )),
+                "the issue only the primary holds is reported as reference-only: {reported:?}"
+            );
+            assert!(
+                reported.contains(&(
+                    DivergentRecord::Event,
+                    DivergenceClass::Conflicting,
+                    conflicting.id()
+                )),
+                "the event both logs hold with different values is a conflict: {reported:?}"
+            );
+            assert_eq!(
+                report.reference_store.as_deref(),
+                Some(reference_root.to_string_lossy().as_ref()),
+                "the report names the primary store it compared against"
+            );
+        }
+
+        #[test]
+        fn test_execute_worktree_store_divergence_leaves_both_checkout_stores_unchanged() {
+            let (_temp, paths) = linked_checkout_paths();
+            let reference_root = paths
+                .primary_data_root()
+                .expect("resolve the primary store")
+                .expect("a linked checkout has a primary store");
+            seed_divergent_stores(&paths, &reference_root);
+
+            let before = (
+                stored_bytes(&paths.local_jit),
+                stored_bytes(&reference_root),
+            );
+            let report =
+                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+            assert!(
+                !report.divergences.is_empty(),
+                "the read-only property is asserted over a comparison that found something"
+            );
+
+            assert_eq!(
+                (
+                    stored_bytes(&paths.local_jit),
+                    stored_bytes(&reference_root)
+                ),
+                before,
+                "the check writes to neither store"
+            );
+        }
+
+        #[test]
+        fn test_execute_worktree_store_divergence_reports_nothing_for_a_linked_checkout_agreeing_with_the_primary(
+        ) {
+            let (_temp, paths) = linked_checkout_paths();
+            let reference_root = paths
+                .primary_data_root()
+                .expect("resolve the primary store")
+                .expect("a linked checkout has a primary store");
+
+            let issue = fixture_issue(
+                "Agreed".to_string(),
+                "Both checkouts hold this record".to_string(),
+            );
+            let events = [event("shared-event", &issue.id, "Both logs hold this")];
+            for store in [paths.local_jit.as_path(), reference_root.as_path()] {
+                seed_issue(store, &issue);
+                seed_events(store, &events);
+            }
+
+            let report =
+                execute_worktree_store_divergence(&paths).expect("compare the two checkout stores");
+
+            assert_eq!(
+                findings(&report),
+                Vec::new(),
+                "a linked checkout whose store agrees with the primary reports no findings"
+            );
+        }
+
+        #[test]
+        fn test_execute_worktree_store_divergence_reports_nothing_in_the_primary_checkout() {
+            let temp = tempfile::TempDir::new().expect("create a temporary directory");
+            let primary = temp.path().join("main");
+            std::fs::create_dir_all(primary.join(".jit")).expect("create the primary store");
+
+            let paths = WorktreePaths {
+                git_repository: true,
+                common_dir: primary.join(".git"),
+                local_jit: primary.join(".jit"),
+                worktree_root: primary.clone(),
+                shared_jit: primary.join(".git/jit"),
+            };
+            assert!(paths.is_main_worktree(), "the fixture models the primary");
+            seed_issue(
+                &paths.local_jit,
+                &fixture_issue(
+                    "Primary record".to_string(),
+                    "The primary checkout's own store".to_string(),
+                ),
+            );
+
+            let report =
+                execute_worktree_store_divergence(&paths).expect("inspect the primary checkout");
+
+            assert_eq!(
+                findings(&report),
+                Vec::new(),
+                "the primary checkout has no other store to diverge from"
+            );
+            assert_eq!(
+                report.reference_store, None,
+                "the primary checkout names no reference store"
+            );
+        }
+
+        #[test]
+        fn test_execute_worktree_store_divergence_reports_nothing_outside_version_control() {
+            let temp = tempfile::TempDir::new().expect("create a temporary directory");
+            let data_root = temp.path().join(".jit");
+            std::fs::create_dir_all(&data_root).expect("create the store");
+            seed_issue(
+                &data_root,
+                &fixture_issue(
+                    "Untracked record".to_string(),
+                    "Held by a store outside version control".to_string(),
+                ),
+            );
+
+            let paths = WorktreePaths::detect_for_data_root(&data_root, temp.path())
+                .expect("classify a store outside version control");
+            assert!(
+                !paths.is_git_repository(),
+                "the fixture models a store outside version control"
+            );
+
+            let report = execute_worktree_store_divergence(&paths)
+                .expect("a store outside version control succeeds rather than erroring");
+
+            assert_eq!(
+                findings(&report),
+                Vec::new(),
+                "a store outside version control has no checkout to compare against"
+            );
+            assert_eq!(
+                report.reference_store, None,
+                "a store outside version control names no reference store"
+            );
+        }
     }
 
     #[test]

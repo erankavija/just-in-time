@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::{
     GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
-    MinimalIssue, Priority, State,
+    MinimalIssue, Priority, State, StoreDivergence,
 };
 use crate::errors::{
     gate_status_name, short_id, state_name, TransitionBlockedError, TransitionBlocker,
@@ -727,6 +727,8 @@ pub enum ErrorCode {
     WorktreeInfoError,
     /// Worktree enumeration failed.
     WorktreeListError,
+    /// Cross-checkout store comparison failed.
+    WorktreeStoreDivergenceError,
     /// Repository hook installation failed.
     HooksInstallError,
     /// A command failed without a more specific public classification.
@@ -755,7 +757,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 44] = [
+    pub const ALL: [ErrorCode; 45] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -790,6 +792,7 @@ impl ErrorCode {
         ErrorCode::RipgrepNotFound,
         ErrorCode::WorktreeInfoError,
         ErrorCode::WorktreeListError,
+        ErrorCode::WorktreeStoreDivergenceError,
         ErrorCode::HooksInstallError,
         ErrorCode::GenericError,
         ErrorCode::RecoveryFailed,
@@ -839,6 +842,7 @@ impl ErrorCode {
             ErrorCode::RipgrepNotFound => "RIPGREP_NOT_FOUND",
             ErrorCode::WorktreeInfoError => "WORKTREE_INFO_ERROR",
             ErrorCode::WorktreeListError => "WORKTREE_LIST_ERROR",
+            ErrorCode::WorktreeStoreDivergenceError => "WORKTREE_STORE_DIVERGENCE_ERROR",
             ErrorCode::HooksInstallError => "HOOKS_INSTALL_ERROR",
             ErrorCode::GenericError => "GENERIC_ERROR",
             ErrorCode::RecoveryFailed => "recovery_failed",
@@ -895,6 +899,7 @@ impl ErrorCode {
             | ErrorCode::RipgrepNotFound
             | ErrorCode::WorktreeInfoError
             | ErrorCode::WorktreeListError
+            | ErrorCode::WorktreeStoreDivergenceError
             | ErrorCode::HooksInstallError
             | ErrorCode::GenericError
             | ErrorCode::RecoveryFailed
@@ -958,6 +963,7 @@ impl ErrorCode {
             ErrorCode::RipgrepNotFound => "The external ripgrep search tool was not found.",
             ErrorCode::WorktreeInfoError => "Worktree identity inspection failed.",
             ErrorCode::WorktreeListError => "Worktree enumeration failed.",
+            ErrorCode::WorktreeStoreDivergenceError => "Cross-checkout store comparison failed.",
             ErrorCode::HooksInstallError => "Repository hook installation failed.",
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
@@ -1082,6 +1088,7 @@ impl std::str::FromStr for ErrorCode {
             "RIPGREP_NOT_FOUND" => Ok(ErrorCode::RipgrepNotFound),
             "WORKTREE_INFO_ERROR" => Ok(ErrorCode::WorktreeInfoError),
             "WORKTREE_LIST_ERROR" => Ok(ErrorCode::WorktreeListError),
+            "WORKTREE_STORE_DIVERGENCE_ERROR" => Ok(ErrorCode::WorktreeStoreDivergenceError),
             "HOOKS_INSTALL_ERROR" => Ok(ErrorCode::HooksInstallError),
             "GENERIC_ERROR" => Ok(ErrorCode::GenericError),
             "recovery_failed" => Ok(ErrorCode::RecoveryFailed),
@@ -2840,6 +2847,20 @@ pub struct WorktreeListResponse {
     pub count: usize,
 }
 
+/// Response for `worktree store-divergence`, wrapping the findings in the
+/// list envelope beside the two stores that were compared.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct WorktreeStoreDivergenceResponse {
+    /// Number of divergences reported.
+    pub count: usize,
+    /// The store the inspected checkout owns.
+    pub checkout_store: String,
+    /// The store it was compared against, absent when the checkout has none.
+    pub reference_store: Option<String>,
+    /// Every record the two stores disagree about.
+    pub divergences: Vec<StoreDivergence>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3500,6 +3521,11 @@ mod tests {
                 ExitCode::GenericError,
             ),
             (
+                ErrorCode::WorktreeStoreDivergenceError,
+                "WORKTREE_STORE_DIVERGENCE_ERROR",
+                ExitCode::GenericError,
+            ),
+            (
                 ErrorCode::HooksInstallError,
                 "HOOKS_INSTALL_ERROR",
                 ExitCode::GenericError,
@@ -3714,6 +3740,7 @@ mod tests {
             ErrorCode::RipgrepNotFound,
             ErrorCode::WorktreeInfoError,
             ErrorCode::WorktreeListError,
+            ErrorCode::WorktreeStoreDivergenceError,
             ErrorCode::HooksInstallError,
             ErrorCode::GenericError,
             ErrorCode::RecoveryFailed,

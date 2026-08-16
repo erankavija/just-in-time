@@ -261,6 +261,7 @@ impl CommandSchema {
             "serve",
             "worktree_info",
             "worktree_list",
+            "worktree_store-divergence",
         ]
         .into_iter()
         .collect()
@@ -733,6 +734,10 @@ impl CommandSchema {
             "worktree_list" => (
                 Some(schema_to_value::<WorktreeListResponse>()),
                 "WorktreeListResponse",
+            ),
+            "worktree_store-divergence" => (
+                Some(schema_to_value::<WorktreeStoreDivergenceResponse>()),
+                "WorktreeStoreDivergenceResponse",
             ),
 
             // Default: no specific schema
