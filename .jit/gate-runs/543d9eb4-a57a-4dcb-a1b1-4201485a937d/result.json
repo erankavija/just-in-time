@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7163176250ced8aa81384860e02ad15f9aec361d",
+  "completed_at": "2026-08-16T19:01:32.249910118Z",
+  "duration_ms": 88315,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "id": "F1",
+        "line": 323,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "An empty store-divergence report is not proof of agreement when run in the primary checkout or outside Git; the cleanup procedure must require the abandoned linked worktree and a reference store."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "id": "F2",
+        "line": 339,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Committing divergent records does not place them in both branch histories or prevent forced deletion of their only unmerged branch; preservation must be tied to merging into a retained branch."
+      }
+    ],
+    "summary": "The recovery guidance has two inaccurate preservation guarantees that can lead to discarding divergent tracker state.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "176cc9ed-e5f4-41a7-9944-06c1775cf29f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "543d9eb4-a57a-4dcb-a1b1-4201485a937d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T19:00:03.934594021Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17639 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00bf2-00aa-7962-ad04-b5e2c6847e11\n--------\nuser\n--- 17626 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. I inspected four `jit:176cc9ed` commits individually; the documentation footprint is the recovery how-to and parallel-work tutorial.\n\nThe new procedure is discoverable and links to the command reference, but two data-loss-sensitive instructions are inaccurate.\n\n1. **F1 — Blocking, issue-impact, high:** The procedure treats `No divergent records.` as proof that nothing needs preservation, but the command returns an empty report in the primary checkout and outside Git without comparing stores. The cleanup recipe does not explicitly require running it from the abandoned linked worktree. Clarify the required working directory and require a populated `Reference store:` before treating an empty report as agreement. [docs/how-to/multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:323)\n\n2. **F2 — Blocking, issue-impact, high:** Committing records in their respective worktrees does not put every record in both branches’ histories or prevent a later forced deletion of the sole unmerged branch. State that commits must be retained until the reconciliation merge reaches the branch that will remain; remove the absolute “no later step” guarantee. [docs/how-to/multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:339)\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The recovery guidance has two inaccurate preservation guarantees that can lead to discarding divergent tracker state.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An empty store-divergence report is not proof of agreement when run in the primary checkout or outside Git; the cleanup procedure must require the abandoned linked worktree and a reference store.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":323},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Committing divergent records does not place them in both branch histories or prevent forced deletion of their only unmerged branch; preservation must be tied to merging into a retained branch.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":339}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
