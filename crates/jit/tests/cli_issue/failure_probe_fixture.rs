@@ -642,6 +642,22 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/worktree.json"), "{")
                     .expect("write malformed worktree identity");
             }
+            SetupStep::MalformedIssueRecord(id) => {
+                let issues = self.root().join(".jit/issues");
+                fs::create_dir_all(&issues).expect("create issue directory");
+                fs::write(issues.join(format!("{id}.json")), "not-json")
+                    .expect("write malformed issue record");
+            }
+            SetupStep::SelectedLinkedWorktree => {
+                // The linked checkout only carries a store if HEAD tracks one.
+                self.run_git(&["add", "-A"]);
+                self.run_git(&["commit", "-q", "-m", "track the jit store"]);
+                self.run_git(&["worktree", "add", "linked"]);
+                self.environment.insert(
+                    "JIT_DATA_DIR".to_owned(),
+                    Some(self.root().join("linked/.jit").display().to_string()),
+                );
+            }
             SetupStep::MalformedPreset(name) => {
                 let presets = self.root().join(".jit/config/gate-presets");
                 fs::create_dir_all(&presets).expect("create preset directory");
@@ -766,7 +782,9 @@ enum SetupStep {
     MalformedServerPid,
     MalformedClaimIndex,
     MalformedWorktreeIdentity,
+    MalformedIssueRecord(String),
     MalformedPreset(String),
+    SelectedLinkedWorktree,
     GitRepositoryWithHead,
     GitRepositoryWithoutHead,
     GitAbsent,
@@ -807,6 +825,7 @@ impl SetupStep {
             "claim:index-with-active-lease" => Ok(Self::ActiveClaimIndex),
             "no-ready-issue" => Ok(Self::MissingReadyIssue),
             "worktree:primary" => Ok(Self::PrimaryWorktree),
+            "worktree:linked-selected" => Ok(Self::SelectedLinkedWorktree),
             _ => prefixed("env-unset:")
                 .map(Self::UnsetEnvironment)
                 .or_else(|| {
@@ -816,6 +835,7 @@ impl SetupStep {
                             .map(|(name, value)| Self::SetEnvironment(name.into(), value.into()))
                     })
                 })
+                .or_else(|| prefixed("malformed-issue-record:").map(Self::MalformedIssueRecord))
                 .or_else(|| prefixed("malformed-preset:").map(Self::MalformedPreset))
                 .or_else(|| prefixed("duplicate-gate:").map(Self::DuplicateGate))
                 .or_else(|| {
@@ -845,6 +865,7 @@ impl SetupStep {
             | Self::MalformedServerPid
             | Self::MalformedClaimIndex
             | Self::MalformedWorktreeIdentity
+            | Self::MalformedIssueRecord(_)
             | Self::MalformedPreset(_) => SetupClass::CorruptRepositoryFile,
             Self::GitRepositoryWithHead | Self::GitRepositoryWithoutHead | Self::GitAbsent => {
                 SetupClass::GitTopology
@@ -855,7 +876,7 @@ impl SetupStep {
             | Self::DanglingInvariant(_)
             | Self::BuiltinPreset(_) => SetupClass::SeededDomainState,
             Self::MissingFile(_) => SetupClass::FilesystemState,
-            Self::PrimaryWorktree => SetupClass::WorktreeTopology,
+            Self::PrimaryWorktree | Self::SelectedLinkedWorktree => SetupClass::WorktreeTopology,
             Self::InvalidRegex(_) => SetupClass::InvocationInput,
             Self::MissingIssue(_)
             | Self::UnknownGate(_)

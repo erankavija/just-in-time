@@ -3890,6 +3890,7 @@ mod recovery_dispatch_tests {
         "version",
         "worktree info",
         "worktree list",
+        "worktree store-divergence",
     ];
 
     const CLAIM_FIRST_LEAF_COMMANDS: &[&str] = &[

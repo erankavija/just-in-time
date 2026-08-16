@@ -1031,9 +1031,9 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
         let class = divergence["class"].as_str().unwrap();
         let id = divergence["id"].as_str().unwrap();
         assert!(
-            rendered.lines().any(|line| line.contains(record)
-                && line.contains(class)
-                && line.contains(id)),
+            rendered
+                .lines()
+                .any(|line| line.contains(record) && line.contains(class) && line.contains(id)),
             "the rendered output names the finding {record}/{class}/{id}:\n{rendered}"
         );
     }

@@ -184,6 +184,16 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
+path = "worktree store-divergence"
+argv = ["worktree", "store-divergence", "--json"]
+setup = ["init", "git:repository-with-head", "worktree:linked-selected", "malformed-issue-record:deadbeef"]
+setup_notes = "Add a linked checkout and select its store with JIT_DATA_DIR so the arm has a primary store to compare against, then write `not-json` to the primary store's issues/deadbeef.json so reading the reference store fails."
+expected_failure = "WORKTREE_STORE_DIVERGENCE_ERROR: Failed to deserialize issue record at <repository>/.jit/issues/deadbeef.json"
+expected_code = "WORKTREE_STORE_DIVERGENCE_ERROR"
+expected_exit = 1
+confirmation = "invoked"
+
+[[arms]]
 path = "doc add"
 argv = ["doc", "add", "deadbeef", ".jit/config.toml", "--json"]
 setup = ["init"]
