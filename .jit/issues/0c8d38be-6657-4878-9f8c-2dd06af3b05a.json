@@ -9,6 +9,7 @@
   ],
   "description": "A mutation permitted by an explicit override of the linked-checkout write stance becomes\ndurable together with its audit record through the same materialization plan; if the\napplication fails, neither lands.\n\n## Background\n\nEvents become durable only when mutation intents are finalized into one materialization plan\nand applied through the recovering transaction kernel; an event variant on its own publishes\nnothing. The carrier spans the whole path through the converged construction boundary: the\ndispatch site that decides an override permitted the invocation sets the fact once into the\nfactory's dispatch-scoped annotation slot; the factory stamps it into the production context\nwherever one is constructed; the context carries it to the finalizer, whose event pass\ncomposes the audit append; and because the second finalizer path used for\ninitialization-style audit appends shares that same event-pass helper, one edit covers both\npaths, so no materialization path can emit its events while omitting the record.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation permitted by an explicit override materializes its audit record in the same finalized plan as the mutation, and both become durable in one application.\n- [hard] REQ-02: An injected persistence failure during that application leaves neither the mutation nor the audit record behind after recovery.\n- [hard] REQ-03: On success, the audit record is readable from the event log alongside the mutation's own events, in canonical order.\n- [hard] REQ-04: An invocation with no override in effect emits no audit record, so a repository that declares neither a stance nor an override sees no new events.\n- [hard] REQ-05: The dispatch-set override fact reaches both finalizer paths that compose audit appends, with coverage that fails if a materialization path omits the record.\n\n## Notes\n\nThe finalizer documents that a no-transition plan carries an empty delta and emits no bytes.\nThe audit record accompanies real events only: an override in effect during a no-op mutation\nproduces no record, preserving that documented property.\n",
   "documents": [],
+  "done_at": "2026-08-16T17:24:19.989538655Z",
   "first_ready_at": "2026-08-16T14:54:04.701710501Z",
   "gates_required": [
     "cargo-ci",
@@ -17,12 +18,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-16T15:29:41.808472472Z",
+      "updated_at": "2026-08-16T17:21:09.049875367Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T15:32:26.002912019Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T17:23:51.930728357Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Publish the override audit record with the mutation it permits",
-  "updated_at": "2026-08-16T15:32:26.002912019Z"
+  "updated_at": "2026-08-16T17:24:19.989538655Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0a5c1540a9c3d9815e71c8d4b8aca3b0c637de6e",
+  "completed_at": "2026-08-16T17:23:51.577060186Z",
+  "duration_ms": 161929,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Current dispatch installs the override annotation, and both finalizer paths publish it atomically with real mutation events under covered success and failure cases.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3806c53b-50a3-409b-8fb3-c6b96bf173d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T17:21:09.647256058Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 84e0cba, 2dadf840, a82652e, f064a1d, 47a5a3b, 8ef283e, b256569, 0a5c154, ef3c04a\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/0c8d38be/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/semantic-types (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T17:21:09Z); prior code-review failed (exit 1, 2026-08-16T15:32:25Z), and its missing-production-dispatch finding is addressed in b256569/0a5c154\nTruncation recovery: narrowed attributable patches and current dispatch/finalizer/factory reads after broad outputs truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Current dispatch installs the override annotation, and both finalizer paths publish it atomically with real mutation events under covered success and failure cases.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
