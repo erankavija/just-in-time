@@ -61,7 +61,10 @@ pub(in crate::storage) use file_transaction::{FileTransactionKernel, Transaction
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
 };
-pub use json::{JsonFileStorage, RetainedMutationSessionGuard, RetainedSessionSuspendedError};
+pub use json::{
+    read_exact_store, ExactStoreSnapshot, JsonFileStorage, RetainedMutationSessionGuard,
+    RetainedSessionSuspendedError,
+};
 pub use lock::{is_lock_timeout, FileLocker, LockMode, LockTimeout};
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use reference::{render_reference_markdown, GateRunField};

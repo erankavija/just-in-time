@@ -47,6 +47,127 @@ thread_local! {
         RefCell<HashMap<u64, Box<dyn RepositoryMutationSession>>> = RefCell::new(HashMap::new());
 }
 
+/// The semantic records physically present in one selected JIT data root.
+///
+/// Unlike [`IssueStore`] readers, this snapshot never consults repository
+/// history, index membership, or another checkout's data root. Issue order is
+/// stable by physical file name; event order remains append-log order.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ExactStoreSnapshot {
+    /// Every ordinary `issues/*.json` record in the selected store.
+    pub issues: Vec<Issue>,
+    /// Every current-vocabulary record in the selected store's event log.
+    pub events: Vec<Event>,
+}
+
+/// Read exactly one JIT data root without aggregation or mutation.
+///
+/// The absolute `data_root` is the sole location authority. The read does not
+/// construct a storage backend, acquire locks that could create sidecar files,
+/// invoke Git, inspect the process working directory, or fall back to a primary
+/// checkout. An absent data root, issue directory, or event log contributes no
+/// records.
+///
+/// # Errors
+///
+/// Returns an error when the selected root is relative, contains an unsafe
+/// filesystem entry, a record cannot be read, or a physical issue/current event
+/// cannot be parsed.
+pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
+    let data = match super::repository_state_store::open_absolute_dir_nofollow(data_root) {
+        Ok(data) => data,
+        Err(RepositoryStateStoreError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound =>
+        {
+            return Ok(ExactStoreSnapshot::default())
+        }
+        Err(error) => return Err(error.into()),
+    };
+
+    let issues = match data.symlink_metadata(ISSUES_DIR) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error.into()),
+        Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
+            anyhow::bail!(
+                "Issue root at {} must be an ordinary directory",
+                data_root.join(ISSUES_DIR).display()
+            )
+        }
+        Ok(_) => {
+            let issue_dir =
+                super::repository_state_store::open_child_dir_nofollow(&data, ISSUES_DIR)?;
+            let mut names = issue_dir
+                .entries()?
+                .map(|entry| entry.map(|entry| entry.file_name()))
+                .collect::<std::io::Result<Vec<_>>>()?;
+            names.sort();
+
+            names
+                .into_iter()
+                .filter(|name| Path::new(name).extension().is_some_and(|ext| ext == "json"))
+                .map(|name| {
+                    let leaf = name.into_string().map_err(|name| {
+                        anyhow!(
+                            "Issue record name at {} is not valid UTF-8",
+                            data_root.join(ISSUES_DIR).join(name).display()
+                        )
+                    })?;
+                    let path = data_root.join(ISSUES_DIR).join(&leaf);
+                    let metadata = issue_dir.symlink_metadata(&leaf)?;
+                    if metadata.is_symlink() || !metadata.is_file() {
+                        anyhow::bail!(
+                            "Issue record at {} must be an ordinary file",
+                            path.display()
+                        );
+                    }
+                    let mut file =
+                        super::file_transaction::open_regular_file_nofollow(&issue_dir, &leaf)
+                            .with_context(|| {
+                                format!("Failed to open issue record at {}", path.display())
+                            })?;
+                    let mut bytes = Vec::new();
+                    file.read_to_end(&mut bytes).with_context(|| {
+                        format!("Failed to read issue record at {}", path.display())
+                    })?;
+                    serde_json::from_slice(&bytes).with_context(|| {
+                        format!("Failed to deserialize issue record at {}", path.display())
+                    })
+                })
+                .collect::<Result<Vec<Issue>>>()?
+        }
+    };
+
+    let events_path = data_root.join(EVENTS_FILE);
+    let events = match data.symlink_metadata(EVENTS_FILE) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error.into()),
+        Ok(metadata) if metadata.is_symlink() || !metadata.is_file() => {
+            anyhow::bail!(
+                "Event log at {} must be an ordinary file",
+                events_path.display()
+            )
+        }
+        Ok(_) => {
+            let mut file = super::file_transaction::open_regular_file_nofollow(&data, EVENTS_FILE)
+                .with_context(|| {
+                    format!("Failed to open event log at {}", events_path.display())
+                })?;
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).with_context(|| {
+                format!("Failed to read event log at {}", events_path.display())
+            })?;
+            parse_known_events(&contents).with_context(|| {
+                format!(
+                    "Failed to deserialize event log at {}",
+                    events_path.display()
+                )
+            })?
+        }
+    };
+
+    Ok(ExactStoreSnapshot { issues, events })
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 enum RetainedSessionState {
     #[default]
@@ -1968,6 +2089,125 @@ mod tests {
             }
             index.deleted_ids.retain(|id| id != &issue.id);
             seed_index_preimage(storage, &index);
+        }
+
+        fn physical_files(root: &Path) -> std::collections::BTreeMap<PathBuf, Vec<u8>> {
+            fn visit(
+                root: &Path,
+                current: &Path,
+                files: &mut std::collections::BTreeMap<PathBuf, Vec<u8>>,
+            ) {
+                let mut entries = fs::read_dir(current)
+                    .unwrap()
+                    .collect::<std::io::Result<Vec<_>>>()
+                    .unwrap();
+                entries.sort_by_key(std::fs::DirEntry::file_name);
+                for entry in entries {
+                    let path = entry.path();
+                    if entry.file_type().unwrap().is_dir() {
+                        visit(root, &path, files);
+                    } else {
+                        files.insert(
+                            path.strip_prefix(root).unwrap().to_path_buf(),
+                            fs::read(path).unwrap(),
+                        );
+                    }
+                }
+            }
+
+            let mut files = std::collections::BTreeMap::new();
+            visit(root, root, &mut files);
+            files
+        }
+
+        #[test]
+        fn test_read_exact_store_excludes_primary_only_records_without_writing_selected_store() {
+            let (_temp_dir, repo_path, main_storage) = setup_git_repo();
+            let add = Command::new("git")
+                .args(["add", "."])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(
+                add.status.success(),
+                "{}",
+                String::from_utf8_lossy(&add.stderr)
+            );
+            let commit = Command::new("git")
+                .args(["commit", "-m", "initialize repository"])
+                .current_dir(&repo_path)
+                .output()
+                .unwrap();
+            assert!(
+                commit.status.success(),
+                "{}",
+                String::from_utf8_lossy(&commit.stderr)
+            );
+
+            let (_secondary_container, secondary_path) = add_secondary_worktree(&repo_path);
+            let secondary_data = secondary_path.join(".jit");
+            let secondary_storage = JsonFileStorage::new(&secondary_data);
+            configure_test_layout(&secondary_storage, &secondary_path, &secondary_data);
+
+            let primary_only = crate::domain::types::fixture_issue(
+                "Only in primary".to_string(),
+                "The exact linked read must not aggregate this record".to_string(),
+            );
+            seed_issue_preimage(&main_storage, &primary_only);
+            let linked_only = crate::domain::types::fixture_issue(
+                "Only in linked".to_string(),
+                "The exact linked read must return this physical record".to_string(),
+            );
+            fs::create_dir_all(secondary_data.join(ISSUES_DIR)).unwrap();
+            fs::write(
+                secondary_data
+                    .join(ISSUES_DIR)
+                    .join(format!("{}.json", linked_only.id)),
+                crate::repository_state::serialize_issue(&linked_only).unwrap(),
+            )
+            .unwrap();
+            let primary_event = Event::IssueCreated {
+                id: "primary-event".to_string(),
+                issue_id: primary_only.id.clone(),
+                timestamp: chrono::Utc::now(),
+                title: primary_only.title.clone(),
+                priority: primary_only.priority,
+            };
+            fs::write(
+                repo_path.join(".jit").join(EVENTS_FILE),
+                format!("{}\n", serde_json::to_string(&primary_event).unwrap()),
+            )
+            .unwrap();
+            let linked_event = Event::IssueCreated {
+                id: "linked-event".to_string(),
+                issue_id: "linked-issue".to_string(),
+                timestamp: chrono::Utc::now(),
+                title: "Only in linked event log".to_string(),
+                priority: crate::domain::Priority::Normal,
+            };
+            fs::write(
+                secondary_data.join(EVENTS_FILE),
+                format!("{}\n", serde_json::to_string(&linked_event).unwrap()),
+            )
+            .unwrap();
+
+            assert_ne!(std::env::current_dir().unwrap(), secondary_path);
+            let before = physical_files(&secondary_data);
+            let exact = read_exact_store(&secondary_data).unwrap();
+            assert_eq!(physical_files(&secondary_data), before);
+            assert_eq!(exact.issues, vec![linked_only]);
+            assert_eq!(exact.events, vec![linked_event]);
+
+            let aggregated = secondary_storage.read_issues().unwrap();
+            assert!(aggregated.iter().any(|issue| issue.id == primary_only.id));
+
+            let absent_data = secondary_path.join("absent-store");
+            assert!(!absent_data.exists());
+            assert_eq!(
+                read_exact_store(&absent_data).unwrap(),
+                ExactStoreSnapshot::default()
+            );
+            assert!(!absent_data.exists());
         }
 
         #[test]
