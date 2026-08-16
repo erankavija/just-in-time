@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "8ad970dfb6f9957dc52471597a3579fe8ab36e83",
+  "completed_at": "2026-08-16T11:49:19.240749576Z",
+  "duration_ms": 98952,
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "4de51e5ab7ff4c982e8b8714e9bcf6ee68b5617fb1160968467681175bdba9f1",
+  "issue_id": "dd26c204-8907-4480-970f-a910d6407d32",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8a3b071b-28cc-4c76-a524-8f097a9c5f8c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T11:47:40.287969046Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 30905 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 30905 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 37874 ms, warmed 17 executables (1994443000 bytes) in 73 ms.\n  ✓ incremental-baseline: 741 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (196 ms)\n  ✓ fmt: ok (1578 ms)\n  ✓ clippy: ok (27906 ms)\n  ✓ suite-build: built in 37874 ms, warmed 17 executables (1994443000 bytes) in 73 ms (37951 ms)\n  ✓ test: 4562 passed, 0 failed, 0 skipped (26322 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4564 ms)\n  ✓ suite-clock: 30905 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (86 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (741 pre-existing entries ignored) (202 ms)\n\n",
+  "tree_dirty": false
+}

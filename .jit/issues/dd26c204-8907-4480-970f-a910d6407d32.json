@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-16T11:49:19.251865020Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dd26c204-8907-4480-970f-a910d6407d32",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Typed remedy data on profile conflicts",
-  "updated_at": "2026-08-16T08:56:57.296620503Z"
+  "updated_at": "2026-08-16T11:49:19.251865020Z"
 }
