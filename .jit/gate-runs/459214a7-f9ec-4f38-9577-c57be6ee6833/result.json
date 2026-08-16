@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ac0762e9bb671a4f9a1d932c0ec79be0c3358683",
+  "completed_at": "2026-08-16T11:33:30.570588470Z",
+  "duration_ms": 182644,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The selected-data-root worktree authority is consistently threaded through storage, commands, claims, lifecycle checks, deletion policy, and worktree introspection.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9757ab31-5e56-421a-b100-3e64dedcc1a5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "459214a7-f9ec-4f38-9577-c57be6ee6833",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T11:30:27.926319065Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: tagged commits 7f66b881, fd177b50, 9a6385d9, 798558c0, 65dc664f, 9e2079d8, 947b3bbe, 749286eb, c6183ca3, 1a15e480, a89c117c, d7939edc, ac0762e9\nPolicy sources: AGENTS.md\nResolved items: @/issue/9757ab31/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (issue description, markdown-first); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/convention-convergence, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T11:28:48Z)\nTruncation recovery: narrowed per-commit and per-path reads recovered truncated patch output; current affected sources and regression tests were inspected\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The selected-data-root worktree authority is consistently threaded through storage, commands, claims, lifecycle checks, deletion policy, and worktree introspection.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

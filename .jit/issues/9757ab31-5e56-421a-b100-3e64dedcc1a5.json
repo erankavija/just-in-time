@@ -8,6 +8,7 @@
   ],
   "description": "Worktree detection and primary-checkout discovery answer from one primitive instead of five\nindependent implementations.\n\n## Background\n\nFive separate implementations currently decide whether the current checkout is a linked\nnon-primary worktree and where the primary checkout lives: a version-control layout probe\ncomputed before every dispatch, a test for whether the repository pointer is a file in the\nJSON storage backend, a library-level path comparison in index loading, an inline\nversion-control invocation in issue loading, and a linked-checkout fallback in the\nrepository-state store. They can disagree, and nothing names one of them as authoritative.\nThe layout probe is the most complete and is already computed before dispatch, so it becomes\nthe single answer.\n\n## Success Criteria\n\n- [hard] REQ-01: One primitive answers whether the selected data root sits inside a linked non-primary checkout and where the primary checkout's store is; no second implementation of either question survives in storage or command code.\n- [hard] REQ-02: Outside version control the primitive reports a non-linked checkout rather than failing, so repositories without version control keep working.\n- [hard] REQ-03: When an environment override selects the data root, classification follows that selected root's location rather than the process working directory, and that behaviour is covered.\n- [hard] REQ-04: The layered issue read fallback, the deletion policy, and worktree introspection keep their current observable behaviour while reading the converged primitive.\n\n## Notes\n\nThe read-side layered issue resolution (local store, then version-control history, then the\nprimary checkout) is documented adopter-facing behaviour and is unchanged here; only the\ndetection question underneath it converges.\n",
   "documents": [],
+  "done_at": "2026-08-16T11:33:50.649142634Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
@@ -16,12 +17,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-16T09:59:48.750439855Z",
+      "updated_at": "2026-08-16T11:30:27.220534543Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T10:03:21.033379799Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T11:33:30.920812990Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +34,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Converge worktree detection on one primitive",
-  "updated_at": "2026-08-16T10:03:21.033379799Z"
+  "updated_at": "2026-08-16T11:33:50.649142634Z"
 }
