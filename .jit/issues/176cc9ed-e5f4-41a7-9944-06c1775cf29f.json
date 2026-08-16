@@ -8,6 +8,7 @@
   ],
   "description": "Adopter guidance states a lossless recovery procedure for a divergent checkout store, and the\ncleanup recipe for an abandoned checkout looks for unmerged tracker state before anything is\ndiscarded.\n\n## Background\n\nThe published cleanup recipe removes an abandoned checkout with a single version-control\ncommand and then says only that leases expire. It says nothing about whether that checkout\nholds tracker records committed nowhere else, which is the most plausible mechanical route to\npermanently losing the only copy of issue and event history. Existing recovery material covers\nmerge conflicts inside one checkout, but nothing covers two checkouts whose stores diverged.\nThe event log already carries a union merge declaration, so disjoint event history survives a\nmerge; issue records do not, and need a stated decision point.\n\n## Success Criteria\n\n- [hard] REQ-01: The procedure preserves both checkouts' issue records and both event logs before any reconciliation step, so no step can leave a record with a single copy.\n- [hard] REQ-02: The procedure states how the event log's union merge behaviour keeps disjoint event history, and where issue records need a human decision instead.\n- [hard] REQ-03: The procedure directs the reader to the read-only divergence check as its first step and states how to read each finding class.\n- [hard] REQ-04: The cleanup recipe for an abandoned checkout checks for unmerged tracker state before removal and states what to do when that check reports findings.\n- [hard] REQ-05: The parallel-work material links to the procedure from where it describes per-checkout tracker state, with each fact stated in one place rather than restated.\n\n## Notes\n\nThe procedure composes version-control behaviour the repository already declares with the\nread-only check; it introduces no reconciliation command of its own.\n",
   "documents": [],
+  "done_at": "2026-08-16T19:07:23.432100752Z",
   "first_ready_at": "2026-08-16T18:13:21.950389827Z",
   "gates_required": [
     "doc-review",
@@ -15,13 +16,13 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T19:01:32.608404990Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T19:07:05.842397389Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-16T19:00:03.406473029Z",
+      "updated_at": "2026-08-16T19:05:40.560896170Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,7 +34,7 @@
     "satisfies:REQ-02"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Recovery guidance for divergent checkout stores",
-  "updated_at": "2026-08-16T19:01:32.608404990Z"
+  "updated_at": "2026-08-16T19:07:23.432100752Z"
 }

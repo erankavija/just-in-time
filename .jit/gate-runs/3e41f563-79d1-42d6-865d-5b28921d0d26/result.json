@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a4ca4acad0969d39cffd057ffd0fd1d9633753ed",
+  "completed_at": "2026-08-16T19:07:05.481588926Z",
+  "duration_ms": 84266,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped recovery guidance accurately documents divergence checking, preservation, reconciliation, and cleanup.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "176cc9ed-e5f4-41a7-9944-06c1775cf29f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3e41f563-79d1-42d6-865d-5b28921d0d26",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T19:05:41.215223657Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; inspected all seven reachable `jit:176cc9ed` commits individually. The combined patch adds and corrects the recovery guidance; current docs and command behavior confirm the prior two blockers are addressed.\n\nDocumentation impact is complete, accurate, discoverable, and concise.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped recovery guidance accurately documents divergence checking, preservation, reconciliation, and cleanup.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
