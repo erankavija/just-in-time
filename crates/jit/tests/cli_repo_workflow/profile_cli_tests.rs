@@ -2075,13 +2075,16 @@ fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict()
         ],
     );
 
-    assert_ne!(
+    // REQ-04: the conflict code and exit status are the pinned compatibility
+    // contract this refusal keeps byte-stable.
+    assert_eq!(
         output.status.code(),
-        Some(0),
-        "publishing nothing because of a conflict is a failure: {output:?}"
+        Some(4),
+        "publishing nothing because of a conflict is a validation failure: {output:?}"
     );
-    assert_eq!(json(&output)["error"]["code"], "PROFILE_CONFLICT");
-    let message = json(&output)["error"]["message"]
+    let body = json(&output);
+    assert_eq!(body["error"]["code"], "PROFILE_CONFLICT");
+    let message = body["error"]["message"]
         .as_str()
         .expect("a conflict states what diverged")
         .to_string();
@@ -2100,6 +2103,39 @@ fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict()
             && !message.contains("ProfileBaseFingerprint"),
         "a conflict states the values that disagree and a remedy: {message}"
     );
+
+    // REQ-01: the same refusal names the conflicting target, its conflict
+    // class, and its typed remedy as structured details, not just prose.
+    let conflicts = body["error"]["details"]["conflicts"]
+        .as_array()
+        .expect("a conflict attaches structured details");
+    let entry = conflicts
+        .iter()
+        .find(|entry| {
+            entry["subject"]["path"]
+                .as_str()
+                .is_some_and(|path| path.ends_with(&format!("docs/{id}-templated.txt")))
+        })
+        .expect("the refused target appears in the structured details");
+    assert_eq!(entry["owner"], id);
+    assert_eq!(entry["subject"]["kind"], "file");
+    assert_eq!(entry["conflict"]["kind"], "diverged");
+    assert_eq!(
+        entry["conflict"]["remedy"]["resolutions"],
+        serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+    );
+
+    // REQ-03: capture is suggested because this remedy allows it.
+    let suggestions = body["error"]["suggestions"]
+        .as_array()
+        .expect("a conflict attaches suggestions");
+    assert!(
+        suggestions.iter().any(|suggestion| suggestion
+            .as_str()
+            .is_some_and(|text| text.contains("jit profile capture"))),
+        "suggestions: {suggestions:?}"
+    );
+
     assert_eq!(
         fs::read_to_string(&target).unwrap(),
         "greeting=edited in place\n"

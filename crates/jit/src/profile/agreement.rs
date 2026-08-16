@@ -15,8 +15,8 @@
 use crate::domain::ProfileOrigin;
 use crate::profile::ProfileCollection;
 use crate::repository_state::{
-    claimed_target_state, AppliedProfileRecord, ClaimedTargetState, ProfileRemedy,
-    ProfileResolution, RepositoryImage, RepositoryStateError,
+    claimed_target_state, remedy_suggestions, AppliedProfileRecord, ClaimedTargetState,
+    ProfileRemedy, ProfileResolution, RepositoryImage, RepositoryStateError,
 };
 use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
 use serde::Serialize;
@@ -300,6 +300,17 @@ impl ProfileCollection<ProfileAgreement> {
     pub fn diverged(&self) -> impl Iterator<Item = &ProfileAgreement> {
         self.profiles.iter().filter(|profile| !profile.agrees())
     }
+
+    /// Distinct resolutions across every divergence this report carries,
+    /// naming capture only where some divergence's remedy allows it.
+    pub fn suggestions(&self) -> Vec<String> {
+        remedy_suggestions(
+            self.profiles
+                .iter()
+                .flat_map(|profile| &profile.divergences)
+                .map(ProfileDivergence::remedy),
+        )
+    }
 }
 
 /// Compare every target one record claims against the value `image` holds for
@@ -363,7 +374,8 @@ pub fn unowned_target_divergences(record: &AppliedProfileRecord) -> Vec<ProfileD
 
 #[cfg(test)]
 mod tests {
-    use super::ProfileDivergence;
+    use super::{ProfileAgreement, ProfileDivergence};
+    use crate::domain::ProfileOrigin;
     use crate::repository_state::ProfileResolution;
 
     #[test]
@@ -410,5 +422,64 @@ mod tests {
             schema.to_string().contains("remedy"),
             "the divergence schema describes the remedy beside the finding: {schema}"
         );
+    }
+
+    #[test]
+    fn test_profile_agreement_result_suggestions_dedupes_and_marks_capture_only_when_applicable() {
+        let origin = ProfileOrigin::Directory(
+            crate::repository_state::RootRelativePath::parse("packages/captured")
+                .expect("a canonical package location"),
+        );
+        let agreement = ProfileAgreement::new(
+            "captured",
+            "1.0.0",
+            ".jit/profiles/captured.json",
+            origin,
+            vec![
+                ProfileDivergence::ChangedTarget {
+                    target: "docs/guide.md".to_string(),
+                },
+                ProfileDivergence::UnreadablePackage {
+                    reason: "profile package is gone".to_string(),
+                },
+            ],
+        );
+        let result = super::ProfileAgreementResult::new(vec![agreement]);
+
+        let suggestions = result.suggestions();
+
+        assert!(
+            suggestions
+                .iter()
+                .any(|text| text.contains("jit profile capture")),
+            "a changed-target remedy allows capture: {suggestions:?}"
+        );
+        assert_eq!(
+            suggestions
+                .iter()
+                .filter(|text| text.contains("restore"))
+                .count(),
+            2,
+            "restoring content and restoring the package are distinct resolutions, each named \
+             once: {suggestions:?}"
+        );
+    }
+
+    #[test]
+    fn test_profile_agreement_result_suggestions_is_empty_when_every_profile_agrees() {
+        let origin = ProfileOrigin::Directory(
+            crate::repository_state::RootRelativePath::parse("packages/captured")
+                .expect("a canonical package location"),
+        );
+        let agreement = ProfileAgreement::new(
+            "captured",
+            "1.0.0",
+            ".jit/profiles/captured.json",
+            origin,
+            Vec::new(),
+        );
+        let result = super::ProfileAgreementResult::new(vec![agreement]);
+
+        assert!(result.suggestions().is_empty());
     }
 }
