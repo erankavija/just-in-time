@@ -21,15 +21,30 @@ You need:
 
 ## Step 1: Create a Secondary Worktree
 
-First, create a new worktree from your main branch:
+A secondary worktree is a linked, non-primary checkout. By default, jit
+refuses state-mutating commands run inside one — see
+[`write_policy`](../reference/configuration.md#write_policy) in the
+Configuration Reference for the stance and its per-invocation override.
+Declare the allowing stance in your main worktree and commit it before
+creating any secondary worktree, so every worktree you create afterward
+inherits permission to write:
 
 ```bash
 # From your main worktree
+jit config set worktree.write_policy allow
+git add .jit/config.toml
+git commit -m "Allow linked-checkout writes for parallel work"
+```
+
+Now create a new worktree from your main branch:
+
+```bash
 git worktree add ../my-feature -b feature/my-work
 cd ../my-feature
 ```
 
-Initialize jit in the new worktree:
+Initialize jit in the new worktree — this succeeds because the worktree
+already carries the allowing stance you committed above:
 
 ```bash
 jit init

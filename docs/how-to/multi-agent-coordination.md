@@ -36,6 +36,20 @@ description = "Copilot session 1"' > ~/.config/jit/agent.toml
 
 ### Create a Worktree
 
+A linked worktree is a non-primary checkout; jit refuses state-mutating
+commands run inside one unless the repository declares the allowing write
+stance first (see [Configuration for
+Coordination](#configuration-for-coordination) below). Declare and commit
+it once, from your primary checkout, before creating any worktree:
+
+```bash
+jit config set worktree.write_policy allow
+git add .jit/config.toml && git commit -m "Allow linked-checkout writes"
+```
+
+Then create the worktree — `jit init` succeeds because it inherits the
+committed stance:
+
 ```bash
 git worktree add ../agent-1-worktree -b feature/agent-1-work
 cd ../agent-1-worktree
@@ -196,6 +210,10 @@ jit query all
 
 ### Writing Issues
 
+Writing from a linked checkout succeeds only once the repository declares
+the allowing write stance — see [Configuration for
+Coordination](#configuration-for-coordination) above.
+
 ```bash
 # Writes go to LOCAL .jit/ only
 jit issue update <issue-id> --state done
@@ -213,6 +231,7 @@ git push
 ```toml
 [worktree]
 enforce_leases = "strict"  # "strict" | "warn" | "off"
+write_policy = "allow"     # "refuse" (default) | "allow"
 
 [coordination]
 max_indefinite_leases_per_agent = 2
@@ -220,6 +239,12 @@ max_indefinite_leases_per_repo = 10
 ```
 
 `enforce_leases` is the active repository policy for structural issue writes.
+`write_policy` is the active repository policy for whether a linked
+(non-primary) checkout may run state-mutating commands at all — every
+worktree example in this guide relies on the repository declaring `allow`
+here, or an invocation supplying `JIT_WORKTREE_WRITE_POLICY=allow`. See
+[`write_policy`](../reference/configuration.md#write_policy) in the
+Configuration Reference for its default, precedence, and the override.
 The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
 finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 `jit claim heartbeat <lease-id>` explicitly while it is active. An omitted
@@ -416,6 +441,9 @@ This section covers the complete workflow for running multiple Copilot CLI agent
 ### Prerequisites
 
 - Git repository with jit initialized
+- The repository declares the allowing write stance for linked checkouts
+  (see [Configuration for Coordination](#configuration-for-coordination)
+  above) — every worktree below writes to its local `.jit/`
 - Copilot CLI installed
 - Issues available for work (`jit query available`)
 
