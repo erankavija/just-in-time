@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9aa3a838dd78fe525930c9b8597bd90325e585b2",
+  "completed_at": "2026-08-16T19:04:57.508132463Z",
+  "duration_ms": 134153,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue’s profile remedy documentation is accurate, canonical, and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "03678c53-371e-410c-801f-19b502025a7e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "95920043-ea7d-4b1f-a9e3-f6bbe2ba0f0b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T19:02:43.354337431Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf with no resolved children. I inspected all four reachable `jit:03678c53` commits individually; the implementation patch is present in the current tree, while the remaining tags are merge/workflow records.\n\nThe profile reference accurately documents the remedy vocabulary, mappings, and JSON paths; the error-code reference links to that canonical guidance; and the curated MCP descriptions identify structured remedies as the resolution source.\n\n1. No issue-impact or pre-existing documentation findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue’s profile remedy documentation is accurate, canonical, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
