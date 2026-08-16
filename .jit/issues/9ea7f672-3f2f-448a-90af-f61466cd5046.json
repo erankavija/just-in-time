@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-16T11:36:20.129191671Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9ea7f672-3f2f-448a-90af-f61466cd5046",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Converge mutation-context construction onto one factory",
-  "updated_at": "2026-08-16T08:56:51.571083315Z"
+  "updated_at": "2026-08-16T11:36:20.129191671Z"
 }

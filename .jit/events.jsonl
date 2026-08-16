@@ -14364,3 +14364,4 @@
 {"gate_key":"code-review","id":"6ecd49ed-f701-4382-b21e-41bc76954b74","issue_id":"9757ab31-5e56-421a-b100-3e64dedcc1a5","timestamp":"2026-08-16T11:33:30.920812990Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"265d6e93-89e6-4dde-af14-37a8e967fef2","issue_id":"9757ab31-5e56-421a-b100-3e64dedcc1a5","timestamp":"2026-08-16T11:33:50.649142634Z","to":"done","type":"issue_state_changed"}
 {"id":"6bd9136e-1d55-4146-ad2a-2c871f8b8450","issue_id":"9757ab31-5e56-421a-b100-3e64dedcc1a5","timestamp":"2026-08-16T11:33:50.649142634Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"bf22b5b0-c16c-41f1-8954-e46d598c3da8","issue_id":"9ea7f672-3f2f-448a-90af-f61466cd5046","timestamp":"2026-08-16T11:36:20.129191671Z","type":"gate_failed","updated_by":"auto:executor"}
