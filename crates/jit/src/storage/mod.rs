@@ -89,6 +89,7 @@ pub(crate) use transaction_recovery::{
     FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
 };
 pub use warnings::StorageWarning;
+pub use worktree_paths::WorktreePaths;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;

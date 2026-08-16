@@ -4,6 +4,7 @@ use crate::repository_state::{
     RepositorySeedKind,
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::process::Command;
 use std::sync::Mutex;
 use tempfile::TempDir;
 
@@ -116,6 +117,64 @@ fn budget() -> CaptureBudget {
         max_bytes: 1024 * 1024,
         max_depth: 8,
     }
+}
+
+#[test]
+fn test_json_linked_capture_reads_uncommitted_primary_store_through_worktree_paths() {
+    let container = TempDir::new().unwrap();
+    let primary = container.path().join("primary");
+    let linked = container.path().join("linked");
+    std::fs::create_dir(&primary).unwrap();
+
+    let git = |cwd: &Path, args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(cwd)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&primary, &["init"]);
+    git(&primary, &["config", "user.name", "Test User"]);
+    git(&primary, &["config", "user.email", "test@example.com"]);
+    std::fs::write(primary.join("README.md"), b"fixture").unwrap();
+    git(&primary, &["add", "README.md"]);
+    git(&primary, &["commit", "-m", "initial"]);
+    git(
+        &primary,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "linked-capture",
+            linked.to_str().unwrap(),
+        ],
+    );
+
+    let primary_data = primary.join(".jit");
+    let linked_data = linked.join(".jit");
+    let bytes = b"[project]\nname = \"uncommitted\"\n".to_vec();
+    std::fs::create_dir(&primary_data).unwrap();
+    std::fs::write(primary_data.join("config.toml"), &bytes).unwrap();
+
+    let layout = discover_repository_layout(&linked, &linked_data).unwrap();
+    let paths = crate::storage::WorktreePaths::detect_for_data_root(&linked_data, &linked).unwrap();
+    let storage = JsonFileStorage::new(&linked_data);
+    storage.configure_worktree_paths(&paths);
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let path = VirtualPath::data("config.toml").unwrap();
+    let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+    spec.discover_linked_worktree(path.clone()).unwrap();
+
+    let image = session.capture(spec).unwrap();
+    let actual = image.linked_worktree_evidence().get(&path).unwrap();
+    let actual = serde_json::to_value(actual).unwrap();
+    assert_eq!(actual["source"], "main_worktree");
+    assert_eq!(actual["bytes"], serde_json::json!(bytes));
 }
 
 fn initial_spec() -> CaptureSpec {

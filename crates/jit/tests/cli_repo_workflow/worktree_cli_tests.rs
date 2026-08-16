@@ -209,6 +209,31 @@ fn test_worktree_info_json_output() {
 }
 
 #[test]
+fn test_worktree_info_follows_overridden_data_root_checkout() {
+    let temp = setup_repo();
+    let worktree_path = create_worktree(temp.path(), "override-selected-worktree");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .env("JIT_DATA_DIR", worktree_path.join(".jit"))
+        .args(["worktree", "info", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "worktree info failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(
+        json["root_path"].as_str(),
+        Some(worktree_path.to_str().unwrap())
+    );
+    assert_eq!(json["is_main_worktree"], false);
+}
+
+#[test]
 fn test_worktree_info_creates_identity_file() {
     let temp = setup_repo();
 
@@ -400,6 +425,32 @@ fn test_worktree_list_multiple_worktrees() {
         .current_dir(temp.path())
         .args(["worktree", "remove", "--force", wt_name])
         .status();
+}
+
+#[test]
+fn test_worktree_list_from_linked_checkout_identifies_primary() {
+    let temp = setup_repo();
+    let worktree_path = create_worktree(temp.path(), "list-from-linked");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&worktree_path)
+        .args(["worktree", "list", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "worktree list failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let worktrees = json["worktrees"].as_array().unwrap();
+    assert!(worktrees.iter().any(|entry| {
+        entry["path"].as_str() == Some(temp.path().to_str().unwrap()) && entry["is_main"] == true
+    }));
+    assert!(worktrees.iter().any(|entry| {
+        entry["path"].as_str() == Some(worktree_path.to_str().unwrap()) && entry["is_main"] == false
+    }));
 }
 
 #[test]

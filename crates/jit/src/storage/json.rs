@@ -16,7 +16,7 @@ use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
     IssueStore, RecoveryDispatchReport, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
     RepositoryMutationSession, RepositoryNotFoundError, RepositoryStateStore,
-    RepositoryStateStoreError, MIN_ID_PREFIX_LENGTH,
+    RepositoryStateStoreError, WorktreePaths, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
@@ -262,6 +262,8 @@ pub struct JsonFileStorage {
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
     /// Explicit worktree/data-root authority for repository-relative readers.
     repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
+    /// Authoritative Git/non-Git classification for the selected data root.
+    worktree_paths: Arc<Mutex<Option<WorktreePaths>>>,
     /// Guards the one-time sweep of orphaned per-issue read-lock sidecars, shared
     /// by every clone so the cleanup runs at most once per storage lifetime.
     sidecars_swept: Arc<AtomicBool>,
@@ -312,6 +314,7 @@ impl JsonFileStorage {
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
+            worktree_paths: Arc::new(Mutex::new(None)),
             sidecars_swept: Arc::new(AtomicBool::new(false)),
             root,
             locker: FileLocker::new(timeout),
@@ -367,6 +370,40 @@ impl JsonFileStorage {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clone()
             .ok_or_else(|| anyhow!("no repository layout configured for storage reads"))
+    }
+
+    /// Bind the invocation's authoritative classification of the selected store.
+    pub fn configure_worktree_paths(&self, paths: &WorktreePaths) {
+        let mut configured = self
+            .worktree_paths
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match configured.as_ref() {
+            None => *configured = Some(paths.clone()),
+            Some(current) if current == paths => *configured = Some(paths.clone()),
+            Some(_) => {}
+        }
+    }
+
+    pub(crate) fn configured_worktree_paths(&self) -> Result<WorktreePaths> {
+        let configured = self
+            .worktree_paths
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone();
+        if let Some(paths) = configured {
+            return Ok(paths);
+        }
+        let layout = self.configured_layout()?;
+        let detected =
+            WorktreePaths::detect_for_data_root(layout.data_root(), layout.worktree_root())?;
+        self.configure_worktree_paths(&detected);
+        Ok(self
+            .worktree_paths
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+            .unwrap_or(detected))
     }
 
     /// Open and retain this storage's canonical startup mutation session.
@@ -659,38 +696,10 @@ impl JsonFileStorage {
 
     /// Load index from main worktree.
     fn load_index_from_main_worktree(&self) -> Result<Option<Index>> {
-        let layout = self.configured_layout()?;
-        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
-        else {
+        let Some(primary_data_root) = self.configured_worktree_paths()?.primary_data_root()? else {
             return Ok(None);
         };
-        let repository = match git2::Repository::discover(layout.worktree_root()) {
-            Ok(repository) => repository,
-            Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
-            Err(error) => return Err(error).context("Failed to open git repository"),
-        };
-        let common_dir = repository.commondir();
-
-        // A normal repository points directly at its common directory. Only a
-        // linked worktree has a distinct per-worktree repository path.
-        if repository.path() == common_dir {
-            return Ok(None);
-        }
-
-        if common_dir.file_name().and_then(|name| name.to_str()) != Some(".git") {
-            return Err(anyhow!(
-                "git common directory is not a main-worktree .git directory: {}",
-                common_dir.display()
-            ));
-        }
-        let main_worktree_root = common_dir.parent().ok_or_else(|| {
-            anyhow!(
-                "git common directory has no main-worktree parent: {}",
-                common_dir.display()
-            )
-        })?;
-
-        let main_index_path = main_worktree_root.join(data_relative).join(INDEX_FILE);
+        let main_index_path = primary_data_root.join(INDEX_FILE);
         let bytes = match fs::read(&main_index_path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
@@ -752,54 +761,10 @@ impl JsonFileStorage {
     /// (not in git, already in main worktree, non-standard layout), and `Err`
     /// for genuine I/O or parse failures on a file that does exist.
     fn load_issue_from_main_worktree(&self, id: &str) -> Result<Option<Issue>> {
-        let layout = self.configured_layout()?;
-        let Some(data_relative) = layout.data_root().strip_prefix(layout.worktree_root()).ok()
-        else {
+        let Some(primary_data_root) = self.configured_worktree_paths()?.primary_data_root()? else {
             return Ok(None);
         };
-
-        // We need to detect worktree context from git commands
-        // First check if we're in a git repo at all
-        let output = Command::new("git")
-            .args(["rev-parse", "--git-common-dir"])
-            .current_dir(layout.worktree_root())
-            .output();
-
-        let output = match output {
-            Ok(o) if o.status.success() => o,
-            _ => return Ok(None), // not in git or git unavailable
-        };
-
-        let common_dir = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-
-        // Get worktree root
-        let output = Command::new("git")
-            .args(["rev-parse", "--show-toplevel"])
-            .current_dir(layout.worktree_root())
-            .output()?;
-
-        if !output.status.success() {
-            return Ok(None); // cannot determine worktree layout
-        }
-
-        let worktree_root = PathBuf::from(String::from_utf8(output.stdout)?.trim());
-
-        // Check if we're in main worktree — if so, there's nothing more to try
-        let is_main = common_dir == worktree_root.join(".git");
-        if is_main {
-            return Ok(None);
-        }
-
-        // Calculate main worktree path
-        let main_worktree_root = if common_dir.file_name().unwrap() == ".git" {
-            common_dir.parent().unwrap().to_path_buf()
-        } else {
-            // Bare repo or non-standard setup — cannot locate main worktree
-            return Ok(None);
-        };
-
-        let main_issue_path = main_worktree_root
-            .join(data_relative)
+        let main_issue_path = primary_data_root
             .join(ISSUES_DIR)
             .join(format!("{}.json", id));
 
@@ -815,19 +780,8 @@ impl JsonFileStorage {
     ///
     /// Returns true if this is a secondary worktree, false if main worktree or not in git.
     pub fn is_secondary_worktree(&self) -> bool {
-        let Ok(layout) = self.configured_layout() else {
-            return false;
-        };
-
-        // Check if .git exists
-        let git_path = layout.worktree_root().join(".git");
-        if !git_path.exists() {
-            return false;
-        }
-
-        // Secondary worktrees have .git as a file (pointing to worktree metadata)
-        // Main worktree has .git as a directory
-        git_path.is_file()
+        self.configured_worktree_paths()
+            .is_ok_and(|paths| paths.is_worktree())
     }
 }
 

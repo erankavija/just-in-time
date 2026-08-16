@@ -27,15 +27,21 @@ impl WorktreePaths {
         Self::detect_from(&env::current_dir()?)
     }
 
-    /// Detect worktree context while using `non_git_root` as the worktree
-    /// authority when Git is unavailable.
+    /// Detect the checkout containing the selected JIT data root.
     ///
-    /// The caller has already selected a JIT data root and therefore knows
-    /// whether that selection came from ancestor discovery or from an explicit
-    /// init/override target. Git remains authoritative whenever `current` is in
-    /// a worktree.
-    pub fn detect_with_non_git_root(non_git_root: &Path) -> Result<Self> {
-        Self::detect_from_with_non_git_root(&env::current_dir()?, non_git_root)
+    /// `selected_data_root` is the authority for Git classification, including
+    /// when it was selected through `JIT_DATA_DIR` and differs from the process
+    /// working directory. `non_git_root` remains the repository worktree root
+    /// used by Git-optional commands when the selected store is outside version
+    /// control.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when Git identifies a checkout but its common directory
+    /// or top-level path cannot be resolved.
+    pub fn detect_for_data_root(selected_data_root: &Path, non_git_root: &Path) -> Result<Self> {
+        let probe = existing_directory_for(selected_data_root);
+        Self::detect_from_with_non_git_root(&probe, non_git_root, Some(selected_data_root))
     }
 
     /// Detect worktree context from an explicitly selected repository root.
@@ -44,10 +50,14 @@ impl WorktreePaths {
     /// use it so machine-local claims coordination is checked for the repository
     /// being validated, even when that repository is not the process cwd.
     pub(crate) fn detect_from(current: &Path) -> Result<Self> {
-        Self::detect_from_with_non_git_root(current, current)
+        Self::detect_from_with_non_git_root(current, current, None)
     }
 
-    fn detect_from_with_non_git_root(current: &Path, non_git_root: &Path) -> Result<Self> {
+    fn detect_from_with_non_git_root(
+        current: &Path,
+        non_git_root: &Path,
+        selected_data_root: Option<&Path>,
+    ) -> Result<Self> {
         // Check if in git repo
         let is_repo = Command::new("git")
             .arg("-C")
@@ -62,7 +72,9 @@ impl WorktreePaths {
             let dot_git = worktree_root.join(".git");
             return Ok(Self {
                 common_dir: dot_git.clone(),
-                local_jit: worktree_root.join(".jit"),
+                local_jit: selected_data_root
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| worktree_root.join(".jit")),
                 worktree_root,
                 shared_jit: dot_git.join("jit"),
             });
@@ -111,7 +123,9 @@ impl WorktreePaths {
 
         let worktree_root = PathBuf::from(String::from_utf8(worktree_root_output.stdout)?.trim());
 
-        let local_jit = worktree_root.join(".jit");
+        let local_jit = selected_data_root
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| worktree_root.join(".jit"));
         let shared_jit = common_dir.join("jit");
 
         Ok(Self {
@@ -135,6 +149,77 @@ impl WorktreePaths {
     pub fn is_main_worktree(&self) -> bool {
         !self.is_worktree()
     }
+
+    /// Return the primary checkout root when this is a linked non-primary checkout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a linked checkout whose common directory cannot be
+    /// mapped to a primary checkout.
+    pub fn primary_worktree_root(&self) -> Result<Option<&Path>> {
+        if !self.is_worktree() {
+            return Ok(None);
+        }
+        if self.common_dir.file_name().and_then(|name| name.to_str()) != Some(".git") {
+            anyhow::bail!(
+                "git common directory is not a primary-checkout .git directory: {}",
+                self.common_dir.display()
+            );
+        }
+        self.common_dir.parent().map(Some).ok_or_else(|| {
+            anyhow::anyhow!(
+                "git common directory has no primary-checkout parent: {}",
+                self.common_dir.display()
+            )
+        })
+    }
+
+    /// Map this checkout's selected data root to the primary checkout's store.
+    ///
+    /// A store outside the selected checkout has no primary-checkout counterpart,
+    /// as does a primary or non-Git checkout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the primary checkout cannot be resolved.
+    pub fn primary_data_root(&self) -> Result<Option<PathBuf>> {
+        let Some(primary_root) = self.primary_worktree_root()? else {
+            return Ok(None);
+        };
+        Ok(self
+            .local_jit
+            .strip_prefix(&self.worktree_root)
+            .ok()
+            .map(|relative| primary_root.join(relative)))
+    }
+
+    /// Return whether `candidate` is this repository's primary checkout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the primary checkout cannot be resolved.
+    pub fn is_primary_worktree_path(&self, candidate: &Path) -> Result<bool> {
+        Ok(match self.primary_worktree_root()? {
+            Some(primary) => candidate == primary,
+            None => candidate == self.worktree_root,
+        })
+    }
+}
+
+fn existing_directory_for(path: &Path) -> PathBuf {
+    let mut candidate = if path.is_dir() {
+        path.to_path_buf()
+    } else {
+        path.parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| path.to_path_buf())
+    };
+    while !candidate.is_dir() {
+        if !candidate.pop() {
+            break;
+        }
+    }
+    candidate
 }
 
 #[cfg(test)]
@@ -146,9 +231,12 @@ mod tests {
         let current = tempfile::tempdir().unwrap();
         let selected_root = tempfile::tempdir().unwrap();
 
-        let paths =
-            WorktreePaths::detect_from_with_non_git_root(current.path(), selected_root.path())
-                .unwrap();
+        let paths = WorktreePaths::detect_from_with_non_git_root(
+            current.path(),
+            selected_root.path(),
+            None,
+        )
+        .unwrap();
 
         assert_eq!(paths.worktree_root, selected_root.path());
         assert_eq!(paths.local_jit, selected_root.path().join(".jit"));
@@ -190,5 +278,31 @@ mod tests {
             shared_jit: PathBuf::from("/repo/.git/jit"),
         };
         assert!(secondary_paths.is_worktree());
+        assert_eq!(
+            secondary_paths.primary_worktree_root().unwrap(),
+            Some(Path::new("/repo"))
+        );
+        assert_eq!(
+            secondary_paths.primary_data_root().unwrap(),
+            Some(PathBuf::from("/repo/.jit"))
+        );
+        assert!(secondary_paths
+            .is_primary_worktree_path(Path::new("/repo"))
+            .unwrap());
+    }
+
+    #[test]
+    fn test_detect_for_data_root_outside_version_control_is_not_linked() {
+        let selected_root = tempfile::tempdir().unwrap();
+        let repository_root = tempfile::tempdir().unwrap();
+
+        let paths =
+            WorktreePaths::detect_for_data_root(selected_root.path(), repository_root.path())
+                .unwrap();
+
+        assert!(!paths.is_worktree());
+        assert_eq!(paths.worktree_root, repository_root.path());
+        assert_eq!(paths.local_jit, selected_root.path());
+        assert_eq!(paths.primary_data_root().unwrap(), None);
     }
 }
