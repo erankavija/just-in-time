@@ -23,14 +23,14 @@
   ],
   "gates_status": {
     "holistic-review": {
-      "status": "pending",
-      "updated_at": "2026-08-16T19:40:09.582117072Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-16T21:54:11.534286742Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
-      "status": "pending",
-      "updated_at": "2026-08-13T16:32:19.514034042Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-16T21:51:33.682181270Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4a559332-e795-4320-9eb9-193e248d628c",
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "ready",
   "title": "gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-16T21:47:06.344400204Z"
+  "updated_at": "2026-08-16T21:54:11.534286742Z"
 }

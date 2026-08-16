@@ -218,6 +218,16 @@
   ],
   "escalations": [
     {
+      "issue_id": "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+      "category": "gate-blocked-by-host-load",
+      "recorded_at": "2026-08-17T00:10:00+03:00",
+      "summary": "The journey's cargo-ci gate repeatedly failed only its suite-clock budget while sustained interactive host load held 3+ cores; all 4636 tests passed and idle-host clocks measure ~24s against the 30s threshold.",
+      "status": "resolved",
+      "decision": "Invoker-directed resolution of the budget verdict for the affected gate runs; suite content, tests, and thresholds unchanged.",
+      "resolved_at": "2026-08-17T00:45:00+03:00",
+      "resolution": "cargo-ci and code-review re-ran green; issue completed."
+    },
+    {
       "issue_id": "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
       "category": "architectural-scope-boundary",
       "recorded_at": "2026-08-16T18:35:00+03:00",

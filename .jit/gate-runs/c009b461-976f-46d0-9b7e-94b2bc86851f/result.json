@@ -1,0 +1,23 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "jit validate",
+  "commit": "a7340db70b786fd12751324550d5f6771496dcee",
+  "completed_at": "2026-08-16T21:51:33.668639546Z",
+  "duration_ms": 2767,
+  "exit_code": 4,
+  "gate_key": "repo-validate",
+  "issue_id": "4a559332-e795-4320-9eb9-193e248d628c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c009b461-976f-46d0-9b7e-94b2bc86851f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T21:51:30.901452275Z",
+  "status": "failed",
+  "stderr": "Error: Invalid repository: repository-integrity validation pass: Found 2 isolated issue(s) not connected to the dependency graph:\n  '525bd61a' (Re-validate after zero-fix jit validate --fix)\n  'ea1745ee' (Fresh init excludes machine-local .jit state from version control)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n",
+  "stdout": "❌ Repository integrity error: Invalid repository: repository-integrity validation pass: Found 2 isolated issue(s) not connected to the dependency graph:\n  '525bd61a' (Re-validate after zero-fix jit validate --fix)\n  'ea1745ee' (Fresh init excludes machine-local .jit state from version control)\nIsolated issues have no dependencies and are not dependencies of any other issue.\nEither add dependencies with 'jit dep add' or delete these issues.\n⚠ 6 membership label(s) not backed by the DAG (run `jit query divergence` for details)\n",
+  "tree_dirty": false
+}

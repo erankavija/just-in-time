@@ -14543,3 +14543,7 @@
 {"from":"ready","id":"fa303878-899b-44cc-8e5a-ae15b5972672","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T21:47:00.386093090Z","to":"done","type":"issue_state_changed"}
 {"id":"17b8e7cd-015c-4747-afa6-73eb171460d1","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T21:47:00.386093090Z","type":"issue_completed"}
 {"from":"backlog","id":"347d7c57-83ec-4025-ad0b-67664486312d","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T21:47:06.344400204Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"repo-validate","id":"9eb8bea9-7321-465d-bc5c-98086d8ed98e","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T21:51:33.682181270Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"52ce1374-5ac8-41fb-ae90-50399b852bb9","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T21:54:11.534286742Z","type":"gate_failed","updated_by":"auto:executor"}
+{"fields":["dependencies"],"id":"3df41987-df72-4450-98fb-6b7c03845307","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-08-16T21:55:26.569049660Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"b51f26fe-2408-45d9-be18-90e5e531c19c","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-08-16T21:55:32.780195447Z","type":"issue_updated","updated_by":"dependency-add"}

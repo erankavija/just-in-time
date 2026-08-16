@@ -1,0 +1,50 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a7340db70b786fd12751324550d5f6771496dcee",
+  "completed_at": "2026-08-16T21:54:11.078159961Z",
+  "duration_ms": 156678,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/gate-runs/c009b461-976f-46d0-9b7e-94b2bc86851f/result.json",
+        "id": "F1",
+        "line": 8,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Required repo-validate failed because two isolated issues violate repository integrity, so the epic is not gate-complete."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/completion-report.md",
+        "id": "F2",
+        "line": 22,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The untracked completion report's rework and escalation metrics contradict progress.json, and its dispatch count has no recorded source."
+      }
+    ],
+    "summary": "The container has a failed required repository-validation gate; its completion metrics also contain unsubstantiated contradictions.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "4a559332-e795-4320-9eb9-193e248d628c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "082fd388-ae97-4c0a-b624-1a5e2b7063ea",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T21:51:34.399895215Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12333 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00c8f-05db-7fc0-86a2-07d692ebcb13\n--------\nuser\n--- 12320 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[high, blocking]** The required `repo-validate` gate failed (exit 4) on commit `a7340db70`: two isolated issues, `525bd61a` and `ea1745ee`, violate repository integrity. The epic remains `ready`, so its completion evidence is not valid. Evidence: `.jit/gate-runs/c009b461-976f-46d0-9b7e-94b2bc86851f/result.json:8-21`.\n\n2. **[medium, advisory]** The untracked completion report contains unsupported and contradictory metrics: it states nine rework cycles and three resolved escalations, while `progress.json` records ten rework cycles and only two escalation records; the claimed “~27” dispatches has no recorded source. Evidence: `dev/active/4a559332-gf2-adopter-reliability/completion-report.md:22-24`, `dev/active/4a559332-gf2-adopter-reliability/progress.json:219-250`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The container has a failed required repository-validation gate; its completion metrics also contain unsubstantiated contradictions.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Required repo-validate failed because two isolated issues violate repository integrity, so the epic is not gate-complete.\",\"file\":\".jit/gate-runs/c009b461-976f-46d0-9b7e-94b2bc86851f/result.json\",\"line\":8},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The untracked completion report's rework and escalation metrics contradict progress.json, and its dispatch count has no recorded source.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/completion-report.md\",\"line\":22,\"references\":[\"@/inv/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
