@@ -1600,9 +1600,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(PrecheckExecution { runs, error: None })
     }
 
-    /// Run all postchecks for an issue
+    /// Run all postchecks for an issue.
     ///
-    /// Runs all automated postchecks and auto-transitions to Done if all pass.
+    /// Production reachability has one direct edge: the `State::Gated` branch of
+    /// [`CommandExecutor::update_issue_state`]. The shipped CLI's only call to that
+    /// state-only method is `issue reject`, with `State::Rejected`, so current CLI
+    /// dispatch does not enter this loop; library callers explicitly requesting
+    /// `State::Gated` do.
+    ///
+    /// Runs all automated postchecks and auto-transitions to Done if all pass. A
+    /// checker's ordinary failing verdict is a successful [`GateRunResult`] with
+    /// [`GateRunStatus::Failed`], so it remains recorded and leaves the issue Gated.
+    /// An evaluation or evidence-persistence error is returned to the caller.
     pub(crate) fn run_postchecks(&self, issue_id: &str) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
@@ -1614,8 +1623,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         for gate_key in &issue.gates_required {
             if let Some(gate) = registry.gates.get(gate_key) {
                 if gate.stage == GateStage::Postcheck && gate.mode == GateMode::Auto {
-                    // Run automated postcheck (errors are logged but don't fail)
-                    let _ = self.check_gate(&full_id, gate_key);
+                    self.check_gate(&full_id, gate_key)?;
                 }
             }
         }
@@ -1640,6 +1648,39 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
     use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+
+    struct FailNthCommitDecision {
+        remaining: Mutex<usize>,
+    }
+
+    impl FailNthCommitDecision {
+        fn new(nth: usize) -> Arc<Self> {
+            Arc::new(Self {
+                remaining: Mutex::new(nth),
+            })
+        }
+    }
+
+    impl crate::storage::TransactionFailureInjector for FailNthCommitDecision {
+        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+            if point != &crate::storage::TransactionFailurePoint::RepositoryBeforeCommitDecision {
+                return Ok(());
+            }
+
+            let mut remaining = self.remaining.lock().unwrap();
+            if *remaining == 0 {
+                return Ok(());
+            }
+            *remaining -= 1;
+            if *remaining == 0 {
+                return Err(std::io::Error::other(
+                    "injected postcheck persistence failure",
+                ));
+            }
+            Ok(())
+        }
+    }
 
     fn add_builtin_gate(
         executor: &CommandExecutor<InMemoryStorage>,
@@ -3667,7 +3708,7 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_postcheck_failure_keeps_in_gated() {
+    fn test_update_issue_state_failing_postcheck_succeeds_and_keeps_issue_gated() {
         let executor = setup();
 
         // Define a failing postcheck gate
@@ -3709,9 +3750,11 @@ source-of-truth = "markdown-first"
             .unwrap();
 
         // Complete work
-        executor
-            .update_issue_state(&issue_id, State::Gated)
-            .unwrap();
+        let result = executor.update_issue_state(&issue_id, State::Gated);
+        assert!(
+            result.is_ok(),
+            "an ordinary checker failure remains a successful invocation: {result:?}"
+        );
 
         // Verify postchecks ran but issue stayed in gated
         let issue = executor.storage.load_issue(&issue_id).unwrap();
@@ -3719,6 +3762,143 @@ source-of-truth = "markdown-first"
 
         let gate_state = issue.gates_status.get("postcheck-fail").unwrap();
         assert_eq!(gate_state.status, crate::domain::GateStatus::Failed);
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].status, GateRunStatus::Failed);
+    }
+
+    #[test]
+    fn test_update_issue_state_surfaces_postcheck_persistence_failure() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "postcheck".to_string(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: "postcheck".to_string(),
+                title: "Postcheck".to_string(),
+                description: "Postcheck".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 0".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: false,
+                    prompt: None,
+                    prompt_file: None,
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        executor
+            .add_gate(&issue_id, "postcheck".to_string())
+            .unwrap();
+
+        // The Gated transition is the first commit decision. The automated
+        // postcheck's coupled issue/run/event publication is the second.
+        let failures = FailNthCommitDecision::new(2);
+        let storage = executor
+            .storage()
+            .with_repository_state_failure_view(failures);
+        let executor = crate::commands::test_helpers::memory_executor(storage);
+
+        let error = executor
+            .update_issue_state(&issue_id, State::Gated)
+            .expect_err("postcheck persistence failure must reach the state-transition caller");
+
+        assert!(
+            error
+                .to_string()
+                .contains("injected postcheck persistence failure"),
+            "unexpected error: {error:#}"
+        );
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Gated);
+        assert_eq!(
+            issue.gates_status["postcheck"].status,
+            crate::domain::GateStatus::Pending,
+            "failed persistence must not leave an unrecorded checker verdict"
+        );
+        assert!(executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn test_update_issue_state_surfaces_postcheck_evaluation_failure() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "postcheck".to_string(),
+            crate::declarations::GateDefinition {
+                version: 1,
+                key: "postcheck".to_string(),
+                title: "Postcheck".to_string(),
+                description: "Postcheck".to_string(),
+                stage: GateStage::Postcheck,
+                mode: GateMode::Auto,
+                checker: Some(GateChecker::Exec {
+                    command: "exit 0".to_string(),
+                    timeout_seconds: 10,
+                    working_dir: None,
+                    env: HashMap::new(),
+                    pass_context: true,
+                    prompt: None,
+                    prompt_file: Some("missing-prompt.md".to_string()),
+                }),
+                priority: 100,
+                reserved: HashMap::new(),
+                auto: true,
+                example_integration: None,
+                inputs: None,
+            },
+        );
+        seed_gate_registry(executor.storage(), &registry);
+
+        let mut issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        issue.state = State::InProgress;
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        executor
+            .add_gate(&issue_id, "postcheck".to_string())
+            .unwrap();
+
+        let error = executor
+            .update_issue_state(&issue_id, State::Gated)
+            .expect_err("postcheck evaluation failure must reach the state-transition caller");
+
+        assert!(
+            error.to_string().contains("missing-prompt.md"),
+            "unexpected error: {error:#}"
+        );
+        let issue = executor.storage.load_issue(&issue_id).unwrap();
+        assert_eq!(issue.state, State::Gated);
+        assert_eq!(
+            issue.gates_status["postcheck"].status,
+            crate::domain::GateStatus::Pending
+        );
+        assert!(executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
