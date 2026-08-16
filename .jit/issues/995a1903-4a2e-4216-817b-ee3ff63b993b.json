@@ -8,12 +8,24 @@
   ],
   "description": "A linked checkout created by the test itself proves refusal, stance-based permission, and\nthe override audit record from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident began in a linked worker checkout whose mutations silently built\na divergent store. An existing integration suite already creates real linked checkouts with\nversion-control commands, and it is the target with the most room for new modules under the\nrepository's test-target budget, so this coverage lands there rather than claiming a scarce\ntarget slot.\n\n## Success Criteria\n\n- [hard] REQ-01: Under the refusing stance, a state-mutating invocation inside a test-created linked checkout is rejected and leaves that checkout's store and event log unchanged.\n- [hard] REQ-02: The same invocation succeeds under a permitting declared stance and emits no override record, and succeeds under an explicit per-invocation override leaving the durable override record behind.\n- [hard] REQ-03: The refusal observed at this boundary carries the machine-readable facts the policy promises: the linked checkout, the refusing stance, and how to permit the operation.\n- [hard] REQ-04: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
   "documents": [],
+  "done_at": "2026-08-16T19:43:36.949237030Z",
   "first_ready_at": "2026-08-16T19:27:11.045460851Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-16T19:41:06.653691500Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T19:43:13.334397774Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "995a1903-4a2e-4216-817b-ee3ff63b993b",
   "labels": [
     "type:task",
@@ -23,7 +35,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Linked-checkout write-policy journey",
-  "updated_at": "2026-08-16T19:38:46.983610660Z"
+  "updated_at": "2026-08-16T19:43:36.949237030Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3d1c67c55ab62f9e5e39b510349fb999c3139769",
+  "completed_at": "2026-08-16T19:43:12.981079903Z",
+  "duration_ms": 125600,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed journey test satisfies the issue criteria and remains within the existing integration-test target.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "995a1903-4a2e-4216-817b-ee3ff63b993b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "28ee8d39-6775-4867-86b1-a626b7c2294a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T19:41:07.380962848Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a0aea84fb, 16753c976, a00969e2d, 5d61c9240 (`jit:995a1903`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a559332/requirement/REQ-06 (.jit issue record); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T19:38:47Z)\nTruncation recovery: narrowed truncated broad searches to individual tagged patches, the changed test/current integration target, exact item sources, dispatch/error paths, and budget checker\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed journey test satisfies the issue criteria and remains within the existing integration-test target.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
