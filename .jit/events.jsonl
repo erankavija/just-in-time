@@ -14515,3 +14515,5 @@
 {"gate_key":"doc-review","id":"5313136a-8298-4946-b930-4acd582414b4","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:36.600144578Z","type":"gate_added"}
 {"gate_key":"docs-mechanical","id":"d8b1bec9-83d5-4437-9dea-fc14a8eca4f8","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T19:59:36.751193531Z","type":"gate_added"}
 {"fields":["dependencies"],"id":"9b9a1362-8580-4d57-9e45-2eb38352179a","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T20:00:05.612053158Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"ec62358f-7eb1-4261-ac16-0123b300084b","issue_id":"ea1745ee-1167-432c-bc17-774f37a99bca","priority":"high","timestamp":"2026-08-16T20:15:49.763605542Z","title":"Fresh init excludes machine-local .jit state from version control","type":"issue_created"}
+{"fields":["description"],"id":"2a82b4e3-30a5-4489-9708-398f3d42874e","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T20:16:07.180310385Z","type":"issue_updated","updated_by":"issue-update"}
