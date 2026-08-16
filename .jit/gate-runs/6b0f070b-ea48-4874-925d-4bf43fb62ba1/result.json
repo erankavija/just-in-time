@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6146b99433768c74472db3e619ec00887dbfd134",
+  "completed_at": "2026-08-16T22:00:01.415392964Z",
+  "duration_ms": 213215,
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/4a559332-gf2-adopter-reliability/completion-report.md",
+        "id": "F1",
+        "line": 86,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/single-source-prose",
+          "@/inv/bounded-rust-build-footprint"
+        ],
+        "severity": "low",
+        "summary": "Suite-timing claims lack a linked raw measurement or reproducible command record."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met; one advisory completion-report timing claim lacks recorded measurement evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "4a559332-e795-4320-9eb9-193e248d628c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6b0f070b-ea48-4874-925d-4bf43fb62ba1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T21:56:28.199953432Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [low, advisory] The completion report’s suite-timing claims (“~24s idle”, “23.7–24.2s”, and “30–35s” under load) have no linked raw measurement or reproducible command record. The hard criteria are otherwise substantiated by implementation, integration tests, documentation, and recorded passing gates. Evidence: `dev/active/4a559332-gf2-adopter-reliability/completion-report.md:86`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; one advisory completion-report timing claim lacks recorded measurement evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Suite-timing claims lack a linked raw measurement or reproducible command record.\",\"file\":\"dev/active/4a559332-gf2-adopter-reliability/completion-report.md\",\"line\":86,\"references\":[\"@/inv/single-source-prose\",\"@/inv/bounded-rust-build-footprint\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
