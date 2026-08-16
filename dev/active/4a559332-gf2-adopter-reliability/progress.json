@@ -185,6 +185,15 @@
   "created_during_execution": [],
   "escalations": [
     {
+      "issue_id": "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
+      "category": "architectural-scope-boundary",
+      "recorded_at": "2026-08-16T18:35:00+03:00",
+      "summary": "code-review blocked 0c8d38be because no production dispatch site installs the override annotation; the approved breakdown assigned dispatch-time permission evaluation to f52567ed.",
+      "status": "resolved",
+      "decision": "Invoker: wire the production dispatch site in 0c8d38be now, with an env-var-only per-invocation override surface; f52567ed retains refusal semantics, messaging, and test-stance cleanup.",
+      "resolved_at": "2026-08-16T18:40:00+03:00"
+    },
+    {
       "issue_id": "9757ab31-5e56-421a-b100-3e64dedcc1a5",
       "category": "rework-exceeded",
       "recorded_at": "2026-08-16T13:03:45+03:00",
@@ -198,6 +207,7 @@
     }
   ],
   "rework_counts": {
+    "0c8d38be-6657-4878-9f8c-2dd06af3b05a": 1,
     "1c8f00bd-dfb3-434f-b800-b0e58348fec5": 1,
     "9757ab31-5e56-421a-b100-3e64dedcc1a5": 3,
     "9ea7f672-3f2f-448a-90af-f61466cd5046": 1,
