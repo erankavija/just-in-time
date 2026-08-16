@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-08-16T09:35:46.079728753Z",
+      "updated_at": "2026-08-16T09:59:48.750439855Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-16T09:40:17.391385146Z",
+      "updated_at": "2026-08-16T10:03:21.033379799Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Converge worktree detection on one primitive",
-  "updated_at": "2026-08-16T09:40:17.391385146Z"
+  "updated_at": "2026-08-16T10:03:21.033379799Z"
 }
