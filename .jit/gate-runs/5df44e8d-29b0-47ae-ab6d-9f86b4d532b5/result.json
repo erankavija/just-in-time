@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cef5d796aa5e6665c73bb7e35afe55791c51bfd6",
+  "completed_at": "2026-08-16T18:08:23.665469037Z",
+  "duration_ms": 189100,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/test-unit.js",
+        "id": "F1",
+        "line": 14,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f980db67/requirement/REQ-07",
+          "@/gate/mcp-ci"
+        ],
+        "severity": "high",
+        "summary": "REQ-07 remains unmet: mcp-ci reports jit_worktree_store-divergence as a stale curation entry because the installed jit schema lacks the new command."
+      }
+    ],
+    "summary": "MCP bridge classification coverage fails because the gate reads a stale installed CLI schema.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f980db67-ed74-4e89-89ef-fb72261a0a86",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5df44e8d-29b0-47ae-ab6d-9f86b4d532b5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T18:05:14.564717675Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10404 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00bbf-ce84-70e1-9c27-1d597a5ae97d\n--------\nuser\n--- 10391 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: b54806cfb, 6d22aba49, 9170c72dd, e27cce885, 5bf089a0f, 796f17185, cef5d796a (`jit:f980db67`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f980db67/requirement/REQ-01–REQ-07 (issue description, markdown-first); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/mcp-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); code-review pending; doc-review passed (0); docs-mechanical passed (0); mcp-ci failed (1)\nTruncation recovery: narrowed the broad gate-artifact search to .jit/gate-runs/2ef2d51c-7498-4392-9441-00ff257170fb/result.json and relevant MCP sources\n\n1. **[blocking][issue-impact]** REQ-07 is unmet: the latest `mcp-ci` run fails its curation-coverage test because its generated schema does not contain `jit_worktree_store-divergence`, making the newly added curated entry stale. `mcp-server/test-unit.js:14` obtains the schema from the installed `jit` executable, while `mcp-server/curated-tools.json:80` adds the new decision. Refresh the dogfood binary before the MCP gate (or make the gate source-aligned) so bridge classification coverage passes. References: @/issue/f980db67/requirement/REQ-07, @/gate/mcp-ci.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"MCP bridge classification coverage fails because the gate reads a stale installed CLI schema.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-07 remains unmet: mcp-ci reports jit_worktree_store-divergence as a stale curation entry because the installed jit schema lacks the new command.\",\"file\":\"mcp-server/test-unit.js\",\"line\":14,\"references\":[\"@/issue/f980db67/requirement/REQ-07\",\"@/gate/mcp-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

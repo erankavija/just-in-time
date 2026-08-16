@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cef5d796aa5e6665c73bb7e35afe55791c51bfd6",
+  "completed_at": "2026-08-16T18:05:13.272180725Z",
+  "duration_ms": 88569,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue’s store-divergence documentation is complete, accurate, and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f980db67-ed74-4e89-89ef-fb72261a0a86",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "dcdfa8d9-537a-496c-b950-7e84486c8cd8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T18:03:44.702561085Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `f980db67` is a leaf task with no resolved children. I inspected its seven reachable `jit:f980db67` commits individually with rename detection; the documentation patch updates the canonical worktree reference, CLI envelope reference, and error-code reference. Current behavior matches those updates.\n\nThe new read-only comparison, finding classes, rendered and JSON output, no-op cases, failure mode, and index discoverability are documented accurately and concisely.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue’s store-divergence documentation is complete, accurate, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

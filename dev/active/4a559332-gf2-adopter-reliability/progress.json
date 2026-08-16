@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 5,
+  "current_wave": 6,
   "waves": [
     {
       "wave_number": 1,
@@ -101,7 +101,7 @@
           "short_id": "f980db67",
           "title": "Report divergent checkout stores",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
