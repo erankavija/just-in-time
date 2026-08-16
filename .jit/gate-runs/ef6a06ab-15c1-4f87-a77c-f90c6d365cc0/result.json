@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "026d301fb572f8038641c51d261b1d356d8e8871",
+  "completed_at": "2026-08-16T12:44:05.635807491Z",
+  "duration_ms": 133676,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped criteria are satisfied by the attributable implementation and documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ef6a06ab-15c1-4f87-a77c-f90c6d365cc0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T12:41:51.959237286Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 026d301fb, 066481032, 0e2803cf\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a559332/requirement/REQ-05 and REQ-06 (issue markdown-first); @/charter/D-1 and D-4 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, gate-semantics, shared-test-contracts, semantic-test-assertions (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T12:40:14Z); doc-review pending; docs-mechanical pending\nTruncation recovery: targeted issue, selector, test, documentation, and policy reads recovered the truncated broad searches\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped criteria are satisfied by the attributable implementation and documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

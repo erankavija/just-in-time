@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -51,7 +51,7 @@
           "short_id": "45de0b2b",
           "title": "Positional profile id for the show command",
           "classification": "implementation",
-          "status": "in_progress"
+          "status": "done"
         }
       ]
     },

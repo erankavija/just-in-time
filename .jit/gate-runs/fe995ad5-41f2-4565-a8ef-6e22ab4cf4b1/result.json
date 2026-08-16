@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "026d301fb572f8038641c51d261b1d356d8e8871",
+  "completed_at": "2026-08-16T12:45:08.985899876Z",
+  "duration_ms": 62092,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's positional profile-show ID is accurately and concisely documented in the affected command reference and grammar.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fe995ad5-41f2-4565-a8ef-6e22ab4cf4b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T12:44:06.893712601Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: this is a leaf task (configured level 4; no DAG-resolved children). I inspected its three tagged commits individually, including the merge’s per-parent patches. The user-visible footprint is limited to `profile show` parsing and its two reference updates. Current dispatch and documentation agree on the bare-ID shorthand, tagged selectors, and their mutual exclusion.\n\nDocumentation impact is complete and discoverable in the command reference and CLI grammar. No issue-impact defects found.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's positional profile-show ID is accurately and concisely documented in the affected command reference and grammar.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
