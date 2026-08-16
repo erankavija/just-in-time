@@ -31,8 +31,8 @@ pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 
 /// Default time-to-live, in seconds, for a lease created by `jit claim acquire`,
-/// and the default extension applied by `jit claim renew` (10 minutes).
-pub const CLAIM_TTL_SECS: u64 = 600;
+/// and the default extension applied by `jit claim renew` (1 hour).
+pub const CLAIM_TTL_SECS: u64 = 3600;
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {

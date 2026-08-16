@@ -87,9 +87,9 @@ State what this does and does not establish. The gate judges a working tree, so 
 If the gate reports failure, repair the merge commit (`git commit --amend` or a follow-up fix commit) and re-run it before merging the next branch.
 
 When the check runs through the tracker's own gate evaluation (`jit gate
-evaluate`), an active lease on the issue is required and the default lease TTL
-(one hour) lapses across a long wave — re-acquire the lease immediately before
-each evaluation rather than relying on the dispatch-time claim.
+evaluate`), an active lease on the issue is required and lease TTLs lapse
+across a long wave — re-acquire the lease immediately before each evaluation
+rather than relying on the dispatch-time claim.
 
 ### Step 6 — Reclaim worktrees once the wave closes
 

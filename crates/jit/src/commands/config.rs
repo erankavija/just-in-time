@@ -511,7 +511,10 @@ mod tests {
         let ttl = executor
             .get_config("coordination.default_ttl_secs")
             .unwrap();
-        assert_eq!(ttl.value, serde_json::json!(600));
+        assert_eq!(
+            ttl.value,
+            serde_json::json!(crate::runtime_defaults::CLAIM_TTL_SECS)
+        );
     }
 
     #[test]

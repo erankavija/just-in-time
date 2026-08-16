@@ -354,7 +354,10 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
     // A merged section with a built-in default still resolves.
     let out = config_get(temp.path(), &["coordination.default_ttl_secs"]);
     assert!(out.status.success(), "get failed: {:?}", out);
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "600");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout).trim(),
+        jit::runtime_defaults::CLAIM_TTL_SECS.to_string()
+    );
 
     // A raw, repo-only section with nothing configured is an intermediate key
     // resolving to an empty object, not an error.

@@ -126,10 +126,10 @@ You should see:
 ```
 ✓ Acquired lease: abc123-def456...
   Issue: <issue-id>
-  TTL: 600 seconds
+  TTL: 3600 seconds
 ```
 
-The `TTL: 600 seconds` shown is the default claim lease TTL — see
+The `TTL: 3600 seconds` shown is the default claim lease TTL — see
 [Runtime Coordination Defaults](../reference/runtime-defaults.md), the
 generated source of that value.
 

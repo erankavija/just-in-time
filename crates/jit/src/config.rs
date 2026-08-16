@@ -3499,7 +3499,10 @@ max_indefinite_leases_per_repo = 10
     #[test]
     fn test_coordination_config_defaults() {
         let coord = CoordinationConfig::default();
-        assert_eq!(coord.default_ttl_secs(), 600);
+        assert_eq!(
+            coord.default_ttl_secs(),
+            crate::runtime_defaults::CLAIM_TTL_SECS
+        );
         assert_eq!(coord.lease_renewal_threshold_pct(), 10);
         assert_eq!(coord.stale_threshold_secs(), 3600);
         assert_eq!(coord.max_indefinite_leases_per_agent(), 2);
@@ -3623,7 +3626,7 @@ use_unified_envelope = true
 
         // Verify coordination
         let coord = config.coordination.unwrap();
-        assert_eq!(coord.default_ttl_secs(), 600);
+        assert_eq!(coord.default_ttl_secs(), 600); // declared above, not the default
     }
 
     // ============================================================
@@ -3692,7 +3695,10 @@ id = "agent:worker-1"
             description: None,
             default_ttl_secs: None,
         };
-        assert_eq!(identity.default_ttl_secs(), 600); // Default from coordination
+        assert_eq!(
+            identity.default_ttl_secs(),
+            crate::runtime_defaults::CLAIM_TTL_SECS
+        ); // Default from coordination
     }
 
     #[test]
@@ -3728,7 +3734,10 @@ description = "Test agent"
         let config = loader.build();
 
         // Should have all defaults
-        assert_eq!(config.coordination().default_ttl_secs(), 600);
+        assert_eq!(
+            config.coordination().default_ttl_secs(),
+            crate::runtime_defaults::CLAIM_TTL_SECS
+        );
         assert_eq!(config.coordination().stale_threshold_secs(), 3600);
         assert!(config.global_operations().require_main_history());
         assert_eq!(config.locks().max_age_secs(), 3600);
@@ -3850,7 +3859,10 @@ default_ttl_secs = 1200
         let config = loader.build();
 
         // All defaults
-        assert_eq!(config.coordination().default_ttl_secs(), 600);
+        assert_eq!(
+            config.coordination().default_ttl_secs(),
+            crate::runtime_defaults::CLAIM_TTL_SECS
+        );
     }
 
     #[test]
