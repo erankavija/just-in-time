@@ -183,6 +183,10 @@
     }
   ],
   "created_during_execution": [],
+  "completion_obligations": [
+    "Write one coherent CHANGELOG.md Unreleased entry covering the epic's adopter-visible surface (write policy + guard + env override + audit event + deletion convergence + store-divergence + profile remedy output) before evaluating the epic gates; flagged by worker-1b6925a9.",
+    "Epic gates: repo-validate AND holistic-review (added at invoker request); reconcile surfaced_pitfalls against epic criteria first per lead-review-protocol."
+  ],
   "escalations": [
     {
       "issue_id": "0c8d38be-6657-4878-9f8c-2dd06af3b05a",
