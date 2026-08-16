@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-08-16T19:27:50.050830320Z",
   "context": {},
   "created_at": "2026-08-14T06:15:34.269849091Z",
   "dependencies": [
@@ -21,7 +22,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Converge the deletion refusal into the write policy",
-  "updated_at": "2026-08-16T19:27:05.594517161Z"
+  "updated_at": "2026-08-16T19:27:50.050830320Z"
 }
