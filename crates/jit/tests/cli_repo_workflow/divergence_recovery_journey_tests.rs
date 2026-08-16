@@ -14,9 +14,12 @@
 //! check reporting nothing. Splitting them would prove each phase against a
 //! different divergence than the one before it.
 //!
-//! Two points in the procedure gave no usable instruction when this was
-//! written; each is marked below where the journey works around it, and each is
-//! a defect in the page rather than in the check.
+//! Two points in the procedure gave no usable instruction when this was first
+//! run — the index conflict a two-sided merge raises, and the second merge the
+//! confirming re-run needs — and both were defects in the page rather than in
+//! the check. The page now instructs them (jit:62518095), so the sequence below
+//! is the documented one step for step; each such step names the page step it
+//! executes.
 
 use crate::linked_checkout_write_policy_tests::{
     create_issue_in, created_issue_id, durable_events, linked_checkout_fixture,
@@ -190,22 +193,20 @@ fn index_stage(checkout: &Path, stage: u8) -> Value {
 /// Resolve a conflicted `.jit/index.json` by keeping every record either side
 /// indexed.
 ///
-/// The documented procedure never mentions this file. Its finding-class table
-/// covers `.jit/events.jsonl` and the per-issue files under `.jit/issues/`, and
-/// its merge step tells the adopter what to do only "if git raises conflict
-/// markers in `.jit/issues/`" — but a merge of two stores that each created an
-/// issue conflicts here rather than there, every time, because both sides
-/// inserted an id into one small array over a common base. The recovery the
-/// page points at cannot repair it either: `jit validate --fix` fails to parse
-/// the conflicted file, and once it is resolved to one side alone reports that
-/// no fixes were needed while `jit validate` rejects the same repository for
-/// the index disagreeing with the issue files.
+/// This is the resolution the procedure's step 4 instructs: a merge of two
+/// stores that each created an issue conflicts here rather than in
+/// `.jit/issues/`, every time, because both sides inserted an id into one small
+/// array over a common base, and the union of the two sides is what the
+/// finding-class table's `local_only` and `reference_only` rows already decided
+/// to keep. The page also stops routing this conflict to `jit validate --fix`,
+/// which fails to parse the conflicted file and, once it is resolved to one
+/// side alone, reports that no fixes were needed while `jit validate` rejects
+/// the same repository for the index disagreeing with the issue files
+/// (jit:62518095).
 ///
-/// Keeping every record is the decision the procedure's own table prescribes
-/// for the `local_only` and `reference_only` findings underneath this conflict,
-/// so that is what this applies — read out of git's own merge stages rather
-/// than reconstructed, so the resolution inherits whatever the two sides
-/// actually indexed (jit:86ec2c50).
+/// The union is read out of git's own merge stages rather than reconstructed,
+/// so the resolution inherits whatever the two sides actually indexed
+/// (jit:86ec2c50).
 fn resolve_index_conflict_keeping_every_record(checkout: &Path) {
     let ours = index_stage(checkout, 2);
     let theirs = index_stage(checkout, 3);
@@ -391,7 +392,7 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
         String::from_utf8_lossy(&merge.stderr)
     );
     if !conflicted.is_empty() {
-        // The page prescribes nothing for this conflict; see
+        // Step 4's index resolution; see
         // `resolve_index_conflict_keeping_every_record`.
         resolve_index_conflict_keeping_every_record(&primary);
         git_ok(&primary, &["add", ".jit/"]);
@@ -432,14 +433,14 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
          primary: {primary_events:?}, linked: {linked_events:?}"
     );
 
+    // Procedure step 5: bring the linked checkout onto the retained branch.
     // Step 4 propagates records one way only, so the primary-only records are
-    // still absent from the linked checkout's store and step 5's confirming
-    // re-run cannot come back clean until the linked checkout takes the
-    // retained branch too. The page promises the clean re-run without naming
-    // this; it is reachable, but not by the steps as written (jit:86ec2c50).
+    // still absent from the linked checkout's store and the confirming re-run
+    // cannot come back clean until the linked checkout takes the retained
+    // branch too (jit:62518095).
     git_ok(&linked, &["merge", &retained_branch, "--no-edit"]);
 
-    // Procedure step 5: confirm agreement. Both the primary-side invocation
+    // Procedure step 6: confirm agreement. Both the primary-side invocation
     // this journey has used throughout and the in-checkout one the page names
     // must report nothing while still naming a real reference store.
     for (working_directory, selected_store) in
