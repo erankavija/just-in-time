@@ -14348,3 +14348,4 @@
 {"gate_key":"doc-review","id":"444c6b47-e11d-4665-b80b-a72eb1e3e9bd","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T22:58:00.559840188Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"3b0193f6-660a-46bf-8a33-ec44c6ba1de0","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T22:58:37.798159632Z","to":"done","type":"issue_state_changed"}
 {"id":"e26bc65c-3c5d-4ead-b8db-ae67fc0ff856","issue_id":"a36b91ff-0fc0-4a4f-8112-632fee4f38ed","timestamp":"2026-08-14T22:58:37.798159632Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"ee9a3f98-dac5-4e15-8d06-e86a952f6102","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T08:53:26.755231837Z","type":"issue_claimed"}
