@@ -13,13 +13,13 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T20:38:19.485104761Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T20:50:39.889618962Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-16T20:36:54.526459504Z",
+      "updated_at": "2026-08-16T20:48:38.414641068Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Correct the divergent-store recovery procedure",
-  "updated_at": "2026-08-16T20:38:19.485104761Z"
+  "updated_at": "2026-08-16T20:50:39.889618962Z"
 }

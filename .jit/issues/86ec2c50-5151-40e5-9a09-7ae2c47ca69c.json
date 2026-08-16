@@ -15,13 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-08-16T20:17:55.936873361Z",
+      "status": "failed",
+      "updated_at": "2026-08-16T20:52:36.859601987Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-08-16T20:20:14.921749435Z",
+      "updated_at": "2026-08-16T20:56:36.163197543Z",
       "updated_by": "auto:executor"
     }
   },
@@ -36,5 +36,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Divergence and recovery journey",
-  "updated_at": "2026-08-16T20:20:14.921749435Z"
+  "updated_at": "2026-08-16T20:56:36.163197543Z"
 }
