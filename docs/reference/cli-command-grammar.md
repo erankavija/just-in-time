@@ -83,9 +83,11 @@ Canonical rules:
   `jit issue show <id>`, `jit gate evaluate <id> <gate-key>`,
   `jit dep add <from> <to>...`, `jit doc add <id> <path>`,
   `jit archive document <path>`, and `jit archive container <id>`.
-- **Profile selection is a repeatable flag.** Profile inspection and application
-  name one or more recorded IDs or worktree package directories with
-  `--profile <SELECTOR>`; repeated occurrences remain in request order.
+- **Profile selection is a repeatable flag, except a single `profile show` ID.**
+  Profile application and the tagged `profile show` form name recorded IDs or
+  worktree package directories with `--profile <SELECTOR>`; repeated occurrences
+  remain in request order. `jit profile show <ID>` is the one positional
+  shorthand for inspecting exactly one recorded profile.
 - **Modifiers are flags.** Anything that tunes, filters, scopes, or formats is a
   flag: `--priority`, `--state`, `--label`, `--force`, `--depth`, `--json`,
   `--quiet`.

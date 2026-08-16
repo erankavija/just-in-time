@@ -398,11 +398,87 @@ fn test_profile_apply_records_complete_shared_ownership_on_first_apply() {
 }
 
 #[test]
-fn test_profile_commands_reject_the_superseded_positional_and_from_surface() {
+fn test_profile_show_accepts_a_bare_applied_profile_id() {
     let repo = TempDir::new().unwrap();
+    assert!(jit(repo.path(), &["init"]).status.success());
+    let location = package_at(repo.path(), "vendor/planner");
+    let selector = path_selector(location);
+    let apply = jit(
+        repo.path(),
+        &["profile", "apply", "--profile", &selector, "--json"],
+    );
+    assert!(apply.status.success(), "{apply:?}");
+
     let show = jit(repo.path(), &["profile", "show", FIXTURE_PROFILE, "--json"]);
-    assert!(!show.status.success());
-    assert!(String::from_utf8_lossy(&show.stderr).contains("unexpected argument"));
+    assert!(show.status.success(), "{show:?}");
+    let show = json(&show);
+    assert_eq!(show["count"], 1);
+    assert_eq!(show["profiles"][0]["id"], FIXTURE_PROFILE);
+}
+
+#[test]
+fn test_profile_show_rejects_bare_and_tagged_selectors_together() {
+    let repo = TempDir::new().unwrap();
+    let show = jit(
+        repo.path(),
+        &[
+            "profile",
+            "show",
+            FIXTURE_PROFILE,
+            "--profile",
+            "id:another-profile",
+        ],
+    );
+
+    assert_eq!(show.status.code(), Some(2), "{show:?}");
+    let stderr = String::from_utf8_lossy(&show.stderr);
+    assert!(stderr.contains("bare ID"), "{stderr}");
+    assert!(stderr.contains("--profile"), "{stderr}");
+}
+
+#[test]
+fn test_profile_show_invalid_bare_id_names_accepted_selector_forms() {
+    let repo = TempDir::new().unwrap();
+    let show = jit(repo.path(), &["profile", "show", "not_a_profile"]);
+
+    assert_eq!(show.status.code(), Some(2), "{show:?}");
+    let stderr = String::from_utf8_lossy(&show.stderr);
+    assert!(stderr.contains("bare ID"), "{stderr}");
+    assert!(stderr.contains("--profile id:ID or path:DIR"), "{stderr}");
+    assert!(!stderr.contains("unexpected argument"), "{stderr}");
+}
+
+#[test]
+fn test_profile_show_invalid_bare_id_preserves_the_json_error_envelope() {
+    let repo = TempDir::new().unwrap();
+    let show = jit(repo.path(), &["profile", "show", "not_a_profile", "--json"]);
+
+    assert_eq!(show.status.code(), Some(2), "{show:?}");
+    let error = json(&show);
+    assert_eq!(error["error"]["code"], "INVALID_ARGUMENT");
+    let message = error["error"]["message"]
+        .as_str()
+        .expect("an invalid positional id error has a message");
+    assert!(message.contains("bare ID"), "{message}");
+    assert!(message.contains("--profile id:ID or path:DIR"), "{message}");
+}
+
+#[test]
+fn test_profile_lifecycle_commands_reject_the_superseded_positional_and_from_surface() {
+    let repo = TempDir::new().unwrap();
+
+    let positional = jit(
+        repo.path(),
+        &[
+            "profile",
+            "apply",
+            FIXTURE_PROFILE,
+            "--profile",
+            "id:missing",
+        ],
+    );
+    assert!(!positional.status.success());
+    assert!(String::from_utf8_lossy(&positional.stderr).contains("unexpected argument"));
 
     let apply = jit(
         repo.path(),

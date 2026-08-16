@@ -846,6 +846,35 @@ fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileS
         .collect()
 }
 
+/// Parse profile show selectors, including its one bare profile-id shorthand.
+fn parse_profile_show_selectors(
+    id: Option<&str>,
+    profiles: &[String],
+    json: bool,
+) -> Result<Vec<ProfileSelector>> {
+    match (id, profiles.is_empty()) {
+        (Some(_), false) => Err(invalid_argument(
+            "profile show accepts either a bare ID or --profile id:ID or path:DIR selectors, not both"
+                .to_string(),
+            json,
+        )),
+        (Some(id), true) => ProfileSelector::id(id).map(|selector| vec![selector]).map_err(|error| {
+            invalid_argument(
+                format!(
+                    "invalid positional profile ID '{id}'; accepted selector forms are a bare ID or --profile id:ID or path:DIR: {error}"
+                ),
+                json,
+            )
+        }),
+        (None, false) => parse_profile_selectors(profiles, json),
+        (None, true) => Err(invalid_argument(
+            "profile show requires a bare ID or at least one --profile id:ID or path:DIR selector"
+                .to_string(),
+            json,
+        )),
+    }
+}
+
 /// Parse command-line profile assignments before entering command orchestration.
 fn parse_profile_variable_assignments(
     values: &[String],
@@ -2460,15 +2489,8 @@ fn run() -> Result<()> {
                 }
                 Err(error) => return Err(error),
             },
-            ProfileCommands::Show { profile, json } => {
-                let selectors = parse_profile_selectors(&profile, json)?;
-                if selectors.is_empty() {
-                    return Err(invalid_argument(
-                        "profile show requires at least one --profile id:ID or path:DIR selector"
-                            .to_string(),
-                        json,
-                    ));
-                }
+            ProfileCommands::Show { id, profile, json } => {
+                let selectors = parse_profile_show_selectors(id.as_deref(), &profile, json)?;
                 match executor.show_profiles(&selectors) {
                     Ok(result) => {
                         if json {

@@ -2949,14 +2949,13 @@ pub enum ProfileCommands {
 
     /// Show one profile manifest and package identity from a repository package
     Show {
+        /// Select one recorded profile by its bare canonical id.
+        #[arg(value_name = "ID")]
+        id: Option<String>,
+
         /// Select a recorded profile id or worktree package directory
         /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append,
-            required = true
-        )]
+        #[arg(long, value_name = "SELECTOR", action = ArgAction::Append)]
         profile: Vec<String>,
 
         /// Output as JSON
