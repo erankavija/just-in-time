@@ -70,7 +70,7 @@
           "short_id": "99ac9679",
           "title": "Override audit event for linked-checkout mutations",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "7ca9a0dd-4dca-4294-9212-278d22b013ac",

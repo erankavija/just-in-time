@@ -8,6 +8,7 @@
   ],
   "description": "A permitted override of the linked-checkout write stance has its own event variant in the\nclosed event vocabulary, with the catalog and rendered-reference rows the freshness guard\nrequires.\n\n## Background\n\nThe event vocabulary is a closed, serde-tagged model mirrored by a fieldless tag set, and a\nfreshness guard fails when a variant is missing from the catalog or the rendered event\nreference. An ordinary mutation event cannot show that an invocation was permitted\nspecifically by an override rather than by a permissive stance, so the record needs a\ndistinct variant. This leaf defines the vocabulary only; how a record of this kind becomes\ndurable alongside the mutation it permits is a separate publication concern.\n\n## Success Criteria\n\n- [hard] REQ-01: A distinct event variant records a permitted override of the linked-checkout write stance, naming the linked checkout, the stance that would have refused, and the override that permitted the invocation.\n- [hard] REQ-02: The variant appears in the event catalog, the rendered event reference is regenerated from that catalog rather than edited by hand, and the existing freshness guard fails if either is missing.\n- [hard] REQ-03: The variant round-trips through serialization with a stable type tag, and existing event-log readers tolerate and report it.\n",
   "documents": [],
+  "done_at": "2026-08-16T14:53:59.238443218Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
@@ -15,7 +16,28 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:49:13.565857527Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:53:34.937413626Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:50:35.160966261Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:49:15.619676954Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "99ac9679-dbb3-44f4-b108-ac52b4487ea7",
   "labels": [
     "type:task",
@@ -25,7 +47,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Override audit event for linked-checkout mutations",
-  "updated_at": "2026-08-16T14:02:48.079262283Z"
+  "updated_at": "2026-08-16T14:53:59.238443218Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9d7ea51eebbae20e6773e5e51f18991ade9a9ac7",
+  "completed_at": "2026-08-16T14:53:34.586666115Z",
+  "duration_ms": 178571,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The override audit event meets all three hard requirements with catalog, projection, serialization, reader, and query coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "99ac9679-dbb3-44f4-b108-ac52b4487ea7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "abaf0da1-7d82-41be-ac5e-d7e58ddb74a9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T14:50:36.015333286Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9d7ea51e, 5c44b212, ef3c04a, 0cdc2ced, 528958943 (`jit:99ac9679`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/99ac9679/requirement/REQ-01, REQ-02, REQ-03 (.jit/issues/99ac9679-dbb3-44f4-b108-ac52b4487ea7.json); @/invariant/semantic-types, @/invariant/single-source-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review passed (exit 0); docs-mechanical passed (exit 0); code-review pending\nTruncation recovery: re-read the truncated tagged patches by file and the current event-catalog ranges, tests, generator, and affected source files in bounded calls\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The override audit event meets all three hard requirements with catalog, projection, serialization, reader, and query coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -14406,3 +14406,10 @@
 {"gate_key":"code-review","id":"cc92a7be-4a55-4d23-9bee-a3294bed9166","issue_id":"7ca9a0dd-4dca-4294-9212-278d22b013ac","timestamp":"2026-08-16T14:41:10.138918497Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"b49a1a74-e6f0-4838-8620-844a2cf0e56d","issue_id":"7ca9a0dd-4dca-4294-9212-278d22b013ac","timestamp":"2026-08-16T14:41:48.622811678Z","to":"done","type":"issue_state_changed"}
 {"id":"7740286a-2129-45ee-a786-d3ca6be4d356","issue_id":"7ca9a0dd-4dca-4294-9212-278d22b013ac","timestamp":"2026-08-16T14:41:48.622811678Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"b178688d-d461-43e9-a650-c1e9dfbe5fb0","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:49:13.565857527Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"2cbbf4a6-5753-43b7-a2eb-14d9387b27e2","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:49:15.619676954Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"76c716e5-8e9d-4714-a4ea-dd3ba72b6332","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:50:35.160966261Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"de201d0b-885a-466e-a8d2-36450949ee64","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:53:34.937413626Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"8360c2dd-5f00-4d1e-83b9-e4f40095e7da","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:53:59.238443218Z","to":"done","type":"issue_state_changed"}
+{"id":"bd9d6ea2-878f-4faa-b019-809c7a269571","issue_id":"99ac9679-dbb3-44f4-b108-ac52b4487ea7","timestamp":"2026-08-16T14:53:59.238443218Z","type":"issue_completed"}
+{"from":"backlog","id":"779f7a22-f3c2-4e22-ab06-f9c3caa419f1","issue_id":"0c8d38be-6657-4878-9f8c-2dd06af3b05a","timestamp":"2026-08-16T14:54:04.701710501Z","to":"ready","type":"issue_state_changed"}
