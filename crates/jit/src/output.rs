@@ -697,6 +697,9 @@ pub enum ErrorCode {
     RepositoryFormatTooNew,
     /// Issue deletion was refused because operator confirmation was absent.
     DeletionNotConfirmed,
+    /// A state-mutating command was refused because it ran inside a linked
+    /// non-primary checkout whose write stance refuses one.
+    LinkedCheckoutWriteRefused,
     /// No resolution route found the requested profile.
     ProfileNotFound,
     /// Profile planning or final-state validation rejected the operation.
@@ -757,7 +760,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 45] = [
+    pub const ALL: [ErrorCode; 46] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -777,6 +780,7 @@ impl ErrorCode {
         ErrorCode::RepositoryNotFound,
         ErrorCode::RepositoryFormatTooNew,
         ErrorCode::DeletionNotConfirmed,
+        ErrorCode::LinkedCheckoutWriteRefused,
         ErrorCode::ProfileNotFound,
         ErrorCode::ProfileConflict,
         ErrorCode::DependencyError,
@@ -827,6 +831,7 @@ impl ErrorCode {
             ErrorCode::RepositoryNotFound => "REPOSITORY_NOT_FOUND",
             ErrorCode::RepositoryFormatTooNew => "REPOSITORY_FORMAT_TOO_NEW",
             ErrorCode::DeletionNotConfirmed => "DELETION_NOT_CONFIRMED",
+            ErrorCode::LinkedCheckoutWriteRefused => "LINKED_CHECKOUT_WRITE_REFUSED",
             ErrorCode::ProfileNotFound => "PROFILE_NOT_FOUND",
             ErrorCode::ProfileConflict => "PROFILE_CONFLICT",
             ErrorCode::DependencyError => "DEPENDENCY_ERROR",
@@ -883,7 +888,8 @@ impl ErrorCode {
             | ErrorCode::InvalidState
             | ErrorCode::AmbiguousId
             | ErrorCode::InvalidIdPrefix
-            | ErrorCode::DeletionNotConfirmed => ExitCode::InvalidArgument,
+            | ErrorCode::DeletionNotConfirmed
+            | ErrorCode::LinkedCheckoutWriteRefused => ExitCode::InvalidArgument,
             ErrorCode::AlreadyExists | ErrorCode::GateError => ExitCode::AlreadyExists,
             ErrorCode::IoError
             | ErrorCode::ClaimRequiresGit
@@ -939,6 +945,9 @@ impl ErrorCode {
             }
             ErrorCode::DeletionNotConfirmed => {
                 "Issue deletion lacks the required operator confirmation."
+            }
+            ErrorCode::LinkedCheckoutWriteRefused => {
+                "The linked checkout's write stance refuses state-mutating commands."
             }
             ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
             ErrorCode::ProfileConflict => "Profile planning or validation found a conflict.",
@@ -1073,6 +1082,7 @@ impl std::str::FromStr for ErrorCode {
             "REPOSITORY_NOT_FOUND" => Ok(ErrorCode::RepositoryNotFound),
             "REPOSITORY_FORMAT_TOO_NEW" => Ok(ErrorCode::RepositoryFormatTooNew),
             "DELETION_NOT_CONFIRMED" => Ok(ErrorCode::DeletionNotConfirmed),
+            "LINKED_CHECKOUT_WRITE_REFUSED" => Ok(ErrorCode::LinkedCheckoutWriteRefused),
             "PROFILE_NOT_FOUND" => Ok(ErrorCode::ProfileNotFound),
             "PROFILE_CONFLICT" => Ok(ErrorCode::ProfileConflict),
             "DEPENDENCY_ERROR" => Ok(ErrorCode::DependencyError),
@@ -3451,6 +3461,11 @@ mod tests {
             (
                 ErrorCode::DeletionNotConfirmed,
                 "DELETION_NOT_CONFIRMED",
+                ExitCode::InvalidArgument,
+            ),
+            (
+                ErrorCode::LinkedCheckoutWriteRefused,
+                "LINKED_CHECKOUT_WRITE_REFUSED",
                 ExitCode::InvalidArgument,
             ),
             (

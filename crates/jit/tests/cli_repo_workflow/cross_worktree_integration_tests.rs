@@ -4,6 +4,8 @@
 //! the 3-tier fallback chain: local .jit → git HEAD → main worktree .jit
 
 use anyhow::Result;
+use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
+use jit::domain::LinkedCheckoutWriteStance;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -50,11 +52,21 @@ fn setup_git_repo() -> (TempDir, PathBuf) {
     (temp_dir, repo_path)
 }
 
-/// Run jit command and return stdout
+/// Run jit command and return stdout.
+///
+/// Every invocation declares the allowing linked-checkout write stance: this suite
+/// initializes and mutates jit inside secondary worktrees as setup for the read-
+/// visibility properties it actually asserts, so it states the stance it relies on
+/// rather than inheriting a default (jit:f52567ed REQ-05). The write policy's own
+/// behaviour is covered by `linked_checkout_write_policy_tests`.
 fn run_jit(dir: &PathBuf, args: &[&str]) -> Result<String> {
     let output = Command::new(env!("CARGO_BIN_EXE_jit"))
         .args(args)
         .current_dir(dir)
+        .env(
+            LINKED_CHECKOUT_WRITE_STANCE_ENV,
+            LinkedCheckoutWriteStance::Allow.as_token(),
+        )
         .output()?;
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();

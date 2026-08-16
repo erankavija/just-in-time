@@ -1,6 +1,9 @@
-//! Durability coverage for the linked-checkout override audit record (jit:0c8d38be) — the
-//! record and the mutation it permits become durable through one materialization plan, or
-//! neither does.
+//! Coverage for the linked-checkout write policy: which invocations it refuses
+//! (jit:f52567ed) and what a permitted override leaves behind (jit:0c8d38be).
+//!
+//! The two halves are one subject. Refusal is what makes an override an override,
+//! and the audit record is what a permitted override owes; a test moving an
+//! invocation from one half to the other only changes the stance it declares.
 
 use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
@@ -212,12 +215,13 @@ fn test_create_issue_under_dispatch_override_persistence_failure_leaves_neither_
 /// Environment variable carrying one invocation's linked-checkout write stance.
 const WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
-/// A linked non-primary checkout of a repository that declares no write stance,
-/// so the refusing default applies there.
+/// A repository whose primary checkout has a linked non-primary checkout beside
+/// it, declaring no write stance, so the refusing default applies in the linked
+/// one.
 ///
 /// Answers the temporary directory holding both checkouts (kept alive by the
-/// caller) and the linked checkout's root.
-fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
+/// caller), the primary checkout's root, and the linked checkout's root.
+fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
     let temp = tempfile::TempDir::new().expect("create a temporary directory");
     let primary = temp.path().join("main");
     std::fs::create_dir(&primary).expect("create the primary checkout directory");
@@ -258,7 +262,17 @@ fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf) {
         .assert()
         .success();
 
-    (temp, linked)
+    (temp, primary, linked)
+}
+
+/// Declare `stance` as `checkout`'s repository-level linked-checkout write stance.
+fn declare_stance(checkout: &Path, stance: LinkedCheckoutWriteStance) {
+    let token = serde_json::to_value(stance).expect("the stance vocabulary serializes");
+    let token = token.as_str().expect("a stance serializes as its token");
+    let config = checkout.join(".jit/config.toml");
+    let declared = std::fs::read_to_string(&config).expect("read the repository configuration")
+        + &format!("\n[worktree]\nwrite_policy = \"{token}\"\n");
+    std::fs::write(&config, declared).expect("declare the repository's write stance");
 }
 
 /// Every event durable in `checkout`'s store, one per log line.
@@ -296,7 +310,9 @@ fn create_issue_in(checkout: &Path, invocation_stance: Option<&str>) -> assert_c
 
 #[test]
 fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with_its_mutation() {
-    let (_temp, linked) = linked_checkout_fixture();
+    // The repository declares nothing, so the refusing default is what the
+    // invocation's own stance outranks — the only shape that warrants a record.
+    let (_temp, _primary, linked) = linked_checkout_fixture();
     create_issue_in(&linked, Some("allow")).success();
 
     let events = durable_events(&linked);
@@ -338,7 +354,10 @@ fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with
 
 #[test]
 fn test_linked_checkout_mutation_without_env_override_records_no_audit_event() {
-    let (_temp, linked) = linked_checkout_fixture();
+    // Permitted by the declaration this test states for itself, so the
+    // invocation supplies no override and there is none to record.
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
     create_issue_in(&linked, None).success();
 
     let events = durable_events(&linked);
@@ -357,11 +376,8 @@ fn test_linked_checkout_mutation_permitted_by_declared_stance_records_no_audit_e
     // The repository's own declaration permits the mutation, so no override
     // outranked a refusal and the record's "stance that would have refused" has
     // no referent.
-    let (_temp, linked) = linked_checkout_fixture();
-    let config = linked.join(".jit/config.toml");
-    let declared = std::fs::read_to_string(&config).expect("read the repository configuration")
-        + "\n[worktree]\nwrite_policy = \"allow\"\n";
-    std::fs::write(&config, declared).expect("declare the allowing stance");
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
 
     create_issue_in(&linked, Some("allow")).success();
 
@@ -398,5 +414,172 @@ fn test_invalid_env_write_stance_token_fails_the_invocation_naming_accepted_toke
             stderr.contains(expected),
             "the failure must name the offending token and every accepted one; stderr: {stderr}"
         );
+    }
+}
+
+// The refusal half of the policy (jit:f52567ed): the guard runs at dispatch,
+// before the repository mutation session opens, so a refused invocation is not a
+// state change and leaves nothing behind to recover from.
+
+/// Every byte under `checkout`'s `.jit/`, keyed by its path relative to it.
+///
+/// A refusal is observable as this map being unchanged: it covers the issue
+/// records, the event log, the machine-local worktree identity, and any residue
+/// a partially-opened session would have staged.
+fn store_bytes(checkout: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
+    fn collect(
+        directory: &Path,
+        root: &Path,
+        into: &mut std::collections::BTreeMap<std::path::PathBuf, Vec<u8>>,
+    ) {
+        for entry in std::fs::read_dir(directory).expect("read a store directory") {
+            let path = entry.expect("read a store entry").path();
+            if path.is_dir() {
+                collect(&path, root, into);
+            } else {
+                let relative = path
+                    .strip_prefix(root)
+                    .expect("entries live under the store");
+                into.insert(
+                    relative.to_path_buf(),
+                    std::fs::read(&path).expect("read a store file"),
+                );
+            }
+        }
+    }
+
+    let root = checkout.join(".jit");
+    let mut bytes = std::collections::BTreeMap::new();
+    collect(&root, &root, &mut bytes);
+    bytes
+}
+
+/// The parsed `--json` error envelope printed by a refused invocation.
+fn refusal_envelope(assert: assert_cmd::assert::Assert) -> serde_json::Value {
+    let output = assert.get_output();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    serde_json::from_str::<serde_json::Value>(&stdout)
+        .unwrap_or_else(|error| panic!("the refusal prints one JSON document ({error}): {stdout}"))
+        ["error"]
+        .clone()
+}
+
+#[test]
+fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_event_log_untouched(
+) {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let before = store_bytes(&linked);
+
+    create_issue_in(&linked, None).failure();
+
+    assert_eq!(
+        store_bytes(&linked),
+        before,
+        "a refused invocation runs before the repository mutation session opens, so not one \
+         byte of the linked checkout's store — its issue records, its event log, or its \
+         machine-local identity — may differ afterwards"
+    );
+}
+
+#[test]
+fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_to_permit() {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+
+    let assert = create_issue_in(&linked, None).failure();
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
+
+    assert!(
+        stderr.contains(&linked.display().to_string()),
+        "the refusal must name the linked checkout it refused in; stderr: {stderr}"
+    );
+    assert!(
+        stderr.contains("refuse"),
+        "the refusal must name the stance that refused it; stderr: {stderr}"
+    );
+    for permit_surface in ["write_policy", "allow", WRITE_STANCE_ENV] {
+        assert!(
+            stderr.contains(permit_surface),
+            "the refusal must name the surfaces that permit the operation, including \
+             {permit_surface}; stderr: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn test_linked_checkout_refusal_json_carries_the_checkout_the_refusing_stance_and_how_to_permit() {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+
+    let error = refusal_envelope(create_issue_in(&linked, None).failure());
+
+    let named_checkout = std::fs::canonicalize(
+        error["details"]["checkout"]
+            .as_str()
+            .unwrap_or_else(|| panic!("the envelope names the refused checkout: {error}")),
+    )
+    .expect("the named checkout exists");
+    assert_eq!(
+        named_checkout,
+        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        "the machine-readable refusal must name the same linked checkout the rendered one does"
+    );
+    assert_eq!(
+        error["details"]["stance"],
+        serde_json::to_value(LinkedCheckoutWriteStance::Refuse).expect("the stance serializes"),
+        "the machine-readable refusal must name the stance that refused it; error: {error}"
+    );
+    let suggestions = error["suggestions"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the envelope carries permit guidance: {error}"))
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect::<Vec<_>>()
+        .join("\n");
+    for permit_surface in ["write_policy", "allow", WRITE_STANCE_ENV] {
+        assert!(
+            suggestions.contains(permit_surface),
+            "the machine-readable refusal must name every surface that permits the operation, \
+             including {permit_surface}; suggestions: {suggestions}"
+        );
+    }
+}
+
+#[test]
+fn test_read_only_invocation_in_a_linked_checkout_succeeds_under_either_stance() {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+
+    for stance in ["refuse", "allow"] {
+        std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(&linked)
+            .env(WRITE_STANCE_ENV, stance)
+            .args(["list", "--json"])
+            .assert()
+            .success();
+    }
+}
+
+#[test]
+fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance() {
+    let (_temp, primary, _linked) = linked_checkout_fixture();
+
+    for stance in ["refuse", "allow"] {
+        create_issue_in(&primary, Some(stance)).success();
+    }
+}
+
+#[test]
+fn test_mutating_invocation_outside_version_control_succeeds_under_either_stance() {
+    for stance in ["refuse", "allow"] {
+        let temp = tempfile::TempDir::new().expect("create a temporary directory");
+        assert!(
+            !temp.path().join(".git").exists(),
+            "the fixture models a repository outside version control"
+        );
+        std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .env(WRITE_STANCE_ENV, stance)
+            .arg("init")
+            .assert()
+            .success();
+        create_issue_in(temp.path(), Some(stance)).success();
     }
 }

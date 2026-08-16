@@ -263,6 +263,91 @@ impl DeletionNotConfirmedError {
     }
 }
 
+/// A state-mutating invocation refused because it runs inside a linked
+/// non-primary checkout whose effective write stance is
+/// [`LinkedCheckoutWriteStance::Refuse`](crate::domain::LinkedCheckoutWriteStance::Refuse).
+///
+/// The refusal is raised at dispatch, before the repository mutation session
+/// opens, so it is not a state change: nothing is written, locked, leased, or
+/// appended, and there is no residue for recovery to converge (`@/inv/event-log`
+/// is preserved rather than excepted).
+///
+/// It carries the three facts a caller needs to act — the checkout it refused
+/// in, the stance that refused it, and how to permit the operation — and the CLI
+/// renders those same three into the `--json` envelope's `details` and
+/// `suggestions`, so the two output modes cannot drift.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("{message}")]
+pub struct LinkedCheckoutWriteRefusedError {
+    message: String,
+    checkout: std::path::PathBuf,
+    stance: crate::domain::LinkedCheckoutWriteStance,
+}
+
+impl LinkedCheckoutWriteRefusedError {
+    /// Both ways to permit the refused operation, in the order they are offered:
+    /// declare the allowing stance for every linked checkout of the repository,
+    /// or supply it for one invocation.
+    ///
+    /// This is the single source both output modes render — the rendered
+    /// message's remediation list and the `--json` envelope's `suggestions` — so
+    /// neither can name a surface the other does not.
+    ///
+    /// The per-invocation override is offered second because it is the narrower
+    /// of the two, and because it is the one that works in the case the first
+    /// does not cover: an invocation whose own stance is the one that refused
+    /// cannot be permitted by editing the declaration it already outranks.
+    pub fn permit_guidance() -> [String; 2] {
+        [
+            "Declare write_policy = \"allow\" under [worktree] in .jit/config.toml to permit \
+             state-mutating commands in this repository's linked checkouts"
+                .to_owned(),
+            format!(
+                "Set {}=allow to permit this one invocation",
+                crate::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV
+            ),
+        ]
+    }
+
+    /// Build the refusal for a state-mutating invocation in `checkout`, whose
+    /// effective write stance resolved to `stance`.
+    pub fn new(
+        checkout: impl Into<std::path::PathBuf>,
+        stance: crate::domain::LinkedCheckoutWriteStance,
+    ) -> Self {
+        let checkout = checkout.into();
+        let message = Self::permit_guidance()
+            .into_iter()
+            .fold(
+                ActionableError::new(format!(
+                    "Refusing a state-mutating command inside the linked checkout at {}.",
+                    checkout.display()
+                ))
+                .with_cause(format!(
+                    "The linked-checkout write stance in force for this invocation is '{}'",
+                    stance.as_token()
+                )),
+                ActionableError::with_remedy,
+            )
+            .to_error_message();
+        Self {
+            message,
+            checkout,
+            stance,
+        }
+    }
+
+    /// The linked checkout the invocation was refused in.
+    pub fn checkout(&self) -> &std::path::Path {
+        &self.checkout
+    }
+
+    /// The write stance that refused the invocation.
+    pub const fn stance(&self) -> crate::domain::LinkedCheckoutWriteStance {
+        self.stance
+    }
+}
+
 /// A validation failure that rejects an operation: a repository-integrity
 /// violation found by `jit validate`'s silent pass (broken dependency, undefined
 /// required gate, dangling document reference, cyclic/isolated DAG, …) or a

@@ -459,9 +459,9 @@ after adding or changing labels that are subject to uniqueness rules.
 
 ### `[worktree]` Section
 
-This section carries lease enforcement for structural issue operations,
-which commands apply today, and the declared write-policy stance for
-state-mutating commands run inside a linked non-primary checkout.
+This section carries lease enforcement for structural issue operations and the
+write-policy stance governing state-mutating commands run inside a linked
+non-primary checkout. Commands apply both.
 
 ```toml
 [worktree]
@@ -484,12 +484,33 @@ present but `enforce_leases` is omitted, it resolves to `strict`.
 
 | Value | Description |
 |-------|-------------|
-| `"refuse"` | Declares the refusing stance for state-mutating commands run inside a linked non-primary checkout |
-| `"allow"` | Declares the allowing stance for state-mutating commands run inside a linked non-primary checkout |
+| `"refuse"` | Refuses state-mutating commands run inside a linked non-primary checkout |
+| `"allow"` | Permits state-mutating commands run inside a linked non-primary checkout |
 
 With no `[worktree]` section, and with the section present but `write_policy`
 omitted, the declared stance is `"refuse"` — unlike `enforce_leases`, both
 cases resolve identically rather than diverging by section presence.
+
+Under the refusing stance, a command that would open a repository mutation
+session inside a linked non-primary checkout fails with
+`LINKED_CHECKOUT_WRITE_REFUSED` (see [Error Codes](error-codes.md)) before any
+repository write, lock, lease, or event append: that checkout's store and event
+log are left exactly as they were, and the refusal names the checkout, the
+stance that refused it, and both ways to permit the operation. Read-only
+commands, commands in the primary checkout, and commands outside version
+control are unaffected by either stance.
+
+The classifier is deliberately broader than the divergent-store hazard that
+motivates it: a command that writes only the shared control plane or
+machine-local runtime state still counts as state-mutating and is still
+refused. Over-refusing that class is the chosen behaviour.
+
+The stance is read from the repository's own `.jit/config.toml` only, never
+from the merged system/user/repo surface `jit config get` and `jit config show`
+report: it is a repository-scoped policy, not something a user- or system-level
+config should be able to relax on the repository's behalf. The one surface that
+outranks it is the per-invocation
+[`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) below.
 
 This repository declares the allowing stance (see `.jit/config.toml`),
 recording its intent that linked agent checkouts continue to mutate their
@@ -503,7 +524,11 @@ case-insensitively and through the same parser; an unrecognised token fails the
 invocation and names the accepted tokens. Unset supplies no override, leaving
 the declared stance in force.
 
-What an override produces today is an audit trail. When a state-mutating command
+Setting it to `"allow"` permits one state-mutating command that the repository's
+declared stance would otherwise refuse; setting it to `"refuse"` withholds
+permission the repository's declaration would otherwise have granted.
+
+An override that permits leaves an audit trail. When a state-mutating command
 runs inside a linked non-primary checkout whose declared stance is `"refuse"`
 and this variable resolves the invocation to `"allow"`, the mutation records a
 `linked_checkout_write_overridden` event (see the
@@ -515,10 +540,6 @@ become durable together or neither does.
 Two cases record nothing, because no override outranked a refusal in either:
 setting the variable to `"refuse"`, and running under a repository that already
 declares `"allow"`.
-
-Neither the key nor this variable refuses a command. Refusing state-mutating
-commands on the declared stance is a separate, not-yet-implemented enforcement
-step.
 
 ### `[coordination]` Section
 
@@ -562,15 +583,8 @@ accepted and available to `jit config get` / `jit config show`, but no current
 command applies them as runtime controls. Do not use them to change worktree
 handling, branch policy, lock recovery, or event format.
 
-`worktree.write_policy` is parsed from the repository's own `.jit/config.toml`
-(see [`write_policy`](#write_policy) above) but is deliberately outside this
-merged system/user/repo introspection surface: the declared stance is a
-repository-scoped policy, not something a user- or system-level config should
-be able to override on the repository's behalf. It does not belong to the
-unapplied fields above — a declared refusal is what makes a per-invocation
-[`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) allowance an override
-worth recording. Refusing a command on the declared stance remains a separate,
-not-yet-implemented enforcement step.
+`worktree.write_policy` is not one of them: it is applied as a runtime control,
+and [`write_policy`](#write_policy) above is its reference.
 
 ## Agent Config (`~/.config/jit/agent.toml`)
 

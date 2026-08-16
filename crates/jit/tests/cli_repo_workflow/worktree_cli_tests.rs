@@ -3,6 +3,8 @@
 //! Tests the full CLI experience for worktree and validate commands.
 
 use assert_cmd::prelude::*;
+use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
+use jit::domain::LinkedCheckoutWriteStance;
 use predicates::prelude::*;
 use serde_json::Value;
 use std::fs;
@@ -129,6 +131,23 @@ fn create_worktree(base_repo: &Path, worktree_name: &str) -> std::path::PathBuf 
     worktree_path
 }
 
+/// Initialize jit inside `checkout`, a linked non-primary checkout.
+///
+/// The invocation declares the allowing linked-checkout write stance rather than
+/// inheriting a default (jit:f52567ed REQ-05): these tests are about worktree
+/// identity, not about the write policy.
+fn init_linked_checkout(checkout: &Path) {
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(checkout)
+        .env(
+            LINKED_CHECKOUT_WRITE_STANCE_ENV,
+            LinkedCheckoutWriteStance::Allow.as_token(),
+        )
+        .arg("init")
+        .assert()
+        .success();
+}
+
 /// Create an issue in `repo` and return its full id.
 fn create_issue(repo: &Path, title: &str) -> String {
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -248,9 +267,15 @@ fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() 
     // discard this copied identity, and leave the primary file untouched.
     fs::write(&linked_identity_path, &primary_before).unwrap();
 
+    // The selected data root is the linked checkout's store, so the invocation
+    // declares the stance that permits it to write there (jit:f52567ed REQ-05).
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp.path())
         .env("JIT_DATA_DIR", worktree_path.join(".jit"))
+        .env(
+            LINKED_CHECKOUT_WRITE_STANCE_ENV,
+            LinkedCheckoutWriteStance::Allow.as_token(),
+        )
         .args(["init", "--json"])
         .output()
         .unwrap();
@@ -748,11 +773,7 @@ fn test_init_in_new_worktree_generates_unique_id() {
     let worktree_path = create_worktree(temp.path(), "test-worktree");
 
     // Run jit init in the worktree
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .arg("init")
-        .assert()
-        .success();
+    init_linked_checkout(&worktree_path);
 
     // Get worktree IDs from both locations
     let main_wt_file = temp.path().join(".jit/worktree.json");
@@ -785,11 +806,7 @@ fn test_init_is_idempotent_in_worktree() {
     let worktree_path = create_worktree(temp.path(), "test-worktree-idempotent");
 
     // Run jit init first time
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .arg("init")
-        .assert()
-        .success();
+    init_linked_checkout(&worktree_path);
 
     let worktree_wt_file = worktree_path.join(".jit/worktree.json");
     let first_content = fs::read_to_string(&worktree_wt_file).unwrap();
@@ -797,11 +814,7 @@ fn test_init_is_idempotent_in_worktree() {
     let first_id = first_identity["worktree_id"].as_str().unwrap();
 
     // Run jit init second time
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .arg("init")
-        .assert()
-        .success();
+    init_linked_checkout(&worktree_path);
 
     let second_content = fs::read_to_string(&worktree_wt_file).unwrap();
     let second_identity: Value = serde_json::from_str(&second_content).unwrap();
@@ -820,17 +833,8 @@ fn test_worktree_list_shows_distinct_ids() {
     let worktree2_path = create_worktree(temp.path(), "test-worktree-2");
 
     // Init both worktrees
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree1_path)
-        .arg("init")
-        .assert()
-        .success();
-
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree2_path)
-        .arg("init")
-        .assert()
-        .success();
+    init_linked_checkout(&worktree1_path);
+    init_linked_checkout(&worktree2_path);
 
     // List worktrees from main repo
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
@@ -918,11 +922,7 @@ fn test_git_worktree_move_preserves_id() {
         .success();
 
     // Initialize jit in the worktree (should get unique ID)
-    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
-        .current_dir(&worktree_path)
-        .arg("init")
-        .assert()
-        .success();
+    init_linked_checkout(&worktree_path);
 
     // Get the worktree ID before move
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
