@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-08-16T09:26:41.547838792Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9757ab31-5e56-421a-b100-3e64dedcc1a5",
   "labels": [
     "type:task",
@@ -24,5 +30,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Converge worktree detection on one primitive",
-  "updated_at": "2026-08-16T08:56:45.884690208Z"
+  "updated_at": "2026-08-16T09:26:41.547838792Z"
 }
