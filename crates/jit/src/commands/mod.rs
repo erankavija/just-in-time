@@ -3298,48 +3298,50 @@ mod tests {
             .is_none());
     }
 
+    /// A dispatch-scoped override fact, as the linked-checkout write guard installs it.
+    fn override_annotation() -> crate::repository_state::MutationContextAnnotation {
+        crate::repository_state::MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+            checkout: std::path::PathBuf::from("/repo/.worktrees/feature"),
+            declared_stance: crate::domain::LinkedCheckoutWriteStance::Refuse,
+            invocation_override: crate::domain::LinkedCheckoutWriteStance::Allow,
+        }
+    }
+
     #[test]
     fn test_dispatch_mutation_annotation_scope_restores_default_after_return_and_unwind() {
         assert!(production_mutation_context()
             .dispatch_annotation()
             .is_none());
 
-        with_dispatch_mutation_annotation(
-            crate::repository_state::MutationContextAnnotation::Test,
-            || {
-                assert_eq!(
-                    production_mutation_context().dispatch_annotation(),
-                    Some(&crate::repository_state::MutationContextAnnotation::Test)
-                );
-                with_dispatch_mutation_annotation(
-                    crate::repository_state::MutationContextAnnotation::Test,
-                    || {
-                        assert!(production_mutation_context()
-                            .dispatch_annotation()
-                            .is_some());
-                    },
-                );
+        with_dispatch_mutation_annotation(override_annotation(), || {
+            assert_eq!(
+                production_mutation_context().dispatch_annotation(),
+                Some(&override_annotation())
+            );
+            with_dispatch_mutation_annotation(override_annotation(), || {
                 assert!(production_mutation_context()
                     .dispatch_annotation()
                     .is_some());
-                std::thread::spawn(|| {
-                    assert!(production_mutation_context()
-                        .dispatch_annotation()
-                        .is_none());
-                })
-                .join()
-                .unwrap();
-            },
-        );
+            });
+            assert!(production_mutation_context()
+                .dispatch_annotation()
+                .is_some());
+            std::thread::spawn(|| {
+                assert!(production_mutation_context()
+                    .dispatch_annotation()
+                    .is_none());
+            })
+            .join()
+            .unwrap();
+        });
         assert!(production_mutation_context()
             .dispatch_annotation()
             .is_none());
 
         let unwound = std::panic::catch_unwind(|| {
-            with_dispatch_mutation_annotation(
-                crate::repository_state::MutationContextAnnotation::Test,
-                || panic!("scope cleanup probe"),
-            );
+            with_dispatch_mutation_annotation(override_annotation(), || {
+                panic!("scope cleanup probe")
+            });
         });
         assert!(unwound.is_err());
         assert!(production_mutation_context()

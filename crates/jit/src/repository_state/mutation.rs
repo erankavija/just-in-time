@@ -21,7 +21,9 @@ use super::{
     RootRelativePath, SeedError, VirtualPath,
 };
 use crate::declarations::GateRegistry;
-use crate::domain::{Assignee, Event, GateRunResult, GateStatus, Issue, State};
+use crate::domain::{
+    Assignee, Event, GateRunResult, GateStatus, Issue, LinkedCheckoutWriteStance, State,
+};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use serde_json::Value;
@@ -182,14 +184,26 @@ pub struct MutationContext {
 
 /// One invocation-scoped fact carried from command dispatch into mutation finalization.
 ///
-/// The vocabulary is intentionally empty until a dispatch concern needs to annotate a
-/// mutation. Keeping the optional carrier in the context now lets that later concern set
-/// the fact once at dispatch instead of threading it through every command module.
+/// The dispatch site sets the fact once, through
+/// [`with_dispatch_mutation_annotation`](crate::commands::with_dispatch_mutation_annotation),
+/// instead of threading it through every command module. The factory stamps it into every
+/// production context it builds, and the finalizer's event pass turns it into an audit
+/// record composed into the same plan as the mutation it annotates.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MutationContextAnnotation {
-    #[cfg(test)]
-    Test,
+    /// An explicit per-invocation override outranked the repository's declared
+    /// linked-checkout write stance and permitted this invocation to mutate the store
+    /// inside a linked non-primary checkout.
+    LinkedCheckoutWriteOverridden {
+        /// Root of the linked checkout whose store the invocation mutates, taken from
+        /// the selected-root worktree authority rather than re-detected.
+        checkout: std::path::PathBuf,
+        /// The stance declared for the repository, which would have refused.
+        declared_stance: LinkedCheckoutWriteStance,
+        /// The per-invocation stance that outranked the declaration.
+        invocation_override: LinkedCheckoutWriteStance,
+    },
 }
 
 /// Constructs production mutation contexts from one dispatch-scoped annotation slot.
@@ -1143,14 +1157,53 @@ pub(super) fn finalize_delta(
     RepositoryDelta::new(layout, actions).map_err(Into::into)
 }
 
+/// Ordering phase of the record a dispatch annotation contributes.
+///
+/// The record annotates the whole append rather than one transition within it, so it
+/// occupies the last phase: it is composed after every event it accompanies, without
+/// displacing any of them and without depending on tag comparison against an existing
+/// phase.
+const ANNOTATION_PHASE: u8 = u8::MAX;
+
+/// The audit record this context's invocation-scoped annotation contributes to one
+/// event pass, or `None` when dispatch installed no annotation.
+///
+/// Every finalizer path that appends events composes them through
+/// [`compose_event_action`], so a path cannot publish its events while omitting the
+/// record. Each plan that emits events carries the record, which is what makes the
+/// record and the mutation it explains durable in the same application.
+fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Option<PendingEvent> {
+    let event = match context.dispatch_annotation()? {
+        MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+            checkout,
+            declared_stance,
+            invocation_override,
+        } => Event::draft_linked_checkout_write_overridden(
+            checkout.clone(),
+            *declared_stance,
+            *invocation_override,
+        ),
+    };
+    let (primary, secondary) = event_identities(&event);
+    Some(PendingEvent {
+        phase: ANNOTATION_PHASE,
+        tag: event.get_type().to_string(),
+        primary,
+        secondary,
+        ordinal,
+        event,
+    })
+}
+
 /// Compose the audit-log append action for a set of pending events over the
-/// captured `events.jsonl` prefix: order them canonically, assign identifiers (via
-/// the context, in the caller's frozen allocation order), stamp the single mutation
-/// timestamp, certify a torn tail (a profile lifecycle marker is required, and the
-/// certifier is composed immediately after the torn partial), and produce the exact
-/// bytes. Returns `None` when there are no events. This is the event pass of
-/// [`finalize`], factored out so [`finalize_audit_append`] can reuse the one
-/// torn-tail authority.
+/// captured `events.jsonl` prefix: admit the record the context's dispatch annotation
+/// contributes, order them canonically, assign identifiers (via the context, in the
+/// caller's frozen allocation order), stamp the single mutation timestamp, certify a
+/// torn tail (a profile lifecycle marker is required, and the certifier is composed
+/// immediately after the torn partial), and produce the exact bytes. Returns `None`
+/// when there are no events. This is the event pass of [`finalize`], factored out so
+/// [`finalize_audit_append`] can reuse the one torn-tail authority — and so the
+/// annotation record reaches both paths from one place.
 fn compose_event_action(
     image: &RepositoryImage,
     context: &MutationContext,
@@ -1158,6 +1211,14 @@ fn compose_event_action(
 ) -> Result<Option<RepositoryAction>, MutationError> {
     if pending_events.is_empty() {
         return Ok(None);
+    }
+    // The annotation record accompanies real events only: the emptiness check above
+    // precedes it, so a no-transition plan that emits no bytes publishes no record
+    // either. Admitting it here — before ordering, identity assignment, and byte
+    // composition — puts it in the same append, and therefore the same plan, as the
+    // events it accompanies.
+    if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
+        pending_events.push(record);
     }
     let path = VirtualPath::EVENTS;
     let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
@@ -1511,9 +1572,28 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_dispatch_annotation_slot_is_behavior_preserving_until_consumed() {
-        let draft = map_order_draft(false);
+    /// The override fact a dispatch site installs when it lets an invocation
+    /// mutate the store of a linked checkout the declared stance refuses.
+    fn override_annotation() -> MutationContextAnnotation {
+        MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+            checkout: std::path::PathBuf::from("/repo/.worktrees/feature"),
+            declared_stance: LinkedCheckoutWriteStance::Refuse,
+            invocation_override: LinkedCheckoutWriteStance::Allow,
+        }
+    }
+
+    /// The deterministic context of [`ctx`] carrying that override fact, as the
+    /// production factory stamps it into every context it builds.
+    fn annotated_ctx() -> MutationContext {
+        MutationContext::with_annotation(
+            IdAuthority::from_seed([7u8; 32]),
+            Box::new(FixedMutationClock::new(fixed_instant())),
+            Some(override_annotation()),
+        )
+    }
+
+    /// The image a single issue creation finalizes over.
+    fn creation_image() -> RepositoryImage {
         let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
             schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
             all_ids: Vec::new(),
@@ -1521,7 +1601,7 @@ mod tests {
         })
         .unwrap();
         let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
-        let image = image_with(vec![
+        image_with(vec![
             (
                 VirtualPath::data("issues").unwrap(),
                 RepositoryEntry::Absent,
@@ -1529,21 +1609,236 @@ mod tests {
             (VirtualPath::INDEX, file_entry(&index_bytes)),
             (VirtualPath::EVENTS, RepositoryEntry::Absent),
             (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
-        ]);
-        let intents = [MutationIntent::CreateIssue {
-            draft: Box::new(draft),
-        }];
-        let without_annotation = finalize(&layout(), &image, &ctx(), &intents).unwrap();
-        let annotated_context = MutationContext::with_annotation(
-            IdAuthority::from_seed([7u8; 32]),
-            Box::new(FixedMutationClock::new(fixed_instant())),
-            Some(MutationContextAnnotation::Test),
-        );
-        let with_annotation = finalize(&layout(), &image, &annotated_context, &intents).unwrap();
+        ])
+    }
 
+    /// The exact bytes a delta appends to the event log, from its single
+    /// `events.jsonl` write.
+    fn appended_event_bytes(delta: &RepositoryDelta) -> Option<Vec<u8>> {
+        let mut writes = delta.actions().iter().filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } if path == &VirtualPath::EVENTS => {
+                Some(bytes.clone())
+            }
+            _ => None,
+        });
+        let first = writes.next();
+        assert!(
+            writes.next().is_none(),
+            "one mutation appends its events through one action"
+        );
+        first
+    }
+
+    /// The events a delta appends, as the event-log reader recovers them.
+    fn appended_events(delta: &RepositoryDelta) -> Vec<Event> {
+        appended_event_bytes(delta)
+            .map(|bytes| {
+                crate::domain::parse_known_events(std::str::from_utf8(&bytes).unwrap()).unwrap()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The override records among `events`.
+    fn override_records(events: &[Event]) -> Vec<&Event> {
+        events
+            .iter()
+            .filter(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .collect()
+    }
+
+    #[test]
+    fn test_finalize_publishes_the_dispatch_override_record_in_the_mutating_plan() {
+        let image = creation_image();
+        let intents = [MutationIntent::CreateIssue {
+            draft: Box::new(map_order_draft(false)),
+        }];
+        let plan = finalize(&layout(), &image, &annotated_ctx(), &intents).unwrap();
+
+        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        assert!(
+            plan.delta()
+                .actions()
+                .iter()
+                .any(|action| action.path() == &issue_path(&created_id).unwrap()),
+            "the record the override permitted is part of the same finalized plan"
+        );
+
+        let events = appended_events(plan.delta());
+        let records = override_records(&events);
         assert_eq!(
-            with_annotation, without_annotation,
-            "an unconsumed dispatch annotation must not change plan output, events, or persisted bytes"
+            records.len(),
+            1,
+            "the permitted mutation carries exactly one override record; events: {events:?}"
+        );
+        let Event::LinkedCheckoutWriteOverridden {
+            id,
+            timestamp,
+            checkout,
+            declared_stance,
+            invocation_override,
+        } = records[0]
+        else {
+            unreachable!("the record was selected by its variant");
+        };
+        let MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+            checkout: annotated_checkout,
+            declared_stance: annotated_declared,
+            invocation_override: annotated_override,
+        } = override_annotation();
+        assert_eq!(
+            (checkout, declared_stance, invocation_override),
+            (
+                &annotated_checkout,
+                &annotated_declared,
+                &annotated_override
+            ),
+            "the record names the checkout and the two stances the dispatch site set"
+        );
+        assert!(
+            !id.is_empty(),
+            "the finalizer assigns the record an identity like any other event"
+        );
+
+        let creation_timestamp = events
+            .iter()
+            .find_map(|event| match event {
+                Event::IssueCreated { timestamp, .. } => Some(timestamp),
+                _ => None,
+            })
+            .expect("the mutation's own event is in the same append");
+        assert_eq!(
+            creation_timestamp, timestamp,
+            "the record carries the one mutation timestamp, so it belongs to this mutation"
+        );
+        let record_position = events
+            .iter()
+            .position(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. }))
+            .expect("the record is in the append");
+        assert_eq!(
+            record_position,
+            events.len() - 1,
+            "the record annotates the whole append, so canonical order places it last; events: {events:?}"
+        );
+    }
+
+    #[test]
+    fn test_finalize_without_dispatch_override_publishes_no_record_and_no_extra_event() {
+        let image = creation_image();
+        let intents = [MutationIntent::CreateIssue {
+            draft: Box::new(map_order_draft(false)),
+        }];
+        let unannotated = appended_event_bytes(
+            finalize(&layout(), &image, &ctx(), &intents)
+                .unwrap()
+                .delta(),
+        )
+        .expect("an issue creation appends its own events");
+        let annotated = appended_event_bytes(
+            finalize(&layout(), &image, &annotated_ctx(), &intents)
+                .unwrap()
+                .delta(),
+        )
+        .expect("an issue creation appends its own events");
+
+        assert!(
+            override_records(
+                &crate::domain::parse_known_events(std::str::from_utf8(&unannotated).unwrap())
+                    .unwrap()
+            )
+            .is_empty(),
+            "an invocation with no override in effect emits no override record"
+        );
+        assert!(
+            annotated.starts_with(&unannotated),
+            "the override record is purely additive: every byte the unannotated mutation \
+             writes is written unchanged, and the record follows them"
+        );
+    }
+
+    #[test]
+    fn test_finalize_noop_mutation_under_dispatch_override_emits_no_bytes() {
+        // The override is in effect, but the mutation transitions nothing. The
+        // documented no-transition property holds: no delta, no identity, no time,
+        // and therefore no override record either.
+        let agent: Assignee = "agent:worker-1".parse().unwrap();
+        let issue = seeded_issue("55555555-5555-4555-8555-555555555555", Some(agent.clone()));
+        let issue_bytes = serialize_issue(&issue).unwrap();
+        let event = Event::IssueClaimed {
+            id: "e".into(),
+            issue_id: issue.id.clone(),
+            timestamp: fixed_instant(),
+            assignee: agent.clone(),
+        };
+        let events_bytes = compose_events(&[], &[serialize_event(&event).unwrap()]);
+        let image = image_with(vec![
+            (issue_path(&issue.id).unwrap(), file_entry(&issue_bytes)),
+            (VirtualPath::EVENTS, file_entry(&events_bytes)),
+        ]);
+        struct PanicClock;
+        impl MutationClock for PanicClock {
+            fn now(&self) -> DateTime<Utc> {
+                panic!("a no-op must not sample the mutation clock");
+            }
+        }
+        let context = MutationContext::with_annotation(
+            IdAuthority::random(),
+            Box::new(PanicClock),
+            Some(override_annotation()),
+        );
+        let plan = finalize(
+            &layout(),
+            &image,
+            &context,
+            &[MutationIntent::ClaimIssue {
+                issue_id: issue.id.clone(),
+                agent,
+            }],
+        )
+        .unwrap();
+        assert!(
+            plan.delta().actions().is_empty(),
+            "an override in effect during a no-op mutation emits no bytes"
+        );
+        assert!(
+            context.ids.sampled_seed().is_none(),
+            "a no-op under an override must not draw the production random seed"
+        );
+    }
+
+    #[test]
+    fn test_finalize_audit_append_publishes_the_dispatch_override_record_with_its_events() {
+        // The second finalizer path composes its events through the same event pass,
+        // so the dispatch fact reaches it without a second edit.
+        let image = image_with(vec![(VirtualPath::EVENTS, RepositoryEntry::Absent)]);
+        let action = finalize_audit_append(
+            &image,
+            &annotated_ctx(),
+            vec![(2, profile_lifecycle_marker())],
+        )
+        .unwrap()
+        .expect("a non-empty audit append composes an action");
+        let RepositoryAction::WriteFile { bytes, .. } = &action else {
+            unreachable!("an audit append writes the event log");
+        };
+        let events =
+            crate::domain::parse_known_events(std::str::from_utf8(bytes).unwrap()).unwrap();
+        assert_eq!(
+            override_records(&events).len(),
+            1,
+            "the initialization-style append carries the override record too; events: {events:?}"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, Event::ProfileLifecycle { .. })),
+            "the caller's own event is in the same append; events: {events:?}"
+        );
+
+        assert!(
+            finalize_audit_append(&image, &annotated_ctx(), Vec::new())
+                .unwrap()
+                .is_none(),
+            "an override in effect over an empty audit append still emits nothing"
         );
     }
 
