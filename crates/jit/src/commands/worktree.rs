@@ -170,11 +170,7 @@ pub fn execute_worktree_info(paths: &WorktreePaths) -> Result<(WorktreeInfo, Vec
     let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
     // Determine if this is the main worktree
     let is_main = !paths.is_worktree();
@@ -269,17 +265,15 @@ fn execute_worktree_list_at(
 
             // Load worktree identity - error if .jit exists but can't be read
             let worktree_id = if local_jit.exists() {
-                let (identity, entry_warnings) = load_or_create_worktree_identity_with_warnings(
-                    &local_jit,
-                    &worktree_path,
-                    &git_entry.branch,
-                )
-                .with_context(|| {
-                    format!(
-                        "Failed to load worktree identity from {}",
-                        local_jit.display()
-                    )
-                })?;
+                let entry_paths = paths.for_worktree_root(worktree_path.clone());
+                let (identity, entry_warnings) =
+                    load_or_create_worktree_identity_with_warnings(&entry_paths, &git_entry.branch)
+                        .with_context(|| {
+                            format!(
+                                "Failed to load worktree identity from {}",
+                                local_jit.display()
+                            )
+                        })?;
                 warnings.extend(entry_warnings);
                 identity.worktree_id
             } else {
@@ -645,6 +639,7 @@ mod tests {
         let worktree_id = format!("wt:{branch}");
 
         let paths = WorktreePaths {
+            git_repository: true,
             common_dir: root.join(".git"),
             worktree_root: root.to_path_buf(),
             local_jit: root.join(".jit"),

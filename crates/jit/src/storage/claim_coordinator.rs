@@ -1542,6 +1542,7 @@ mod tests {
     /// A coordinator whose contended lock waits expire after `lock_wait`.
     fn coordinator_with_lock_wait(temp_dir: &TempDir, lock_wait: StdDuration) -> ClaimCoordinator {
         let paths = WorktreePaths {
+            git_repository: true,
             common_dir: temp_dir.path().join(".git"),
             worktree_root: temp_dir.path().to_path_buf(),
             local_jit: temp_dir.path().join(".jit"),
@@ -1687,6 +1688,7 @@ mod tests {
         ));
         let other = ClaimCoordinator::new(
             WorktreePaths {
+                git_repository: true,
                 common_dir: temp_dir.path().join(".git"),
                 worktree_root: temp_dir.path().to_path_buf(),
                 local_jit: temp_dir.path().join(".jit"),
@@ -1800,6 +1802,7 @@ mod tests {
 
                 thread::spawn(move || {
                     let paths = WorktreePaths {
+                        git_repository: true,
                         common_dir: temp_path.join(".git"),
                         worktree_root: temp_path.to_path_buf(),
                         local_jit: temp_path.join(".jit"),
@@ -2077,6 +2080,7 @@ mod tests {
 
         // Create coordinator for different agent
         let paths = WorktreePaths {
+            git_repository: true,
             common_dir: temp_dir.path().join(".git"),
             worktree_root: temp_dir.path().to_path_buf(),
             local_jit: temp_dir.path().join(".jit"),
@@ -2135,6 +2139,7 @@ mod tests {
 
         // Create coordinator for different agent
         let paths = WorktreePaths {
+            git_repository: true,
             common_dir: temp_dir.path().join(".git"),
             worktree_root: temp_dir.path().to_path_buf(),
             local_jit: temp_dir.path().join(".jit"),
@@ -2165,6 +2170,7 @@ mod tests {
 
         // Create admin coordinator
         let paths = WorktreePaths {
+            git_repository: true,
             common_dir: temp_dir.path().join(".git"),
             worktree_root: temp_dir.path().to_path_buf(),
             local_jit: temp_dir.path().join(".jit"),

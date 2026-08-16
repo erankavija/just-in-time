@@ -3081,31 +3081,22 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// remains outside repository publication.
     pub fn initialize_worktree_identity(
         &self,
+        paths: &crate::storage::worktree_paths::WorktreePaths,
     ) -> Result<(
         Option<WorktreeIdentity>,
         Vec<crate::storage::StorageWarning>,
     )> {
         use crate::storage::worktree_identity::load_or_create_worktree_identity_with_warnings;
-        use crate::storage::worktree_paths::WorktreePaths;
 
-        // Check if we're actually in a git repository
-        let in_git_repo = std::process::Command::new("git")
-            .args(["rev-parse", "--is-inside-work-tree"])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false);
-
-        if !in_git_repo {
+        if !paths.is_git_repository() {
             return Ok((None, Vec::new()));
         }
 
-        // Create worktree identity
-        let paths = WorktreePaths::detect()?;
-
         // Get git branch name
         let branch = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&paths.worktree_root)
             .args(["branch", "--show-current"])
-            .current_dir(&paths.worktree_root)
             .output()
             .ok()
             .and_then(|output| {
@@ -3121,11 +3112,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Create or update worktree identity
         // This handles copied files in git worktrees automatically
-        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-            &paths.local_jit,
-            &paths.worktree_root,
-            &branch,
-        )?;
+        let (identity, warnings) = load_or_create_worktree_identity_with_warnings(paths, &branch)?;
 
         Ok((Some(identity), warnings))
     }

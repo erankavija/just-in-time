@@ -1,6 +1,7 @@
 use jit::storage::worktree_identity::{
     generate_worktree_id, load_or_create_worktree_identity, WorktreeIdentity,
 };
+use jit::storage::WorktreePaths;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -8,6 +9,10 @@ use tempfile::TempDir;
 
 fn jit_binary() -> &'static str {
     env!("CARGO_BIN_EXE_jit")
+}
+
+fn identity_paths(temp_dir: &TempDir) -> WorktreePaths {
+    WorktreePaths::detect_for_data_root(&temp_dir.path().join(".jit"), temp_dir.path()).unwrap()
 }
 
 #[test]
@@ -101,7 +106,7 @@ fn test_load_or_create_creates_new_identity() {
     fs::create_dir_all(&jit_dir).unwrap();
 
     let branch = "test-branch".to_string();
-    let identity = load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let identity = load_or_create_worktree_identity(&identity_paths(&temp_dir), &branch).unwrap();
 
     assert!(identity.worktree_id.starts_with("wt:"));
     assert_eq!(identity.branch, branch);
@@ -123,10 +128,11 @@ fn test_load_or_create_loads_existing_identity() {
     let branch = "test-branch".to_string();
 
     // Create first time
-    let identity1 = load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let paths = identity_paths(&temp_dir);
+    let identity1 = load_or_create_worktree_identity(&paths, &branch).unwrap();
 
     // Load second time - should get same ID
-    let identity2 = load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let identity2 = load_or_create_worktree_identity(&paths, &branch).unwrap();
 
     assert_eq!(identity1.worktree_id, identity2.worktree_id);
     assert_eq!(identity1.created_at, identity2.created_at);
@@ -141,8 +147,8 @@ fn test_relocation_detection_updates_path() {
     let branch = "test-branch".to_string();
 
     // Create identity with original path
-    let mut identity =
-        load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let paths = identity_paths(&temp_dir);
+    let mut identity = load_or_create_worktree_identity(&paths, &branch).unwrap();
     let original_id = identity.worktree_id.clone();
 
     // Manually change the root in the JSON file to simulate relocation
@@ -152,7 +158,7 @@ fn test_relocation_detection_updates_path() {
     fs::write(&wt_file, json).unwrap();
 
     // Load again - should detect relocation
-    let relocated = load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let relocated = load_or_create_worktree_identity(&paths, &branch).unwrap();
 
     assert_eq!(
         relocated.worktree_id, original_id,
@@ -178,8 +184,8 @@ fn test_atomic_write_on_relocation() {
     let branch = "test-branch".to_string();
 
     // Create identity
-    let mut identity =
-        load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let paths = identity_paths(&temp_dir);
+    let mut identity = load_or_create_worktree_identity(&paths, &branch).unwrap();
     identity.root = "/old/path".to_string();
 
     let wt_file = jit_dir.join("worktree.json");
@@ -187,7 +193,7 @@ fn test_atomic_write_on_relocation() {
     fs::write(&wt_file, json).unwrap();
 
     // Load should update atomically
-    let _relocated = load_or_create_worktree_identity(&jit_dir, temp_dir.path(), &branch).unwrap();
+    let _relocated = load_or_create_worktree_identity(&paths, &branch).unwrap();
 
     // Verify no .tmp file left behind
     let tmp_file = jit_dir.join("worktree.json.tmp");

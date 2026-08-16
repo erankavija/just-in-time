@@ -11,6 +11,8 @@ use crate::errors;
 /// (`.jit/`) and shared control plane (`.git/jit/`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct WorktreePaths {
+    /// Whether the selected data root belongs to a Git checkout.
+    pub git_repository: bool,
     /// Shared .git directory (common across all worktrees)
     pub common_dir: PathBuf,
     /// Root of current worktree
@@ -71,6 +73,7 @@ impl WorktreePaths {
             let worktree_root = non_git_root.to_path_buf();
             let dot_git = worktree_root.join(".git");
             return Ok(Self {
+                git_repository: false,
                 common_dir: dot_git.clone(),
                 local_jit: selected_data_root
                     .map(Path::to_path_buf)
@@ -129,11 +132,33 @@ impl WorktreePaths {
         let shared_jit = common_dir.join("jit");
 
         Ok(Self {
+            git_repository: true,
             common_dir,
             worktree_root,
             local_jit,
             shared_jit,
         })
+    }
+
+    /// Return whether the selected data root belongs to a Git checkout.
+    pub fn is_git_repository(&self) -> bool {
+        self.git_repository
+    }
+
+    /// Project this repository authority onto one worktree reported by Git.
+    ///
+    /// This derives per-worktree identity paths without running a second
+    /// repository-layout probe. The projected store uses the conventional
+    /// `.jit` location reported by `git worktree list` consumers.
+    pub fn for_worktree_root(&self, worktree_root: PathBuf) -> Self {
+        let local_jit = worktree_root.join(".jit");
+        Self {
+            git_repository: self.git_repository,
+            common_dir: self.common_dir.clone(),
+            worktree_root,
+            local_jit,
+            shared_jit: self.shared_jit.clone(),
+        }
     }
 
     /// Check if we're in a secondary worktree (not main worktree).
@@ -264,6 +289,7 @@ mod tests {
     #[test]
     fn test_is_worktree_detection() {
         let main_paths = WorktreePaths {
+            git_repository: true,
             common_dir: PathBuf::from("/repo/.git"),
             worktree_root: PathBuf::from("/repo"),
             local_jit: PathBuf::from("/repo/.jit"),
@@ -272,6 +298,7 @@ mod tests {
         assert!(!main_paths.is_worktree());
 
         let secondary_paths = WorktreePaths {
+            git_repository: true,
             common_dir: PathBuf::from("/repo/.git"),
             worktree_root: PathBuf::from("/worktrees/feature-a"),
             local_jit: PathBuf::from("/worktrees/feature-a/.jit"),
@@ -301,6 +328,7 @@ mod tests {
                 .unwrap();
 
         assert!(!paths.is_worktree());
+        assert!(!paths.is_git_repository());
         assert_eq!(paths.worktree_root, repository_root.path());
         assert_eq!(paths.local_jit, selected_root.path());
         assert_eq!(paths.primary_data_root().unwrap(), None);

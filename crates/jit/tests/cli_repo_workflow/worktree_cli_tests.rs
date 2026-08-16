@@ -234,6 +234,55 @@ fn test_worktree_info_follows_overridden_data_root_checkout() {
 }
 
 #[test]
+fn test_init_follows_overridden_linked_data_root_and_replaces_copied_identity() {
+    let temp = setup_repo();
+    let worktree_path = create_worktree(temp.path(), "override-init-worktree");
+    let primary_identity_path = temp.path().join(".jit/worktree.json");
+    let linked_identity_path = worktree_path.join(".jit/worktree.json");
+    let primary_before = fs::read(&primary_identity_path).unwrap();
+    let primary_identity: Value = serde_json::from_slice(&primary_before).unwrap();
+    let linked_branch = worktree_path.file_name().unwrap().to_str().unwrap();
+
+    // Reproduce a linked checkout copied from a primary store that carried its
+    // machine-local identity. Init must classify the selected linked store,
+    // discard this copied identity, and leave the primary file untouched.
+    fs::write(&linked_identity_path, &primary_before).unwrap();
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .env("JIT_DATA_DIR", worktree_path.join(".jit"))
+        .args(["init", "--json"])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "override init failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read(&primary_identity_path).unwrap(),
+        primary_before,
+        "initializing the selected linked store must not refresh the primary identity"
+    );
+    let linked_identity: Value =
+        serde_json::from_slice(&fs::read(&linked_identity_path).unwrap()).unwrap();
+    assert_eq!(
+        linked_identity["root"].as_str(),
+        Some(worktree_path.to_str().unwrap())
+    );
+    assert_eq!(linked_identity["branch"].as_str(), Some(linked_branch));
+    assert_ne!(
+        linked_identity["branch"], primary_identity["branch"],
+        "the linked identity must use the selected checkout's branch"
+    );
+    assert_ne!(
+        linked_identity["worktree_id"], primary_identity["worktree_id"],
+        "a copied primary identity must be replaced for the selected linked checkout"
+    );
+}
+
+#[test]
 fn test_worktree_info_creates_identity_file() {
     let temp = setup_repo();
 

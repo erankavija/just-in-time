@@ -2341,7 +2341,8 @@ fn run() -> Result<()> {
             )?;
             // Machine-local worktree identity (gitignored, not part of the
             // repository transaction) is created after the scaffold is published.
-            let (worktree_identity, init_warnings) = executor.initialize_worktree_identity()?;
+            let (worktree_identity, init_warnings) =
+                executor.initialize_worktree_identity(&worktree_paths)?;
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
             }

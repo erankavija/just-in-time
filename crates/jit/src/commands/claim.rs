@@ -97,11 +97,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
     let branch = get_current_branch()?;
 
     // Load or generate worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Resolve agent ID using proper priority: CLI flag > JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let agent = resolve_agent_id(agent_id.map(|s| s.to_string()))?;
@@ -247,11 +243,7 @@ pub fn execute_claim_heartbeat(lease_id: &str) -> Result<Vec<StorageWarning>> {
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -364,11 +356,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Resolve the acting identity for the audit trail BEFORE evicting anything,
     // so a release never happens without an attributable actor. This is
@@ -457,11 +445,7 @@ pub fn execute_claim_renew<S: IssueStore>(
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Resolve agent ID
     let agent = resolve_agent_id(None)?;
@@ -514,11 +498,7 @@ pub fn execute_claim_status<S: IssueStore>(
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Resolve current agent ID using proper priority: JIT_AGENT_ID > ~/.config/jit/agent.toml > error
     let current_agent_id = resolve_agent_id(None)?;
@@ -571,11 +551,7 @@ pub fn execute_claim_list() -> Result<(Vec<Lease>, Vec<StorageWarning>)> {
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // We need an agent ID for coordinator, but it doesn't matter which one for listing
     let agent = "system:list".to_string();
@@ -626,11 +602,8 @@ pub fn check_issue_lease(
     };
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    ) {
+    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(&paths, &branch)
+    {
         Ok(loaded) => loaded,
         Err(_) => return Ok((None, Vec::new())), // Can't load identity, skip lease check
     };
@@ -689,11 +662,7 @@ pub fn execute_claim_force_evict<S: IssueStore>(
     let branch = get_current_branch()?;
 
     // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, warnings) = load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // For force-evict, we use a system agent (admin operation)
     let agent = "system:admin".to_string();
@@ -747,11 +716,8 @@ pub fn execute_recover<S: IssueStore>(_storage: &S) -> Result<RecoveryReport> {
     let branch = get_current_branch()?;
 
     // Load worktree identity (surfacing any relocation as a typed warning)
-    let (identity, identity_warnings) = load_or_create_worktree_identity_with_warnings(
-        &paths.local_jit,
-        &paths.worktree_root,
-        &branch,
-    )?;
+    let (identity, identity_warnings) =
+        load_or_create_worktree_identity_with_warnings(&paths, &branch)?;
 
     // Create claim coordinator
     let agent = "system:recovery".to_string();
@@ -863,8 +829,7 @@ mod tests {
 
         // Get or create worktree identity
         let branch = "test-branch".to_string();
-        let identity =
-            load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+        let identity = load_or_create_worktree_identity(&paths, &branch)?;
 
         // Create coordinator
         let locker = FileLocker::new(Duration::from_secs(
@@ -1265,8 +1230,7 @@ mod tests {
         let paths = create_test_paths(temp);
 
         let branch = "test-branch".to_string();
-        let identity =
-            load_or_create_worktree_identity(&paths.local_jit, &paths.worktree_root, &branch)?;
+        let identity = load_or_create_worktree_identity(&paths, &branch)?;
 
         let locker = FileLocker::new(Duration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
@@ -1701,11 +1665,7 @@ mod tests {
     ) -> Result<String> {
         let full_id = storage.resolve_issue_id(issue_id)?;
         let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(
-            &paths.local_jit,
-            &paths.worktree_root,
-            "test-branch",
-        )?;
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let locker = FileLocker::new(Duration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
@@ -1740,11 +1700,7 @@ mod tests {
 
     fn persist_legacy_claim(temp: &TempDir, issue_id: &str, agent_id: &str) -> Result<Lease> {
         let paths = create_test_paths(temp);
-        let identity = load_or_create_worktree_identity(
-            &paths.local_jit,
-            &paths.worktree_root,
-            "test-branch",
-        )?;
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let coordinator = ClaimCoordinator::new(
             paths,
             FileLocker::new(Duration::from_secs(
@@ -1977,11 +1933,7 @@ mod tests {
         let full_id = storage.resolve_issue_id(&issue_id)?;
 
         let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(
-            &paths.local_jit,
-            &paths.worktree_root,
-            "test-branch",
-        )?;
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let locker = FileLocker::new(Duration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));
@@ -2021,11 +1973,7 @@ mod tests {
         let full_id = storage.resolve_issue_id(&issue_id)?;
 
         let paths = create_test_paths(&temp);
-        let identity = load_or_create_worktree_identity(
-            &paths.local_jit,
-            &paths.worktree_root,
-            "test-branch",
-        )?;
+        let identity = load_or_create_worktree_identity(&paths, "test-branch")?;
         let locker = FileLocker::new(Duration::from_secs(
             crate::runtime_defaults::LOCK_TIMEOUT_SECS,
         ));

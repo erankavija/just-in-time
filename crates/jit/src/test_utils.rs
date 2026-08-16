@@ -1248,6 +1248,7 @@ pub fn copy_package_tree(source: &Path, root: &Path) -> PathBuf {
 /// ```
 pub fn create_test_paths(temp: &TempDir) -> WorktreePaths {
     WorktreePaths {
+        git_repository: true,
         common_dir: temp.path().join(".git"),
         worktree_root: temp.path().to_path_buf(),
         local_jit: temp.path().join(".jit"),
