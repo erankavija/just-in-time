@@ -14524,3 +14524,4 @@
 {"from":"backlog","id":"d3fc8733-a532-420b-9ac0-f52b97805074","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T20:21:12.861111901Z","to":"ready","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"43130c99-8f63-4f7c-a0c3-84976a0c5d85","issue_id":"4a559332-e795-4320-9eb9-193e248d628c","timestamp":"2026-08-16T20:21:18.943022441Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["description"],"id":"3a6e7644-b0d5-4980-8793-44f014ff29f3","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T20:21:37.603020320Z","type":"issue_updated","updated_by":"issue-update"}
+{"assignee":"agent:worker","id":"c824802d-962f-4f7b-84bd-97397960fb46","issue_id":"62518095-2bb8-4c12-9828-3247ce22b7c6","timestamp":"2026-08-16T20:22:33.845915301Z","type":"issue_claimed"}
