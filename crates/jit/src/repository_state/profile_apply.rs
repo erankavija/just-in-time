@@ -237,7 +237,7 @@ pub struct ComposedContribution {
 }
 
 /// Origin of one differing definition in a semantic contribution conflict.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum ContributionConflictOwner {
     /// The repository itself authored one of the conflicting definitions.
     Repository,
@@ -662,6 +662,32 @@ pub enum ProfileTargetConflict {
 }
 
 impl ProfileTargetConflict {
+    /// The resolutions that apply to this conflict.
+    pub fn remedy(&self) -> ProfileRemedy {
+        match self {
+            Self::Occupied {
+                occupant: ProfileConflictOccupant::Repository,
+            } => ProfileRemedy::new([
+                ProfileResolution::MoveTargetAside,
+                ProfileResolution::CaptureRepositoryContent,
+            ]),
+            Self::Occupied {
+                occupant: ProfileConflictOccupant::Package(_),
+            } => ProfileRemedy::new([
+                ProfileResolution::StopOnePackageFromDeclaringTarget,
+                ProfileResolution::ApplyOneOfConflictingPackages,
+            ]),
+            Self::Diverged { .. } => ProfileRemedy::new([
+                ProfileResolution::RestoreRecordedContent,
+                ProfileResolution::CaptureRepositoryContent,
+            ]),
+            Self::Contested { .. } => ProfileRemedy::new([
+                ProfileResolution::MakeDefinitionsIdentical,
+                ProfileResolution::ApplyOnlyOneDeclaringPackage,
+            ]),
+        }
+    }
+
     /// A human clause naming why the target cannot be published and what
     /// resolves it.
     ///
@@ -674,11 +700,7 @@ impl ProfileTargetConflict {
         match self {
             Self::Occupied { occupant } => format!(
                 "is held by {occupant} with content this profile did not publish: {}",
-                match occupant {
-                    ProfileConflictOccupant::Repository => SET_ASIDE_OR_CAPTURE,
-                    ProfileConflictOccupant::Package(_) =>
-                        "stop one of the two packages from declaring it, or apply only one of them",
-                }
+                self.remedy().message(),
             ),
             Self::Diverged {
                 base,
@@ -686,45 +708,159 @@ impl ProfileTargetConflict {
                 candidate,
             } => format!(
                 "changed after this profile published it (recorded {}, now {}, would publish {}): \
-                 {RESTORE_OR_CAPTURE}",
+                 {}",
                 fingerprint_label(base),
                 fingerprint_label(current),
                 fingerprint_label(candidate),
+                self.remedy().message(),
             ),
             Self::Contested { owners } => format!(
-                "is defined differently by {}: {ALIGN_OR_SELECT_ONE}",
+                "is defined differently by {}: {}",
                 owners
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>()
                     .join(", "),
+                self.remedy().message(),
             ),
         }
     }
 }
 
-/// What resolves a target the repository holds and no package published.
-///
-/// The remedy that always applies comes first. Capture redraws a declaration
-/// whose source is a live one, so it folds the repository's content into the
-/// package only for those; naming that condition keeps the second remedy from
-/// promising an outcome a plain packaged asset would not get.
-const SET_ASIDE_OR_CAPTURE: &str = "move it aside before applying, or fold it into a live-source \
-                                    package with 'jit profile capture --source <package-dir> \
-                                    --destination <package-dir>'";
+/// One action that can resolve a profile conflict or divergence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProfileResolution {
+    /// Move the repository-authored target aside before applying the profile.
+    MoveTargetAside,
+    /// Restore the content recorded when this profile last published the target.
+    RestoreRecordedContent,
+    /// Capture the repository's current content into its live-source package.
+    CaptureRepositoryContent,
+    /// Stop one of the conflicting packages from declaring the shared target.
+    StopOnePackageFromDeclaringTarget,
+    /// Apply only one of the packages that conflict over a target.
+    ApplyOneOfConflictingPackages,
+    /// Make the competing semantic definitions identical.
+    MakeDefinitionsIdentical,
+    /// Apply only one package that declares the contested definition.
+    ApplyOnlyOneDeclaringPackage,
+    /// Restore the recorded package source before recovering its content.
+    RestoreRecordedPackage,
+}
 
-/// What resolves a profile-owned target edited after its owner published it.
-const RESTORE_OR_CAPTURE: &str = "restore the value this profile published, or fold the edit into \
-                                  a live-source package with 'jit profile capture --source \
-                                  <package-dir> --destination <package-dir>'";
+impl ProfileResolution {
+    fn message(self) -> &'static str {
+        match self {
+            Self::MoveTargetAside => "move it aside before applying",
+            Self::RestoreRecordedContent => "restore the value this profile published",
+            Self::CaptureRepositoryContent => {
+                "fold it into a live-source package with \
+                                               'jit profile capture --source <package-dir> \
+                                               --destination <package-dir>'"
+            }
+            Self::StopOnePackageFromDeclaringTarget => {
+                "stop one of the two packages from declaring it"
+            }
+            Self::ApplyOneOfConflictingPackages => "apply only one of them",
+            Self::MakeDefinitionsIdentical => "make those definitions identical",
+            Self::ApplyOnlyOneDeclaringPackage => "apply only one package that declares it",
+            Self::RestoreRecordedPackage => "restore the package this profile recorded",
+        }
+    }
+}
 
-/// What resolves a declaration its owners define differently.
-///
-/// Capture is deliberately absent: it redraws a package from repository files,
-/// which leaves a declaration two owners disagree about exactly as contested as
-/// it was.
-const ALIGN_OR_SELECT_ONE: &str = "make those definitions identical, or apply only one package \
-                                   that declares it";
+/// The complete set of resolutions that applies to one profile finding.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProfileRemedy {
+    resolutions: Vec<ProfileResolution>,
+}
+
+impl ProfileRemedy {
+    pub(crate) fn new(resolutions: impl IntoIterator<Item = ProfileResolution>) -> Self {
+        Self {
+            resolutions: resolutions.into_iter().collect(),
+        }
+    }
+
+    /// The individually named resolutions that apply.
+    pub fn resolutions(&self) -> &[ProfileResolution] {
+        &self.resolutions
+    }
+
+    /// Whether capturing repository content is an applicable resolution.
+    pub fn allows_capture_repository_content(&self) -> bool {
+        self.resolutions
+            .contains(&ProfileResolution::CaptureRepositoryContent)
+    }
+
+    /// Render the resolutions as the human prose attached to a finding.
+    pub fn message(&self) -> String {
+        self.resolutions
+            .iter()
+            .map(|resolution| resolution.message())
+            .collect::<Vec<_>>()
+            .join(", or ")
+    }
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ProfileTargetConflictWire<'a> {
+    Occupied {
+        occupant: &'a ProfileConflictOccupant,
+        remedy: ProfileRemedy,
+    },
+    Diverged {
+        base: Option<&'a ProfileBaseFingerprint>,
+        current: Option<&'a ProfileBaseFingerprint>,
+        candidate: Option<&'a ProfileBaseFingerprint>,
+        remedy: ProfileRemedy,
+    },
+    Contested {
+        owners: &'a [ContributionConflictOwner],
+        remedy: ProfileRemedy,
+    },
+}
+
+impl Serialize for ProfileTargetConflict {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let wire = match self {
+            Self::Occupied { occupant } => ProfileTargetConflictWire::Occupied {
+                occupant,
+                remedy: self.remedy(),
+            },
+            Self::Diverged {
+                base,
+                current,
+                candidate,
+            } => ProfileTargetConflictWire::Diverged {
+                base: three_way_fingerprint(base),
+                current: three_way_fingerprint(current),
+                candidate: three_way_fingerprint(candidate),
+                remedy: self.remedy(),
+            },
+            Self::Contested { owners } => ProfileTargetConflictWire::Contested {
+                owners,
+                remedy: self.remedy(),
+            },
+        };
+        wire.serialize(serializer)
+    }
+}
+
+fn three_way_fingerprint(
+    value: &ThreeWayValue<ProfileBaseFingerprint>,
+) -> Option<&ProfileBaseFingerprint> {
+    match value {
+        ThreeWayValue::Absent => None,
+        ThreeWayValue::Present(fingerprint) => Some(fingerprint),
+    }
+}
 
 /// How many leading digits of a fingerprint a message names.
 ///
@@ -4171,6 +4307,60 @@ mod tests {
                 && !diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS + 1)),
             "the values that disagree reach the reader as their leading digits: {diverged}"
         );
+    }
+
+    #[test]
+    fn test_profile_target_conflict_serializes_its_typed_remedy_with_the_conflict_evidence() {
+        let conflict = ProfileTargetConflict::Diverged {
+            base: ThreeWayValue::Absent,
+            current: ThreeWayValue::Absent,
+            candidate: ThreeWayValue::Absent,
+        };
+
+        let serialized = serde_json::to_value(&conflict).expect("a conflict serializes");
+
+        assert_eq!(serialized["kind"], "diverged");
+        assert_eq!(
+            serialized["remedy"]["resolutions"],
+            serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+        );
+        assert_eq!(
+            conflict.remedy().resolutions(),
+            &[
+                ProfileResolution::RestoreRecordedContent,
+                ProfileResolution::CaptureRepositoryContent,
+            ]
+        );
+    }
+
+    #[test]
+    fn test_profile_target_conflict_remedy_marks_capture_only_for_resolvable_conflicts() {
+        let conflicts = [
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Repository,
+            },
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("base")),
+            },
+            ProfileTargetConflict::Diverged {
+                base: ThreeWayValue::Absent,
+                current: ThreeWayValue::Absent,
+                candidate: ThreeWayValue::Absent,
+            },
+            ProfileTargetConflict::Contested { owners: Vec::new() },
+        ];
+
+        assert_eq!(
+            conflicts
+                .iter()
+                .filter(|conflict| conflict.remedy().allows_capture_repository_content())
+                .count(),
+            2,
+            "capture applies only to repository-owned occupants and diverged owned targets"
+        );
+        assert!(conflicts
+            .iter()
+            .all(|conflict| conflict.message().contains(&conflict.remedy().message())));
     }
 
     /// A composition decides every target it was asked about, so a package

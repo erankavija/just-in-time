@@ -15,16 +15,15 @@
 use crate::domain::ProfileOrigin;
 use crate::profile::ProfileCollection;
 use crate::repository_state::{
-    claimed_target_state, AppliedProfileRecord, ClaimedTargetState, RepositoryImage,
-    RepositoryStateError,
+    claimed_target_state, AppliedProfileRecord, ClaimedTargetState, ProfileRemedy,
+    ProfileResolution, RepositoryImage, RepositoryStateError,
 };
-use schemars::JsonSchema;
+use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
 use serde::Serialize;
 
 /// One way a recorded profile no longer agrees with its package or with the
 /// repository content it owns.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileDivergence {
     /// The location this profile's record names holds no readable package.
     ///
@@ -71,13 +70,30 @@ pub enum ProfileDivergence {
 }
 
 impl ProfileDivergence {
+    /// The resolutions that apply to this divergence.
+    pub fn remedy(&self) -> ProfileRemedy {
+        match self {
+            Self::UnreadablePackage { .. }
+            | Self::UnresolvedValues { .. }
+            | Self::UnownedTarget { .. } => {
+                ProfileRemedy::new([ProfileResolution::RestoreRecordedPackage])
+            }
+            Self::ChangedPackageIdentity { .. }
+            | Self::ChangedTarget { .. }
+            | Self::AbsentTarget { .. } => ProfileRemedy::new([
+                ProfileResolution::RestoreRecordedContent,
+                ProfileResolution::CaptureRepositoryContent,
+            ]),
+        }
+    }
+
     /// A standalone human sentence naming what diverged and how.
     ///
     /// The message carries every fact its structured form carries, so a reader
     /// of CLI output and a reader of a validation finding act on the same
     /// evidence without consulting the JSON envelope.
     pub fn message(&self) -> String {
-        match self {
+        let finding = match self {
             Self::UnreadablePackage { reason } => reason.clone(),
             Self::UnresolvedValues { reason } => format!(
                 "the values this profile recorded no longer resolve against the package at its \
@@ -101,7 +117,126 @@ impl ProfileDivergence {
             Self::UnownedTarget { target } => format!(
                 "'{target}' is claimed by this profile, whose package can no longer be read"
             ),
-        }
+        };
+        format!("{finding}: {}", self.remedy().message())
+    }
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ProfileDivergenceWire<'a> {
+    UnreadablePackage {
+        reason: &'a str,
+        remedy: ProfileRemedy,
+    },
+    UnresolvedValues {
+        reason: &'a str,
+        remedy: ProfileRemedy,
+    },
+    ChangedPackageIdentity {
+        recorded_version: &'a str,
+        recorded_package_hash: &'a str,
+        current_version: &'a str,
+        current_package_hash: &'a str,
+        remedy: ProfileRemedy,
+    },
+    ChangedTarget {
+        target: &'a str,
+        remedy: ProfileRemedy,
+    },
+    AbsentTarget {
+        target: &'a str,
+        remedy: ProfileRemedy,
+    },
+    UnownedTarget {
+        target: &'a str,
+        remedy: ProfileRemedy,
+    },
+}
+
+impl Serialize for ProfileDivergence {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let wire = match self {
+            Self::UnreadablePackage { reason } => ProfileDivergenceWire::UnreadablePackage {
+                reason,
+                remedy: self.remedy(),
+            },
+            Self::UnresolvedValues { reason } => ProfileDivergenceWire::UnresolvedValues {
+                reason,
+                remedy: self.remedy(),
+            },
+            Self::ChangedPackageIdentity {
+                recorded_version,
+                recorded_package_hash,
+                current_version,
+                current_package_hash,
+            } => ProfileDivergenceWire::ChangedPackageIdentity {
+                recorded_version,
+                recorded_package_hash,
+                current_version,
+                current_package_hash,
+                remedy: self.remedy(),
+            },
+            Self::ChangedTarget { target } => ProfileDivergenceWire::ChangedTarget {
+                target,
+                remedy: self.remedy(),
+            },
+            Self::AbsentTarget { target } => ProfileDivergenceWire::AbsentTarget {
+                target,
+                remedy: self.remedy(),
+            },
+            Self::UnownedTarget { target } => ProfileDivergenceWire::UnownedTarget {
+                target,
+                remedy: self.remedy(),
+            },
+        };
+        wire.serialize(serializer)
+    }
+}
+
+#[allow(dead_code)]
+#[derive(JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ProfileDivergenceSchema {
+    UnreadablePackage {
+        reason: String,
+        remedy: ProfileRemedy,
+    },
+    UnresolvedValues {
+        reason: String,
+        remedy: ProfileRemedy,
+    },
+    ChangedPackageIdentity {
+        recorded_version: String,
+        recorded_package_hash: String,
+        current_version: String,
+        current_package_hash: String,
+        remedy: ProfileRemedy,
+    },
+    ChangedTarget {
+        target: String,
+        remedy: ProfileRemedy,
+    },
+    AbsentTarget {
+        target: String,
+        remedy: ProfileRemedy,
+    },
+    UnownedTarget {
+        target: String,
+        remedy: ProfileRemedy,
+    },
+}
+
+impl JsonSchema for ProfileDivergence {
+    fn schema_name() -> String {
+        "ProfileDivergence".to_string()
+    }
+
+    fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        ProfileDivergenceSchema::json_schema(generator)
     }
 }
 
@@ -224,4 +359,56 @@ pub fn unowned_target_divergences(record: &AppliedProfileRecord) -> Vec<ProfileD
             target: claim.identity.to_string(),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProfileDivergence;
+    use crate::repository_state::ProfileResolution;
+
+    #[test]
+    fn test_profile_divergence_serializes_the_remedy_that_its_message_renders() {
+        let divergence = ProfileDivergence::ChangedTarget {
+            target: "docs/guide.md".to_string(),
+        };
+
+        let serialized = serde_json::to_value(&divergence).expect("a divergence serializes");
+
+        assert_eq!(serialized["kind"], "changed_target");
+        assert_eq!(
+            serialized["remedy"]["resolutions"],
+            serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+        );
+        assert_eq!(
+            divergence.remedy().resolutions(),
+            &[
+                ProfileResolution::RestoreRecordedContent,
+                ProfileResolution::CaptureRepositoryContent,
+            ]
+        );
+        assert!(divergence
+            .message()
+            .contains(&divergence.remedy().message()));
+    }
+
+    #[test]
+    fn test_profile_divergence_does_not_offer_capture_when_the_recorded_package_is_unavailable() {
+        let divergence = ProfileDivergence::UnreadablePackage {
+            reason: "profile package is gone".to_string(),
+        };
+
+        assert!(!divergence.remedy().allows_capture_repository_content());
+        assert!(!divergence.message().contains("jit profile capture"));
+    }
+
+    #[test]
+    fn test_profile_divergence_schema_exposes_the_typed_remedy() {
+        let schema = serde_json::to_value(schemars::schema_for!(ProfileDivergence))
+            .expect("the divergence schema serializes");
+
+        assert!(
+            schema.to_string().contains("remedy"),
+            "the divergence schema describes the remedy beside the finding: {schema}"
+        );
+    }
 }
