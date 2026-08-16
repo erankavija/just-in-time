@@ -3698,11 +3698,10 @@ fn run() -> Result<()> {
                     }
                 }
                 IssueCommands::Delete { id, json } => {
-                    // Phase 3 safety check: Block deletion in secondary worktrees
-                    if storage.is_secondary_worktree() {
-                        anyhow::bail!("Deletion is not allowed in secondary worktrees. Deletions must be performed from the main worktree to maintain consistency across all worktrees.");
-                    }
-
+                    // Deletion inside a linked checkout is governed by the
+                    // linked-checkout write policy decided at dispatch, like
+                    // every other state-mutating invocation (jit:1b6925a9).
+                    //
                     // Phase 3 safety check: require JIT_ALLOW_DELETION=1 to discourage
                     // deletion (jit:0daba57d). The env var is read here (dispatch-level
                     // input gathering); the refusal decision itself is

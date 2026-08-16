@@ -7,7 +7,7 @@ use anyhow::Result;
 use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
 use jit::domain::LinkedCheckoutWriteStance;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
@@ -471,55 +471,10 @@ fn test_local_overrides_git_and_main() {
     assert_eq!(loaded_main["title"].as_str().unwrap(), "Original");
 }
 
-#[test]
-fn test_deletion_blocked_in_secondary_worktree() {
-    // Phase 3: Deletion safety - secondary worktrees cannot delete issues
-    let (_temp_dir, repo_path) = setup_git_repo();
-
-    // Initialize jit and create issue in main
-    run_jit(&repo_path, &["init"]).unwrap();
-    let output = run_jit(&repo_path, &["issue", "create", "-t", "Test", "-d", "desc"]).unwrap();
-    let issue_id = extract_issue_id(&output);
-
-    // Commit it (explicitly commit .jit like other tests)
-    Command::new("git")
-        .args(["add", ".jit"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-    Command::new("git")
-        .args(["commit", "-m", "Add issue"])
-        .current_dir(&repo_path)
-        .output()
-        .unwrap();
-
-    // Create secondary worktree in a subdirectory of the test's temp directory
-    let secondary_path = repo_path.join("secondary");
-    create_secondary_worktree(&repo_path, &secondary_path);
-
-    run_jit(&secondary_path, &["init"]).unwrap();
-
-    // Verify issue is visible in secondary
-    let query_output = run_jit(&secondary_path, &["query", "all"]).unwrap();
-    assert!(
-        query_output.contains(&issue_id),
-        "Issue should be visible in secondary worktree"
-    );
-
-    // Try to delete from secondary - should be blocked
-    let result = run_jit(&secondary_path, &["issue", "delete", &issue_id]);
-
-    assert!(
-        result.is_err(),
-        "Deletion should be blocked in secondary worktree"
-    );
-    let error = result.unwrap_err().to_string();
-    assert!(
-        error.contains("secondary worktree") || error.contains("not allowed"),
-        "Error should mention secondary worktree: {}",
-        error
-    );
-}
+// Deletion inside a secondary worktree is not a visibility property and no
+// longer a rule of its own: it is one governed case of the linked-checkout write
+// policy, covered under every stance by `linked_checkout_write_policy_tests`
+// (jit:1b6925a9).
 
 #[test]
 fn test_deletion_requires_env_var() {
@@ -592,18 +547,4 @@ fn run_jit_with_env(dir: &PathBuf, args: &[&str], env_vars: &[(&str, &str)]) -> 
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
-}
-
-fn create_secondary_worktree(main_path: &Path, secondary_path: &Path) {
-    Command::new("git")
-        .args([
-            "worktree",
-            "add",
-            "-b",
-            "secondary-branch",
-            secondary_path.to_str().unwrap(),
-        ])
-        .current_dir(main_path)
-        .output()
-        .unwrap();
 }

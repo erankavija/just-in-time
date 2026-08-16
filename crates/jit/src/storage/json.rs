@@ -896,14 +896,6 @@ impl JsonFileStorage {
         // File exists — read it; any I/O or parse error is a real failure.
         self.read_json(&main_issue_path).map(Some)
     }
-
-    /// Check if the current worktree is a secondary git worktree.
-    ///
-    /// Returns true if this is a secondary worktree, false if main worktree or not in git.
-    pub fn is_secondary_worktree(&self) -> bool {
-        self.configured_worktree_paths()
-            .is_ok_and(|paths| paths.is_worktree())
-    }
 }
 
 impl JsonFileStorage {
@@ -2858,37 +2850,6 @@ mod tests {
             assert!(loaded.all_ids.contains(&"issue-2".to_string()));
             assert_eq!(loaded.deleted_ids.len(), 1);
             assert!(loaded.deleted_ids.contains(&"issue-3".to_string()));
-        }
-    }
-
-    // Tests for worktree deletion safety (Phase 3)
-    mod deletion_safety_tests {
-        use super::*;
-
-        #[test]
-        fn test_is_secondary_worktree_detection() {
-            // Main worktree: .git is a directory, one level above the .jit
-            // root. The git repository must live in a directory this test
-            // owns, not in a bare `TempDir::new()`'s parent: that parent is
-            // the shared, process-wide temp directory (every `TempDir` is
-            // created directly under it), so `git init` there would leave a
-            // stray `.git` at the root of the shared temp directory — silently
-            // polluting it as an ancestor "repository" for every other test
-            // that creates a `TempDir` for the rest of the process's lifetime.
-            let outer = TempDir::new().unwrap();
-            let main_dir = outer.path().join("jit-root");
-            fs::create_dir_all(&main_dir).unwrap();
-            let main_storage = JsonFileStorage::new(&main_dir);
-
-            // Initialize git at the outer, privately-owned directory.
-            Command::new("git")
-                .arg("init")
-                .current_dir(outer.path())
-                .output()
-                .unwrap();
-
-            // Should detect as main worktree
-            assert!(!main_storage.is_secondary_worktree());
         }
     }
 
