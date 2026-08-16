@@ -37,21 +37,21 @@
           "short_id": "fc773c22",
           "title": "Exact single-store read for cross-checkout comparison",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "6a489764-9d04-4672-a266-b5dcabe22609",
           "short_id": "6a489764",
           "title": "Surface swallowed postcheck failures",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         },
         {
           "id": "45de0b2b-3c77-4b92-8f2b-362fc2cbbf42",
           "short_id": "45de0b2b",
           "title": "Positional profile id for the show command",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress"
         }
       ]
     },
