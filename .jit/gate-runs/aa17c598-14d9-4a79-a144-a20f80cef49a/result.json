@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "674b4f63b91b3310b8fd74a55575af1c14bbc174",
+  "completed_at": "2026-08-16T21:36:28.150974366Z",
+  "duration_ms": 195998,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/main.rs",
+        "id": "F1",
+        "line": 12,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/86ec2c50/requirement/REQ-03",
+          "@/invariant/bounded-rust-build-footprint",
+          "@/gate/cargo-ci"
+        ],
+        "severity": "high",
+        "summary": "The latest required cargo-ci failure leaves REQ-03's measured-budget condition unverified for the added journey module."
+      }
+    ],
+    "summary": "The latest failed cargo-ci leaves REQ-03's measured-budget condition materially unverified.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aa17c598-14d9-4a79-a144-a20f80cef49a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T21:33:12.152720800Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6373 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00c7e-3669-7d33-801d-8bc9e53ddcfa\n--------\nuser\n--- 6360 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 27b2770aa, e20f12652, a74732131, df3e21818, a6b7bb7a3, 964d51416, 86f465413, 7a2e14b4 (`jit:86ec2c50`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/86ec2c50/requirement/REQ-01, REQ-02, REQ-03; @/issue/4a559332/requirement/REQ-06 (issue Markdown); @/invariant/bounded-rust-build-footprint, event-log, no-ignored-tests, semantic-test-assertions, shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-08-16T21:32:35Z)\nTruncation recovery: re-read focused requirement, documentation, current-test, helper-diff, and individual merge-parent patch ranges after broad outputs truncated\n\n1. [blocking][issue-impact] **F1 (high):** The latest required `cargo-ci` failure leaves REQ-03’s measured-budget condition unverified for the added journey module in `crates/jit/tests/cli_repo_workflow/main.rs:12`. REQ-01 and REQ-02 are covered by the current command-level journey, but this hard criterion remains unmet until the Rust CI budget gate passes. References: `@/issue/86ec2c50/requirement/REQ-03`, `@/invariant/bounded-rust-build-footprint`, `@/gate/cargo-ci`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The latest failed cargo-ci leaves REQ-03's measured-budget condition materially unverified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The latest required cargo-ci failure leaves REQ-03's measured-budget condition unverified for the added journey module.\",\"file\":\"crates/jit/tests/cli_repo_workflow/main.rs\",\"line\":12,\"references\":[\"@/issue/86ec2c50/requirement/REQ-03\",\"@/invariant/bounded-rust-build-footprint\",\"@/gate/cargo-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

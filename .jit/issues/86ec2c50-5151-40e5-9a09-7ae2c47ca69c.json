@@ -8,6 +8,7 @@
   ],
   "description": "A linked checkout with a deliberately diverged store proves the divergence report and the\nlossless recovery procedure from the boundary an adopter invokes.\n\n## Background\n\nThe reported field incident ended with issue and event history recoverable only from a\ndangling commit. No artefact of that repository is preserved anywhere, so the reproduction is\nbuilt rather than restored: a test-created linked checkout diverges its store on purpose, and\nthe check and the documented procedure are then exercised exactly as an adopter would run\nthem.\n\n## Success Criteria\n\n- [hard] REQ-01: After a mutation inside the linked checkout, the divergence check run from the primary reports the diverged issue records and the disjoint events, and reports nothing once the two stores agree.\n- [hard] REQ-02: The documented recovery procedure applied to that reproduction yields one store holding both checkouts' issue records and both event histories, with neither side overwritten.\n- [hard] REQ-03: The coverage lands as modules of an existing test target and keeps the suite inside the repository's measured budgets.\n",
   "documents": [],
+  "done_at": "2026-08-16T21:46:54.311316102Z",
   "first_ready_at": "2026-08-16T19:07:28.923920223Z",
   "gates_required": [
     "cargo-ci",
@@ -15,13 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-08-16T20:52:36.859601987Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T21:42:43.293355045Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T20:56:36.163197543Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T21:45:05.803963147Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,7 +35,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Divergence and recovery journey",
-  "updated_at": "2026-08-16T20:56:36.163197543Z"
+  "updated_at": "2026-08-16T21:46:54.311316102Z"
 }

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e6eae0ba8ff88ed4c620daddb2055273b6eb0e61",
+  "completed_at": "2026-08-16T21:45:05.359249350Z",
+  "duration_ms": 141367,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The journey test exercises the documented primary-side divergence check and lossless two-way recovery, while the newer passing cargo-ci evidence verifies the measured-budget criterion.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "86ec2c50-5151-40e5-9a09-7ae2c47ca69c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2a2fb476-6dad-4cd7-83ae-88ef76a38473",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T21:42:43.991640134Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 27b2770a, e20f12652, a74732131, df3e21818, a6b7bb7a3, 964d51416, 86f465413, 7a2e14b4 (`jit:86ec2c50`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; docs/how-to/multi-agent-coordination.md; docs/reference/worktree-validate.md\nResolved items: @/issue/86ec2c50/requirement/REQ-01, REQ-02, REQ-03 (issue markdown); @/issue/4a559332/requirement/REQ-02, REQ-06 (issue markdown); @/issue/176cc9ed/requirement/REQ-01, REQ-02, REQ-03 (issue markdown); @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T21:42:08Z)\nTruncation recovery: narrowed current test, helper, guide, reference, merge-parent, and individual-patch reads after combined output truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The journey test exercises the documented primary-side divergence check and lossless two-way recovery, while the newer passing cargo-ci evidence verifies the measured-budget criterion.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

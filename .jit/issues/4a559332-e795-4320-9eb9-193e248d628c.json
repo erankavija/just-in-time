@@ -42,7 +42,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-16T20:21:18.943022441Z"
+  "updated_at": "2026-08-16T21:47:06.344400204Z"
 }

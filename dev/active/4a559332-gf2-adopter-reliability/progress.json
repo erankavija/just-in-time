@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 9,
+  "current_wave": 11,
   "waves": [
     {
       "wave_number": 1,
@@ -177,7 +177,7 @@
           "short_id": "86ec2c50",
           "title": "Divergence and recovery journey",
           "classification": "implementation",
-          "status": "rework-blocked-on-docfix"
+          "status": "done"
         }
       ]
     },
@@ -189,7 +189,7 @@
           "short_id": "62518095",
           "title": "Correct the divergent-store recovery procedure",
           "classification": "documentation",
-          "status": "review-passed-awaiting-completion"
+          "status": "done"
         }
       ]
     }
@@ -201,7 +201,7 @@
       "classification": "documentation",
       "reason": "Journey execution (86ec2c50) found three defects in the 176cc9ed procedure; epic REQ-02 names the documented recovery path, so the fix is in-epic.",
       "wave": 10,
-      "status": "pending"
+      "status": "done"
     },
     {
       "short_id": "525bd61a",
