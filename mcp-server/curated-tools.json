@@ -77,6 +77,7 @@
     "jit_profile_add": "Places a package obtained out of band into the worktree; which archive to trust is a human decision made before any agent connects.",
     "jit_worktree_info": "Worktree identity is host state the agent already has from its shell.",
     "jit_worktree_list": "Fleet-wide worktree inspection is a coordinating lead's view.",
+    "jit_worktree_store-divergence": "Cross-checkout store divergence is a recovery diagnostic a human runs on a suspect checkout; the report names no repair an agent can perform.",
     "jit_events_tail": "Event-log forensics; agents act on current state rather than history.",
     "jit_events_query": "Event-log forensics; agents act on current state rather than history.",
     "jit_graph_export": "Bulk graph dump whose payload dwarfs a tool response; tree, deps, and rdeps answer the same questions incrementally.",

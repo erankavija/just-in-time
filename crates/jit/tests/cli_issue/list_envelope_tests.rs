@@ -290,6 +290,16 @@ fn test_worktree_list_envelope() {
 }
 
 #[test]
+fn test_worktree_store_divergence_envelope() {
+    let (temp, _) = setup_repo();
+    assert_envelope(
+        &run_json(&temp, &["worktree", "store-divergence", "--json"]),
+        "divergences",
+        &["worktree", "store-divergence"],
+    );
+}
+
+#[test]
 fn test_graph_envelopes() {
     let (temp, id) = setup_repo();
     assert_envelope(

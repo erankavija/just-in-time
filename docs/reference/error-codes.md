@@ -44,6 +44,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `RIPGREP_NOT_FOUND` | The external ripgrep search tool was not found. | `1` |
 | `WORKTREE_INFO_ERROR` | Worktree identity inspection failed. | `1` |
 | `WORKTREE_LIST_ERROR` | Worktree enumeration failed. | `1` |
+| `WORKTREE_STORE_DIVERGENCE_ERROR` | Cross-checkout store comparison failed. | `1` |
 | `HOOKS_INSTALL_ERROR` | Repository hook installation failed. | `1` |
 | `GENERIC_ERROR` | A command failed without a more specific public classification. | `1` |
 | `recovery_failed` | Repository recovery failed. | `1` |
