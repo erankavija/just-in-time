@@ -984,12 +984,28 @@ fn create_issue_in_own_store(checkout: &Path, title: &str) -> String {
     json["id"].as_str().unwrap().to_string()
 }
 
-/// Run `jit worktree store-divergence` in `checkout`, answering its stdout.
-fn store_divergence_output(checkout: &Path, json: bool) -> String {
+/// Run `jit worktree store-divergence` from `working_directory`, answering its
+/// stdout.
+///
+/// `selected_store` is the data root the invocation selects through
+/// `JIT_DATA_DIR`; `None` leaves the working directory's own store selected.
+/// The selected root is the authority for which checkout is inspected, so
+/// naming a linked checkout's store while the working directory is the primary
+/// checkout is how an adopter runs the check from the primary: the linked store
+/// is the one inspected and the primary's becomes its reference.
+pub(crate) fn store_divergence_output(
+    working_directory: &Path,
+    selected_store: Option<&Path>,
+    json: bool,
+) -> String {
     let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     command
-        .current_dir(checkout)
+        .current_dir(working_directory)
         .args(["worktree", "store-divergence"]);
+    match selected_store {
+        Some(store) => command.env("JIT_DATA_DIR", store),
+        None => command.env_remove("JIT_DATA_DIR"),
+    };
     if json {
         command.arg("--json");
     }
@@ -1012,7 +1028,8 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
     create_issue(temp.path(), "Held by the primary checkout alone");
     create_issue_in_own_store(&linked, "Held by the linked checkout alone");
 
-    let machine: Value = serde_json::from_str(&store_divergence_output(&linked, true)).unwrap();
+    let machine: Value =
+        serde_json::from_str(&store_divergence_output(&linked, None, true)).unwrap();
     let divergences = machine["divergences"].as_array().unwrap();
 
     assert_eq!(
@@ -1025,7 +1042,7 @@ fn test_worktree_store_divergence_json_and_rendered_output_name_the_same_finding
         "the two diverged stores report findings: {machine}"
     );
 
-    let rendered = store_divergence_output(&linked, false);
+    let rendered = store_divergence_output(&linked, None, false);
     for divergence in divergences {
         let record = divergence["record"].as_str().unwrap();
         let class = divergence["class"].as_str().unwrap();

@@ -232,7 +232,8 @@ const ALLOW_DELETION_ENV: &str = "JIT_ALLOW_DELETION";
 ///
 /// Answers the temporary directory holding both checkouts (kept alive by the
 /// caller), the primary checkout's root, and the linked checkout's root.
-fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
+pub(crate) fn linked_checkout_fixture(
+) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
     let temp = tempfile::TempDir::new().expect("create a temporary directory");
     let primary = temp.path().join("main");
     std::fs::create_dir(&primary).expect("create the primary checkout directory");
@@ -253,6 +254,17 @@ fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf, std::pat
         .arg("init")
         .assert()
         .success();
+    // The machine-local runtime state a live store carries under `.jit/` is
+    // gitignored in a tracked repository, and it is exactly the set the storage
+    // format reference names. `jit init` writes no ignore file, so the fixture
+    // states it before the base commit — and before the linked checkout exists,
+    // so both checkouts inherit it and neither commits the other's locks or
+    // worktree identity.
+    std::fs::write(
+        primary.join(".gitignore"),
+        ".jit/**/*.lock\n.jit/worktree.json\n.jit/server.log\n.jit/server.pid.json\n.jit/tmp/\n.jit-bootstrap.lock\n",
+    )
+    .expect("state the repository's machine-local ignores");
     for arguments in [vec!["add", "-A"], vec!["commit", "-qm", "track with jit"]] {
         std::process::Command::new("git")
             .current_dir(&primary)
@@ -295,7 +307,7 @@ fn declare_stance(checkout: &Path, stance: LinkedCheckoutWriteStance) {
 }
 
 /// Every event durable in `checkout`'s store, one per log line.
-fn durable_events(checkout: &Path) -> Vec<serde_json::Value> {
+pub(crate) fn durable_events(checkout: &Path) -> Vec<serde_json::Value> {
     let log = std::fs::read_to_string(checkout.join(".jit/events.jsonl"))
         .expect("read the checkout's event log");
     log.lines()
@@ -309,15 +321,20 @@ fn events_tagged<'a>(events: &'a [serde_json::Value], tag: &str) -> Vec<&'a serd
     events.iter().filter(|event| event["type"] == tag).collect()
 }
 
-/// Create one issue in `checkout`, optionally supplying an invocation stance.
-fn create_issue_in(checkout: &Path, invocation_stance: Option<&str>) -> assert_cmd::assert::Assert {
+/// Create one issue titled `title` in `checkout`, optionally supplying an
+/// invocation stance.
+pub(crate) fn create_issue_in(
+    checkout: &Path,
+    title: &str,
+    invocation_stance: Option<&str>,
+) -> assert_cmd::assert::Assert {
     let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"));
     command.current_dir(checkout).args([
         "issue",
         "create",
-        "Permitted mutation",
+        title,
         "-d",
-        "Created inside a linked checkout",
+        "Created by the linked-checkout coverage",
         "--json",
     ]);
     match invocation_stance {
@@ -328,7 +345,7 @@ fn create_issue_in(checkout: &Path, invocation_stance: Option<&str>) -> assert_c
 }
 
 /// The identifier of the issue a successful [`create_issue_in`] reported.
-fn created_issue_id(assert: assert_cmd::assert::Assert) -> String {
+pub(crate) fn created_issue_id(assert: assert_cmd::assert::Assert) -> String {
     let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
     serde_json::from_str::<serde_json::Value>(&stdout)
         .unwrap_or_else(|error| panic!("the creation prints one JSON document ({error}): {stdout}"))
@@ -380,7 +397,7 @@ fn test_linked_checkout_mutation_under_env_override_records_the_audit_event_with
     // The repository declares nothing, so the refusing default is what the
     // invocation's own stance outranks — the only shape that warrants a record.
     let (_temp, _primary, linked) = linked_checkout_fixture();
-    create_issue_in(&linked, Some("allow")).success();
+    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
 
     let events = durable_events(&linked);
     let records = events_tagged(&events, "linked_checkout_write_overridden");
@@ -425,7 +442,7 @@ fn test_linked_checkout_mutation_without_env_override_records_no_audit_event() {
     // invocation supplies no override and there is none to record.
     let (_temp, _primary, linked) = linked_checkout_fixture();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
-    create_issue_in(&linked, None).success();
+    create_issue_in(&linked, "Permitted mutation", None).success();
 
     let events = durable_events(&linked);
     assert!(
@@ -446,7 +463,7 @@ fn test_linked_checkout_mutation_permitted_by_declared_stance_records_no_audit_e
     let (_temp, _primary, linked) = linked_checkout_fixture();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
 
-    create_issue_in(&linked, Some("allow")).success();
+    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
 
     let events = durable_events(&linked);
     assert!(
@@ -537,7 +554,7 @@ fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_
     let (_temp, _primary, linked) = linked_checkout_fixture();
     let before = store_bytes(&linked);
 
-    create_issue_in(&linked, None).failure();
+    create_issue_in(&linked, "Permitted mutation", None).failure();
 
     assert_eq!(
         store_bytes(&linked),
@@ -552,7 +569,7 @@ fn test_linked_checkout_mutation_under_the_refusing_stance_leaves_the_store_and_
 fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_to_permit() {
     let (_temp, _primary, linked) = linked_checkout_fixture();
 
-    let assert = create_issue_in(&linked, None).failure();
+    let assert = create_issue_in(&linked, "Permitted mutation", None).failure();
     let stderr = String::from_utf8_lossy(&assert.get_output().stderr).into_owned();
 
     assert!(
@@ -576,7 +593,7 @@ fn test_linked_checkout_refusal_names_the_checkout_the_refusing_stance_and_how_t
 fn test_linked_checkout_refusal_json_carries_the_checkout_the_refusing_stance_and_how_to_permit() {
     let (_temp, _primary, linked) = linked_checkout_fixture();
 
-    let error = refusal_envelope(create_issue_in(&linked, None).failure());
+    let error = refusal_envelope(create_issue_in(&linked, "Permitted mutation", None).failure());
 
     let named_checkout = std::fs::canonicalize(
         error["details"]["checkout"]
@@ -629,7 +646,7 @@ fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance
     let (_temp, primary, _linked) = linked_checkout_fixture();
 
     for stance in ["refuse", "allow"] {
-        create_issue_in(&primary, Some(stance)).success();
+        create_issue_in(&primary, "Permitted mutation", Some(stance)).success();
     }
 }
 
@@ -641,7 +658,8 @@ fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance
 #[test]
 fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_before_any_write() {
     let (_temp, _primary, linked) = linked_checkout_fixture();
-    let issue = created_issue_id(create_issue_in(&linked, Some("allow")).success());
+    let issue =
+        created_issue_id(create_issue_in(&linked, "Permitted mutation", Some("allow")).success());
     let before = store_bytes(&linked);
 
     let error = refusal_envelope(delete_issue_in(&linked, &issue, None).failure());
@@ -681,7 +699,7 @@ fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_befo
 fn test_delete_issue_in_a_linked_checkout_permitted_by_the_declared_stance_removes_the_issue() {
     let (_temp, _primary, linked) = linked_checkout_fixture();
     declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
-    let issue = created_issue_id(create_issue_in(&linked, None).success());
+    let issue = created_issue_id(create_issue_in(&linked, "Permitted mutation", None).success());
 
     delete_issue_in(&linked, &issue, None).success();
 
@@ -706,7 +724,8 @@ fn test_delete_issue_in_a_linked_checkout_under_an_invocation_override_records_t
     // invocation's own stance outranks — and a permitted deletion owes the same
     // audit record every other permitted override does.
     let (_temp, _primary, linked) = linked_checkout_fixture();
-    let issue = created_issue_id(create_issue_in(&linked, Some("allow")).success());
+    let issue =
+        created_issue_id(create_issue_in(&linked, "Permitted mutation", Some("allow")).success());
     let overrides_before =
         events_tagged(&durable_events(&linked), "linked_checkout_write_overridden").len();
 
@@ -750,7 +769,7 @@ fn test_mutating_invocation_outside_version_control_succeeds_under_either_stance
             .arg("init")
             .assert()
             .success();
-        create_issue_in(temp.path(), Some(stance)).success();
+        create_issue_in(temp.path(), "Permitted mutation", Some(stance)).success();
     }
 }
 
@@ -785,7 +804,7 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     // override. The invocation is refused and the checkout's store is
     // byte-identical afterward.
     let before_refusal = store_bytes(&linked);
-    create_issue_in(&linked, None).failure();
+    create_issue_in(&linked, "Permitted mutation", None).failure();
     assert_eq!(
         store_bytes(&linked),
         before_refusal,
@@ -796,7 +815,7 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     // Leg 2: the checkout now declares the permitting stance. The same
     // invocation, needing no override, lands cleanly and records no override.
     redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Allow);
-    create_issue_in(&linked, None).success();
+    create_issue_in(&linked, "Permitted mutation", None).success();
     let events_after_declared_permit = durable_events(&linked);
     assert!(
         events_tagged(
@@ -819,7 +838,7 @@ fn test_linked_checkout_write_policy_journey_walks_refusal_then_declared_permit_
     // invocation's own override can permit the next mutation on this same
     // checkout.
     redeclare_stance(&linked, &base_config, LinkedCheckoutWriteStance::Refuse);
-    create_issue_in(&linked, Some("allow")).success();
+    create_issue_in(&linked, "Permitted mutation", Some("allow")).success();
     let events_after_override = durable_events(&linked);
     let override_records =
         events_tagged(&events_after_override, "linked_checkout_write_overridden");
