@@ -1,9 +1,10 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-08-16T20:48:24.957486798Z",
   "context": {},
   "created_at": "2026-08-16T20:15:49.763605542Z",
   "dependencies": [],
-  "description": "A freshly initialized repository excludes its machine-local `.jit/` state from version\ncontrol, so committing the store never commits lock files or checkout identity.\n\n## Background\n\nDiscovered while executing the documented divergence recovery procedure against a fixture\nbuilt the way `jit init` builds a repository. `jit init` writes `.gitattributes` declaring\nthe event-log union merge, but no `.gitignore` for the machine-local set\n`docs/reference/storage-format.md` names as gitignored (`.repo-write.lock`, `.events.lock`,\n`.index.lock`, `worktree.json`). A plain `git add .jit/` — the recovery procedure's own\ninstruction, and the natural first commit of any adopter — therefore commits lock files and\nthe checkout's identity file. This repository does not exhibit the gap because its\n`.gitignore` was authored by hand; the shipped initialization is what lacks it.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit init` in a fresh repository under version control, `git add .jit/` stages no lock file and no machine-local checkout identity; the excluded set matches what the storage-format reference names as machine-local.\n- [hard] REQ-02: Initialization in a repository that already carries an exclusion for these paths does not duplicate or clobber it.\n- [hard] REQ-03: Coverage proves the staged-set property at the boundary an adopter uses, and the storage-format reference and init documentation agree on where the exclusion comes from.\n",
+  "description": "A freshly initialized repository excludes its machine-local `.jit/` state from version\ncontrol, so committing the store never commits lock files or checkout identity.\n\n## Background\n\nDiscovered while executing the documented divergence recovery procedure against a fixture\nbuilt the way `jit init` builds a repository. `jit init` writes `.gitattributes` declaring\nthe event-log union merge, but no `.gitignore` for the machine-local set\n`docs/reference/storage-format.md` names as gitignored (`.repo-write.lock`, `.events.lock`,\n`.index.lock`, `worktree.json`). A plain `git add .jit/` — the recovery procedure's own\ninstruction, and the natural first commit of any adopter — therefore commits lock files and\nthe checkout's identity file. This repository does not exhibit the gap because its\n`.gitignore` was authored by hand; the shipped initialization is what lacks it.\n\n## Success Criteria\n\n- [hard] REQ-01: After `jit init` in a fresh repository under version control, `git add .jit/` stages no lock file and no machine-local checkout identity; the excluded set matches what the storage-format reference names as machine-local.\n- [hard] REQ-02: Initialization in a repository that already carries an exclusion for these paths does not duplicate or clobber it.\n- [hard] REQ-03: Coverage proves the staged-set property at the boundary an adopter uses, and the storage-format reference and init documentation agree on where the exclusion comes from.\n\n\n## Note from jit:62518095's sweep\n\nThe worktree guides' feature-commit snippets (docs/tutorials/parallel-work-worktrees.md and docs/how-to/multi-agent-coordination.md, the `git add -A` sites) carry the same hazard in passing: with no ignore rule, `-A` commits machine-local lock files and worktree.json alongside feature work. The systemic fix is initialization writing the exclusion; prose patches in N places are not the remedy.",
   "documents": [],
   "first_ready_at": "2026-08-16T20:15:49.763605542Z",
   "gates_required": [],
@@ -17,5 +18,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Fresh init excludes machine-local .jit state from version control",
-  "updated_at": "2026-08-16T20:15:49.763605542Z"
+  "updated_at": "2026-08-16T20:48:29.241451323Z"
 }
