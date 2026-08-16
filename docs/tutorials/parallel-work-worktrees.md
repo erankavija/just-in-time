@@ -204,6 +204,11 @@ flowchart LR
 - **Claims** are shared across all worktrees (via `.git/jit/`)
 - **Issue changes** sync between worktrees through git — another worktree sees them once its branch is updated (a secondary worktree can additionally read the main worktree's issues directly, as in Step 3)
 
+If two worktrees' stores end up holding different records for the same ids,
+[Divergent Checkout
+Stores](../how-to/multi-agent-coordination.md#divergent-checkout-stores) walks
+through checking, preserving, and reconciling them.
+
 ## Try It Yourself
 
 1. Create two worktrees

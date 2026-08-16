@@ -172,6 +172,10 @@ git add .jit/
 git commit
 ```
 
+Merging one already-known-diverged branch, as above, is different from two
+checkouts whose stores you haven't yet compared — see [Divergent Checkout
+Stores](#divergent-checkout-stores) below for that starting point.
+
 ## Visibility Across Worktrees
 
 ### How Issue Resolution Works
@@ -300,10 +304,78 @@ jit recover
 jit validate
 ```
 
+### Divergent Checkout Stores
+
+Two checkouts' `.jit/` stores can end up holding different issue or event
+records under the same id — an agent's worktree that was never merged back,
+or one that still holds work nobody committed. Reconcile before discarding
+either checkout: git and the merge drivers this repository already declares
+do the actual merging; this procedure only sequences them safely.
+
+1. **Check for divergence first**, from the checkout in question, before
+   committing, merging, or removing anything:
+   ```bash
+   jit worktree store-divergence
+   ```
+   This is a read-only report; it writes to neither store. See the [`jit
+   worktree store-divergence`
+   reference](../reference/worktree-validate.md#jit-worktree-store-divergence)
+   for its finding classes and output shape. `No divergent records.` means
+   there is nothing to preserve — proceed with your normal merge or removal.
+   Any other output names a record present in only one store, or held by both
+   under conflicting values; continue below.
+
+2. **Commit before reconciling anything.** The check compares the stores as
+   they physically sit, uncommitted work included — that uncommitted copy is
+   the fragile one. A plain `git worktree remove` refuses to discard modified
+   or untracked files, but `--force` does not; and a fully committed branch
+   survives worktree removal but not a later forced branch delete
+   (`git branch -D`, which `git branch -d` refuses on an unmerged branch
+   without it). Commit every reported record in whichever checkout(s) still
+   hold it uncommitted:
+   ```bash
+   git add .jit/ && git commit
+   ```
+   Once both sides are committed, every record the check named lives on a
+   branch in both checkouts' histories, so no later step can strand the only
+   copy.
+
+3. **Read each finding class and act on it:**
+
+   | Record  | Class                            | Action |
+   |---------|-----------------------------------|--------|
+   | `event` | `local_only` / `reference_only`  | Nothing to decide. `.jit/events.jsonl` declares `merge=union` (`.gitattributes`), so a normal merge keeps both sides' disjoint lines automatically. |
+   | `event` | `conflicting`                    | Needs a human decision. Events are meant to be written once per id (`@/inv/event-log`); the union driver merges by taking the union of *lines*, not by resolving same-id disagreement, so two differing lines under one id survive the merge as a duplicate, not a correct entry. Inspect both and remove the wrong one before merging. |
+   | `issue` | `local_only` / `reference_only`  | Nothing to decide. Each issue is its own file under `.jit/issues/`; a normal merge picks up a file only one side has without conflict. |
+   | `issue` | `conflicting`                    | Needs a human decision. No merge driver is declared for issue files, so the same id holding different values in both stores has no automatic resolution. Compare both versions and decide which is correct, or hand-merge the fields, before committing the merge. |
+
+4. **Merge**, resolving what step 3 flagged. If git raises conflict markers in
+   `.jit/issues/`, resolve them with the existing [merge-conflict recovery
+   steps](#conflict-merge-conflicts-in-jit). A `conflicting` finding that
+   merges silently — the two edits touched different lines, so git needed no
+   markers — still needs the decision from step 3 applied by hand before you
+   commit the merge.
+
+5. **Confirm agreement:**
+   ```bash
+   jit worktree store-divergence
+   ```
+   A clean re-run reports `No divergent records.` If it still reports
+   findings, a conflicting record still needs the decision from step 3.
+
 ### Orphaned Worktree
 
+Before removing, check whether the worktree's store diverged from the primary
+checkout — see [Divergent Checkout Stores](#divergent-checkout-stores) above.
+Preserve and reconcile any reported finding first: a worktree can hold issue
+or event records committed nowhere else, and a plain removal followed by a
+later forced branch delete is enough to lose them for good.
+
 ```bash
-# Clean up abandoned worktree
+# Check for tracker state this checkout alone holds
+jit worktree store-divergence
+
+# Once it reports no findings (or you've reconciled what it found):
 git worktree remove ../old-worktree
 
 # Finite leases from that worktree expire at their TTL and are evicted on the
@@ -467,6 +539,7 @@ git rev-parse --git-common-dir
 ## See Also
 
 - [Tutorial: Parallel Work with Git Worktrees](../tutorials/parallel-work-worktrees.md)
+- [jit worktree and jit validate Reference](../reference/worktree-validate.md)
 - [Configuration Reference](../reference/configuration.md)
 - [CLI Commands Reference](../reference/cli-commands.md)
 - Design document: `dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md`
