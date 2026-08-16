@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb273bca26de8e3a26a1b411cd06003e702a8bc5",
+  "completed_at": "2026-08-16T14:57:58.277931698Z",
+  "duration_ms": 56417,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 462,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The write-policy reference calls the setting active and claims allow keeps linked checkouts mutating, although no command applies it."
+      }
+    ],
+    "summary": "The issue-authored configuration reference promises a runtime effect that the current implementation does not provide.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "1c8f00bd-dfb3-434f-b800-b0e58348fec5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "849e73aa-d3d2-4cbe-8ecc-2d81a4a15642",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T14:57:01.860009587Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 13496 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00b13-7e63-7283-b0fe-b3bae8593c1d\n--------\nuser\n--- 13483 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `1c8f00bd` is a level-4 leaf with no resolved children. I inspected its four tagged commits individually; two contain the implementation/documentation patch and two are administrative. Current code parses and resolves the stance but does not apply it to command dispatch.\n\n1. F1 — high, blocking, issue-impact: [docs/reference/configuration.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:462) calls `write_policy` active and claims the repository’s `\"allow\"` stance keeps linked checkouts mutating ([line 496](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:496)). This contradicts the same page’s accurate statement that no command applies the setting ([line 541](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:541)). Describe it solely as a parsed, repository-declared stance and remove the claimed runtime effect until enforcement ships.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue-authored configuration reference promises a runtime effect that the current implementation does not provide.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The write-policy reference calls the setting active and claims allow keeps linked checkouts mutating, although no command applies it.\",\"file\":\"docs/reference/configuration.md\",\"line\":462}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

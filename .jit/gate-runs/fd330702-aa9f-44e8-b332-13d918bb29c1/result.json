@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb273bca26de8e3a26a1b411cd06003e702a8bc5",
+  "completed_at": "2026-08-16T15:00:01.926151074Z",
+  "duration_ms": 122432,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 496,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/1c8f00bd/requirement/REQ-05"
+        ],
+        "severity": "medium",
+        "summary": "The configuration reference promises linked checkouts keep mutating despite stating no command currently enforces write_policy."
+      }
+    ],
+    "summary": "The configuration implementation is covered, but the reference documentation promises behavior that the key does not currently enforce.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1c8f00bd-dfb3-434f-b800-b0e58348fec5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fd330702-aa9f-44e8-b332-13d918bb29c1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T14:57:59.493611136Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3046 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00b14-5f7c-7870-9818-cdc5b78f8e71\n--------\nuser\n--- 3033 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cb273bca2, 2e8722264, 0cdc2ced1, 5289589431 (`jit:1c8f00bd`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1c8f00bd/requirement/REQ-01 through REQ-05 (issue success criteria, markdown-first); @/charter/D-1 (dev/vision/9db27a3a-charter.md); @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review failed (exit 1); docs-mechanical passed (exit 0)\nTruncation recovery: narrowed merge, patch, current-file, and call-site reads after a broad result truncated\n\n1. [F1] **blocking, issue-impact** — [docs/reference/configuration.md:496](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:496) says the repository’s `allow` declaration means linked checkouts “keep mutating,” while [lines 541–546](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:541) state that no current command applies the key as a runtime control. This is a promise of enforcement, contrary to REQ-05; describe it solely as the declared stance and retain the separate-enforcement qualification.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The configuration implementation is covered, but the reference documentation promises behavior that the key does not currently enforce.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The configuration reference promises linked checkouts keep mutating despite stating no command currently enforces write_policy.\",\"file\":\"docs/reference/configuration.md\",\"line\":496,\"references\":[\"@/issue/1c8f00bd/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
