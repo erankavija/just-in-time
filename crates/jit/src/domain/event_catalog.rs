@@ -265,8 +265,8 @@ impl EventTag {
             }
             EventTag::LinkedCheckoutWriteOverridden => {
                 "An explicit per-invocation override permitted a state-mutating command inside a \
-                 linked checkout whose declared stance refuses them; the record names the \
-                 checkout, the refusing declared stance, and the permitting override."
+                 linked checkout that the declared write stance refuses; the record names the \
+                 checkout, the refusing stance, and the permitting override."
             }
         }
     }

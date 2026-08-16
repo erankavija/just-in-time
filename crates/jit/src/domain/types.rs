@@ -1491,6 +1491,11 @@ pub enum Event {
     /// carries no issue id. It exists because an ordinary mutation record cannot
     /// show that the invocation was permitted by an override rather than by a
     /// permissive declared stance: the pair of stances is the audit fact.
+    ///
+    /// The vocabulary is declared ahead of the surface that appends it, like the
+    /// post-apply members of [`ProfileLifecycleOperation`], so the event contract
+    /// is stable before a mutation path publishes a record through it
+    /// (jit:0c8d38be).
     LinkedCheckoutWriteOverridden {
         /// Event ID
         id: String,

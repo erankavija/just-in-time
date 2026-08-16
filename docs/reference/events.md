@@ -46,7 +46,7 @@ A `jit events query --issue-id <ID>` filter therefore never returns them.
 | `gate_definition_removed` | registry | no | `jit gate remove` unregistered a gate. |
 | `lifecycle_timestamps_backfilled` | repository | no | The one-time `jit migrate lifecycle-timestamps` backfill wrote derived lifecycle timestamps; the record carries the number of issues it updated. |
 | `profile_lifecycle` | repository | no | A profile lifecycle operation reached one durable transaction commit point; the record summarizes per-profile actions and variable source kinds without resolved values or rendered content. |
-| `linked_checkout_write_overridden` | repository | no | An explicit per-invocation override permitted a state-mutating command inside a linked checkout whose declared stance refuses them; the record names the checkout, the refusing declared stance, and the permitting override. |
+| `linked_checkout_write_overridden` | repository | no | An explicit per-invocation override permitted a state-mutating command inside a linked checkout that the declared write stance refuses; the record names the checkout, the refusing stance, and the permitting override. |
 
 For the commands that read the log, see
 [Event Log Commands](cli-commands.md#event-log-commands); for the file's place in
