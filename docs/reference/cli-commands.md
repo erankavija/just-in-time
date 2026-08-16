@@ -675,8 +675,13 @@ from prose.
 Show one or more profile manifests and package identities from repository packages:
 
 ```bash
+jit profile show <ID> [--json]
 jit profile show --profile <SELECTOR>... [--json]
 ```
+
+The bare `ID` form selects exactly one recorded profile by its canonical id.
+Use repeatable tagged `--profile` selectors (`id:ID` or `path:DIR`) for one or
+more explicit selections; the bare and tagged forms cannot be combined.
 
 Human output summarizes each package's identity, compatibility, hashes,
 contribution and asset counts, and installed state. JSON returns the
