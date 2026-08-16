@@ -12,6 +12,8 @@
 //! - **repository_inputs**: Declared root-and-exclusion input sets and the content
 //!   digest taken over one, used by gate input declarations
 //! - **queries**: Pure query operations on issue collections
+//! - **store_divergence**: Pure comparison naming the records two repository
+//!   stores disagree about
 //! - **type_taxonomy**: The taxonomy of type labels and their levels, and validation against it
 //! - **graph**: Dependency graph algorithms (cycle detection, topological sort, transitive reduction)
 //! - **validation**: Issue validation against configuration rules
@@ -34,6 +36,7 @@ pub mod item;
 pub mod projection;
 pub mod queries;
 pub mod repository_inputs;
+pub mod store_divergence;
 pub mod type_taxonomy;
 pub mod types;
 
@@ -42,6 +45,11 @@ pub use types::*;
 
 // Re-export the structured gate-findings parser and its types.
 pub use gate_findings::{parse_gate_findings, GateFinding, GateFindings};
+
+// Re-export the cross-store comparison and its finding model.
+pub use store_divergence::{
+    compare_stores, DivergenceClass, DivergentRecord, StoreDivergence, StoreRecords,
+};
 
 // Re-export the declared-input model and its digest.
 pub use repository_inputs::{

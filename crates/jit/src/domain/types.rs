@@ -1577,6 +1577,37 @@ pub enum Event {
 }
 
 impl Event {
+    /// This event's identity, as assigned by [`Self::assign_identity`].
+    ///
+    /// A drafted event that has not reached the mutation finalizer carries an
+    /// empty id.
+    pub fn id(&self) -> &str {
+        match self {
+            Event::IssueCreated { id, .. }
+            | Event::IssueClaimed { id, .. }
+            | Event::IssueStateChanged { id, .. }
+            | Event::GatePassed { id, .. }
+            | Event::GateFailed { id, .. }
+            | Event::GateAdded { id, .. }
+            | Event::GateRemoved { id, .. }
+            | Event::IssueCompleted { id, .. }
+            | Event::IssueDeleted { id, .. }
+            | Event::IssueReleased { id, .. }
+            | Event::ArtifactArchiveExecuted { id, .. }
+            | Event::IssueUpdated { id, .. }
+            | Event::DependencyReduced { id, .. }
+            | Event::LocalRuleBypassed { id, .. }
+            | Event::TransitionBlocked { id, .. }
+            | Event::GraphRuleBypassed { id, .. }
+            | Event::GateDefinitionUpdated { id, .. }
+            | Event::GateDefinitionCreated { id, .. }
+            | Event::GateDefinitionRemoved { id, .. }
+            | Event::LifecycleTimestampsBackfilled { id, .. }
+            | Event::ProfileLifecycle { id, .. }
+            | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
+        }
+    }
+
     /// Overwrite this event's id and timestamp with finalizer-assigned values.
     ///
     /// The `repository_state` mutation finalizer is the sole authority over event
