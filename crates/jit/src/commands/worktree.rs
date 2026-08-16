@@ -42,9 +42,10 @@ pub struct WorktreeListEntry {
 }
 
 /// Get current git branch name.
-fn get_current_branch() -> Result<String> {
+fn get_current_branch(worktree_root: &std::path::Path) -> Result<String> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .current_dir(worktree_root)
         .output()
         .context("Failed to get current git branch")?;
 
@@ -162,15 +163,11 @@ fn count_claims_for_worktree(
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected (e.g. not in a git
-/// repository) or the identity cannot be loaded or created.
-pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
-    // Detect worktree context
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
+/// Returns an error if the selected checkout's branch cannot be resolved or the
+/// identity cannot be loaded or created.
+pub fn execute_worktree_info(paths: &WorktreePaths) -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
     // Get current branch
-    let branch = get_current_branch()?;
+    let branch = get_current_branch(&paths.worktree_root)?;
 
     // Load or generate worktree identity, surfacing relocation as a warning
     let (identity, warnings) = load_or_create_worktree_identity_with_warnings(
@@ -207,15 +204,13 @@ pub fn execute_worktree_info() -> Result<(WorktreeInfo, Vec<StorageWarning>)> {
 ///
 /// # Errors
 ///
-/// Returns an error if worktree context cannot be detected, `git worktree list`
-/// fails, or a present `.jit` identity cannot be read.
-pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
-    // Get worktree paths to access shared control plane
-    let paths = WorktreePaths::detect()
-        .context("Failed to detect worktree paths - are you in a git repository?")?;
-
+/// Returns an error if `git worktree list` fails, the primary checkout cannot
+/// be resolved, or a present `.jit` identity cannot be read.
+pub fn execute_worktree_list(
+    paths: &WorktreePaths,
+) -> Result<(Vec<WorktreeListEntry>, Vec<StorageWarning>)> {
     // Production time source: the real system clock.
-    execute_worktree_list_at(&paths, &crate::storage::clock::SystemClock)
+    execute_worktree_list_at(paths, &crate::storage::clock::SystemClock)
 }
 
 /// Core of [`execute_worktree_list`] with the control-plane paths and time
@@ -223,8 +218,8 @@ pub fn execute_worktree_list() -> Result<(Vec<WorktreeListEntry>, Vec<StorageWar
 ///
 /// This holds the real command logic (running `git worktree list`, loading the
 /// claims index, resolving each worktree's identity, and counting active
-/// claims); the public wrapper only detects `paths` and supplies a
-/// [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
+/// claims); the public wrapper supplies the invocation's authoritative `paths`
+/// and a [`SystemClock`](crate::storage::clock::SystemClock). `now` for every
 /// per-worktree expiry check is read once from `clock`, so a test can drive
 /// expiry deterministically by advancing an injected clock while exercising this
 /// exact path.
@@ -295,8 +290,7 @@ fn execute_worktree_list_at(
             // Count active claims for this worktree
             let active_claims = count_claims_for_worktree(&claims_index, &worktree_id, now);
 
-            // Determine if main worktree (compare with common_dir parent)
-            let is_main = worktree_path == paths.worktree_root && !paths.is_worktree();
+            let is_main = paths.is_primary_worktree_path(&worktree_path)?;
 
             Ok(WorktreeListEntry {
                 worktree_id,
@@ -473,8 +467,8 @@ mod tests {
 
     // Note: test_worktree_list_returns_current_worktree() removed.
     // Note: test_json_output_structure() removed.
-    // These tests used execute_worktree_list() which calls WorktreePaths::detect(),
-    // making them detect the REAL repository, not test temp dirs.
+    // These tests used execute_worktree_list() without injected worktree paths,
+    // making them inspect the REAL repository rather than test temp dirs.
     // Tests must NEVER touch production .jit/ directory!
     // The worktree list functionality is tested with parse_git_worktree_porcelain() above.
 

@@ -22,7 +22,6 @@ use cap_std::{ambient_authority, fs::MetadataExt as _};
 use std::collections::BTreeMap;
 use std::io::{ErrorKind, Read};
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 /// Successful application of one exact repository delta.
@@ -494,7 +493,8 @@ impl RepositoryMutationSession for JsonMutationSession {
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        let image = capture_capability_image(&self.layout, &self.roots, spec)?;
+        let worktree_paths = self.storage.configured_worktree_paths()?;
+        let image = capture_capability_image(&self.layout, &self.roots, &worktree_paths, spec)?;
         self.captured = Some(image.clone());
         Ok(image)
     }
@@ -512,8 +512,13 @@ impl RepositoryMutationSession for JsonMutationSession {
         // listing, root, or alias change yields a typed retryable conflict before
         // anything durable is written.
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        let current =
-            capture_capability_image(&self.layout, &self.roots, image.capture_spec().clone())?;
+        let worktree_paths = self.storage.configured_worktree_paths()?;
+        let current = capture_capability_image(
+            &self.layout,
+            &self.roots,
+            &worktree_paths,
+            image.capture_spec().clone(),
+        )?;
         if &current != image {
             return Err(RepositoryStateStoreError::RetryableConflict {
                 path: first_image_difference(image, &current),
@@ -855,6 +860,7 @@ fn stable_unavailable_reason(diagnostic: &str) -> String {
 fn capture_capability_image(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
+    worktree_paths: &crate::storage::WorktreePaths,
     spec: CaptureSpec,
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
     let entries = spec
@@ -927,7 +933,12 @@ fn capture_capability_image(
     let linked = spec
         .linked_worktree()
         .iter()
-        .map(|path| Ok((path.clone(), capture_linked_evidence(layout, roots, path)?)))
+        .map(|path| {
+            Ok((
+                path.clone(),
+                capture_linked_evidence(layout, roots, worktree_paths, path)?,
+            ))
+        })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     RepositoryImage::close(layout.clone(), spec, entries, listings, pinned, linked)
         .map_err(Into::into)
@@ -1355,6 +1366,7 @@ fn normalized_mode(metadata: &cap_std::fs::Metadata) -> FileMode {
 fn capture_linked_evidence(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
+    worktree_paths: &crate::storage::WorktreePaths,
     path: &VirtualPath,
 ) -> Result<LinkedWorktreeEvidence, RepositoryStateStoreError> {
     match inspect_capability_entry(layout, roots, path)? {
@@ -1406,9 +1418,11 @@ fn capture_linked_evidence(
         )
         .map_err(Into::into);
     }
-    if let Some(main_root) = discover_main_worktree(layout.worktree_root())? {
-        let main_data = main_root.join(data_prefix);
-        if let Ok(main_layout) = discover_repository_layout(&main_root, &main_data) {
+    if let (Some(main_root), Some(main_data)) = (
+        worktree_paths.primary_worktree_root()?,
+        worktree_paths.primary_data_root()?,
+    ) {
+        if let Ok(main_layout) = discover_repository_layout(main_root, &main_data) {
             let (main_roots, _, _) = CapabilityRoots::open(&main_layout)?;
             match inspect_capability_entry(&main_layout, &main_roots, path)? {
                 RepositoryEntry::File {
@@ -1433,27 +1447,6 @@ fn capture_linked_evidence(
     }
     LinkedWorktreeEvidence::new(path.clone(), LinkedWorktreeSourceClass::Absent, None, None)
         .map_err(Into::into)
-}
-
-fn discover_main_worktree(worktree: &Path) -> Result<Option<PathBuf>, RepositoryStateStoreError> {
-    let common = Command::new("git")
-        .args(["rev-parse", "--path-format=absolute", "--git-common-dir"])
-        .current_dir(worktree)
-        .output();
-    let Ok(common) = common else { return Ok(None) };
-    if !common.status.success() {
-        return Ok(None);
-    }
-    let common = PathBuf::from(String::from_utf8_lossy(&common.stdout).trim());
-    let Some(main) = common.parent() else {
-        return Ok(None);
-    };
-    let main = lexical_absolute(main)?;
-    if main == worktree {
-        Ok(None)
-    } else {
-        Ok(Some(main))
-    }
 }
 
 /// Open the parent directory of a repository-relative target for capture.

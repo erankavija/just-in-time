@@ -2262,7 +2262,6 @@ fn run() -> Result<()> {
         }
     };
 
-    let storage = JsonFileStorage::new(&jit_dir);
     // Construct the canonical repository layout before any recovery or service
     // reads: the Git-optional
     // worktree root (falling back to the current directory outside Git) plus the
@@ -2270,12 +2269,15 @@ fn run() -> Result<()> {
     // layout; the worktree root always comes from this boundary, never inferred
     // from the storage parent (`@/charter/D-4`, plan layout authority). Discovery
     // is mandatory: startup reports discovery/wiring failures before dispatch.
-    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect_with_non_git_root(
+    let worktree_paths = jit::storage::worktree_paths::WorktreePaths::detect_for_data_root(
+        &jit_dir,
         &non_git_worktree_root,
     )
     .context("failed to discover repository worktree layout")?;
+    let storage = JsonFileStorage::new(&jit_dir);
+    storage.configure_worktree_paths(&worktree_paths);
     let executor_layout =
-        jit::storage::discover_repository_layout(worktree_paths.worktree_root, &jit_dir)
+        jit::storage::discover_repository_layout(&worktree_paths.worktree_root, &jit_dir)
             .context("failed to construct repository layout")?;
     // Session opening is the one recovery boundary. Ordinary mutation dispatch
     // asks storage to open and retain its own exact session, so no caller can
@@ -8367,7 +8369,7 @@ fn run() -> Result<()> {
                 use jit::commands::worktree::execute_worktree_info;
                 use jit::output::{JsonError, JsonOutput, OutputContext};
 
-                match execute_worktree_info() {
+                match execute_worktree_info(&worktree_paths) {
                     Ok((info, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -8419,7 +8421,7 @@ fn run() -> Result<()> {
                 use jit::commands::worktree::execute_worktree_list;
                 use jit::output::{JsonError, JsonOutput, OutputContext, WorktreeListResponse};
 
-                match execute_worktree_list() {
+                match execute_worktree_list(&worktree_paths) {
                     Ok((worktrees, warnings)) => {
                         if json {
                             let count = worktrees.len();
