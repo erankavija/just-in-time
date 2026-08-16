@@ -184,11 +184,13 @@ pub struct MutationContext {
 
 /// One invocation-scoped fact carried from command dispatch into mutation finalization.
 ///
-/// The dispatch site sets the fact once, through
-/// [`with_dispatch_mutation_annotation`](crate::commands::with_dispatch_mutation_annotation),
-/// instead of threading it through every command module. The factory stamps it into every
-/// production context it builds, and the finalizer's event pass turns it into an audit
-/// record composed into the same plan as the mutation it annotates.
+/// Top-level dispatch decides the fact once and installs it for the rest of the
+/// invocation — through
+/// [`DispatchMutationAnnotation`](crate::commands::DispatchMutationAnnotation) or its
+/// closure form — instead of threading it through every command module. The factory
+/// stamps it into every production context it builds, and the finalizer's event pass
+/// turns it into an audit record composed into the same plan as the mutation it
+/// annotates.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum MutationContextAnnotation {

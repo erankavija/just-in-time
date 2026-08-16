@@ -489,13 +489,36 @@ present but `enforce_leases` is omitted, it resolves to `strict`.
 
 With no `[worktree]` section, and with the section present but `write_policy`
 omitted, the declared stance is `"refuse"` — unlike `enforce_leases`, both
-cases resolve identically rather than diverging by section presence. A
-per-invocation override, where one is supplied, takes precedence over the
-declared stance.
+cases resolve identically rather than diverging by section presence.
 
 This repository declares the allowing stance (see `.jit/config.toml`),
 recording its intent that linked agent checkouts continue to mutate their
 local `.jit/` stores.
+
+##### `JIT_WORKTREE_WRITE_POLICY`
+
+One invocation's write stance, which takes precedence over whatever the
+repository declares. It accepts the same two tokens as the key,
+case-insensitively and through the same parser; an unrecognised token fails the
+invocation and names the accepted tokens. Unset supplies no override, leaving
+the declared stance in force.
+
+What an override produces today is an audit trail. When a state-mutating command
+runs inside a linked non-primary checkout whose declared stance is `"refuse"`
+and this variable resolves the invocation to `"allow"`, the mutation records a
+`linked_checkout_write_overridden` event (see the
+[event reference](events.md)) naming the checkout, the declaration that would
+have refused, and the override that permitted the invocation. That record is
+composed into the same transaction as the mutation it accompanies, so the two
+become durable together or neither does.
+
+Two cases record nothing, because no override outranked a refusal in either:
+setting the variable to `"refuse"`, and running under a repository that already
+declares `"allow"`.
+
+Neither the key nor this variable refuses a command. Refusing state-mutating
+commands on the declared stance is a separate, not-yet-implemented enforcement
+step.
 
 ### `[coordination]` Section
 
@@ -543,8 +566,11 @@ handling, branch policy, lock recovery, or event format.
 (see [`write_policy`](#write_policy) above) but is deliberately outside this
 merged system/user/repo introspection surface: the declared stance is a
 repository-scoped policy, not something a user- or system-level config should
-be able to override on the repository's behalf. No current command applies it
-as a runtime control; enforcement is a separate, not-yet-implemented issue.
+be able to override on the repository's behalf. It does not belong to the
+unapplied fields above — a declared refusal is what makes a per-invocation
+[`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) allowance an override
+worth recording. Refusing a command on the declared stance remains a separate,
+not-yet-implemented enforcement step.
 
 ## Agent Config (`~/.config/jit/agent.toml`)
 

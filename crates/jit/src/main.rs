@@ -2201,6 +2201,48 @@ fn emit_top_level_json_error(error: &anyhow::Error) -> Option<ExitCode> {
     Some(exit_code)
 }
 
+/// The invocation-scoped fact to stamp into this dispatch's mutation contexts, or
+/// `None` when nothing about this invocation warrants an override audit record.
+///
+/// A record is warranted only when an explicit per-invocation override is the sole
+/// reason the invocation may write: it must be one that opens a repository mutation
+/// session, it must run inside a linked non-primary checkout according to the
+/// selected-root worktree authority, and it must turn the repository's declared
+/// refusal into an effective allowance. A repository declaring the allowing stance is
+/// permitted by its own declaration rather than by an override, and an override that
+/// refuses permits nothing, so neither installs anything — the record's fields name
+/// the stance that *would have refused*.
+///
+/// Precedence between the two stances is never re-decided here: it comes from
+/// [`LinkedCheckoutWriteStance::resolve`](jit::domain::LinkedCheckoutWriteStance::resolve).
+///
+/// # Errors
+///
+/// Returns an error when the repository's declared stance cannot be read.
+fn linked_checkout_write_override(
+    opens_mutation_session: bool,
+    worktree_paths: &jit::storage::worktree_paths::WorktreePaths,
+    jit_dir: &std::path::Path,
+    invocation_override: Option<jit::domain::LinkedCheckoutWriteStance>,
+) -> Result<Option<jit::repository_state::MutationContextAnnotation>> {
+    use jit::domain::LinkedCheckoutWriteStance;
+
+    if !opens_mutation_session || !worktree_paths.is_worktree() {
+        return Ok(None);
+    }
+    let declared = jit::config_manager::ConfigManager::new(jit_dir).get_write_policy()?;
+    let effective = LinkedCheckoutWriteStance::resolve(declared, invocation_override);
+    Ok((declared == LinkedCheckoutWriteStance::Refuse
+        && effective == LinkedCheckoutWriteStance::Allow)
+        .then(
+            || jit::repository_state::MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+                checkout: worktree_paths.worktree_root.clone(),
+                declared_stance: declared,
+                invocation_override: effective,
+            },
+        ))
+}
+
 fn run() -> Result<()> {
     #[cfg(feature = "test-support")]
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("__test-fixture-setup")) {
@@ -2242,6 +2284,11 @@ fn run() -> Result<()> {
 
     let current_dir = env::current_dir()?;
     let requires_recovery_dispatch = command.requires_recovery_dispatch();
+    // The per-invocation write stance is read before any repository work, so an
+    // unusable token fails the invocation rather than being silently dropped by a
+    // command that never consults it.
+    let invocation_write_override =
+        jit::config_manager::ConfigManager::invocation_write_override()?;
 
     // Determine the jit data directory.
     //
@@ -2338,6 +2385,20 @@ fn run() -> Result<()> {
     let mut executor = CommandExecutor::new(storage.clone())
         .with_layout(executor_layout.clone())
         .with_worktree_paths(worktree_paths.clone());
+
+    // One dispatch-scoped decision covers every mutation this invocation makes:
+    // when an explicit override is the only reason it may write inside a linked
+    // checkout, every production mutation context carries that fact, and the
+    // finalizer publishes the audit record in the same plan as the mutation. The
+    // guard lives for the rest of dispatch and restores the previous annotation on
+    // the way out.
+    let _linked_checkout_write_override = linked_checkout_write_override(
+        requires_recovery_dispatch,
+        &worktree_paths,
+        &jit_dir,
+        invocation_write_override,
+    )?
+    .map(jit::commands::DispatchMutationAnnotation::install);
 
     match &command {
         Commands::Init {
@@ -6831,6 +6892,9 @@ fn run() -> Result<()> {
                         result.errors.push(format!("JIT_ENFORCE_LEASES: {e}"));
                     }
                 }
+                if let Err(e) = jit::config_manager::ConfigManager::invocation_write_override() {
+                    result.errors.push(format!("{e}"));
+                }
 
                 // Try to build effective config to catch merge issues
                 let loader = ConfigLoader::new();
@@ -8572,6 +8636,153 @@ fn run() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod linked_checkout_write_override_tests {
+    //! The dispatch-time decision behind the override audit record: which
+    //! invocations install the fact, and which install nothing.
+
+    use super::linked_checkout_write_override;
+    use jit::domain::LinkedCheckoutWriteStance;
+    use jit::repository_state::MutationContextAnnotation;
+    use jit::storage::worktree_paths::WorktreePaths;
+    use std::path::PathBuf;
+
+    /// A repository whose `[worktree]` section declares `stance`, or which
+    /// declares no stance at all when `stance` is `None`.
+    fn repository_declaring(stance: Option<&str>) -> tempfile::TempDir {
+        let temp = tempfile::TempDir::new().expect("create a temporary repository");
+        let declaration = stance
+            .map(|token| format!("[worktree]\nwrite_policy = \"{token}\"\n"))
+            .unwrap_or_default();
+        std::fs::write(temp.path().join("config.toml"), declaration)
+            .expect("write the repository configuration");
+        temp
+    }
+
+    /// Paths describing either a linked non-primary checkout or the primary one.
+    fn checkout_paths(linked: bool) -> WorktreePaths {
+        let worktree_root = if linked {
+            PathBuf::from("/repo/.worktrees/feature")
+        } else {
+            PathBuf::from("/repo")
+        };
+        WorktreePaths {
+            git_repository: true,
+            common_dir: PathBuf::from("/repo/.git"),
+            local_jit: worktree_root.join(".jit"),
+            worktree_root,
+            shared_jit: PathBuf::from("/repo/.git/jit"),
+        }
+    }
+
+    #[test]
+    fn test_linked_checkout_write_override_installs_only_when_an_override_outranks_a_refusal() {
+        let refusing = repository_declaring(Some("refuse"));
+        let annotation = linked_checkout_write_override(
+            true,
+            &checkout_paths(true),
+            refusing.path(),
+            Some(LinkedCheckoutWriteStance::Allow),
+        )
+        .expect("the declared stance is readable")
+        .expect("an override outranking a refusal warrants an audit record");
+
+        let MutationContextAnnotation::LinkedCheckoutWriteOverridden {
+            checkout,
+            declared_stance,
+            invocation_override,
+        } = annotation
+        else {
+            unreachable!("the linked-checkout override is the fact this dispatch installs")
+        };
+        assert_eq!(
+            checkout,
+            checkout_paths(true).worktree_root,
+            "the record names the checkout the worktree authority selected"
+        );
+        assert_eq!(
+            (declared_stance, invocation_override),
+            (
+                LinkedCheckoutWriteStance::Refuse,
+                LinkedCheckoutWriteStance::Allow
+            ),
+            "the record pairs the declaration that would have refused with the stance that permitted"
+        );
+    }
+
+    #[test]
+    fn test_linked_checkout_write_override_installs_nothing_without_an_outranked_refusal() {
+        let refusing = repository_declaring(Some("refuse"));
+        let undeclared = repository_declaring(None);
+        let allowing = repository_declaring(Some("allow"));
+        let linked = checkout_paths(true);
+
+        let cases: [(&str, bool, &std::path::Path, Option<LinkedCheckoutWriteStance>); 5] = [
+            (
+                "an invocation that opens no mutation session writes nothing to audit",
+                false,
+                refusing.path(),
+                Some(LinkedCheckoutWriteStance::Allow),
+            ),
+            (
+                "an override supplies no audit fact where no refusal was outranked",
+                true,
+                refusing.path(),
+                None,
+            ),
+            (
+                "an override that refuses permits nothing",
+                true,
+                undeclared.path(),
+                Some(LinkedCheckoutWriteStance::Refuse),
+            ),
+            (
+                "a repository declaring the allowing stance permits by declaration, not by override",
+                true,
+                allowing.path(),
+                Some(LinkedCheckoutWriteStance::Allow),
+            ),
+            (
+                "an undeclared stance refuses by default but nothing outranked it here",
+                true,
+                undeclared.path(),
+                None,
+            ),
+        ];
+
+        for (reason, opens_mutation_session, jit_dir, invocation_override) in cases {
+            assert!(
+                linked_checkout_write_override(
+                    opens_mutation_session,
+                    &linked,
+                    jit_dir,
+                    invocation_override
+                )
+                .expect("the declared stance is readable")
+                .is_none(),
+                "{reason}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_linked_checkout_write_override_installs_nothing_outside_a_linked_checkout() {
+        let refusing = repository_declaring(Some("refuse"));
+        assert!(
+            linked_checkout_write_override(
+                true,
+                &checkout_paths(false),
+                refusing.path(),
+                Some(LinkedCheckoutWriteStance::Allow),
+            )
+            .expect("the declared stance is readable")
+            .is_none(),
+            "the primary checkout is never governed by the linked-checkout stance, so an \
+             override there outranks nothing"
+        );
+    }
 }
 
 #[cfg(test)]

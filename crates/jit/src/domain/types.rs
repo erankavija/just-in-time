@@ -1171,13 +1171,55 @@ pub struct ProfileLifecycleProfile {
 /// One vocabulary carries both the repository's declared stance and the
 /// per-invocation override that can outrank it, so an audit record names the
 /// two with one type instead of two parallel ones.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+///
+/// This type is also the parser for both sources of that vocabulary: the
+/// `[worktree] write_policy` TOML key deserializes through
+/// [`FromStr`](std::str::FromStr) (case-insensitively), and so does the
+/// per-invocation override read from the environment, so neither source can
+/// drift from the other's accepted tokens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum LinkedCheckoutWriteStance {
     /// State-mutating commands are refused inside a linked checkout.
     Refuse,
     /// State-mutating commands may run inside a linked checkout.
     Allow,
+}
+
+/// Failure to parse a linked-checkout write stance token.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum LinkedCheckoutWriteStanceError {
+    /// The value is not one of `"refuse"` or `"allow"`.
+    #[error("invalid linked-checkout write stance '{value}'; expected 'refuse' or 'allow'")]
+    Invalid {
+        /// The unrecognised value.
+        value: String,
+    },
+}
+
+impl std::str::FromStr for LinkedCheckoutWriteStance {
+    type Err = LinkedCheckoutWriteStanceError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.to_lowercase().as_str() {
+            "refuse" => Ok(LinkedCheckoutWriteStance::Refuse),
+            "allow" => Ok(LinkedCheckoutWriteStance::Allow),
+            _ => Err(LinkedCheckoutWriteStanceError::Invalid {
+                value: value.to_string(),
+            }),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for LinkedCheckoutWriteStance {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, <D as serde::Deserializer<'de>>::Error> {
+        let token = String::deserialize(deserializer)?;
+        token
+            .parse::<LinkedCheckoutWriteStance>()
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl LinkedCheckoutWriteStance {
@@ -1927,6 +1969,53 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<LinkedCheckoutWriteStance>("\"allow\"").unwrap(),
             LinkedCheckoutWriteStance::Allow
+        );
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_from_str_accepts_tokens_case_insensitively() {
+        for (token, expected) in [
+            ("refuse", LinkedCheckoutWriteStance::Refuse),
+            ("REFUSE", LinkedCheckoutWriteStance::Refuse),
+            ("allow", LinkedCheckoutWriteStance::Allow),
+            ("Allow", LinkedCheckoutWriteStance::Allow),
+        ] {
+            assert_eq!(
+                token.parse::<LinkedCheckoutWriteStance>().unwrap(),
+                expected,
+                "case must not change which stance a token names"
+            );
+        }
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_from_str_rejects_unknown_token_naming_accepted_ones() {
+        let error = "sometimes"
+            .parse::<LinkedCheckoutWriteStance>()
+            .expect_err("a token outside the vocabulary is not a stance");
+        let message = error.to_string();
+        for expected in ["sometimes", "refuse", "allow"] {
+            assert!(
+                message.contains(expected),
+                "the rejection must name the offending token and every accepted one; got: {message}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_deserializes_through_its_own_parser() {
+        // The TOML key and the per-invocation override share one parser, so a
+        // token either source accepts is accepted by the other.
+        assert_eq!(
+            serde_json::from_str::<LinkedCheckoutWriteStance>("\"ALLOW\"").unwrap(),
+            "ALLOW".parse::<LinkedCheckoutWriteStance>().unwrap(),
+            "deserialization must not apply case rules the string parser does not"
+        );
+        let error = serde_json::from_str::<LinkedCheckoutWriteStance>("\"sometimes\"")
+            .expect_err("a token outside the vocabulary is not a stance");
+        assert!(
+            error.to_string().contains("sometimes"),
+            "the deserialization error must carry the parser's message; got: {error}"
         );
     }
 
