@@ -312,33 +312,41 @@ or one that still holds work nobody committed. Reconcile before discarding
 either checkout: git and the merge drivers this repository already declares
 do the actual merging; this procedure only sequences them safely.
 
-1. **Check for divergence first**, from the checkout in question, before
-   committing, merging, or removing anything:
+1. **Check for divergence first, from the linked checkout being inspected**
+   — not from the primary — before committing, merging, or removing
+   anything:
    ```bash
    jit worktree store-divergence
    ```
    This is a read-only report; it writes to neither store. See the [`jit
    worktree store-divergence`
    reference](../reference/worktree-validate.md#jit-worktree-store-divergence)
-   for its finding classes and output shape. `No divergent records.` means
-   there is nothing to preserve — proceed with your normal merge or removal.
-   Any other output names a record present in only one store, or held by both
-   under conflicting values; continue below.
+   for its finding classes and output shape. Read the `Reference store:` line
+   before trusting an empty result: the primary checkout and a location
+   outside version control have no second store to compare against and print
+   `No divergent records.` regardless, so that combination proves nothing.
+   Only a report naming a real `Reference store:` and showing
+   `No divergent records.` means there is nothing to preserve here — proceed
+   with your normal merge or removal. Any other output names a record present
+   in only one store, or held by both under conflicting values; continue
+   below.
 
-2. **Commit before reconciling anything.** The check compares the stores as
-   they physically sit, uncommitted work included — that uncommitted copy is
-   the fragile one. A plain `git worktree remove` refuses to discard modified
-   or untracked files, but `--force` does not; and a fully committed branch
-   survives worktree removal but not a later forced branch delete
-   (`git branch -D`, which `git branch -d` refuses on an unmerged branch
-   without it). Commit every reported record in whichever checkout(s) still
-   hold it uncommitted:
+2. **Commit — this makes records durable enough to survive worktree removal,
+   not preserved.** The check compares the stores as they physically sit,
+   uncommitted work included, and that uncommitted copy is the most fragile:
+   a plain `git worktree remove` refuses to discard modified or untracked
+   files, but `--force` does not. Commit every reported record in whichever
+   checkout(s) still hold it uncommitted:
    ```bash
    git add .jit/ && git commit
    ```
-   Once both sides are committed, every record the check named lives on a
-   branch in both checkouts' histories, so no later step can strand the only
-   copy.
+   A commit only lands a record on the one branch you committed it to. That
+   is enough to survive a plain `git worktree remove`, which checks for a
+   clean working tree, not a merged branch — but it is not enough on its own:
+   the branch is still unmerged, `git branch -d` refuses it as not fully
+   merged, and `git branch -D` deletes it, and every record only it holds,
+   anyway. A record isn't preserved until it reaches a branch you are
+   keeping; that happens in step 4, not here.
 
 3. **Read each finding class and act on it:**
 
@@ -349,34 +357,52 @@ do the actual merging; this procedure only sequences them safely.
    | `issue` | `local_only` / `reference_only`  | Nothing to decide. Each issue is its own file under `.jit/issues/`; a normal merge picks up a file only one side has without conflict. |
    | `issue` | `conflicting`                    | Needs a human decision. No merge driver is declared for issue files, so the same id holding different values in both stores has no automatic resolution. Compare both versions and decide which is correct, or hand-merge the fields, before committing the merge. |
 
-4. **Merge**, resolving what step 3 flagged. If git raises conflict markers in
-   `.jit/issues/`, resolve them with the existing [merge-conflict recovery
-   steps](#conflict-merge-conflicts-in-jit). A `conflicting` finding that
-   merges silently — the two edits touched different lines, so git needed no
-   markers — still needs the decision from step 3 applied by hand before you
-   commit the merge.
+4. **Merge the checkout's branch into the branch you are keeping** —
+   typically run from the primary checkout, `git merge <linked-branch>`.
+   This is the step that actually preserves a record: landing it on a
+   retained branch is what survives a later `git branch -D` of the
+   checkout's own branch, which committing alone (step 2) did not. If git
+   raises conflict markers in `.jit/issues/`, resolve them with the existing
+   [merge-conflict recovery steps](#conflict-merge-conflicts-in-jit). A
+   `conflicting` finding that merges silently — the two edits touched
+   different lines, so git needed no markers — still needs the decision from
+   step 3 applied by hand before you commit the merge.
 
-5. **Confirm agreement:**
+5. **Confirm agreement, from the same linked checkout:**
    ```bash
    jit worktree store-divergence
    ```
-   A clean re-run reports `No divergent records.` If it still reports
-   findings, a conflicting record still needs the decision from step 3.
+   A clean re-run — naming the same real `Reference store:` as step 1 —
+   reports `No divergent records.` If it still reports findings, a
+   conflicting record still needs the decision from step 3. Only once this
+   passes, with step 4's merge already landed on the branch you are keeping,
+   is the checkout's own branch safe to delete.
 
 ### Orphaned Worktree
 
-Before removing, check whether the worktree's store diverged from the primary
-checkout — see [Divergent Checkout Stores](#divergent-checkout-stores) above.
-Preserve and reconcile any reported finding first: a worktree can hold issue
-or event records committed nowhere else, and a plain removal followed by a
-later forced branch delete is enough to lose them for good.
+Run the divergence check *inside* the worktree before removing it — once the
+worktree is gone there is no live checkout left to compare, only commit
+history. See [Divergent Checkout Stores](#divergent-checkout-stores) above;
+its step 1 explains why running the check from the primary instead proves
+nothing. Work through that procedure, including the merge in step 4, for
+anything it reports: a worktree can hold issue or event records committed
+nowhere else, and committing them (step 2) is not enough on its own — only a
+completed merge onto a branch you keep survives deleting the worktree's own
+branch afterward.
 
 ```bash
-# Check for tracker state this checkout alone holds
+# From INSIDE the worktree being removed, not the primary:
 jit worktree store-divergence
 
-# Once it reports no findings (or you've reconciled what it found):
+# Once it names a real reference store and reports no divergent records
+# (or you've completed Divergent Checkout Stores' merge for what it found):
 git worktree remove ../old-worktree
+
+# The worktree's own branch is separate cleanup. Delete it only once its
+# unique records have landed on a branch you keep (Divergent Checkout
+# Stores, step 4) — `git branch -D` on it beforehand discards anything
+# committed nowhere else; `git branch -d` refuses it for exactly that
+# reason, so don't reach for `-D` here until that merge has landed.
 
 # Finite leases from that worktree expire at their TTL and are evicted on the
 # next claim acquisition; an indefinite lease left behind needs an explicit
