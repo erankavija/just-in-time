@@ -84,6 +84,9 @@ if [ -z "${CARGO_CI_NO_LOCK:-}" ] && [ -z "${CARGO_CI_LOCKED:-}" ]; then
   echo "cargo-ci: flock not found; running without host-wide build lock" >&2
 fi
 
+BUSY_HOST_OVERRIDE_FOR_BUDGET="${BUSY_HOST_OVERRIDE:-}"
+unset BUSY_HOST_OVERRIDE
+
 # Resolve the real cargo binary. Some local setups place a debugging shim at
 # ~/.cargo/bin/cargo that exits 0 for every invocation; without this guard each
 # cargo step below would silently succeed, recording a false-positive gate PASS.
@@ -632,7 +635,8 @@ run_budget_check() {
     echo "could not resolve this run's Cargo workspace root" >&2
     return 1
   fi
-  "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
+  BUSY_HOST_OVERRIDE="$BUSY_HOST_OVERRIDE_FOR_BUDGET" \
+    "${NICE_PREFIX[@]}" "$CARGO_CI_SCRIPT_DIR/rust-build-budget.sh" \
     --root "$root" --artifacts-json "$SUITE_ARTIFACTS_JSON" --test-suite-ms "$suite_clock_ms"
 }
 run_step budget run_budget_check
