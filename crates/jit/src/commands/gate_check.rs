@@ -1966,6 +1966,61 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         assert_eq!(gate_state.status, crate::domain::GateStatus::Passed);
     }
 
+    /// REQ-04 (jit:7ca9a0dd): the evaluation publishes the gate run, the issue's
+    /// gate status, and the event as one coupled plan before it returns, so a
+    /// caller that sees success can read all three. A path that reported success
+    /// ahead of any one of them would fail here.
+    #[test]
+    fn test_check_gate_publishes_run_status_and_event_before_returning() {
+        let executor = setup();
+        let issue_id = add_builtin_gate(
+            &executor,
+            "durability-check",
+            GateChecker::Exec {
+                command: "exit 0".to_string(),
+                timeout_seconds: 10,
+                working_dir: None,
+                env: HashMap::new(),
+                pass_context: false,
+                prompt: None,
+                prompt_file: None,
+            },
+            Vec::new(),
+        );
+
+        let result = executor.check_gate(&issue_id, "durability-check").unwrap();
+        assert_eq!(result.status, GateRunStatus::Passed);
+
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap();
+        assert!(
+            runs.iter().any(|run| run.run_id == result.run_id
+                && run.gate_key == "durability-check"
+                && run.status == GateRunStatus::Passed),
+            "the returned run must already be recorded: {runs:?}"
+        );
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().gates_status["durability-check"].status,
+            crate::domain::GateStatus::Passed,
+            "the issue must already carry the passing verdict"
+        );
+        assert!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .iter()
+                .any(|event| matches!(
+                    event,
+                    crate::domain::Event::GatePassed { issue_id: subject, gate_key, .. }
+                        if subject == &issue_id && gate_key == "durability-check"
+                )),
+            "the evaluation must already have logged its gate-passed event"
+        );
+    }
+
     #[test]
     fn test_review_placeholder_passes_with_unmistakable_structured_warning() {
         let executor = setup();

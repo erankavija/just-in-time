@@ -1867,6 +1867,9 @@ enforce_leases = "off"
         );
     }
 
+    /// Fail the transaction kernel once, at the selected control point, then
+    /// let every later point through. Shared by every gate-command durability
+    /// test in this module, whatever repository state the command publishes.
     #[derive(Default)]
     struct OneFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
 
@@ -1875,7 +1878,7 @@ enforce_leases = "off"
             let mut selected = self.0.lock().unwrap();
             if selected.as_ref() == Some(point) {
                 selected.take();
-                return Err(std::io::Error::other("injected gate registry failure"));
+                return Err(std::io::Error::other("injected persistence failure"));
             }
             Ok(())
         }
@@ -1953,6 +1956,71 @@ enforce_leases = "off"
             .gates_required
             .is_empty());
         assert!(recovered.read_events().unwrap().is_empty());
+    }
+
+    /// REQ-05 (jit:7ca9a0dd): the manual attestation branch of gate evaluation
+    /// publishes the attested gate status and its event as one plan through the
+    /// same recovering kernel the automated branch uses, so a persistence
+    /// failure reaches the caller as an error rather than a reported pass.
+    #[test]
+    fn test_pass_gate_manual_attestation_surfaces_persistence_failure() {
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        define_manual_gate(&executor, "manual-gate");
+        let issue = crate::domain::types::fixture_issue("Test".to_string(), "Test".to_string());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        executor
+            .add_gate(&issue_id, "manual-gate".to_string())
+            .unwrap();
+
+        // The attestation's own publication is the first commit decision this
+        // view sees: the fixture above was seeded through the clean storage.
+        let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
+            crate::storage::TransactionFailurePoint::RepositoryBeforeCommitDecision,
+        ))));
+        let injected = executor
+            .storage()
+            .with_repository_state_failure_view(failures);
+        let recovered = injected.without_repository_state_failures();
+        let layout = injected.repository_layout();
+        let attesting = crate::commands::test_helpers::memory_executor(injected);
+
+        let error = attesting
+            .pass_gate(
+                &issue_id,
+                "manual-gate".to_string(),
+                Some("human:reviewer".to_string()),
+                false,
+            )
+            .expect_err("a manual attestation whose persistence fails must not report success");
+        assert!(
+            format!("{error:#}").contains("injected persistence failure"),
+            "the injected failure must be what surfaced: {error:#}"
+        );
+
+        drop(
+            recovered
+                .open_mutation_session(layout)
+                .expect("recovery converges"),
+        );
+        assert_eq!(
+            recovered.load_issue(&issue_id).unwrap().gates_status["manual-gate"].status,
+            GateStatus::Pending,
+            "a failed attestation must leave no recorded pass"
+        );
+        assert!(
+            !recovered
+                .read_events()
+                .unwrap()
+                .iter()
+                .any(|event| matches!(
+                    event,
+                    Event::GatePassed { gate_key, .. } if gate_key == "manual-gate"
+                )),
+            "a failed attestation must log no gate-passed event"
+        );
     }
 
     #[test]

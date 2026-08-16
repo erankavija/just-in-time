@@ -7,6 +7,7 @@ mod gate_cli_integration_test;
 mod gate_evaluate_all_test;
 mod gate_evaluate_exit_code_test;
 mod gate_evaluate_skip_at_head_test;
+mod gate_evaluation_durability_test;
 mod gate_findings_test;
 mod gate_key_flag_test;
 mod gate_modification_cli_tests;
