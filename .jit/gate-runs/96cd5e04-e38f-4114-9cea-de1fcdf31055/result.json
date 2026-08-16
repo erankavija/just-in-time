@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8cb9c4f508c7911983e996449b84de8c5ca0859",
+  "completed_at": "2026-08-16T14:41:09.789542977Z",
+  "duration_ms": 166520,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped durability coverage criteria are implemented and supported by the recorded cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7ca9a0dd-4dca-4294-9212-278d22b013ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "96cd5e04-e38f-4114-9cea-de1fcdf31055",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T14:38:23.268598415Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a8cb9c4f, 6f523a90b, 0cdc2ced, 528958943 (jit:7ca9a0dd)\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a559332/requirement/REQ-03 (.jit/issues/4a559332-e795-4320-9eb9-193e248d628c.json); @/issue/4a559332/requirement/REQ-06 (.jit/issues/4a559332-e795-4320-9eb9-193e248d628c.json); @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/event-log, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T14:36:49Z); code-review pending\nTruncation recovery: reread each tagged commit and affected path individually; narrowed current-source, criterion, configuration, and test reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped durability coverage criteria are implemented and supported by the recorded cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

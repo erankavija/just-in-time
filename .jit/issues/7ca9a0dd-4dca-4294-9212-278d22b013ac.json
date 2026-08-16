@@ -8,12 +8,24 @@
   ],
   "description": "An injected persistence failure during an automated gate evaluation proves that success is\nreported only once the gate run, the issue gate status, and the event are durably recorded.\n\n## Background\n\nAn adopter reported a gate evaluation printing success without a durable gate-run record. The\ncurrent automated path builds the issue update, the gate-run record, and the event into one\nplan and applies them through the recovering two-phase-commit kernel before returning, so the\nguarantee holds on that path; what is missing is coverage that would catch its regression.\nFailure injection through the transaction kernel already exists and is used where gates are\ndefined, but never where a gate is run. The existing crashed-fixture helper is\ninitialization-specific and the command subprocess exposes no injector, so the coverage drives\nthe gate path in process with injected storage and then inspects the recovered repository from\na separate process.\n\n## Success Criteria\n\n- [hard] REQ-01: A persistence failure injected during an automated gate evaluation returns failure rather than success.\n- [hard] REQ-02: After that injected failure, a freshly opened repository reports the gate as not passed and holds no gate-run record for the failed attempt.\n- [hard] REQ-03: A separate process reading the same repository after recovery reports the same gate status, proving the guarantee at the boundary an adopter uses rather than in process only.\n- [hard] REQ-04: On the successful path, the gate run, the issue gate status, and the event are all readable once the evaluation returns.\n- [hard] REQ-05: The manual attestation branch of gate evaluation is confirmed to propagate a persistence failure rather than reporting success, with coverage proving it.\n\n## Notes\n\nThis adds no production code: the durability primitive already exists, and the value delivered\nis the coverage that fails if it regresses.\n",
   "documents": [],
+  "done_at": "2026-08-16T14:41:48.622811678Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:38:22.751899647Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-08-16T14:41:10.138918497Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "7ca9a0dd-4dca-4294-9212-278d22b013ac",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Regression coverage for gate evaluation durability",
-  "updated_at": "2026-08-16T14:02:53.483606629Z"
+  "updated_at": "2026-08-16T14:41:48.622811678Z"
 }
