@@ -346,7 +346,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{declarations_from_image, finalize, MutationContext};
+        use crate::repository_state::{declarations_from_image, finalize};
         use std::collections::HashSet;
 
         let layout = self.require_layout()?;
@@ -369,7 +369,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let config = declarations.config();
                 let plan_content =
                     crate::commands::validate::plan_content_from_image(&image, &active)?;
-                let context = MutationContext::production();
+                let context = super::production_mutation_context();
 
                 let confirmed = candidates
                     .iter()

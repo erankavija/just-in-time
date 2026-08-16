@@ -172,7 +172,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
             let (lease_targets, lease_mode) = {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;

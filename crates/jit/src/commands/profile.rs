@@ -1856,7 +1856,7 @@ impl CommandExecutor<JsonFileStorage> {
         operation: ProfileLifecycleOperation,
     ) -> Result<ProfileComposedApplyResult> {
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(self.storage(), &layout, "profile application", |session| {
             let Some(plan) = self.prepare_profile_selection(
                 session,

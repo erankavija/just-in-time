@@ -883,11 +883,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
         let target_id = self.bind_gate_target(&layout, issue_id)?;
-        let mutation = MutationContext::production();
+        let mutation = super::production_mutation_context();
         let mut cached = None::<CachedGateEvaluation>;
         let run_id = mutation.identifier_at(0);
         let result_path = crate::repository_state::gate_run_result_relative_path(&run_id)?;

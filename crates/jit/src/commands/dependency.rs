@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
-use crate::repository_state::{finalize, MutationContext, MutationIntent};
+use crate::repository_state::{finalize, MutationIntent};
 use crate::storage::{
     AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
@@ -254,7 +254,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             request => request,
         };
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
 
         with_mutation_attempts("dependency mutation", || {
             let (expected_source, expected_lease_mode, enforce_lease) = {
@@ -385,7 +385,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_attempts("dependency removal", || {
             let (resolved_request, expected_lease_mode, enforce_lease) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;

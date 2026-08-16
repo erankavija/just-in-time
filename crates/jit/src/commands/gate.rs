@@ -1098,11 +1098,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{
             assemble_config, finalize_gate_registry_edit, render_capture_closure, CaptureBudget,
-            CaptureSpec, MutationContext, MutationIntent, RepositoryEntry, VirtualPath,
+            CaptureSpec, MutationIntent, RepositoryEntry, VirtualPath,
         };
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         let budget = CaptureBudget {
             max_listings: 64,
             max_bytes: 256 * 1024 * 1024,
@@ -1394,10 +1394,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, finalize_gate_registry_edit, MutationContext};
+        use crate::repository_state::{finalize, finalize_gate_registry_edit};
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_attempts("gate preset application", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
@@ -1504,7 +1504,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map_err(|error| crate::errors::InvalidArgumentError::new(error.to_string()))?;
 
         let layout = self.require_layout()?;
-        let context = crate::repository_state::MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "gate preset creation", |session| {
             let Some(image) = capture_gate_preset_image(session, false, Some(preset_name))? else {
                 return Ok(SessionStep::Retry);

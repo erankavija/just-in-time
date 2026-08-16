@@ -285,7 +285,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, VirtualPath};
+        use crate::repository_state::{finalize, VirtualPath};
         use crate::storage::validate_repo_relative_path;
         use std::collections::BTreeSet;
 
@@ -302,7 +302,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             },
             None => DocumentScanSource::Worktree(document_path),
         };
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
 
         with_mutation_session(&self.storage, &layout, "document add", |session| {
             let initial_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
@@ -367,13 +367,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, VirtualPath};
+        use crate::repository_state::{finalize, VirtualPath};
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
         let events_path = VirtualPath::EVENTS;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "document removal", |session| {
             let paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
             let Some(image) = capture_or_retry(session.capture(document_capture_spec(paths)?))?
@@ -949,7 +949,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
         let issue_path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
@@ -959,7 +959,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Operation-scoped so a fresh-session retry cannot resample the update
         // timestamp or audit-event identity.
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "document rescan", |session| {
             let initial = document_scan_capture_spec(
                 [issue_path.clone(), events_path.clone()]

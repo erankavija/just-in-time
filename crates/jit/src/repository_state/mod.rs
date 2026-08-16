@@ -97,10 +97,11 @@ pub use materialize::{validate_capture_closure, ValidationCaptureClosure};
 #[allow(unused_imports)]
 pub(crate) use materialize::ValidationCaptureClosure;
 pub(crate) use mutation::captured_gate_run_result_paths;
+pub(crate) use mutation::MutationContextFactory;
 pub use mutation::{
     finalize, fresh_index_bytes, gate_run_result_relative_path, prefix_has_torn_tail,
     serialize_event, serialize_gate_run, serialize_issue, IdAuthority, MutationClock,
-    MutationContext, MutationError, MutationIntent, SystemMutationClock,
+    MutationContext, MutationContextAnnotation, MutationError, MutationIntent, SystemMutationClock,
 };
 
 /// Finalize one typed gate-registry edit, its audit event, and every coupled

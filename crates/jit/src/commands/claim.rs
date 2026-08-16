@@ -180,7 +180,7 @@ where
 {
     use super::{capture_or_retry, with_mutation_session, SessionStep};
     use crate::repository_state::{
-        finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
+        finalize, CaptureBudget, CaptureSpec, MutationIntent, VirtualPath,
     };
     use crate::storage::discover_repository_layout;
 
@@ -205,7 +205,7 @@ where
     };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
     // transition time stable while opening a fresh recovered session.
-    let context = MutationContext::production();
+    let context = super::production_mutation_context();
     with_mutation_session(
         storage,
         &layout,
