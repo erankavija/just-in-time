@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b594854d2eb13755bde7caef909e1277db3543bb",
+  "completed_at": "2026-08-16T18:49:22.903856780Z",
+  "duration_ms": 123225,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed profile JSON changes satisfy the issue’s structured-details, remedy-suggestion, compatibility, and command-boundary coverage criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7b820ccc-1835-43f8-9a24-98c085a2e2c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "49a75b46-0b23-4b21-a38b-3c1ba1d12a8c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T18:47:19.678562605Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: dbd09da70, b6552d1e7, 413f7cc1a, 9ff873141, 329dc9ae9, 3a446ef76, b594854d2\nPolicy sources: AGENTS.md\nResolved items: @/issue/4a559332/requirement/REQ-04 and REQ-06 (issue description); @/invariant/semantic-test-assertions (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/charter/D-8 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-08-16T18:45:42Z)\nTruncation recovery: narrowed the truncated broad history search to the active epic, individual commit patches, current affected source ranges, tests, and gate definition.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed profile JSON changes satisfy the issue’s structured-details, remedy-suggestion, compatibility, and command-boundary coverage criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

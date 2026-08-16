@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 6,
+  "current_wave": 7,
   "waves": [
     {
       "wave_number": 1,
@@ -113,7 +113,7 @@
           "short_id": "7b820ccc",
           "title": "Profile conflict output carries its remedy",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },

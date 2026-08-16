@@ -7,6 +7,7 @@
   ],
   "description": "The canonical profile reference and the bridge's tool descriptions state the machine-readable\nremedy contract, so an adopter reading prose and an agent reading data find the same\nresolutions.\n\n## Background\n\nThe profile reference already gives restore-versus-capture guidance in prose. Once that\ndistinction is available as data on refusals and divergences, the reference states the\ncontract rather than restating advice, and the error-code entry for a refused publication\npoints at it instead of carrying its own copy. The bridge's curated tool descriptions already\nmention divergence and capture as a recovery choice, so they name where the structured remedy\nappears.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile reference states the remedy vocabulary, which resolutions each conflict and divergence class carries, and where the structured form appears in machine-readable output.\n- [hard] REQ-02: The error-code entry for a refused publication points at that guidance rather than repeating it.\n- [hard] REQ-03: The bridge's tool descriptions name the structured remedy as the resolution source for a divergence and for a refusal.\n- [hard] REQ-04: Each guidance fact has one home, with other pages citing it instead of restating it.\n\n## Notes\n\nThe contract described here is already shipped by the time this lands, so no behaviour is\ndecided in prose.\n",
   "documents": [],
+  "first_ready_at": "2026-08-16T18:50:01.564469641Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical",
@@ -22,7 +23,7 @@
     "satisfies:REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Profile recovery guidance reference",
-  "updated_at": "2026-08-14T06:15:34.269849091Z"
+  "updated_at": "2026-08-16T18:50:01.564469641Z"
 }
