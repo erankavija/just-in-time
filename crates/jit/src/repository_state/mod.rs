@@ -195,7 +195,7 @@ pub use path::{
 };
 pub use profile_apply::{
     applied_profile_records, claimed_target_state, compose_resolved_contributions,
-    AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
+    remedy_suggestions, AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
     AppliedProfileClaimIdentity, AppliedProfileRecord, ClaimedTargetState,
     CompleteProjectionConfig, ComposedContribution, Contribution, ContributionConflictOwner,
     ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,

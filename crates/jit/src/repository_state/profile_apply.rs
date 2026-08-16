@@ -906,9 +906,33 @@ impl std::fmt::Display for ProfileTargetSubject {
     }
 }
 
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum ProfileTargetSubjectWire<'a> {
+    File { path: String },
+    Contribution { identity: &'a ContributionIdentity },
+}
+
+impl Serialize for ProfileTargetSubject {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let wire = match self {
+            // Rendered through the same repository-relative spelling a message
+            // names it with, not the wrapper type that carries it.
+            Self::File(path) => ProfileTargetSubjectWire::File {
+                path: path.repository_relative(),
+            },
+            Self::Contribution(identity) => ProfileTargetSubjectWire::Contribution { identity },
+        };
+        wire.serialize(serializer)
+    }
+}
+
 /// One decision a profile selection cannot publish, named the way its reader
 /// acts on it: the profile that decided it, what it decided about, and why.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ProfileTargetConflictEntry {
     /// Profile whose contribution was refused.
     pub owner: ProfileId,
@@ -936,7 +960,7 @@ impl std::fmt::Display for ProfileTargetConflictEntry {
 /// that refused it rather than the first one a composition reached: an adopter
 /// that only ever sees one conflict per run cannot tell how much work resolving
 /// the selection is.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize)]
 #[error(
     "{} profile decision(s) cannot be published: {}",
     .conflicts.len(),
@@ -952,6 +976,32 @@ impl ProfileTargetConflictsError {
     pub fn new(conflicts: Vec<ProfileTargetConflictEntry>) -> Self {
         Self { conflicts }
     }
+
+    /// Distinct resolutions across every refused decision, naming capture only
+    /// where some decision's remedy allows it.
+    pub fn suggestions(&self) -> Vec<String> {
+        remedy_suggestions(self.conflicts.iter().map(|entry| entry.conflict.remedy()))
+    }
+}
+
+/// Distinct resolution messages carried by `remedies`, in first-occurrence
+/// order — what a JSON envelope attaches as `suggestions` beside a refusal or
+/// a divergence report. A resolution named by more than one remedy in the
+/// sequence is suggested once, so `capture-repository-content`'s prose names
+/// `jit profile capture` only when some remedy in the sequence actually
+/// carries it.
+pub fn remedy_suggestions(remedies: impl IntoIterator<Item = ProfileRemedy>) -> Vec<String> {
+    let mut seen = Vec::new();
+    let mut suggestions = Vec::new();
+    for remedy in remedies {
+        for resolution in remedy.resolutions() {
+            if !seen.contains(resolution) {
+                seen.push(*resolution);
+                suggestions.push(resolution.message().to_string());
+            }
+        }
+    }
+    suggestions
 }
 
 /// A profile package's contribution to a repository, in canonical repository-state
@@ -4361,6 +4411,127 @@ mod tests {
         assert!(conflicts
             .iter()
             .all(|conflict| conflict.message().contains(&conflict.remedy().message())));
+    }
+
+    #[test]
+    fn test_profile_target_conflict_entry_serializes_owner_subject_and_conflict() {
+        let entry = ProfileTargetConflictEntry {
+            owner: ProfileId::try_from("captured").expect("a canonical test profile id"),
+            subject: ProfileTargetSubject::File(
+                VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
+            ),
+            conflict: ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Repository,
+            },
+        };
+
+        let serialized = serde_json::to_value(&entry).expect("a conflict entry serializes");
+
+        assert_eq!(serialized["owner"], "captured");
+        assert_eq!(serialized["subject"]["kind"], "file");
+        assert_eq!(serialized["subject"]["path"], "docs/guide.md");
+        assert_eq!(serialized["conflict"]["kind"], "occupied");
+        assert_eq!(
+            serialized["conflict"]["remedy"]["resolutions"],
+            serde_json::json!(["move-target-aside", "capture-repository-content"])
+        );
+    }
+
+    #[test]
+    fn test_profile_target_subject_serializes_a_contribution_by_its_canonical_identity() {
+        let subject = ProfileTargetSubject::Contribution(ContributionIdentity {
+            registry: ContributionRegistry::Config,
+            target: ContributionIdentityTarget::Projection {
+                name: "docs".to_string(),
+            },
+        });
+
+        let serialized = serde_json::to_value(&subject).expect("a subject serializes");
+
+        assert_eq!(serialized["kind"], "contribution");
+        assert_eq!(serialized["identity"]["registry"], "config");
+        assert_eq!(serialized["identity"]["target"]["kind"], "projection");
+        assert_eq!(serialized["identity"]["target"]["name"], "docs");
+    }
+
+    #[test]
+    fn test_profile_target_conflicts_error_serializes_as_its_conflict_list() {
+        let entry = ProfileTargetConflictEntry {
+            owner: ProfileId::try_from("captured").expect("a canonical test profile id"),
+            subject: ProfileTargetSubject::File(
+                VirtualPath::worktree("docs/guide.md").expect("a canonical worktree path"),
+            ),
+            conflict: ProfileTargetConflict::Diverged {
+                base: ThreeWayValue::Absent,
+                current: ThreeWayValue::Absent,
+                candidate: ThreeWayValue::Absent,
+            },
+        };
+        let error = ProfileTargetConflictsError::new(vec![entry]);
+
+        let serialized = serde_json::to_value(&error).expect("a conflicts error serializes");
+
+        assert_eq!(serialized["conflicts"].as_array().unwrap().len(), 1);
+        assert_eq!(serialized["conflicts"][0]["owner"], "captured");
+        assert_eq!(serialized["conflicts"][0]["conflict"]["kind"], "diverged");
+    }
+
+    #[test]
+    fn test_profile_target_conflicts_error_suggestions_dedupes_and_marks_capture_only_when_applicable(
+    ) {
+        let entry = |owner: &str, conflict: ProfileTargetConflict| ProfileTargetConflictEntry {
+            owner: ProfileId::try_from(owner).expect("a canonical test profile id"),
+            subject: ProfileTargetSubject::File(
+                VirtualPath::worktree(format!("{owner}.txt")).expect("a canonical worktree path"),
+            ),
+            conflict,
+        };
+
+        // Two package-occupied entries carry the identical remedy, so their
+        // resolutions collapse into one suggestion apiece rather than repeating.
+        let occupied_only = ProfileTargetConflictsError::new(vec![
+            entry(
+                "first",
+                ProfileTargetConflict::Occupied {
+                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
+                },
+            ),
+            entry(
+                "second",
+                ProfileTargetConflict::Occupied {
+                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
+                },
+            ),
+        ]);
+        let suggestions = occupied_only.suggestions();
+        assert_eq!(
+            suggestions.len(),
+            2,
+            "a package-occupied remedy names two resolutions, deduplicated across entries: \
+             {suggestions:?}"
+        );
+        assert!(
+            suggestions
+                .iter()
+                .all(|text| !text.contains("jit profile capture")),
+            "no entry's remedy allows capture, so no suggestion names it: {suggestions:?}"
+        );
+
+        // A repository-occupied entry's remedy allows capture, so it is named.
+        let with_capture = ProfileTargetConflictsError::new(vec![entry(
+            "third",
+            ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Repository,
+            },
+        )]);
+        assert!(
+            with_capture
+                .suggestions()
+                .iter()
+                .any(|text| text.contains("jit profile capture")),
+            "a repository-occupied remedy allows capture: {:?}",
+            with_capture.suggestions()
+        );
     }
 
     /// A composition decides every target it was asked about, so a package
