@@ -8,6 +8,7 @@
   ],
   "description": "A read-only check reports the issue records and event history one checkout's store holds and\nthe other does not, in both directions.\n\n## Background\n\nNo command compares two checkouts' tracker stores today. The two existing names that sound\nlike they might belong to unrelated concepts: one reports membership labels disagreeing with\nthe dependency graph, the other checks branch ancestry against the upstream default. An\nadopter recovering a divergent store therefore has no way to see what diverged. Issue records\ndo fall back across the local store, version-control history, and the primary checkout when\nread, but the event log has no fallback at all, so a linked checkout's events are visible only\nfrom inside it.\n\n## Success Criteria\n\n- [hard] REQ-01: The check names issue records present in one checkout's store and absent from the other, in both directions, and writes to neither store.\n- [hard] REQ-02: The check names event records held by one checkout's log and missing from the other, since event history has no cross-checkout read path.\n- [hard] REQ-03: Records present in both stores but holding conflicting values are reported as conflicts, distinct from records present in only one place.\n- [hard] REQ-04: The check reports no findings in the primary checkout, in a linked checkout whose store agrees with the primary, and outside version control.\n- [hard] REQ-05: Machine-readable output carries the same findings as the rendered output, wrapped in the repository's list envelope.\n- [hard] REQ-06: The worktree command reference states the check, its output shape, and what each finding class means.\n- [hard] REQ-07: The command's generated bridge tool is classified in the curated tool registry with a rationale, and the bridge's classification coverage passes.\n\n## Notes\n\nThe comparison consumes the storage-owned exact single-store read; the command layer\nperforms no direct persistence access of its own. The check reads only. Recovering from a reported divergence is a separate concern, and this\nsurface deliberately offers no reconciliation.\n",
   "documents": [],
+  "first_ready_at": "2026-08-16T12:32:54.711122948Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -33,7 +34,7 @@
     "component:mcp"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Report divergent checkout stores",
-  "updated_at": "2026-08-14T06:25:01.409060601Z"
+  "updated_at": "2026-08-16T12:32:54.711122948Z"
 }

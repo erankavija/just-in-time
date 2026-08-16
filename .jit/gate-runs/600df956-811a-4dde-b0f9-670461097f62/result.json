@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5b545d4bb9aecd06bc2b08c19c1ab9f1a604f98d",
+  "completed_at": "2026-08-16T12:32:28.839294806Z",
+  "duration_ms": 131724,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The exact single-store storage read meets all hard success criteria with focused regression coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fc773c22-6253-4c5f-aab9-dba31b3af1c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "600df956-811a-4dde-b0f9-670461097f62",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T12:30:17.114747840Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0e2803cf (claim records), 78cda6d69 (implementation), 5b545d4bb (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/fc773c22/requirement/REQ-01–REQ-04 (issue description); @/invariant/architecture-dependency-direction and @/invariant/semantic-test-assertions (.jit/invariants.toml); @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0; 2026-08-16T12:28:37Z)\nTruncation recovery: split the implementation and merge patches by file and parent; recovered the full added test separately\n1. No findings. `read_exact_store` reads only the explicit data root without locks, Git, or fallback (`crates/jit/src/storage/json.rs:76`), and its test verifies isolated cross-worktree issue/event reads and no writes (`crates/jit/src/storage/json.rs:2124`).\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The exact single-store storage read meets all hard success criteria with focused regression coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
