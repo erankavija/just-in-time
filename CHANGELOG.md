@@ -190,6 +190,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **Linked checkouts follow a declared write policy, and a linked store that
+  diverged anyway is now discoverable and recoverable.** A state-mutating
+  command inside a linked non-primary checkout previously wrote to that
+  checkout's own `.jit/` store without comment, silently building a divergent
+  history — the failure a field adopter hit, where issue and event records
+  survived only on a dangling commit. Now the repository declares its stance as
+  `write_policy` under `[worktree]` (`"refuse"` or `"allow"`; absent key and
+  absent section both refuse), and under the refusing stance such an invocation
+  fails with `LINKED_CHECKOUT_WRITE_REFUSED` before any write, lock, lease, or
+  event append, naming the checkout, the stance, and both permit surfaces. A
+  per-invocation `JIT_WORKTREE_WRITE_POLICY` override outranks the declaration,
+  and an override that permits what the declaration would have refused appends
+  a `linked_checkout_write_overridden` event in the same transaction as the
+  mutation it permitted, so the mutation and its audit record land together or
+  not at all. Issue deletion's standalone secondary-worktree refusal dissolved
+  into this policy rather than surviving as a parallel rule. For stores that
+  already diverged, `jit worktree store-divergence` reports — read-only, in
+  both directions — the issue records and event history one checkout's store
+  holds and the other does not, plus same-id records whose values conflict, and
+  the multi-agent coordination guide now carries a lossless recovery procedure
+  proven end to end by an executable journey test: preserve both sides, merge
+  onto a retained branch, resolve the deterministic index conflict to the union
+  of records, and confirm agreement with a clean re-run.
+
+- **Machine consumers get the same failure guidance humans read.** A refused
+  profile publication and a divergence report now carry structured
+  `details` naming each conflicting or diverged target, its class, and its
+  typed remedy, plus `suggestions` naming capture only where capture is valid;
+  the profile reference states the remedy contract once and the error-code
+  entry and MCP tool descriptions point at it. `jit profile show` accepts an
+  unambiguous positional profile id. Gate evaluation durability — success
+  reported only after the gate run, the issue gate status, and the event are
+  durably recorded, on both the automated and the manual-attestation path — is
+  now pinned by regression coverage that injects persistence failures and
+  inspects the recovered repository from a separate process.
+
 - **`jit profile diff` states what a selection would change before anything is
   published.** The command family could report a package and it could publish
   one, but nothing answered what publishing would do to this repository, so an
