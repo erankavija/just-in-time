@@ -344,7 +344,9 @@ An owned target that has drifted is a conflict for reconfigure or upgrade; the
 conflict publishes nothing. Restore the intended owner’s content, or capture
 the intended package change before applying or upgrading it. Do not use a
 profile operation to overwrite repository-authored or another profile’s
-conflicting content.
+conflicting content. Every conflict and divergence carries this choice as a
+typed remedy; see [the remedy contract](#the-remedy-contract) for the
+vocabulary and its machine-readable form.
 
 All profile commands support `--json` and use the standard count-wrapped
 `{"count": N, "profiles": [...]}` collection shape. A show response contains
@@ -369,6 +371,61 @@ member of that selection is published separately. For an existing repository,
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
 tools.
+
+## The remedy contract
+
+A refused publication and a `jit profile validate` divergence both carry a
+typed remedy: the resolutions that apply to that finding, drawn from one
+fixed vocabulary rather than composed per command. The restore-versus-capture
+guidance above is that vocabulary read as prose; this section is its data
+contract.
+
+| Resolution | What it does |
+|---|---|
+| `move-target-aside` | Move the repository-authored target aside before applying. |
+| `restore-recorded-content` | Restore the value this profile published. |
+| `capture-repository-content` | Fold the repository's current value into a live-source package with `jit profile capture`. |
+| `stop-one-package-from-declaring-target` | Stop one of the two conflicting packages from declaring the target. |
+| `apply-one-of-conflicting-packages` | Apply only one of the packages that conflict over a target. |
+| `make-definitions-identical` | Make the competing semantic definitions identical. |
+| `apply-only-one-declaring-package` | Apply only one package that declares the contested definition. |
+| `restore-recorded-package` | Restore the package this profile recorded, at its recorded location. |
+
+A refused publication's conflict is one of three classes, each carrying a
+fixed remedy from that vocabulary — an occupied target's remedy further
+depends on who holds it:
+
+| Conflict class | Held by | Remedy |
+|---|---|---|
+| Occupied | the repository | `move-target-aside`, `capture-repository-content` |
+| Occupied | a package | `stop-one-package-from-declaring-target`, `apply-one-of-conflicting-packages` |
+| Diverged | — | `restore-recorded-content`, `capture-repository-content` |
+| Contested | — | `make-definitions-identical`, `apply-only-one-declaring-package` |
+
+A `jit profile validate` divergence is one of six classes, each carrying a
+fixed remedy:
+
+| Divergence class | Remedy |
+|---|---|
+| Unreadable package, unresolved values, or unowned target | `restore-recorded-package` |
+| Changed package identity, changed target, or absent target | `restore-recorded-content`, `capture-repository-content` |
+
+The remedy reaches machine-readable output as part of the [standard `--json`
+error envelope](cli-commands.md#cli-json-contracts):
+
+- A refused publication's `PROFILE_CONFLICT` error carries
+  `error.details.conflicts[]`, one entry per refused target or declaration as
+  `{owner, subject, conflict}`. `conflict.kind` names the conflict class and
+  `conflict.remedy.resolutions` carries its remedy from the vocabulary above.
+  `error.suggestions` carries the distinct resolution messages across every
+  conflict in the refusal, in first-occurrence order, naming
+  `jit profile capture` only where some conflict's remedy allows it.
+- `jit profile validate --json` reports divergence the same way, under
+  `error.details.profiles[].divergences[]`: each divergence carries its
+  `kind` and `remedy.resolutions`, and `error.suggestions` is the same
+  distinct, first-occurrence list over the whole report.
+
+`jit --schema` is the field-level contract for both shapes.
 
 ## The `jit-dogfood` package
 

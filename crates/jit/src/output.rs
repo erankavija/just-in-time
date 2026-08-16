@@ -941,7 +941,10 @@ impl ErrorCode {
                 "Issue deletion lacks the required operator confirmation."
             }
             ErrorCode::ProfileNotFound => "No resolution route found the requested profile.",
-            ErrorCode::ProfileConflict => "Profile planning or validation found a conflict.",
+            ErrorCode::ProfileConflict => {
+                "Profile planning or validation found a conflict. For the resolutions each \
+                 conflict class carries, see [the remedy contract](profiles.md#the-remedy-contract)."
+            }
             ErrorCode::DependencyError => "A dependency command failed.",
             ErrorCode::GateError => "A gate command failed.",
             ErrorCode::GateCheckError => "A gate-status check failed.",
