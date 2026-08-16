@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 7,
+  "current_wave": 8,
   "waves": [
     {
       "wave_number": 1,
@@ -125,7 +125,7 @@
           "short_id": "f52567ed",
           "title": "Refuse state-mutating commands in linked worktrees",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "176cc9ed-e5f4-41a7-9944-06c1775cf29f",

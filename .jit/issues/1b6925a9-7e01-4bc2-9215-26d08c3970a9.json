@@ -7,6 +7,7 @@
   ],
   "description": "The standalone secondary-checkout deletion refusal becomes a case of the general\nlinked-checkout write policy rather than a parallel variant.\n\n## Background\n\nIssue deletion carries its own unconditional secondary-checkout refusal, checked independently\nof any policy and with its own detection mechanism. With a general write policy governing\nstate-mutating dispatch, a second, private refusal for one command is exactly the parallel\nvariant the repository's convention-convergence invariant names a defect.\n\n## Success Criteria\n\n- [hard] REQ-01: Deletion inside a linked non-primary checkout is governed by the general write policy, and the independent unconditional check no longer exists as a separate mechanism.\n- [hard] REQ-02: Under the refusing stance, deletion inside a linked checkout keeps its current outcome: it is refused with an explanation before any write.\n- [hard] REQ-03: Under a permitting stance or an explicit override, deletion follows the general policy like every other state-mutating invocation.\n",
   "documents": [],
+  "first_ready_at": "2026-08-16T19:27:05.594517161Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -20,7 +21,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Converge the deletion refusal into the write policy",
-  "updated_at": "2026-08-14T06:15:34.269849091Z"
+  "updated_at": "2026-08-16T19:27:05.594517161Z"
 }

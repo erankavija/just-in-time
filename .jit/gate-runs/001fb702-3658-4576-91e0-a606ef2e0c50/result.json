@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "32736b876b837827fe668139aa163c2e5b395cdb",
+  "completed_at": "2026-08-16T19:26:33.992802360Z",
+  "duration_ms": 237365,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied with no unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f52567ed-5305-40f3-85db-9c621878f412",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "001fb702-3658-4576-91e0-a606ef2e0c50",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T19:22:36.627417739Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 32736b876, b076bfd5b, 38f8e86fe, df79f79c6  \nPolicy sources: AGENTS.md  \nResolved items: @/issue/f52567ed/requirement/REQ-01 (issue description, markdown-first); @/invariant/event-log, @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/semantic-types (.jit/invariants.toml, registry-first); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml, registry-first)  \nGate evidence: cargo-ci passed (exit 0, 2026-08-16T19:20:58Z); code-review pending (this run)  \nTruncation recovery: scoped commit/path diffs, rename-aware reads, current-file slices, and targeted registry reads  \n\n1. No findings. The dispatch-time refusal precedes `JsonFileStorage::new` at `crates/jit/src/main.rs:2417`, and the attributable tests cover refusal immutability, JSON guidance, declared and per-invocation permission, audit durability, and exempt invocation contexts.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied with no unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -7,6 +7,7 @@
   ],
   "description": "The adopter guides that teach the linked-checkout workflow state the write stance that\ngoverns it and where a repository declares that stance.\n\n## Background\n\nThe parallel-work tutorial and the multi-agent coordination guide teach mutation from a linked\ncheckout as the sanctioned workflow. With a refusing default governing that workflow, a reader\nfollowing either page in a repository that has declared nothing meets a refusal the pages\nnever mention, and the opt-in path the refusal names is undiscoverable from the only pages\nthat teach the workflow it governs.\n\n## Success Criteria\n\n- [hard] REQ-01: The parallel-work tutorial states the stance that governs mutation inside a linked checkout and where a repository declares it, and every step it instructs succeeds under the stance it tells the reader to declare.\n- [hard] REQ-02: The multi-agent coordination guide states the same stance where it presents linked-checkout writes as the sanctioned path.\n",
   "documents": [],
+  "first_ready_at": "2026-08-16T19:27:16.493546769Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -20,7 +21,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "State the linked-checkout write stance in the worktree guides",
-  "updated_at": "2026-08-14T06:15:34.269849091Z"
+  "updated_at": "2026-08-16T19:27:16.493546769Z"
 }
