@@ -175,26 +175,81 @@ impl IdAuthority {
 pub struct MutationContext {
     ids: IdAuthority,
     clock: Box<dyn MutationClock>,
+    dispatch_annotation: Option<MutationContextAnnotation>,
     sampled: Cell<Option<DateTime<Utc>>>,
     next_index: Cell<u64>,
+}
+
+/// One invocation-scoped fact carried from command dispatch into mutation finalization.
+///
+/// The vocabulary is intentionally empty until a dispatch concern needs to annotate a
+/// mutation. Keeping the optional carrier in the context now lets that later concern set
+/// the fact once at dispatch instead of threading it through every command module.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MutationContextAnnotation {
+    #[cfg(test)]
+    Test,
+}
+
+/// Constructs production mutation contexts from one dispatch-scoped annotation slot.
+///
+/// The command layer owns the single live factory and scopes changes to its annotation.
+/// Keeping construction here lets [`MutationContext::production`] remain inaccessible to
+/// command modules and integration tests.
+#[derive(Default)]
+pub(crate) struct MutationContextFactory {
+    dispatch_annotation: Option<MutationContextAnnotation>,
+}
+
+impl MutationContextFactory {
+    pub(crate) fn create(&self) -> MutationContext {
+        MutationContext::production(self.dispatch_annotation.clone())
+    }
+
+    pub(crate) fn replace_annotation(
+        &mut self,
+        annotation: Option<MutationContextAnnotation>,
+    ) -> Option<MutationContextAnnotation> {
+        std::mem::replace(&mut self.dispatch_annotation, annotation)
+    }
 }
 
 impl MutationContext {
     /// Construct a context from an injected authority and clock.
     pub fn new(ids: IdAuthority, clock: Box<dyn MutationClock>) -> Self {
+        Self::with_annotation(ids, clock, None)
+    }
+
+    fn with_annotation(
+        ids: IdAuthority,
+        clock: Box<dyn MutationClock>,
+        dispatch_annotation: Option<MutationContextAnnotation>,
+    ) -> Self {
         Self {
             ids,
             clock,
+            dispatch_annotation,
             sampled: Cell::new(None),
             next_index: Cell::new(0),
         }
     }
 
-    /// The production context: a lazily-drawn random seed and the system clock.
+    /// Build the factory-owned production context from a lazily-drawn random seed and the
+    /// system clock.
+    ///
+    /// Command code must route through `commands::production_mutation_context`; keeping
+    /// this constructor private prevents another production construction convention from
+    /// emerging beside that factory.
+    ///
     /// A no-op mutation allocates no identifier and stamps no transition, so it
     /// draws neither the random source nor the clock.
-    pub fn production() -> Self {
-        Self::new(IdAuthority::random(), Box::new(SystemMutationClock))
+    fn production(dispatch_annotation: Option<MutationContextAnnotation>) -> Self {
+        Self::with_annotation(
+            IdAuthority::random(),
+            Box::new(SystemMutationClock),
+            dispatch_annotation,
+        )
     }
 
     /// A deterministic context for memory and tests: fixed seed and clock.
@@ -211,6 +266,11 @@ impl MutationContext {
             [0; 32],
             DateTime::<Utc>::from_timestamp(0, 0).expect("the Unix epoch is representable"),
         )
+    }
+
+    /// Invocation-scoped annotation captured by the production factory, if any.
+    pub fn dispatch_annotation(&self) -> Option<&MutationContextAnnotation> {
+        self.dispatch_annotation.as_ref()
     }
 
     /// Derive an identifier at the finalizer's frozen allocation index without
@@ -1448,6 +1508,42 @@ mod tests {
             first.hash(),
             retry.hash(),
             "semantic plan hashes must be stable across retries"
+        );
+    }
+
+    #[test]
+    fn test_dispatch_annotation_slot_is_behavior_preserving_until_consumed() {
+        let draft = map_order_draft(false);
+        let index_bytes = serde_json::to_vec_pretty(&RepositoryIndex {
+            schema_version: SUPPORTED_INDEX_SCHEMA_VERSION,
+            all_ids: Vec::new(),
+            deleted_ids: Vec::new(),
+        })
+        .unwrap();
+        let created_id = IdAuthority::from_seed([7u8; 32]).uuid_at(0);
+        let image = image_with(vec![
+            (
+                VirtualPath::data("issues").unwrap(),
+                RepositoryEntry::Absent,
+            ),
+            (VirtualPath::INDEX, file_entry(&index_bytes)),
+            (VirtualPath::EVENTS, RepositoryEntry::Absent),
+            (issue_path(&created_id).unwrap(), RepositoryEntry::Absent),
+        ]);
+        let intents = [MutationIntent::CreateIssue {
+            draft: Box::new(draft),
+        }];
+        let without_annotation = finalize(&layout(), &image, &ctx(), &intents).unwrap();
+        let annotated_context = MutationContext::with_annotation(
+            IdAuthority::from_seed([7u8; 32]),
+            Box::new(FixedMutationClock::new(fixed_instant())),
+            Some(MutationContextAnnotation::Test),
+        );
+        let with_annotation = finalize(&layout(), &image, &annotated_context, &intents).unwrap();
+
+        assert_eq!(
+            with_annotation, without_annotation,
+            "an unconsumed dispatch annotation must not change plan output, events, or persisted bytes"
         );
     }
 

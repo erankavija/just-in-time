@@ -116,7 +116,52 @@ use crate::storage::IssueStore;
 // Type hierarchy validation (currently only validates type labels)
 use anyhow::{anyhow, Context, Result};
 use serde::Serialize;
+use std::cell::RefCell;
 use std::sync::OnceLock;
+
+thread_local! {
+    /// The one production-context factory for the current dispatch thread.
+    ///
+    /// CLI dispatch is synchronous, while the thread-local boundary prevents parallel
+    /// in-process invocations from sharing annotations. Scoped replacement below restores
+    /// the previous value for nested calls and during unwinding.
+    static PRODUCTION_MUTATION_CONTEXT_FACTORY: RefCell<crate::repository_state::MutationContextFactory> =
+        RefCell::new(crate::repository_state::MutationContextFactory::default());
+}
+
+/// Construct the operation-scoped production mutation context.
+///
+/// Every command and integration helper uses this factory boundary. The context receives
+/// the annotation, if any, installed by [`with_dispatch_mutation_annotation`]; ordinary
+/// dispatch has no annotation and therefore preserves the previous mutation behaviour.
+pub fn production_mutation_context() -> crate::repository_state::MutationContext {
+    PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| factory.borrow().create())
+}
+
+/// Run one dispatch with an annotation stamped into every production mutation context it
+/// constructs.
+///
+/// The prior annotation is restored when `dispatch` returns or unwinds, so nested and
+/// repeated in-process invocations cannot leak facts into one another.
+pub fn with_dispatch_mutation_annotation<T>(
+    annotation: crate::repository_state::MutationContextAnnotation,
+    dispatch: impl FnOnce() -> T,
+) -> T {
+    struct AnnotationScope(Option<crate::repository_state::MutationContextAnnotation>);
+
+    impl Drop for AnnotationScope {
+        fn drop(&mut self) {
+            PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| {
+                factory.borrow_mut().replace_annotation(self.0.take());
+            });
+        }
+    }
+
+    let previous = PRODUCTION_MUTATION_CONTEXT_FACTORY
+        .with(|factory| factory.borrow_mut().replace_annotation(Some(annotation)));
+    let _scope = AnnotationScope(previous);
+    dispatch()
+}
 
 // ── Mutation-session retry contract (mutation-session-contract) ──────────────
 //
@@ -2054,12 +2099,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, MutationContext, RepositoryEntry, VirtualPath,
+            finalize, CaptureBudget, CaptureSpec, RepositoryEntry, VirtualPath,
         };
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = production_mutation_context();
         with_mutation_session(
             &self.storage,
             &layout,
@@ -2136,11 +2181,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = production_mutation_context();
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = context.identifier_at(0);
             let Some(image) = self.capture_proposed_base(
@@ -2360,11 +2405,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext};
+        use crate::repository_state::finalize;
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = production_mutation_context();
         with_mutation_attempts("issue update", || {
             let (expected_target, expected_lease_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
@@ -2548,11 +2593,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, MutationIntent};
+        use crate::repository_state::{finalize, MutationIntent};
         use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = production_mutation_context();
         let mut cached_precheck = None::<CachedPrecheckExecution>;
         with_mutation_attempts("lifecycle mutation", || {
             let (
@@ -3242,6 +3287,62 @@ impl<S: IssueStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_production_mutation_context_factory_defaults_to_empty_annotation() {
+        assert!(production_mutation_context()
+            .dispatch_annotation()
+            .is_none());
+    }
+
+    #[test]
+    fn test_dispatch_mutation_annotation_scope_restores_default_after_return_and_unwind() {
+        assert!(production_mutation_context()
+            .dispatch_annotation()
+            .is_none());
+
+        with_dispatch_mutation_annotation(
+            crate::repository_state::MutationContextAnnotation::Test,
+            || {
+                assert_eq!(
+                    production_mutation_context().dispatch_annotation(),
+                    Some(&crate::repository_state::MutationContextAnnotation::Test)
+                );
+                with_dispatch_mutation_annotation(
+                    crate::repository_state::MutationContextAnnotation::Test,
+                    || {
+                        assert!(production_mutation_context()
+                            .dispatch_annotation()
+                            .is_some());
+                    },
+                );
+                assert!(production_mutation_context()
+                    .dispatch_annotation()
+                    .is_some());
+                std::thread::spawn(|| {
+                    assert!(production_mutation_context()
+                        .dispatch_annotation()
+                        .is_none());
+                })
+                .join()
+                .unwrap();
+            },
+        );
+        assert!(production_mutation_context()
+            .dispatch_annotation()
+            .is_none());
+
+        let unwound = std::panic::catch_unwind(|| {
+            with_dispatch_mutation_annotation(
+                crate::repository_state::MutationContextAnnotation::Test,
+                || panic!("scope cleanup probe"),
+            );
+        });
+        assert!(unwound.is_err());
+        assert!(production_mutation_context()
+            .dispatch_annotation()
+            .is_none());
+    }
 
     #[test]
     fn test_repository_layout_normalizes_only_leading_current_directory_components() {

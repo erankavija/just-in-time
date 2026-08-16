@@ -271,7 +271,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationContext, MutationIntent, VirtualPath};
+        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
         use std::collections::BTreeMap;
 
         self.validate_batch_from_json(&defs)?;
@@ -282,7 +282,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|(index, def)| (def.key.as_str(), index))
             .collect::<HashMap<_, _>>();
         let layout = self.require_layout()?;
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         let created_issue_ids = (0..defs.len())
             .map(|index| context.identifier_at(index as u64))
             .collect::<Vec<_>>();

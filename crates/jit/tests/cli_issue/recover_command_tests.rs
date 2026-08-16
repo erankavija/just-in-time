@@ -1,10 +1,11 @@
 //! Tests for the jit recover command
 
 use assert_cmd::Command;
+use jit::commands::production_mutation_context;
 use jit::config::ProjectName;
 use jit::repository_state::{
     derive_materialization, CaptureBudget, CaptureSpec, InitializationScaffold,
-    MaterializationRequest, MutationContext,
+    MaterializationRequest,
 };
 use jit::storage::{
     discover_repository_layout, JsonFileStorage, RepositoryStateStore, TransactionFailureInjector,
@@ -101,7 +102,7 @@ fn leave_fresh_prepared_journal(temp: &TempDir) {
     .unwrap();
     let mut session = storage.open_mutation_session(layout).unwrap();
     let image = session.capture(spec).unwrap();
-    let context = MutationContext::production();
+    let context = production_mutation_context();
     let plan = derive_materialization(
         &image,
         MaterializationRequest::Initialize {

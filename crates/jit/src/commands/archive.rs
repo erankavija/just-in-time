@@ -966,7 +966,7 @@ impl CommandExecutor<JsonFileStorage> {
         target: ArchiveTarget<'_>,
     ) -> Result<ArchiveExecutionResult> {
         let layout = self.require_layout()?;
-        let context = crate::repository_state::MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "archive execution", |session| {
             let Some((image, plan)) = self.capture_archive_plan(session, target)? else {
                 return Ok(SessionStep::Retry);

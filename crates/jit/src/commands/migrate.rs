@@ -38,7 +38,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, MutationContext, MutationIntent, VirtualPath,
+            finalize, CaptureBudget, CaptureSpec, MutationIntent, VirtualPath,
         };
         let layout = self.require_layout()?;
         let index_path = VirtualPath::INDEX;
@@ -50,7 +50,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         };
         // Operation-scoped so the repair and audit event keep one identity/time
         // authority across fresh-session conflict retries.
-        let context = MutationContext::production();
+        let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "lifecycle migration", |session| {
             let Some(first) = capture_or_retry(session.capture(CaptureSpec::phase_one(
                 [index_path.clone(), events_path.clone()],

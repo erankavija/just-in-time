@@ -177,7 +177,7 @@ impl CommandExecutor<JsonFileStorage> {
         let gitattributes = gitattributes_claim(&layout);
         // One MutationContext per operation, reused across probe/final finalize and
         // every retry so a composed lifecycle event's id/timestamp stay stable.
-        let context = crate::repository_state::MutationContext::production();
+        let context = super::production_mutation_context();
         let mut result = with_mutation_session(
             self.storage(),
             &layout,
