@@ -1,7 +1,7 @@
 {
   "epic_id": "4a559332-e795-4320-9eb9-193e248d628c",
   "epic_short_id": "4a559332",
-  "current_wave": 3,
+  "current_wave": 4,
   "waves": [
     {
       "wave_number": 1,
@@ -63,7 +63,7 @@
           "short_id": "1c8f00bd",
           "title": "Worktree write policy configuration key",
           "classification": "implementation",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "99ac9679-dbb3-44f4-b108-ac52b4487ea7",

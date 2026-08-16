@@ -8,6 +8,7 @@
   ],
   "description": "Repository configuration declares whether state-mutating commands may run inside a linked\nnon-primary checkout, and resolves to refusal when nothing is declared.\n\n## Background\n\nThe configuration already carries a worktree section whose lease-enforcement key is typed,\nparsed at load, and defaulted in one place. A write-policy stance follows that same shape: a\ntyped value with a stated default, so a repository chooses its stance in version-controlled\nconfiguration rather than through an undeclared environment convention. The shipped default\nrefuses, because the adopter who never considered the question is the one the divergent-store\nhazard hurts.\n\n## Success Criteria\n\n- [hard] REQ-01: A typed write-policy value parses from the worktree configuration section and rejects unknown tokens at load time with a message naming the accepted ones.\n- [hard] REQ-02: With no declared value, and with no worktree section at all, the resolved stance refuses state-mutating commands inside a linked non-primary checkout.\n- [hard] REQ-03: A declared permissive stance resolves to permitting those commands, and the precedence between the declared stance and a per-invocation override is stated once and covered by tests.\n- [hard] REQ-04: This repository declares the permissive stance in its own tracker configuration, so its linked agent checkouts keep mutating their local stores.\n- [hard] REQ-05: The configuration reference states the key, its accepted values, its default, and how an absent section resolves, worded as the repository's declared stance rather than as a promise of enforcement.\n\n## Notes\n\nThe neighbouring lease-enforcement key resolves differently depending on whether the section\nis present at all. The write-policy key states its own resolution explicitly rather than\ninheriting that asymmetry.\n",
   "documents": [],
+  "done_at": "2026-08-16T15:07:44.019673390Z",
   "first_ready_at": "2026-08-14T06:15:34.269849091Z",
   "gates_required": [
     "cargo-ci",
@@ -22,18 +23,18 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T15:00:02.276362334Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T15:07:18.647550821Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-08-16T14:57:58.632588080Z",
+      "status": "passed",
+      "updated_at": "2026-08-16T15:03:47.942837738Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-08-16T14:57:01.240262559Z",
+      "updated_at": "2026-08-16T15:02:41.526001836Z",
       "updated_by": "auto:executor"
     }
   },
@@ -46,7 +47,7 @@
     "satisfies:REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Worktree write policy configuration key",
-  "updated_at": "2026-08-16T15:00:02.276362334Z"
+  "updated_at": "2026-08-16T15:07:44.019673390Z"
 }

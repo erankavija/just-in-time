@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7830ebcf49aa8421300319c57fde9d29340bc9b7",
+  "completed_at": "2026-08-16T15:07:18.296304621Z",
+  "duration_ms": 209396,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The typed write-policy configuration, resolution defaults, precedence tests, repository declaration, and declared-stance documentation satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1c8f00bd-dfb3-434f-b800-b0e58348fec5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aea00395-3f7a-4161-85b9-84c2760ff6d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T15:03:48.900133062Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7830ebcf, baed7151, 24c09261, cb273bca, 2e872226, 0cdc2ced, 52895894 (`jit:1c8f00bd`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/1c8f00bd/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review passed (exit 0); docs-mechanical passed (exit 0)\nTruncation recovery: narrowed current source, tests, docs, and merge reads; historical gate-record payloads excluded as records of past\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The typed write-policy configuration, resolution defaults, precedence tests, repository declaration, and declared-stance documentation satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
