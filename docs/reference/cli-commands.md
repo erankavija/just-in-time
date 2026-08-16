@@ -1704,8 +1704,10 @@ JIT_ALLOW_DELETION=1 jit issue delete <ID>
   `JIT_ALLOW_DELETION=1 jit issue delete <ID>` remediation command.
 - **Confirmed deletion is unchanged**: it removes the issue, logs the deletion
   event, and reports the removal (exit `0`).
-- **Main worktree only.** Deletion is refused from secondary git worktrees to
-  keep worktree state consistent.
+- **Linked checkouts follow the repository's write policy.** Deletion carries no
+  worktree rule of its own: inside a linked non-primary checkout it is decided by
+  [`write_policy`](configuration.md#write_policy), like every other
+  state-mutating command.
 
 ## Gate Commands
 

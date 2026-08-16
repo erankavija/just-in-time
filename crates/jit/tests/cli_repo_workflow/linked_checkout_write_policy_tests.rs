@@ -4,6 +4,10 @@
 //! The two halves are one subject. Refusal is what makes an override an override,
 //! and the audit record is what a permitted override owes; a test moving an
 //! invocation from one half to the other only changes the stance it declares.
+//!
+//! Issue deletion is covered here rather than beside the deletion command,
+//! because the policy is the only thing that decides it inside a linked checkout
+//! (jit:1b6925a9).
 
 use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
@@ -215,6 +219,13 @@ fn test_create_issue_under_dispatch_override_persistence_failure_leaves_neither_
 /// Environment variable carrying one invocation's linked-checkout write stance.
 const WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
+/// Environment variable confirming operator intent for `jit issue delete`.
+///
+/// Deletion's confirmation flow is a separate concern from the write policy, so
+/// the deletion cases below satisfy it unconditionally: the only refusal they
+/// can observe is then the policy's own (jit:1b6925a9).
+const ALLOW_DELETION_ENV: &str = "JIT_ALLOW_DELETION";
+
 /// A repository whose primary checkout has a linked non-primary checkout beside
 /// it, declaring no write stance, so the refusing default applies in the linked
 /// one.
@@ -265,13 +276,21 @@ fn linked_checkout_fixture() -> (tempfile::TempDir, std::path::PathBuf, std::pat
     (temp, primary, linked)
 }
 
-/// Declare `stance` as `checkout`'s repository-level linked-checkout write stance.
+/// Declare `stance` as `checkout`'s repository-level linked-checkout write stance,
+/// changing nothing else about the repository.
+///
+/// The `[worktree]` section this writes also carries lease enforcement, which
+/// resolves to `strict` when the section is present and the key omitted but to
+/// `off` when the whole section is absent. Restating the section-absent value
+/// keeps the declaration's only effect the one it is named for, so a test that
+/// declares a stance does not silently acquire lease enforcement it never asked
+/// for.
 fn declare_stance(checkout: &Path, stance: LinkedCheckoutWriteStance) {
     let token = serde_json::to_value(stance).expect("the stance vocabulary serializes");
     let token = token.as_str().expect("a stance serializes as its token");
     let config = checkout.join(".jit/config.toml");
     let declared = std::fs::read_to_string(&config).expect("read the repository configuration")
-        + &format!("\n[worktree]\nwrite_policy = \"{token}\"\n");
+        + &format!("\n[worktree]\nenforce_leases = \"off\"\nwrite_policy = \"{token}\"\n");
     std::fs::write(&config, declared).expect("declare the repository's write stance");
 }
 
@@ -306,6 +325,54 @@ fn create_issue_in(checkout: &Path, invocation_stance: Option<&str>) -> assert_c
         None => command.env_remove(WRITE_STANCE_ENV),
     };
     command.assert()
+}
+
+/// The identifier of the issue a successful [`create_issue_in`] reported.
+fn created_issue_id(assert: assert_cmd::assert::Assert) -> String {
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout).into_owned();
+    serde_json::from_str::<serde_json::Value>(&stdout)
+        .unwrap_or_else(|error| panic!("the creation prints one JSON document ({error}): {stdout}"))
+        ["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("the creation names the issue it created: {stdout}"))
+        .to_owned()
+}
+
+/// Delete `issue` in `checkout` with operator confirmation supplied, optionally
+/// supplying an invocation stance.
+fn delete_issue_in(
+    checkout: &Path,
+    issue: &str,
+    invocation_stance: Option<&str>,
+) -> assert_cmd::assert::Assert {
+    let mut command = std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command
+        .current_dir(checkout)
+        .env(ALLOW_DELETION_ENV, "1")
+        .args(["issue", "delete", issue, "--json"]);
+    match invocation_stance {
+        Some(stance) => command.env(WRITE_STANCE_ENV, stance),
+        None => command.env_remove(WRITE_STANCE_ENV),
+    };
+    command.assert()
+}
+
+/// The event of `tag` naming `issue`, of which there must be exactly one.
+fn issue_event<'a>(
+    events: &'a [serde_json::Value],
+    tag: &str,
+    issue: &str,
+) -> &'a serde_json::Value {
+    let matching = events_tagged(events, tag)
+        .into_iter()
+        .filter(|event| event["issue_id"] == serde_json::json!(issue))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        matching.len(),
+        1,
+        "exactly one {tag} event must name {issue}; events: {events:?}"
+    );
+    matching[0]
 }
 
 #[test]
@@ -564,6 +631,109 @@ fn test_mutating_invocation_in_the_primary_checkout_succeeds_under_either_stance
     for stance in ["refuse", "allow"] {
         create_issue_in(&primary, Some(stance)).success();
     }
+}
+
+// Deletion is one of the governed invocations, not a case of its own
+// (jit:1b6925a9). It carried a standalone unconditional refusal in linked
+// checkouts, decided by its own detection and answering neither stance; these
+// three cases pin it to the policy's three outcomes instead.
+
+#[test]
+fn test_delete_issue_in_a_linked_checkout_under_the_refusing_stance_refuses_before_any_write() {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let issue = created_issue_id(create_issue_in(&linked, Some("allow")).success());
+    let before = store_bytes(&linked);
+
+    let error = refusal_envelope(delete_issue_in(&linked, &issue, None).failure());
+
+    assert_eq!(
+        error["code"],
+        serde_json::json!(jit::output::ErrorCode::LinkedCheckoutWriteRefused.as_str()),
+        "the confirmed deletion must be refused by the write policy rather than by a refusal of \
+         its own; error: {error}"
+    );
+    let named_checkout = std::fs::canonicalize(
+        error["details"]["checkout"]
+            .as_str()
+            .unwrap_or_else(|| panic!("the envelope names the refused checkout: {error}")),
+    )
+    .expect("the named checkout exists");
+    assert_eq!(
+        named_checkout,
+        std::fs::canonicalize(&linked).expect("the linked checkout exists"),
+        "the refusal must name the linked checkout the deletion would have mutated"
+    );
+    assert_eq!(
+        error["details"]["stance"],
+        serde_json::to_value(LinkedCheckoutWriteStance::Refuse).expect("the stance serializes"),
+        "the refusal must name the stance that refused the deletion; error: {error}"
+    );
+    assert_eq!(
+        store_bytes(&linked),
+        before,
+        "a refused deletion runs before the repository mutation session opens, so not one byte \
+         of the linked checkout's store — the issue it targeted, the event log, or the index — \
+         may differ afterwards"
+    );
+}
+
+#[test]
+fn test_delete_issue_in_a_linked_checkout_permitted_by_the_declared_stance_removes_the_issue() {
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    declare_stance(&linked, LinkedCheckoutWriteStance::Allow);
+    let issue = created_issue_id(create_issue_in(&linked, None).success());
+
+    delete_issue_in(&linked, &issue, None).success();
+
+    let events = durable_events(&linked);
+    issue_event(&events, "issue_deleted", &issue);
+    assert!(
+        events_tagged(&events, "linked_checkout_write_overridden").is_empty(),
+        "a deletion permitted by the declared stance overrode no refusal, so it records none; \
+         events: {events:?}"
+    );
+    std::process::Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(&linked)
+        .args(["issue", "show", &issue, "--json"])
+        .assert()
+        .failure();
+}
+
+#[test]
+fn test_delete_issue_in_a_linked_checkout_under_an_invocation_override_records_the_override_with_the_deletion(
+) {
+    // The repository declares nothing, so the refusing default is what the
+    // invocation's own stance outranks — and a permitted deletion owes the same
+    // audit record every other permitted override does.
+    let (_temp, _primary, linked) = linked_checkout_fixture();
+    let issue = created_issue_id(create_issue_in(&linked, Some("allow")).success());
+    let overrides_before =
+        events_tagged(&durable_events(&linked), "linked_checkout_write_overridden").len();
+
+    delete_issue_in(&linked, &issue, Some("allow")).success();
+
+    let events = durable_events(&linked);
+    let deletion = issue_event(&events, "issue_deleted", &issue);
+    let records = events_tagged(&events, "linked_checkout_write_overridden");
+    assert_eq!(
+        records.len(),
+        overrides_before + 1,
+        "the permitted deletion must record exactly one further override; events: {events:?}"
+    );
+    let record = records
+        .last()
+        .expect("the permitted deletion recorded an override");
+    assert_eq!(
+        (&record["declared_stance"], &record["invocation_override"]),
+        (&serde_json::json!("refuse"), &serde_json::json!("allow")),
+        "the record must pair the declaration that would have refused the deletion with the \
+         stance that permitted it; record: {record}"
+    );
+    assert_eq!(
+        record["timestamp"], deletion["timestamp"],
+        "sharing one mutation timestamp is what shows both records came from one plan; \
+         events: {events:?}"
+    );
 }
 
 #[test]
