@@ -4,6 +4,8 @@
 //! Verifies actual binary execution, exit codes, and output formats.
 
 use assert_cmd::prelude::*;
+use jit::config_manager::LINKED_CHECKOUT_WRITE_STANCE_ENV;
+use jit::domain::LinkedCheckoutWriteStance;
 use jit::output::ErrorCode;
 use predicates::prelude::*;
 use serde_json::Value;
@@ -104,6 +106,10 @@ fn create_linked_worktree(repo_path: &Path, branch: &str) -> std::path::PathBuf 
     linked
 }
 
+/// Acquire a lease against the linked checkout's selected store.
+///
+/// The invocation declares the allowing linked-checkout write stance it relies on
+/// rather than inheriting a default (jit:f52567ed REQ-05).
 fn acquire_selected_linked_lease(
     primary: &Path,
     linked: &Path,
@@ -113,6 +119,10 @@ fn acquire_selected_linked_lease(
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(primary)
         .env("JIT_DATA_DIR", linked.join(".jit"))
+        .env(
+            LINKED_CHECKOUT_WRITE_STANCE_ENV,
+            LinkedCheckoutWriteStance::Allow.as_token(),
+        )
         .args([
             "claim",
             "acquire",
@@ -200,6 +210,10 @@ fn test_lifecycle_lease_check_uses_selected_linked_authority_from_foreign_primar
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(foreign_primary.path())
         .env("JIT_DATA_DIR", linked.join(".jit"))
+        .env(
+            LINKED_CHECKOUT_WRITE_STANCE_ENV,
+            LinkedCheckoutWriteStance::Allow.as_token(),
+        )
         .env("JIT_AGENT_ID", agent_id)
         .args([
             "issue",

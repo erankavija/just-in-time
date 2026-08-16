@@ -1242,6 +1242,22 @@ impl LinkedCheckoutWriteStance {
     ) -> LinkedCheckoutWriteStance {
         invocation_override.unwrap_or(declared)
     }
+
+    /// The token naming this stance: the inverse of
+    /// [`FromStr`](std::str::FromStr), and the same text the type serializes to,
+    /// so prose naming a stance and a machine-readable field carrying one agree.
+    pub const fn as_token(self) -> &'static str {
+        match self {
+            LinkedCheckoutWriteStance::Refuse => "refuse",
+            LinkedCheckoutWriteStance::Allow => "allow",
+        }
+    }
+}
+
+impl std::fmt::Display for LinkedCheckoutWriteStance {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_token())
+    }
 }
 
 /// System event types for audit log
@@ -2001,6 +2017,31 @@ mod tests {
             serde_json::from_str::<LinkedCheckoutWriteStance>("\"allow\"").unwrap(),
             LinkedCheckoutWriteStance::Allow
         );
+    }
+
+    #[test]
+    fn test_linked_checkout_write_stance_as_token_round_trips_through_every_representation() {
+        for stance in [
+            LinkedCheckoutWriteStance::Refuse,
+            LinkedCheckoutWriteStance::Allow,
+        ] {
+            let token = stance.as_token();
+            assert_eq!(
+                token.parse::<LinkedCheckoutWriteStance>().unwrap(),
+                stance,
+                "the token a stance renders as must be one its own parser accepts"
+            );
+            assert_eq!(
+                serde_json::to_value(stance).unwrap(),
+                serde_json::Value::String(token.to_owned()),
+                "prose naming a stance and a machine-readable field carrying one must agree"
+            );
+            assert_eq!(
+                stance.to_string(),
+                token,
+                "Display must render the same token"
+            );
+        }
     }
 
     #[test]

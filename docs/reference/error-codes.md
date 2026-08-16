@@ -29,6 +29,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `REPOSITORY_NOT_FOUND` | No JIT repository exists at the resolved path. | `3` |
 | `REPOSITORY_FORMAT_TOO_NEW` | The repository format is newer than this binary supports. | `10` |
 | `DELETION_NOT_CONFIRMED` | Issue deletion lacks the required operator confirmation. | `2` |
+| `LINKED_CHECKOUT_WRITE_REFUSED` | The linked checkout's write stance refuses state-mutating commands. | `2` |
 | `PROFILE_NOT_FOUND` | No resolution route found the requested profile. | `3` |
 | `PROFILE_CONFLICT` | Profile planning or validation found a conflict. For the resolutions each conflict class carries, see [the remedy contract](profiles.md#the-remedy-contract). | `4` |
 | `DEPENDENCY_ERROR` | A dependency command failed. | `3` |
