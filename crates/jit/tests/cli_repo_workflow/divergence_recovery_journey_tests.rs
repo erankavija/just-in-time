@@ -247,6 +247,47 @@ fn commit_store(checkout: &Path, message: &str) {
     git_ok(checkout, &["commit", "-qm", message]);
 }
 
+/// Make `issue` depend on `dependency` in `checkout`, supplying an invocation
+/// write stance where the checkout needs one.
+///
+/// An issue with neither dependencies nor dependents is an isolated node, which
+/// repository-integrity validation rejects, so each side's own record is wired
+/// to the shared one — otherwise nothing this journey recovers could validate
+/// whatever the recovery did. The edge lives in the depending issue's record
+/// alone, so the shared record stays byte-identical in both stores and the
+/// divergence under test stays one-sided.
+fn depend_on(checkout: &Path, issue: &str, dependency: &str, invocation_stance: Option<&str>) {
+    let mut command = Command::new(assert_cmd::cargo::cargo_bin!("jit"));
+    command
+        .current_dir(checkout)
+        .args(["dep", "add", issue, dependency]);
+    match invocation_stance {
+        Some(stance) => command.env("JIT_WORKTREE_WRITE_POLICY", stance),
+        None => command.env_remove("JIT_WORKTREE_WRITE_POLICY"),
+    };
+    let output = command.output().expect("spawn jit dep add");
+    assert!(
+        output.status.success(),
+        "declaring {issue} dependent on {dependency} in {} failed: {}",
+        checkout.display(),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Run plain `jit validate` in `checkout`, answering its process outcome.
+///
+/// Plain, never `--fix`: the repair path reports that no fixes were needed
+/// whenever it applies none, and only re-runs validation when it applied at
+/// least one, so it exits 0 on a repository plain validation rejects. The
+/// unadorned command is the one whose exit status means what it says.
+fn validate(checkout: &Path) -> std::process::Output {
+    Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(checkout)
+        .arg("validate")
+        .output()
+        .expect("spawn jit validate")
+}
+
 #[test]
 fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the_documented_procedure(
 ) {
@@ -289,9 +330,11 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
     let primary_issue = created_issue_id(
         create_issue_in(&primary, "Held by the primary checkout alone", None).success(),
     );
+    depend_on(&primary, &primary_issue, &shared_issue, None);
     let linked_issue = created_issue_id(
         create_issue_in(&linked, "Held by the linked checkout alone", Some("allow")).success(),
     );
+    depend_on(&linked, &linked_issue, &shared_issue, Some("allow"));
     let primary_events = event_ids(&primary);
     let linked_events = event_ids(&linked);
     let primary_only_events = &primary_events - &linked_events;
@@ -397,6 +440,19 @@ fn test_divergence_recovery_journey_preserves_both_checkouts_records_through_the
         git_ok(&primary, &["add", ".jit/"]);
         git_ok(&primary, &["commit", "-q", "--no-edit"]);
     }
+
+    // The recovered store validates as it stands. This is what makes the index
+    // resolution above a repair rather than a patch that merely parses: plain
+    // validation is the check that rejects an index disagreeing with the issue
+    // files, so its passing here says the union kept exactly the records the
+    // merge preserved.
+    let validation = validate(&primary);
+    assert!(
+        validation.status.success(),
+        "the recovered repository must validate as it stands; stdout: {}, stderr: {}",
+        String::from_utf8_lossy(&validation.stdout),
+        String::from_utf8_lossy(&validation.stderr)
+    );
 
     // REQ-02: the retained branch's store now holds both checkouts' records and
     // both event histories, with neither side's record replaced by the other's.
