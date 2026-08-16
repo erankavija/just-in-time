@@ -1149,19 +1149,25 @@ fn render_profile_agreement(
     let diverged = result.diverged().count();
     if json {
         let details = serde_json::to_value(result)?;
-        let message = if diverged == 0 {
-            format!("{} recorded profile(s) agree", result.count)
-        } else {
-            format!(
-                "{diverged} of {} recorded profile(s) diverged",
-                result.count
-            )
-        };
-        return render_validation_json(
-            details,
-            message,
-            (diverged > 0).then_some(ErrorCode::ValidationFailed),
+        if diverged == 0 {
+            let message = format!("{} recorded profile(s) agree", result.count);
+            let output = JsonOutput::success(details).with_message(message);
+            println!("{}", output.to_json_string()?);
+            return Ok(());
+        }
+        // Every fact `details` carries is the same typed report a plain-text
+        // divergence line names; the suggestions beside it are the distinct
+        // resolutions those divergences' remedies carry, naming capture only
+        // where a remedy allows it.
+        let message = format!(
+            "{diverged} of {} recorded profile(s) diverged",
+            result.count
         );
+        let output = JsonError::new(ErrorCode::ValidationFailed, message)
+            .with_details(details)
+            .with_suggestions(result.suggestions());
+        println!("{}", output.to_json_string()?);
+        std::process::exit(output.exit_code().code());
     }
 
     for profile in &result.profiles {
@@ -1190,14 +1196,16 @@ fn render_profile_agreement(
     std::process::exit(jit::ExitCode::ValidationFailed.code());
 }
 
-fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
+fn profile_json_error(error: &anyhow::Error) -> Result<jit::output::JsonError> {
     use jit::output::{ErrorCode, JsonError};
     use jit::repository_state::RepositoryStateError;
 
     if error.downcast_ref::<jit::errors::NotFoundError>().is_some() {
-        return JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
-            "Select a package with --profile path:DIR, or run \
-             'jit profile list --json' to see the profiles this repository records",
+        return Ok(
+            JsonError::new(ErrorCode::ProfileNotFound, error.to_string()).with_suggestion(
+                "Select a package with --profile path:DIR, or run \
+                 'jit profile list --json' to see the profiles this repository records",
+            ),
         );
     }
     if error
@@ -1207,7 +1215,10 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
             .downcast_ref::<jit::commands::ProfileApplyError>()
             .is_some()
     {
-        return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
+        return Ok(JsonError::new(
+            ErrorCode::ProfileConflict,
+            error.to_string(),
+        ));
     }
     // Stated rather than left to the fallback below, so this envelope and
     // `error_to_error_code`'s classification of the same failure are read from
@@ -1216,15 +1227,17 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
         .downcast_ref::<jit::commands::ProfileResolutionError>()
         .is_some()
     {
-        return JsonError::new(ErrorCode::ProfileError, error.to_string());
+        return Ok(JsonError::new(ErrorCode::ProfileError, error.to_string()));
     }
     if error
         .downcast_ref::<jit::commands::ProfileDependencyError>()
         .is_some()
     {
-        return JsonError::new(ErrorCode::ProfileError, error.to_string()).with_suggestion(
-            "Place the package it depends on beside it, or apply that package \
-             first so this repository records where its bytes are",
+        return Ok(
+            JsonError::new(ErrorCode::ProfileError, error.to_string()).with_suggestion(
+                "Place the package it depends on beside it, or apply that package \
+                 first so this repository records where its bytes are",
+            ),
         );
     }
     // The single sanctioned downcast of the anyhow CLI transport to the typed
@@ -1233,19 +1246,23 @@ fn profile_json_error(error: &anyhow::Error) -> jit::output::JsonError {
     // unreadable or unparseable profile registry is a generic profile error. Every
     // other variant keeps the generic profile-error code.
     if let Some(state_error) = error.downcast_ref::<RepositoryStateError>() {
-        if matches!(state_error, RepositoryStateError::ProfileTargetConflicts(_)) {
-            return JsonError::new(ErrorCode::ProfileConflict, error.to_string());
+        if let RepositoryStateError::ProfileTargetConflicts(conflicts) = state_error {
+            return Ok(
+                JsonError::new(ErrorCode::ProfileConflict, error.to_string())
+                    .with_details(serde_json::to_value(conflicts)?)
+                    .with_suggestions(conflicts.suggestions()),
+            );
         }
-        return JsonError::new(ErrorCode::ProfileError, error.to_string());
+        return Ok(JsonError::new(ErrorCode::ProfileError, error.to_string()));
     }
-    JsonError::new(ErrorCode::ProfileError, error.to_string())
+    Ok(JsonError::new(ErrorCode::ProfileError, error.to_string()))
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {
     match result {
         Ok(value) => Ok(value),
         Err(error) if json => {
-            let json_error = profile_json_error(&error);
+            let json_error = profile_json_error(&error)?;
             println!("{}", json_error.to_json_string()?);
             std::process::exit(json_error.exit_code().code());
         }
@@ -2544,7 +2561,7 @@ fn run() -> Result<()> {
                     }
                 }
                 Err(error) if json => {
-                    let json_error = profile_json_error(&error);
+                    let json_error = profile_json_error(&error)?;
                     println!("{}", json_error.to_json_string()?);
                     std::process::exit(json_error.exit_code().code());
                 }
@@ -2585,7 +2602,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(error) if json => {
-                        let json_error = profile_json_error(&error);
+                        let json_error = profile_json_error(&error)?;
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     }
@@ -2595,7 +2612,7 @@ fn run() -> Result<()> {
             ProfileCommands::Validate { json } => match executor.validate_recorded_profiles() {
                 Ok(result) => render_profile_agreement(&result, json)?,
                 Err(error) if json => {
-                    let json_error = profile_json_error(&error);
+                    let json_error = profile_json_error(&error)?;
                     println!("{}", json_error.to_json_string()?);
                     std::process::exit(json_error.exit_code().code());
                 }
@@ -2691,7 +2708,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(error) if json => {
-                        let json_error = profile_json_error(&error);
+                        let json_error = profile_json_error(&error)?;
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     }
@@ -2746,7 +2763,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(error) if json => {
-                        let json_error = profile_json_error(&error);
+                        let json_error = profile_json_error(&error)?;
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     }
@@ -2799,7 +2816,7 @@ fn run() -> Result<()> {
                         }
                     }
                     Err(error) if json => {
-                        let json_error = profile_json_error(&error);
+                        let json_error = profile_json_error(&error)?;
                         println!("{}", json_error.to_json_string()?);
                         std::process::exit(json_error.exit_code().code());
                     }
@@ -9284,7 +9301,7 @@ mod repository_state_classifier_tests {
         let conflict_cases: Vec<RepositoryStateError> = vec![target_conflicts().into()];
         for state_error in conflict_cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error);
+            let json = profile_json_error(&error).expect("a conflict renders a JSON error");
             assert_eq!(json.error.code, jit::output::ErrorCode::ProfileConflict);
             assert_eq!(json.exit_code().code(), 4);
         }
@@ -9295,16 +9312,126 @@ mod repository_state_classifier_tests {
         ];
         for state_error in error_cases {
             let error = anyhow::Error::new(state_error);
-            let json = profile_json_error(&error);
+            let json = profile_json_error(&error).expect("a profile error renders a JSON error");
             assert_eq!(json.error.code, jit::output::ErrorCode::ProfileError);
             assert_eq!(json.exit_code().code(), 1);
         }
     }
 
+    /// REQ-04: the conflict code, exit status, and rendered human message a
+    /// refused publication carries are unaffected by attaching structured
+    /// details and suggestions beside them — the message stays exactly the
+    /// sentence [`RepositoryStateError`]'s `Display` renders, byte for byte,
+    /// carrying every fact its structured form carries so a reader of either
+    /// acts on the same evidence.
+    #[test]
+    fn test_profile_json_error_conflict_keeps_its_code_exit_and_message_stable() {
+        let state_error: RepositoryStateError = target_conflicts().into();
+        let error = anyhow::Error::new(state_error);
+        let rendered = error.to_string();
+
+        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+
+        assert_eq!(json.error.code, jit::output::ErrorCode::ProfileConflict);
+        assert_eq!(json.exit_code().code(), 4);
+        assert_eq!(json.error.message, rendered);
+        for expected in [
+            "3 profile decision(s) cannot be published",
+            ".jit/issues/abc123.json",
+            ".jit/issues/def456.json",
+            "scalar:validation-default-type",
+            "stop one of the two packages",
+            "restore the value this profile published",
+            "make those definitions identical",
+        ] {
+            assert!(
+                rendered.contains(expected),
+                "the conflict message omits '{expected}': {rendered}"
+            );
+        }
+    }
+
+    /// REQ-01/REQ-03: a refused publication's JSON envelope names every
+    /// conflicting target beside its conflict class and typed remedy, and
+    /// suggests capture only for the entry whose remedy allows it.
+    #[test]
+    fn test_profile_json_error_conflict_attaches_structured_details_and_suggestions() {
+        let state_error: RepositoryStateError = target_conflicts().into();
+        let error = anyhow::Error::new(state_error);
+
+        let json = profile_json_error(&error).expect("a conflict renders a JSON error");
+
+        let details = json.error.details.expect("a conflict attaches details");
+        let conflicts = details["conflicts"]
+            .as_array()
+            .expect("details carry the conflict list");
+        assert_eq!(conflicts.len(), 3);
+
+        let occupied = &conflicts[0];
+        assert_eq!(occupied["owner"], "candidate");
+        assert_eq!(occupied["subject"]["kind"], "file");
+        assert_eq!(occupied["subject"]["path"], ".jit/issues/abc123.json");
+        assert_eq!(occupied["conflict"]["kind"], "occupied");
+        assert_eq!(
+            occupied["conflict"]["remedy"]["resolutions"],
+            serde_json::json!([
+                "stop-one-package-from-declaring-target",
+                "apply-one-of-conflicting-packages"
+            ])
+        );
+
+        let diverged = &conflicts[1];
+        assert_eq!(diverged["conflict"]["kind"], "diverged");
+        assert_eq!(
+            diverged["conflict"]["remedy"]["resolutions"],
+            serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+        );
+
+        let contested = &conflicts[2];
+        assert_eq!(contested["subject"]["kind"], "contribution");
+        assert_eq!(contested["conflict"]["kind"], "contested");
+        assert_eq!(
+            contested["conflict"]["remedy"]["resolutions"],
+            serde_json::json!([
+                "make-definitions-identical",
+                "apply-only-one-declaring-package"
+            ])
+        );
+
+        // Only the diverged entry's remedy allows capture, so it is the only
+        // resolution naming `jit profile capture` — named once, not per entry.
+        assert_eq!(
+            json.error
+                .suggestions
+                .iter()
+                .filter(|suggestion| suggestion.contains("jit profile capture"))
+                .count(),
+            1,
+            "suggestions: {:?}",
+            json.error.suggestions
+        );
+        assert!(
+            json.error
+                .suggestions
+                .iter()
+                .any(|suggestion| suggestion.contains("stop one of the two packages")),
+            "suggestions: {:?}",
+            json.error.suggestions
+        );
+        assert!(
+            json.error
+                .suggestions
+                .iter()
+                .any(|suggestion| suggestion.contains("make those definitions identical")),
+            "suggestions: {:?}",
+            json.error.suggestions
+        );
+    }
+
     #[test]
     fn test_profile_json_error_maps_not_found_before_variant_match() {
         let error = anyhow::Error::new(jit::errors::NotFoundError::new("no such profile"));
-        let json = profile_json_error(&error);
+        let json = profile_json_error(&error).expect("a not-found error renders a JSON error");
         assert_eq!(json.error.code, jit::output::ErrorCode::ProfileNotFound);
         assert_eq!(json.exit_code().code(), 3);
     }
