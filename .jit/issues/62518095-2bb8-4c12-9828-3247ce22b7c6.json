@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-16T19:59:36.448274185Z",
   "context": {},
   "created_at": "2026-08-16T19:59:12.609553184Z",
@@ -13,14 +13,14 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-08-16T19:59:36.600144578Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-08-16T20:38:19.485104761Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-16T19:59:36.751193531Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-16T20:36:54.526459504Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "62518095-2bb8-4c12-9828-3247ce22b7c6",
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Correct the divergent-store recovery procedure",
-  "updated_at": "2026-08-16T20:22:33.845915301Z"
+  "updated_at": "2026-08-16T20:38:19.485104761Z"
 }

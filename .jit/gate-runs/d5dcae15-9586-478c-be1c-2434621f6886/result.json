@@ -1,0 +1,47 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f41762ea1b3e56513630d2e6ea4bcc2d89374972",
+  "completed_at": "2026-08-16T20:38:19.063481280Z",
+  "duration_ms": 83919,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "id": "F1",
+        "line": 419,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Step 4 stages only the index after also instructing users to resolve issue-file conflicts, leaving resolved issue files unmerged and preventing the commit."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/cli_repo_workflow/divergence_recovery_journey_tests.rs",
+        "id": "F2",
+        "line": 247,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The executable journey stages all of .jit/ rather than the selective tracked store state required by the documented procedure."
+      }
+    ],
+    "summary": "The recovery documentation has two issue-impact blocking gaps: incomplete conflict staging and a divergent executable witness.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "62518095-2bb8-4c12-9828-3247ce22b7c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d5dcae15-9586-478c-be1c-2434621f6886",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-16T20:36:55.144382281Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 29192 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.147.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a00c4a-b0f5-7bc0-8eae-8168c1943d6a\n--------\nuser\n--- 29179 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf `bug` (maximum hierarchy level), with no resolved children. I inspected all seven reachable `jit:62518095` commits individually, including merge-parent patches; commit attribution was available. The impact cone is the divergent-store how-to and command reference.\n\n1. **F1 — Blocking, issue-impact:** Step 4 says to resolve conflicting issue files, but its command stages only `.jit/index.json`; `git commit --no-edit` then fails if any `.jit/issues/*.json` conflict was resolved. Update the command to stage both resolved issue records and the index. [docs/how-to/multi-agent-coordination.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/multi-agent-coordination.md:419)\n\n2. **F2 — Blocking, issue-impact:** The page’s selective staging instruction does not match its claimed step-for-step executable witness: the journey stages all of `.jit/`, which can include the machine-local files the documentation warns against. Make the witness stage only issue records, events, and the index, including after index resolution. [divergence_recovery_journey_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_repo_workflow/divergence_recovery_journey_tests.rs:247)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The recovery documentation has two issue-impact blocking gaps: incomplete conflict staging and a divergent executable witness.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Step 4 stages only the index after also instructing users to resolve issue-file conflicts, leaving resolved issue files unmerged and preventing the commit.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":419},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The executable journey stages all of .jit/ rather than the selective tracked store state required by the documented procedure.\",\"file\":\"crates/jit/tests/cli_repo_workflow/divergence_recovery_journey_tests.rs\",\"line\":247}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
