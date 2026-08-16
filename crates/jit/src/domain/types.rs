@@ -1166,6 +1166,20 @@ pub struct ProfileLifecycleProfile {
     pub variables: Vec<ProfileLifecycleVariable>,
 }
 
+/// The stance on state-mutating commands inside a linked non-primary checkout.
+///
+/// One vocabulary carries both the repository's declared stance and the
+/// per-invocation override that can outrank it, so an audit record names the
+/// two with one type instead of two parallel ones.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum LinkedCheckoutWriteStance {
+    /// State-mutating commands are refused inside a linked checkout.
+    Refuse,
+    /// State-mutating commands may run inside a linked checkout.
+    Allow,
+}
+
 /// System event types for audit log
 ///
 /// `JsonSchema` is derived so the event catalog's freshness guard can read the
@@ -1469,6 +1483,33 @@ pub enum Event {
         /// malformed event tail immediately before this record.
         isolated_torn_tail: bool,
     },
+    /// An explicit per-invocation override permitted a state-mutating command
+    /// inside a linked non-primary checkout.
+    ///
+    /// Repository-scoped, like [`Event::ProfileLifecycle`]: the override is
+    /// decided for the whole invocation before any issue is known, so the record
+    /// carries no issue id. It exists because an ordinary mutation record cannot
+    /// show that the invocation was permitted by an override rather than by a
+    /// permissive declared stance: the pair of stances is the audit fact.
+    ///
+    /// The vocabulary is declared ahead of the surface that appends it, like the
+    /// post-apply members of [`ProfileLifecycleOperation`], so the event contract
+    /// is stable before a mutation path publishes a record through it
+    /// (jit:0c8d38be).
+    LinkedCheckoutWriteOverridden {
+        /// Event ID
+        id: String,
+        /// When this occurred
+        timestamp: DateTime<Utc>,
+        /// Root of the linked checkout whose store the invocation mutated.
+        checkout: std::path::PathBuf,
+        /// The stance declared for the repository, which would have refused the
+        /// invocation.
+        declared_stance: LinkedCheckoutWriteStance,
+        /// The per-invocation stance that outranked the declaration and
+        /// permitted the invocation.
+        invocation_override: LinkedCheckoutWriteStance,
+    },
 }
 
 impl Event {
@@ -1499,7 +1540,8 @@ impl Event {
             | Event::GateDefinitionCreated { id, timestamp, .. }
             | Event::GateDefinitionRemoved { id, timestamp, .. }
             | Event::LifecycleTimestampsBackfilled { id, timestamp, .. }
-            | Event::ProfileLifecycle { id, timestamp, .. } => {
+            | Event::ProfileLifecycle { id, timestamp, .. }
+            | Event::LinkedCheckoutWriteOverridden { id, timestamp, .. } => {
                 *id = new_id;
                 *timestamp = new_timestamp;
             }
@@ -1814,6 +1856,7 @@ impl Event {
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
             Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
             Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
+            Event::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
         }
     }
 
