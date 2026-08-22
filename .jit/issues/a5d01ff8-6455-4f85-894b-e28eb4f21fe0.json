@@ -14,13 +14,13 @@
   "gates_status": {},
   "id": "a5d01ff8-6455-4f85-894b-e28eb4f21fe0",
   "labels": [
-    "epic:core-maintenance",
     "component:mcp-server",
     "type:bug",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "epic:v1-release"
   ],
   "priority": "high",
   "state": "done",
   "title": "Remediate fast-uri and hono production dependency advisories in mcp-server",
-  "updated_at": "2026-08-04T06:26:33.835081542Z"
+  "updated_at": "2026-08-22T12:40:14.305190225Z"
 }
