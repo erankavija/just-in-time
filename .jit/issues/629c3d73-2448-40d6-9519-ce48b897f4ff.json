@@ -11,17 +11,17 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/4a559332-gf2-adopter-reliability/investigation.md"
+      "path": "dev/archive/4a559332-gf2-adopter-reliability/investigation.md"
     },
     {
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "8c23c2d3a961b9a48a13076185eabb163568453b84df317703226b1c0c339b7e",
+          "content_hash": "48c039ad6326b3c25ef41f7e56998a05b852b0e255cc05f5a1d983989fe70644",
           "is_shared": false,
           "mime_type": null,
           "original_path": "breakdown.json",
-          "resolved_path": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json"
+          "resolved_path": "dev/archive/4a559332-gf2-adopter-reliability/breakdown.json"
         },
         {
           "asset_type": "local",
@@ -29,21 +29,21 @@
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "investigation.md",
-          "resolved_path": "dev/active/4a559332-gf2-adopter-reliability/investigation.md"
+          "resolved_path": "dev/archive/4a559332-gf2-adopter-reliability/investigation.md"
         }
       ],
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/4a559332-gf2-adopter-reliability/plan.md"
+      "path": "dev/archive/4a559332-gf2-adopter-reliability/plan.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/4a559332-gf2-adopter-reliability/breakdown.json"
+      "path": "dev/archive/4a559332-gf2-adopter-reliability/breakdown.json"
     }
   ],
   "done_at": "2026-08-14T06:14:32.389489407Z",
@@ -69,5 +69,5 @@
   "priority": "high",
   "state": "done",
   "title": "planning: gf2 adopter reliability: safe worktrees, durable gates, actionable profiles",
-  "updated_at": "2026-08-14T06:14:32.389489407Z"
+  "updated_at": "2026-08-22T11:53:12.407157841Z"
 }
