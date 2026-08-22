@@ -1,0 +1,20 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-22T12:49:38.932371304Z",
+  "dependencies": [],
+  "description": "Recovery evicts leases on expiry, but an indefinite lease has no expiry, so a lease whose holder died is never reclaimed even though the tracker already reports it stale.\n\n## Background\n\nA lease taken with a zero time-to-live records no expiry and is kept alive by heartbeats instead. That makes a missing heartbeat the designed staleness signal for such a lease, and lease listings already compute and report a stale flag from it.\n\nRecovery documents itself as removing provably stale data and reports an eviction count for expired leases. Because an indefinite lease never becomes expired, it falls outside the only lease condition recovery tests, and no routine reclaims it. The issue it holds stays locked against the mutations that require a lease, and the only remaining route is the administrative force-evict, which is documented for operator intervention rather than for routine recovery.\n\nThe gap widens as corroborating evidence accumulates: the holder's worktree and branch can be gone and the issue itself already terminal, while the lease survives every recovery run.\n\n## Success Criteria\n\n- [hard] REQ-01: Recovery reclaims an indefinite lease whose heartbeat has lapsed beyond the staleness threshold, and reports it in its result.\n- [hard] REQ-02: Recovery leaves an indefinite lease whose heartbeat is current.\n- [hard] REQ-03: The staleness threshold recovery applies is the same one lease listings report their stale flag from, so a lease reported stale is a lease recovery reclaims.\n- [hard] REQ-04: Reclaiming a lease appends an event distinguishing recovery reclamation from a holder's release and from an administrative eviction.\n- [hard] REQ-05: Recovery's reported counts distinguish leases reclaimed for lapsed heartbeat from leases evicted for expiry.\n\n## Notes\n\nObserved in this repository: three leases held since 2026-07-16 with a zero time-to-live and no expiry, each reported stale, each on an issue that has since reached a terminal state, and each naming a worktree and branch that no longer exist. Recovery reports zero evictions and all three survive.\n\nThe staleness threshold is the open question. Reusing whatever listings already apply keeps one definition of stale in the product rather than introducing a second; if that threshold is currently implicit, making it explicit and configurable belongs in this issue.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-22T12:49:38.932371304Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "5b37a806-043c-4b42-bbf6-ebc06941db59",
+  "labels": [
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Recovery never reclaims an indefinite lease whose holder has died",
+  "updated_at": "2026-08-22T12:49:38.932371304Z"
+}

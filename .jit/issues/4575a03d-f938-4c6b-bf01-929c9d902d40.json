@@ -1,0 +1,20 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-22T12:49:17.165202737Z",
+  "dependencies": [],
+  "description": "Archiving a container copies the permanent-path documents it links into the archive, producing a frozen second copy of a living document that nothing reconciles. Measured drift already exists in this repository.\n\n## Background\n\n`@/issue/8e071e18/decision/D-14` records that copy-on-archive was implemented and then rejected on measurement for artifacts outside the development root: permanence sets keep-the-source while leaving wants-a-destination true, so copying falls out as an inherited consequence rather than a chosen behaviour. The decision names the result a staleness defect under `@/inv/single-source-prose` and `@/charter/D-13`, and settles those artifacts on retain-in-place.\n\nThe same inherited consequence still governs permanent paths that sit inside the development root. They are declared permanent, so the source is kept; they are also inside a managed area, so a destination is still scheduled, and the artifact archives by copy. D-14's remedy reached the outside-root case only.\n\nThe copy is not merely redundant. A copy lands below the archive root, so every relative reference it carries to a target that stayed put resolves from a directory that no longer exists in the same relation. D-14 already anticipates this and exempts such an edge from the execution-time layout validator, which leaves the frozen copy internally broken rather than making it correct. Repairing the copy's references edits it away from its source, so the mechanism can guarantee byte-divergence at the moment of archival.\n\n## Success Criteria\n\n- [hard] REQ-01: A document under a declared permanent path archives without a copy being written under the archive root; the archive records the reference and the source is untouched.\n- [hard] REQ-02: An archive plan reports no `copy` action whose evidence names a permanent path.\n- [hard] REQ-03: Re-running an already-executed container archive reports no destination conflict arising from a permanent-path document.\n- [hard] REQ-04: Traceability from a terminal issue to a permanent-path document it delivered survives archival and resolves to the live document.\n- [hard] REQ-05: The permanent-path copies already written to this repository's archive are removed, and the references that reach them resolve to the live sources.\n\n## Notes\n\nExisting state at the time of filing, from `dev/archive`:\n\n- `dev/architecture/repository-state-materialization.md` exists in three places. The copy under `1cc809de-repository-state-quality` differs from the live document by 92 lines; the copy under `4b7c06d0-test-suite-performance` is byte-identical today and drifts on the next edit to the live file.\n- `dev/TESTING.md` has a copy under `4b7c06d0-test-suite-performance` whose relative references were repaired so the copy resolved, which is itself the divergence this issue describes.\n- Four further copies under `f2532a2d-jit-project-lead` are byte-identical today.\n\nD-14 measured the outside-root case at 684 copy operations over 139 distinct files and 16.6 MB. The in-root permanent set is far smaller, so the argument here rests on the staleness defect rather than on volume.\n\nREQ-05 covers repository-local cleanup; the shipped behaviour is REQ-01 through REQ-04.\n",
+  "documents": [],
+  "first_ready_at": "2026-08-22T12:49:17.165202737Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "4575a03d-f938-4c6b-bf01-929c9d902d40",
+  "labels": [
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Archived permanent-path documents are copied into a frozen second source of truth",
+  "updated_at": "2026-08-22T12:49:17.165202737Z"
+}
