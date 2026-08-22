@@ -10,10 +10,10 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "evidence",
+      "doc_type": null,
       "format": "markdown",
-      "label": "Replacement-image cutover smoke",
-      "path": "dev/active/8b05a612-production-readiness/3a3b5704-container-cutover-smoke.md"
+      "label": null,
+      "path": "dev/active/3a3b5704/3a3b5704-container-cutover-smoke.md"
     }
   ],
   "done_at": "2026-07-30T18:07:26.185529112Z",
@@ -69,5 +69,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Remove obsolete Docker topologies and migrate every active consumer",
-  "updated_at": "2026-07-30T18:07:26.185529112Z"
+  "updated_at": "2026-08-22T11:58:32.989981979Z"
 }

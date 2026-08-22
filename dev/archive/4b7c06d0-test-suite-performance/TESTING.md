@@ -1,7 +1,7 @@
 # JIT Testing Strategy
 
 This document describes the testing approach for the Just-In-Time issue tracker. It is the
-detailed elaboration of the three-layer strategy summarized in [AGENTS.md](../AGENTS.md).
+detailed elaboration of the three-layer strategy summarized in [AGENTS.md](../../../AGENTS.md).
 
 ## Three Layers
 
@@ -316,7 +316,7 @@ harness that produces both.
   is workspace code. A package override changes no other profile key, so `debug-assertions` and
   `overflow-checks` still hold everywhere. The measured build cost of the override, against the
   matched unoptimized arm and both fixed 25% ceilings, is in
-  [dev/benchmarks/dependency-profile-6d10e5d4/](benchmarks/dependency-profile-6d10e5d4/).
+  [dev/benchmarks/dependency-profile-6d10e5d4/](../../benchmarks/dependency-profile-6d10e5d4/).
 - **Incremental compilation** — both profiles also state `incremental = true` explicitly, for
   ordinary interactive development, where the cost amortizes across many rebuilds of the same
   tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
@@ -397,7 +397,7 @@ per-test duration, `warm_duration_ms`, for every test nextest ran in the default
 state warm, one warmup run ahead of the measured run, `ceil(exec_time_seconds * 1000)`.
 Nothing in that profile is close to either enforced ceiling: the slowest single test,
 5,324 ms, sits well under the per-test bound in
-[`.config/nextest.toml`](../.config/nextest.toml), and the whole default run sits
+[`.config/nextest.toml`](../../../.config/nextest.toml), and the whole default run sits
 comfortably under `MAX_TEST_SUITE_SECONDS` — see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
 for the exact measured margin. The tables below attribute cost, not risk: for every test whose
@@ -666,7 +666,7 @@ cargo test --doc --workspace
 ```
 
 The committed nextest policy is documented in
-[`.config/nextest.toml`](../.config/nextest.toml), which also pins a per-test ceiling: a
+[`.config/nextest.toml`](../../../.config/nextest.toml), which also pins a per-test ceiling: a
 slow-timeout of 10s, terminated after a second 10s grace period, so any single test that
 runs past 20s fails the run rather than hanging it.
 
@@ -757,8 +757,8 @@ fn test_cli_defer_issue() {
 
 ## See Also
 
-- [AGENTS.md](../AGENTS.md) - architecture, layer boundaries, coding conventions
-- [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
-- [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
-- [crates/jit/tests/common/harness.rs](../crates/jit/tests/common/harness.rs) - the harness implementation
-- [crates/jit/tests/fast_docs_templates/harness_demo.rs](../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples
+- [AGENTS.md](../../../AGENTS.md) - architecture, layer boundaries, coding conventions
+- [.github/copilot-instructions.md](../../../.github/copilot-instructions.md) - TDD guidelines and functional style
+- [docs/reference/jit-content-standards.md](../../../docs/reference/jit-content-standards.md) - content standards for docs and issues
+- [crates/jit/tests/common/harness.rs](../../../crates/jit/tests/common/harness.rs) - the harness implementation
+- [crates/jit/tests/fast_docs_templates/harness_demo.rs](../../../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples

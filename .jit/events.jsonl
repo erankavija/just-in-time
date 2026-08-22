@@ -14570,3 +14570,5 @@
 {"from":"rejected","id":"b4362359-3cbc-44f3-9120-d243402b5b18","issue_id":"8b05a612-91e6-43c8-b36e-557e2417c88e","timestamp":"2026-08-22T11:57:05.237395498Z","to":"archived","type":"issue_state_changed"}
 {"fields":["documents"],"id":"afea1969-9d38-45c9-b04a-c3cefd4b2fb0","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-22T11:58:06.803706717Z","type":"issue_updated","updated_by":"doc-remove"}
 {"fields":["documents"],"id":"842dc75a-cc2f-4b98-9fab-8a896698cac2","issue_id":"c639cfb5-8356-4c54-b45c-860064432560","timestamp":"2026-08-22T11:58:06.962896263Z","type":"issue_updated","updated_by":"doc-add"}
+{"fields":["documents"],"id":"79abd92a-af35-4402-8295-e4eefb19e5b1","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-08-22T11:58:32.828951224Z","type":"issue_updated","updated_by":"doc-remove"}
+{"fields":["documents"],"id":"555b6046-d811-44b6-8d8b-851100860314","issue_id":"3a3b5704-b385-4358-98e3-23e095b2ee97","timestamp":"2026-08-22T11:58:32.989981979Z","type":"issue_updated","updated_by":"doc-add"}
