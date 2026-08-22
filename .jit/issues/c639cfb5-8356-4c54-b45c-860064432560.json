@@ -5,9 +5,7 @@
   "context": {},
   "created_at": "2026-07-14T18:53:07.181314286Z",
   "dependencies": [
-    "08883a21-571d-4b00-a639-6e21309dee31",
     "42c8c9c1-737d-48a6-b8b4-911aafa1a263",
-    "8bbe6557-2b47-4de5-9800-4061752a8767",
     "dd268d0f-2656-4e85-8527-990dc6aea0b4",
     "f6a17e0d-b9bb-4b8d-9e92-e3f0296320c0",
     "f73d54a2-14bd-4641-bcfe-be5f1431c133"
@@ -208,5 +206,5 @@
   "priority": "high",
   "state": "archived",
   "title": "Complete profile lifecycle, composition, and upgrades",
-  "updated_at": "2026-08-22T11:58:06.962896263Z"
+  "updated_at": "2026-08-22T12:16:48.548987178Z"
 }
