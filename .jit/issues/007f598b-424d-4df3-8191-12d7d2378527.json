@@ -13,7 +13,7 @@
       "doc_type": "design",
       "format": "markdown",
       "label": "Repository state materialization architecture",
-      "path": "dev/architecture/repository-state-materialization.md"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/architecture/repository-state-materialization.md"
     }
   ],
   "done_at": "2026-08-12T00:27:32.182828238Z",
@@ -50,5 +50,5 @@
   "priority": "high",
   "state": "done",
   "title": "Cut over journal durability documentation",
-  "updated_at": "2026-08-12T00:27:32.182828238Z"
+  "updated_at": "2026-08-22T11:56:49.854246582Z"
 }

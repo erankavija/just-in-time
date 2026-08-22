@@ -13,7 +13,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/3923fd06/measurement-report.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/3923fd06/measurement-report.md"
     }
   ],
   "done_at": "2026-08-04T17:53:01.408252764Z",
@@ -46,5 +46,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Bind every published package to the registry it restates",
-  "updated_at": "2026-08-04T22:20:41.961335218Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

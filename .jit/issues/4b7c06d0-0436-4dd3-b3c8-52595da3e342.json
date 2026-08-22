@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-11T19:09:38.781867025Z",
   "context": {},
@@ -16,34 +17,34 @@
       "doc_type": "handoff",
       "format": "markdown",
       "label": "Session 1 handoff",
-      "path": "dev/active/4b7c06d0-test-suite-performance/handoff.md"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/active/handoff.md"
     },
     {
       "commit": null,
       "doc_type": "progress",
       "label": "Execution progress",
-      "path": "dev/active/4b7c06d0-test-suite-performance/progress.json"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/active/progress.json"
     },
     {
       "commit": null,
       "doc_type": "handoff",
       "format": "markdown",
       "label": "Session 2 handoff",
-      "path": "dev/active/4b7c06d0-test-suite-performance/handoff-2.md"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/active/handoff-2.md"
     },
     {
       "commit": null,
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Completion Report",
-      "path": "dev/active/4b7c06d0-test-suite-performance/completion-report.md"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/active/completion-report.md"
     },
     {
       "commit": null,
       "doc_type": "documentation",
       "format": "markdown",
       "label": "Enforcement Evidence",
-      "path": "dev/benchmarks/suite-enforcement-4b7c06d0/README.md"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/suite-enforcement-4b7c06d0/README.md"
     }
   ],
   "done_at": "2026-08-13T04:25:35.522417774Z",
@@ -79,7 +80,7 @@
     "epic:test-suite-performance"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "The workspace test suite runs in under 30 seconds",
-  "updated_at": "2026-08-13T04:25:35.522417774Z"
+  "updated_at": "2026-08-22T11:56:49.854246582Z"
 }

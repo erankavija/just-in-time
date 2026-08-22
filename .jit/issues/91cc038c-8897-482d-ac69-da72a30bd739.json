@@ -12,7 +12,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/91cc038c/91cc038c-unreachable-wait-evidence.md"
     }
   ],
   "done_at": "2026-08-05T07:27:38.145030042Z",
@@ -44,5 +44,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Report a lock that admits a contender it must refuse without waiting out the stall bound",
-  "updated_at": "2026-08-05T07:27:38.145030042Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

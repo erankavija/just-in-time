@@ -12,7 +12,7 @@
       "commit": null,
       "doc_type": "benchmark",
       "label": "Transaction benchmark evidence",
-      "path": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/test-suite-performance-4b7c06d0.json"
     }
   ],
   "done_at": "2026-08-11T23:17:23.123454646Z",
@@ -45,5 +45,5 @@
   "priority": "high",
   "state": "done",
   "title": "Measure transaction model-limit round trips",
-  "updated_at": "2026-08-11T23:17:23.123454646Z"
+  "updated_at": "2026-08-22T11:56:49.854246582Z"
 }

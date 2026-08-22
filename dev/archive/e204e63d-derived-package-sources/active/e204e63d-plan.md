@@ -623,11 +623,11 @@ flowchart LR
   `dev/active/e204e63d-derived-package-sources/e204e63d-investigation.md`. The
   exhaustive consumer inventories, the per-root undeclared file counts, the
   manifest and template diffs, and the primitive-verification table remain there.
-- [Extraction findings](../a62d444d/findings.md) —
+- [Extraction findings](a62d444d/findings.md) —
   `dev/active/a62d444d/findings.md`. The consumer table for the compiled-in
   package, the three measured adopter cases, the ordering it established, and the
   costs with no route back remain there.
-- [Boundary audit](../7cbefe7c/findings.md) — `dev/active/7cbefe7c/findings.md`.
+- [Boundary audit](7cbefe7c/findings.md) — `dev/active/7cbefe7c/findings.md`.
   The twenty-seven classified sites with their destinations, the composition
   analysis, the shape a bare initialization takes, the widened ordering, the
   per-issue consequences for delivered work, and the release-archive analysis

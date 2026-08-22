@@ -11,7 +11,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/400a8539/400a8539-seeded-regression.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/400a8539/400a8539-seeded-regression.md"
     }
   ],
   "done_at": "2026-08-04T23:13:44.947752031Z",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Report server startup on what the child did, not on a fixed pause",
-  "updated_at": "2026-08-04T23:13:44.947752031Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

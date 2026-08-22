@@ -12,7 +12,7 @@
       "commit": null,
       "doc_type": "benchmark",
       "label": "Applied fsync decision evidence",
-      "path": "dev/benchmarks/test-suite-performance-4b7c06d0.json"
+      "path": "dev/archive/4b7c06d0-test-suite-performance/benchmarks/test-suite-performance-4b7c06d0.json"
     }
   ],
   "done_at": "2026-08-11T23:59:12.604709065Z",
@@ -44,5 +44,5 @@
   "priority": "high",
   "state": "done",
   "title": "Apply the benchmark-driven fsync decision",
-  "updated_at": "2026-08-11T23:59:12.604709065Z"
+  "updated_at": "2026-08-22T11:56:49.854246582Z"
 }

@@ -11,7 +11,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/15afa1f8/15afa1f8-seeded-regression.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/15afa1f8/15afa1f8-seeded-regression.md"
     }
   ],
   "done_at": "2026-08-04T23:13:52.040697476Z",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Decide the drain-outcome test on the shutdown sequence, not on a 50-millisecond window",
-  "updated_at": "2026-08-04T23:13:52.040697476Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

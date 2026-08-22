@@ -173,7 +173,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   that a caller still queued for a held lock reports an expired wait and is
   granted the same claim once the lock is free. A survey of every remaining
   assertion in the gate's suite whose outcome could turn on host load, and the
-  result recorded for each, is in `dev/active/57675b68/`.
+  result recorded for each, is in `dev/archive/f3f7de97-guards-and-ergonomics/active/57675b68/`.
 
 - **The shutdown drain property is proven against a server that breaks it.** The
   real-process graceful-shutdown case asserts that a connection stuck mid message

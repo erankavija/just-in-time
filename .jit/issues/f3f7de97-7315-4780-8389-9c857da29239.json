@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-04T11:29:43.427445519Z",
   "context": {},
@@ -27,69 +28,27 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f3f7de97-guards-and-ergonomics/plan.md"
-    },
-    {
-      "assets": [
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416133",
-          "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416135",
-          "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416166",
-          "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30979416145",
-          "resolved_path": null
-        },
-        {
-          "asset_type": "external",
-          "content_hash": null,
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "https://github.com/erankavija/just-in-time/actions/runs/30884326921",
-          "resolved_path": null
-        }
-      ],
-      "commit": null,
-      "doc_type": null,
-      "format": "markdown",
-      "label": null,
-      "path": "dev/active/f3f7de97-guards-and-ergonomics/hosted-ci-evidence.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/plan.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f3f7de97-guards-and-ergonomics/completion-report.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/hosted-ci-evidence.md"
+    },
+    {
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": null,
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/completion-report.md"
     },
     {
       "commit": null,
       "doc_type": null,
       "label": null,
-      "path": "dev/active/f3f7de97-guards-and-ergonomics/progress.json"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/progress.json"
     }
   ],
   "done_at": "2026-08-05T08:15:40.883616279Z",
@@ -118,7 +77,7 @@
     "type:epic"
   ],
   "priority": "normal",
-  "state": "done",
+  "state": "archived",
   "title": "Unguarded duplicate facts, unreliable verification, and tracker ergonomics",
-  "updated_at": "2026-08-05T08:15:40.883616279Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

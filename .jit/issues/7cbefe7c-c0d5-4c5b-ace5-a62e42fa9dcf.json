@@ -13,7 +13,7 @@
       "doc_type": "investigation",
       "format": "markdown",
       "label": "Investigation",
-      "path": "dev/active/7cbefe7c/findings.md"
+      "path": "dev/archive/e204e63d-derived-package-sources/active/7cbefe7c/findings.md"
     }
   ],
   "done_at": "2026-07-31T16:46:47.517256344Z",
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "done",
   "title": "Inventory the binary's declarative configuration and sequence its removal",
-  "updated_at": "2026-07-31T17:30:00.038285837Z"
+  "updated_at": "2026-08-22T11:55:46.749687782Z"
 }

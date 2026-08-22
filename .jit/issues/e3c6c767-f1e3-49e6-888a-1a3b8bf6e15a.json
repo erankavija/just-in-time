@@ -13,7 +13,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/e3c6c767/e3c6c767-seeded-regressions.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/e3c6c767/e3c6c767-seeded-regressions.md"
     }
   ],
   "done_at": "2026-08-04T23:13:59.107728329Z",
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Decide the lock tests on lock behaviour, not on scheduling",
-  "updated_at": "2026-08-05T05:44:48.340591495Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

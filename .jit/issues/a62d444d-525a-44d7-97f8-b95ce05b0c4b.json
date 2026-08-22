@@ -13,7 +13,7 @@
       "doc_type": "research",
       "format": "markdown",
       "label": "Research Findings",
-      "path": "dev/active/a62d444d/findings.md"
+      "path": "dev/archive/e204e63d-derived-package-sources/active/a62d444d/findings.md"
     }
   ],
   "done_at": "2026-07-31T11:43:02.412401107Z",
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "done",
   "title": "How jit's own workflow profile leaves the binary",
-  "updated_at": "2026-07-31T18:30:52.894496372Z"
+  "updated_at": "2026-08-22T11:55:46.749687782Z"
 }

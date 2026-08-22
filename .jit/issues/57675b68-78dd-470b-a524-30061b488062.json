@@ -11,7 +11,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/57675b68/57675b68-host-load-survey.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/57675b68/57675b68-host-load-survey.md"
     }
   ],
   "done_at": "2026-08-04T19:11:29.262458881Z",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Hold a concurrency property without racing a wall clock",
-  "updated_at": "2026-08-04T22:20:41.575819118Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }

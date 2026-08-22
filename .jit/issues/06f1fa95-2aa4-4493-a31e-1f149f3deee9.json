@@ -11,7 +11,7 @@
       "doc_type": null,
       "format": "markdown",
       "label": null,
-      "path": "dev/active/06f1fa95/load-independence-verification.md"
+      "path": "dev/archive/f3f7de97-guards-and-ergonomics/active/06f1fa95/load-independence-verification.md"
     }
   ],
   "done_at": "2026-08-04T19:25:54.711327068Z",
@@ -43,5 +43,5 @@
   "priority": "normal",
   "state": "done",
   "title": "Make the cargo-ci verdict independent of unrelated host load",
-  "updated_at": "2026-08-05T07:04:09.804919238Z"
+  "updated_at": "2026-08-22T11:53:41.182152271Z"
 }
