@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-08-22T12:53:18.327806004Z",
   "context": {},
   "created_at": "2026-08-22T12:49:17.165202737Z",
   "dependencies": [],
@@ -11,10 +12,12 @@
   "id": "4575a03d-f938-4c6b-bf01-929c9d902d40",
   "labels": [
     "component:core",
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "milestone:v1.0"
   ],
   "priority": "high",
   "state": "ready",
   "title": "Archived permanent-path documents are copied into a frozen second source of truth",
-  "updated_at": "2026-08-22T12:49:17.165202737Z"
+  "updated_at": "2026-08-22T12:53:21.916106277Z"
 }
