@@ -1,0 +1,21 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-08-26T22:07:49.376417349Z",
+  "dependencies": [],
+  "description": "`jit gate evaluate` re-runs a gate whose latest recorded run passed, so a routine command repeats expensive checkers (AI reviews, full CI) whose verdict already stands. Re-evaluating a passed gate should be an explicit, flagged act.\n\n## Background\n\nObserved as lead-workflow misuse in a downstream repository (gf2 OSD epic, 2026-08-27): an execution lead re-evaluated passed `code-review` gates for issues whose deliverables had not changed, burning two multi-minute AI review runs that could not change the outcome's standing. A passed gate is a point-in-time stamp; re-running it is either waste or a deliberate re-certification, and the deliberate case deserves `--force`. Staleness detection (comparing the pass's commit against newer attributed commits) is intentionally out of scope: judging whether a pass is stale stays with the operator.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit gate evaluate <issue> <gate>` on a gate whose latest run passed refuses without running the checker, naming the recorded pass's commit and timestamp and the `--force` flag.\n- [hard] REQ-02: `--force` evaluates exactly as today and appends to the run history.\n- [hard] REQ-03: `jit gate evaluate-many` applies the same guard per issue: gates whose latest run passed are skipped with a per-issue notice unless `--force`, and skipped-as-passed does not contribute a failure to the exit code.\n- [hard] REQ-04: Pending and failed gates evaluate without the flag, unchanged.\n- [hard] REQ-05: The MCP gate-evaluation tools expose the same guard through an optional force parameter defaulting to off.",
+  "documents": [],
+  "first_ready_at": "2026-08-26T22:07:49.376417349Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "ea2bb1f6-8c39-402d-89d2-e40b658df16d",
+  "labels": [
+    "component:core",
+    "milestone:v1.0",
+    "type:enhancement"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Gate evaluate refuses to re-run a passed gate without --force",
+  "updated_at": "2026-08-26T22:07:49.376417349Z"
+}

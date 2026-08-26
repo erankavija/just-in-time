@@ -14586,3 +14586,5 @@
 {"fields":["labels"],"id":"2eb96ed0-205b-44dd-8502-8f07043b09c3","issue_id":"4575a03d-f938-4c6b-bf01-929c9d902d40","timestamp":"2026-08-22T12:53:21.916106277Z","type":"issue_updated","updated_by":"issue-update"}
 {"assignee":"agent:claude","id":"49777849-4833-405b-92c1-ba225327d3d7","issue_id":"5b37a806-043c-4b42-bbf6-ebc06941db59","timestamp":"2026-08-22T12:53:23.850126928Z","type":"issue_claimed"}
 {"fields":["labels"],"id":"b1f47b5c-810a-4871-9529-5e2e63399268","issue_id":"5b37a806-043c-4b42-bbf6-ebc06941db59","timestamp":"2026-08-22T12:53:27.442681151Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"2496d25b-da10-4363-a9f1-8d98d29de70b","issue_id":"ea2bb1f6-8c39-402d-89d2-e40b658df16d","priority":"normal","timestamp":"2026-08-26T22:07:49.376417349Z","title":"Gate evaluate refuses to re-run a passed gate without --force","type":"issue_created"}
+{"fields":["dependencies"],"id":"7d273ac7-1bde-4ce9-9d50-63d9d252e535","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-26T22:08:06.431911999Z","type":"issue_updated","updated_by":"dependency-add"}
