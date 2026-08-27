@@ -14590,3 +14590,4 @@
 {"fields":["dependencies"],"id":"7d273ac7-1bde-4ce9-9d50-63d9d252e535","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-26T22:08:06.431911999Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"d2425fd9-d5ca-4d7e-b4d3-2f729bfefe66","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","priority":"high","timestamp":"2026-08-27T19:00:33.241629247Z","title":"Every mutation spawns two git processes per document reference","type":"issue_created"}
 {"fields":["dependencies"],"id":"52ea18c8-2b8a-4ff5-bbc3-512f9cf46c3e","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-27T19:00:45.526217722Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["documents"],"id":"7a643bd4-474f-4450-b831-48bab32c3951","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","timestamp":"2026-08-27T19:01:55.787026904Z","type":"issue_updated","updated_by":"doc-add"}
