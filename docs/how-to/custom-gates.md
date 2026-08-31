@@ -683,6 +683,12 @@ jit issue claim $ISSUE agent:me
 # If passes: Issue transitions to in_progress
 ```
 
+Each precheck checker runs at most once per transition. A repository that
+changes while a checker is running does not cost a second execution and does
+not discard the verdict it already reached: the run is recorded, carrying the
+`evaluation_stability` the [gate run record](../reference/storage-records.md#gate-run-records)
+describes.
+
 ### Postchecks (After Work Completes)
 
 Must pass before an issue can complete as `done`.
