@@ -14601,3 +14601,4 @@
 {"gate_key":"npm-ci","id":"3f2af93e-b60c-4bf5-9ff5-1eaea600501a","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
 {"fields":["dependencies"],"id":"358b0817-c912-4926-b8b7-1eeece57ab25","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-31T18:59:36.943791416Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["documents"],"id":"b3926529-10cf-4037-aad5-b33293e59d54","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T19:00:16.785966605Z","type":"issue_updated","updated_by":"doc-add"}
+{"fields":["description"],"id":"897e4bcb-1cb1-4f20-8eef-29a937b0cb4c","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T19:17:52.945516365Z","type":"issue_updated","updated_by":"issue-update"}
