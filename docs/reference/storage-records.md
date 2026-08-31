@@ -104,7 +104,8 @@ its coupled issue and event updates.
   "origin": {
     "derivation": "reused",
     "source_run": "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34"
-  }
+  },
+  "evaluation_stability": "inputs_moved"
 }
 ```
 
@@ -137,3 +138,4 @@ a `null` one alike.
 | `findings` | omitted when unset | Structured findings parsed from the checker's machine-readable block, carrying the checker's `verdict`, a `summary`, and the `findings` array. Each finding may carry an optional `references` array of opaque strings; it is omitted when empty. Unset when the checker emitted no such block; the raw `stdout` is kept either way. `jit gate status --findings` prints this field. |
 | `inputs_digest` | omitted when unset | Digest of the repository files the gate declares its checker reads, taken before the verdict was obtained. Two runs of one gate carrying the same value read byte-identical content at byte-identical paths. Unset when the gate declares no inputs, which is what keeps its checker running on every evaluation. |
 | `origin` | always | Where the verdict came from. `{"derivation": "executed"}` means this run ran the checker; `{"derivation": "reused", "source_run": "<run-id>"}` means it carries the named earlier run's verdict, whose `inputs_digest` matched, without the checker running again. The report text behind a reused verdict lives at the named run. |
+| `evaluation_stability` | always | Whether the evaluation inputs still matched the repository when the run was recorded. `stable` means they held still; `inputs_moved` means the verdict is the checker's verdict over the state captured before it started, not over the state the record was published against. A reader can therefore distinguish post-run repository drift without treating the completed verdict as discarded. |

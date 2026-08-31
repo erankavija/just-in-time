@@ -3,7 +3,8 @@
 use super::*;
 use crate::declarations::{GateMode, GateStage, REVIEW_PLACEHOLDER_WARNING};
 use crate::domain::{
-    GateContext, GateFinding, GateFindings, GateRunResult, GateRunStatus, GateStatus,
+    GateContext, GateEvaluationStability, GateFinding, GateFindings, GateRunResult, GateRunStatus,
+    GateStatus,
 };
 use crate::errors::TransitionBlockedError;
 use crate::gate_execution;
@@ -57,6 +58,7 @@ fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> 
         findings: source.findings.clone(),
         inputs_digest: source.inputs_digest.clone(),
         origin: crate::domain::GateVerdictOrigin::Reused(source.run_id.clone()),
+        evaluation_stability: GateEvaluationStability::Stable,
     }
 }
 
@@ -96,11 +98,6 @@ struct GateEvaluationEvidence {
 struct CapturedGateEvaluation {
     evidence: GateEvaluationEvidence,
     prompt: Option<String>,
-}
-
-struct CachedGateEvaluation {
-    evidence: GateEvaluationEvidence,
-    result: GateRunResult,
 }
 
 #[derive(Default)]
@@ -856,6 +853,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// gate definition, prompt, run history) and passes it to the checker
     /// process via a temp file.
     ///
+    /// The checker executes at most once per invocation. Its verdict is recorded against the
+    /// image captured before the checker started; if the repository changes while it runs, the
+    /// record reports that drift.
+    ///
     /// Equivalent to [`check_gate_with`](Self::check_gate_with) under
     /// [`VerdictSource::ReuseUnchangedInputs`]: a gate declaring inputs whose
     /// digest a prior run of that gate already recorded takes that run's
@@ -873,7 +874,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// See [`check_gate`](Self::check_gate) for what an evaluation does;
     /// `source` governs only whether reuse is considered.
     /// [`VerdictSource::Execute`] runs the checker whatever any prior run
-    /// recorded, which is what an explicit re-run request asks for.
+    /// recorded, which is what an explicit re-run request asks for. The checker still executes
+    /// at most once during this invocation: publication races retry the cheap record operation
+    /// without re-running it. The verdict is recorded against the image captured before the
+    /// checker started, with any post-run input drift reported on the record.
     pub fn check_gate_with(
         &self,
         issue_id: &str,
@@ -888,7 +892,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let target_id = self.bind_gate_target(&layout, issue_id)?;
         let mutation = super::production_mutation_context();
-        let mut cached = None::<CachedGateEvaluation>;
         let run_id = mutation.identifier_at(0);
         let result_path = crate::repository_state::gate_run_result_relative_path(&run_id)?;
         let run_dir = result_path
@@ -900,8 +903,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             VirtualPath::data(run_dir)?,
             VirtualPath::data(result_path.as_path())?,
         ];
-        with_mutation_attempts("gate evaluation", || {
-            let (image, issue, issues, registry, runs, captured) = {
+        let (image, issue, issues, registry, runs, captured) =
+            with_mutation_attempts("gate evaluation inputs", || {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
                 let Some(image) = self.capture_gate_evaluation_image(
                     session.as_mut(),
@@ -932,44 +935,39 @@ impl<S: IssueStore> CommandExecutor<S> {
                     CapturedGateRuns::default()
                 };
                 let captured = captured_gate_evaluation(&image, &issue, gate_key, gate, &runs)?;
-                (image, issue, issues, registry, runs, captured)
-            };
-            if !cached
-                .as_ref()
-                .is_some_and(|cached| cached.evidence == captured.evidence)
-            {
-                let gate = registry
-                    .gates
-                    .get(gate_key)
-                    .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
-                // Digest the declared inputs BEFORE the checker runs: the value
-                // must name the content the verdict was derived over, not what
-                // the checker left behind.
-                let digest = self.declared_inputs_digest(gate)?;
-                let reused = match (source, digest.as_ref()) {
-                    (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
-                        self.reusable_verdict(gate_key, digest)?
-                    }
-                    _ => None,
-                };
-                let mut result = match reused {
-                    Some(source_run) => reused_gate_run(&source_run, &issue.id, gate.stage),
-                    None => self.execute_captured_gate(CapturedGateExecution {
-                        image: &image,
-                        issue: &issue,
-                        issues: &issues,
-                        gate_key,
-                        gate,
-                        runs: &runs.results,
-                        prompt: captured.prompt.as_deref(),
-                    })?,
-                };
-                result.inputs_digest = digest;
-                cached = Some(CachedGateEvaluation {
-                    evidence: captured.evidence.clone(),
-                    result,
-                });
+                Ok(AttemptOutcome::Done((
+                    image, issue, issues, registry, runs, captured,
+                )))
+            })?;
+
+        let gate = registry
+            .gates
+            .get(gate_key)
+            .ok_or_else(|| crate::storage::GateNotFoundError::single(gate_key))?;
+        // Digest the declared inputs BEFORE the checker runs: the value must name the content
+        // the verdict was derived over, not what the checker left behind.
+        let digest = self.declared_inputs_digest(gate)?;
+        let reused = match (source, digest.as_ref()) {
+            (VerdictSource::ReuseUnchangedInputs, Some(digest)) => {
+                self.reusable_verdict(gate_key, digest)?
             }
+            _ => None,
+        };
+        let mut result = match reused {
+            Some(source_run) => reused_gate_run(&source_run, &issue.id, gate.stage),
+            None => self.execute_captured_gate(CapturedGateExecution {
+                image: &image,
+                issue: &issue,
+                issues: &issues,
+                gate_key,
+                gate,
+                runs: &runs.results,
+                prompt: captured.prompt.as_deref(),
+            })?,
+        };
+        result.inputs_digest = digest;
+
+        with_mutation_attempts("gate evaluation record", || {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some(final_image) = self.capture_gate_evaluation_image(
                 session.as_mut(),
@@ -999,16 +997,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                 final_gate,
                 &final_runs,
             )?;
-            let Some(cached) = cached.as_ref() else {
-                return Ok(AttemptOutcome::Retry);
+            result.evaluation_stability = if final_captured.evidence == captured.evidence {
+                GateEvaluationStability::Stable
+            } else {
+                GateEvaluationStability::InputsMoved
             };
-            if cached.evidence != final_captured.evidence {
-                return Ok(AttemptOutcome::Retry);
-            }
-
-            let (state, by) = gate_state_from_run(&cached.result)?;
+            let (state, by) = gate_state_from_run(&result)?;
             final_issue.gates_status.insert(gate_key.to_string(), state);
-            let event = if cached.result.status == GateRunStatus::Passed {
+            let event = if result.status == GateRunStatus::Passed {
                 Event::draft_gate_passed(target_id.clone(), gate_key.to_string(), by)
             } else {
                 Event::draft_gate_failed(target_id.clone(), gate_key.to_string(), by)
@@ -1018,7 +1014,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue: Box::new(final_issue),
                 },
                 MutationIntent::RecordGateRun {
-                    draft: Box::new(cached.result.clone()),
+                    draft: Box::new(result.clone()),
                 },
                 MutationIntent::RecordEvent {
                     phase: 1,
@@ -1029,9 +1025,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             if let AttemptOutcome::Retry = classify_apply(session.apply(&plan), ())? {
                 return Ok(AttemptOutcome::Retry);
             }
-            let mut result = cached.result.clone();
-            result.run_id = run_id.clone();
-            Ok(AttemptOutcome::Done(result))
+            let mut recorded_result = result.clone();
+            recorded_result.run_id = run_id.clone();
+            Ok(AttemptOutcome::Done(recorded_result))
         })
     }
 
@@ -1265,6 +1261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // digest is taken over.
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         })
     }
 
@@ -1822,6 +1819,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             findings,
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         }
     }
 
@@ -3707,6 +3705,59 @@ source-of-truth = "markdown-first"
         assert_eq!(issue.state, State::Ready);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn test_lifecycle_precheck_records_one_moved_run_when_checker_mutates_repository() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "precheck-race",
+            "Precheck race",
+            format!(
+                "if [ ! -f .precheck-race-seen ]; then : > .precheck-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; true"
+            ),
+            None,
+        );
+        executor
+            .update_gate(
+                "precheck-race",
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Ready)
+            .unwrap();
+
+        executor
+            .update_issue_state(&issue_id, State::InProgress)
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "x"
+        );
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "precheck-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
+        );
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().state,
+            State::InProgress
+        );
+    }
+
     #[test]
     fn test_run_postchecks_on_completion() {
         let executor = setup();
@@ -4085,7 +4136,8 @@ source-of-truth = "markdown-first"
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_reexecutes_when_prompt_changes_during_checker() {
+    fn test_check_gate_records_inputs_moved_without_reexecuting_when_prompt_changes_during_checker()
+    {
         let (repo, executor, issue_id) = setup_file_repository();
         std::fs::write(repo.path().join("review-prompt.md"), "old prompt").unwrap();
         add_exec_gate(
@@ -4100,26 +4152,28 @@ source-of-truth = "markdown-first"
         let result = executor.check_gate(&issue_id, "prompt-race").unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
-        assert_eq!(context["prompt"], "new prompt");
+        assert_eq!(context["prompt"], "old prompt");
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "xx"
+            "x"
         );
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "prompt-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
         assert_eq!(
-            executor
-                .storage
-                .list_gate_runs_for_issue(&issue_id)
-                .unwrap()
-                .into_iter()
-                .filter(|run| run.gate_key == "prompt-race")
-                .count(),
-            1
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
         );
     }
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_rebases_final_update_when_issue_changes_during_checker() {
+    fn test_check_gate_records_pre_run_verdict_when_issue_changes_during_checker() {
         let (repo, executor, issue_id) = setup_file_repository();
         let issue_path = format!(".jit/issues/{issue_id}.json");
         add_exec_gate(
@@ -4136,20 +4190,32 @@ source-of-truth = "markdown-first"
         let result = executor.check_gate(&issue_id, "issue-race").unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
-        assert_eq!(context["issue"]["title"], "Changed concurrently");
+        assert_eq!(context["issue"]["title"], "Test");
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().title,
             "Changed concurrently"
         );
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "xx"
+            "x"
+        );
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "issue-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
         );
     }
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_reexecutes_when_direct_dependency_changes() {
+    fn test_check_gate_records_pre_run_verdict_when_direct_dependency_changes() {
         let (repo, executor, issue_id) = setup_file_repository();
         let (dependency_id, _) = executor
             .create_issue(
@@ -4179,19 +4245,28 @@ source-of-truth = "markdown-first"
         let result = executor.check_gate(&issue_id, "dependency-race").unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
-        assert_eq!(
-            context["issue"]["dependencies"][0]["title"],
-            "Changed dependency"
-        );
+        assert_eq!(context["issue"]["dependencies"][0]["title"], "Dependency");
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "xx"
+            "x"
+        );
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "dependency-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
         );
     }
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_reexecutes_when_gate_definition_changes_during_checker() {
+    fn test_check_gate_records_pre_run_verdict_when_gate_definition_changes_during_checker() {
         let (repo, executor, issue_id) = setup_file_repository();
         std::fs::write(
             repo.path().join("gate-race.sh"),
@@ -4210,10 +4285,10 @@ source-of-truth = "markdown-first"
         let result = executor.check_gate(&issue_id, "gate-race").unwrap();
         let context: serde_json::Value = serde_json::from_str(&result.stdout).unwrap();
 
-        assert_eq!(context["gate"]["title"], "Changed race title");
+        assert_eq!(context["gate"]["title"], "Original race title");
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "xx"
+            "x"
         );
         assert_eq!(
             executor
@@ -4224,6 +4299,17 @@ source-of-truth = "markdown-first"
                 .filter(|run| run.gate_key == "gate-race")
                 .count(),
             1
+        );
+        let run = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .find(|run| run.gate_key == "gate-race")
+            .unwrap();
+        assert_eq!(
+            run.evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
         );
     }
 
@@ -4304,7 +4390,7 @@ source-of-truth = "markdown-first"
 
     #[cfg(unix)]
     #[test]
-    fn test_check_gate_reexecutes_for_new_same_issue_run_but_not_unrelated_run() {
+    fn test_check_gate_classifies_same_issue_run_drift_but_not_unrelated_run() {
         let (repo, executor, issue_id) = setup_file_repository();
         let mut concurrent = prior_run(
             "concurrent",
@@ -4332,9 +4418,20 @@ source-of-truth = "markdown-first"
 
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
-            "xx"
+            "x"
         );
-        assert_eq!(context["run_history"][0]["run_id"], "concurrent");
+        assert_eq!(context["run_history"], serde_json::json!([]));
+        let run = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .find(|run| run.gate_key == "run-race")
+            .unwrap();
+        assert_eq!(
+            run.evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
+        );
 
         let (repo, executor, issue_id) = setup_file_repository();
         concurrent.issue_id = "unrelated-issue".to_string();
@@ -4356,6 +4453,17 @@ source-of-truth = "markdown-first"
         assert_eq!(
             std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
             "x"
+        );
+        let run = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .find(|run| run.gate_key == "run-race")
+            .unwrap();
+        assert_eq!(
+            run.evaluation_stability,
+            crate::domain::GateEvaluationStability::Stable
         );
     }
 
@@ -4391,6 +4499,10 @@ source-of-truth = "markdown-first"
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].run_id, result.run_id);
         assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::Stable
+        );
+        assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().gates_status["apply-race"].status,
             crate::domain::GateStatus::Passed
         );
@@ -4412,6 +4524,110 @@ source-of-truth = "markdown-first"
                 })
                 .count(),
             1
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_records_one_run_and_event_when_inputs_move_during_checker() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "single-record-race",
+            "Single record race",
+            format!(
+                "if [ ! -f .single-record-race-seen ]; then : > .single-record-race-seen; sed -i 's/\\\"title\\\": \\\"Test\\\"/\\\"title\\\": \\\"Moved\\\"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; true"
+            ),
+            None,
+        );
+
+        executor
+            .check_gate(&issue_id, "single-record-race")
+            .unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "x"
+        );
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == "single-record-race")
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
+        );
+        assert_eq!(
+            executor
+                .storage
+                .read_events()
+                .unwrap()
+                .into_iter()
+                .filter(|event| {
+                    matches!(
+                        event,
+                        crate::domain::Event::GatePassed { issue_id: event_issue, gate_key, .. }
+                            if event_issue == &issue_id && gate_key == "single-record-race"
+                    )
+                })
+                .count(),
+            1
+        );
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().gates_status["single-record-race"]
+                .status,
+            crate::domain::GateStatus::Passed
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_check_gate_records_failing_verdict_and_findings_when_inputs_move_during_checker() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "failing-race",
+            "Failing race",
+            format!(
+                r#"if [ ! -f .failing-race-seen ]; then : > .failing-race-seen; sed -i 's/"title": "Test"/"title": "Moved"/' .jit/issues/{issue_id}.json; fi; printf x >> checker-count; printf '%s\n' '<<<JIT-FINDINGS-JSON' '{{"verdict":"fail","summary":"blocking finding","findings":[{{"id":"F1","severity":"high","disposition":"blocking","summary":"broken contract"}}]}}' 'JIT-FINDINGS-JSON>>>'; exit 1"#
+            ),
+            None,
+        );
+
+        let result = executor
+            .check_gate(&issue_id, "failing-race")
+            .expect("a checker failure is a recorded verdict");
+
+        assert_eq!(result.status, GateRunStatus::Failed);
+        assert_eq!(
+            std::fs::read_to_string(repo.path().join("checker-count")).unwrap(),
+            "x"
+        );
+        let run = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .find(|run| run.gate_key == "failing-race")
+            .unwrap();
+        assert_eq!(run.status, GateRunStatus::Failed);
+        assert_eq!(
+            run.evaluation_stability,
+            crate::domain::GateEvaluationStability::InputsMoved
+        );
+        assert_eq!(
+            run.findings.as_ref().unwrap().findings[0].summary,
+            "broken contract"
+        );
+        assert_eq!(
+            executor.storage.load_issue(&issue_id).unwrap().gates_status["failing-race"].status,
+            crate::domain::GateStatus::Failed
         );
     }
 

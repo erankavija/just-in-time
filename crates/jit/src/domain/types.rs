@@ -1002,6 +1002,10 @@ pub struct GateRunResult {
     /// or an earlier run over the same declared inputs.
     #[serde(default)]
     pub origin: GateVerdictOrigin,
+    /// Whether the evaluation inputs this verdict was derived over still
+    /// matched the repository when the run was recorded.
+    #[serde(default)]
+    pub evaluation_stability: GateEvaluationStability,
 }
 
 impl GateRunResult {
@@ -1056,6 +1060,23 @@ pub enum GateVerdictOrigin {
     /// The verdict was taken from the run with this id, whose declared inputs
     /// digested to the same value. That run executed the checker.
     Reused(String),
+}
+
+/// Whether the evaluation inputs a verdict was derived over still matched the
+/// repository when the run was recorded.
+///
+/// A checker is launched against one captured repository image. `InputsMoved`
+/// says the repository changed under a checker that had already started, so the
+/// verdict is the checker's own, taken over the state captured before it ran,
+/// rather than over the state the record was published against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum GateEvaluationStability {
+    /// The evaluation inputs held still from capture through recording.
+    #[default]
+    Stable,
+    /// The evaluation inputs moved while the checker ran.
+    InputsMoved,
 }
 
 impl GateVerdictOrigin {

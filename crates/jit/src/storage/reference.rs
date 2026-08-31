@@ -105,11 +105,13 @@ pub enum GateRunField {
     InputsDigest,
     /// `origin`
     Origin,
+    /// `evaluation_stability`
+    EvaluationStability,
 }
 
 impl GateRunField {
     /// Every field of the record, in [`GateRunResult`] declaration order.
-    pub const ALL: [GateRunField; 21] = [
+    pub const ALL: [GateRunField; 22] = [
         GateRunField::SchemaVersion,
         GateRunField::RunId,
         GateRunField::GateKey,
@@ -131,6 +133,7 @@ impl GateRunField {
         GateRunField::Findings,
         GateRunField::InputsDigest,
         GateRunField::Origin,
+        GateRunField::EvaluationStability,
     ];
 
     /// The JSON key serde writes for this field.
@@ -157,6 +160,7 @@ impl GateRunField {
             GateRunField::Findings => "findings",
             GateRunField::InputsDigest => "inputs_digest",
             GateRunField::Origin => "origin",
+            GateRunField::EvaluationStability => "evaluation_stability",
         }
     }
 
@@ -264,6 +268,14 @@ impl GateRunField {
                  verdict lives at the named run."
                     .to_string()
             }
+            GateRunField::EvaluationStability => {
+                "Whether the evaluation inputs still matched the repository when the run was \
+                 recorded. `stable` means they held still; `inputs_moved` means the verdict is \
+                 the checker's verdict over the state captured before it started, not over the \
+                 state the record was published against. A reader can therefore distinguish \
+                 post-run repository drift without treating the completed verdict as discarded."
+                    .to_string()
+            }
         }
     }
 }
@@ -352,6 +364,7 @@ fn sample_gate_run() -> GateRunResult {
         origin: crate::domain::GateVerdictOrigin::Reused(
             "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34".to_string(),
         ),
+        evaluation_stability: crate::domain::GateEvaluationStability::InputsMoved,
     }
 }
 
@@ -373,6 +386,7 @@ fn sample_gate_run_minimal() -> GateRunResult {
         findings: None,
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
+        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         ..sample_gate_run()
     }
 }

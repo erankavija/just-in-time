@@ -2113,6 +2113,8 @@ jit gate evaluate abc123 --gate tests --force
 **Behavior:**
 - For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence with a new event and timestamp, including when the same attestor already passed the gate at the current `HEAD`. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
+- A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
+- The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
 - After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
 
 **Automated skip when already passed at HEAD:**

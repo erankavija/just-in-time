@@ -100,6 +100,7 @@ mod tests {
             }),
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
         let run_id = record_gate_run(&temp, &storage, result, 1);
@@ -255,6 +256,7 @@ mod tests {
                     findings: None,
                     inputs_digest: None,
                     origin: crate::domain::GateVerdictOrigin::Executed,
+                    evaluation_stability: crate::domain::GateEvaluationStability::Stable,
                 };
                 record_gate_run(&temp, &storage, result, i + 1)
             })
@@ -312,6 +314,7 @@ mod tests {
             findings: None,
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
         let run_id = record_gate_run(&temp, &storage, result, 1);

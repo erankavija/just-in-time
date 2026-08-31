@@ -1534,6 +1534,7 @@ mod gate_findings_text_tests {
             }),
             inputs_digest: None,
             origin: jit::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: jit::domain::GateEvaluationStability::Stable,
         }
     }
 
@@ -8971,6 +8972,7 @@ mod exit_code_projection_tests {
             findings: None,
             inputs_digest: None,
             origin: jit::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: jit::domain::GateEvaluationStability::Stable,
         };
         jit::commands::GatePassFailed {
             issue_id: "abc123".to_string(),

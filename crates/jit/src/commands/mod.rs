@@ -107,8 +107,8 @@ use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::{
-    is_dependency_met, Event, GateState, GateStatus, Issue, LabelNamespaces, Priority,
-    ReadinessCorrection, State,
+    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
+    LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
 use crate::labels as label_utils;
@@ -511,8 +511,14 @@ struct CapturedPrecheckPlan {
     prompts: std::collections::HashMap<String, String>,
 }
 
+/// One precheck execution retained across publication retries. A transition
+/// reuses it whenever the bound target is unchanged, even when its captured
+/// inputs moved; that drift is recorded on the reused run instead of launching
+/// the checker again.
 struct CachedPrecheckExecution {
     target_id: String,
+    /// The captured inputs are retained so a reused precheck can be recorded as
+    /// stable or as having moved while its checker ran.
     evidence: PrecheckEvidence,
     execution: gate_check::PrecheckExecution,
 }
@@ -2718,9 +2724,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             }
             if let Some(plan) = &expected_precheck {
-                let reuse = cached_precheck.as_ref().is_some_and(|cached| {
-                    cached.target_id == expected_target && cached.evidence == plan.evidence
-                });
+                let reuse = cached_precheck
+                    .as_ref()
+                    .is_some_and(|cached| cached.target_id == expected_target);
                 if !reuse {
                     cached_precheck = Some(CachedPrecheckExecution {
                         target_id: expected_target.clone(),
@@ -2734,7 +2740,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     });
                 }
             }
-            let precheck_runs = cached_precheck
+            let mut precheck_runs = cached_precheck
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .map(|cached| cached.execution.runs.clone())
@@ -2799,16 +2805,25 @@ impl<S: IssueStore> CommandExecutor<S> {
             if current_precheck_required != expected_precheck_required {
                 return Ok(AttemptOutcome::Retry);
             }
-            if let Some(expected) = &expected_precheck {
-                let evidence_matches = if expected.evidence.validation_view.is_some() {
-                    expected.evidence.matches(&image)?
+            let precheck_inputs_moved = if let Some(cached) = cached_precheck.as_ref() {
+                let changed_since_precheck_capture = expected_precheck
+                    .as_ref()
+                    .is_some_and(|plan| plan.evidence != cached.evidence);
+                if changed_since_precheck_capture {
+                    true
+                } else if cached.evidence.validation_view.is_some() {
+                    !cached.evidence.matches(&image)?
                 } else {
                     captured_precheck_plan(&image, &issue, &declarations.gates)?.evidence
-                        == expected.evidence
-                };
-                if !evidence_matches {
-                    return Ok(AttemptOutcome::Retry);
+                        != cached.evidence
                 }
+            } else {
+                false
+            };
+            if precheck_inputs_moved {
+                precheck_runs.iter_mut().for_each(|run| {
+                    run.evaluation_stability = GateEvaluationStability::InputsMoved;
+                });
             }
             let mut external_warnings = if enforce_lease {
                 captured_lease_warnings(
@@ -3573,6 +3588,7 @@ mod tests {
             findings: None,
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: GateEvaluationStability::Stable,
         }
     }
 

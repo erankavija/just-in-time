@@ -179,6 +179,7 @@ pub fn execute_gate_checker_with_context(
         // digest is taken over.
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
+        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     })
 }
 
@@ -1514,6 +1515,7 @@ mod tests {
             findings: None,
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
         let context = GateContext {

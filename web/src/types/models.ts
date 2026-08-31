@@ -39,6 +39,7 @@ export interface GateRunSummary {
   message?: string;
   inputs_digest?: string;
   origin: GateVerdictOrigin;
+  evaluation_stability: GateEvaluationStability;
 }
 
 /** Where a recorded gate verdict came from: this run's own checker execution,
@@ -46,6 +47,9 @@ export interface GateRunSummary {
 export type GateVerdictOrigin =
   | { derivation: 'executed' }
   | { derivation: 'reused'; source_run: string };
+
+/** Whether the evaluation inputs held still through recording. */
+export type GateEvaluationStability = 'stable' | 'inputs_moved';
 
 export interface GateRunDetail extends GateRunSummary {
   stdout: string;

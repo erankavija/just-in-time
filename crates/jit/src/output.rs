@@ -2420,7 +2420,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 /// ```
 /// use chrono::Utc;
 /// use jit::declarations::GateStage;
-/// use jit::domain::{GateRunResult, GateRunStatus, GateVerdictOrigin};
+/// use jit::domain::{GateEvaluationStability, GateRunResult, GateRunStatus, GateVerdictOrigin};
 /// use jit::output::GateRunSummary;
 ///
 /// let run = GateRunResult {
@@ -2445,6 +2445,7 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     findings: None,
 ///     inputs_digest: None,
 ///     origin: GateVerdictOrigin::Executed,
+///     evaluation_stability: GateEvaluationStability::Stable,
 /// };
 /// // Lean form drops stdout/stderr for passing runs.
 /// let lean = GateRunSummary::lean(&run);
@@ -2504,6 +2505,10 @@ pub struct GateRunSummary {
     /// how many times a gate was actually verified counts the executed ones and
     /// follows the named run for the report text behind a reused verdict.
     pub origin: crate::domain::GateVerdictOrigin,
+    /// Whether the evaluation inputs still matched the repository when the run
+    /// was recorded. `inputs_moved` means the verdict remains the checker's
+    /// verdict over the pre-run image, while publication used a later image.
+    pub evaluation_stability: crate::domain::GateEvaluationStability,
 }
 
 impl GateRunSummary {
@@ -2541,6 +2546,7 @@ impl GateRunSummary {
             findings: r.findings.clone(),
             inputs_digest: r.inputs_digest.clone(),
             origin: r.origin.clone(),
+            evaluation_stability: r.evaluation_stability,
         }
     }
 }
@@ -3171,6 +3177,7 @@ mod tests {
             findings: None,
             inputs_digest: None,
             origin: crate::domain::GateVerdictOrigin::Executed,
+            evaluation_stability: crate::domain::GateEvaluationStability::Stable,
         };
 
         let resp = IssueShowResponse::from_issue(issue, vec![], std::slice::from_ref(&run));

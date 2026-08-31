@@ -4472,6 +4472,7 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
         findings: None,
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
+        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
     let provenance = Event::GateDefinitionCreated {
         id: "prov-1".into(),
@@ -4680,6 +4681,7 @@ fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
         findings: None,
         inputs_digest: None,
         origin: crate::domain::GateVerdictOrigin::Executed,
+        evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     };
     let intents = || {
         [
