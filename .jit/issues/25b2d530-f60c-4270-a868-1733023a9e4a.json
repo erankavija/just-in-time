@@ -5,7 +5,15 @@
   "created_at": "2026-08-31T18:55:13.995967286Z",
   "dependencies": [],
   "description": "A gate evaluation whose checker ran to completion is discarded and the checker re-executed whenever the repository moved while it was running, so a long checker runs as many times as its inputs drift and a finished verdict reaches no record.\n\n## Background\n\nGate evaluation wraps capture, checker execution, and publication in one optimistic-concurrency retry (`crates/jit/src/commands/gate_check.rs:903`). Each attempt captures a gate-input image, executes the checker, re-captures, and retries the whole closure when the post-run evidence differs from the pre-run evidence. The finished result crosses into the next attempt only while the newly captured evidence still equals the evidence it was derived over (`crates/jit/src/commands/gate_check.rs:939`), so the attempt that retried because the inputs moved is exactly the attempt that re-executes the checker.\n\nThe design binds a verdict to a repository state that did not move under it, and for a checker costing milliseconds the re-execution is invisible. Over a checker costing minutes it inverts: drift is near-certain in a repository with concurrent agents — uncommitted issue and gate state, peer git activity, files the checker itself writes — so the retry re-spawns the whole checker chain, and the completed verdict with its status, findings, and report text is discarded, leaving no run record and no event that it ever happened.\n\nObserved in an adopter repository: a fifteen-minute reviewer reached a structured failing verdict, which jit discarded before re-spawning the chain from scratch; `.jit/gate-runs` held no trace of the first run.\n\nThe lifecycle precheck path caches its executions under the same evidence-equality rule (`crates/jit/src/commands/mod.rs:2719`), so a long precheck gate re-executes on the same drift.\n\nA verdict derived over inputs that moved is weaker evidence than one derived over inputs that held still, which is the concern the re-execution was serving. That concern is satisfied by recording the drift on the run rather than by paying for the checker again.\n\n## Success Criteria\n\n- [hard] REQ-01: One gate evaluation executes its gate's checker at most once, whatever changes in the repository while the checker runs.\n- [hard] REQ-02: A checker that reaches a verdict has that verdict recorded exactly once — one run record, one gate event, one issue gate-status update — including when the evaluation inputs moved while it ran.\n- [hard] REQ-03: A run record states whether the evaluation inputs its verdict was derived over still matched the repository when the run was recorded, and a machine reader can read that from the stored record and from gate-run output.\n- [hard] REQ-04: An evaluation that loses a capture or apply race still converges without re-executing the checker: publication retries against a fresh repository view and records the verdict against the issue as that view holds it.\n- [hard] REQ-05: One lifecycle transition executes each of its precheck checkers at most once and records each verdict once, under the same input drift.\n- [hard] REQ-06: Regression coverage fails if a completed checker is executed again, or its verdict discarded, because the evaluation inputs moved while it ran.\n\n## Notes\n\nVerdict reuse over an unchanged declared-inputs digest is a separate mechanism reached before execution and is unaffected.\n\nOne narrow case keeps its current behavior: where the gate stops being required for the issue, stops being declared, or turns manual while the checker runs, the post-run capture cannot resolve the gate and the evaluation errors, losing the verdict. Keeping the post-run capture keyed on the gate as the repository then declares it is what keeps drift detection sharp — a dependency or document added mid-run is still seen — and the case is far narrower than the drift that motivates this issue.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Change plan",
+      "path": "dev/active/25b2d530/plan.md"
+    }
+  ],
   "first_ready_at": "2026-08-31T18:55:13.995967286Z",
   "gates_required": [
     "cargo-ci",
@@ -51,5 +59,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Gate evaluation re-runs a completed checker when its inputs move",
-  "updated_at": "2026-08-31T18:59:10.121606332Z"
+  "updated_at": "2026-08-31T19:00:16.785966605Z"
 }
