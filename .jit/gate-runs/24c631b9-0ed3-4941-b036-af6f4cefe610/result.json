@@ -1,0 +1,24 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/docs-mechanical.sh",
+  "commit": "9372b3960c27503dfdcb86fd895a0878a4d5404c",
+  "completed_at": "2026-08-31T19:21:52.243627229Z",
+  "duration_ms": 2151,
+  "exit_code": 0,
+  "gate_key": "docs-mechanical",
+  "inputs_digest": "7fecd579127077abbe2690eb83c6646500521a8104e99fb883504cacac15d131",
+  "issue_id": "25b2d530-f60c-4270-a868-1733023a9e4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "24c631b9-0ed3-4941-b036-af6f4cefe610",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-31T19:21:50.091865413Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "== M2 links & anchors ==\nOK: all links and anchors resolve\n\n== M3 citations ==\nOK: all cited paths and @/ items resolve\n\n== M5 projections ==\nOK: projections fresh\n\n== M6 canonical homes ==\nOK: canonical homes resolve, and each fact is live and unique\n\n== M7 shipped policy ==\nOK: shipped-policy regions carry the shipped classification\n\n",
+  "tree_dirty": true
+}

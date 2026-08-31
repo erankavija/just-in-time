@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9372b3960c27503dfdcb86fd895a0878a4d5404c",
+  "completed_at": "2026-08-31T19:24:57.412442056Z",
+  "duration_ms": 184604,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented with regression coverage and passing recorded validation evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "25b2d530-f60c-4270-a868-1733023a9e4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bedce306-b275-42aa-b5f0-65d119096a68",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-31T19:21:52.807837910Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 418f187e6, b8e354513, 466b20e88, 64473d04f, 9372b3960\nPolicy sources: AGENTS.md\nResolved items: @/invariant/gate-semantics, @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/single-source-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/no-ignored-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (0); npm-ci passed (0); docs-mechanical passed (0); doc-review pending (no run)\nTruncation recovery: Re-read the affected current implementations, all changed test ranges, output/storage projections, packaging declaration, and individually bounded tagged patches.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented with regression coverage and passing recorded validation evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

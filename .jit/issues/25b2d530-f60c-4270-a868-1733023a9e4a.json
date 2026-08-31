@@ -14,6 +14,7 @@
       "path": "dev/active/25b2d530/plan.md"
     }
   ],
+  "done_at": "2026-08-31T19:33:36.682546600Z",
   "first_ready_at": "2026-08-31T18:55:13.995967286Z",
   "gates_required": [
     "cargo-ci",
@@ -24,29 +25,29 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-31T18:59:10.121606332Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-31T19:28:33.598755827Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-08-31T18:59:10.121606332Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-31T19:32:28.302324666Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "pending",
-      "updated_at": "2026-08-31T18:59:10.121606332Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-31T19:33:20.691368115Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
-      "status": "pending",
-      "updated_at": "2026-08-31T18:59:10.121606332Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-31T19:28:36.424200235Z",
+      "updated_by": "auto:executor"
     },
     "npm-ci": {
-      "status": "pending",
-      "updated_at": "2026-08-31T18:59:10.121606332Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-08-31T19:28:34.013648976Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "25b2d530-f60c-4270-a868-1733023a9e4a",
@@ -57,7 +58,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Gate evaluation re-runs a completed checker when its inputs move",
-  "updated_at": "2026-08-31T19:17:52.945516365Z"
+  "updated_at": "2026-08-31T19:33:36.682546600Z"
 }

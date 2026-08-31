@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d00f22f5e421fb85584d59a67f451319b11e2b80",
+  "completed_at": "2026-08-31T19:32:27.914399265Z",
+  "duration_ms": 230789,
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable implementation satisfies the issue’s hard criteria with no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "25b2d530-f60c-4270-a868-1733023a9e4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b6ec245a-0ea6-466e-8a4e-4656c589a06a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-31T19:28:37.124740916Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 418f187e6, b8e354513, 466b20e88, 64473d04f, 9372b3960, d00f22f5e (all reachable from HEAD via `jit:25b2d530`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/gate-semantics, event-log, derived-state-coherence, atomic-writes, semantic-types, architecture-dependency-direction, single-source-prose, semantic-test-assertions, no-ignored-tests, convention-convergence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (0); npm-ci passed (exit code unavailable); docs-mechanical passed (0); doc-review failed (1); prior code-review passed (0)\nTruncation recovery: narrowed per-commit patches, affected current-file line ranges, package coverage tests, output projections, and gate-status reads\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation satisfies the issue’s hard criteria with no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

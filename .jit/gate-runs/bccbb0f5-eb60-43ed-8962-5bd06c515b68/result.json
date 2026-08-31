@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9372b3960c27503dfdcb86fd895a0878a4d5404c",
+  "completed_at": "2026-08-31T19:26:55.202563196Z",
+  "duration_ms": 116550,
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/custom-gates.md",
+        "id": "F1",
+        "line": 681,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The precheck workflow omits the new at-most-once execution and drift-recording guarantee."
+      }
+    ],
+    "summary": "The lifecycle precheck workflow lacks documentation for this issue's at-most-once execution and drift-recording guarantee.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "25b2d530-f60c-4270-a868-1733023a9e4a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bccbb0f5-eb60-43ed-8962-5bd06c515b68",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-08-31T19:24:58.652315610Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.sORsfhZ7n6: binary file matches\n--- agent stderr (first 12 of 28218 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.151.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a05948-325b-7ec1-8779-d542931ac6ab\n--------\n--- 28206 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: leaf issue with no resolved children; reviewed five individual reachable `jit:25b2d530` commits. The shipped footprint adds `evaluation_stability`, preserves completed explicit evaluations through drift, and changes lifecycle precheck retries. The explicit-evaluation and storage-reference docs are accurate, but the directly affected precheck workflow omits the new guarantee.\n\n1. **F1 — blocking, issue-impact, medium:** The precheck workflow documents that `jit issue claim` runs prechecks, but not that each checker runs at most once per transition or that drift is retained as a recorded verdict. Add a concise statement at [docs/how-to/custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:681) describing the guarantee and directing readers to `evaluation_stability` in gate-run inspection.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The lifecycle precheck workflow lacks documentation for this issue's at-most-once execution and drift-recording guarantee.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The precheck workflow omits the new at-most-once execution and drift-recording guarantee.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":681}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
