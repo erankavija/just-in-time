@@ -14614,3 +14614,6 @@
 {"gate_key":"doc-review","id":"edefc0f2-4532-41dd-b791-3e3be804eeb4","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T19:33:20.691368115Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"5676dbef-cb5a-4873-b478-be728d4ada72","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T19:33:36.682546600Z","to":"done","type":"issue_state_changed"}
 {"id":"b3f596f4-22b8-4046-bc3d-ba6688cbaf36","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T19:33:36.682546600Z","type":"issue_completed"}
+{"id":"ca65cdd8-994f-4dc2-8fad-d97c27e06aa3","issue_id":"5c4fe384-6c66-461f-b2aa-ac4f75d5f40f","priority":"normal","timestamp":"2026-08-31T19:36:30.763971695Z","title":"Gate completion loop re-evaluates every gate after one fails","type":"issue_created"}
+{"assignee":"agent:claude","id":"e9182557-c204-4540-a356-e14898e0d58d","issue_id":"5c4fe384-6c66-461f-b2aa-ac4f75d5f40f","timestamp":"2026-08-31T19:37:13.103327039Z","type":"issue_claimed"}
+{"id":"b5f15f3b-7c4a-4b4d-b682-d95997e89a08","issue_id":"5c4fe384-6c66-461f-b2aa-ac4f75d5f40f","timestamp":"2026-08-31T19:37:16.932265924Z","type":"issue_deleted"}
