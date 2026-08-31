@@ -14591,3 +14591,12 @@
 {"id":"d2425fd9-d5ca-4d7e-b4d3-2f729bfefe66","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","priority":"high","timestamp":"2026-08-27T19:00:33.241629247Z","title":"Every mutation spawns two git processes per document reference","type":"issue_created"}
 {"fields":["dependencies"],"id":"52ea18c8-2b8a-4ff5-bbc3-512f9cf46c3e","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-27T19:00:45.526217722Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["documents"],"id":"7a643bd4-474f-4450-b831-48bab32c3951","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","timestamp":"2026-08-27T19:01:55.787026904Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"49d9e70b-2298-4623-bb11-d29dccea4356","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","priority":"high","timestamp":"2026-08-31T18:55:13.995967286Z","title":"Gate evaluation re-runs a completed checker when its inputs move","type":"issue_created"}
+{"from":"ready","id":"4b76ef9b-4641-4dd7-b8ba-3396ba823b2d","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:58:55.422638037Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:claude","id":"311d4ddd-3489-48e8-840f-1410a13023b1","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:58:55.422638037Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"2f9ff446-10f9-4d82-bb37-3a3d3757f1bc","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
+{"gate_key":"code-review","id":"a869eec3-2299-4ce9-b4c2-12622223779b","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
+{"gate_key":"doc-review","id":"12571ad9-37ec-4384-b2fc-978394c4c6a4","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
+{"gate_key":"docs-mechanical","id":"2f82d8d5-e29c-424d-a5e3-9fcb10dda73b","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
+{"gate_key":"npm-ci","id":"3f2af93e-b60c-4bf5-9ff5-1eaea600501a","issue_id":"25b2d530-f60c-4270-a868-1733023a9e4a","timestamp":"2026-08-31T18:59:10.121606332Z","type":"gate_added"}
+{"fields":["dependencies"],"id":"358b0817-c912-4926-b8b7-1eeece57ab25","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-08-31T18:59:36.943791416Z","type":"issue_updated","updated_by":"dependency-add"}

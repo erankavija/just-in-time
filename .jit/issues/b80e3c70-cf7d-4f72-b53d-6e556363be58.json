@@ -5,6 +5,7 @@
   "created_at": "2026-07-29T13:43:53.196219266Z",
   "dependencies": [
     "0708d692-66d3-4536-ac75-739e759ac179",
+    "25b2d530-f60c-4270-a868-1733023a9e4a",
     "4575a03d-f938-4c6b-bf01-929c9d902d40",
     "5b37a806-043c-4b42-bbf6-ebc06941db59",
     "661e35c9-5612-40aa-b87d-9ae597c62f37",
@@ -42,5 +43,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Version 1.0 release",
-  "updated_at": "2026-08-27T19:00:45.526217722Z"
+  "updated_at": "2026-08-31T18:59:36.943791416Z"
 }
