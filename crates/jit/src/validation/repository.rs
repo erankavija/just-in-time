@@ -916,11 +916,13 @@ fn validate_materializations(
                     crate::repository_state::MaterializationDriftKind::Stale => "stale",
                     crate::repository_state::MaterializationDriftKind::Unexpected => "unexpected",
                 };
-                format!("- {:?}: {kind}", finding.path)
+                format!("- {}: {kind}", finding.path.repository_relative())
             })
             .collect::<Vec<_>>()
             .join("\n");
-        return Err(anyhow!("derived-state drift:\n{details}"));
+        return Err(anyhow!(
+            "derived-state drift (repair with `jit validate --fix`):\n{details}"
+        ));
     }
     Ok(())
 }

@@ -1375,7 +1375,17 @@ impl ClaimCoordinator {
 
         let index_path = self.paths.shared_jit.join("claims.index.json");
         if !index_path.exists() {
-            return Ok((false, Vec::new()));
+            let log_has_entries = self
+                .paths
+                .shared_jit
+                .join("claims.jsonl")
+                .try_exists()
+                .context("Failed to inspect claims log")?
+                && fs::read_to_string(self.paths.shared_jit.join("claims.jsonl"))
+                    .context("Failed to read claims log")?
+                    .lines()
+                    .any(|line| !line.trim().is_empty());
+            return Ok((!log_has_entries, Vec::new()));
         }
 
         // Try to parse index

@@ -741,6 +741,49 @@ fn test_claim_workflow_end_to_end() {
 }
 
 #[test]
+fn test_recover_empty_claim_log_does_not_warn_about_missing_index() {
+    let repo = setup_repo();
+
+    let recovered = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo.path())
+        .args(["recover", "--json"])
+        .output()
+        .unwrap();
+    assert!(recovered.status.success(), "{recovered:?}");
+
+    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
+    assert_eq!(report["index_rebuilt"], false);
+    assert!(!report["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| warning["kind"] == "index_rebuilt"));
+}
+
+#[test]
+fn test_recover_rebuilds_index_when_claim_log_has_claims_but_index_is_missing() {
+    let repo = setup_repo();
+    let issue_id = create_issue(repo.path(), "Claim log recovery");
+    acquire_lease(repo.path(), &issue_id, "agent:recovery-test");
+    fs::remove_file(repo.path().join(".git/jit/claims.index.json")).unwrap();
+
+    let recovered = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(repo.path())
+        .args(["recover", "--json"])
+        .output()
+        .unwrap();
+    assert!(recovered.status.success(), "{recovered:?}");
+
+    let report: Value = serde_json::from_slice(&recovered.stdout).unwrap();
+    assert_eq!(report["index_rebuilt"], true);
+    assert!(report["warnings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|warning| warning["kind"] == "index_rebuilt"));
+}
+
+#[test]
 fn test_claim_status_shows_lease_details() {
     let temp = setup_repo();
     let issue_id = create_issue(temp.path(), "Test Issue");

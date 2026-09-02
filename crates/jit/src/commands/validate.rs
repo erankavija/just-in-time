@@ -523,7 +523,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// their managed region, so authored content is preserved. In `dry_run` the
     /// delta is derived but not applied. Returns the number of repaired targets and
     /// a per-target message. JSON and memory stores execute this same path.
-    fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
+    pub(crate) fn repair_derived_state(&self, dry_run: bool) -> Result<(usize, Vec<String>)> {
         use crate::repository_state::RepositoryAction;
 
         let layout = self.require_layout()?;

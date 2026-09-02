@@ -7784,6 +7784,7 @@ fn run() -> Result<()> {
                             "index_rebuilt": false,
                             "expired_leases_evicted": 0,
                             "temp_files_removed": 0,
+                            "derived_state_repaired": 0,
                             "warnings": [],
                         }))
                     .with_message(format!(
@@ -7812,6 +7813,7 @@ fn run() -> Result<()> {
                             "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
                             "temp_files_removed": report.temp_files_removed,
+                            "derived_state_repaired": report.derived_state_repaired,
                             "warnings": report.warnings,
                         }))
                         .with_message(msg);
@@ -7826,6 +7828,10 @@ fn run() -> Result<()> {
                             report.expired_leases_evicted
                         );
                         println!("  • Temp files removed: {}", report.temp_files_removed);
+                        println!(
+                            "  • Derived-state targets repaired: {}",
+                            report.derived_state_repaired
+                        );
                         let output_ctx = OutputContext::new(quiet, json);
                         for warning in &report.warnings {
                             output_ctx.print_warning(warning)?;
