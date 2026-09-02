@@ -303,13 +303,48 @@ pub enum PackageArchiveError {
 /// encoded, and [`PackageArchiveError::Io`] when the in-memory tar writer
 /// fails.
 pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, PackageArchiveError> {
-    let model = package.model();
+    pack_archive(
+        package.model(),
+        &package.hashes().package,
+        package
+            .files()
+            .iter()
+            .map(|(source, bytes)| (source.as_str(), bytes.as_slice())),
+    )
+}
+
+/// Pack a package tree assembled from repository authorities into the same
+/// portable archive format as an ordinary package directory.
+///
+/// A captured tree is the complete package for a manifest with live assets:
+/// those assets are intentionally absent from the authored directory and are
+/// drawn from their declared repository targets at capture time. Keeping this
+/// entry point beside [`pack_package_archive`] makes both routes share the
+/// archive wire and its reproducibility rules.
+pub(crate) fn pack_captured_package_archive(
+    package: &CapturedPackageTree,
+) -> Result<Vec<u8>, PackageArchiveError> {
+    pack_archive(
+        package.model(),
+        &package.hashes().package,
+        package
+            .files()
+            .iter()
+            .map(|(source, file)| (source.as_str(), file.bytes.as_slice())),
+    )
+}
+
+fn pack_archive<'a>(
+    model: &ProfilePackageModel,
+    package_hash: &str,
+    files: impl IntoIterator<Item = (&'a str, &'a [u8])>,
+) -> Result<Vec<u8>, PackageArchiveError> {
     let metadata = toml::to_string(&ArchiveMetadataWire {
         archive: ArchiveMetadata {
             archive_version: ARCHIVE_VERSION,
             id: model.id.clone(),
             version: model.version.clone(),
-            package_hash: package.hashes().package.clone(),
+            package_hash: package_hash.to_string(),
         },
     })
     .map_err(PackageArchiveError::MetadataSerialization)?;
@@ -323,7 +358,7 @@ pub fn pack_package_archive(package: &ProfilePackage) -> Result<Vec<u8>, Package
         ARCHIVE_METADATA_ENTRY,
         metadata.as_bytes(),
     )?;
-    for (source, bytes) in package.files() {
+    for (source, bytes) in files {
         append_entry(
             &mut builder,
             EntryType::Regular,

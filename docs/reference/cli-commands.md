@@ -971,18 +971,19 @@ jit profile pack --source <DIR> --output <FILE> [--dry-run] [--json]
 ```
 
 `--source` names the package directory and must classify as worktree content.
+Before archiving, JIT captures live assets from the repository targets declared
+by the manifest and refreshes declared contributions from their registries.
 `--output` names the archive file to write, anywhere the invocation can write.
 When that path is inside the repository, it is limited to 128 path components
 below the repository root; an external output path has no repository traversal.
 
 The archive is an uncompressed tar carrying one metadata entry — the package
-`id`, `version`, and identity digest — and one entry per package file under a
-`package/` prefix. It carries no directory entries, so extracting it with
+`id`, `version`, and identity digest — and one entry per captured package file
+under a `package/` prefix. It carries no directory entries, so extracting it with
 `tar -xf` creates the package's directories with your umask's default mode, as
 any tar archive without them does; `jit profile add` builds the tree itself and
-takes every mode from the manifest. Only the package directory is read: no
-resolved variable value, no applied-profile record, and nothing outside that
-directory reaches the archive. Packing the same package twice produces
+takes every mode from the manifest. Only the captured package tree is read:
+no resolved variable value reaches the archive. Packing the same package twice produces
 byte-identical output, so an archive can be compared or checksummed without
 re-reading the package.
 

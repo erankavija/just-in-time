@@ -48,6 +48,27 @@ cp -R <extracted-archive>/packages .
 jit init --profile path:packages/jit-dogfood
 ```
 
+When working from a source checkout rather than a release extraction, first
+make portable archives from the checkout. This matters for `jit-dogfood`, whose
+`assets/live/` files are captured from the checkout's declared repository roots
+and are not stored as duplicate authored files:
+
+```bash
+(cd <jit-checkout> && jit profile pack --source profiles/jit-default --output /tmp/jit-default.jitprof)
+(cd <jit-checkout> && jit profile pack --source profiles/jit-dogfood --output /tmp/jit-dogfood.jitprof)
+
+mkdir my-project
+cd my-project
+jit init
+jit profile add --archive /tmp/jit-default.jitprof --destination packages/jit-default
+jit profile add --archive /tmp/jit-dogfood.jitprof --destination packages/jit-dogfood
+jit init --profile path:packages/jit-dogfood
+```
+
+The initial plain `jit init` only creates the structural repository needed by
+`profile add`; the final profiled initialization applies the package and its
+dependency from the directories the archives placed in the worktree.
+
 Plain `jit init` remains the methodology-neutral alternative. It creates the
 structural minimum — the schema version and the project name, beside the empty
 registries, the event log and the index — and declares no workflow vocabulary.
@@ -155,12 +176,13 @@ that region. `template` is optional and defaults to `false`. An asset and a
 region cannot share a source or a target, and package files other than
 `manifest.toml` must be declared as one of those sources.
 
-For a live asset that `jit profile capture` refreshes from the repository,
-write its asset source below `assets/live/` and make its `target` the repository
-file that supplies the bytes. The package does not need a checked-in copy of
-that live source when capture creates its destination. Assets outside that
-prefix, and every region source, are package-authored files read from the
-package directory.
+For a live asset that `jit profile capture` or `jit profile pack` refreshes from
+the repository, write its asset source below `assets/live/` and make its
+`target` the repository file that supplies the bytes. The package does not need
+a checked-in copy of that live source: capture creates the package tree and
+packing assembles the same tree in memory before writing its archive. Assets
+outside that prefix, and every region source, are package-authored files read
+from the package directory.
 
 Each `[[live-source]]` declares one required repository-relative directory
 `root`; its optional `exclude` list defaults to `[]`. Use shell-style,

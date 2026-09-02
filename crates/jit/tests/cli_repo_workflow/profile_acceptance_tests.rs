@@ -1061,6 +1061,64 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
     );
 }
 
+/// A fresh repository can obtain the shipped workflow from archives made by a
+/// source checkout, then initialize through the documented path selector.
+#[test]
+fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
+    let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let exchange = TempDir::new().unwrap();
+    let repo = TestRepo::new();
+    assert!(!repo.path.join(".jit").exists());
+
+    for id in ["jit-default", "jit-dogfood"] {
+        let archive = exchange.path().join(format!("{id}.tar"));
+        let archive = archive.to_str().unwrap();
+        let packed = super::profile_cli_tests::jit(
+            &checkout,
+            &[
+                "profile",
+                "pack",
+                "--source",
+                &format!("profiles/{id}"),
+                "--output",
+                archive,
+                "--json",
+            ],
+        );
+        assert!(packed.status.success(), "packing {id} failed: {packed:?}");
+
+        let initialized = super::profile_cli_tests::jit(&repo.path, &["init", "--json"]);
+        assert!(
+            initialized.status.success(),
+            "plain init failed: {initialized:?}"
+        );
+        let added = super::profile_cli_tests::jit(
+            &repo.path,
+            &[
+                "profile",
+                "add",
+                "--archive",
+                archive,
+                "--destination",
+                &format!("packages/{id}"),
+                "--json",
+            ],
+        );
+        assert!(added.status.success(), "adding {id} failed: {added:?}");
+    }
+
+    let profiled = super::profile_cli_tests::jit(
+        &repo.path,
+        &["init", "--profile", "path:packages/jit-dogfood", "--json"],
+    );
+    assert!(
+        profiled.status.success(),
+        "profiled init failed: {profiled:?}"
+    );
+    assert!(repo.path.join(".jit/profiles/jit-default.json").is_file());
+    assert!(repo.path.join(".jit/profiles/jit-dogfood.json").is_file());
+}
+
 // ===========================================================================
 // jit:f2389b18 — `jit profile validate` checks the profiles this repository
 // records against the packages they came from and the content they own.
