@@ -71,11 +71,15 @@ These rules apply across **all** workflows. Never violate them.
 
 Runs before every workflow. Do not skip.
 
-1. Verify `.jit/` exists in the repo root. If not, suggest
-   `jit init --profile jit-dogfood` as the preferred portable workflow, or the
-   `jit-migrate` skill for existing planning artifacts, and stop. Plain
-   `jit init` is the methodology-neutral alternative; see
-   [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md).
+1. Verify `.jit/` exists in the repo root. If not, stop and suggest one of:
+   the profile bootstrap for JIT's portable workflow, the `jit-migrate` skill
+   when planning artifacts already exist, or plain `jit init` for a
+   methodology-neutral repository. A profile reaches a repository that does not
+   already contain its package by archive: pack it from a jit checkout, add the
+   archive to the worktree, then initialize against the added directory. The
+   procedure is in
+   [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md);
+   `--profile` takes `id:ID` or `path:DIR`, never a bare package name.
 
 2. Run `jit recover` to clean stale locks from crashed processes.
 

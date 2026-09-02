@@ -193,10 +193,12 @@ flags.
 
 Stop immediately and report to the invoker when:
 
-- `.jit/` is absent from the repository root. Suggest
-  `jit init --profile jit-dogfood` for the preferred portable workflow, or the
-  jit-migrate skill when planning artifacts already exist. Plain `jit init` is
-  the methodology-neutral alternative; see
+- `.jit/` is absent from the repository root. Suggest the profile bootstrap for
+  the preferred portable workflow, the jit-migrate skill when planning artifacts
+  already exist, or plain `jit init` for a methodology-neutral repository. A
+  profile reaches a repository lacking its package by archive: pack, add, then
+  initialize against the added directory — `--profile` takes `id:ID` or
+  `path:DIR`, never a bare package name. See
   [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md).
 - `.jit/config.toml` is missing or unreadable (no configuration to read).
 - Tier derivation stops (see `references/tier-derivation.md`). A missing

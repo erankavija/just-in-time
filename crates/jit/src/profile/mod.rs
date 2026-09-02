@@ -67,6 +67,7 @@ pub use package::{
     PackageHash, ProfilePackage, ProfilePackageError, ProfilePackageHashes, ProfilePackageSource,
     MAX_PROFILE_PACKAGE_BYTES, MAX_PROFILE_PACKAGE_FILES,
 };
+pub(crate) use package_archive::pack_captured_package_archive;
 pub use package_archive::{
     pack_package_archive, read_package_archive, PackageArchiveError,
     MAX_PROFILE_PACKAGE_ARCHIVE_BYTES, MAX_PROFILE_PACKAGE_ARCHIVE_ENTRIES,

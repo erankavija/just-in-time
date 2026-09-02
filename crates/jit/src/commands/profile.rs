@@ -1,9 +1,9 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::ProfileLifecycleOperation;
 use crate::profile::{
-    build_profile_claims_from_resolved, capture_package_tree, pack_package_archive,
+    build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
     read_package_archive, resolve_package, resolve_package_from_record, CapturedContributionState,
-    CapturedPackageTree, EngineVersion, ProfileAddEntry, ProfileAddResult,
+    CapturedPackageTree, EngineVersion, PackageCaptureError, ProfileAddEntry, ProfileAddResult,
     ProfileApplicationStatus, ProfileApplyResult, ProfileCaptureEntry, ProfileCaptureResult,
     ProfileComposedApplyResult, ProfileContributionChange, ProfileGraphError, ProfileId,
     ProfileListResult, ProfileOrigin, ProfilePackEntry, ProfilePackResult, ProfilePackage,
@@ -128,7 +128,9 @@ pub enum ProfileSelector {
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ProfileSelectorError {
     /// The selector does not have one of the supported tags.
-    #[error("invalid profile selector '{selector}': expected id:ID or path:DIR")]
+    #[error(
+        "invalid profile selector '{selector}': expected id:ID or path:DIR; for a shipped package, place it under the worktree and use path:packages/<PROFILE_ID>"
+    )]
     InvalidShape {
         /// User-supplied selector.
         selector: String,
@@ -216,6 +218,15 @@ pub enum ProfileResolutionError {
         location: String,
         /// Package-reader failure.
         source: ProfilePackageError,
+    },
+    /// A package whose live sources are drawn from repository content could
+    /// not be assembled for an archive.
+    #[error("profile package location '{location}' cannot be captured: {source}")]
+    UncapturableLocation {
+        /// Location as the caller supplied it.
+        location: String,
+        /// Capture failure.
+        source: PackageCaptureError,
     },
     /// A path selector attempts to use the name of an explicitly selected id.
     #[error(
@@ -818,11 +829,13 @@ impl CommandExecutor<JsonFileStorage> {
     /// `output`.
     ///
     /// The package directory is a worktree path resolved the way every other
-    /// path argument is, and the read is the same one every route into a
-    /// package takes, so a symbolic link, an entry of another kind, or content
-    /// the manifest does not declare is refused before an archive exists. The
-    /// archive is written from those validated bytes alone: no resolved value,
-    /// no applied record, and nothing outside the package directory reaches it.
+    /// path argument is. The package is captured before it is archived, so live
+    /// assets are drawn from their declared repository targets and contributed
+    /// values are refreshed from their declared registries. A symbolic link, an
+    /// entry of another kind, or content the manifest does not declare is
+    /// refused before an archive exists. No resolved variable value and
+    /// nothing outside the package or its declared repository authorities
+    /// reaches the archive.
     ///
     /// The output path is the caller's, and it is published no-replace through
     /// the same classification `jit snapshot export` uses — into the repository
@@ -867,14 +880,13 @@ impl CommandExecutor<JsonFileStorage> {
     ) -> Result<(ProfilePackResult, Vec<String>)> {
         let layout = self.require_layout()?;
         let source = worktree_directory(&layout, invocation_dir, package_source)?;
-        let package = ProfilePackage::from_directory(
-            &layout.worktree_root().join(source.relative().as_path()),
-        )
-        .map_err(|source_error| ProfileResolutionError::UnreadableLocation {
-            location: package_source.display().to_string(),
-            source: source_error,
+        let package = capture_package_tree(&source, &layout).map_err(|source_error| {
+            ProfileResolutionError::UncapturableLocation {
+                location: package_source.display().to_string(),
+                source: source_error,
+            }
         })?;
-        let archive = pack_package_archive(&package)?;
+        let archive = pack_captured_package_archive(&package)?;
         let archive_bytes = archive.len() as u64;
         let warnings =
             self.publish_package_archive(&layout, invocation_dir, output, archive, publish)?;

@@ -509,6 +509,11 @@ fn test_profile_commands_require_a_tagged_selector() {
         "{}",
         String::from_utf8_lossy(&invalid.stderr)
     );
+    assert!(
+        String::from_utf8_lossy(&invalid.stderr).contains("path:packages/<PROFILE_ID>"),
+        "{}",
+        String::from_utf8_lossy(&invalid.stderr)
+    );
 }
 
 #[test]
@@ -2508,6 +2513,51 @@ fn test_profile_pack_writes_identical_archives_for_one_package_directory() {
         fs::read(repo.path().join("second.tar")).unwrap(),
         "two packs of one package directory wrote different archives"
     );
+}
+
+/// Every shipped package is self-contained at the archive boundary, including
+/// packages whose live consumers are drawn from this checkout while packing.
+#[test]
+fn test_profile_pack_packs_every_shipped_package_from_the_checkout() {
+    let exchange = TempDir::new().unwrap();
+    let checkout = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+    for id in jit::test_utils::published_package_ids() {
+        let output = exchange.path().join(format!("{id}.tar"));
+        let output = output.to_str().unwrap();
+        let packed = jit(
+            &checkout,
+            &[
+                "profile",
+                "pack",
+                "--source",
+                &format!("profiles/{id}"),
+                "--output",
+                output,
+                "--json",
+            ],
+        );
+        assert!(
+            packed.status.success(),
+            "packing shipped package {id} failed\nstdout={}\nstderr={}",
+            String::from_utf8_lossy(&packed.stdout),
+            String::from_utf8_lossy(&packed.stderr)
+        );
+        assert!(output_path_exists(output), "packing {id} wrote no archive");
+        if id == "jit-dogfood" {
+            let tree = jit::profile::read_package_archive(&fs::read(output).unwrap())
+                .expect("the shipped dogfood archive reads back");
+            assert!(
+                tree.files()
+                    .contains_key("assets/live/.agents/skills/jit-breakdown/SKILL.md"),
+                "the dogfood archive omitted a declared live consumer"
+            );
+        }
+    }
+}
+
+fn output_path_exists(path: &str) -> bool {
+    Path::new(path).is_file()
 }
 
 /// One package reaches another repository through the archive alone: the

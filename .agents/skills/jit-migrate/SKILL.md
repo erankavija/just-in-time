@@ -23,7 +23,7 @@ the result with `jit validate`.
 
    | Situation | Action |
    |---|---|
-   | No `.jit/` | Prefer `jit init --profile jit-dogfood` for JIT's portable workflow; use plain `jit init` or `--hierarchy-template` only for custom methodology. See [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md). |
+   | No `.jit/` | Prefer the profile bootstrap for JIT's portable workflow: pack the package from a jit checkout, add the archive to the worktree, then `jit init --profile path:<added-dir>` (`--profile` takes `id:ID` or `path:DIR`, never a bare name). Use plain `jit init` or `--hierarchy-template` only for custom methodology. See [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md). |
    | `.jit/` exists, index empty | Proceed. |
    | `.jit/` exists and already has issues | Warn: "Migration will **add** issues; existing issues are untouched." Ask the user to confirm before continuing. |
 
