@@ -7849,6 +7849,7 @@ fn run() -> Result<()> {
                             "expired_leases_evicted": report.expired_leases_evicted,
                             "temp_files_removed": report.temp_files_removed,
                             "derived_state_repaired": report.derived_state_repaired,
+                            "claims_lease_recovery": report.claims_lease_recovery,
                             "warnings": report.warnings,
                         }))
                         .with_message(msg);

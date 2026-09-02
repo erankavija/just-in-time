@@ -46,6 +46,9 @@ pub enum StorageWarning {
     },
     /// The claims index was inconsistent and has been rebuilt from the log.
     IndexRebuilt,
+    /// Claims and lease recovery was skipped because the repository is not a
+    /// git repository.
+    ClaimsLeaseRecoverySkipped,
     /// A stale lock left behind by a finished process was removed.
     StaleLockRemoved {
         /// Path of the lock file that was removed.
@@ -101,6 +104,10 @@ impl fmt::Display for StorageWarning {
             StorageWarning::IndexRebuilt => {
                 write!(f, "Claims index inconsistent, rebuilding from log")
             }
+            StorageWarning::ClaimsLeaseRecoverySkipped => write!(
+                f,
+                "Skipped claims and lease recovery because it requires a git repository"
+            ),
             StorageWarning::StaleLockRemoved { path } => {
                 write!(f, "Removed stale lock: {}", path.display())
             }

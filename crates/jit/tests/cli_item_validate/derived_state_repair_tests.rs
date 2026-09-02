@@ -507,3 +507,46 @@ fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
     assert!(validation.status.success(), "{validation:?}");
     assert_eq!(json(&validation)["valid"], true);
 }
+
+#[test]
+fn test_recover_repairs_derived_state_drift_without_git() {
+    let repo = TempDir::new().unwrap();
+    let initialized = run(repo.path(), &["init"]);
+    assert!(initialized.status.success(), "{initialized:?}");
+
+    let config_path = repo.path().join(".jit/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        config_path,
+        format!("{config}\n[type_hierarchy]\ntypes = {{ custom = 4 }}\n"),
+    )
+    .unwrap();
+
+    let recovered = run(repo.path(), &["recover", "--json"]);
+    assert!(recovered.status.success(), "{recovered:?}");
+    let report = json(&recovered);
+    assert!(
+        report["derived_state_repaired"].as_u64().unwrap_or(0) > 0,
+        "recovery must report a structural repair count: {report}"
+    );
+    assert_eq!(
+        report["claims_lease_recovery"]["status"], "skipped",
+        "recovery must report that git-dependent recovery was skipped: {report}"
+    );
+    assert_eq!(
+        report["claims_lease_recovery"]["reason"], "requires_git",
+        "recovery must report why git-dependent recovery was skipped: {report}"
+    );
+    assert!(
+        report["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|warning| warning["kind"] == "claims_lease_recovery_skipped"),
+        "recovery must expose the skip through its warning mechanism: {report}"
+    );
+
+    let validation = run(repo.path(), &["validate", "--json"]);
+    assert!(validation.status.success(), "{validation:?}");
+    assert_eq!(json(&validation)["valid"], true);
+}

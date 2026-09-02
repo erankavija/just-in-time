@@ -9,6 +9,8 @@ use crate::storage::{
     ClaimAcquireLimits, ClaimCoordinator, FileLocker, IssueStore, Lease, StorageWarning,
 };
 use anyhow::{Context, Result};
+use schemars::JsonSchema;
+use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
@@ -674,37 +676,51 @@ pub struct RecoveryReport {
     pub temp_files_removed: usize,
     /// Number of derived-state targets repaired during recovery.
     pub derived_state_repaired: usize,
+    /// Whether claims and lease recovery ran or was skipped because it
+    /// requires git.
+    pub claims_lease_recovery: RecoveryPhase,
     /// Non-fatal warnings observed during recovery, for the output layer to
     /// render. Storage returns these instead of writing to stderr directly.
     pub warnings: Vec<StorageWarning>,
 }
 
-/// Execute recovery routines to fix common issues.
-///
-/// Performs automatic recovery operations:
-/// - Cleans up stale locks from crashed processes (PID check)
-/// - Rebuilds corrupted claims index from append-only log
-/// - Evicts expired leases
-/// - Removes orphaned temp files (older than 1 hour)
-/// - Repairs declaration-derived state through the `jit validate --fix` path
-///
-/// Safe to run at any time: cleanup removes only provably stale data, and
-/// derived-state repair uses the transactional validation path.
-pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
-    storage: &S,
-    paths: &WorktreePaths,
-) -> Result<RecoveryReport> {
-    use crate::storage::lock_cleanup;
-    use crate::storage::temp_cleanup;
+/// Outcome of a recovery phase whose execution depends on an external
+/// capability.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema, Default)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum RecoveryPhase {
+    /// The phase ran to completion.
+    #[default]
+    Completed,
+    /// The phase was skipped, with the capability it requires recorded.
+    Skipped { reason: RecoverySkipReason },
+}
 
-    // Get current branch for identity
+/// Why a recovery phase was skipped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RecoverySkipReason {
+    /// The phase requires a git repository.
+    RequiresGit,
+}
+
+/// Run recovery for claims, worktree identity, locks, and leases.
+///
+/// This phase intentionally requires git. The caller must keep it separate
+/// from git-independent recovery so derived-state repair remains available in
+/// repositories that do not use git.
+fn execute_git_recovery(paths: &WorktreePaths, report: &mut RecoveryReport) -> Result<()> {
+    use crate::storage::lock_cleanup;
+
+    // Get current branch for identity.
     let branch = get_current_branch(&paths.worktree_root)?;
 
-    // Load worktree identity (surfacing any relocation as a typed warning)
+    // Load worktree identity (surfacing any relocation as a typed warning).
     let (identity, identity_warnings) =
         load_or_create_worktree_identity_with_warnings(paths, &branch)?;
+    report.warnings.extend(identity_warnings);
 
-    // Create claim coordinator
+    // Create claim coordinator.
     let agent = "system:recovery".to_string();
     let locker = FileLocker::new(Duration::from_secs(
         crate::runtime_defaults::LOCK_TIMEOUT_SECS,
@@ -712,13 +728,9 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
     let coordinator = ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent);
     coordinator.init()?;
 
-    let mut report = RecoveryReport::default();
-    report.warnings.extend(identity_warnings);
-
-    // 1. Clean up stale locks
+    // 1. Clean up stale locks.
     let lock_dir = paths.shared_jit.join("locks");
     if lock_dir.exists() {
-        // Count locks before cleanup
         let locks_before = std::fs::read_dir(&lock_dir)
             .map(|entries| {
                 entries
@@ -744,7 +756,7 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
         report.stale_locks_cleaned = locks_before.saturating_sub(locks_after);
     }
 
-    // 2. Rebuild index if corrupted
+    // 2. Rebuild index if corrupted.
     let (consistent, verify_warnings) = coordinator.verify_index_consistency()?;
     report.warnings.extend(verify_warnings);
     if !consistent {
@@ -755,12 +767,45 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
         report.index_rebuilt = true;
     }
 
-    // 3. Evict expired leases
+    // 3. Evict expired leases.
     let mut index = coordinator.load_claims_index()?;
     let leases_before = index.leases.len();
     coordinator.evict_expired(&mut index)?;
     coordinator.write_index_atomic(&index)?;
     report.expired_leases_evicted = leases_before.saturating_sub(index.leases.len());
+
+    Ok(())
+}
+
+/// Execute recovery routines to fix common issues.
+///
+/// Performs automatic recovery operations:
+/// - Cleans up stale locks from crashed processes (PID check)
+/// - Rebuilds corrupted claims index from append-only log
+/// - Evicts expired leases
+/// - Removes orphaned temp files (older than 1 hour)
+/// - Repairs declaration-derived state through the `jit validate --fix` path
+///
+/// Safe to run at any time: cleanup removes only provably stale data, and
+/// derived-state repair uses the transactional validation path.
+pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
+    storage: &S,
+    paths: &WorktreePaths,
+) -> Result<RecoveryReport> {
+    use crate::storage::temp_cleanup;
+
+    let mut report = RecoveryReport::default();
+
+    if paths.git_repository {
+        execute_git_recovery(paths, &mut report)?;
+    } else {
+        report.claims_lease_recovery = RecoveryPhase::Skipped {
+            reason: RecoverySkipReason::RequiresGit,
+        };
+        report
+            .warnings
+            .push(StorageWarning::ClaimsLeaseRecoverySkipped);
+    }
 
     // 4. Clean up orphaned temp files. Best-effort: a failure is surfaced as a
     // warning rather than aborting recovery.
