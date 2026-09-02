@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-02T22:26:11.721460962Z",
+  "dependencies": [],
+  "description": "`jit validate` reports derived-state drift as an integrity failure without naming the command that repairs it, and `jit recover` reports success while leaving the drift in place.\n\n## Background\n\nEditing `.jit/config.toml` leaves the generated `rules.toml` and `schemas/default-*.json` targets stale. `jit validate` then exits 4 with:\n\n```\n❌ Repository integrity error: Invalid repository: derived-materialization validation pass: derived-state drift:\n- VirtualPath { root: Data, relative: Descendant(\"rules.toml\") }: stale\n- VirtualPath { root: Data, relative: Descendant(\"schemas/default-type-hierarchy-known.json\") }: stale\n```\n\nThe diagnostic lists stale targets and stops. `jit validate --fix` repairs them completely, but nothing on the failure path names it, leaving the remedy discoverable only by accident from unrelated command output. `jit recover` — the command an operator reaches for once a repository is called invalid, and the pre-flight step the shipped skills direct — reports `Index rebuilt: true` and exits 0 while the drift persists.\n\nTwo further details shape the fix. Stale targets render as the `VirtualPath { root: Data, relative: Descendant(\"...\") }` debug form rather than as repository-relative paths. And the condition self-heals on the next semantic mutation, so `Invalid repository` overstates a recoverable state.\n\n## Success Criteria\n\n- [hard] REQ-01: The derived-state drift diagnostic names the command that repairs the drift.\n- [hard] REQ-02: Stale targets are reported as repository-relative paths rather than Rust debug representations.\n- [hard] REQ-03: Recovery run against a repository carrying derived-state drift either repairs it or reports it as an outstanding condition the run did not resolve, rather than reporting unqualified success.\n- [aspirational] REQ-04: Diagnostic severity distinguishes a recoverable derived-state condition from an unrecoverable integrity failure.\n- [hard] REQ-05: Tests cover the diagnostic text and the recovery behaviour on a repository whose configuration edit left generated targets stale.\n\n## Notes\n\nReported from first-run adoption of jit 1.0.0 in a fresh external repository, and reproduced here on a scratch repository: initialize, append a `[type_hierarchy].types` table to `.jit/config.toml`, then validate (exit 4), recover (exit 0, drift persists), validate with the repair flag (exit 0, repaired).\n",
+  "documents": [],
+  "first_ready_at": "2026-09-02T22:26:11.721460962Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "labels": [
+    "component:cli",
+    "component:storage",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Derived-state drift reports no remedy and survives recovery",
+  "updated_at": "2026-09-02T22:26:11.721460962Z"
+}

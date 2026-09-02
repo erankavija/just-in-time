@@ -1,0 +1,23 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-02T22:26:22.859435039Z",
+  "dependencies": [],
+  "description": "`jit invariant list` exits 2 with `unrecognized subcommand`, while every other noun in the command surface — `gate`, `issue`, `profile` — answers `list`.\n\n## Background\n\nInvariants are enumerable: a repository declares them in its registry and `jit project render` projects them. The `invariant` command offers `check` but no way to enumerate what would be checked, so the first-guess command for discovering the declared set fails and the operator has to read the command's help to learn that enumeration lives elsewhere.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit invariant list` enumerates the invariants the repository declares.\n- [hard] REQ-02: The command supports `--json` and wraps its collection in the standard count-plus-collection envelope.\n- [hard] REQ-03: The listing derives its contents from the repository's own registry and yields an empty collection for a repository declaring no invariants.\n- [hard] REQ-04: Tests cover the listing against a repository with declared invariants and a repository with none.\n\n## Notes\n\nREQ-03 keeps the command a mechanism over the repository's declarations rather than an enumeration baked into the binary.\n\nReported from first-run adoption of jit 1.0.0 in a fresh external repository.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-02T22:26:22.859435039Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1ad59bd3-3389-4bc8-b6ec-48057a8a83a7",
+  "labels": [
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "low",
+  "state": "ready",
+  "title": "The invariant command has no list verb",
+  "updated_at": "2026-09-02T22:26:22.859435039Z"
+}

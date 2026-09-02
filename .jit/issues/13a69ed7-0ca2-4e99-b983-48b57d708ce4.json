@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-02T22:26:17.284884924Z",
+  "dependencies": [],
+  "description": "`jit init --profile jit-dogfood`, the bootstrap that three shipped skills name as the preferred setup path, cannot succeed in a repository that does not already contain the profile package.\n\n## Background\n\nThe selector grammar accepts `id:ID` or `path:DIR`, so a bare package name is rejected outright:\n\n```\nError: invalid profile selector 'jit-dogfood': expected id:ID or path:DIR\n```\n\nSupplying the shipped package by path then fails a containment check:\n\n```\nError: profile package directory '<repo>/profiles/jit-dogfood' is not inside the repository worktree\n```\n\nBecause a package must already live inside the target worktree, a fresh external repository has no reachable form of this command, and the shipped `profiles/jit-dogfood` and `profiles/jit-default` packages are unreachable from outside this repository. `jit profile list` returning a zero count is correct behaviour — it lists the profiles a repository records — and is outside this defect.\n\nThe unreachable instruction appears in `.agents/skills/jit-manage/SKILL.md`, `.agents/skills/jit-migrate/SKILL.md`, and `.agents/skills/jit-project-lead/SKILL.md`. An agent following any of them literally issues a command that cannot work.\n\n## Success Criteria\n\n- [hard] REQ-01: A repository with no prior jit state can be initialized from a shipped profile package by following the documented procedure end to end.\n- [hard] REQ-02: Every shipped skill naming a profile bootstrap names a form that succeeds against a repository with no prior jit state.\n- [hard] REQ-03: A rejected profile selector names an accepted form for reaching the shipped packages rather than restating the grammar alone.\n- [hard] REQ-04: The profiles reference documents how a shipped package reaches a repository that does not yet contain one.\n- [hard] REQ-05: A test initializes a repository with no prior jit state from a shipped profile package through the documented procedure.\n\n## Notes\n\nReported from first-run adoption of jit 1.0.0 in a fresh external repository and reproduced here against both the bare-name and `path:` selector forms.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-02T22:26:17.284884924Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "13a69ed7-0ca2-4e99-b983-48b57d708ce4",
+  "labels": [
+    "component:cli",
+    "component:docs",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "The documented profile bootstrap is unreachable for a repository without the package",
+  "updated_at": "2026-09-02T22:26:17.284884924Z"
+}
