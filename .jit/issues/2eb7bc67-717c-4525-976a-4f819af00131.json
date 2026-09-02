@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-02T22:41:33.036672092Z",
   "context": {},
   "created_at": "2026-09-02T22:26:11.721460962Z",
   "dependencies": [],
@@ -18,7 +19,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Derived-state drift reports no remedy and survives recovery",
-  "updated_at": "2026-09-02T22:26:11.721460962Z"
+  "updated_at": "2026-09-02T22:41:33.036672092Z"
 }

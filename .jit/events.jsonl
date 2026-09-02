@@ -14622,3 +14622,11 @@
 {"id":"ae9cff52-027d-4e05-9f64-ef092d8de604","issue_id":"1ad59bd3-3389-4bc8-b6ec-48057a8a83a7","priority":"low","timestamp":"2026-09-02T22:26:22.859435039Z","title":"The invariant command has no list verb","type":"issue_created"}
 {"id":"f7f75ffd-c5b0-4799-93d0-872365e3a75a","issue_id":"f5a01b6c-145d-4acc-95fe-4d71da6f9098","priority":"low","timestamp":"2026-09-02T22:26:28.445373767Z","title":"Recovery warns that a zero-claim repository's claims index is inconsistent","type":"issue_created"}
 {"fields":["dependencies"],"id":"c11f875b-e88d-4702-b2e1-02086cc9db4f","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-09-02T22:27:38.768812076Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"d88175dd-c70f-487a-8e29-c4759cb1b926","issue_id":"2eb7bc67-717c-4525-976a-4f819af00131","timestamp":"2026-09-02T22:41:33.036672092Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"cbb8b8e6-9d72-4f86-9610-5c8f1e402842","issue_id":"2eb7bc67-717c-4525-976a-4f819af00131","timestamp":"2026-09-02T22:41:33.036672092Z","type":"issue_claimed"}
+{"from":"ready","id":"762037b9-a5c4-416d-ac44-7742ad71e3fb","issue_id":"13a69ed7-0ca2-4e99-b983-48b57d708ce4","timestamp":"2026-09-02T22:41:38.686939909Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"90a4023c-0716-406a-8fed-3b4949a9ab58","issue_id":"13a69ed7-0ca2-4e99-b983-48b57d708ce4","timestamp":"2026-09-02T22:41:38.686939909Z","type":"issue_claimed"}
+{"from":"ready","id":"badb1d0c-2d45-4058-91b6-b3959b25dd8e","issue_id":"1ad59bd3-3389-4bc8-b6ec-48057a8a83a7","timestamp":"2026-09-02T22:41:44.335888155Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"1cf4033e-b0f4-42e1-845b-6056f1526279","issue_id":"1ad59bd3-3389-4bc8-b6ec-48057a8a83a7","timestamp":"2026-09-02T22:41:44.335888155Z","type":"issue_claimed"}
+{"from":"ready","id":"7b24a7da-e204-4118-b43e-428ff6aa474e","issue_id":"f5a01b6c-145d-4acc-95fe-4d71da6f9098","timestamp":"2026-09-02T22:41:49.989921103Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"23e2c1f7-3cb7-4d9a-8ff0-e29586b78fbb","issue_id":"f5a01b6c-145d-4acc-95fe-4d71da6f9098","timestamp":"2026-09-02T22:41:49.989921103Z","type":"issue_claimed"}
