@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:20:54.987480642Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:23:53.017573646Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1ad59bd3-3389-4bc8-b6ec-48057a8a83a7",
   "labels": [
     "component:cli",
@@ -20,5 +31,5 @@
   "priority": "low",
   "state": "in_progress",
   "title": "The route for enumerating invariants is undiscoverable from the invariant command",
-  "updated_at": "2026-09-02T22:58:09.540271624Z"
+  "updated_at": "2026-09-02T23:23:53.017573646Z"
 }

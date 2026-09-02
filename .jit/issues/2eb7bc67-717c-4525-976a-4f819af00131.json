@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:13:05.584513774Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-09-02T23:15:33.631287721Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2eb7bc67-717c-4525-976a-4f819af00131",
   "labels": [
     "component:cli",
@@ -21,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Derived-state drift reports no remedy and survives recovery",
-  "updated_at": "2026-09-02T22:41:33.036672092Z"
+  "updated_at": "2026-09-02T23:15:33.631287721Z"
 }

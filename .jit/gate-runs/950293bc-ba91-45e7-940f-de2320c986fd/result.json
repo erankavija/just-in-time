@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9af372929ddf6440d1fa4802ddd1aeb0029133e6",
+  "completed_at": "2026-09-02T23:20:53.707008715Z",
+  "duration_ms": 184331,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six success criteria are met by the attributable current-tree changes; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "13a69ed7-0ca2-4e99-b983-48b57d708ce4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "950293bc-ba91-45e7-940f-de2320c986fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-02T23:17:49.375594418Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 604dbffa, 2fc55c0, c370a7ef, c7580a18 (merge has no own patch)\nPolicy sources: AGENTS.md\nResolved items: @/gate/jit-validate (.jit/gates.toml); @/invariant/atomic-writes, @/invariant/convention-convergence, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (2026-09-02T23:17:48Z; exit code unavailable)\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six success criteria are met by the attributable current-tree changes; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

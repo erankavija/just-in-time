@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:15:34.416479596Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:17:47.890072603Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f5a01b6c-145d-4acc-95fe-4d71da6f9098",
   "labels": [
     "component:cli",
@@ -21,5 +32,5 @@
   "priority": "low",
   "state": "in_progress",
   "title": "Recovery warns that a zero-claim repository's claims index is inconsistent",
-  "updated_at": "2026-09-02T22:41:49.989921103Z"
+  "updated_at": "2026-09-02T23:17:47.890072603Z"
 }

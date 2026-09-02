@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9af372929ddf6440d1fa4802ddd1aeb0029133e6",
+  "completed_at": "2026-09-02T23:17:47.529846440Z",
+  "duration_ms": 132489,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All three hard recovery-warning criteria are implemented and covered by the attributable integration tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f5a01b6c-145d-4acc-95fe-4d71da6f9098",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "5b56f2bb-ff01-44e0-b0bc-5953acbff06b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-02T23:15:35.040224844Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 604dbffa2, 3699091db, 4b5128379 (`jit:f5a01b6c`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code not recorded, 2026-09-02T23:15:34Z); no prior code-review run\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All three hard recovery-warning criteria are implemented and covered by the attributable integration tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

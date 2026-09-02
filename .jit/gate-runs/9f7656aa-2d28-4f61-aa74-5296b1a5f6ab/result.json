@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9af372929ddf6440d1fa4802ddd1aeb0029133e6",
+  "completed_at": "2026-09-02T23:15:33.272745348Z",
+  "duration_ms": 147023,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 701,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-4"
+        ],
+        "severity": "high",
+        "summary": "Recovery requires Git before reaching derived-state repair, leaving non-Git repositories with drift unresolved."
+      }
+    ],
+    "summary": "Recovery cannot handle derived-state drift in initialized non-Git repositories.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9f7656aa-2d28-4f61-aa74-5296b1a5f6ab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-02T23:13:06.249316285Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4115 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.151.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a06465-c759-7e80-bf21-db1e083af85b\n--------\nuser\n--- 4102 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3699091db; 4b5128379 (merge; no independent tree change)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/derived-state-coherence (.jit/invariants.toml); @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-02T23:11:26Z); code-review pending\nTruncation recovery: recovered broad-diff truncation with parent-specific merge comparisons and bounded current-file reads\n\n1. **F1 — Recovery still requires Git before repairing derived-state drift.** `execute_recover` calls `get_current_branch` at [claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:701), which returns `ClaimRequiresGitError` outside a Git repository, before the repair path at line 782. The new recovery test initializes and commits a Git repository at [derived_state_repair_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_item_validate/derived_state_repair_tests.rs:464), so it does not cover this required non-Git core-command scenario. An initialized non-Git repository with stale derived targets therefore receives neither repair nor an outstanding-drift report, leaving REQ-03 unmet and conflicting with @/charter/D-4. Disposition: blocking. Origin: issue-impact.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Recovery cannot handle derived-state drift in initialized non-Git repositories.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recovery requires Git before reaching derived-state repair, leaving non-Git repositories with drift unresolved.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":701,\"references\":[\"@/charter/D-4\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

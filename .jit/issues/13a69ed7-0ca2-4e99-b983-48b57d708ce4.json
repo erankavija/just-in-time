@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:17:48.703767615Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-02T23:20:54.115163252Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "13a69ed7-0ca2-4e99-b983-48b57d708ce4",
   "labels": [
     "component:cli",
@@ -21,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "The documented profile bootstrap is unreachable for a repository without the package",
-  "updated_at": "2026-09-02T22:43:37.713246323Z"
+  "updated_at": "2026-09-02T23:20:54.115163252Z"
 }
