@@ -1280,16 +1280,17 @@ fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T>
     }
 }
 
-/// Wrong-verb guess -> canonical-command hint, keyed by (group, guessed verb).
+/// Wrong-command guess -> canonical-command hint, keyed by (group, guessed verb).
 /// Backs the hidden stub subcommands in `cli.rs` (`IssueCommands::Rm`,
 /// `DepCommands::Remove`, ...): each stub always fails through
 /// [`verb_hint_error`], which looks itself up here. Adding a newly observed
-/// wrong guess is a one-line addition: wire a hidden stub variant in
-/// `cli.rs`, add its match arm below, and add the mapping here. See
+/// wrong guess is a one-line addition: wire a hidden stub variant in `cli.rs`,
+/// add its match arm below, and add the mapping here. Parser-level rejected
+/// subcommands can use the same mapping directly. See
 /// docs/reference/cli-commands.md's "Command and flag aliases" section for
 /// the user-facing writeup — these are hints, not aliases: the wrong verb
 /// still fails, it just names the right one.
-const VERB_HINTS: &[(&str, &str, &str)] = &[
+const COMMAND_HINTS: &[(&str, &str, &str)] = &[
     ("dep", "remove", "jit dep rm"),
     ("dep", "delete", "jit dep rm"),
     ("issue", "rm", "jit issue delete"),
@@ -1315,7 +1316,34 @@ const VERB_HINTS: &[(&str, &str, &str)] = &[
         "remove",
         "jit issue update <id> --remove-label <namespace:value>",
     ),
+    ("invariant", "list", "jit item list --kind invariant"),
 ];
+
+fn canonical_command_hint(group: &str, verb: &str) -> Option<&'static str> {
+    COMMAND_HINTS
+        .iter()
+        .find_map(|(known_group, known_verb, hint)| {
+            (*known_group == group && *known_verb == verb).then_some(*hint)
+        })
+}
+
+/// Return the canonical command for a parser-level unknown subcommand, if the
+/// rejected command is one of the known first-guess residuals. The lookup is
+/// deliberately shared with the hidden-stub dispatch hints so a wrong command
+/// has one source of guidance regardless of where clap rejects it.
+fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<String> {
+    if error.kind() != clap::error::ErrorKind::InvalidSubcommand {
+        return None;
+    }
+
+    let mut positional = args
+        .iter()
+        .skip(1)
+        .filter(|argument| !matches!(argument.as_str(), "-q" | "--quiet" | "--schema"));
+    let group = positional.next()?;
+    let verb = positional.next()?;
+    canonical_command_hint(group, verb).map(|canonical| format!("Hint: use '{canonical}' instead."))
+}
 
 /// Fail fast on an observed wrong-verb guess (`jit <group> <verb>`) with a
 /// hint naming the canonical command, instead of executing (there is nothing
@@ -1327,9 +1355,7 @@ const VERB_HINTS: &[(&str, &str, &str)] = &[
 /// Always returns an error; never used as a fallible operation.
 fn verb_hint_error(group: &str, verb: &str, args: &[String]) -> anyhow::Error {
     let json = args.iter().any(|a| a == "--json");
-    let canonical = VERB_HINTS
-        .iter()
-        .find_map(|(g, v, hint)| (*g == group && *v == verb).then_some(*hint))
+    let canonical = canonical_command_hint(group, verb)
         .unwrap_or_else(|| panic!("no verb hint registered for 'jit {group} {verb}'"));
     let command = format!("{group} {verb}");
     invalid_argument(
@@ -2307,7 +2333,16 @@ fn run() -> Result<()> {
         return jit::test_utils::prepare_nextest_profiled_repository_fixture(&id);
     }
 
-    let cli = Cli::parse();
+    let args: Vec<String> = env::args().collect();
+    let cli = match Cli::try_parse_from(args.clone()) {
+        Ok(cli) => cli,
+        Err(error) => {
+            if let Some(hint) = unknown_subcommand_hint(&error, &args) {
+                eprintln!("{hint}");
+            }
+            error.exit();
+        }
+    };
     let quiet = cli.quiet;
 
     // Handle --schema flag first

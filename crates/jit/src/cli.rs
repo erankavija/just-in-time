@@ -302,6 +302,7 @@ pub enum Commands {
     /// `check` reports invariants whose `enforced-by` binding names a missing or
     /// unloadable rule/gate. To render the invariant registry into documentation,
     /// use `jit project render` (the generic `[projection.*]` command).
+    /// To enumerate the declared invariants, use `jit item list --kind invariant`.
     #[command(subcommand)]
     Invariant(InvariantCommands),
 
@@ -572,6 +573,8 @@ pub enum ItemCommands {
 /// `check` runs the enforcement-drift check between the registry and the declared
 /// rules/gates, reporting the sole declared-but-unenforced direction (an invariant
 /// whose `enforced-by` resolves to no loadable rule/gate).
+///
+/// To enumerate the declared invariants, use `jit item list --kind invariant`.
 #[derive(Subcommand)]
 pub enum InvariantCommands {
     /// Check enforcement drift between invariants and declared rules/gates

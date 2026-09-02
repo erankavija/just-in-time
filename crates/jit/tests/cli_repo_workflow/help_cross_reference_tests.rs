@@ -103,6 +103,15 @@ fn test_doc_remove_help_mentions_events_verification() {
 }
 
 #[test]
+fn test_invariant_help_mentions_item_list_route() {
+    let help = help_text(&["invariant", "--help"]);
+    assert!(
+        help.contains("jit item list --kind invariant"),
+        "invariant --help should point at the generic invariant listing route, got: {help}"
+    );
+}
+
+#[test]
 fn test_profile_help_describes_repository_package_locations() {
     let list = help_text(&["profile", "list", "--help"]);
     assert!(
