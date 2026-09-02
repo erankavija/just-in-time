@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "`jit recover` prints `Warning: Claims index inconsistent, rebuilding from log` on a freshly initialized repository holding no issues and no claims.\n\n## Background\n\nA repository with no recorded claims has nothing for the index to disagree with, so the warning reports an inconsistency that cannot exist. It surfaces on one of the first commands an operator runs after initialization, because the shipped skills direct recovery as a pre-flight step, which trains readers to disregard a diagnostic that carries real meaning when an index genuinely diverges.\n\n## Success Criteria\n\n- [hard] REQ-01: Recovery run against a repository with no recorded claims emits no claims-index inconsistency warning.\n- [hard] REQ-02: The warning is still emitted when a claims index genuinely diverges from the claim log.\n- [hard] REQ-03: Tests cover both a repository with no recorded claims and one whose index genuinely diverges.\n\n## Notes\n\nReported from first-run adoption of jit 1.0.0 in a fresh external repository and reproduced here on a scratch repository immediately after initialization.\n",
   "documents": [],
+  "done_at": "2026-09-02T23:38:40.074693195Z",
   "first_ready_at": "2026-09-02T22:26:28.445373767Z",
   "gates_required": [
     "cargo-ci",
@@ -30,7 +31,7 @@
     "type:bug"
   ],
   "priority": "low",
-  "state": "in_progress",
+  "state": "done",
   "title": "Recovery warns that a zero-claim repository's claims index is inconsistent",
-  "updated_at": "2026-09-02T23:17:47.890072603Z"
+  "updated_at": "2026-09-02T23:38:40.074693195Z"
 }
