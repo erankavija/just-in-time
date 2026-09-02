@@ -164,6 +164,26 @@ fn test_gate_status_transposed_args_did_you_mean() {
     );
 }
 
+#[test]
+fn test_invariant_list_rejection_mentions_item_list_route() {
+    let output = jit()
+        .args(["invariant", "list"])
+        .assert()
+        .failure()
+        .get_output()
+        .clone();
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "an unsupported invariant subcommand remains a usage error"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("jit item list --kind invariant"),
+        "the rejected invariant list should name the canonical enumeration route, got: {stderr}"
+    );
+}
+
 // 4a. Top-level `jit rdeps` routes to the canonical `jit graph rdeps`.
 #[test]
 fn test_top_level_rdeps_routes_to_graph_rdeps() {
