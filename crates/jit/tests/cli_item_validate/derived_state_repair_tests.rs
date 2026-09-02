@@ -419,3 +419,91 @@ fn test_cli_validate_fix_profile_provenance_failures_are_zero_write() {
         assert_snapshot_unchanged(repo.path(), &before);
     }
 }
+
+#[test]
+fn test_validate_derived_state_drift_names_repair_command_and_repository_paths() {
+    let repo = TempDir::new().unwrap();
+    let initialized = run(repo.path(), &["init"]);
+    assert!(initialized.status.success(), "{initialized:?}");
+
+    let config_path = repo.path().join(".jit/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        config_path,
+        format!("{config}\n[type_hierarchy]\ntypes = {{ custom = 4 }}\n"),
+    )
+    .unwrap();
+
+    let validation = run(repo.path(), &["validate"]);
+    assert!(!validation.status.success(), "{validation:?}");
+    let diagnostic = format!(
+        "{}{}",
+        String::from_utf8_lossy(&validation.stdout),
+        String::from_utf8_lossy(&validation.stderr)
+    );
+    assert!(
+        diagnostic.contains("jit validate --fix"),
+        "diagnostic should name the repair command: {diagnostic}"
+    );
+    assert!(
+        diagnostic.contains(".jit/rules.toml"),
+        "diagnostic should use repository-relative paths: {diagnostic}"
+    );
+    assert!(
+        !diagnostic.contains("VirtualPath {"),
+        "diagnostic should not expose virtual-path debug formatting: {diagnostic}"
+    );
+}
+
+#[test]
+fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
+    let repo = TempDir::new().unwrap();
+    let initialized = run(repo.path(), &["init"]);
+    assert!(initialized.status.success(), "{initialized:?}");
+
+    Command::new("git")
+        .current_dir(repo.path())
+        .args(["init", "-q"])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(repo.path())
+        .args(["config", "user.email", "test@example.com"])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(repo.path())
+        .args(["config", "user.name", "Test User"])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(repo.path())
+        .args(["add", "."])
+        .status()
+        .unwrap();
+    Command::new("git")
+        .current_dir(repo.path())
+        .args(["commit", "-qm", "Initialize recovery fixture"])
+        .status()
+        .unwrap();
+
+    let config_path = repo.path().join(".jit/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        config_path,
+        format!("{config}\n[type_hierarchy]\ntypes = {{ custom = 4 }}\n"),
+    )
+    .unwrap();
+
+    let recovered = run(repo.path(), &["recover", "--json"]);
+    assert!(recovered.status.success(), "{recovered:?}");
+    let report = json(&recovered);
+    assert!(
+        report["derived_state_repaired"].as_u64().unwrap_or(0) > 0,
+        "recovery must report a structural repair count: {report}"
+    );
+
+    let validation = run(repo.path(), &["validate", "--json"]);
+    assert!(validation.status.success(), "{validation:?}");
+    assert_eq!(json(&validation)["valid"], true);
+}

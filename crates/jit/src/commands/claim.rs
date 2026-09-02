@@ -672,6 +672,8 @@ pub struct RecoveryReport {
     pub expired_leases_evicted: usize,
     /// Number of orphaned temp files removed
     pub temp_files_removed: usize,
+    /// Number of derived-state targets repaired during recovery.
+    pub derived_state_repaired: usize,
     /// Non-fatal warnings observed during recovery, for the output layer to
     /// render. Storage returns these instead of writing to stderr directly.
     pub warnings: Vec<StorageWarning>,
@@ -684,10 +686,12 @@ pub struct RecoveryReport {
 /// - Rebuilds corrupted claims index from append-only log
 /// - Evicts expired leases
 /// - Removes orphaned temp files (older than 1 hour)
+/// - Repairs declaration-derived state through the `jit validate --fix` path
 ///
-/// Safe to run at any time - only removes provably stale data.
-pub fn execute_recover<S: IssueStore>(
-    _storage: &S,
+/// Safe to run at any time: cleanup removes only provably stale data, and
+/// derived-state repair uses the transactional validation path.
+pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
+    storage: &S,
     paths: &WorktreePaths,
 ) -> Result<RecoveryReport> {
     use crate::storage::lock_cleanup;
@@ -769,6 +773,17 @@ pub fn execute_recover<S: IssueStore>(
         Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
             reason: e.to_string(),
         }),
+    }
+
+    // Derived-state drift is recoverable, but leaving it behind would make a
+    // successful recovery report misleading. Reuse the transactional repair
+    // path owned by `jit validate --fix` and expose its target count in the
+    // recovery report.
+    if paths.local_jit.join("config.toml").is_file() {
+        let layout =
+            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+        let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
+        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
     }
 
     Ok(report)

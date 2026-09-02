@@ -421,8 +421,10 @@ pub enum Commands {
     /// - Rebuilds corrupted claims index from append-only log
     /// - Evicts expired leases
     /// - Removes orphaned temp files (older than 1 hour)
+    /// - Repairs declaration-derived state through the `jit validate --fix` path
     ///
-    /// Safe to run at any time - only removes provably stale data.
+    /// Safe to run at any time: cleanup removes only provably stale data, and
+    /// derived-state repair uses the transactional validation path.
     Recover {
         #[arg(long)]
         json: bool,
