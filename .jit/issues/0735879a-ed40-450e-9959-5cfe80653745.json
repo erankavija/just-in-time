@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-07-18T12:55:41.530699291Z",
   "dependencies": [
+    "0723860e-ed82-4a46-a9b1-c52f1abfa956",
     "13a69ed7-0ca2-4e99-b983-48b57d708ce4",
     "13c69884-dfe9-4a62-b2ef-59fa4d2f76f3",
     "1ad59bd3-3389-4bc8-b6ec-48057a8a83a7",
@@ -12,7 +13,8 @@
     "be005f64-76e8-4fe9-9d53-bf11a0ff0043",
     "c3a09e0d-93c0-4c76-8a9a-dbed38bf1718",
     "ea1745ee-1167-432c-bc17-774f37a99bca",
-    "f5a01b6c-145d-4acc-95fe-4d71da6f9098"
+    "f5a01b6c-145d-4acc-95fe-4d71da6f9098",
+    "fc2403fb-74d3-471e-b6aa-e3a743fb22e1"
   ],
   "description": "Deliver the post-v1.0 release through explicit DAG membership, beginning with the complete profile lifecycle, composition, and upgrade work. This milestone is the strategic home for accepted v1.1 epics; milestone labels describe release intent but do not substitute for dependency-based hierarchy.\n\n## Success Criteria\n\n- [hard] REQ-01: The complete profile lifecycle epic is delivered through its approved plan and breakdown on top of the finished v1.0 repository-materialization foundation.\n- [hard] REQ-02: Every v1.1 child uses canonical long-term architecture and source-of-truth boundaries; no temporary command, adapter, dual format, fallback, compatibility layer, or deferred cleanup is accepted.\n- [hard] REQ-03: All attached v1.1 epics and their required gates are effectively terminal before this milestone completes, with release evidence reviewed on the exact integrated candidate.\n\n## Decisions\n\n- D-01: Dependency edges are authoritative for milestone membership; milestone labels are projections and filters only.\n- D-02: General profile removal remains deferred beyond v1.1.\n\n## Notes\n\nAdditional accepted v1.1 epics may be attached directly to this milestone. Unrelated issues carrying a historical milestone:v1.1 label are not silently adopted without an explicit DAG decision.",
   "documents": [],
@@ -29,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Version 1.1 Release",
-  "updated_at": "2026-09-02T22:27:38.768812076Z"
+  "updated_at": "2026-09-03T04:25:30.373052470Z"
 }
