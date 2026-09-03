@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d7e7315c091337b0071a79883de3ecea0e076a97",
+  "completed_at": "2026-09-02T23:54:25.450260490Z",
+  "duration_ms": 79732,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "55e50332b61d0302f1943ebd7ff80c26bac16746ba369566ef7d2773c8ae8c0c",
+  "issue_id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "69ca774f-2a93-4601-af89-7a830ab45dc6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-02T23:53:05.717846248Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- test failures ---\n     Summary [   5.258s] 0/4648 tests run: 0 passed, 0 skipped\ninfo: experimental features enabled: setup-scripts\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n────────────\n Nextest run ID dc607257-256f-416f-8b08-8ef1bc5b01e8 with nextest profile: default\n    Starting 4648 tests across 14 binaries\n       SETUP [      1/3] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default\n  SETUP PASS [   0.489s] default-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-default\n       SETUP [      2/3] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood\n  SETUP PASS [   1.677s] dogfood-repository-fixture: /home/vkaskivuo/Projects/just-in-time/target/debug/jit __test-fixture-setup jit-dogfood\n       SETUP [      3/3] recorded-failure-corpus: /home/vkaskivuo/Projects/just-in-time/scripts/setup-recorded-failure-corpus.sh\n  SETUP FAIL [   3.069s] recorded-failure-corpus: /home/vkaskivuo/Projects/just-in-time/scripts/setup-recorded-failure-corpus.sh\n  stdout ───\n\n    running 1 test\n    test failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step ... FAILED\n\n    failures:\n\n    failures:\n        failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step\n\n    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 334 filtered out; finished in 2.93s\n\n  stderr ───\n        Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n         Running tests/cli_issue/main.rs (target/debug/deps/cli_issue-322154c1cbd47875)\n\n    thread 'failure_probe_fixture::test_failure_probe_fixture_accepts_every_recorded_setup_step' (1090698) panicked at crates/jit/tests/cli_issue/failure_probe_fixture.rs:895:34:\n    prepare the run-bound recorded failure corpus: recorded failure corpus row for `recover` does not match the live registry\n    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n    error: test failed, to rerun pass `-p jit --test cli_issue`\n\n  Cancelling due to setup script failure: \n────────────\n     Summary [   5.258s] 0/4648 tests run: 0 passed, 0 skipped\nerror: setup script failed\n--- excluded-tests output ---\ncargo-ci: reporter-contract failure: could not parse pinned nextest success summary for excluded-test measurement\n  ✓ incremental-baseline: 822 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (256 ms)\n  ✓ fmt: ok (1621 ms)\n  ✓ clippy: ok (28751 ms)\n  ✓ suite-build: built in 38334 ms, warmed 17 executables (2045910160 bytes) in 74 ms (38411 ms)\n  ✗ test: FAILED (exit 105) (5595 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4596 ms)\n  ✓ suite-clock: 10205 ms\n  ✗ excluded-tests: FAILED (exit 1) (4 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1718964896/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=10205ms (82 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (822 pre-existing entries ignored) (250 ms)\n\n",
+  "tree_dirty": false
+}

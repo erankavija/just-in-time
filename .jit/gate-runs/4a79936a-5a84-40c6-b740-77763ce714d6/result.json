@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "d7e7315c091337b0071a79883de3ecea0e076a97",
+  "completed_at": "2026-09-03T00:06:37.852386261Z",
+  "duration_ms": 191035,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "886dacb55a622ecb0ee37ecbdb71f4a7e5b82c37a0f22ec34a5a07c52c94d260",
+  "issue_id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4a79936a-5a84-40c6-b740-77763ce714d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-03T00:03:26.817184336Z",
+  "status": "passed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nflock           1179009 WRITE* /run/user/1000/cargo-ci.lock\nflock           1164768 WRITE  /run/user/1000/cargo-ci.lock\n",
+  "stdout": "  ✓ incremental-baseline: 822 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (268 ms)\n  ✓ fmt: ok (1608 ms)\n  ✓ clippy: ok (28770 ms)\n  ✓ suite-build: built in 23689 ms, warmed 17 executables (2045910672 bytes) in 72 ms (23764 ms)\n  ✓ test: 4648 passed, 0 failed, 0 skipped (23361 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4568 ms)\n  ✓ suite-clock: 27947 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1718965408/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=27947ms (82 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (822 pre-existing entries ignored) (248 ms)\n\n",
+  "tree_dirty": true
+}

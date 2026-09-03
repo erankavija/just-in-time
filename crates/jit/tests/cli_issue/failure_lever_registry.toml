@@ -913,8 +913,9 @@ confirmation = "invoked"
 [[arms]]
 path = "recover"
 argv = ["recover", "--json"]
-setup = ["init", "git:repository-without-head"]
-expected_failure = "Recovery cannot resolve a current branch in a Git repository with no commits."
+setup = ["init", "malformed-config-toml"]
+setup_notes = "The fixture sets GIT_CEILING_DIRECTORIES to its own root, so git is never discoverable here and the git-dependent recovery phase is skipped rather than reached. Malformed config.toml fails the derived-state repair phase instead, which is the part of recovery that runs without git."
+expected_failure = "declaration validation pass: config.toml is invalid"
 expected_code = "recovery_failed"
 expected_exit = 1
 confirmation = "invoked"
