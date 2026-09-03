@@ -18,8 +18,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "passed",
-      "updated_at": "2026-09-02T23:51:48.892510828Z",
+      "status": "failed",
+      "updated_at": "2026-09-03T00:09:25.892165108Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Derived-state drift reports no remedy and survives recovery",
-  "updated_at": "2026-09-03T00:06:37.864173965Z"
+  "updated_at": "2026-09-03T00:09:25.892165108Z"
 }

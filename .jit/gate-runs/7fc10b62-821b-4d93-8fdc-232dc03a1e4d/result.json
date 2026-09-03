@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "65a512aa0e73afd0cc4c5e0865f596bb36289035",
+  "completed_at": "2026-09-03T00:09:25.528466404Z",
+  "duration_ms": 157668,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 799,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/2eb7bc67/requirement/REQ-03",
+          "@/charter/D-4",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Recovery aborts before repairing or reporting derived-state drift in a Git repository with no commits."
+      }
+    ],
+    "summary": "Recovery leaves derived-state drift unresolved in Git repositories without a first commit.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7fc10b62-821b-4d93-8fdc-232dc03a1e4d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-03T00:06:47.859680785Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7537 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.151.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a06496-ee2d-7b01-be90-654d3cae436b\n--------\nuser\n--- 7524 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 604dbffa2, 3699091db, 4b5128379, 54de3a84a, 4b00eb86d, 9a09ddcc5, d7e7315c, 65a512aa0\nPolicy sources: AGENTS.md\nResolved items: @/issue/2eb7bc67/requirement/REQ-03 (issue description), @/charter/D-4 (dev/vision/9db27a3a-charter.md), @/invariant/derived-state-coherence (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review passed (exit 0)\nTruncation recovery: re-read recovery dispatch, Git detection, current tests, failure lever, and validation diagnostic by bounded line ranges\n\n1. **[blocking][issue-impact]** `jit recover` still aborts before derived-state repair in a Git repository with no commits. Git detection marks that repository as Git-capable, then `execute_recover` calls the Git-dependent phase first at [claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:799); its branch lookup explicitly errors for an unresolved `HEAD` at [claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:54). The repair is only reached later at [claim.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/claim.rs:827), so drift remains and no recovery report identifies it. The tests cover no-Git and committed-Git fixtures, while the branchless-Git failure lever was removed at [failure_lever_registry.toml](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/cli_issue/failure_lever_registry.toml:913). This violates hard REQ-03 and makes a core recovery capability depend on Git history.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Recovery leaves derived-state drift unresolved in Git repositories without a first commit.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recovery aborts before repairing or reporting derived-state drift in a Git repository with no commits.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":799,\"references\":[\"@/issue/2eb7bc67/requirement/REQ-03\",\"@/charter/D-4\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
