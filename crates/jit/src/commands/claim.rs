@@ -796,6 +796,19 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
 
     let mut report = RecoveryReport::default();
 
+    // Derived-state drift is repaired before anything that depends on git.
+    // The git-dependent phase below aborts in a repository whose HEAD does not
+    // resolve, and repairing afterwards would leave that repository's drift
+    // untouched — a core capability made conditional on git history, against
+    // `@/charter/D-4`. Repairing first keeps the repair unconditional while
+    // preserving the git phase's own failure.
+    if paths.local_jit.join("config.toml").is_file() {
+        let layout =
+            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
+        let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
+        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
+    }
+
     if paths.git_repository {
         execute_git_recovery(paths, &mut report)?;
     } else {
@@ -818,17 +831,6 @@ pub fn execute_recover<S: IssueStore + crate::storage::RepositoryStateStore>(
         Err(e) => report.warnings.push(StorageWarning::TempCleanupFailed {
             reason: e.to_string(),
         }),
-    }
-
-    // Derived-state drift is recoverable, but leaving it behind would make a
-    // successful recovery report misleading. Reuse the transactional repair
-    // path owned by `jit validate --fix` and expose its target count in the
-    // recovery report.
-    if paths.local_jit.join("config.toml").is_file() {
-        let layout =
-            crate::storage::discover_repository_layout(&paths.worktree_root, &paths.local_jit)?;
-        let executor = crate::commands::CommandExecutor::new(storage.clone()).with_layout(layout);
-        report.derived_state_repaired = executor.repair_derived_state(false)?.0;
     }
 
     Ok(report)

@@ -508,6 +508,54 @@ fn test_recover_repairs_derived_state_drift_and_reports_repair_in_json() {
     assert_eq!(json(&validation)["valid"], true);
 }
 
+/// A git repository with no commits resolves no branch, so the git-dependent
+/// recovery phase fails there. Derived-state repair must still have run: the
+/// repair is a core capability and cannot depend on git history
+/// (`@/charter/D-4`).
+#[test]
+fn test_recover_repairs_derived_state_drift_in_git_repository_without_commits() {
+    let repo = TempDir::new().unwrap();
+    let initialized_git = Command::new("git")
+        .current_dir(repo.path())
+        .args(["init"])
+        .status()
+        .unwrap();
+    assert!(initialized_git.success(), "{initialized_git:?}");
+
+    let initialized = run(repo.path(), &["init"]);
+    assert!(initialized.status.success(), "{initialized:?}");
+
+    let config_path = repo.path().join(".jit/config.toml");
+    let config = fs::read_to_string(&config_path).unwrap();
+    fs::write(
+        config_path,
+        format!("{config}\n[type_hierarchy]\ntypes = {{ custom = 4 }}\n"),
+    )
+    .unwrap();
+
+    let drifted = run(repo.path(), &["validate", "--json"]);
+    assert!(
+        !drifted.status.success(),
+        "the edited configuration must leave derived state stale: {drifted:?}"
+    );
+
+    // The git-dependent phase still fails on the unresolved HEAD; that
+    // behaviour is deliberate and preserved.
+    let recovered = run(repo.path(), &["recover", "--json"]);
+    assert!(
+        !recovered.status.success(),
+        "recovery must still surface the unresolved-HEAD failure: {recovered:?}"
+    );
+
+    // The repair nevertheless happened, which is what the requirement asks for.
+    let validation = run(repo.path(), &["validate", "--json"]);
+    assert!(
+        validation.status.success(),
+        "recovery must repair derived state before the git phase fails: {validation:?}"
+    );
+    assert_eq!(json(&validation)["valid"], true);
+}
+
 #[test]
 fn test_recover_repairs_derived_state_drift_without_git() {
     let repo = TempDir::new().unwrap();
