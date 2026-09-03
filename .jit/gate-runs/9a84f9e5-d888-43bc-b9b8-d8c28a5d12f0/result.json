@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "c9d27491edf3c8b5e621bf02c0ba220670c11385",
+  "completed_at": "2026-09-03T00:13:31.667134415Z",
+  "duration_ms": 100347,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "505a41d3b611acdda38fea1049df2873bfcd5fab916647c1c7a6d3c09c6408b2",
+  "issue_id": "2eb7bc67-717c-4525-976a-4f819af00131",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9a84f9e5-d888-43bc-b9b8-d8c28a5d12f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-03T00:11:51.320091145Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 30637 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 30637 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 38320 ms, warmed 17 executables (2045918760 bytes) in 71 ms.\n  ✓ incremental-baseline: 826 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (253 ms)\n  ✓ fmt: ok (1609 ms)\n  ✓ clippy: ok (29004 ms)\n  ✓ suite-build: built in 38320 ms, warmed 17 executables (2045918760 bytes) in 71 ms (38394 ms)\n  ✓ test: 4649 passed, 0 failed, 0 skipped (26113 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4507 ms)\n  ✓ suite-clock: 30637 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (82 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (826 pre-existing entries ignored) (251 ms)\n\n",
+  "tree_dirty": false
+}

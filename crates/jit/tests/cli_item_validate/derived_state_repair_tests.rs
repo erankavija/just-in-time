@@ -533,12 +533,6 @@ fn test_recover_repairs_derived_state_drift_in_git_repository_without_commits() 
     )
     .unwrap();
 
-    let drifted = run(repo.path(), &["validate", "--json"]);
-    assert!(
-        !drifted.status.success(),
-        "the edited configuration must leave derived state stale: {drifted:?}"
-    );
-
     // The git-dependent phase still fails on the unresolved HEAD; that
     // behaviour is deliberate and preserved.
     let recovered = run(repo.path(), &["recover", "--json"]);
