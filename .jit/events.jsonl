@@ -14661,3 +14661,6 @@
 {"id":"34586643-e450-409b-8200-82676b982c1e","issue_id":"a68eb999-3cdf-437e-9e5a-d1e0f3e9550a","priority":"low","timestamp":"2026-09-03T04:31:23.810651679Z","title":"State that a template names gates rather than carrying them","type":"issue_created"}
 {"fields":["dependencies"],"id":"a89b27c9-26cb-41a2-bd0e-5cfab06589d2","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-09-03T04:31:40.296886796Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"95bb7fce-92c5-43b7-bb06-0df7f460afd8","issue_id":"f69c9b87-b76d-438e-93ed-686b07ecbd0e","priority":"normal","timestamp":"2026-09-12T15:44:24.274703385Z","title":"Asset scanner reads demangled Rust symbols as paths","type":"issue_created"}
+{"assignee":"agent:claude-opus-5","id":"622468d5-6637-43bc-89ec-631728fa97ac","issue_id":"f69c9b87-b76d-438e-93ed-686b07ecbd0e","timestamp":"2026-09-12T16:06:24.013548525Z","type":"issue_claimed"}
+{"from":"ready","id":"7335ef83-d72c-4e29-a2a1-45890dc52bee","issue_id":"f69c9b87-b76d-438e-93ed-686b07ecbd0e","timestamp":"2026-09-12T16:06:28.081966694Z","to":"done","type":"issue_state_changed"}
+{"id":"a8b4ddda-4898-44b7-b40c-faf7113eeeb7","issue_id":"f69c9b87-b76d-438e-93ed-686b07ecbd0e","timestamp":"2026-09-12T16:06:28.081966694Z","type":"issue_completed"}

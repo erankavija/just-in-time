@@ -1,10 +1,12 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude-opus-5",
+  "claimed_at": "2026-09-12T16:06:24.013548525Z",
   "context": {},
   "created_at": "2026-09-12T15:44:24.274703385Z",
   "dependencies": [],
   "description": "`jit doc add` refuses a text document whose content contains a demangled Rust symbol path, reading the symbol as a relative filesystem path and rejecting it as not lexically confined.\n\n## Background\n\nThe asset scanner extracts path-like tokens from a document being linked so that referenced assets can be recorded. A committed profiler or disassembly dump contains symbols such as `memchr::arch::x86_64::memchr::count_raw::find_avx2`; the scanner treats the `::`-separated token as a relative path, fails confinement, and refuses the link for every document type. Committed perf attribution and assembly dumps therefore cannot be linked to the issue that produced them.\n\n## Success Criteria\n\n- [hard] REQ-01: Linking a `.txt` document whose body contains `memchr::arch::x86_64::memchr::count_raw::find_avx2` succeeds for every document type, and the token is not recorded as an asset.\n- [hard] REQ-02: A genuine relative path that escapes the repository in the same document is still refused with the existing confinement error.\n- [hard] REQ-03: A regression test covers both cases.\n\n## Notes\n\nObserved in a downstream repository while linking `popcnt-attribution.txt`, a committed perf report.",
   "documents": [],
+  "done_at": "2026-09-12T16:06:28.081966694Z",
   "first_ready_at": "2026-09-12T15:44:24.274703385Z",
   "gates_required": [],
   "gates_status": {},
@@ -13,7 +15,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Asset scanner reads demangled Rust symbols as paths",
-  "updated_at": "2026-09-12T15:44:24.274703385Z"
+  "updated_at": "2026-09-12T16:06:28.081966694Z"
 }
