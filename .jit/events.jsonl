@@ -14660,3 +14660,4 @@
 {"fields":["dependencies"],"id":"76987dd1-8f82-4ddf-952b-4fc1c7df98a6","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-09-03T04:25:30.373052470Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"34586643-e450-409b-8200-82676b982c1e","issue_id":"a68eb999-3cdf-437e-9e5a-d1e0f3e9550a","priority":"low","timestamp":"2026-09-03T04:31:23.810651679Z","title":"State that a template names gates rather than carrying them","type":"issue_created"}
 {"fields":["dependencies"],"id":"a89b27c9-26cb-41a2-bd0e-5cfab06589d2","issue_id":"0735879a-ed40-450e-9959-5cfe80653745","timestamp":"2026-09-03T04:31:40.296886796Z","type":"issue_updated","updated_by":"dependency-add"}
+{"id":"95bb7fce-92c5-43b7-bb06-0df7f460afd8","issue_id":"f69c9b87-b76d-438e-93ed-686b07ecbd0e","priority":"normal","timestamp":"2026-09-12T15:44:24.274703385Z","title":"Asset scanner reads demangled Rust symbols as paths","type":"issue_created"}

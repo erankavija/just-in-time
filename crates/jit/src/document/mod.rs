@@ -6,6 +6,7 @@
 
 mod adapter;
 mod assets;
+mod link_target;
 mod link_validator;
 pub mod parser;
 mod reference;

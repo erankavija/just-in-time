@@ -63,7 +63,9 @@ pub trait DocFormatAdapter {
 /// # Excluded
 ///
 /// - Anchor-only links: `#section`
-/// - Mailto links: `mailto:user@example.com`
+/// - References carrying a scheme other than http/https: `mailto:user@example.com`,
+///   `tel:+358401234567`, and a demangled Rust symbol that CommonMark reads as
+///   an absolute-URI autolink
 pub struct HtmlAdapter;
 
 impl DocFormatAdapter for HtmlAdapter {
@@ -88,6 +90,7 @@ impl DocFormatAdapter for HtmlAdapter {
     }
 
     fn scan_assets(&self, content: &str) -> HashSet<String> {
+        use super::link_target::{classify_link_target, LinkTarget};
         use regex::Regex;
         use std::sync::LazyLock;
 
@@ -105,30 +108,11 @@ impl DocFormatAdapter for HtmlAdapter {
 
         for cap in re.captures_iter(content) {
             let value = cap[1].trim();
-
-            // Skip anchor-only links
-            if value.starts_with('#') {
-                continue;
+            if let Some(LinkTarget::External(path) | LinkTarget::Local(path)) =
+                classify_link_target(value)
+            {
+                assets.insert(path.to_string());
             }
-
-            // Skip mailto links
-            if value.starts_with("mailto:") {
-                continue;
-            }
-
-            // Strip fragment
-            let without_fragment = if let Some(pos) = value.find('#') {
-                &value[..pos]
-            } else {
-                value
-            };
-
-            // Skip empty after stripping
-            if without_fragment.is_empty() {
-                continue;
-            }
-
-            assets.insert(without_fragment.to_string());
         }
 
         assets
@@ -219,9 +203,14 @@ impl Default for AdapterRegistry {
 ///
 /// # Excluded
 ///
-/// - External URLs: `https://example.com/image.png`
 /// - Anchor-only links: `#section`
-/// - Mailto links: `mailto:user@example.com`
+/// - References carrying a scheme other than http/https: `mailto:user@example.com`,
+///   `tel:+358401234567`, and a demangled Rust symbol such as
+///   `memchr::arch::x86_64::memchr::count_raw::find_avx2`, which CommonMark reads
+///   as an absolute-URI autolink
+///
+/// External http/https URLs are collected here and classified as external by
+/// [`AssetScanner`](crate::document::AssetScanner).
 pub struct MarkdownAdapter;
 
 impl DocFormatAdapter for MarkdownAdapter {
@@ -245,6 +234,7 @@ impl DocFormatAdapter for MarkdownAdapter {
     }
 
     fn scan_assets(&self, content: &str) -> HashSet<String> {
+        use super::link_target::{classify_link_target, LinkTarget};
         use pulldown_cmark::{Event, Parser, Tag};
 
         let mut assets = HashSet::new();
@@ -255,27 +245,10 @@ impl DocFormatAdapter for MarkdownAdapter {
                 Event::Start(Tag::Image { dest_url, .. })
                 | Event::Start(Tag::Link { dest_url, .. }) => {
                     let path = dest_url.as_ref().trim();
-
-                    // Skip anchor-only links
-                    if path.starts_with('#') {
-                        continue;
-                    }
-
-                    // Skip mailto links
-                    if path.starts_with("mailto:") {
-                        continue;
-                    }
-
-                    // Remove anchor fragments
-                    let path_without_anchor = if let Some(pos) = path.find('#') {
-                        &path[..pos]
-                    } else {
-                        path
-                    };
-
-                    // Add non-empty paths (including external URLs)
-                    if !path_without_anchor.is_empty() {
-                        assets.insert(path_without_anchor.to_string());
+                    if let Some(LinkTarget::External(path) | LinkTarget::Local(path)) =
+                        classify_link_target(path)
+                    {
+                        assets.insert(path.to_string());
                     }
                 }
                 _ => {}
@@ -352,6 +325,15 @@ Local image: ![Local](local.png)
         assert!(assets.contains("https://example.com/image.png"));
         assert!(assets.contains("http://example.com"));
         assert!(assets.contains("local.png"));
+    }
+
+    #[test]
+    fn test_markdown_scan_assets_skips_a_demangled_rust_symbol_autolink() {
+        let adapter = MarkdownAdapter;
+        let content =
+            "# Attribution\n\nHot symbol: <memchr::arch::x86_64::memchr::count_raw::find_avx2>\n";
+
+        assert!(adapter.scan_assets(content).is_empty());
     }
 
     #[test]
@@ -613,6 +595,14 @@ mod html_tests {
         let assets = adapter.scan_assets(content);
         assert!(!assets.contains("mailto:user@example.com"));
         assert!(assets.contains("page.html"));
+    }
+
+    #[test]
+    fn test_html_scan_assets_skips_a_demangled_rust_symbol_autolink() {
+        let adapter = HtmlAdapter;
+        let content = r#"<a href="memchr::arch::x86_64::memchr::count_raw::find_avx2">sym</a>"#;
+
+        assert!(adapter.scan_assets(content).is_empty());
     }
 
     #[test]

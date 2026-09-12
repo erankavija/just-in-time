@@ -3,7 +3,7 @@
 //! Scans documents for asset references, classifies them as per-doc vs shared,
 //! resolves paths, and computes metadata (MIME types, hashes).
 
-use crate::document::AdapterRegistry;
+use crate::document::{link_target::is_external_reference, AdapterRegistry};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -84,7 +84,7 @@ impl AssetScanner {
             .scan_assets(content)
             .into_iter()
             .map(|original_path| {
-                if original_path.starts_with("http://") || original_path.starts_with("https://") {
+                if is_external_reference(&original_path) {
                     Ok(Asset {
                         original_path,
                         resolved_path: None,
@@ -222,7 +222,7 @@ impl AssetScanner {
     /// Resolve an asset reference to absolute path and metadata
     fn resolve_asset(&self, asset_path: &str, doc_path: &Path) -> Result<Asset, String> {
         // Check for external URLs
-        if asset_path.starts_with("http://") || asset_path.starts_with("https://") {
+        if is_external_reference(asset_path) {
             return Ok(Asset {
                 original_path: asset_path.to_string(),
                 resolved_path: None,
@@ -266,7 +266,12 @@ impl AssetScanner {
 
     /// Resolve relative path to absolute path from repo root
     ///
-    /// Security: Validates that resolved path doesn't escape repo root
+    /// Security: Validates that resolved path doesn't escape repo root, and
+    /// that the normalized result is a path
+    /// [`VirtualPath::worktree`](crate::repository_state::VirtualPath::worktree)
+    /// can represent. A destination the worktree identity rejects therefore
+    /// fails here, where the caller degrades it to a scan warning, rather than
+    /// failing the mutation that consumes the resolved paths.
     fn resolve_path(&self, asset_path: &str, doc_path: &Path) -> Result<PathBuf, String> {
         let base_path = if let Some(stripped) = asset_path.strip_prefix('/') {
             // Root-relative path: strip leading slash
@@ -294,6 +299,9 @@ impl AssetScanner {
 
         // Normalize path (resolve .. and .)
         let normalized = normalize_path(&base_path);
+
+        crate::repository_state::VirtualPath::worktree(&normalized)
+            .map_err(|error| error.to_string())?;
 
         Ok(normalized)
     }
@@ -426,6 +434,19 @@ mod tests {
     }
 
     #[test]
+    fn test_asset_scanner_scan_document_skips_a_demangled_rust_symbol_autolink() {
+        let temp = TempDir::new().unwrap();
+        let scanner = AssetScanner::new(AdapterRegistry::with_builtins(), temp.path());
+        let content =
+            "# Attribution\n\nHot symbol: <memchr::arch::x86_64::memchr::count_raw::find_avx2>\n";
+
+        assert!(scanner
+            .scan_document(Path::new("report.txt"), content)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
     fn test_asset_scanner_missing_files() {
         let temp = TempDir::new().unwrap();
         let registry = AdapterRegistry::with_builtins();
@@ -536,6 +557,21 @@ mod tests {
         let result = scanner.resolve_path("../../file.md", Path::new("dev/active/doc.md"));
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), PathBuf::from("file.md"));
+    }
+
+    #[test]
+    fn test_resolve_path_rejects_a_path_the_worktree_identity_cannot_represent() {
+        let temp = TempDir::new().unwrap();
+        let scanner = AssetScanner::new(AdapterRegistry::with_builtins(), temp.path());
+
+        let result = scanner.resolve_path("memchr::symbol", Path::new("report.txt"));
+
+        assert!(
+            result
+                .as_ref()
+                .is_err_and(|error| error.contains("memchr::symbol")),
+            "{result:?}"
+        );
     }
 
     #[test]

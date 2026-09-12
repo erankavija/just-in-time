@@ -11,6 +11,7 @@ mod cross_substrate_generality_tests;
 mod cross_worktree_integration_tests;
 mod divergence_recovery_journey_tests;
 mod doc_show_tests;
+mod document_asset_scan_tests;
 mod document_history_tests;
 mod first_guess_residuals_test;
 mod format_compat_cli_tests;

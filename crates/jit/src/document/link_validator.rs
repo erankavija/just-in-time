@@ -3,6 +3,7 @@
 //! Validates that Markdown links between documents resolve correctly
 //! and won't break during archival operations.
 
+use super::link_target::{classify_link_target, LinkTarget};
 use anyhow::Result;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -60,34 +61,11 @@ impl LinkValidator {
                 // Process links only if not in code block
                 // Note: Inline code (`...`) cannot contain Markdown links, so no need to track it
                 Event::Start(Tag::Link { dest_url, .. }) if !in_code_block => {
-                    let url = dest_url.as_ref().trim();
-
-                    // Skip external URLs
-                    if url.starts_with("http://") || url.starts_with("https://") {
+                    let Some(LinkTarget::Local(url_without_anchor)) =
+                        classify_link_target(dest_url.as_ref())
+                    else {
                         continue;
-                    }
-
-                    // Skip mailto links
-                    if url.starts_with("mailto:") {
-                        continue;
-                    }
-
-                    // Skip anchor-only links
-                    if url.starts_with('#') {
-                        continue;
-                    }
-
-                    // Remove anchor fragments from URLs
-                    let url_without_anchor = if let Some(pos) = url.find('#') {
-                        &url[..pos]
-                    } else {
-                        url
                     };
-
-                    // Skip empty paths
-                    if url_without_anchor.is_empty() {
-                        continue;
-                    }
 
                     links.push(InternalLink {
                         target: url_without_anchor.to_string(),
