@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ffb93647334e06a7e0f58ad7f83147e073e4c943",
+  "completed_at": "2026-09-16T23:06:08.331156602Z",
+  "duration_ms": 139429,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable batching, commit-keyed cache, regression coverage, and benchmark evidence satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9c9ac88e-ceec-4fd6-8820-7b3a3120ebee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "aae6c5b9-f49c-4c42-94cc-4712173c49de",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-16T23:03:48.901859459Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b487e207, 4c914f11, 85d65103, 6c8922cb, 5755fb65, 1d2c8d86, a297f5c5, ffb93647\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-16T23:03:14Z)\nTruncation recovery: re-read changed resolver, storage integration, tests, and benchmark in bounded path/line ranges; historical issue/event records excluded\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable batching, commit-keyed cache, regression coverage, and benchmark evidence satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

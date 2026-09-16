@@ -21,6 +21,7 @@
       "path": "dev/active/9c9ac88e/benchmark.md"
     }
   ],
+  "done_at": "2026-09-16T23:06:28.143232113Z",
   "first_ready_at": "2026-08-27T19:00:33.241629247Z",
   "gates_required": [
     "cargo-ci",
@@ -28,14 +29,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-09-16T22:08:31.353013634Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-16T23:03:43.694087627Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-09-16T22:08:31.353013634Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-16T23:06:08.692347767Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "9c9ac88e-ceec-4fd6-8820-7b3a3120ebee",
@@ -46,7 +47,7 @@
     "milestone:v1.0"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Every mutation spawns up to three git processes per document reference",
-  "updated_at": "2026-09-16T22:55:08.937565770Z"
+  "updated_at": "2026-09-16T23:06:28.143232113Z"
 }
