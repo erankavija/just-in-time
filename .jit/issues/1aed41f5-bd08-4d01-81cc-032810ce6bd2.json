@@ -1,0 +1,30 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-16T22:09:04.641695362Z",
+  "context": {},
+  "created_at": "2026-09-16T22:08:56.552970686Z",
+  "dependencies": [],
+  "description": "Clicking a cluster box in the web UI graph view selects the cluster's layout node id as if it were an issue id, so the issue detail panel requests a nonexistent issue and the server logs an error for every request.\n\n## Background\n\nThe cluster-aware layout creates visual group nodes whose ids take the form `cluster-<uuid>` (`web/src/components/Graph/GraphView.tsx:221`). The graph's node click handler forwards every clicked node's id to `onNodeClick` without distinguishing issue nodes from cluster nodes (`web/src/components/Graph/GraphView.tsx:974-980`), and the application stores that id as the selected issue (`web/src/App.tsx:233`). The detail panel then fetches `/api/issues/cluster-<uuid>`, which fails, and `crates/server/src/routes.rs:101` logs `Failed to get issue cluster-...: Issue not found` at error level.\n\nAn adopter's server log showed this error repeated about once per second for as long as the panel stayed open, which buries real server errors.\n\n## Success Criteria\n\n- [hard] REQ-01: Clicking a cluster node never changes the selected issue.\n- [hard] REQ-02: Clicking an issue node still selects that issue.\n- [hard] REQ-03: A regression test fails if a cluster node click reaches issue selection.\n\n## Notes\n\nWhether a cluster click should instead toggle expansion is a separate design choice and out of scope.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-16T22:08:56.552970686Z",
+  "gates_required": [
+    "code-review",
+    "npm-ci"
+  ],
+  "gates_status": {
+    "npm-ci": {
+      "status": "pending",
+      "updated_at": "2026-09-16T22:09:04.826884178Z",
+      "updated_by": null
+    }
+  },
+  "id": "1aed41f5-bd08-4d01-81cc-032810ce6bd2",
+  "labels": [
+    "type:bug",
+    "component:frontend"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Clicking a graph cluster box selects its layout id as an issue",
+  "updated_at": "2026-09-16T22:09:04.990546902Z"
+}
