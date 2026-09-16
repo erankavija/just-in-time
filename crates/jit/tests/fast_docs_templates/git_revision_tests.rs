@@ -1,4 +1,5 @@
 use jit::storage::{GitRevisionError, GitRevisionResolver};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -156,6 +157,234 @@ fn test_git_revision_resolver_reports_unavailable_git() {
         resolver.resolve_commit("HEAD"),
         Err(GitRevisionError::GitUnavailable { .. })
     ));
+}
+
+#[cfg(unix)]
+fn counted_git(repo: &Repo) -> (std::path::PathBuf, std::path::PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let log = repo.root.join("git-processes.log");
+    let wrapper = repo.root.join("git-wrapper.sh");
+    let log_literal = log.to_string_lossy().replace('\'', "'\\''");
+    fs::write(
+        &wrapper,
+        format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log_literal}'\nexec git \"$@\"\n"),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&wrapper).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&wrapper, permissions).unwrap();
+    (wrapper, log)
+}
+
+#[cfg(unix)]
+fn process_log(log: &Path) -> Vec<String> {
+    fs::read_to_string(log)
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[cfg(unix)]
+fn assert_batch_matches_single(
+    expected: &Result<jit::storage::PinnedTargetRead, GitRevisionError>,
+    actual: &Result<jit::storage::PinnedTargetRead, GitRevisionError>,
+) {
+    match (expected, actual) {
+        (Ok(expected), Ok(actual)) => assert_eq!(expected, actual),
+        (Err(expected), Err(actual)) => {
+            assert_eq!(
+                std::mem::discriminant(expected),
+                std::mem::discriminant(actual)
+            );
+            assert_eq!(expected.to_string(), actual.to_string());
+        }
+        (expected, actual) => panic!("single={expected:?}, batch={actual:?}"),
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let repo = Repo::new();
+    repo.write("docs/file.md", b"first version");
+    repo.write("docs/executable.sh", b"#!/bin/sh\nexit 0\n");
+    fs::set_permissions(
+        repo.root.join("docs/executable.sh"),
+        fs::Permissions::from_mode(0o755),
+    )
+    .unwrap();
+    repo.write("docs/section/.keep", b"directory");
+    repo.write("docs/space name.md", b"space\tpath\0\n");
+    std::os::unix::fs::symlink("file.md", repo.root.join("docs/link.md")).unwrap();
+    let first = repo.commit("first");
+    repo.write("docs/file.md", b"second version");
+    repo.commit("second");
+    let abbreviated = first[..8].to_string();
+    let range = format!("{first}..HEAD");
+    let requests = [
+        ("HEAD", "docs/file.md"),
+        ("HEAD", "docs/executable.sh"),
+        ("HEAD", "docs/section"),
+        ("HEAD", "docs/link.md"),
+        ("HEAD", "docs/missing.md"),
+        ("HEAD", "docs/file.md/x"),
+        ("HEAD", "docs/space name.md"),
+        (first.as_str(), "docs/file.md"),
+        (abbreviated.as_str(), "docs/file.md"),
+        (range.as_str(), "docs/file.md"),
+        ("not-a-revision", "docs/file.md"),
+    ]
+    .into_iter()
+    .map(|(revision, path)| (revision.to_string(), path.to_string()))
+    .collect::<std::collections::BTreeSet<_>>();
+
+    let ordinary = GitRevisionResolver::new(&repo.root);
+    let expected = requests
+        .iter()
+        .map(|request| {
+            (
+                request.clone(),
+                ordinary.inspect_pinned_target(&request.0, &request.1),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let (wrapper, _) = counted_git(&repo);
+    let batched = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let mut cache = BTreeMap::new();
+    let actual = batched.inspect_pinned_targets(&requests, &mut cache);
+
+    assert_eq!(actual.len(), expected.len());
+    requests.iter().for_each(|request| {
+        assert_batch_matches_single(expected.get(request).unwrap(), actual.get(request).unwrap());
+    });
+    assert_eq!(
+        actual[&("HEAD".to_string(), "docs/file.md".to_string())]
+            .as_ref()
+            .unwrap()
+            .bytes(),
+        Some(b"second version".as_slice())
+    );
+    assert_eq!(
+        actual[&("HEAD".to_string(), "docs/file.md/x".to_string())]
+            .as_ref()
+            .unwrap()
+            .unavailable_reason(),
+        Some("not found in commit tree")
+    );
+    assert!(process_log(&repo.root.join("git-processes.log"))
+        .iter()
+        .any(|line| line == "rev-parse --verify not-a-revision^{commit}"));
+    assert_eq!(cache.len(), 8);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_count() {
+    let repo = Repo::new();
+    (0..40).for_each(|index| {
+        repo.write(
+            &format!("docs/file-{index}.md"),
+            format!("file-{index}").as_bytes(),
+        );
+    });
+    let revision = repo.commit("many files");
+    let requests = (0..40)
+        .map(|index| ("HEAD".to_string(), format!("docs/file-{index}.md")))
+        .collect::<std::collections::BTreeSet<_>>();
+    let (wrapper, log) = counted_git(&repo);
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let mut cache = BTreeMap::new();
+    resolver.inspect_pinned_targets(
+        &[("HEAD".to_string(), "docs/file-0.md".to_string())]
+            .into_iter()
+            .collect(),
+        &mut cache,
+    );
+    assert_eq!(process_log(&log).len(), 3);
+    resolver.inspect_pinned_targets(&requests, &mut cache);
+
+    let processes = process_log(&log);
+    assert_eq!(processes.len(), 6);
+    assert!(processes.iter().any(|line| line.starts_with("rev-parse ")));
+    assert!(processes
+        .iter()
+        .any(|line| line == &format!("ls-tree -r -t -z --full-tree {revision}")));
+    assert!(processes.iter().any(|line| line == "cat-file --batch"));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_process() {
+    let repo = Repo::new();
+    repo.write("docs/file.md", b"first");
+    let first = repo.commit("first");
+    repo.write("docs/file.md", b"second");
+    let second = repo.commit("second");
+    let requests = [
+        ("HEAD".to_string(), "docs/file.md".to_string()),
+        (first.clone(), "docs/file.md".to_string()),
+        (second[..8].to_string(), "docs/file.md".to_string()),
+    ]
+    .into_iter()
+    .collect::<std::collections::BTreeSet<_>>();
+    let (wrapper, log) = counted_git(&repo);
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+    let mut cache = BTreeMap::new();
+    let results = resolver.inspect_pinned_targets(&requests, &mut cache);
+
+    assert!(results.values().all(Result::is_ok));
+    let processes = process_log(&log);
+    assert_eq!(
+        processes
+            .iter()
+            .filter(|line| line.starts_with("rev-parse "))
+            .count(),
+        1
+    );
+    assert_eq!(
+        processes
+            .iter()
+            .filter(|line| line.starts_with("ls-tree "))
+            .count(),
+        2
+    );
+    assert_eq!(
+        processes
+            .iter()
+            .filter(|line| *line == "cat-file --batch")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn test_inspect_pinned_targets_returns_same_git_unavailable_error_for_every_request() {
+    let repo = Repo::new();
+    repo.write("docs/file.md", b"content");
+    repo.commit("content");
+    let missing_git = repo.root.join("definitely-no-git-here");
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, &missing_git);
+    let requests = [
+        ("HEAD".to_string(), "docs/file.md".to_string()),
+        ("HEAD".to_string(), "docs/other.md".to_string()),
+    ]
+    .into_iter()
+    .collect::<std::collections::BTreeSet<_>>();
+    let mut cache = BTreeMap::new();
+    let actual = resolver.inspect_pinned_targets(&requests, &mut cache);
+
+    requests.iter().for_each(|request| {
+        let expected = resolver
+            .inspect_pinned_target(&request.0, &request.1)
+            .unwrap_err();
+        let actual = actual.get(request).unwrap().as_ref().unwrap_err();
+        assert!(matches!(actual, GitRevisionError::GitUnavailable { .. }));
+        assert_eq!(expected.to_string(), actual.to_string());
+    });
 }
 
 #[test]

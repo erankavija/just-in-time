@@ -494,7 +494,13 @@ impl RepositoryMutationSession for JsonMutationSession {
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
         let worktree_paths = self.storage.configured_worktree_paths()?;
-        let image = capture_capability_image(&self.layout, &self.roots, &worktree_paths, spec)?;
+        let image = capture_capability_image(
+            &self.layout,
+            &self.roots,
+            &worktree_paths,
+            &self.storage,
+            spec,
+        )?;
         self.captured = Some(image.clone());
         Ok(image)
     }
@@ -517,6 +523,7 @@ impl RepositoryMutationSession for JsonMutationSession {
             &self.layout,
             &self.roots,
             &worktree_paths,
+            &self.storage,
             image.capture_spec().clone(),
         )?;
         if &current != image {
@@ -861,6 +868,7 @@ fn capture_capability_image(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     worktree_paths: &crate::storage::WorktreePaths,
+    storage: &JsonFileStorage,
     spec: CaptureSpec,
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
     let entries = spec
@@ -886,12 +894,19 @@ fn capture_capability_image(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    let resolver = crate::storage::GitRevisionResolver::new(layout.worktree_root());
+    let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), spec.pinned());
     let pinned = spec
         .pinned()
         .iter()
         .map(|(revision, path)| {
-            let evidence = match resolver.inspect_pinned_target(revision, path) {
+            let read = pinned_reads
+                .get(&(revision.clone(), path.clone()))
+                .ok_or_else(|| {
+                    RepositoryStateStoreError::Other(anyhow::anyhow!(
+                        "batch inspection omitted pinned target {revision}:{path}"
+                    ))
+                })?;
+            let evidence = match read {
                 Ok(read) => {
                     let commit = read.version().as_str().to_string();
                     let object_oid = read.object_oid().map(str::to_string);

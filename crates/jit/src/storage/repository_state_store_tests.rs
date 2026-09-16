@@ -4825,3 +4825,207 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
     assert_eq!(event_id(&parsed[1]), ids.uuid_at(2));
     assert_eq!(event_id(&parsed[2]), ids.uuid_at(3));
 }
+
+#[cfg(unix)]
+fn capture_git_fixture() -> (TempDir, PathBuf, PathBuf, String) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    let run_git = |args: &[&str]| {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run_git(&["init"]);
+    run_git(&["config", "user.name", "Test User"]);
+    run_git(&["config", "user.email", "test@example.com"]);
+    std::fs::create_dir_all(worktree.path().join("docs")).unwrap();
+    std::fs::write(worktree.path().join("docs/a.md"), b"first a").unwrap();
+    std::fs::write(worktree.path().join("docs/b.md"), b"first b").unwrap();
+    run_git(&["add", "-A"]);
+    run_git(&["commit", "-m", "first"]);
+    let first = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+    let log = worktree.path().join("git-processes.log");
+    let wrapper = worktree.path().join("git-wrapper.sh");
+    let log_literal = log.to_string_lossy().replace('\'', "'\\''");
+    std::fs::write(
+        &wrapper,
+        format!("#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{log_literal}'\nexec git \"$@\"\n"),
+    )
+    .unwrap();
+    let mut permissions = std::fs::metadata(&wrapper).unwrap().permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&wrapper, permissions).unwrap();
+    (worktree, data, wrapper, first)
+}
+
+#[cfg(unix)]
+fn capture_process_log(log: &Path) -> Vec<String> {
+    std::fs::read_to_string(log)
+        .unwrap_or_default()
+        .lines()
+        .map(str::to_owned)
+        .collect()
+}
+
+#[cfg(unix)]
+fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> CaptureSpec {
+    let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+    paths
+        .into_iter()
+        .try_for_each(|path| spec.discover_pinned("HEAD", path))
+        .unwrap();
+    spec
+}
+
+#[cfg(unix)]
+#[test]
+fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
+    let (worktree, data, wrapper, _) = capture_git_fixture();
+    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
+
+    session.capture(spec.clone()).unwrap();
+    let first_capture_processes = capture_process_log(&worktree.path().join("git-processes.log"));
+    assert_eq!(first_capture_processes.len(), 3);
+    session.capture(spec).unwrap();
+    let all_processes = capture_process_log(&worktree.path().join("git-processes.log"));
+    assert_eq!(all_processes.len(), 4);
+    assert_eq!(
+        all_processes
+            .iter()
+            .filter(|line| line.starts_with("rev-parse "))
+            .count(),
+        2
+    );
+    assert_eq!(
+        all_processes
+            .iter()
+            .filter(|line| line.starts_with("ls-tree "))
+            .count(),
+        1
+    );
+    assert_eq!(
+        all_processes
+            .iter()
+            .filter(|line| *line == "cat-file --batch")
+            .count(),
+        1
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_json_capture_re_resolves_moved_head_and_rekeys_pinned_cache() {
+    let (worktree, data, wrapper, first) = capture_git_fixture();
+    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let spec = pinned_capture_spec(["docs/a.md"]);
+    let initial = session.capture(spec.clone()).unwrap();
+    assert_eq!(
+        initial.pinned_evidence()[&("HEAD".into(), "docs/a.md".into())].bytes(),
+        Some(b"first a".as_slice())
+    );
+
+    std::fs::write(worktree.path().join("docs/a.md"), b"second a").unwrap();
+    let output = Command::new("git")
+        .current_dir(worktree.path())
+        .args(["add", "docs/a.md"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let output = Command::new("git")
+        .current_dir(worktree.path())
+        .args(["commit", "-m", "second"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let second = {
+        let output = Command::new("git")
+            .current_dir(worktree.path())
+            .args(["rev-parse", "HEAD"])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8(output.stdout).unwrap().trim().to_string()
+    };
+
+    let moved = session.capture(spec).unwrap();
+    assert_eq!(
+        moved.pinned_evidence()[&("HEAD".into(), "docs/a.md".into())].bytes(),
+        Some(b"second a".as_slice())
+    );
+    assert_eq!(
+        storage.pinned_target_cache_keys(),
+        vec![(second, "docs/a.md".to_string())]
+    );
+    assert_ne!(first, storage.pinned_target_cache_keys()[0].0);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_json_capture_keeps_pinned_target_cache_across_captures_that_pin_nothing() {
+    let (worktree, data, wrapper, revision) = capture_git_fixture();
+    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+    let spec = pinned_capture_spec(["docs/a.md", "docs/b.md"]);
+    let log = worktree.path().join("git-processes.log");
+
+    session.capture(spec.clone()).unwrap();
+    let after_first = capture_process_log(&log).len();
+    session.capture(pinned_capture_spec([])).unwrap();
+    assert_eq!(capture_process_log(&log).len(), after_first);
+    assert_eq!(
+        storage.pinned_target_cache_keys(),
+        vec![
+            (revision.clone(), "docs/a.md".to_string()),
+            (revision, "docs/b.md".to_string()),
+        ]
+    );
+    session.capture(spec).unwrap();
+    let repeated = capture_process_log(&log)[after_first..].to_vec();
+    assert!(
+        repeated.len() == 1 && repeated[0].starts_with("rev-parse "),
+        "a capture after one that pins nothing must reuse cached evidence, spawned {repeated:?}"
+    );
+}
+
+#[test]
+fn test_json_capture_retains_only_pairs_used_by_the_most_recent_capture() {
+    let (worktree, data, wrapper, revision) = capture_git_fixture();
+    let storage = JsonFileStorage::with_git_program(&data, wrapper);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let mut session = storage.open_mutation_session(layout).unwrap();
+
+    session
+        .capture(pinned_capture_spec(["docs/a.md", "docs/b.md"]))
+        .unwrap();
+    assert_eq!(storage.pinned_target_cache_keys().len(), 2);
+    assert_eq!(storage.clone().pinned_target_cache_keys().len(), 2);
+    session.capture(pinned_capture_spec(["docs/b.md"])).unwrap();
+    assert_eq!(
+        storage.pinned_target_cache_keys(),
+        vec![(revision, "docs/b.md".to_string())]
+    );
+}

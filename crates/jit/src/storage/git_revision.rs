@@ -8,8 +8,11 @@
 use crate::domain::artifact_plan::ArtifactVersion;
 use crate::repository_state::RepositoryTargetKind;
 use crate::storage::validate_repo_relative_path;
+use std::collections::{BTreeMap, BTreeSet};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
+use std::thread;
 use thiserror::Error;
 
 /// Errors from canonical revision resolution and historical blob reads.
@@ -60,6 +63,13 @@ pub struct PinnedTargetRead {
     object_oid: Option<String>,
     bytes: Option<Vec<u8>>,
     unavailable_reason: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct TreeEntry {
+    mode: String,
+    object_type: String,
+    object_oid: String,
 }
 
 impl PinnedTargetRead {
@@ -257,6 +267,207 @@ impl GitRevisionResolver {
         })
     }
 
+    /// Resolve and inspect a set of pinned targets with shared Git processes.
+    ///
+    /// The supplied cache is owned by the caller and is replaced with only the
+    /// successfully classified commit-and-path pairs used by this call. An empty
+    /// request set spawns nothing and leaves the cache untouched, so captures
+    /// that pin no documents do not evict evidence a later capture reuses.
+    /// Revision names are always resolved again; the cache is intentionally
+    /// keyed by the resulting full commit OID so moving symbolic revisions cannot
+    /// serve stale evidence.
+    pub fn inspect_pinned_targets(
+        &self,
+        requests: &BTreeSet<(String, String)>,
+        cache: &mut BTreeMap<(String, String), PinnedTargetRead>,
+    ) -> BTreeMap<(String, String), Result<PinnedTargetRead, GitRevisionError>> {
+        if requests.is_empty() {
+            return BTreeMap::new();
+        }
+        let previous_cache = std::mem::take(cache);
+        let mut next_cache = BTreeMap::new();
+        let mut results: BTreeMap<(String, String), Result<PinnedTargetRead, GitRevisionError>> =
+            BTreeMap::new();
+        let valid_requests = requests
+            .iter()
+            .filter(|request| match validate_repo_relative_path(&request.1) {
+                Ok(()) => true,
+                Err(error) => {
+                    results.insert((*request).clone(), Err(error.into()));
+                    false
+                }
+            })
+            .collect::<Vec<_>>();
+        let revisions = valid_requests
+            .iter()
+            .map(|(revision, _)| revision.clone())
+            .collect::<BTreeSet<_>>();
+        let resolutions = self.resolve_commits(&revisions);
+
+        // Resolve every request first so an invalid revision can never prevent
+        // valid revisions in the same batch from being inspected.
+        let mut uncached =
+            BTreeMap::<String, BTreeMap<String, Vec<(String, String, ArtifactVersion)>>>::new();
+        valid_requests.into_iter().for_each(|request| {
+            let (revision, path) = request;
+            match resolutions.get(revision) {
+                Some(Ok(version)) => {
+                    let cache_key = (version.as_str().to_string(), path.clone());
+                    if let Some(read) = previous_cache.get(&cache_key) {
+                        results.insert(request.clone(), Ok(read.clone()));
+                        next_cache.insert(cache_key, read.clone());
+                    } else {
+                        uncached
+                            .entry(version.as_str().to_string())
+                            .or_default()
+                            .entry(path.clone())
+                            .or_default()
+                            .push((revision.clone(), path.clone(), version.clone()));
+                    }
+                }
+                Some(Err(error)) => {
+                    results.insert(request.clone(), Err(clone_git_revision_error(error)));
+                }
+                None => {
+                    results.insert(
+                        request.clone(),
+                        Err(GitRevisionError::RevisionNotFound {
+                            revision: revision.clone(),
+                            stderr: "revision was not resolved".into(),
+                        }),
+                    );
+                }
+            }
+        });
+
+        let mut pending_files =
+            BTreeMap::<String, Vec<(String, String, String, PinnedTargetRead)>>::new();
+        uncached.into_iter().for_each(|(commit, paths)| {
+            let output = self.run(["ls-tree", "-r", "-t", "-z", "--full-tree", commit.as_str()]);
+            let entries = match output {
+                Ok(output) if output.status.success() => parse_pinned_tree_entries(&output.stdout),
+                Ok(output) => Err(stderr(&output)),
+                Err(error) => {
+                    paths.values().flatten().for_each(|(revision, path, _)| {
+                        results.insert(
+                            (revision.clone(), path.clone()),
+                            Err(clone_git_revision_error(&error)),
+                        );
+                    });
+                    return;
+                }
+            };
+            let entries = match entries {
+                Ok(entries) => entries.into_iter().collect::<BTreeMap<_, _>>(),
+                Err(reason) => {
+                    paths.values().flatten().for_each(|(revision, path, _)| {
+                        results.insert(
+                            (revision.clone(), path.clone()),
+                            Err(GitRevisionError::PinnedReadFailed {
+                                revision: revision.clone(),
+                                path: path.clone(),
+                                stderr: reason.clone(),
+                            }),
+                        );
+                    });
+                    return;
+                }
+            };
+            paths.into_iter().for_each(|(path, requests)| {
+                let Some(first_request) = requests.first() else {
+                    return;
+                };
+                let target = entries.get(path.as_bytes()).map(|entry| {
+                    let target_kind = match (entry.mode.as_str(), entry.object_type.as_str()) {
+                        ("100644" | "100755", "blob") => RepositoryTargetKind::File,
+                        ("040000", "tree") => RepositoryTargetKind::Directory,
+                        _ => RepositoryTargetKind::Unsupported,
+                    };
+                    PinnedTargetRead {
+                        version: first_request.2.clone(),
+                        target_kind,
+                        object_oid: Some(entry.object_oid.clone()),
+                        bytes: None,
+                        unavailable_reason: None,
+                    }
+                });
+                let target = target.unwrap_or_else(|| PinnedTargetRead {
+                    version: first_request.2.clone(),
+                    target_kind: RepositoryTargetKind::Missing,
+                    object_oid: None,
+                    bytes: None,
+                    unavailable_reason: Some("not found in commit tree".into()),
+                });
+                if target.target_kind.is_file() {
+                    if let Some(object_oid) = target.object_oid.clone() {
+                        pending_files.entry(object_oid).or_default().extend(
+                            requests.into_iter().map(|(revision, path, _)| {
+                                (revision, path, commit.clone(), target.clone())
+                            }),
+                        );
+                    }
+                } else {
+                    requests.into_iter().for_each(|(revision, path, _)| {
+                        results.insert((revision, path.clone()), Ok(target.clone()));
+                        next_cache.insert((commit.clone(), path), target.clone());
+                    });
+                }
+            });
+        });
+
+        if !pending_files.is_empty() {
+            let oids = pending_files.keys().cloned().collect::<BTreeSet<_>>();
+            match self.read_blob_batch(&oids) {
+                Ok(blob_results) => pending_files.into_iter().for_each(|(oid, requests)| {
+                    requests
+                        .into_iter()
+                        .for_each(|(revision, path, commit, mut target)| {
+                            match blob_results.get(&oid) {
+                                Some(Ok(bytes)) => {
+                                    target.bytes = Some(bytes.clone());
+                                    results.insert((revision, path.clone()), Ok(target.clone()));
+                                    next_cache.insert((commit, path), target);
+                                }
+                                Some(Err(reason)) => {
+                                    results.insert(
+                                        (revision.clone(), path.clone()),
+                                        Err(GitRevisionError::PinnedReadFailed {
+                                            revision,
+                                            path,
+                                            stderr: reason.clone(),
+                                        }),
+                                    );
+                                }
+                                None => {
+                                    results.insert(
+                                        (revision.clone(), path.clone()),
+                                        Err(GitRevisionError::PinnedReadFailed {
+                                            revision,
+                                            path,
+                                            stderr:
+                                                "git cat-file --batch omitted the requested object"
+                                                    .into(),
+                                        }),
+                                    );
+                                }
+                            }
+                        });
+                }),
+                Err(error) => pending_files.into_iter().for_each(|(_, requests)| {
+                    requests.into_iter().for_each(|(revision, path, _, _)| {
+                        results.insert(
+                            (revision.clone(), path.clone()),
+                            Err(clone_git_revision_error(&error)),
+                        );
+                    });
+                }),
+            }
+        }
+
+        *cache = next_cache;
+        results
+    }
+
     /// Return paths changed between two revisions, using NUL-delimited Git
     /// output so unusual but valid repository paths cannot be confused with
     /// record separators.
@@ -307,6 +518,161 @@ impl GitRevisionResolver {
                 source,
             })
     }
+
+    fn resolve_commits(
+        &self,
+        revisions: &BTreeSet<String>,
+    ) -> BTreeMap<String, Result<ArtifactVersion, GitRevisionError>> {
+        if revisions.is_empty() {
+            return BTreeMap::new();
+        }
+        let peeled = revisions
+            .iter()
+            .map(|revision| format!("{revision}^{{commit}}"))
+            .collect::<Vec<_>>();
+        let mut arguments = vec!["rev-parse", "--end-of-options"];
+        arguments.extend(peeled.iter().map(String::as_str));
+        let output = match self.run(arguments) {
+            Ok(output) if output.status.success() => output,
+            Ok(_) => return self.resolve_commits_individually(revisions),
+            Err(error) => {
+                return revisions
+                    .iter()
+                    .map(|revision| (revision.clone(), Err(clone_git_revision_error(&error))))
+                    .collect()
+            }
+        };
+        let lines = output
+            .stdout
+            .split(|byte| *byte == b'\n')
+            // Git 2.55 echoes the end-of-options marker once when rev-parse
+            // is used without --verify. It is not a resolved revision.
+            .filter(|line| !line.is_empty() && *line != b"--end-of-options")
+            .collect::<Vec<_>>();
+        if lines.len() != revisions.len() {
+            return self.resolve_commits_individually(revisions);
+        }
+        revisions
+            .iter()
+            .zip(lines)
+            .map(|(revision, line)| {
+                (
+                    revision.clone(),
+                    canonical_version(revision, &String::from_utf8_lossy(line)),
+                )
+            })
+            .collect()
+    }
+
+    fn resolve_commits_individually(
+        &self,
+        revisions: &BTreeSet<String>,
+    ) -> BTreeMap<String, Result<ArtifactVersion, GitRevisionError>> {
+        revisions
+            .iter()
+            .map(|revision| (revision.clone(), self.resolve_commit(revision)))
+            .collect()
+    }
+
+    fn read_blob_batch(
+        &self,
+        oids: &BTreeSet<String>,
+    ) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, GitRevisionError> {
+        let mut child = Command::new(&self.git_program)
+            .current_dir(&self.repo_root)
+            .args(["cat-file", "--batch"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|source| GitRevisionError::GitUnavailable {
+                program: self.git_program.clone(),
+                source,
+            })?;
+        let Some(mut stdin) = child.stdin.take() else {
+            return Ok(oids
+                .iter()
+                .map(|oid| {
+                    (
+                        oid.clone(),
+                        Err("git cat-file --batch did not expose stdin".into()),
+                    )
+                })
+                .collect());
+        };
+        let write_oids = oids.iter().cloned().collect::<Vec<_>>();
+        let writer = thread::spawn(move || {
+            let result = write_oids
+                .iter()
+                .try_for_each(|oid| writeln!(stdin, "{oid}"));
+            drop(stdin);
+            result
+        });
+        let Some(mut stdout) = child.stdout.take() else {
+            let _ = child.wait();
+            let _ = writer.join();
+            return Ok(oids
+                .iter()
+                .map(|oid| {
+                    (
+                        oid.clone(),
+                        Err("git cat-file --batch did not expose stdout".into()),
+                    )
+                })
+                .collect());
+        };
+        let stderr_reader = child.stderr.take().map(|mut stderr_pipe| {
+            thread::spawn(move || {
+                let mut bytes = Vec::new();
+                let result = stderr_pipe.read_to_end(&mut bytes);
+                result.map(|_| bytes)
+            })
+        });
+        let mut bytes = Vec::new();
+        let read_result = stdout.read_to_end(&mut bytes).map(|_| ());
+        let wait_result = child.wait();
+        let writer_result = writer
+            .join()
+            .map_err(|_| io::Error::other("git cat-file input writer panicked"))
+            .and_then(|result| result);
+        let stderr_bytes = stderr_reader
+            .map(|reader| {
+                reader
+                    .join()
+                    .map_err(|_| io::Error::other("git cat-file stderr reader panicked"))
+                    .and_then(|result| result)
+            })
+            .transpose()
+            .map_err(|error| GitRevisionError::PinnedReadFailed {
+                revision: "batch".into(),
+                path: "<blobs>".into(),
+                stderr: error.to_string(),
+            })?
+            .unwrap_or_default();
+        if let Err(error) = read_result.or(writer_result) {
+            return Ok(oids
+                .iter()
+                .map(|oid| (oid.clone(), Err(error.to_string())))
+                .collect());
+        }
+        let status = wait_result.map_err(|error| GitRevisionError::PinnedReadFailed {
+            revision: "batch".into(),
+            path: "<blobs>".into(),
+            stderr: error.to_string(),
+        })?;
+        if !status.success() {
+            let reason = String::from_utf8_lossy(&stderr_bytes).trim().to_string();
+            return Ok(oids
+                .iter()
+                .map(|oid| (oid.clone(), Err(reason.clone())))
+                .collect());
+        }
+        parse_cat_file_batch(&bytes, oids).map_err(|reason| GitRevisionError::PinnedReadFailed {
+            revision: "batch".into(),
+            path: "<blobs>".into(),
+            stderr: reason,
+        })
+    }
 }
 
 /// Parse the one exact NUL-delimited `git ls-tree` entry requested for a
@@ -316,34 +682,165 @@ fn parse_pinned_tree_entry(
     output: &[u8],
     expected_path: &str,
 ) -> Result<Option<(String, String, String)>, String> {
-    let entries = output
+    let entries = parse_pinned_tree_entries(output)?;
+    match entries.as_slice() {
+        [] => Ok(None),
+        [(path, entry)] => {
+            if path != expected_path.as_bytes() {
+                return Err("git ls-tree returned a different path than requested".into());
+            }
+            Ok(Some((
+                entry.mode.clone(),
+                entry.object_type.clone(),
+                entry.object_oid.clone(),
+            )))
+        }
+        _ => Err("git ls-tree returned multiple entries for one path".into()),
+    }
+}
+
+fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>, String> {
+    output
         .split(|byte| *byte == 0)
         .filter(|entry| !entry.is_empty())
-        .collect::<Vec<_>>();
-    let [] = entries.as_slice() else {
-        let [entry] = entries.as_slice() else {
-            return Err("git ls-tree returned multiple entries for one path".into());
+        .map(|entry| {
+            let Some(tab_index) = entry.iter().position(|byte| *byte == b'\t') else {
+                return Err("git ls-tree entry lacks a path separator".into());
+            };
+            let (header, path_with_separator) = entry.split_at(tab_index);
+            let path = path_with_separator[1..].to_vec();
+            let fields = header.split(|byte| *byte == b' ').collect::<Vec<_>>();
+            let [mode, object_type, oid] = fields.as_slice() else {
+                return Err("git ls-tree entry has an invalid header".into());
+            };
+            let decode = |field: &[u8]| {
+                std::str::from_utf8(field)
+                    .map(str::to_owned)
+                    .map_err(|_| "git ls-tree entry is not UTF-8".to_string())
+            };
+            Ok((
+                path,
+                TreeEntry {
+                    mode: decode(mode)?,
+                    object_type: decode(object_type)?,
+                    object_oid: decode(oid)?,
+                },
+            ))
+        })
+        .collect()
+}
+
+fn parse_cat_file_batch(
+    output: &[u8],
+    requested_oids: &BTreeSet<String>,
+) -> Result<BTreeMap<String, Result<Vec<u8>, String>>, String> {
+    let mut responses = BTreeMap::new();
+    let mut offset = 0;
+    while offset < output.len() {
+        let Some(header_length) = output[offset..].iter().position(|byte| *byte == b'\n') else {
+            return Err("git cat-file --batch response lacks a header terminator".into());
         };
-        let Some(tab_index) = entry.iter().position(|byte| *byte == b'\t') else {
-            return Err("git ls-tree entry lacks a path separator".into());
+        let header_end = offset + header_length;
+        let fields = output[offset..header_end]
+            .split(|byte| *byte == b' ')
+            .collect::<Vec<_>>();
+        let [oid, object_type, size] = fields.as_slice() else {
+            return Err("git cat-file --batch response has an invalid header".into());
         };
-        let (header, path_with_separator) = entry.split_at(tab_index);
-        let path = &path_with_separator[1..];
-        if path != expected_path.as_bytes() {
-            return Err("git ls-tree returned a different path than requested".into());
+        let oid = std::str::from_utf8(oid)
+            .map(str::to_owned)
+            .map_err(|_| "git cat-file --batch response has a non-UTF-8 OID".to_string())?;
+        offset = header_end + 1;
+        if *object_type == b"missing" {
+            responses.insert(
+                oid,
+                Err("git cat-file --batch reported a missing object".into()),
+            );
+            continue;
         }
-        let fields = header.split(|byte| *byte == b' ').collect::<Vec<_>>();
-        let [mode, object_type, oid] = fields.as_slice() else {
-            return Err("git ls-tree entry has an invalid header".into());
+        if *object_type != b"blob" {
+            return Err("git cat-file --batch returned a non-blob object".into());
+        }
+        let size = std::str::from_utf8(size)
+            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?
+            .parse::<usize>()
+            .map_err(|_| "git cat-file --batch response has an invalid size".to_string())?;
+        let Some(content_end) = offset.checked_add(size) else {
+            return Err("git cat-file --batch response size overflows".into());
         };
-        let decode = |field: &[u8]| {
-            std::str::from_utf8(field)
-                .map(str::to_owned)
-                .map_err(|_| "git ls-tree entry is not UTF-8".to_string())
-        };
-        return Ok(Some((decode(mode)?, decode(object_type)?, decode(oid)?)));
-    };
-    Ok(None)
+        if content_end >= output.len() || output[content_end] != b'\n' {
+            return Err("git cat-file --batch response lacks its content terminator".into());
+        }
+        responses.insert(oid, Ok(output[offset..content_end].to_vec()));
+        offset = content_end + 1;
+    }
+    if requested_oids
+        .iter()
+        .any(|oid| !responses.contains_key(oid))
+    {
+        return Err("git cat-file --batch returned fewer responses than requested".into());
+    }
+    Ok(responses)
+}
+
+fn clone_git_revision_error(error: &GitRevisionError) -> GitRevisionError {
+    match error {
+        GitRevisionError::GitUnavailable { program, source } => GitRevisionError::GitUnavailable {
+            program: program.clone(),
+            source: clone_io_error(source),
+        },
+        GitRevisionError::RevisionNotFound { revision, stderr } => {
+            GitRevisionError::RevisionNotFound {
+                revision: revision.clone(),
+                stderr: stderr.clone(),
+            }
+        }
+        GitRevisionError::NonCanonicalOid { revision, output } => {
+            GitRevisionError::NonCanonicalOid {
+                revision: revision.clone(),
+                output: output.clone(),
+            }
+        }
+        GitRevisionError::PinnedReadFailed {
+            revision,
+            path,
+            stderr,
+        } => GitRevisionError::PinnedReadFailed {
+            revision: revision.clone(),
+            path: path.clone(),
+            stderr: stderr.clone(),
+        },
+        GitRevisionError::ChangedPathsFailed { operation, stderr } => {
+            GitRevisionError::ChangedPathsFailed {
+                operation: operation.clone(),
+                stderr: stderr.clone(),
+            }
+        }
+        GitRevisionError::InvalidPath(error) => GitRevisionError::InvalidPath(match error {
+            crate::storage::PathReadError::NotFound(value) => {
+                crate::storage::PathReadError::NotFound(value.clone())
+            }
+            crate::storage::PathReadError::CommitNotFound(value) => {
+                crate::storage::PathReadError::CommitNotFound(value.clone())
+            }
+            crate::storage::PathReadError::InvalidPath(value) => {
+                crate::storage::PathReadError::InvalidPath(value.clone())
+            }
+            crate::storage::PathReadError::OutsideRepoRoot(value) => {
+                crate::storage::PathReadError::OutsideRepoRoot(value.clone())
+            }
+            crate::storage::PathReadError::Other(error) => {
+                crate::storage::PathReadError::Other(anyhow::anyhow!(error.to_string()))
+            }
+        }),
+    }
+}
+
+fn clone_io_error(error: &io::Error) -> io::Error {
+    error
+        .raw_os_error()
+        .map(io::Error::from_raw_os_error)
+        .unwrap_or_else(|| io::Error::new(error.kind(), error.to_string()))
 }
 
 fn parse_changed_paths(output: Output, operation: String) -> Result<Vec<String>, GitRevisionError> {

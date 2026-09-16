@@ -21,7 +21,7 @@ use crate::storage::{
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::cell::RefCell;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
@@ -388,6 +388,9 @@ pub struct JsonFileStorage {
     /// Guards the one-time sweep of orphaned per-issue read-lock sidecars, shared
     /// by every clone so the cleanup runs at most once per storage lifetime.
     sidecars_swept: Arc<AtomicBool>,
+    /// Shared commit-keyed pinned evidence retained for the most recent capture.
+    pinned_target_cache: Arc<Mutex<BTreeMap<(String, String), crate::storage::PinnedTargetRead>>>,
+    git_program: PathBuf,
 }
 
 /// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
@@ -437,6 +440,8 @@ impl JsonFileStorage {
             repository_layout: Arc::new(Mutex::new(None)),
             worktree_paths: Arc::new(Mutex::new(None)),
             sidecars_swept: Arc::new(AtomicBool::new(false)),
+            pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
+            git_program: PathBuf::from("git"),
             root,
             locker: FileLocker::new(timeout),
         }
@@ -471,6 +476,42 @@ impl JsonFileStorage {
         let mut storage = Self::new(root);
         storage.repository_state_failures = failures;
         storage
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_git_program<P: AsRef<Path>, G: Into<PathBuf>>(
+        root: P,
+        git_program: G,
+    ) -> Self {
+        let mut storage = Self::new(root);
+        storage.git_program = git_program.into();
+        storage
+    }
+
+    pub(crate) fn inspect_pinned_targets(
+        &self,
+        repo_root: &Path,
+        requests: &BTreeSet<(String, String)>,
+    ) -> BTreeMap<
+        (String, String),
+        Result<crate::storage::PinnedTargetRead, crate::storage::GitRevisionError>,
+    > {
+        let mut cache = self
+            .pinned_target_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
+            .inspect_pinned_targets(requests, &mut cache)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pinned_target_cache_keys(&self) -> Vec<(String, String)> {
+        self.pinned_target_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .keys()
+            .cloned()
+            .collect()
     }
 
     pub(crate) fn repository_state_failures(
