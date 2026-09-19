@@ -2241,6 +2241,32 @@ fn test_json_session_opens_beneath_non_utf8_ancestor() {
     ));
 }
 
+/// A file captured both as an exact path and as a listed child carries one
+/// identity in the image.
+#[test]
+fn test_capture_listing_child_shares_the_identity_of_its_captured_path() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir_all(data.join("issues")).unwrap();
+    std::fs::write(data.join("issues").join("a.json"), b"{}").unwrap();
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let path = VirtualPath::data("issues/a.json").unwrap();
+    let mut spec = CaptureSpec::phase_one([path.clone()], budget()).unwrap();
+    spec.discover_listing(VirtualPath::data("issues").unwrap())
+        .unwrap();
+
+    let json = JsonFileStorage::new(&data);
+    let image = json
+        .open_mutation_session(layout)
+        .unwrap()
+        .capture(spec)
+        .unwrap();
+
+    let listed =
+        &image.listing_fingerprints()[&VirtualPath::data("issues").unwrap()].children()["a.json"];
+    assert_eq!(Some(listed), image.entry(&path).unwrap().identity());
+}
+
 fn capture_listing_errors(
     children: &[(&str, &[u8])],
     budget: CaptureBudget,

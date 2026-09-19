@@ -208,6 +208,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             DocumentCapture::All,
             false,
         )
+        .map(|captured| captured.map(|(image, _)| image))
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
@@ -221,7 +222,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
             &std::collections::BTreeMap::new(),
@@ -231,6 +232,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             DocumentCapture::PlanOnly,
             false,
         )
+        .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
     }
 
     /// What a mutation decides before taking the claims guard: the
@@ -308,6 +310,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             DocumentCapture::None,
             true,
         )
+        .map(|captured| captured.map(|(image, _)| image))
     }
 
     /// The whole-repository validation base plus a complete listing of each
@@ -332,6 +335,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             DocumentCapture::All,
             false,
         )
+        .map(|captured| captured.map(|(image, _)| image))
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -347,7 +351,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         precheck_target: Option<&str>,
         documents: DocumentCapture,
         archive_scan: bool,
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
             validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
         };
@@ -364,16 +368,17 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             },
             ..MUTATION_CAPTURE_BUDGET
         };
-        let registries = || -> Result<Vec<VirtualPath>> {
-            Ok(vec![
+        // Phase one reads what plans the closure; the event log joins the image
+        // from phase two on, since nothing in closure planning reads it.
+        let planning_registries = || {
+            vec![
                 VirtualPath::CONFIG,
                 VirtualPath::INVARIANTS,
                 VirtualPath::RULES,
                 VirtualPath::GATES,
                 VirtualPath::TEMPLATES,
                 VirtualPath::INDEX,
-                VirtualPath::EVENTS,
-            ])
+            ]
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
         // proposed absence) when present, otherwise the captured base bytes.
@@ -386,8 +391,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 None => super::image_repo_bytes(image, repo_rel),
             }
         };
-        let Some(image_one) =
-            capture_or_retry(session.capture(CaptureSpec::phase_one(registries()?, budget)?))?
+        let Some(image_one) = capture_or_retry(
+            session.capture(CaptureSpec::phase_one(planning_registries(), budget)?),
+        )?
         else {
             return Ok(None);
         };
@@ -408,7 +414,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let closure =
             validate_capture_closure(image_one.layout(), &config, &all_ids, schema_rules)?;
 
-        let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
+        let mut spec = CaptureSpec::phase_one(planning_registries(), budget)?;
+        spec.discover_paths([VirtualPath::EVENTS])?;
         spec.discover_paths(closure.paths)?;
         for listing in &closure.listings {
             spec.discover_listing(listing.clone())?;
@@ -434,7 +441,17 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             )?;
         }
 
-        let issues = effective_issues(&image_two, &all_ids, &effective)?;
+        // A mutation derives from exactly these issues, so they are parsed once,
+        // with the strict reader, and handed back with the image; a repository
+        // without an index yet has none. Validation parses the overlaid set
+        // leniently and reports defects as findings.
+        let issues = if documents == DocumentCapture::PlanOnly
+            && image_two.file_bytes(&VirtualPath::INDEX)?.is_some()
+        {
+            super::captured_active_issues(&image_two)?
+        } else {
+            effective_issues(&image_two, &all_ids, &effective)?
+        };
         let mut full_config = config.clone();
         full_config.templates = effective_templates(&image_two, &config, &effective)?;
         let precheck = match precheck_target {
@@ -529,10 +546,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(base) if base.has_stable_overlap(&image_two) => base,
             Some(_) | None => return Ok(None),
         };
-        if !capture_precheck_history {
-            return Ok(Some(image_three));
-        }
-        super::capture_gate_run_results(session, image_three)
+        let image = if capture_precheck_history {
+            super::capture_gate_run_results(session, image_three)?
+        } else {
+            Some(image_three)
+        };
+        Ok(image.map(|image| (image, issues)))
     }
 
     /// Capture the validation image and return the full whole-repository report.
@@ -1245,6 +1264,15 @@ const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
         max_depth: 32,
     };
 
+/// The base an issue mutation derives from, from
+/// [`CommandExecutor::capture_mutation_base`].
+pub(crate) struct MutationBase {
+    /// Registries, issues, and the plan documents transition rules read.
+    pub(crate) image: crate::repository_state::RepositoryImage,
+    /// Every indexed issue in `image`, sorted by id.
+    pub(crate) issues: Vec<Issue>,
+}
+
 /// The lease inputs and target issue a mutation reads before taking the claims
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
@@ -1352,15 +1380,30 @@ pub(crate) fn plan_content_from_image(
     let effective: &Effective<'_> = &effective;
 
     // Declaration parsing is best-effort, mirroring `capture_proposed_base`: a
-    // missing or malformed config/index/issue set yields an empty projection (no
+    // missing or malformed config (parsed in `plan_content_with_issues`),
+    // index, or issue set yields an empty projection (no
     // breakable containers, so no external plan docs), and `validate_repository`
     // is the authority that reports the parse error. Only a genuinely missing
     // required plan document (below) is a hard error.
+    let all_ids = effective_index_ids(image, effective).unwrap_or_default();
+    let all_issues = effective_issues(image, &all_ids, effective).unwrap_or_default();
+    plan_content_with_issues(image, &all_issues, emit_for)
+}
+
+/// [`plan_content_from_image`] for a caller already holding the image's
+/// complete issue set as `all_issues`.
+pub(crate) fn plan_content_with_issues(
+    image: &crate::repository_state::RepositoryImage,
+    all_issues: &[Issue],
+    emit_for: &[Issue],
+) -> Result<std::collections::HashMap<String, String>> {
+    let effective = |img: &crate::repository_state::RepositoryImage,
+                     repo_rel: &str|
+     -> Result<Option<Vec<u8>>> { super::image_repo_bytes(img, repo_rel) };
+    let effective: &Effective<'_> = &effective;
     let mut config =
         effective_config(image, effective).unwrap_or_else(|_| empty_materialization_config());
     config.templates = effective_templates(image, &config, effective)?;
-    let all_ids = effective_index_ids(image, effective).unwrap_or_default();
-    let all_issues = effective_issues(image, &all_ids, effective).unwrap_or_default();
 
     let templates = &config.templates;
     let breakable: std::collections::HashSet<String> =
@@ -4512,7 +4555,8 @@ description = \"Full Rust CI pipeline must pass.\"
         let mutation = executor
             .capture_mutation_base(session.as_mut(), &[], None)
             .unwrap()
-            .expect("a settled capture");
+            .expect("a settled capture")
+            .image;
 
         assert!(validation.capture_spec().contains_path(&document));
         assert!(!validation.capture_spec().pinned().is_empty());

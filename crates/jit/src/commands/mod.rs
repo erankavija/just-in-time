@@ -893,6 +893,7 @@ struct DerivedFieldUpdate {
 }
 
 struct CapturedFieldUpdateOutcome {
+    target_id: String,
     changed: bool,
     warnings: Vec<String>,
 }
@@ -2252,14 +2253,15 @@ impl<S: IssueStore> CommandExecutor<S> {
         let context = production_mutation_context();
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = context.identifier_at(0);
-            let Some(image) = self.capture_mutation_base(
-                session,
-                &[
-                    VirtualPath::ISSUES,
-                    VirtualPath::data(format!("issues/{issue_id}.json"))?,
-                ],
-                None,
-            )?
+            let Some(crate::commands::validate::MutationBase { image, .. }) = self
+                .capture_mutation_base(
+                    session,
+                    &[
+                        VirtualPath::ISSUES,
+                        VirtualPath::data(format!("issues/{issue_id}.json"))?,
+                    ],
+                    None,
+                )?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -2481,10 +2483,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
+            let Some(crate::commands::validate::MutationBase { image, issues }) =
+                self.capture_mutation_base(session.as_mut(), &[], None)?
+            else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let issues = captured_active_issues(&image)?;
             let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
             let issue = issues
                 .iter()
@@ -2503,9 +2506,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 Vec::new()
             };
-            let plan_content = validate::plan_content_from_image(&image, &issues)?;
+            let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = target;
+            effective_request.issue_id = target.clone();
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2524,6 +2527,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return match derived.error_after_apply {
                     Some(error) => Err(error.with_warnings(derived.warnings).into()),
                     None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
+                        target_id: target,
                         changed: derived.changed,
                         warnings: derived.warnings,
                     })),
@@ -2536,6 +2540,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             match derived.error_after_apply {
                 Some(error) => Err(error.with_warnings(derived.warnings).into()),
                 None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
+                    target_id: target,
                     changed: derived.changed,
                     warnings: derived.warnings,
                 })),
@@ -2655,15 +2660,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // Precheck gates run outside the repository lock, so only a
                 // transition that runs them reads its full base before the guard.
                 let precheck = if should_precheck {
-                    let Some(image) = self.capture_mutation_base(
-                        preflight.as_mut(),
-                        &[],
-                        Some(request.issue_id()),
-                    )?
+                    let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                        .capture_mutation_base(preflight.as_mut(), &[], Some(request.issue_id()))?
                     else {
                         return Ok(AttemptOutcome::Retry);
                     };
-                    let issue = captured_active_issues(&image)?
+                    let issue = issues
                         .into_iter()
                         .find(|issue| issue.id == light.target.id)
                         .ok_or_else(|| crate::storage::IssueNotFoundError::new(&light.target.id))?;
@@ -2758,15 +2760,15 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_mutation_base(
-                session.as_mut(),
-                &precheck_run_paths,
-                Some(request.issue_id()),
-            )?
+            let Some(crate::commands::validate::MutationBase { image, issues }) = self
+                .capture_mutation_base(
+                    session.as_mut(),
+                    &precheck_run_paths,
+                    Some(request.issue_id()),
+                )?
             else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let issues = captured_active_issues(&image)?;
             if resolve_issue_from_capture(&issues, request.issue_id())? != expected_target {
                 return Ok(AttemptOutcome::Retry);
             }
@@ -2996,7 +2998,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 target
             };
-            let plan_content = validate::plan_content_from_image(&image, &issues)?;
+            let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let (mut warnings, mut events, mut update, blocked) = if issue.state == effective_target
             {
                 (Vec::new(), Vec::new(), None, None)
@@ -3523,12 +3525,11 @@ mod tests {
             .storage
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
-        let image = executor
+        let crate::commands::validate::MutationBase { image, issues } = executor
             .capture_mutation_base(session.as_mut(), &[], Some(issue_id))
             .unwrap()
             .unwrap();
-        let issue = captured_active_issues(&image)
-            .unwrap()
+        let issue = issues
             .into_iter()
             .find(|issue| issue.id == issue_id)
             .unwrap();

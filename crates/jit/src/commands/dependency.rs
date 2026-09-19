@@ -265,10 +265,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
+            let Some(crate::commands::validate::MutationBase { image, issues }) =
+                self.capture_mutation_base(session.as_mut(), &[], None)?
+            else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let issues = super::captured_active_issues(&image)?;
             let expected_source = match &request {
                 CapturedDependencyMutation::Single { issue_id, .. }
                 | CapturedDependencyMutation::Batch { issue_id, .. } => {
@@ -353,10 +354,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
+            let Some(crate::commands::validate::MutationBase { image, issues }) =
+                self.capture_mutation_base(session.as_mut(), &[], None)?
+            else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let issues = super::captured_active_issues(&image)?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let resolved_request = match &request {
@@ -376,7 +378,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
             };
-            let plan_content = super::validate::plan_content_from_image(&image, &issues)?;
+            let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
                 captured_lease_warnings(
                     self.config_manager.enforcement_mode_from_config(&config)?,

@@ -3538,8 +3538,19 @@ fn run() -> Result<()> {
 
                     // Single issue mode
                     if let Some(id_str) = id {
-                        // Resolve short hash to full UUID first
-                        let full_id = storage.resolve_issue_id(&id_str)?;
+                        // Gate and assignee changes publish before the field update,
+                        // so only they need the full id up front; the field update
+                        // resolves `id_str` against the image it captures.
+                        let early_id = if !add_gate.is_empty()
+                            || !remove_gate.is_empty()
+                            || unassign
+                            || assignee.is_some()
+                        {
+                            Some(storage.resolve_issue_id(&id_str)?)
+                        } else {
+                            None
+                        };
+                        let requested_id = early_id.as_deref().unwrap_or(&id_str);
 
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;
@@ -3573,7 +3584,8 @@ fn run() -> Result<()> {
 
                         // Handle gate modifications first (before other updates)
                         if !add_gate.is_empty() {
-                            let (_result, warnings) = executor.add_gates(&full_id, &add_gate)?;
+                            let (_result, warnings) =
+                                executor.add_gates(requested_id, &add_gate)?;
                             for warning in warnings {
                                 output_ctx.print_warning(&warning)?;
                             }
@@ -3581,7 +3593,7 @@ fn run() -> Result<()> {
 
                         if !remove_gate.is_empty() {
                             let (_result, warnings) =
-                                executor.remove_gates(&full_id, &remove_gate)?;
+                                executor.remove_gates(requested_id, &remove_gate)?;
                             for warning in warnings {
                                 output_ctx.print_warning(&warning)?;
                             }
@@ -3589,19 +3601,19 @@ fn run() -> Result<()> {
 
                         // Handle assignee changes
                         if unassign {
-                            let warnings = executor.unassign_issue(&full_id)?;
+                            let warnings = executor.unassign_issue(requested_id)?;
                             for warning in warnings {
                                 output_ctx.print_warning(&warning)?;
                             }
                         } else if let Some(assignee_str) = assignee {
-                            let warnings = executor.assign_issue(&full_id, assignee_str)?;
+                            let warnings = executor.assign_issue(requested_id, assignee_str)?;
                             for warning in warnings {
                                 output_ctx.print_warning(&warning)?;
                             }
                         }
 
-                        match executor.update_issue(
-                            &full_id,
+                        match executor.update_issue_resolved(
+                            requested_id,
                             title,
                             description_update,
                             prio,
@@ -3612,7 +3624,7 @@ fn run() -> Result<()> {
                             issue_type,
                             force,
                         ) {
-                            Ok(warnings) => {
+                            Ok((full_id, warnings)) => {
                                 // Print warnings to stderr
                                 for warning in &warnings {
                                     eprintln!("⚠️  Warning: {}", warning);
@@ -3645,7 +3657,7 @@ fn run() -> Result<()> {
                                     .downcast_ref::<jit::storage::IssueNotFoundError>()
                                     .is_some()
                                 {
-                                    jit::output::JsonError::issue_not_found(&full_id)
+                                    jit::output::JsonError::issue_not_found(requested_id)
                                 } else {
                                     command_json_error(&e, jit::output::ErrorCode::GenericError)
                                 };

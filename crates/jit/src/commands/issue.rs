@@ -462,27 +462,59 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let warnings = self
-            .publish_captured_field_update(CapturedFieldUpdate {
-                issue_id: id.to_string(),
-                title,
-                description,
-                priority,
-                state,
-                add_labels,
-                remove_labels,
-                label_edit: None,
-                content_format,
-                issue_type,
-                add_gates: Vec::new(),
-                remove_gates: Vec::new(),
-                assignee: None,
-                unassign: false,
-                bulk: false,
-                force,
-                enforce_lease: true,
-            })?
-            .warnings;
+        self.update_issue_resolved(
+            id,
+            title,
+            description,
+            priority,
+            state,
+            add_labels,
+            remove_labels,
+            content_format,
+            issue_type,
+            force,
+        )
+        .map(|(_, warnings)| warnings)
+    }
+
+    /// [`Self::update_issue`], also returning the full id `id` resolved to in
+    /// the captured repository.
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_issue_resolved(
+        &self,
+        id: &str,
+        title: Option<String>,
+        description: Option<DescriptionUpdate>,
+        priority: Option<Priority>,
+        state: Option<State>,
+        add_labels: Vec<String>,
+        remove_labels: Vec<String>,
+        content_format: Option<Option<crate::domain::ContentFormat>>,
+        issue_type: Option<String>,
+        force: bool,
+    ) -> Result<(String, Vec<String>)>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
+            issue_id: id.to_string(),
+            title,
+            description,
+            priority,
+            state,
+            add_labels,
+            remove_labels,
+            label_edit: None,
+            content_format,
+            issue_type,
+            add_gates: Vec::new(),
+            remove_gates: Vec::new(),
+            assignee: None,
+            unassign: false,
+            bulk: false,
+            force,
+            enforce_lease: true,
+        })?;
 
         // Check whether the completed publication unblocks dependents.
         if let Some(s) = state {
@@ -491,7 +523,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         }
 
-        Ok(warnings)
+        Ok((outcome.target_id, outcome.warnings))
     }
 
     /// Confirm operator intent for the destructive `jit issue delete` command
@@ -568,10 +600,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
+            let Some(crate::commands::validate::MutationBase { image, issues }) =
+                self.capture_mutation_base(session.as_mut(), &[], None)?
+            else {
                 return Ok(AttemptOutcome::Retry);
             };
-            let issues = captured_active_issues(&image)?;
             let target_id = resolve_issue_from_capture(&issues, id)?;
             let config = crate::repository_state::assemble_config(&image)?;
             let current_mode = self.config_manager.enforcement_mode_from_config(&config)?;

@@ -895,7 +895,7 @@ fn capture_capability_image(
         .map(|path| {
             Ok((
                 path.clone(),
-                inspect_capability_listing(layout, roots, path, spec.is_advisory(path))?,
+                inspect_capability_listing(layout, roots, path, spec.is_advisory(path), &entries)?,
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
@@ -1257,11 +1257,15 @@ fn advisory_unreadable_entry(
     })
 }
 
+/// Fingerprint the directory at `path`. A child this capture already inspected
+/// as an exact path in `captured` keeps that identity, so each captured file is
+/// read once and the image states one identity for it.
 fn inspect_capability_listing(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
     advisory: bool,
+    captured: &BTreeMap<VirtualPath, RepositoryEntry>,
 ) -> Result<ListingFingerprint, RepositoryStateStoreError> {
     let entry = inspect_capability_entry(layout, roots, path)?;
     let RepositoryEntry::Directory { identity, .. } = entry else {
@@ -1304,17 +1308,17 @@ fn inspect_capability_listing(
             .into_string()
             .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
-        let child_entry = match inspect_capability_entry(layout, roots, &child) {
-            Ok(entry) => entry,
-            Err(error) if advisory && is_advisory_permission_denied(&error) => {
-                advisory_unreadable_entry(&child)?
-            }
-            Err(error) => return Err(error),
-        };
-        let identity = child_entry
-            .identity()
-            .cloned()
-            .ok_or_else(|| RepositoryStateStoreError::RetryableConflict { path: name.clone() })?;
+        let identity = match captured.get(&child) {
+            Some(entry) => entry.identity().cloned(),
+            None => match inspect_capability_entry(layout, roots, &child) {
+                Ok(entry) => entry.identity().cloned(),
+                Err(error) if advisory && is_advisory_permission_denied(&error) => {
+                    advisory_unreadable_entry(&child)?.identity().cloned()
+                }
+                Err(error) => return Err(error),
+            },
+        }
+        .ok_or_else(|| RepositoryStateStoreError::RetryableConflict { path: name.clone() })?;
         children.insert(name, identity);
     }
     ListingFingerprint::for_directory(identity, children).map_err(Into::into)

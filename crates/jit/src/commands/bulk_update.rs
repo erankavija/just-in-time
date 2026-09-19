@@ -355,14 +355,17 @@ impl<S: IssueStore> CommandExecutor<S> {
             &layout,
             "bulk-update no-op verification",
             |session| {
-                let Some(image) = self.capture_mutation_base(session, &[], None)? else {
+                let Some(crate::commands::validate::MutationBase {
+                    image,
+                    issues: active,
+                }) = self.capture_mutation_base(session, &[], None)?
+                else {
                     return Ok(SessionStep::Retry);
                 };
-                let active = captured_active_issues(&image)?;
                 let declarations = declarations_from_image(&image)?;
                 let config = declarations.config();
                 let plan_content =
-                    crate::commands::validate::plan_content_from_image(&image, &active)?;
+                    crate::commands::validate::plan_content_with_issues(&image, &active, &active)?;
                 let context = super::production_mutation_context();
 
                 let confirmed = candidates
