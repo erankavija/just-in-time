@@ -29,10 +29,11 @@ const MANAGED_TARGETS: [&str; 3] = [
 /// the repository data root and its ownership record. The three reverse-action
 /// stages are rollback-recovery stages, not forward publication stages. All
 /// other canonical stages are required below and discovered from a real run.
-const EXPECTED_PROFILE_PUBLICATION_STAGES: [&str; 28] = [
+const EXPECTED_PROFILE_PUBLICATION_STAGES: [&str; 29] = [
     "recovery_external",
     "recovery_internal",
     "sweep_companions",
+    "before_read_set_revalidation",
     "before_control_creation",
     "create_control",
     "before_initial_journal",
@@ -195,6 +196,7 @@ fn stage_name(point: &TransactionFailurePoint) -> &'static str {
     match point {
         RepositoryRecoveryExternal => "recovery_external",
         RepositoryRecoveryInternal => "recovery_internal",
+        RepositoryBeforeReadSetRevalidation => "before_read_set_revalidation",
         RepositoryBeforeControlCreation => "before_control_creation",
         RepositoryCreateControl => "create_control",
         RepositoryBeforeInitialJournal => "before_initial_journal",

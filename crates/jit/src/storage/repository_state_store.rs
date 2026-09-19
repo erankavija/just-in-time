@@ -512,6 +512,9 @@ impl RepositoryMutationSession for JsonMutationSession {
         let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
+        self.storage
+            .repository_state_failures()
+            .check(&TransactionFailurePoint::RepositoryBeforeReadSetRevalidation)?;
         // Immediately before journal preparation, revalidate the entire read set
         // and the selected-root identities while the session is held. Any content,
         // listing, root, or alias change yields a typed retryable conflict before
@@ -607,6 +610,9 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 path: "injected memory read-set conflict".into(),
             });
         }
+        self.storage
+            .repository_state_failures()
+            .check(&TransactionFailurePoint::RepositoryBeforeReadSetRevalidation)?;
         let mut state = self.storage.repository_state();
         let current = capture_memory_image(&self.layout, &state, image.capture_spec().clone())?;
         if &current != image {

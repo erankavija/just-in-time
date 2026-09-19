@@ -788,6 +788,16 @@ fn lifecycle_requires_prechecks(request: &CapturedLifecycleMutation, issue: &Iss
         )
 }
 
+/// The full base a precheck-running lifecycle transition reads before taking
+/// the claims guard, because its precheck gates run outside the lock.
+struct PrecheckPreflight {
+    plan: CapturedPrecheckPlan,
+    image: crate::repository_state::RepositoryImage,
+    issue: Issue,
+    registry: crate::declarations::GateRegistry,
+    lease_mode: crate::config::EnforcementMode,
+}
+
 struct CapturedLifecycleOutcome {
     target_id: String,
     changed: bool,
@@ -2463,20 +2473,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = production_mutation_context();
         with_mutation_attempts("issue update", || {
-            let (expected_target, expected_lease_mode) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let issues = captured_active_issues(&image)?;
-                let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
-                let declarations = crate::repository_state::declarations_from_image(&image)?;
-                (
-                    target,
-                    self.config_manager
-                        .enforcement_mode_from_config(declarations.config())?,
-                )
-            };
+            // The claims guard does not depend on the repository, so it is taken
+            // before the one session whose image decides target and lease policy.
             let claims_guard = request
                 .enforce_lease
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
@@ -2487,28 +2485,18 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;
-            if resolve_issue_from_capture(&issues, &request.issue_id)? != expected_target {
-                return Ok(AttemptOutcome::Retry);
-            }
+            let target = resolve_issue_from_capture(&issues, &request.issue_id)?;
             let issue = issues
                 .iter()
-                .find(|issue| issue.id == expected_target)
+                .find(|issue| issue.id == target)
                 .cloned()
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
-            if request.enforce_lease
-                && self
-                    .config_manager
-                    .enforcement_mode_from_config(declarations.config())?
-                    != expected_lease_mode
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
             let lease_warnings = if request.enforce_lease {
                 captured_lease_warnings(
-                    expected_lease_mode,
-                    std::slice::from_ref(&expected_target),
+                    self.config_manager.enforcement_mode_from_config(config)?,
+                    std::slice::from_ref(&target),
                     &issues,
                     claims_guard.as_ref(),
                 )?
@@ -2517,7 +2505,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = validate::plan_content_from_image(&image, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = expected_target;
+            effective_request.issue_id = target;
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2646,64 +2634,64 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = production_mutation_context();
         let mut cached_precheck = None::<CachedPrecheckExecution>;
+        let enforce_lease = matches!(
+            &request,
+            CapturedLifecycleMutation::State {
+                enforce_lease: true,
+                ..
+            }
+        );
+        let coordinate_claims =
+            enforce_lease || matches!(request, CapturedLifecycleMutation::Claim { .. });
         with_mutation_attempts("lifecycle mutation", || {
-            let (
-                expected_target,
-                expected_precheck_required,
-                expected_precheck,
-                precheck_image,
-                precheck_issue,
-                precheck_registry,
-                expected_lease_mode,
-                enforce_lease,
-            ) = {
+            let (expected_target, expected_precheck_required, precheck) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) =
-                    self.capture_mutation_base(preflight.as_mut(), &[], Some(request.issue_id()))?
+                let Some(light) =
+                    self.capture_mutation_preflight(preflight.as_mut(), request.issue_id())?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                let issues = captured_active_issues(&image)?;
-                let target_id = resolve_issue_from_capture(&issues, request.issue_id())?;
-                let issue = issues
-                    .iter()
-                    .find(|issue| issue.id == target_id)
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target_id))?;
-                let should_precheck = lifecycle_requires_prechecks(&request, issue);
-                let enforce_lease = matches!(
-                    &request,
-                    CapturedLifecycleMutation::State {
-                        enforce_lease: true,
-                        ..
-                    }
-                );
-                let declarations = crate::repository_state::declarations_from_image(&image)?;
-                let lease_mode = self
-                    .config_manager
-                    .enforcement_mode_from_config(declarations.config())?;
-                let registry = declarations.gates;
-                let plan = should_precheck
-                    .then(|| captured_precheck_plan(&image, issue, &registry))
-                    .transpose()?;
-                (
-                    target_id,
-                    should_precheck,
-                    plan,
-                    image,
-                    issue.clone(),
-                    registry,
-                    lease_mode,
-                    enforce_lease,
-                )
+                let should_precheck = lifecycle_requires_prechecks(&request, &light.target);
+                // Precheck gates run outside the repository lock, so only a
+                // transition that runs them reads its full base before the guard.
+                let precheck = if should_precheck {
+                    let Some(image) = self.capture_mutation_base(
+                        preflight.as_mut(),
+                        &[],
+                        Some(request.issue_id()),
+                    )?
+                    else {
+                        return Ok(AttemptOutcome::Retry);
+                    };
+                    let issue = captured_active_issues(&image)?
+                        .into_iter()
+                        .find(|issue| issue.id == light.target.id)
+                        .ok_or_else(|| crate::storage::IssueNotFoundError::new(&light.target.id))?;
+                    let declarations = crate::repository_state::declarations_from_image(&image)?;
+                    let lease_mode = self
+                        .config_manager
+                        .enforcement_mode_from_config(declarations.config())?;
+                    let registry = declarations.gates;
+                    let plan = captured_precheck_plan(&image, &issue, &registry)?;
+                    Some(PrecheckPreflight {
+                        plan,
+                        image,
+                        issue,
+                        registry,
+                        lease_mode,
+                    })
+                } else {
+                    None
+                };
+                (light.target.id, should_precheck, precheck)
             };
-            let coordinate_claims =
-                enforce_lease || matches!(request, CapturedLifecycleMutation::Claim { .. });
-            if coordinate_claims {
-                let preflight_issues = captured_active_issues(&precheck_image)?;
+            if let (true, Some(precheck)) = (coordinate_claims, &precheck) {
+                // Refuse before running prechecks; the held guard repeats this.
+                let preflight_issues = captured_active_issues(&precheck.image)?;
                 let preliminary_guard = claims_mutation_guard(self.require_worktree_paths()?)?;
                 if enforce_lease {
                     captured_lease_warnings(
-                        expected_lease_mode,
+                        precheck.lease_mode,
                         std::slice::from_ref(&expected_target),
                         &preflight_issues,
                         preliminary_guard.as_ref(),
@@ -2718,19 +2706,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                     )?;
                 }
             }
-            if let Some(plan) = &expected_precheck {
+            let expected_precheck = precheck.as_ref().map(|precheck| &precheck.plan);
+            if let Some(precheck) = &precheck {
                 let reuse = cached_precheck
                     .as_ref()
                     .is_some_and(|cached| cached.target_id == expected_target);
                 if !reuse {
                     cached_precheck = Some(CachedPrecheckExecution {
                         target_id: expected_target.clone(),
-                        evidence: plan.evidence.clone(),
+                        evidence: precheck.plan.evidence.clone(),
                         execution: self.execute_captured_prechecks(
-                            &precheck_image,
-                            &precheck_issue,
-                            &precheck_registry,
-                            &plan.prompts,
+                            &precheck.image,
+                            &precheck.issue,
+                            &precheck.registry,
+                            &precheck.plan.prompts,
                         )?,
                     });
                 }
@@ -2787,14 +2776,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
-            if enforce_lease
-                && self
-                    .config_manager
-                    .enforcement_mode_from_config(declarations.config())?
-                    != expected_lease_mode
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
+            let lease_mode = self
+                .config_manager
+                .enforcement_mode_from_config(declarations.config())?;
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
             if current_precheck_required != expected_precheck_required {
                 return Ok(AttemptOutcome::Retry);
@@ -2821,7 +2805,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
             let mut external_warnings = if enforce_lease {
                 captured_lease_warnings(
-                    expected_lease_mode,
+                    lease_mode,
                     std::slice::from_ref(&expected_target),
                     &issues,
                     claims_guard.as_ref(),

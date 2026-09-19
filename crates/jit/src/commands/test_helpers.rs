@@ -69,28 +69,31 @@ impl crate::storage::TransactionFailureInjector for SessionOpenCounter {
     }
 }
 
-pub(crate) enum OpenRaceAction {
+pub(crate) enum SessionRaceAction {
     Save(Box<crate::domain::Issue>),
     Delete(String),
     WriteRepoFile { path: String, content: String },
 }
 
-struct OpenRace {
+/// Performs one repository write when a session reaches `point` for the
+/// `trigger`th time, standing in for a concurrent writer at that boundary.
+struct SessionRace {
+    point: crate::storage::TransactionFailurePoint,
     trigger: usize,
-    opens: std::sync::atomic::AtomicUsize,
+    hits: std::sync::atomic::AtomicUsize,
     storage: Mutex<Option<InMemoryStorage>>,
-    action: Mutex<Option<OpenRaceAction>>,
+    action: Mutex<Option<SessionRaceAction>>,
 }
 
-impl crate::storage::TransactionFailureInjector for OpenRace {
+impl crate::storage::TransactionFailureInjector for SessionRace {
     fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal
-            && self.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == self.trigger
+        if point == &self.point
+            && self.hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == self.trigger
         {
             let storage = self.storage.lock().unwrap().clone().unwrap();
             match self.action.lock().unwrap().take().unwrap() {
-                OpenRaceAction::Save(issue) => seed_issue(&storage, *issue),
-                OpenRaceAction::Delete(id) => {
+                SessionRaceAction::Save(issue) => seed_issue(&storage, *issue),
+                SessionRaceAction::Delete(id) => {
                     let bytes = storage
                         .read_repo_file(".jit/index.json")
                         .unwrap()
@@ -104,7 +107,7 @@ impl crate::storage::TransactionFailureInjector for OpenRace {
                         std::str::from_utf8(&index).unwrap(),
                     );
                 }
-                OpenRaceAction::WriteRepoFile { path, content } => {
+                SessionRaceAction::WriteRepoFile { path, content } => {
                     seed_repo_file(&storage, &path, &content);
                 }
             }
@@ -113,14 +116,45 @@ impl crate::storage::TransactionFailureInjector for OpenRace {
     }
 }
 
+/// Race `action` against the `trigger`th session open, before that session
+/// captures anything.
 pub(crate) fn with_open_race(
     storage: InMemoryStorage,
     trigger: usize,
-    action: OpenRaceAction,
+    action: SessionRaceAction,
 ) -> InMemoryStorage {
-    let race = Arc::new(OpenRace {
+    with_session_race(
+        storage,
+        crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal,
         trigger,
-        opens: std::sync::atomic::AtomicUsize::new(0),
+        action,
+    )
+}
+
+/// Race `action` against the first apply, after its session captured the read
+/// set and before apply revalidates it.
+pub(crate) fn with_apply_race(
+    storage: InMemoryStorage,
+    action: SessionRaceAction,
+) -> InMemoryStorage {
+    with_session_race(
+        storage,
+        crate::storage::TransactionFailurePoint::RepositoryBeforeReadSetRevalidation,
+        1,
+        action,
+    )
+}
+
+fn with_session_race(
+    storage: InMemoryStorage,
+    point: crate::storage::TransactionFailurePoint,
+    trigger: usize,
+    action: SessionRaceAction,
+) -> InMemoryStorage {
+    let race = Arc::new(SessionRace {
+        point,
+        trigger,
+        hits: std::sync::atomic::AtomicUsize::new(0),
         storage: Mutex::new(None),
         action: Mutex::new(Some(action)),
     });

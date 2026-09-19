@@ -37,6 +37,8 @@ pub(crate) enum RecoveryState {
 pub enum FailurePoint {
     RepositoryRecoveryExternal,
     RepositoryRecoveryInternal,
+    /// A held session's apply, before it revalidates the captured read set.
+    RepositoryBeforeReadSetRevalidation,
     RepositoryBeforeControlCreation,
     RepositoryCreateControl,
     RepositoryBeforeInitialJournal,
@@ -46,25 +48,51 @@ pub enum FailurePoint {
     RepositoryCreateCompanion,
     RepositorySweepCompanions,
     RepositoryPrepareIntent,
-    RepositoryPrepareAction { action: usize },
-    RepositoryStageAction { action: usize },
-    RepositorySyncStage { action: usize },
-    RepositorySyncBackup { action: usize },
+    RepositoryPrepareAction {
+        action: usize,
+    },
+    RepositoryStageAction {
+        action: usize,
+    },
+    RepositorySyncStage {
+        action: usize,
+    },
+    RepositorySyncBackup {
+        action: usize,
+    },
     RepositorySyncPreparedJournal,
-    RepositoryBeforeAction { action: usize },
-    RepositoryBeforeTargetMutation { action: usize },
-    RepositoryAfterRootBindingCheck { action: usize },
-    RepositoryBeforeDeleteRename { action: usize },
-    RepositoryAfterTargetMutation { action: usize },
-    RepositoryVerifyFinalIdentity { action: usize },
-    RepositoryAfterAction { action: usize },
+    RepositoryBeforeAction {
+        action: usize,
+    },
+    RepositoryBeforeTargetMutation {
+        action: usize,
+    },
+    RepositoryAfterRootBindingCheck {
+        action: usize,
+    },
+    RepositoryBeforeDeleteRename {
+        action: usize,
+    },
+    RepositoryAfterTargetMutation {
+        action: usize,
+    },
+    RepositoryVerifyFinalIdentity {
+        action: usize,
+    },
+    RepositoryAfterAction {
+        action: usize,
+    },
     RepositoryBeforeDataRootPublication,
     RepositoryAfterDataParentBindingCheck,
     RepositoryAfterDataRootPublication,
     RepositoryBeforeCommitDecision,
     RepositoryAfterCommit,
-    RepositoryBeforeReverseAction { action: usize },
-    RepositoryAfterReverseAction { action: usize },
+    RepositoryBeforeReverseAction {
+        action: usize,
+    },
+    RepositoryAfterReverseAction {
+        action: usize,
+    },
     RepositoryBeforeRollbackDecision,
     RepositoryBeforeStageCleanup,
     RepositoryBeforeCompanionCleanup,

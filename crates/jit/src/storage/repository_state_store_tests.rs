@@ -2835,6 +2835,7 @@ fn absent_preimage_failure_points() -> Vec<TransactionFailurePoint> {
     vec![
         RepositoryRecoveryExternal,
         RepositoryRecoveryInternal,
+        RepositoryBeforeReadSetRevalidation,
         RepositoryBeforeControlCreation,
         RepositoryCreateControl,
         RepositoryBeforeInitialJournal,

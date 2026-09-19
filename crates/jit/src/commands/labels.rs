@@ -57,7 +57,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::test_helpers::{memory_executor, with_open_race, OpenRaceAction};
+    use crate::commands::test_helpers::{memory_executor, with_apply_race, SessionRaceAction};
     use crate::commands::CommandExecutor;
     use crate::domain::Priority;
     use crate::storage::{InMemoryStorage, IssueStore};
@@ -86,7 +86,7 @@ mod tests {
 
         let mut concurrent = storage.load_issue(&id).unwrap();
         concurrent.labels.push("owner:concurrent".to_string());
-        let raced = with_open_race(storage, 2, OpenRaceAction::Save(Box::new(concurrent)));
+        let raced = with_apply_race(storage, SessionRaceAction::Save(Box::new(concurrent)));
         let executor = memory_executor(raced.clone());
 
         executor.add_label(&id, "resolution:done").unwrap();

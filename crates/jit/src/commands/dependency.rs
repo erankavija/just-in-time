@@ -256,31 +256,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
 
+        let enforce_lease = matches!(request, CapturedDependencyMutation::Single { .. });
         with_mutation_attempts("dependency mutation", || {
-            let (expected_source, expected_lease_mode, enforce_lease) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let issues = super::captured_active_issues(&image)?;
-                let source = match &request {
-                    CapturedDependencyMutation::Single { issue_id, .. }
-                    | CapturedDependencyMutation::Batch { issue_id, .. } => {
-                        Some(resolve_captured_issue_id(&issues, issue_id)?)
-                    }
-                    CapturedDependencyMutation::ReduceAll { .. } => None,
-                    CapturedDependencyMutation::RemoveSingle { .. }
-                    | CapturedDependencyMutation::RemoveBatch { .. } => {
-                        unreachable!("removals use the captured removal coordinator")
-                    }
-                };
-                let config = crate::repository_state::assemble_config(&image)?;
-                (
-                    source,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
-                    matches!(request, CapturedDependencyMutation::Single { .. }),
-                )
-            };
+            // The claims guard depends only on the request, so it is taken before
+            // the one session whose image decides source and lease policy.
             let claims_guard = enforce_lease
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
@@ -290,7 +269,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = super::captured_active_issues(&image)?;
-            let current_source = match &request {
+            let expected_source = match &request {
                 CapturedDependencyMutation::Single { issue_id, .. }
                 | CapturedDependencyMutation::Batch { issue_id, .. } => {
                     Some(resolve_captured_issue_id(&issues, issue_id)?)
@@ -298,17 +277,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 CapturedDependencyMutation::ReduceAll { .. } => None,
                 _ => unreachable!("removals use the captured removal coordinator"),
             };
-            let config = crate::repository_state::assemble_config(&image)?;
-            if current_source != expected_source
-                || (enforce_lease
-                    && self.config_manager.enforcement_mode_from_config(&config)?
-                        != expected_lease_mode)
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
             let lease_warnings = if enforce_lease {
+                let config = crate::repository_state::assemble_config(&image)?;
                 captured_lease_warnings(
-                    expected_lease_mode,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
                     std::slice::from_ref(
                         expected_source
                             .as_ref()
@@ -372,37 +344,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
+        let enforce_lease = matches!(request, CapturedDependencyMutation::RemoveSingle { .. });
         with_mutation_attempts("dependency removal", || {
-            let (resolved_request, expected_lease_mode, enforce_lease) = {
-                let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
-                    return Ok(AttemptOutcome::Retry);
-                };
-                let issues = super::captured_active_issues(&image)?;
-                let resolved = match &request {
-                    CapturedDependencyMutation::RemoveSingle {
-                        issue_id,
-                        dependency_id,
-                    } => CapturedDependencyMutation::RemoveSingle {
-                        issue_id: resolve_captured_issue_id(&issues, issue_id)?,
-                        dependency_id: resolve_captured_issue_id(&issues, dependency_id)?,
-                    },
-                    CapturedDependencyMutation::RemoveBatch {
-                        issue_id,
-                        dependency_ids,
-                    } => CapturedDependencyMutation::RemoveBatch {
-                        issue_id: resolve_captured_issue_id(&issues, issue_id)?,
-                        dependency_ids: dependency_ids.clone(),
-                    },
-                    _ => unreachable!("removal coordinator receives only removals"),
-                };
-                let config = crate::repository_state::assemble_config(&image)?;
-                (
-                    resolved,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
-                    matches!(request, CapturedDependencyMutation::RemoveSingle { .. }),
-                )
-            };
+            // The claims guard depends only on the request, so it is taken before
+            // the one session whose image resolves the removal and lease policy.
             let claims_guard = enforce_lease
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
                 .transpose()?
@@ -414,12 +359,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let issues = super::captured_active_issues(&image)?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = crate::repository_state::assemble_config(&image)?;
-            if enforce_lease
-                && self.config_manager.enforcement_mode_from_config(&config)? != expected_lease_mode
-            {
-                return Ok(AttemptOutcome::Retry);
-            }
-            let recaptured_request = match &request {
+            let resolved_request = match &request {
                 CapturedDependencyMutation::RemoveSingle {
                     issue_id,
                     dependency_id,
@@ -436,29 +376,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
             };
-            if recaptured_request.issue_id() != resolved_request.issue_id()
-                || matches!(
-                    (&recaptured_request, &resolved_request),
-                    (
-                        CapturedDependencyMutation::RemoveSingle {
-                            dependency_id: current,
-                            ..
-                        },
-                        CapturedDependencyMutation::RemoveSingle {
-                            dependency_id: expected,
-                            ..
-                        }
-                    ) if current != expected
-                )
-            {
-                return Err(anyhow!(
-                    "dependency removal target resolution changed during coordinated publication"
-                ));
-            }
             let plan_content = super::validate::plan_content_from_image(&image, &issues)?;
             let warning = if enforce_lease {
                 captured_lease_warnings(
-                    expected_lease_mode,
+                    self.config_manager.enforcement_mode_from_config(&config)?,
                     &[resolved_request.issue_id().to_string()],
                     &issues,
                     claims_guard.as_ref(),
@@ -1132,10 +1053,9 @@ mod captured_tests {
         let source_id = source.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         source.title = "concurrent title".to_string();
-        let storage = crate::commands::test_helpers::with_open_race(
+        let storage = crate::commands::test_helpers::with_apply_race(
             storage,
-            2,
-            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(source)),
+            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(source)),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -1286,10 +1206,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut collision = crate::domain::types::fixture_issue("collision".into(), String::new());
         collision.id = "22222222222222222222222222222222".to_string();
-        let storage = crate::commands::test_helpers::with_open_race(
+        let storage = crate::commands::test_helpers::with_apply_race(
             storage,
-            2,
-            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(collision)),
+            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(collision)),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
         let events_before = executor.storage.read_events().unwrap();
@@ -1313,7 +1232,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     }
 
     #[test]
-    fn test_single_removal_rejects_dependency_deleted_between_phases() {
+    fn test_single_removal_rejects_dependency_deleted_before_publication() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
@@ -1323,10 +1242,9 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
-        let storage = crate::commands::test_helpers::with_open_race(
+        let storage = crate::commands::test_helpers::with_apply_race(
             storage,
-            2,
-            crate::commands::test_helpers::OpenRaceAction::Delete(dependency.id),
+            crate::commands::test_helpers::SessionRaceAction::Delete(dependency.id),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
         let events_before = executor.storage.read_events().unwrap();

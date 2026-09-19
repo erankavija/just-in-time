@@ -233,6 +233,68 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
     }
 
+    /// What a mutation decides before taking the claims guard: the
+    /// configuration, invariant and gate registries, the index, and the issue
+    /// `requested` names.
+    ///
+    /// Only issues whose ids match `requested` are read, and the target is
+    /// resolved among them exactly as a full capture resolves it.
+    pub(crate) fn capture_mutation_preflight(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        requested: &str,
+    ) -> Result<Option<MutationPreflight>> {
+        use crate::repository_state::{CaptureSpec, VirtualPath};
+
+        let fixed = || {
+            vec![
+                VirtualPath::CONFIG,
+                VirtualPath::INVARIANTS,
+                VirtualPath::GATES,
+                VirtualPath::INDEX,
+            ]
+        };
+        let Some(registries) = capture_or_retry(
+            session.capture(CaptureSpec::phase_one(fixed(), MUTATION_CAPTURE_BUDGET)?),
+        )?
+        else {
+            return Ok(None);
+        };
+        let index_bytes = registries
+            .file_bytes(&VirtualPath::INDEX)?
+            .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+        let normalized = requested.to_lowercase().replace('-', "");
+        let candidates = crate::storage::json::parse_repository_index(index_bytes)?
+            .all_ids
+            .into_iter()
+            .filter(|id| {
+                id == requested || id.to_lowercase().replace('-', "").starts_with(&normalized)
+            })
+            .collect::<Vec<_>>();
+        let mut spec = CaptureSpec::phase_one(fixed(), MUTATION_CAPTURE_BUDGET)?;
+        spec.discover_paths(
+            candidates
+                .iter()
+                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                .collect::<std::result::Result<Vec<_>, _>>()?,
+        )?;
+        let image = match capture_or_retry(session.capture(spec))? {
+            Some(image) if image.has_stable_overlap(&registries) => image,
+            Some(_) | None => return Ok(None),
+        };
+        let effective =
+            |image: &crate::repository_state::RepositoryImage,
+             repo_rel: &str|
+             -> Result<Option<Vec<u8>>> { super::image_repo_bytes(image, repo_rel) };
+        let issues = effective_issues(&image, &candidates, &effective)?;
+        let target_id = super::resolve_issue_from_capture(&issues, requested)?;
+        let target = issues
+            .into_iter()
+            .find(|issue| issue.id == target_id)
+            .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target_id))?;
+        Ok(Some(MutationPreflight { image, target }))
+    }
+
     pub(crate) fn capture_proposed_base_without_documents(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -295,9 +357,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         // the admitted size can hold rather than the handful a registry scan
         // needs.
         let budget = CaptureBudget {
-            max_listings: if archive_scan { 1 << 16 } else { 256 },
-            max_bytes: 512 * 1024 * 1024,
-            max_depth: 32,
+            max_listings: if archive_scan {
+                1 << 16
+            } else {
+                MUTATION_CAPTURE_BUDGET.max_listings
+            },
+            ..MUTATION_CAPTURE_BUDGET
         };
         let registries = || -> Result<Vec<VirtualPath>> {
             Ok(vec![
@@ -1171,6 +1236,23 @@ type DocumentClosure = (
     Vec<crate::repository_state::VirtualPath>,
     Vec<(String, String)>,
 );
+
+/// Capture budget for mutation bases and preflights.
+const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+    crate::repository_state::CaptureBudget {
+        max_listings: 256,
+        max_bytes: 512 * 1024 * 1024,
+        max_depth: 32,
+    };
+
+/// The lease inputs and target issue a mutation reads before taking the claims
+/// guard, from [`CommandExecutor::capture_mutation_preflight`].
+pub(crate) struct MutationPreflight {
+    /// Configuration, invariant and gate registries, index, and candidate issues.
+    pub(crate) image: crate::repository_state::RepositoryImage,
+    /// The issue the request names.
+    pub(crate) target: Issue,
+}
 
 /// Which issue-linked documents a base capture reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -3752,7 +3834,7 @@ depends_on = ["planning"]
 
     #[test]
     fn test_apply_type_fix_preserves_concurrent_type_correction() {
-        use crate::commands::test_helpers::{memory_executor, with_open_race, OpenRaceAction};
+        use crate::commands::test_helpers::{memory_executor, with_apply_race, SessionRaceAction};
         use crate::storage::{InMemoryStorage, IssueStore};
 
         let storage = InMemoryStorage::new();
@@ -3773,7 +3855,7 @@ depends_on = ["planning"]
 
         let mut issue = storage.load_issue(&id).unwrap();
         issue.labels = vec!["type:story".to_string()];
-        let raced = with_open_race(storage, 2, OpenRaceAction::Save(Box::new(issue)));
+        let raced = with_apply_race(storage, SessionRaceAction::Save(Box::new(issue)));
         let executor = memory_executor(raced.clone());
 
         executor.apply_type_fix(&id, "taks", "task").unwrap();
@@ -4436,5 +4518,36 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!validation.capture_spec().pinned().is_empty());
         assert!(!mutation.capture_spec().contains_path(&document));
         assert!(mutation.capture_spec().pinned().is_empty());
+    }
+
+    /// A mutation preflight reads the lease inputs and the requested issue, and
+    /// resolves a short id exactly as a full capture does, without the event log
+    /// or any other issue.
+    #[test]
+    fn test_capture_mutation_preflight_reads_lease_inputs_and_target_only() {
+        use crate::commands::test_helpers::{seed_issue, setup};
+        use crate::repository_state::VirtualPath;
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let target = crate::domain::types::fixture_issue("Target".to_string(), String::new());
+        let other = crate::domain::types::fixture_issue("Other".to_string(), String::new());
+        let (target_id, other_id) = (target.id.clone(), other.id.clone());
+        seed_issue(executor.storage(), target);
+        seed_issue(executor.storage(), other);
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+
+        let preflight = executor
+            .capture_mutation_preflight(session.as_mut(), &target_id[..8])
+            .unwrap()
+            .expect("a settled capture");
+
+        let spec = preflight.image.capture_spec();
+        assert_eq!(preflight.target.id, target_id);
+        assert!(spec.contains_path(&VirtualPath::CONFIG));
+        assert!(spec.contains_path(&VirtualPath::GATES));
+        assert!(!spec.contains_path(&VirtualPath::EVENTS));
+        assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
 }

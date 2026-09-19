@@ -551,14 +551,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("issue deletion", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
+                let Some(preflight) = self.capture_mutation_preflight(preflight.as_mut(), id)?
+                else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                let issues = captured_active_issues(&image)?;
-                let target = resolve_issue_from_capture(&issues, id)?;
-                let config = crate::repository_state::assemble_config(&image)?;
+                let config = crate::repository_state::assemble_config(&preflight.image)?;
                 (
-                    target,
+                    preflight.target.id,
                     self.config_manager.enforcement_mode_from_config(&config)?,
                 )
             };
@@ -1260,7 +1259,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
-            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(issue)),
+            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(issue)),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
@@ -1986,7 +1985,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
-            crate::commands::test_helpers::OpenRaceAction::WriteRepoFile {
+            crate::commands::test_helpers::SessionRaceAction::WriteRepoFile {
                 path: ".jit/config.toml".to_string(),
                 content: "[worktree]\nenforce_leases = \"warn\"\n".to_string(),
             },
@@ -2022,7 +2021,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let storage = crate::commands::test_helpers::with_open_race(
             storage,
             2,
-            crate::commands::test_helpers::OpenRaceAction::Save(Box::new(collision.clone())),
+            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(collision.clone())),
         );
         let executor = crate::commands::test_helpers::memory_executor(storage);
 

@@ -1403,14 +1403,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("gate preset application", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = capture_gate_preset_image(&mut *preflight, false, None)? else {
+                let Some(preflight) = self.capture_mutation_preflight(&mut *preflight, issue_id)?
+                else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                let issues = super::captured_active_issues(&image)?;
-                let target = super::resolve_issue_from_capture(&issues, issue_id)?;
-                let config = crate::repository_state::assemble_config(&image)?;
+                let config = crate::repository_state::assemble_config(&preflight.image)?;
                 (
-                    target,
+                    preflight.target.id,
                     self.config_manager.enforcement_mode_from_config(&config)?,
                 )
             };
