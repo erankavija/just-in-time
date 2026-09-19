@@ -116,3 +116,9 @@ id = "essential-code-prose"
 statement = "Comments and rustdoc carry only what the code leaves non-obvious: a contract, an invariant, the reason behind a choice, or a pointer to evidence, each in the shortest form that conveys it. History lives in git and jit, and a module-level orientation is at most one short paragraph."
 kind = "enforced"
 enforced-by = "@/gate/code-review"
+
+[[invariants]]
+id = "orthogonal-tests"
+statement = "Each property has one owning test, at the cheapest layer that can observe it, and each test owns one property. A mechanism's behavior matrix (failure points, backends, edge cases) is proven once against the mechanism; each consumer proves only that it goes through the mechanism, and a higher layer tests only what it adds: wiring, composition, and its own boundary. A test that re-proves a property owned elsewhere is a duplication defect."
+kind = "enforced"
+enforced-by = "@/gate/code-review"
