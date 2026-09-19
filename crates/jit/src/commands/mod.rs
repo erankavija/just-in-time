@@ -641,7 +641,6 @@ fn claims_mutation_guard(
     paths: &crate::storage::WorktreePaths,
 ) -> Result<Option<crate::storage::claim_coordinator::ClaimsMutationGuard>> {
     use crate::storage::{ClaimCoordinator, FileLocker};
-    use std::time::Duration;
 
     if !paths.is_git_repository() {
         return Ok(None);
@@ -652,9 +651,7 @@ fn claims_mutation_guard(
         .unwrap_or_else(|| paths.worktree_root.display().to_string());
     let coordinator = ClaimCoordinator::new(
         paths.clone(),
-        FileLocker::new(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        )),
+        FileLocker::with_configured_timeout(),
         worktree_id,
         agent,
     );

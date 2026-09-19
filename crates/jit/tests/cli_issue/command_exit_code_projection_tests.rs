@@ -254,6 +254,27 @@ fn test_command_exit_codes_too_new_format_emits_10() {
     });
 }
 
+/// A mutation queued behind another holder of the repository lock chain, with a
+/// wait shorter than the hold, reaches the universal lock-timeout row.
+#[test]
+fn test_command_exit_codes_expired_lock_wait_emits_11() {
+    let temp = setup();
+    let _held = jit::storage::FileLocker::new(std::time::Duration::from_secs(5))
+        .lock_exclusive(&temp.path().join(".jit-bootstrap.lock"))
+        .unwrap();
+    assert_projected_exit_status_in_both_forms("*", 11, false, |json| {
+        let mut command = Command::new(jit_binary());
+        command
+            .current_dir(&temp)
+            .env("JIT_LOCK_TIMEOUT", "1")
+            .args(["issue", "create", "Queued"]);
+        if json {
+            command.arg("--json");
+        }
+        command.output().unwrap()
+    });
+}
+
 /// An enforcing validation rule rejects an issue create before publication,
 /// exercising the shared write-validation row through a real writer.
 #[test]
@@ -1110,6 +1131,7 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("*", Some(1)),
         ("*", Some(5)),
         ("*", Some(10)),
+        ("*", Some(11)),
         ("any command that writes an issue", Some(4)),
         (
             "gate evaluate, gate evaluate-all, gate evaluate-many",

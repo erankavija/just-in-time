@@ -332,7 +332,7 @@ pub const STARTUP_SERVE_ALLOWANCE: Duration = Duration::from_secs(30);
 /// continuous-integration jobs to their execution ceiling.
 #[must_use]
 pub fn startup_bound() -> Duration {
-    crate::storage::json::configured_lock_timeout() + STARTUP_SERVE_ALLOWANCE
+    crate::storage::lock::configured_lock_timeout() + STARTUP_SERVE_ALLOWANCE
 }
 
 /// The request one liveness probe sends.

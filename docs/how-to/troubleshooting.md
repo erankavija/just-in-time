@@ -187,19 +187,25 @@ Agent copilot:worker-1 already has 2 indefinite lease(s) (max: 2).
 
 ## Lock and Recovery Issues
 
-### Stale Lock File
+### Lock Timeout
 
 **Symptom:**
 ```
-Error: Failed to acquire lock - timed out after 5 seconds
+Error: Lock timeout: could not acquire exclusive lock on <path> after <wait>
 ```
 
-**Cause:** A previous process died while holding a lock. The `5 seconds` is the
-default lock-acquisition timeout — see
-[Runtime Coordination Defaults](../reference/runtime-defaults.md), the generated
-source of that value.
+The command exits with the dedicated lock-timeout exit code (see
+[Exit Codes](../reference/exit-codes.md)).
 
-**Solution:** Run recovery:
+**Cause:** Another jit process held the lock for longer than this command was
+willing to wait. Mutations serialize on the repository lock, so a burst of
+concurrent mutations, or one slow mutation, can exhaust a short wait. The default
+wait is the lock-acquisition timeout in
+[Runtime Coordination Defaults](../reference/runtime-defaults.md).
+
+**Solution:** Retry the command, or raise `JIT_LOCK_TIMEOUT` (whole seconds) for
+workflows that run many mutations concurrently. If no other jit process is
+running, run recovery:
 ```bash
 jit recover
 ```

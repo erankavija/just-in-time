@@ -30,7 +30,6 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
-use std::time::Duration;
 
 const ISSUES_DIR: &str = "issues";
 const INDEX_FILE: &str = "index.json";
@@ -403,29 +402,16 @@ pub struct JsonFileStorage {
     git_program: PathBuf,
 }
 
-/// The configured storage-lock acquisition timeout (`JIT_LOCK_TIMEOUT` seconds,
-/// or the runtime default), shared by every file-backed lock this backend opens.
-///
-/// Visible to the crate because a caller that waits on a process performing its
-/// own recovery has to allow for this wait: `commands::serve`'s startup bound
-/// reads it here rather than resolving the same setting a second way
-/// (`@/invariant/convention-convergence`).
-pub(crate) fn configured_lock_timeout() -> Duration {
-    std::env::var("JIT_LOCK_TIMEOUT")
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .map(Duration::from_secs)
-        .unwrap_or(Duration::from_secs(
-            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
-        ))
-}
-
 impl JsonFileStorage {
     /// Create a new JSON file storage instance at the given root path.
     /// The root should be the `.jit` directory (or custom directory from JIT_DATA_DIR).
     pub fn new<P: AsRef<Path>>(root: P) -> Self {
-        let timeout = configured_lock_timeout();
+        Self::with_lock_timeout(root, crate::storage::lock::configured_lock_timeout())
+    }
 
+    /// Create storage whose every lock waits `timeout` instead of the
+    /// configured wait.
+    fn with_lock_timeout<P: AsRef<Path>>(root: P, timeout: std::time::Duration) -> Self {
         let root = root.as_ref().to_path_buf();
         let bootstrap_lock_path = root
             .parent()
@@ -649,7 +635,7 @@ impl JsonFileStorage {
     ) -> Result<RepoWriteGuard> {
         RepoWriteLock::shared_for_lock_path(
             worktree_root.join(".jit-bootstrap.lock"),
-            configured_lock_timeout(),
+            crate::storage::lock::configured_lock_timeout(),
         )
         .acquire()
     }
@@ -1133,8 +1119,17 @@ impl IssueStore for JsonFileStorage {
 
         // Re-establish the boundary before the caller can persist a verdict.
         // This also repairs a journal left by a checker-side mutation that
-        // crashed after preparing or committing its transaction.
-        match self.open_mutation_session(layout) {
+        // crashed after preparing or committing its transaction. The external
+        // process has already finished, so a lock wait that expires is retried
+        // rather than discarding its outcome: another jit process holds the
+        // chain, and that holder is itself a bounded operation.
+        let reopened = loop {
+            match self.open_mutation_session(layout.clone()) {
+                Err(error) if crate::storage::repository_state_store::is_lock_timeout(&error) => {}
+                attempt => break attempt,
+            }
+        };
+        match reopened {
             Ok(session) => {
                 let inserted = RETAINED_MUTATION_SESSIONS.with(|sessions| {
                     let mut sessions = sessions.borrow_mut();
@@ -1694,6 +1689,42 @@ mod tests {
             competing.acquire().is_err(),
             "the canonical session must be retained again before returning"
         );
+        drop(retained);
+    }
+
+    #[test]
+    fn test_run_external_process_keeps_finished_result_when_reopen_waits_past_timeout() {
+        let (temp, storage, _taxonomy) =
+            crate::test_utils::setup_test_repo_with_taxonomy().unwrap();
+        // The bootstrap lock is shared per path, so the fixture's instance must
+        // be gone before the short-wait storage registers its own.
+        let root = storage.root().to_path_buf();
+        drop(storage);
+        let storage =
+            JsonFileStorage::with_lock_timeout(root, std::time::Duration::from_millis(50));
+        let data = temp.path().join(".jit");
+        let layout = crate::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let retained = storage.open_and_retain_mutation_session(layout).unwrap();
+        let bootstrap = temp.path().join(".jit-bootstrap.lock");
+        let (acquired, holding) = std::sync::mpsc::channel();
+
+        let result = storage.run_external_process(|| {
+            // Another jit process takes the lock chain while the checker runs
+            // and holds it for many lock waits after the checker finishes.
+            let holder = std::thread::spawn(move || {
+                let competing =
+                    RepoWriteLock::for_lock_path(bootstrap, std::time::Duration::from_secs(5));
+                let guard = competing.acquire().unwrap();
+                acquired.send(()).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(400));
+                drop(guard);
+            });
+            holding.recv().unwrap();
+            drop(holder);
+            Ok("verdict")
+        });
+
+        assert_eq!(result.unwrap(), "verdict");
         drop(retained);
     }
 

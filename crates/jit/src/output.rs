@@ -576,6 +576,9 @@ pub enum ExitCode {
     /// External dependency failed - git, file system, etc. (10)
     ExternalError = 10,
 
+    /// A lock wait expired while another jit process held the lock (11)
+    LockTimeout = 11,
+
     /// A downstream reader closed the pipe while jit was writing (141)
     ///
     /// `128 + SIGPIPE (13) = 141`: the exit status a shell reports for a
@@ -606,6 +609,9 @@ impl ExitCode {
             ExitCode::PermissionDenied => "Permission denied",
             ExitCode::AlreadyExists => "Resource already exists",
             ExitCode::ExternalError => "External dependency failed (git, file system, etc.)",
+            ExitCode::LockTimeout => {
+                "A lock wait expired while another jit process held the lock; retrying may succeed"
+            }
             ExitCode::BrokenPipe => {
                 "Downstream reader closed the pipe while jit was writing (128 + SIGPIPE)"
             }
@@ -624,6 +630,7 @@ impl ExitCode {
              {}  - {}\n\
              {}  - {}\n\
              {} - {}\n\
+             {} - {}\n\
              {} - {}",
             ExitCode::Success.code(),
             ExitCode::Success.description(),
@@ -641,6 +648,8 @@ impl ExitCode {
             ExitCode::AlreadyExists.description(),
             ExitCode::ExternalError.code(),
             ExitCode::ExternalError.description(),
+            ExitCode::LockTimeout.code(),
+            ExitCode::LockTimeout.description(),
             ExitCode::BrokenPipe.code(),
             ExitCode::BrokenPipe.description(),
         )
@@ -753,6 +762,8 @@ pub enum ErrorCode {
     ClaimListError,
     /// Forced claim eviction failed.
     ClaimForceEvictError,
+    /// A lock wait expired while another jit process held the lock.
+    LockTimeout,
 }
 
 impl ErrorCode {
@@ -760,7 +771,7 @@ impl ErrorCode {
     ///
     /// A conformance test compares this list with the variants schemars derives
     /// from [`ErrorCode`], so omitting a newly added member fails the suite.
-    pub const ALL: [ErrorCode; 46] = [
+    pub const ALL: [ErrorCode; 47] = [
         ErrorCode::IssueNotFound,
         ErrorCode::GateNotFound,
         ErrorCode::CycleDetected,
@@ -807,6 +818,7 @@ impl ErrorCode {
         ErrorCode::ClaimStatusError,
         ErrorCode::ClaimListError,
         ErrorCode::ClaimForceEvictError,
+        ErrorCode::LockTimeout,
     ];
 
     /// Return the byte-exact code written to a JSON error envelope.
@@ -858,6 +870,7 @@ impl ErrorCode {
             ErrorCode::ClaimStatusError => "CLAIM_STATUS_ERROR",
             ErrorCode::ClaimListError => "CLAIM_LIST_ERROR",
             ErrorCode::ClaimForceEvictError => "CLAIM_FORCE_EVICT_ERROR",
+            ErrorCode::LockTimeout => "LOCK_TIMEOUT",
         }
     }
 
@@ -895,6 +908,7 @@ impl ErrorCode {
             | ErrorCode::ClaimRequiresGit
             | ErrorCode::RepositoryFormatTooNew => ExitCode::ExternalError,
             ErrorCode::PermissionDenied => ExitCode::PermissionDenied,
+            ErrorCode::LockTimeout => ExitCode::LockTimeout,
             ErrorCode::ParseError
             | ErrorCode::ItemNotFound
             | ErrorCode::ItemCommandFailed
@@ -992,6 +1006,9 @@ impl ErrorCode {
                 "Claim enumeration failed without a more specific classification."
             }
             ErrorCode::ClaimForceEvictError => "Forced claim eviction failed.",
+            ErrorCode::LockTimeout => {
+                "A lock wait expired while another jit process held the lock; nothing was changed."
+            }
         }
     }
 }
@@ -1112,6 +1129,7 @@ impl std::str::FromStr for ErrorCode {
             "CLAIM_STATUS_ERROR" => Ok(ErrorCode::ClaimStatusError),
             "CLAIM_LIST_ERROR" => Ok(ErrorCode::ClaimListError),
             "CLAIM_FORCE_EVICT_ERROR" => Ok(ErrorCode::ClaimForceEvictError),
+            "LOCK_TIMEOUT" => Ok(ErrorCode::LockTimeout),
             code => Err(UnknownErrorCode {
                 code: code.to_string(),
             }),
@@ -3599,6 +3617,11 @@ mod tests {
                 ErrorCode::ClaimForceEvictError,
                 "CLAIM_FORCE_EVICT_ERROR",
                 ExitCode::NotFound,
+            ),
+            (
+                ErrorCode::LockTimeout,
+                "LOCK_TIMEOUT",
+                ExitCode::LockTimeout,
             ),
         ];
 

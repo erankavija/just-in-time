@@ -56,3 +56,4 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `CLAIM_STATUS_ERROR` | Claim status inspection failed without a more specific classification. | `1` |
 | `CLAIM_LIST_ERROR` | Claim enumeration failed without a more specific classification. | `1` |
 | `CLAIM_FORCE_EVICT_ERROR` | Forced claim eviction failed. | `3` |
+| `LOCK_TIMEOUT` | A lock wait expired while another jit process held the lock; nothing was changed. | `11` |

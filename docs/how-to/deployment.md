@@ -204,7 +204,7 @@ docker compose up -d
 |----------|---------|-------------|
 | `JIT_DATA_DIR` | `./.jit` | Native `jit-server` data directory; the container serves `/repo/.jit` from its bind mount |
 | `RUST_LOG` | `info` | Log level (trace, debug, info, warn, error) |
-| `JIT_LOCK_TIMEOUT` | `5` | Lock timeout in seconds (the default is the lock-acquisition timeout in [Runtime Coordination Defaults](../reference/runtime-defaults.md)) |
+| `JIT_LOCK_TIMEOUT` | see description | Lock wait in whole seconds for every lock jit acquires (the default is the lock-acquisition timeout in [Runtime Coordination Defaults](../reference/runtime-defaults.md)) |
 
 The Compose service reads four further variables of its own: `JIT_REPO`, the
 repository to mount; `JIT_UID` and `JIT_GID`, the [mount

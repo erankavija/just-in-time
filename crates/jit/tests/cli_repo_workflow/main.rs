@@ -22,6 +22,7 @@ mod init_tests;
 mod integration_schema;
 mod integration_test;
 mod linked_checkout_write_policy_tests;
+mod lock_contention_tests;
 mod profile_acceptance_tests;
 mod profile_cli_tests;
 mod profile_concurrency_tests;

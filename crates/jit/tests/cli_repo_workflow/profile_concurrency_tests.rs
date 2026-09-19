@@ -110,7 +110,14 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     let contention_message = contention["error"]["message"]
         .as_str()
         .expect("contention failure carries a message");
-    assert_eq!(contention["error"]["code"], "GENERIC_ERROR");
+    assert_eq!(
+        contention["error"]["code"],
+        jit::output::ErrorCode::LockTimeout.as_str()
+    );
+    assert_eq!(
+        contender.status.code(),
+        Some(jit::output::ExitCode::LockTimeout.code())
+    );
     assert!(contention_message.contains("Lock timeout"), "{contention}");
     assert!(
         contention_message.contains("exclusive lock"),

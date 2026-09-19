@@ -12,14 +12,17 @@
 //! committed copy matches the projection, so changing a default without
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
 
-/// Maximum time, in seconds, a lock holder waits to acquire a file lock before
-/// failing. `JsonFileStorage` resolves one timeout from the `JIT_LOCK_TIMEOUT`
-/// environment variable (whole seconds) when set, falling back to this default,
-/// and applies it to every lock it acquires — both its repository write lock and
-/// the shared `FileLocker` it uses for all other `.jit` file locks. The
-/// claim-coordination and worktree locks build their own `FileLocker` from this
-/// constant and ignore the variable.
-pub const LOCK_TIMEOUT_SECS: u64 = 5;
+/// Maximum time, in seconds, a caller waits to acquire a file lock before
+/// failing. Every production lock resolves its wait through
+/// `storage::lock::configured_lock_timeout`, which reads the `JIT_LOCK_TIMEOUT`
+/// environment variable (whole seconds) when set and falls back to this
+/// default. The default sits well above one mutation's lock hold, so
+/// concurrent callers queue rather than fail.
+pub const LOCK_TIMEOUT_SECS: u64 = 60;
+
+// Concurrent callers queue behind a mutation that holds the repository lock
+// for several seconds; a shorter default turns that contention into failures.
+const _: () = assert!(LOCK_TIMEOUT_SECS >= 60);
 
 /// Interval, in milliseconds, between successive attempts while blocking on a
 /// contended file lock.
@@ -57,7 +60,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Lock acquisition timeout",
             format!("{LOCK_TIMEOUT_SECS} seconds"),
-            "Default timeout for acquiring a file lock before failing. `JsonFileStorage` resolves one timeout from the `JIT_LOCK_TIMEOUT` environment variable when set, falling back to this default, and applies it to every lock it acquires — both its repository write lock and the shared `FileLocker` it uses for all other `.jit` file locks. The claim-coordination and worktree locks build their own `FileLocker` from this constant and ignore the environment variable.",
+            "Default wait for acquiring a file lock before failing. Every lock jit acquires, including the repository lock chain, the shared `.jit` file locks, and claim coordination, resolves its wait from the `JIT_LOCK_TIMEOUT` environment variable (whole seconds) when set, falling back to this default. A wait that expires exits with the dedicated lock-timeout exit code.",
         ),
         (
             "Lock poll interval",

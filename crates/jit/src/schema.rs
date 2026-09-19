@@ -868,6 +868,12 @@ impl CommandSchema {
                 description: "External dependency failed (git, file system, etc.)".to_string(),
             },
             ExitCodeDoc {
+                code: 11,
+                description:
+                    "A lock wait expired while another jit process held the lock; retrying may succeed"
+                        .to_string(),
+            },
+            ExitCodeDoc {
                 code: 141,
                 description: "Downstream reader closed the pipe while jit was writing \
                     (128 + SIGPIPE)"
@@ -922,6 +928,14 @@ impl CommandSchema {
                 10,
                 "The repository's on-disk format is newer than this binary, or a \
                  filesystem/subprocess I/O operation failed.",
+                false,
+            ),
+            row(
+                "*",
+                11,
+                "A lock wait expired while another jit process held the lock \
+                 (`JIT_LOCK_TIMEOUT`); the command changed nothing and may be \
+                 retried.",
                 false,
             ),
             // Command-family classification (standard taxonomy meaning).

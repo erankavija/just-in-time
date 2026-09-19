@@ -50,10 +50,42 @@ pub struct LockTimeout {
     pub waited: Duration,
 }
 
-/// True when `error` is a lock wait that expired rather than an outcome the
-/// locked operation decided.
+/// True when `error`, or any cause beneath it, is a lock wait that expired
+/// rather than an outcome the locked operation decided.
+///
+/// The whole cause chain is searched because a session-level failure carries
+/// the timeout inside
+/// [`RepositoryStateStoreError`](crate::storage::repository_state_store::RepositoryStateStoreError),
+/// whose transparent variant hides the inner error from the chain.
 pub fn is_lock_timeout(error: &anyhow::Error) -> bool {
-    error.downcast_ref::<LockTimeout>().is_some()
+    error.chain().any(is_lock_timeout_cause)
+}
+
+fn is_lock_timeout_cause(cause: &(dyn std::error::Error + 'static)) -> bool {
+    use crate::storage::repository_state_store::RepositoryStateStoreError;
+    cause.downcast_ref::<LockTimeout>().is_some()
+        || matches!(
+            cause.downcast_ref::<RepositoryStateStoreError>(),
+            Some(RepositoryStateStoreError::Other(inner)) if is_lock_timeout(inner)
+        )
+}
+
+/// The configured lock acquisition timeout: `JIT_LOCK_TIMEOUT` whole seconds
+/// when set and valid, otherwise
+/// [`LOCK_TIMEOUT_SECS`](crate::runtime_defaults::LOCK_TIMEOUT_SECS).
+///
+/// Every production lock resolves its wait here, so one setting governs the
+/// repository lock chain, the shared `.jit` file locks, and claim
+/// coordination. A caller that waits on a process performing its own recovery
+/// (`commands::serve`'s startup bound) allows for this same wait.
+pub fn configured_lock_timeout() -> Duration {
+    std::env::var("JIT_LOCK_TIMEOUT")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .map(Duration::from_secs)
+        .unwrap_or(Duration::from_secs(
+            crate::runtime_defaults::LOCK_TIMEOUT_SECS,
+        ))
 }
 
 /// Metadata for lock diagnostics
@@ -152,6 +184,11 @@ impl FileLocker {
             timeout,
             warnings: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Create a FileLocker that waits for [`configured_lock_timeout`].
+    pub fn with_configured_timeout() -> Self {
+        Self::new(configured_lock_timeout())
     }
 
     /// Return the non-fatal warnings recorded by this locker and its clones.
