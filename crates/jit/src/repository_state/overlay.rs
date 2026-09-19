@@ -16,7 +16,7 @@
 //! removals so whole-repository validation sees one coherent proposed repository.
 
 use super::{
-    CaptureError, EntryIdentity, FileMode, ListingFingerprint, RepositoryEntry, RepositoryImage,
+    CaptureError, CapturedBytes, FileMode, ListingFingerprint, RepositoryEntry, RepositoryImage,
     RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 
@@ -66,11 +66,11 @@ pub fn apply_overlay(
         spec.discover_paths([path.clone()])?;
         let (entry, child_identity) = match value {
             Some(bytes) => {
-                let identity = EntryIdentity::for_bytes(OVERLAY_OBJECT, &bytes)?;
+                let content = CapturedBytes::new(OVERLAY_OBJECT, bytes)?;
+                let identity = content.identity().clone();
                 (
                     RepositoryEntry::File {
-                        identity: identity.clone(),
-                        bytes,
+                        content,
                         mode: FileMode::Regular,
                     },
                     Some(identity),
@@ -127,7 +127,7 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, RepositoryLayout, RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -145,8 +145,7 @@ mod tests {
 
     fn file_entry(text: &str) -> RepositoryEntry {
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes("base", text.as_bytes()).unwrap(),
-            bytes: text.as_bytes().to_vec(),
+            content: CapturedBytes::new("base", text.as_bytes().to_vec()).unwrap(),
             mode: FileMode::Regular,
         }
     }

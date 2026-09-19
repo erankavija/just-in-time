@@ -1841,8 +1841,8 @@ pub(super) fn compose_profile_targets_with_context(
         let mode = existing_file_mode(base, &path)?;
         if matches!(
             base.entry(&path).map_err(ProducerError::from)?,
-            RepositoryEntry::File { bytes: existing, mode: existing_mode, .. }
-                if existing == &bytes && *existing_mode == mode
+            RepositoryEntry::File { content: existing, mode: existing_mode }
+                if existing.bytes() == bytes.as_slice() && *existing_mode == mode
         ) && matches!(
             profile_conflict_occupant(&ownership, &path),
             ProfileConflictOccupant::Repository
@@ -1919,8 +1919,8 @@ pub(super) fn compose_profile_targets_with_context(
         }
         if matches!(
             base.entry(path).map_err(ProducerError::from)?,
-            RepositoryEntry::File { bytes: existing, mode: existing_mode, .. }
-                if existing == bytes && *existing_mode == *mode
+            RepositoryEntry::File { content: existing, mode: existing_mode }
+                if existing.bytes() == bytes.as_slice() && *existing_mode == *mode
         ) && matches!(
             profile_conflict_occupant(&ownership, path),
             ProfileConflictOccupant::Repository
@@ -1967,10 +1967,9 @@ fn composed_target_disposition(
     Ok(match base.entry(path).map_err(ProducerError::from)? {
         RepositoryEntry::Absent => ProfileTargetDisposition::Create,
         RepositoryEntry::File {
-            bytes: existing,
+            content: existing,
             mode: existing_mode,
-            ..
-        } if existing.as_slice() == bytes && *existing_mode == mode => {
+        } if existing.bytes() == bytes && *existing_mode == mode => {
             ProfileTargetDisposition::Unchanged
         }
         _ => ProfileTargetDisposition::Update,
@@ -1997,13 +1996,13 @@ fn decide_asset_replacement(
     candidate_mode: FileMode,
 ) -> Result<Option<ProfileTargetConflict>, RepositoryStateError> {
     let RepositoryEntry::File {
-        bytes: current_bytes,
+        content: current,
         mode: current_mode,
-        ..
     } = base.entry(path).map_err(ProducerError::from)?
     else {
         return Ok(None);
     };
+    let current_bytes = current.bytes();
     if current_bytes == candidate_bytes && *current_mode == candidate_mode {
         return Ok(None);
     }
@@ -2046,15 +2045,17 @@ fn recorded_asset_claim(
     if !base.capture_spec().contains_path(&record_path) {
         return Ok(None);
     }
-    let RepositoryEntry::File { bytes, .. } =
+    let RepositoryEntry::File { content, .. } =
         base.entry(&record_path).map_err(ProducerError::from)?
     else {
         return Ok(None);
     };
     let record: AppliedProfileRecord =
-        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
-            path: record_path.repository_relative(),
-            source,
+        serde_json::from_slice(content.bytes()).map_err(|source| {
+            ProducerError::ProfileRecordParse {
+                path: record_path.repository_relative(),
+                source,
+            }
         })?;
     validate_applied_record_path(&record_path, &record)?;
     Ok(record
@@ -2081,15 +2082,17 @@ fn replacement_asset_paths(
     if !base.capture_spec().contains_path(&record_path) {
         return Ok(Vec::new());
     }
-    let RepositoryEntry::File { bytes, .. } =
+    let RepositoryEntry::File { content, .. } =
         base.entry(&record_path).map_err(ProducerError::from)?
     else {
         return Ok(Vec::new());
     };
     let record: AppliedProfileRecord =
-        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
-            path: record_path.repository_relative(),
-            source,
+        serde_json::from_slice(content.bytes()).map_err(|source| {
+            ProducerError::ProfileRecordParse {
+                path: record_path.repository_relative(),
+                source,
+            }
         })?;
     validate_applied_record_path(&record_path, &record)?;
     record
@@ -2120,15 +2123,17 @@ fn departing_asset_decisions(
     if !base.capture_spec().contains_path(&record_path) {
         return Ok(BTreeMap::new());
     }
-    let RepositoryEntry::File { bytes, .. } =
+    let RepositoryEntry::File { content, .. } =
         base.entry(&record_path).map_err(ProducerError::from)?
     else {
         return Ok(BTreeMap::new());
     };
     let record: AppliedProfileRecord =
-        serde_json::from_slice(bytes).map_err(|source| ProducerError::ProfileRecordParse {
-            path: record_path.repository_relative(),
-            source,
+        serde_json::from_slice(content.bytes()).map_err(|source| {
+            ProducerError::ProfileRecordParse {
+                path: record_path.repository_relative(),
+                source,
+            }
         })?;
     validate_applied_record_path(&record_path, &record)?;
     record
@@ -2149,8 +2154,8 @@ fn departing_asset_decisions(
             }
             let (current, mode) = match base.entry(&path).map_err(ProducerError::from)? {
                 RepositoryEntry::Absent => (ThreeWayValue::Absent, FileMode::Regular),
-                RepositoryEntry::File { bytes, mode, .. } => (
-                    ThreeWayValue::Present(fingerprint_profile_asset(bytes, *mode)),
+                RepositoryEntry::File { content, mode } => (
+                    ThreeWayValue::Present(fingerprint_profile_asset(content.bytes(), *mode)),
                     *mode,
                 ),
                 _ => return Ok(None),
@@ -2545,7 +2550,7 @@ fn render_composed_contributions(
         if !documents.contains_key(&target) {
             let path = base.layout().classify_repository_relative(&target)?;
             let existing = match base.entry(&path).map_err(ProducerError::from)? {
-                RepositoryEntry::File { bytes, mode, .. } => Some((bytes.clone(), *mode)),
+                RepositoryEntry::File { content, mode } => Some((content.bytes().to_vec(), *mode)),
                 RepositoryEntry::Absent => None,
                 _ => return Err(ProducerError::ProfileRegistryNotFile { target }.into()),
             };
@@ -2590,17 +2595,18 @@ pub fn applied_profile_records(
     applied_profile_record_paths(base)?
         .into_iter()
         .map(|path| {
-            let RepositoryEntry::File { bytes, .. } =
+            let RepositoryEntry::File { content, .. } =
                 base.entry(&path).map_err(ProducerError::from)?
             else {
                 return Ok(None);
             };
-            let record: AppliedProfileRecord = serde_json::from_slice(bytes).map_err(|source| {
-                ProducerError::ProfileRecordParse {
-                    path: path.repository_relative(),
-                    source,
-                }
-            })?;
+            let record: AppliedProfileRecord =
+                serde_json::from_slice(content.bytes()).map_err(|source| {
+                    ProducerError::ProfileRecordParse {
+                        path: path.repository_relative(),
+                        source,
+                    }
+                })?;
             validate_applied_record_path(&path, &record)?;
             Ok(Some((path, record)))
         })
@@ -2828,20 +2834,21 @@ pub fn claimed_target_state(
         }
         AppliedProfileClaimIdentity::Asset { .. } => {
             Ok(match base.entry(&path).map_err(ProducerError::from)? {
-                RepositoryEntry::File { bytes, mode, .. } => ClaimedTargetState::matching(
-                    fingerprint_profile_asset(bytes, *mode) == claim.base_fingerprint,
+                RepositoryEntry::File { content, mode } => ClaimedTargetState::matching(
+                    fingerprint_profile_asset(content.bytes(), *mode) == claim.base_fingerprint,
                 ),
                 _ => ClaimedTargetState::Absent,
             })
         }
         AppliedProfileClaimIdentity::ManagedRegion { region_id, .. } => {
-            let RepositoryEntry::File { bytes, mode, .. } =
+            let RepositoryEntry::File { content, mode } =
                 base.entry(&path).map_err(ProducerError::from)?
             else {
                 return Ok(ClaimedTargetState::Absent);
             };
             let (begin, end) = region_delimiters(region_id);
-            let Some(body) = super::managed_document::region_body(bytes, &begin, &end) else {
+            let Some(body) = super::managed_document::region_body(content.bytes(), &begin, &end)
+            else {
                 return Ok(ClaimedTargetState::Absent);
             };
             if carries_nested_region(body) {
@@ -2876,7 +2883,7 @@ fn repository_definition(
     let path = base.layout().classify_repository_relative(registry)?;
     let bytes = match base.entry(&path).map_err(ProducerError::from)? {
         RepositoryEntry::Absent => return Ok(None),
-        RepositoryEntry::File { bytes, .. } => bytes.clone(),
+        RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
         _ => {
             return Err(ProducerError::ProfileRegistryNotFile {
                 target: registry.to_string(),
@@ -3541,8 +3548,8 @@ fn existing_file_mode(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, ListingFingerprint, RepositoryLayout,
-        RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, ListingFingerprint,
+        RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -3562,8 +3569,6 @@ mod tests {
             super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        let config_bytes = b"";
-        let config_identity = EntryIdentity::for_bytes("config", config_bytes).unwrap();
         let owners = targets
             .iter()
             .flat_map(|(_, _, owners)| owners.iter().copied())
@@ -3592,13 +3597,10 @@ mod tests {
                     ResolvedVariables::default(),
                     claims,
                 );
-                let bytes = record.to_bytes().unwrap();
-                let identity = EntryIdentity::for_bytes("record", &bytes).unwrap();
                 (
                     format!("{owner}.json"),
                     VirtualPath::data(format!("profiles/{owner}.json")).unwrap(),
-                    bytes,
-                    identity,
+                    CapturedBytes::new("record", record.to_bytes().unwrap()).unwrap(),
                 )
             })
             .collect::<Vec<_>>();
@@ -3611,7 +3613,7 @@ mod tests {
             VirtualPath::TEMPLATES,
             profiles.clone(),
         ];
-        requested.extend(records.iter().map(|(_, path, _, _)| path.clone()));
+        requested.extend(records.iter().map(|(_, path, _)| path.clone()));
         requested.extend(targets.iter().map(|(target, _, _)| target.clone()));
         let mut spec = CaptureSpec::phase_one(
             requested,
@@ -3627,8 +3629,7 @@ mod tests {
             (
                 VirtualPath::CONFIG,
                 RepositoryEntry::File {
-                    identity: config_identity,
-                    bytes: config_bytes.to_vec(),
+                    content: CapturedBytes::new("config", Vec::new()).unwrap(),
                     mode: FileMode::Regular,
                 },
             ),
@@ -3640,12 +3641,11 @@ mod tests {
                 },
             ),
         ]);
-        entries.extend(records.iter().map(|(_, path, bytes, identity)| {
+        entries.extend(records.iter().map(|(_, path, content)| {
             (
                 path.clone(),
                 RepositoryEntry::File {
-                    identity: identity.clone(),
-                    bytes: bytes.clone(),
+                    content: content.clone(),
                     mode: FileMode::Regular,
                 },
             )
@@ -3654,8 +3654,7 @@ mod tests {
             (
                 target.clone(),
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes("target", bytes).unwrap(),
-                    bytes: bytes.to_vec(),
+                    content: CapturedBytes::new("target", bytes.to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             )
@@ -3675,7 +3674,7 @@ mod tests {
             ListingFingerprint::new(
                 records
                     .iter()
-                    .map(|(name, _, _, identity)| (name.clone(), identity.clone()))
+                    .map(|(name, _, content)| (name.clone(), content.identity().clone()))
                     .collect(),
             )
             .unwrap(),
@@ -4732,8 +4731,7 @@ mod tests {
             BTreeMap::from([(
                 VirtualPath::CONFIG,
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes("config", config).unwrap(),
-                    bytes: config.to_vec(),
+                    content: CapturedBytes::new("config", config.to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             )]),
@@ -4892,8 +4890,7 @@ mod tests {
             BTreeMap::from([(
                 path,
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes(".jit/config.toml", authored).unwrap(),
-                    bytes: authored.to_vec(),
+                    content: CapturedBytes::new(".jit/config.toml", authored.to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             )]),
@@ -4946,9 +4943,8 @@ mod tests {
                 let entry = match held {
                     None => RepositoryEntry::Absent,
                     Some((path, bytes, mode)) => RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes(path.repository_relative(), bytes)
+                        content: CapturedBytes::new(path.repository_relative(), bytes.to_vec())
                             .expect("entry identity"),
-                        bytes: bytes.to_vec(),
                         mode: *mode,
                     },
                 };

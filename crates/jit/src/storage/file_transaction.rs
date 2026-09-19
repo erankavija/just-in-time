@@ -17,8 +17,8 @@ use super::transaction_recovery::{
 };
 use super::transaction_staging::{stage_bytes, sync_directory};
 use crate::repository_state::{
-    EntryIdentity, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryLayout, RepositoryRootClass, VirtualPath,
+    CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta,
+    RepositoryEntry, RepositoryLayout, RepositoryRootClass, VirtualPath,
 };
 use anyhow::Result;
 use cap_primitives::fs::FollowSymlinks;
@@ -1133,13 +1133,13 @@ fn prepare_repository_actions(
                     let (parent, leaf) = open_parent(root, &relative, false)?;
                     let current = inspect_repository_leaf(&parent, &leaf)?;
                     ensure_repository_expected(&path, &journal.actions[index].expected, &current)?;
-                    let RepositoryEntry::File { bytes, .. } = current else {
+                    let RepositoryEntry::File { content, .. } = current else {
                         return Err(FileTransactionError::UnsupportedTarget {
                             path: format!("{path:?}"),
                         }
                         .into());
                     };
-                    stage_bytes(stages, stage.as_str(), &bytes)?;
+                    stage_bytes(stages, stage.as_str(), content.bytes())?;
                     set_mode(stages, stage.as_str(), repository_unix_mode(*mode))?;
                     barrier.record(BarrierDirectory::Stages(path.root_class()));
                     journal.actions[index].final_identity = repository_final_identity(
@@ -1311,13 +1311,13 @@ fn prepare_repository_backup(
     let (injector, index) = failure;
     let current = inspect_repository_leaf(parent, leaf)?;
     ensure_repository_expected(path, expected, &current)?;
-    let RepositoryEntry::File { bytes, mode, .. } = current else {
+    let RepositoryEntry::File { content, mode } = current else {
         return Err(FileTransactionError::UnsupportedTarget {
             path: format!("{path:?}"),
         }
         .into());
     };
-    stage_bytes(backups, backup.as_str(), &bytes).map_err(|error| {
+    stage_bytes(backups, backup.as_str(), content.bytes()).map_err(|error| {
         if error.kind() == ErrorKind::AlreadyExists {
             FileTransactionError::UnexpectedOccupant {
                 path: format!("backup {}", backup.as_str()),
@@ -2501,8 +2501,7 @@ fn inspect_repository_leaf(parent: &Dir, leaf: &str) -> Result<RepositoryEntry> 
         let target = parent.read_link(leaf)?;
         let bytes = target.as_os_str().as_encoded_bytes().to_vec();
         return Ok(RepositoryEntry::Symlink {
-            identity: repository_entry_identity(&metadata, &bytes)?,
-            target: bytes,
+            target: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
             mode: repository_file_mode(&metadata),
         });
     }
@@ -2518,8 +2517,7 @@ fn inspect_repository_leaf(parent: &Dir, leaf: &str) -> Result<RepositoryEntry> 
         file.read_to_end(&mut bytes)?;
         let metadata = file.metadata()?;
         return Ok(RepositoryEntry::File {
-            identity: repository_entry_identity(&metadata, &bytes)?,
-            bytes,
+            content: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
             mode: repository_file_mode(&metadata),
         });
     }
@@ -2585,13 +2583,12 @@ fn repository_file_content_matches_expected(
                 mode: expected_mode,
             },
             RepositoryEntry::File {
-                identity: actual_identity,
+                content,
                 mode: actual_mode,
-                ..
             },
         ) => {
-            expected_identity.sha256() == actual_identity.sha256()
-                && expected_identity.byte_size() == actual_identity.byte_size()
+            expected_identity.sha256() == content.identity().sha256()
+                && expected_identity.byte_size() == content.identity().byte_size()
                 && expected_mode == actual_mode
         }
         _ => repository_matches_expected(expected, actual),
@@ -2620,8 +2617,8 @@ fn repository_final_identity(entry: &RepositoryEntry) -> Result<RepositoryFinalI
             identity: identity.clone(),
             mode: *mode,
         }),
-        RepositoryEntry::File { identity, mode, .. } => Ok(RepositoryFinalIdentity::File {
-            identity: identity.clone(),
+        RepositoryEntry::File { content, mode } => Ok(RepositoryFinalIdentity::File {
+            identity: content.identity().clone(),
             mode: *mode,
         }),
         RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {

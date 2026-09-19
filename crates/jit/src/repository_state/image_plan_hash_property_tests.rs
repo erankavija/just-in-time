@@ -256,3 +256,41 @@ proptest! {
         );
     }
 }
+
+proptest! {
+    /// `plan_hash` commits to the exact bytes a `WriteFile` publishes: two
+    /// otherwise identical single-write deltas hash equal exactly when their
+    /// written bytes are equal.
+    #[test]
+    fn prop_plan_hash_distinguishes_write_file_bytes(
+        path in virtual_path_strategy(),
+        left_bytes in prop::collection::vec(any::<u8>(), 0..256),
+        right_bytes in prop::collection::vec(any::<u8>(), 0..256),
+    ) {
+        let repo_layout = layout();
+        let delta_writing = |bytes: Vec<u8>| {
+            RepositoryDelta::new(
+                &repo_layout,
+                vec![RepositoryAction::write_file(
+                    path.clone(),
+                    "plan-hash-property",
+                    ExpectedPreimage::Absent,
+                    bytes,
+                    FileMode::Regular,
+                )],
+            )
+            .expect("a single absent-preimage write is contract-valid")
+        };
+        let left = delta_writing(left_bytes.clone());
+        let right = delta_writing(right_bytes.clone());
+
+        let repo_image = empty_image(repo_layout.clone());
+        let repo_seed = fixed_seed();
+        let intent = MaterializationIntent::SemanticMutation;
+
+        let left_hash = plan_hash(&repo_image, &repo_seed, &intent, &left).unwrap();
+        let right_hash = plan_hash(&repo_image, &repo_seed, &intent, &right).unwrap();
+
+        prop_assert_eq!(left_hash == right_hash, left_bytes == right_bytes);
+    }
+}

@@ -249,7 +249,7 @@ pub fn resolve_document_reference(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, FileMode, PinnedDocumentEvidence,
+        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, FileMode, PinnedDocumentEvidence,
         PinnedSourceClass, RepositoryEntry, RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
@@ -343,8 +343,7 @@ mod tests {
                 worktree.clone(),
                 if in_worktree {
                     RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes("wt", &bytes).unwrap(),
-                        bytes,
+                        content: CapturedBytes::new("wt", bytes).unwrap(),
                         mode: FileMode::Regular,
                     }
                 } else {

@@ -360,8 +360,8 @@ pub(crate) fn compose_configured_projections(
     let mut actions = Vec::new();
     for (vpath, expected_bytes) in composed {
         let entry = image.entry(&vpath)?;
-        if let RepositoryEntry::File { bytes, mode, .. } = entry {
-            if bytes == &expected_bytes && *mode == FileMode::Regular {
+        if let RepositoryEntry::File { content, mode } = entry {
+            if content.bytes() == expected_bytes.as_slice() && *mode == FileMode::Regular {
                 continue;
             }
         }
@@ -457,8 +457,8 @@ pub(crate) fn compose_default_ruleset(
             continue;
         }
         let occupant = entry(image, &vpath)?;
-        if let RepositoryEntry::File { bytes, mode, .. } = occupant {
-            if bytes == schema.content.as_bytes() && *mode == FileMode::Regular {
+        if let RepositoryEntry::File { content, mode } = occupant {
+            if content.bytes() == schema.content.as_bytes() && *mode == FileMode::Regular {
                 continue;
             }
         }
@@ -568,7 +568,7 @@ mod tests {
     use crate::domain::ProfileOrigin;
     use crate::repository_state::{
         compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
-        CaptureSpec, Contribution, EntryIdentity, InitializationScaffold, MapEntryTarget,
+        CaptureSpec, CapturedBytes, Contribution, InitializationScaffold, MapEntryTarget,
         MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
         MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
         ProfileClaims, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
@@ -631,8 +631,7 @@ kind = "advisory"
             let vpath = layout.classify_repository_relative(repo_rel).unwrap();
             let entry = match contents {
                 Some(text) => RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes(*repo_rel, text.as_bytes()).unwrap(),
-                    bytes: text.as_bytes().to_vec(),
+                    content: CapturedBytes::new(*repo_rel, text.as_bytes().to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
                 None => RepositoryEntry::Absent,

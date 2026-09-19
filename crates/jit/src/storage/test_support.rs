@@ -5,7 +5,8 @@
 use super::{atomic_write::rename_noreplace_cap, InMemoryStorage, IssueStore};
 use crate::domain::Issue;
 use crate::repository_state::{
-    serialize_issue, EntryIdentity, FileMode, RepositoryEntry, RepositoryIndex, VirtualPath,
+    serialize_issue, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryIndex,
+    VirtualPath,
 };
 use anyhow::{bail, Context, Result};
 use std::collections::BTreeMap;
@@ -130,10 +131,8 @@ impl InMemoryStorage {
                         mode,
                     }
                 } else if metadata.is_file() {
-                    let bytes = fs::read(&path)?;
                     RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes(object, &bytes)?,
-                        bytes,
+                        content: CapturedBytes::new(object, fs::read(&path)?)?,
                         mode,
                     }
                 } else {

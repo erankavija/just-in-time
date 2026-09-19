@@ -113,8 +113,10 @@ fn captured_repository_index(
 
     let path = VirtualPath::INDEX;
     match image.entry(&path)? {
-        RepositoryEntry::File { bytes, .. } => crate::storage::json::parse_repository_index(bytes)
-            .context("failed to parse captured issue index"),
+        RepositoryEntry::File { content, .. } => {
+            crate::storage::json::parse_repository_index(content.bytes())
+                .context("failed to parse captured issue index")
+        }
         RepositoryEntry::Absent => Err(anyhow!("captured repository has no .jit/index.json")),
         _ => Err(anyhow!("captured .jit/index.json is not a regular file")),
     }
@@ -128,8 +130,8 @@ fn captured_issue_record(
 
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
     match image.entry(&path)? {
-        RepositoryEntry::File { bytes, .. } => {
-            let issue: Issue = serde_json::from_slice(bytes)
+        RepositoryEntry::File { content, .. } => {
+            let issue: Issue = serde_json::from_slice(content.bytes())
                 .with_context(|| format!("failed to parse captured issue at {path:?}"))?;
             if issue.id != issue_id {
                 anyhow::bail!(
@@ -163,8 +165,10 @@ fn captured_gate_registry(
 
     let path = VirtualPath::GATES;
     match image.entry(&path)? {
-        RepositoryEntry::File { bytes, .. } => crate::declarations::parse_gate_registry(bytes)
-            .context("failed to parse captured gate registry"),
+        RepositoryEntry::File { content, .. } => {
+            crate::declarations::parse_gate_registry(content.bytes())
+                .context("failed to parse captured gate registry")
+        }
         RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
         _ => Err(anyhow!("captured .jit/gates.toml is not a regular file")),
     }
@@ -280,10 +284,10 @@ fn captured_gate_runs(
             let entry = image.entry(&path)?;
             let identity = entry.identity().cloned();
             let result = match entry {
-                RepositoryEntry::File { bytes, .. } => Some(
-                    serde_json::from_slice::<GateRunResult>(bytes).with_context(|| {
-                        format!("failed to parse captured gate run at {path:?}")
-                    })?,
+                RepositoryEntry::File { content, .. } => Some(
+                    serde_json::from_slice::<GateRunResult>(content.bytes()).with_context(
+                        || format!("failed to parse captured gate run at {path:?}"),
+                    )?,
                 ),
                 RepositoryEntry::Absent => None,
                 _ => {

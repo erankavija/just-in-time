@@ -55,7 +55,7 @@ pub(crate) use export::{
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
 };
 pub use image::{
-    plan_hash, CaptureBudget, CaptureError, CaptureSpec, DeltaError, EntryIdentity,
+    plan_hash, CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
     ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
     ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
     PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
@@ -1116,10 +1116,9 @@ fn derive_repair(
             if !matches!(
                 image.entry(&path).map_err(ProducerError::from)?,
                 RepositoryEntry::File {
-                    bytes: existing,
+                    content: existing,
                     mode: existing_mode,
-                    ..
-                } if existing.as_slice() == bytes && *existing_mode == mode
+                } if existing.bytes() == bytes && *existing_mode == mode
             ) {
                 actions.push(RepositoryAction::WriteFile {
                     path,
@@ -1265,11 +1264,10 @@ pub fn compare_materializations(
                 (
                     RepositoryAction::WriteFile { bytes, mode, .. },
                     RepositoryEntry::File {
-                        bytes: actual,
+                        content: actual,
                         mode: actual_mode,
-                        ..
                     },
-                ) if actual == bytes && actual_mode == mode => None,
+                ) if actual.bytes() == bytes.as_slice() && actual_mode == mode => None,
                 (RepositoryAction::WriteFile { .. }, _) => Some(MaterializationDriftKind::Stale),
                 (
                     RepositoryAction::SetMode { mode, .. },
@@ -1393,11 +1391,11 @@ mod tests {
         let delete = VirtualPath::data("delete").unwrap();
         let set_mode = VirtualPath::data("set-mode").unwrap();
         let write = VirtualPath::data("write").unwrap();
-        let delete_bytes = b"delete me".to_vec();
-        let mode_bytes = b"mode".to_vec();
         let write_bytes = b"old".to_vec();
-        let delete_identity = EntryIdentity::for_bytes("delete", &delete_bytes).unwrap();
-        let mode_identity = EntryIdentity::for_bytes("mode", &mode_bytes).unwrap();
+        let delete_content = CapturedBytes::new("delete", b"delete me".to_vec()).unwrap();
+        let mode_content = CapturedBytes::new("mode", b"mode".to_vec()).unwrap();
+        let delete_identity = delete_content.identity().clone();
+        let mode_identity = mode_content.identity().clone();
         let image = RepositoryImage::close(
             layout.clone(),
             CaptureSpec::phase_one(
@@ -1415,24 +1413,21 @@ mod tests {
                 (
                     delete.clone(),
                     RepositoryEntry::File {
-                        identity: delete_identity.clone(),
-                        bytes: delete_bytes,
+                        content: delete_content,
                         mode: FileMode::Regular,
                     },
                 ),
                 (
                     set_mode.clone(),
                     RepositoryEntry::File {
-                        identity: mode_identity.clone(),
-                        bytes: mode_bytes,
+                        content: mode_content,
                         mode: FileMode::Regular,
                     },
                 ),
                 (
                     write.clone(),
                     RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes("write", &write_bytes).unwrap(),
-                        bytes: write_bytes,
+                        content: CapturedBytes::new("write", write_bytes).unwrap(),
                         mode: FileMode::Regular,
                     },
                 ),

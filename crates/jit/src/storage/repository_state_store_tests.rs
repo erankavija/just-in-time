@@ -1106,7 +1106,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
         .unwrap();
     assert!(matches!(
         refreshed.entry(&path),
-        Ok(RepositoryEntry::File { bytes, .. }) if bytes == b"{}"
+        Ok(RepositoryEntry::File { content, .. }) if content.bytes() == b"{}"
     ));
 }
 
@@ -1377,8 +1377,7 @@ fn seed_memory_barrier_fixture(storage: &InMemoryStorage, existing_data_root: bo
         state.entries.insert(
             VirtualPath::data("record.txt").unwrap(),
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes("memory:data-record", b"old-data").unwrap(),
-                bytes: b"old-data".to_vec(),
+                content: CapturedBytes::new("memory:data-record", b"old-data".to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -1391,8 +1390,7 @@ fn seed_memory_barrier_fixture(storage: &InMemoryStorage, existing_data_root: bo
         state.entries.insert(
             path.clone(),
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes(format!("memory:{path:?}"), bytes).unwrap(),
-                bytes: bytes.to_vec(),
+                content: CapturedBytes::new(format!("memory:{path:?}"), bytes.to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -1512,7 +1510,7 @@ fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
                 image
                     .entry(&VirtualPath::worktree("first.txt").unwrap())
                     .unwrap(),
-                RepositoryEntry::File { bytes, .. } if bytes == b"old-first"
+                RepositoryEntry::File { content, .. } if content.bytes() == b"old-first"
             ));
             let data_record = image
                 .entry(&VirtualPath::data("record.txt").unwrap())
@@ -1520,7 +1518,7 @@ fn test_memory_rollback_edge_failure_retains_prepared_residue_for_retry() {
             if existing_data_root {
                 assert!(matches!(
                     data_record,
-                    RepositoryEntry::File { bytes, .. } if bytes == b"old-data"
+                    RepositoryEntry::File { content, .. } if content.bytes() == b"old-data"
                 ));
             } else {
                 assert!(matches!(data_record, RepositoryEntry::Absent));
@@ -1556,7 +1554,7 @@ fn test_memory_committed_recovery_stays_forward_without_rollback_edges() {
         image
             .entry(&VirtualPath::worktree("note.txt").unwrap())
             .unwrap(),
-        RepositoryEntry::File { bytes, .. } if bytes == b"note"
+        RepositoryEntry::File { content, .. } if content.bytes() == b"note"
     ));
     assert!(rollback_points(recording.observed()).is_empty());
     assert!(storage.repository_state().recovery.is_none());
@@ -1578,8 +1576,7 @@ fn test_memory_set_mode_uses_exact_file_preimage() {
         state.entries.insert(
             path,
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes("memory-tool", b"tool").unwrap(),
-                bytes: b"tool".to_vec(),
+                content: CapturedBytes::new("memory-tool", b"tool".to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -1748,8 +1745,10 @@ fn semantic_entry(entry: &RepositoryEntry) -> SemanticEntry {
     match entry {
         RepositoryEntry::Absent => SemanticEntry::Absent,
         RepositoryEntry::Directory { mode, .. } => SemanticEntry::Directory(*mode),
-        RepositoryEntry::File { bytes, mode, .. } => SemanticEntry::File(bytes.clone(), *mode),
-        RepositoryEntry::Symlink { target, .. } => SemanticEntry::Symlink(target.clone()),
+        RepositoryEntry::File { content, mode } => {
+            SemanticEntry::File(content.bytes().to_vec(), *mode)
+        }
+        RepositoryEntry::Symlink { target, .. } => SemanticEntry::Symlink(target.bytes().to_vec()),
         RepositoryEntry::Unsupported { .. } => SemanticEntry::Unsupported,
     }
 }
@@ -1839,8 +1838,7 @@ fn seed_memory_existing(memory: &InMemoryStorage, files: &[(VirtualPath, &[u8])]
         state.entries.insert(
             path.clone(),
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes(format!("mem:{path:?}"), bytes).unwrap(),
-                bytes: bytes.to_vec(),
+                content: CapturedBytes::new(format!("mem:{path:?}"), bytes.to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -2281,8 +2279,7 @@ fn capture_listing_errors(
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes(format!("mem:{path:?}"), bytes).unwrap(),
-                    bytes: bytes.to_vec(),
+                    content: CapturedBytes::new(format!("mem:{path:?}"), bytes.to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             );
@@ -3831,8 +3828,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
         state.entries.insert(
             VirtualPath::data("x").unwrap(),
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes("mem:x", b"changed").unwrap(),
-                bytes: b"changed".to_vec(),
+                content: CapturedBytes::new("mem:x", b"changed".to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -3968,8 +3964,7 @@ fn seed_memory_issue(memory: &InMemoryStorage, id: &str, issue: &Issue, events: 
     state.entries.insert(
         VirtualPath::data(format!("issues/{id}.json")).unwrap(),
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes("mem-issue", &issue_bytes).unwrap(),
-            bytes: issue_bytes,
+            content: CapturedBytes::new("mem-issue", issue_bytes).unwrap(),
             mode: FileMode::Regular,
         },
     );
@@ -3977,8 +3972,7 @@ fn seed_memory_issue(memory: &InMemoryStorage, id: &str, issue: &Issue, events: 
         state.entries.insert(
             VirtualPath::data("events.jsonl").unwrap(),
             RepositoryEntry::File {
-                identity: EntryIdentity::for_bytes("mem-events", events).unwrap(),
-                bytes: events.to_vec(),
+                content: CapturedBytes::new("mem-events", events.to_vec()).unwrap(),
                 mode: FileMode::Regular,
             },
         );
@@ -4049,7 +4043,7 @@ fn test_conformance_claim_finalizer_bytes_match_across_backends() {
             .get(&VirtualPath::data(format!("issues/{id}.json")).unwrap())
             .unwrap()
         {
-            RepositoryEntry::File { bytes, .. } => bytes.clone(),
+            RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
             other => panic!("expected issue file, got {other:?}"),
         };
         let events = match state
@@ -4057,7 +4051,7 @@ fn test_conformance_claim_finalizer_bytes_match_across_backends() {
             .get(&VirtualPath::data("events.jsonl").unwrap())
             .unwrap()
         {
-            RepositoryEntry::File { bytes, .. } => bytes.clone(),
+            RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
             other => panic!("expected events file, got {other:?}"),
         };
         (issue, events)
@@ -4567,11 +4561,11 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
     let json_events = std::fs::read(data.join("events.jsonl")).unwrap();
     let state = memory.repository_state();
     let memory_gate = match state.entries.get(&run_file).unwrap() {
-        RepositoryEntry::File { bytes, .. } => bytes.clone(),
+        RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
         other => panic!("expected gate-run file, got {other:?}"),
     };
     let memory_events = match state.entries.get(&events).unwrap() {
-        RepositoryEntry::File { bytes, .. } => bytes.clone(),
+        RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
         other => panic!("expected events file, got {other:?}"),
     };
     assert_eq!(
@@ -4613,8 +4607,7 @@ fn memory_file(path: &VirtualPath, bytes: &[u8]) -> (VirtualPath, RepositoryEntr
     (
         path.clone(),
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes(format!("mem-file:{path:?}"), bytes).unwrap(),
-            bytes: bytes.to_vec(),
+            content: CapturedBytes::new(format!("mem-file:{path:?}"), bytes.to_vec()).unwrap(),
             mode: FileMode::Regular,
         },
     )
@@ -4622,7 +4615,7 @@ fn memory_file(path: &VirtualPath, bytes: &[u8]) -> (VirtualPath, RepositoryEntr
 
 fn memory_bytes(memory: &InMemoryStorage, path: &VirtualPath) -> Vec<u8> {
     match memory.repository_state().entries.get(path).unwrap() {
-        RepositoryEntry::File { bytes, .. } => bytes.clone(),
+        RepositoryEntry::File { content, .. } => content.bytes().to_vec(),
         other => panic!("expected a file at {path:?}, got {other:?}"),
     }
 }

@@ -49,7 +49,7 @@ pub fn finalize_archive_execution(
         let destination_path = archive_path(image, destination)?;
         let (bytes, source_mode) = if artifact.already_archived() {
             match captured_entry(image, &destination_path)? {
-                RepositoryEntry::File { bytes, mode, .. } => (bytes.clone(), *mode),
+                RepositoryEntry::File { content, mode } => (content.bytes().to_vec(), *mode),
                 _ => {
                     return Err(ArchiveExecutionError::NonFileSource {
                         role: "archived destination",
@@ -61,7 +61,7 @@ pub fn finalize_archive_execution(
         } else {
             let source = archive_path(image, artifact.source())?;
             match captured_entry(image, &source)? {
-                RepositoryEntry::File { bytes, mode, .. } => (bytes.clone(), *mode),
+                RepositoryEntry::File { content, mode } => (content.bytes().to_vec(), *mode),
                 _ => {
                     return Err(ArchiveExecutionError::NonFileSource {
                         role: "archive source",
@@ -94,8 +94,8 @@ pub fn finalize_archive_execution(
                     adopted: false,
                 });
             }
-            RepositoryEntry::File { bytes, .. } => {
-                identity_matches(identity, bytes, destination)?;
+            RepositoryEntry::File { content, .. } => {
+                identity_matches(identity, content.bytes(), destination)?;
                 if !covered_publications
                     .iter()
                     .any(|(path, found)| path == destination && found == identity)
@@ -140,8 +140,8 @@ pub fn finalize_archive_execution(
                     adopted: false,
                 });
             }
-            RepositoryEntry::File { bytes, .. } => {
-                identity_matches(&identity, bytes, &destination)?;
+            RepositoryEntry::File { content, .. } => {
+                identity_matches(&identity, content.bytes(), &destination)?;
                 if !covered_publications
                     .iter()
                     .any(|(path, found)| path == &destination && found == &identity)
@@ -218,7 +218,7 @@ pub fn finalize_archive_execution(
     let mut changed_issue_ids = Vec::new();
     for (id, issue) in &issues {
         let path = issue_path(id)?;
-        let RepositoryEntry::File { bytes, .. } = captured_entry(image, &path)? else {
+        let RepositoryEntry::File { content, .. } = captured_entry(image, &path)? else {
             return Err(ArchiveExecutionError::NonFileSource {
                 role: "captured issue",
                 path: id.clone(),
@@ -228,7 +228,7 @@ pub fn finalize_archive_execution(
         if crate::repository_state::serialize_issue(issue)
             .map_err(ArchiveExecutionError::Mutation)?
             .as_slice()
-            != bytes
+            != content.bytes()
         {
             changed_issue_ids.push(id.clone());
         }
@@ -253,8 +253,8 @@ pub fn finalize_archive_execution(
         let path = archive_path(image, &deletion.source)?;
         match captured_entry(image, &path)? {
             RepositoryEntry::Absent => {}
-            RepositoryEntry::File { bytes, .. } => {
-                if ContentIdentity::from_bytes(bytes) == deletion.content_identity {
+            RepositoryEntry::File { content, .. } => {
+                if ContentIdentity::from_bytes(content.bytes()) == deletion.content_identity {
                     actions.push(RepositoryAction::DeleteFile {
                         path,
                         owner: OWNER.into(),
@@ -606,8 +606,8 @@ mod tests {
     use crate::domain::types::fixture_issue;
     use crate::domain::DocumentReference;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryImage, RepositoryLayout,
-        RepositoryRootClass, RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
+        RepositoryLayout, RepositoryRootClass, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -661,8 +661,7 @@ mod tests {
 
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes("obj", bytes).unwrap(),
-            bytes: bytes.to_vec(),
+            content: CapturedBytes::new("obj", bytes.to_vec()).unwrap(),
             mode: FileMode::Regular,
         }
     }

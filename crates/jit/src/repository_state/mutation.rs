@@ -1011,10 +1011,9 @@ pub(super) fn finalize_delta(
             if !matches!(
                 current,
                 crate::repository_state::RepositoryEntry::File {
-                    bytes: current_bytes,
+                    content,
                     mode: FileMode::Regular,
-                    ..
-                } if current_bytes == &bytes
+                } if content.bytes() == bytes.as_slice()
             ) {
                 actions.push(RepositoryAction::WriteFile {
                     path,
@@ -1399,7 +1398,7 @@ mod tests {
     use super::*;
     use crate::domain::{GateState, GateStatus};
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryEntry, RepositoryImage,
+        CaptureBudget, CaptureSpec, CapturedBytes, RepositoryEntry, RepositoryImage,
         RepositoryIndex, RepositoryRootEvidence, SUPPORTED_INDEX_SCHEMA_VERSION,
     };
     use std::collections::{BTreeMap, HashMap};
@@ -1461,8 +1460,7 @@ mod tests {
 
     fn file_entry(bytes: &[u8]) -> RepositoryEntry {
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes("obj", bytes).unwrap(),
-            bytes: bytes.to_vec(),
+            content: CapturedBytes::new("obj", bytes.to_vec()).unwrap(),
             mode: FileMode::Regular,
         }
     }

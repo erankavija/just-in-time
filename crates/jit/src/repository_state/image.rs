@@ -96,6 +96,48 @@ impl EntryIdentity {
     }
 }
 
+/// Exact bytes paired with the content identity derived from them.
+///
+/// The only constructor hashes the bytes, so an identity can never disagree
+/// with the bytes it describes and a closed image need not re-hash them. It
+/// serializes as its identity alone, which binds the bytes into a plan hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CapturedBytes {
+    identity: EntryIdentity,
+    bytes: Vec<u8>,
+}
+
+impl CapturedBytes {
+    /// Hash `bytes` under the boundary-provided `object` identity.
+    pub fn new(object: impl Into<String>, bytes: Vec<u8>) -> Result<Self, CaptureError> {
+        Ok(Self {
+            identity: EntryIdentity::for_bytes(object, &bytes)?,
+            bytes,
+        })
+    }
+
+    /// Identity derived from [`Self::bytes`].
+    pub fn identity(&self) -> &EntryIdentity {
+        &self.identity
+    }
+
+    /// Exact captured bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Take ownership of the exact captured bytes.
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Serialize for CapturedBytes {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.identity.serialize(serializer)
+    }
+}
+
 /// One exact captured path state, including typed absence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum RepositoryEntry {
@@ -103,11 +145,8 @@ pub enum RepositoryEntry {
     Absent,
     /// An ordinary file and its exact bytes.
     File {
-        /// Exact entry identity.
-        identity: EntryIdentity,
-        /// Exact bytes, bound into the plan hash through `identity`.
-        #[serde(skip_serializing)]
-        bytes: Vec<u8>,
+        /// Exact bytes and their identity.
+        content: CapturedBytes,
         /// Normalized mode.
         mode: FileMode,
     },
@@ -120,10 +159,8 @@ pub enum RepositoryEntry {
     },
     /// A symbolic link, never followed.
     Symlink {
-        /// Exact link identity.
-        identity: EntryIdentity,
-        /// Exact link payload.
-        target: Vec<u8>,
+        /// Exact link payload and its identity.
+        target: CapturedBytes,
         /// Normalized link mode where the platform exposes one.
         mode: FileMode,
     },
@@ -143,10 +180,9 @@ impl RepositoryEntry {
     pub fn identity(&self) -> Option<&EntryIdentity> {
         match self {
             Self::Absent => None,
-            Self::File { identity, .. }
-            | Self::Directory { identity, .. }
-            | Self::Symlink { identity, .. }
-            | Self::Unsupported { identity, .. } => Some(identity),
+            Self::File { content, .. } => Some(content.identity()),
+            Self::Symlink { target, .. } => Some(target.identity()),
+            Self::Directory { identity, .. } | Self::Unsupported { identity, .. } => Some(identity),
         }
     }
 }
@@ -912,7 +948,7 @@ impl RepositoryImage {
     /// Read an ordinary file's exact bytes.
     pub fn file_bytes(&self, path: &VirtualPath) -> Result<Option<&[u8]>, CaptureError> {
         match self.entry(path)? {
-            RepositoryEntry::File { bytes, .. } => Ok(Some(bytes)),
+            RepositoryEntry::File { content, .. } => Ok(Some(content.bytes())),
             RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => Ok(None),
             RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
                 Err(CaptureError::UnsafeCapturedOccupant(path.clone()))
@@ -962,14 +998,11 @@ impl RepositoryImage {
 
 fn validate_entry(path: &VirtualPath, entry: &RepositoryEntry) -> Result<(), CaptureError> {
     match entry {
-        RepositoryEntry::Absent => Ok(()),
-        RepositoryEntry::File {
-            identity, bytes, ..
-        } => identity.validate_bytes(bytes),
+        // Captured bytes carry the identity derived from them at construction.
+        RepositoryEntry::Absent
+        | RepositoryEntry::File { .. }
+        | RepositoryEntry::Symlink { .. } => Ok(()),
         RepositoryEntry::Directory { identity, .. } => identity.validate(),
-        RepositoryEntry::Symlink {
-            identity, target, ..
-        } => identity.validate_bytes(target),
         RepositoryEntry::Unsupported {
             identity, reason, ..
         } => {
@@ -1033,8 +1066,8 @@ fn captured_byte_count(
     entries
         .values()
         .filter_map(|entry| match entry {
-            RepositoryEntry::File { bytes, .. } => Some(bytes.len() as u64),
-            RepositoryEntry::Symlink { target, .. } => Some(target.len() as u64),
+            RepositoryEntry::File { content, .. } => Some(content.bytes().len() as u64),
+            RepositoryEntry::Symlink { target, .. } => Some(target.bytes().len() as u64),
             RepositoryEntry::Absent
             | RepositoryEntry::Directory { .. }
             | RepositoryEntry::Unsupported { .. } => None,
@@ -1259,21 +1292,17 @@ impl ExpectedPreimage {
     pub fn of(entry: &RepositoryEntry) -> Self {
         match entry {
             RepositoryEntry::Absent => Self::Absent,
-            RepositoryEntry::File { identity, mode, .. } => Self::File {
-                identity: identity.clone(),
+            RepositoryEntry::File { content, mode } => Self::File {
+                identity: content.identity().clone(),
                 mode: *mode,
             },
             RepositoryEntry::Directory { identity, mode } => Self::Directory {
                 identity: identity.clone(),
                 mode: *mode,
             },
-            RepositoryEntry::Symlink {
-                identity,
-                target,
-                mode,
-            } => Self::Symlink {
-                identity: identity.clone(),
-                target: target.clone(),
+            RepositoryEntry::Symlink { target, mode } => Self::Symlink {
+                identity: target.identity().clone(),
+                target: target.bytes().to_vec(),
                 mode: *mode,
             },
             RepositoryEntry::Unsupported {
@@ -1314,6 +1343,8 @@ pub enum RepositoryAction {
         path: VirtualPath,
         owner: String,
         expected: ExpectedPreimage,
+        /// Exact bytes to publish, bound into the plan hash through their digest.
+        #[serde(serialize_with = "serialize_content_digest")]
         bytes: Vec<u8>,
         mode: FileMode,
     },
@@ -1570,6 +1601,15 @@ pub fn plan_hash(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// Serialize bytes as their SHA-256 digest and length, so plan identity commits
+/// to written content without encoding it byte by byte.
+fn serialize_content_digest<S: serde::Serializer>(
+    bytes: &[u8],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    (format!("{:x}", Sha256::digest(bytes)), bytes.len()).serialize(serializer)
+}
+
 fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update((bytes.len() as u64).to_be_bytes());
     hasher.update(bytes);
@@ -1710,8 +1750,7 @@ mod tests {
             BTreeMap::from([(
                 path,
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes("index", &bytes).unwrap(),
-                    bytes,
+                    content: CapturedBytes::new("index", bytes).unwrap(),
                     mode: FileMode::Regular,
                 },
             )]),
@@ -1933,39 +1972,7 @@ mod tests {
     }
 
     #[test]
-    fn test_close_revalidates_entry_identity_and_listing_fingerprint() {
-        let path = VirtualPath::data("index.json").unwrap();
-        let spec = CaptureSpec::phase_one(
-            [path.clone()],
-            CaptureBudget {
-                max_listings: 1,
-                max_bytes: 64,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        let bytes = b"captured".to_vec();
-        let mut identity = EntryIdentity::for_bytes("index", &bytes).unwrap();
-        identity.byte_size += 1;
-        assert!(matches!(
-            RepositoryImage::close(
-                layout(),
-                spec,
-                BTreeMap::from([(
-                    path,
-                    RepositoryEntry::File {
-                        identity,
-                        bytes,
-                        mode: FileMode::Regular,
-                    },
-                )]),
-                BTreeMap::new(),
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
-            Err(CaptureError::EntryIdentityMismatch { .. })
-        ));
-
+    fn test_close_revalidates_listing_fingerprint() {
         let directory = VirtualPath::data("issues").unwrap();
         let mut listing = ListingFingerprint::new(BTreeMap::new()).unwrap();
         listing.sha256 = "0".repeat(64);
@@ -2023,12 +2030,10 @@ mod tests {
         let entries = exact
             .iter()
             .map(|name| {
-                let identity = identities.get(*name).unwrap().clone();
                 Ok((
                     VirtualPath::data(format!("{path}/{name}", path = path.relative().as_str()))?,
                     RepositoryEntry::File {
-                        identity,
-                        bytes: Vec::new(),
+                        content: CapturedBytes::new(*name, Vec::new())?,
                         mode: FileMode::Regular,
                     },
                 ))
@@ -2076,8 +2081,7 @@ mod tests {
                 BTreeMap::from([(
                     path.clone(),
                     RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes("index", &bytes)?,
-                        bytes: bytes.clone(),
+                        content: CapturedBytes::new("index", bytes.clone())?,
                         mode: FileMode::Regular,
                     },
                 )]),
@@ -2489,8 +2493,7 @@ mod tests {
                 (
                     discovered.clone(),
                     RepositoryEntry::File {
-                        identity: EntryIdentity::for_bytes("plan", &bytes).unwrap(),
-                        bytes: bytes.clone(),
+                        content: CapturedBytes::new("plan", bytes.clone()).unwrap(),
                         mode: FileMode::Regular,
                     },
                 ),
@@ -2570,6 +2573,21 @@ mod tests {
             )
             .unwrap()
         );
+    }
+
+    proptest::proptest! {
+        /// Captured bytes carry exactly the identity their bytes hash to.
+        #[test]
+        fn prop_captured_bytes_identity_matches_its_bytes(
+            object in "[a-z][a-z0-9-]{0,15}",
+            bytes in proptest::collection::vec(proptest::prelude::any::<u8>(), 0..256),
+        ) {
+            let expected = EntryIdentity::for_bytes(object.clone(), &bytes).unwrap();
+            let captured = CapturedBytes::new(object, bytes.clone()).unwrap();
+            proptest::prop_assert_eq!(captured.identity().sha256(), expected.sha256());
+            proptest::prop_assert_eq!(captured.identity().byte_size(), expected.byte_size());
+            proptest::prop_assert_eq!(captured.bytes(), bytes.as_slice());
+        }
     }
 }
 

@@ -737,7 +737,9 @@ fn parse_template_gate_registry(
     image: &RepositoryImage,
 ) -> Result<crate::declarations::GateRegistry> {
     match image.entry(&VirtualPath::GATES)? {
-        RepositoryEntry::File { bytes, .. } => Ok(crate::declarations::parse_gate_registry(bytes)?),
+        RepositoryEntry::File { content, .. } => {
+            Ok(crate::declarations::parse_gate_registry(content.bytes())?)
+        }
         RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
         _ => Err(anyhow!("captured gate registry is not an ordinary file")),
     }

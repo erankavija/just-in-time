@@ -286,8 +286,8 @@ pub fn finalize_package_tree_capture(
             let entry = base.entry(path)?;
             let disposition = match entry {
                 RepositoryEntry::Absent => TreeFileDisposition::Create,
-                RepositoryEntry::File { bytes, mode, .. }
-                    if bytes == &file.bytes && mode == &file.mode =>
+                RepositoryEntry::File { content, mode }
+                    if content.bytes() == file.bytes.as_slice() && mode == &file.mode =>
                 {
                     TreeFileDisposition::Unchanged
                 }

@@ -581,9 +581,9 @@ fn captured_precheck_plan(
                 .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
             for path in run_paths {
                 match image.entry(&path)? {
-                    crate::repository_state::RepositoryEntry::File { bytes, .. } => {
-                        let run: crate::domain::GateRunResult = serde_json::from_slice(bytes)
-                            .with_context(|| {
+                    crate::repository_state::RepositoryEntry::File { content, .. } => {
+                        let run: crate::domain::GateRunResult =
+                            serde_json::from_slice(content.bytes()).with_context(|| {
                                 format!("failed to parse captured gate run at {path:?}")
                             })?;
                         if run.issue_id == issue.id {
@@ -1860,7 +1860,7 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
         .map(|id| {
             let path = VirtualPath::data(format!("issues/{id}.json"))?;
             let bytes = match image.entry(&path)? {
-                RepositoryEntry::File { bytes, .. } => bytes,
+                RepositoryEntry::File { content, .. } => content.bytes(),
                 RepositoryEntry::Absent => {
                     return Err(crate::storage::IssueNotFoundError::new(id).into())
                 }
@@ -2175,10 +2175,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 };
                 let issue_path = VirtualPath::data(format!("issues/{}.json", request.issue_id()))?;
                 let issue: Issue = match image.entry(&issue_path)? {
-                    RepositoryEntry::File { bytes, .. } => serde_json::from_slice(bytes)
-                        .with_context(|| {
+                    RepositoryEntry::File { content, .. } => {
+                        serde_json::from_slice(content.bytes()).with_context(|| {
                             format!("failed to parse captured issue {}", request.issue_id())
-                        })?,
+                        })?
+                    }
                     RepositoryEntry::Absent => {
                         return Err(
                             crate::storage::IssueNotFoundError::new(request.issue_id()).into()
@@ -2196,8 +2197,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let registry = if request.captures_gate_registry() {
                     let path = VirtualPath::GATES;
                     match image.entry(&path)? {
-                        RepositoryEntry::File { bytes, .. } => {
-                            crate::declarations::parse_gate_registry(bytes)
+                        RepositoryEntry::File { content, .. } => {
+                            crate::declarations::parse_gate_registry(content.bytes())
                                 .context("failed to parse captured gate registry")?
                         }
                         RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),

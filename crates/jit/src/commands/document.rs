@@ -1614,8 +1614,10 @@ fn captured_issue(
     use crate::repository_state::RepositoryEntry;
 
     let issue = match image.entry(issue_path)? {
-        RepositoryEntry::File { bytes, .. } => serde_json::from_slice::<Issue>(bytes)
-            .with_context(|| format!("failed to parse captured issue {expected_id}"))?,
+        RepositoryEntry::File { content, .. } => {
+            serde_json::from_slice::<Issue>(content.bytes())
+                .with_context(|| format!("failed to parse captured issue {expected_id}"))?
+        }
         RepositoryEntry::Absent => {
             return Err(crate::storage::IssueNotFoundError::new(expected_id).into())
         }

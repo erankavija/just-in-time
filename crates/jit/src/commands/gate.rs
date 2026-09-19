@@ -400,8 +400,8 @@ fn captured_gate_registry(
 ) -> Result<crate::declarations::GateRegistry> {
     use crate::repository_state::{RepositoryEntry, VirtualPath};
     match image.entry(&VirtualPath::GATES)? {
-        RepositoryEntry::File { bytes, .. } => {
-            crate::declarations::parse_gate_registry(bytes).map_err(Into::into)
+        RepositoryEntry::File { content, .. } => {
+            crate::declarations::parse_gate_registry(content.bytes()).map_err(Into::into)
         }
         RepositoryEntry::Absent => Ok(crate::declarations::GateRegistry::default()),
         _ => Err(anyhow!("captured gate registry is not an ordinary file")),
@@ -415,8 +415,10 @@ fn captured_gate_preset_issue(
     use crate::repository_state::{RepositoryEntry, VirtualPath};
     let path = VirtualPath::data(format!("issues/{issue_id}.json"))?;
     let issue = match image.entry(&path)? {
-        RepositoryEntry::File { bytes, .. } => serde_json::from_slice::<Issue>(bytes)
-            .with_context(|| format!("failed to parse captured issue {issue_id}"))?,
+        RepositoryEntry::File { content, .. } => {
+            serde_json::from_slice::<Issue>(content.bytes())
+                .with_context(|| format!("failed to parse captured issue {issue_id}"))?
+        }
         RepositoryEntry::Absent => {
             return Err(crate::storage::IssueNotFoundError::new(issue_id).into())
         }
@@ -1146,8 +1148,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 };
                 let gates_path = VirtualPath::GATES;
                 let registry = match image.entry(&gates_path)? {
-                    RepositoryEntry::File { bytes, .. } => {
-                        crate::declarations::parse_gate_registry(bytes)?
+                    RepositoryEntry::File { content, .. } => {
+                        crate::declarations::parse_gate_registry(content.bytes())?
                     }
                     RepositoryEntry::Absent => crate::declarations::GateRegistry::default(),
                     _ => return Err(anyhow!("captured gate registry is not an ordinary file")),
@@ -2282,8 +2284,8 @@ style = "full"
                 .entry(&VirtualPath::data("gates.toml").unwrap())
                 .unwrap()
             {
-                crate::repository_state::RepositoryEntry::File { bytes, .. } => {
-                    crate::declarations::parse_gate_registry(bytes).unwrap()
+                crate::repository_state::RepositoryEntry::File { content, .. } => {
+                    crate::declarations::parse_gate_registry(content.bytes()).unwrap()
                 }
                 crate::repository_state::RepositoryEntry::Absent => Default::default(),
                 other => panic!("unexpected gate registry entry: {other:?}"),

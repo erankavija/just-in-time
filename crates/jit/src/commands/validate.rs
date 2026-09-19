@@ -842,9 +842,9 @@ fn captured_applied_record(
 
     Ok(match image.entry(record_path)? {
         RepositoryEntry::Absent => None,
-        RepositoryEntry::File { bytes, .. } => {
-            Some(serde_json::from_slice(bytes).context("invalid applied profile provenance"))
-        }
+        RepositoryEntry::File { content, .. } => Some(
+            serde_json::from_slice(content.bytes()).context("invalid applied profile provenance"),
+        ),
         _ => Some(Err(anyhow!(
             "applied profile provenance path {record_path:?} is not a regular file"
         ))),

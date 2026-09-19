@@ -6,8 +6,8 @@
 use crate::declarations::{parse_gate_registry, GateRegistry};
 use crate::domain::{Event, GateRunResult, Issue};
 use crate::repository_state::{
-    gate_run_result_relative_path, EntryIdentity, FileMode, RepositoryEntry, RepositoryRootClass,
-    RootRelativePath, VirtualPath,
+    gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
+    RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use crate::storage::{
     AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
@@ -242,8 +242,8 @@ impl InMemoryStorage {
                     return None;
                 }
                 Some(match entry {
-                    RepositoryEntry::File { bytes, .. } => {
-                        Ok((filename.to_string(), bytes.clone()))
+                    RepositoryEntry::File { content, .. } => {
+                        Ok((filename.to_string(), content.bytes().to_vec()))
                     }
                     _ => Err(crate::errors::InvalidArgumentError::new(format!(
                         "Custom preset file '{filename}' must be an ordinary file"
@@ -297,17 +297,17 @@ impl InMemoryStorage {
         vpath: VirtualPath,
         content: &str,
     ) -> Result<(), crate::storage::PathReadError> {
-        use crate::repository_state::{EntryIdentity, FileMode, RepositoryEntry};
+        use crate::repository_state::{FileMode, RepositoryEntry};
         self.repository_layout()
             .ensure_canonical(&vpath)
             .map_err(|error| crate::storage::PathReadError::InvalidPath(error.to_string()))?;
-        let identity = EntryIdentity::for_bytes(
+        let content = CapturedBytes::new(
             format!(
                 "memory:{:?}:{}",
                 vpath.root_class(),
                 vpath.relative().as_str()
             ),
-            content.as_bytes(),
+            content.as_bytes().to_vec(),
         )
         .map_err(|e| crate::storage::PathReadError::Other(anyhow!("{e}")))?;
         let mut state = self.repository_state();
@@ -318,8 +318,7 @@ impl InMemoryStorage {
         state.entries.insert(
             vpath,
             RepositoryEntry::File {
-                identity,
-                bytes: content.as_bytes().to_vec(),
+                content,
                 mode: FileMode::Regular,
             },
         );
@@ -401,15 +400,13 @@ impl InMemoryStorage {
     #[cfg(test)]
     fn put_data_entry(state: &mut MemoryRepositoryState, vpath: VirtualPath, bytes: Vec<u8>) {
         let object = vpath.relative().as_str().to_owned();
-        let identity =
-            EntryIdentity::for_bytes(object, &bytes).expect("entry identity is hashable");
+        let content = CapturedBytes::new(object, bytes).expect("entry identity is hashable");
         Self::mark_data_root_existing(state);
         Self::ensure_ancestor_dirs(state, &vpath);
         state.entries.insert(
             vpath,
             RepositoryEntry::File {
-                identity,
-                bytes,
+                content,
                 mode: FileMode::Regular,
             },
         );
@@ -449,7 +446,7 @@ impl InMemoryStorage {
     /// Read the exact captured bytes for `vpath` from the aggregate image.
     fn data_entry_bytes(state: &MemoryRepositoryState, vpath: &VirtualPath) -> Option<Vec<u8>> {
         match state.entries.get(vpath) {
-            Some(RepositoryEntry::File { bytes, .. }) => Some(bytes.clone()),
+            Some(RepositoryEntry::File { content, .. }) => Some(content.bytes().to_vec()),
             _ => None,
         }
     }
@@ -468,7 +465,7 @@ impl InMemoryStorage {
             if vpath.root_class() != RepositoryRootClass::Data {
                 return None;
             }
-            let RepositoryEntry::File { bytes, .. } = entry else {
+            let RepositoryEntry::File { content, .. } = entry else {
                 return None;
             };
             let rel = vpath.relative().as_str();
@@ -476,7 +473,7 @@ impl InMemoryStorage {
             if leaf.contains('/') || !leaf.ends_with(suffix) {
                 return None;
             }
-            Some((leaf.to_owned(), bytes.clone()))
+            Some((leaf.to_owned(), content.bytes().to_vec()))
         })
     }
 
@@ -556,13 +553,15 @@ impl InMemoryStorage {
                 };
                 match state.entries.get(&vpath) {
                     None | Some(RepositoryEntry::Absent) => None,
-                    Some(RepositoryEntry::File { bytes, .. }) => Some(
-                        serde_json::from_slice::<GateRunResult>(bytes).with_context(|| {
-                            format!(
-                                "Failed to deserialize gate-run result at {}",
-                                vpath.relative().as_path().display()
-                            )
-                        }),
+                    Some(RepositoryEntry::File { content, .. }) => Some(
+                        serde_json::from_slice::<GateRunResult>(content.bytes()).with_context(
+                            || {
+                                format!(
+                                    "Failed to deserialize gate-run result at {}",
+                                    vpath.relative().as_path().display()
+                                )
+                            },
+                        ),
                     ),
                     Some(_) => Some(Err(anyhow!(
                         "Gate run result at {} must be an ordinary file",
@@ -679,7 +678,7 @@ impl IssueStore for InMemoryStorage {
         }
         match state.entries.get(&path) {
             None | Some(RepositoryEntry::Absent) => Err(GateRunNotFoundError::new(run_id).into()),
-            Some(RepositoryEntry::File { bytes, .. }) => serde_json::from_slice(bytes)
+            Some(RepositoryEntry::File { content, .. }) => serde_json::from_slice(content.bytes())
                 .with_context(|| {
                     format!(
                         "Failed to deserialize gate-run result at {}",
@@ -739,8 +738,8 @@ impl IssueStore for InMemoryStorage {
         use crate::repository_state::RepositoryEntry;
         let vpath = self.repo_file_vpath(rel_path)?;
         Ok(match self.repository_state().entries.get(&vpath) {
-            Some(RepositoryEntry::File { bytes, .. }) => {
-                Some(String::from_utf8_lossy(bytes).into_owned())
+            Some(RepositoryEntry::File { content, .. }) => {
+                Some(String::from_utf8_lossy(content.bytes()).into_owned())
             }
             _ => None,
         })
@@ -800,6 +799,8 @@ mod tests {
     fn gate_run_parent_entry(kind: &str) -> RepositoryEntry {
         let identity =
             || EntryIdentity::for_bytes(format!("parent-{kind}"), kind.as_bytes()).unwrap();
+        let captured =
+            |bytes: &[u8]| CapturedBytes::new(format!("parent-{kind}"), bytes.to_vec()).unwrap();
         match kind {
             "absent" => RepositoryEntry::Absent,
             "directory" => RepositoryEntry::Directory {
@@ -807,13 +808,11 @@ mod tests {
                 mode: FileMode::Executable,
             },
             "file" => RepositoryEntry::File {
-                identity: identity(),
-                bytes: b"not a directory".to_vec(),
+                content: captured(b"not a directory"),
                 mode: FileMode::Regular,
             },
             "symlink" => RepositoryEntry::Symlink {
-                identity: identity(),
-                target: b"elsewhere".to_vec(),
+                target: captured(b"elsewhere"),
                 mode: FileMode::Regular,
             },
             "unsupported" => RepositoryEntry::Unsupported {
@@ -970,7 +969,7 @@ mod tests {
         assert!(!state.entries.contains_key(&VirtualPath::data("").unwrap()));
         assert!(matches!(
             state.entries.get(&VirtualPath::worktree("docs/guide.md").unwrap()),
-            Some(RepositoryEntry::File { bytes, .. }) if bytes == b"guide"
+            Some(RepositoryEntry::File { content, .. }) if content.bytes() == b"guide"
         ));
     }
 

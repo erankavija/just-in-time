@@ -3029,8 +3029,8 @@ fn read_applied_record(
 ) -> Result<Option<AppliedProfileRecord>> {
     match base.entry(record_path)? {
         RepositoryEntry::Absent => Ok(None),
-        RepositoryEntry::File { bytes, .. } => {
-            serde_json::from_slice::<AppliedProfileRecord>(bytes)
+        RepositoryEntry::File { content, .. } => {
+            serde_json::from_slice::<AppliedProfileRecord>(content.bytes())
                 .and_then(|record| {
                     (record.id.as_str() == id).then_some(record).ok_or_else(|| {
                         serde_json::Error::io(std::io::Error::other(

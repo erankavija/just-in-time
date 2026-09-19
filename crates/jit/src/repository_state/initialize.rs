@@ -681,8 +681,8 @@ fn profile_record_changed(
 ) -> Result<bool, InitializationError> {
     match base.entry(&profile.record_path)? {
         RepositoryEntry::Absent => Ok(true),
-        RepositoryEntry::File { bytes, .. } => {
-            let existing = serde_json::from_slice::<AppliedProfileRecord>(bytes);
+        RepositoryEntry::File { content, .. } => {
+            let existing = serde_json::from_slice::<AppliedProfileRecord>(content.bytes());
             match existing {
                 Ok(existing) if existing == *record => Ok(false),
                 Ok(existing) if existing.id == profile.id => Ok(true),
@@ -913,8 +913,8 @@ fn resolve_gitattributes(
     let block = format!("{GITATTRIBUTES_MARKER}\n{line}\n");
     match entry {
         RepositoryEntry::Absent => Ok((GitattributesStatus::Created, Some(block.into_bytes()))),
-        RepositoryEntry::File { bytes, .. } => {
-            let content = std::str::from_utf8(bytes).map_err(|_| {
+        RepositoryEntry::File { content, .. } => {
+            let content = std::str::from_utf8(content.bytes()).map_err(|_| {
                 InitializationError::UnsafeGitattributes(".gitattributes is not valid UTF-8".into())
             })?;
             let mut lines = content.lines().peekable();
@@ -1196,36 +1196,36 @@ fn profile_lifecycle_profile(
     profile: &ProfileApplicationInput,
     changed: bool,
 ) -> Result<ProfileLifecycleProfile, InitializationError> {
-    let status = match base.entry(&profile.record_path)? {
-        RepositoryEntry::Absent => {
-            if changed {
-                ProfileLifecycleStatus::Installed
-            } else {
-                ProfileLifecycleStatus::Unchanged
-            }
-        }
-        RepositoryEntry::File { bytes, .. } => {
-            let prior = serde_json::from_slice::<AppliedProfileRecord>(bytes).map_err(|_| {
-                InitializationError::InstalledRecordConflict {
-                    path: profile.record_path.clone(),
-                    id: profile.id.to_string(),
-                    version: profile.version.clone(),
+    let status =
+        match base.entry(&profile.record_path)? {
+            RepositoryEntry::Absent => {
+                if changed {
+                    ProfileLifecycleStatus::Installed
+                } else {
+                    ProfileLifecycleStatus::Unchanged
                 }
-            })?;
-            if prior.version != profile.version || prior.package_hash != profile.package_hash {
-                ProfileLifecycleStatus::Upgraded
-            } else if prior.variables != profile.variables {
-                ProfileLifecycleStatus::Reconfigured
-            } else {
-                ProfileLifecycleStatus::Unchanged
             }
-        }
-        _ => {
-            return Err(InitializationError::UnsupportedMetadataPath(
-                profile.record_path.clone(),
-            ))
-        }
-    };
+            RepositoryEntry::File { content, .. } => {
+                let prior = serde_json::from_slice::<AppliedProfileRecord>(content.bytes())
+                    .map_err(|_| InitializationError::InstalledRecordConflict {
+                        path: profile.record_path.clone(),
+                        id: profile.id.to_string(),
+                        version: profile.version.clone(),
+                    })?;
+                if prior.version != profile.version || prior.package_hash != profile.package_hash {
+                    ProfileLifecycleStatus::Upgraded
+                } else if prior.variables != profile.variables {
+                    ProfileLifecycleStatus::Reconfigured
+                } else {
+                    ProfileLifecycleStatus::Unchanged
+                }
+            }
+            _ => {
+                return Err(InitializationError::UnsupportedMetadataPath(
+                    profile.record_path.clone(),
+                ))
+            }
+        };
     let variables = profile
         .variables
         .sources()
@@ -1366,7 +1366,8 @@ mod tests {
     use super::*;
     use crate::profile::ProfileOrigin;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryLayout, RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryLayout,
+        RepositoryRootEvidence,
     };
     use std::collections::{BTreeMap, BTreeSet};
 
@@ -1374,8 +1375,7 @@ mod tests {
 
     fn file(bytes: &[u8]) -> RepositoryEntry {
         RepositoryEntry::File {
-            identity: EntryIdentity::for_bytes("obj", bytes).unwrap(),
-            bytes: bytes.to_vec(),
+            content: CapturedBytes::new("obj", bytes.to_vec()).unwrap(),
             mode: FileMode::Regular,
         }
     }

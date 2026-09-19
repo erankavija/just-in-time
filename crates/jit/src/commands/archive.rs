@@ -392,7 +392,7 @@ fn image_evidence(
     let vpath = image_path(image.layout(), path)?;
     Ok(match image.entry(&vpath)? {
         RepositoryEntry::Absent => ArtifactEvidence::Missing,
-        RepositoryEntry::File { bytes, .. } => ArtifactEvidence::File(bytes.clone()),
+        RepositoryEntry::File { content, .. } => ArtifactEvidence::File(content.bytes().to_vec()),
         RepositoryEntry::Symlink { .. } => ArtifactEvidence::Symlink,
         RepositoryEntry::Unsupported { .. } => ArtifactEvidence::Unsupported,
         RepositoryEntry::Directory { .. } => {
@@ -625,8 +625,8 @@ fn capture_citation_scan_evidence(
                     .to_string_lossy()
                     .replace('\\', "/");
                 match entry {
-                    crate::repository_state::RepositoryEntry::File { bytes, .. } => {
-                        Some((relative, bytes.clone()))
+                    crate::repository_state::RepositoryEntry::File { content, .. } => {
+                        Some((relative, content.bytes().to_vec()))
                     }
                     _ => None,
                 }

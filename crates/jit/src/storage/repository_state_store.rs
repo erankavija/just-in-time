@@ -4,11 +4,11 @@
 //! the capability-confined [`FileTransactionKernel`].
 
 use crate::repository_state::{
-    CaptureError, CaptureSpec, EntryIdentity, ExpectedPreimage, FileMode, LinkedWorktreeEvidence,
-    LinkedWorktreeSourceClass, ListingFingerprint, MaterializationPlan, PinnedDocumentEvidence,
-    PinnedSourceClass, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence,
-    RootRelativePath, VirtualPath,
+    CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
+    LinkedWorktreeEvidence, LinkedWorktreeSourceClass, ListingFingerprint, MaterializationPlan,
+    PinnedDocumentEvidence, PinnedSourceClass, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 use crate::storage::file_transaction::RepositoryRecoveryDisposition;
 use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
@@ -1026,13 +1026,11 @@ fn capture_memory_image(
         .iter()
         .map(|path| {
             let evidence = match state.entries.get(path) {
-                Some(RepositoryEntry::File {
-                    identity, bytes, ..
-                }) => LinkedWorktreeEvidence::new(
+                Some(RepositoryEntry::File { content, .. }) => LinkedWorktreeEvidence::new(
                     path.clone(),
                     LinkedWorktreeSourceClass::LocalData,
-                    Some(identity.clone()),
-                    Some(bytes.clone()),
+                    Some(content.identity().clone()),
+                    Some(content.bytes().to_vec()),
                 )?,
                 None | Some(RepositoryEntry::Absent) => LinkedWorktreeEvidence::new(
                     path.clone(),
@@ -1194,24 +1192,19 @@ fn apply_memory_action(
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
-                    identity: EntryIdentity::for_bytes(format!("memory-file:{path:?}"), bytes)?,
-                    bytes: bytes.clone(),
+                    content: CapturedBytes::new(format!("memory-file:{path:?}"), bytes.clone())?,
                     mode: *mode,
                 },
             );
         }
         RepositoryAction::SetMode { path, mode, .. } => {
-            let RepositoryEntry::File {
-                identity, bytes, ..
-            } = current
-            else {
+            let RepositoryEntry::File { content, .. } = current else {
                 return Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}")));
             };
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
-                    identity,
-                    bytes,
+                    content,
                     mode: *mode,
                 },
             );
@@ -1334,8 +1327,7 @@ fn inspect_capability_leaf(
         let target = parent.read_link(leaf)?;
         let bytes = target.as_os_str().as_encoded_bytes().to_vec();
         return Ok(RepositoryEntry::Symlink {
-            identity: entry_identity(&metadata, &bytes)?,
-            target: bytes,
+            target: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
             mode: normalized_mode(&metadata),
         });
     }
@@ -1351,8 +1343,7 @@ fn inspect_capability_leaf(
         file.read_to_end(&mut bytes)?;
         let metadata = file.metadata()?;
         return Ok(RepositoryEntry::File {
-            identity: entry_identity(&metadata, &bytes)?,
-            bytes,
+            content: CapturedBytes::new(capability_metadata_identity(&metadata)?, bytes)?,
             mode: normalized_mode(&metadata),
         });
     }
@@ -1404,14 +1395,12 @@ fn capture_linked_evidence(
     path: &VirtualPath,
 ) -> Result<LinkedWorktreeEvidence, RepositoryStateStoreError> {
     match inspect_capability_entry(layout, roots, path)? {
-        RepositoryEntry::File {
-            identity, bytes, ..
-        } => {
+        RepositoryEntry::File { content, .. } => {
             return LinkedWorktreeEvidence::new(
                 path.clone(),
                 LinkedWorktreeSourceClass::LocalData,
-                Some(identity),
-                Some(bytes),
+                Some(content.identity().clone()),
+                Some(content.into_bytes()),
             )
             .map_err(Into::into)
         }
@@ -1459,14 +1448,12 @@ fn capture_linked_evidence(
         if let Ok(main_layout) = discover_repository_layout(main_root, &main_data) {
             let (main_roots, _, _) = CapabilityRoots::open(&main_layout)?;
             match inspect_capability_entry(&main_layout, &main_roots, path)? {
-                RepositoryEntry::File {
-                    identity, bytes, ..
-                } => {
+                RepositoryEntry::File { content, .. } => {
                     return LinkedWorktreeEvidence::new(
                         path.clone(),
                         LinkedWorktreeSourceClass::MainWorktree,
-                        Some(identity),
-                        Some(bytes),
+                        Some(content.identity().clone()),
+                        Some(content.into_bytes()),
                     )
                     .map_err(Into::into)
                 }

@@ -336,7 +336,9 @@ fn normalize_absolute(path: PathBuf) -> Result<PathBuf, RepositoryLayoutError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repository_state::{EntryIdentity, ListingFingerprint, RepositoryRootEvidence};
+    use crate::repository_state::{
+        CapturedBytes, EntryIdentity, ListingFingerprint, RepositoryRootEvidence,
+    };
 
     fn layout() -> RepositoryLayout {
         RepositoryLayout::new(
@@ -415,8 +417,7 @@ mod tests {
             &image(
                 target.clone(),
                 RepositoryEntry::File {
-                    identity: identity("target", old),
-                    bytes: old.to_vec(),
+                    content: CapturedBytes::new("target", old.to_vec()).unwrap(),
                     mode: FileMode::Executable,
                 },
             ),
@@ -442,8 +443,7 @@ mod tests {
             &image(
                 target.clone(),
                 RepositoryEntry::Symlink {
-                    identity: identity("target", b"elsewhere"),
-                    target: b"elsewhere".to_vec(),
+                    target: CapturedBytes::new("target", b"elsewhere".to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             ),
@@ -539,8 +539,7 @@ mod tests {
             &image(
                 target.clone(),
                 RepositoryEntry::File {
-                    identity: identity("target", b"old"),
-                    bytes: b"old".to_vec(),
+                    content: CapturedBytes::new("target", b"old".to_vec()).unwrap(),
                     mode: FileMode::Regular,
                 },
             ),
