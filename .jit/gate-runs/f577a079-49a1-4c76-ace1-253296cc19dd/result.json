@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8fe73186e67d0bf0000f644160f24066b97e6ef2",
+  "completed_at": "2026-09-19T20:41:43.242739827Z",
+  "duration_ms": 218906,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 254,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/9750b151/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "Mutation preflight captures invariant and gate registries that its pre-claims consumers do not use."
+      }
+    ],
+    "summary": "The light preflight still captures registries unrelated to lease decisions, violating REQ-03.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9750b151-3471-4916-bee6-4b1221694d2e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f577a079-49a1-4c76-ace1-253296cc19dd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-19T20:38:04.336685734Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10006 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.154.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0bb63-f8a9-77a1-a9d1-d1f231304dba\n--------\nuser\n--- 9993 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 498b5c797, 786787c8d, fd9d4db99, f69b98455, 86a34c2a8 (all `jit:9750b151`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/9750b151/requirement/REQ-01 through REQ-04 (issue description); @/invariant/atomic-writes, derived-state-coherence, semantic-test-assertions, shared-test-contracts, semantic-types, architecture-dependency-direction, bounded-rust-build-footprint, no-ignored-tests (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml); @/charter/D-1, D-4 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-09-19T20:37:38Z; recorded before the attributed commits); code-review pending\nTruncation recovery: targeted reads of image.rs, file_transaction.rs, repository_state_store.rs, commands/mod.rs, commands/validate.rs, and their affected tests recovered truncated patch sections\n\n1. **[blocking][issue-impact][high]** `capture_mutation_preflight` captures `.jit/invariants.toml` and `.jit/gates.toml` in both preflight captures, although its pre-guard consumers only use the resolved target and lease mode from configuration. This affects deletion, preset application, and lifecycle transitions that do not run prechecks; `lifecycle_requires_prechecks` itself only examines request type and issue state. Remove those registries from the light preflight (or make any genuinely needed registry conditional) to meet REQ-03’s “only what the lease decision needs” requirement. [`crates/jit/src/commands/validate.rs:251`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:251) References: @/issue/9750b151/requirement/REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The light preflight still captures registries unrelated to lease decisions, violating REQ-03.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Mutation preflight captures invariant and gate registries that its pre-claims consumers do not use.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":254,\"references\":[\"@/issue/9750b151/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -51,7 +51,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-19T20:30:11.173582530Z"
+  "updated_at": "2026-09-19T20:49:06.333734509Z"
 }
