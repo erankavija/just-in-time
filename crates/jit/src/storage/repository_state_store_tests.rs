@@ -172,9 +172,9 @@ fn test_json_linked_capture_reads_uncommitted_primary_store_through_worktree_pat
 
     let image = session.capture(spec).unwrap();
     let actual = image.linked_worktree_evidence().get(&path).unwrap();
+    assert_eq!(actual.bytes(), Some(bytes.as_slice()));
     let actual = serde_json::to_value(actual).unwrap();
     assert_eq!(actual["source"], "main_worktree");
-    assert_eq!(actual["bytes"], serde_json::json!(bytes));
 }
 
 fn initial_spec() -> CaptureSpec {
@@ -4920,7 +4920,7 @@ fn test_json_capture_reuses_pinned_target_cache_for_unchanged_commit() {
     assert_eq!(
         all_processes
             .iter()
-            .filter(|line| line.starts_with("ls-tree "))
+            .filter(|line| line.contains(" ls-tree "))
             .count(),
         1
     );

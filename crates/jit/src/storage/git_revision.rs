@@ -15,6 +15,10 @@ use std::process::{Command, Output, Stdio};
 use std::thread;
 use thiserror::Error;
 
+/// Maximum pinned paths passed to one `git ls-tree` process, keeping the
+/// argument list well inside the platform limit.
+const LS_TREE_PATHS_PER_PROCESS: usize = 1024;
+
 /// Errors from canonical revision resolution and historical blob reads.
 #[derive(Debug, Error)]
 pub enum GitRevisionError {
@@ -214,8 +218,15 @@ impl GitRevisionResolver {
     ) -> Result<PinnedTargetRead, GitRevisionError> {
         validate_repo_relative_path(path)?;
         let version = self.resolve_commit(revision)?;
-        let entry_output =
-            self.run(["ls-tree", "-z", "--full-tree", version.as_str(), "--", path])?;
+        let entry_output = self.run([
+            "--literal-pathspecs",
+            "ls-tree",
+            "-z",
+            "--full-tree",
+            version.as_str(),
+            "--",
+            path,
+        ])?;
         if !entry_output.status.success() {
             return Err(GitRevisionError::PinnedReadFailed {
                 revision: revision.to_string(),
@@ -343,10 +354,8 @@ impl GitRevisionResolver {
         let mut pending_files =
             BTreeMap::<String, Vec<(String, String, String, PinnedTargetRead)>>::new();
         uncached.into_iter().for_each(|(commit, paths)| {
-            let output = self.run(["ls-tree", "-r", "-t", "-z", "--full-tree", commit.as_str()]);
-            let entries = match output {
-                Ok(output) if output.status.success() => parse_pinned_tree_entries(&output.stdout),
-                Ok(output) => Err(stderr(&output)),
+            let entries = match self.list_pinned_tree_entries(&commit, paths.keys()) {
+                Ok(Ok(entries)) => entries,
                 Err(error) => {
                     paths.values().flatten().for_each(|(revision, path, _)| {
                         results.insert(
@@ -356,10 +365,7 @@ impl GitRevisionResolver {
                     });
                     return;
                 }
-            };
-            let entries = match entries {
-                Ok(entries) => entries.into_iter().collect::<BTreeMap<_, _>>(),
-                Err(reason) => {
+                Ok(Err(reason)) => {
                     paths.values().flatten().for_each(|(revision, path, _)| {
                         results.insert(
                             (revision.clone(), path.clone()),
@@ -466,6 +472,51 @@ impl GitRevisionResolver {
 
         *cache = next_cache;
         results
+    }
+
+    /// List the tree entries of `commit` at the requested `paths`, keyed by
+    /// path bytes.
+    ///
+    /// The paths are passed to `git ls-tree` as literal pathspecs, so the
+    /// output scales with the requested paths rather than with the commit
+    /// tree. `-t` keeps a requested directory's own entry when a path beneath
+    /// it is also requested. The listing may include unrequested siblings;
+    /// callers look entries up by exact path. Paths are split across
+    /// processes in chunks of [`LS_TREE_PATHS_PER_PROCESS`] to bound the
+    /// argument list. The outer error is a spawn failure; the inner one is a
+    /// git failure or malformed output.
+    fn list_pinned_tree_entries<'a>(
+        &self,
+        commit: &str,
+        paths: impl Iterator<Item = &'a String>,
+    ) -> Result<Result<BTreeMap<Vec<u8>, TreeEntry>, String>, GitRevisionError> {
+        let paths = paths.map(String::as_str).collect::<Vec<_>>();
+        paths
+            .chunks(LS_TREE_PATHS_PER_PROCESS)
+            .try_fold(Ok(BTreeMap::new()), |listed, chunk| {
+                let Ok(mut listed) = listed else {
+                    return Ok(listed);
+                };
+                let arguments = [
+                    "--literal-pathspecs",
+                    "ls-tree",
+                    "-t",
+                    "-z",
+                    "--full-tree",
+                    commit,
+                    "--",
+                ]
+                .into_iter()
+                .chain(chunk.iter().copied());
+                let output = self.run(arguments)?;
+                if !output.status.success() {
+                    return Ok(Err(stderr(&output)));
+                }
+                Ok(parse_pinned_tree_entries(&output.stdout).map(|entries| {
+                    listed.extend(entries);
+                    listed
+                }))
+            })
     }
 
     /// Return paths changed between two revisions, using NUL-delimited Git

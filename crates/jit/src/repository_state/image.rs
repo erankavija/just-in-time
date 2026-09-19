@@ -4,7 +4,6 @@ use super::{RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, Virtua
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Write};
 
 /// Platform-neutral file mode.
 #[derive(
@@ -106,7 +105,8 @@ pub enum RepositoryEntry {
     File {
         /// Exact entry identity.
         identity: EntryIdentity,
-        /// Exact bytes.
+        /// Exact bytes, bound into the plan hash through `identity`.
+        #[serde(skip_serializing)]
         bytes: Vec<u8>,
         /// Normalized mode.
         mode: FileMode,
@@ -337,7 +337,8 @@ pub struct PinnedDocumentEvidence {
     object_oid: Option<String>,
     /// Exact object/content identity, including SHA-256 and byte size.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present.
+    /// Exact bytes when present, bound into the plan hash through `identity`.
+    #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
     /// Stable absence/unavailable reason.
     unavailable_reason: Option<String>,
@@ -399,16 +400,28 @@ impl PinnedDocumentEvidence {
         self.commit_oid.as_deref()
     }
 
+    /// Git object OID when the target is present at the resolved commit.
+    pub fn object_oid(&self) -> Option<&str> {
+        self.object_oid.as_deref()
+    }
+
     /// The stable Git-unavailable/not-found/read-failed reason, when the target
     /// could not be captured as a present typed object.
     pub fn unavailable_reason(&self) -> Option<&str> {
         self.unavailable_reason.as_deref()
     }
 
-    fn validate_request(&self, request: &(String, String)) -> Result<(), CaptureError> {
+    /// Require that this evidence answers `request`. The payload needs no
+    /// revalidation: [`new`](Self::new) is the only constructor and validates it.
+    fn ensure_request(&self, request: &(String, String)) -> Result<(), CaptureError> {
         if (&self.requested_revision, &self.requested_path) != (&request.0, &request.1) {
             return Err(CaptureError::PinnedEvidenceRequestMismatch(request.clone()));
         }
+        Ok(())
+    }
+
+    fn validate_request(&self, request: &(String, String)) -> Result<(), CaptureError> {
+        self.ensure_request(request)?;
         validate_pinned_request(&self.requested_revision, &self.requested_path)?;
         for oid in [&self.commit_oid, &self.object_oid].into_iter().flatten() {
             if oid.is_empty() || oid.chars().any(char::is_control) {
@@ -477,7 +490,8 @@ pub struct LinkedWorktreeEvidence {
     source: LinkedWorktreeSourceClass,
     /// Exact identity when present.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present.
+    /// Exact bytes when present, bound into the plan hash through `identity`.
+    #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
 }
 
@@ -499,10 +513,22 @@ impl LinkedWorktreeEvidence {
         Ok(evidence)
     }
 
-    fn validate_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
+    /// The exact bytes read from the selected fallback source, when present.
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.bytes.as_deref()
+    }
+
+    /// Require that this evidence answers `request`. The payload needs no
+    /// revalidation: [`new`](Self::new) is the only constructor and validates it.
+    fn ensure_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
         if &self.path != request {
             return Err(CaptureError::LinkedEvidenceRequestMismatch(request.clone()));
         }
+        Ok(())
+    }
+
+    fn validate_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
+        self.ensure_request(request)?;
         if self.path.root_class() != super::RepositoryRootClass::Data {
             return Err(CaptureError::LinkedEvidenceRequiresDataPath(
                 self.path.clone(),
@@ -643,15 +669,18 @@ impl CaptureSpec {
     }
 
     /// Require immutable pinned evidence.
+    ///
+    /// A pinned request constrains nothing else in the declaration, so only
+    /// the new request is validated. Revalidating the whole declaration per
+    /// request would make a capture quadratic in its pinned-request count.
     pub fn discover_pinned(
         &mut self,
         revision: impl Into<String>,
         path: impl Into<String>,
     ) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        candidate.pinned.insert((revision.into(), path.into()));
-        candidate.validate()?;
-        *self = candidate;
+        let request = (revision.into(), path.into());
+        validate_pinned_request(&request.0, &request.1)?;
+        self.pinned.insert(request);
         Ok(())
     }
 
@@ -812,7 +841,7 @@ impl RepositoryImage {
             if !spec.pinned.contains(request) {
                 return Err(CaptureError::UnexpectedPinnedEvidence(request.clone()));
             }
-            evidence.validate_request(request)?;
+            evidence.ensure_request(request)?;
         }
         for request in &spec.pinned {
             if !pinned.contains_key(request) {
@@ -824,7 +853,7 @@ impl RepositoryImage {
             if !spec.linked_worktree.contains(path) {
                 return Err(CaptureError::UnexpectedLinkedEvidence(path.clone()));
             }
-            evidence.validate_request(path)?;
+            evidence.ensure_request(path)?;
         }
         for path in &spec.linked_worktree {
             if !linked_worktree.contains_key(path) {
@@ -1547,38 +1576,8 @@ fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
 }
 
 fn hash_serialized(hasher: &mut Sha256, value: &impl Serialize) -> Result<(), PlanHashError> {
-    let mut counter = ByteCounter::default();
-    serde_json::to_writer(&mut counter, value)?;
-    hasher.update(counter.0.to_be_bytes());
-    serde_json::to_writer(HashWriter(hasher), value)?;
+    hash_field(hasher, &serde_json::to_vec(value)?);
     Ok(())
-}
-
-#[derive(Default)]
-struct ByteCounter(u64);
-
-impl Write for ByteCounter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0 += bytes.len() as u64;
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-struct HashWriter<'a>(&'a mut Sha256);
-
-impl Write for HashWriter<'_> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.update(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 /// Capture closure failure.
@@ -2502,20 +2501,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(captured.file_bytes(&discovered).unwrap(), Some(&bytes[..]));
-    }
-
-    #[test]
-    fn test_hash_serialized_matches_buffered_length_prefixed_json_contract() {
-        let captured = image(1, 2);
-        let value = captured.entries.iter().collect::<Vec<_>>();
-        let mut streamed = Sha256::new();
-        hash_serialized(&mut streamed, &value).unwrap();
-
-        let mut buffered = Sha256::new();
-        let bytes = serde_json::to_vec(&value).unwrap();
-        hash_field(&mut buffered, &bytes);
-
-        assert_eq!(streamed.finalize(), buffered.finalize());
     }
 
     #[test]

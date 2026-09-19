@@ -219,6 +219,7 @@ fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() 
     .unwrap();
     repo.write("docs/section/.keep", b"directory");
     repo.write("docs/space name.md", b"space\tpath\0\n");
+    repo.write("docs/[x].md", b"glob characters");
     std::os::unix::fs::symlink("file.md", repo.root.join("docs/link.md")).unwrap();
     let first = repo.commit("first");
     repo.write("docs/file.md", b"second version");
@@ -233,6 +234,10 @@ fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() 
         ("HEAD", "docs/missing.md"),
         ("HEAD", "docs/file.md/x"),
         ("HEAD", "docs/space name.md"),
+        ("HEAD", "docs"),
+        ("HEAD", "docs/[x].md"),
+        ("HEAD", "docs/*.md"),
+        ("HEAD", ":(glob)docs/*.md"),
         (first.as_str(), "docs/file.md"),
         (abbreviated.as_str(), "docs/file.md"),
         (range.as_str(), "docs/file.md"),
@@ -278,7 +283,7 @@ fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() 
     assert!(process_log(&repo.root.join("git-processes.log"))
         .iter()
         .any(|line| line == "rev-parse --verify not-a-revision^{commit}"));
-    assert_eq!(cache.len(), 8);
+    assert_eq!(cache.len(), 12);
 }
 
 #[cfg(unix)]
@@ -310,10 +315,49 @@ fn test_inspect_pinned_targets_scales_one_revision_independently_of_reference_co
     let processes = process_log(&log);
     assert_eq!(processes.len(), 6);
     assert!(processes.iter().any(|line| line.starts_with("rev-parse ")));
-    assert!(processes
+    let listing = processes
         .iter()
-        .any(|line| line == &format!("ls-tree -r -t -z --full-tree {revision}")));
+        .skip(3)
+        .filter(|line| line.contains("ls-tree"))
+        .collect::<Vec<_>>();
+    assert_eq!(listing.len(), 1);
+    assert!(listing[0].starts_with(&format!(
+        "--literal-pathspecs ls-tree -t -z --full-tree {revision} -- "
+    )));
+    assert!((1..40).all(|index| listing[0].contains(&format!("docs/file-{index}.md"))));
     assert!(processes.iter().any(|line| line == "cat-file --batch"));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_inspect_pinned_targets_lists_only_requested_paths_of_a_commit_tree() {
+    let repo = Repo::new();
+    (0..40).for_each(|index| {
+        repo.write(&format!("other/file-{index}.md"), b"unrequested");
+    });
+    repo.write("docs/nested/file.md", b"requested");
+    repo.commit("wide tree");
+    let requests = [("HEAD", "docs"), ("HEAD", "docs/nested/file.md")]
+        .into_iter()
+        .map(|(revision, path)| (revision.to_string(), path.to_string()))
+        .collect::<std::collections::BTreeSet<_>>();
+    let (wrapper, log) = counted_git(&repo);
+    let resolver = GitRevisionResolver::with_git_program(&repo.root, wrapper);
+
+    let results = resolver.inspect_pinned_targets(&requests, &mut BTreeMap::new());
+
+    assert!(results.values().all(Result::is_ok));
+    let listings = process_log(&log)
+        .into_iter()
+        .filter(|line| line.contains("ls-tree"))
+        .collect::<Vec<_>>();
+    assert_eq!(listings.len(), 1);
+    assert!(
+        !listings[0].split(' ').any(|argument| argument == "-r"),
+        "pinned classification listed the commit tree recursively: {}",
+        listings[0]
+    );
+    assert!(!listings[0].contains("other"));
 }
 
 #[cfg(unix)]
@@ -348,7 +392,7 @@ fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_proces
     assert_eq!(
         processes
             .iter()
-            .filter(|line| line.starts_with("ls-tree "))
+            .filter(|line| line.contains(" ls-tree "))
             .count(),
         2
     );

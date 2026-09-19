@@ -276,6 +276,10 @@ impl Drop for RetainedSessionSuspension {
 
 type Index = RepositoryIndex;
 
+/// Pinned-document evidence retained across captures, keyed by request.
+pub(crate) type PinnedEvidenceCache =
+    BTreeMap<(String, String), crate::repository_state::PinnedDocumentEvidence>;
+
 #[cfg(all(test, unix))]
 mod artifact_location_tests {
     use super::*;
@@ -390,6 +394,12 @@ pub struct JsonFileStorage {
     sidecars_swept: Arc<AtomicBool>,
     /// Shared commit-keyed pinned evidence retained for the most recent capture.
     pinned_target_cache: Arc<Mutex<BTreeMap<(String, String), crate::storage::PinnedTargetRead>>>,
+    /// Pinned-document evidence built by the most recent capture that pinned
+    /// any document, keyed by request. Evidence is a pure function of the
+    /// request and the Git objects it resolved to, so a later capture reuses it
+    /// while the request resolves to the same commit and object, skipping the
+    /// content hashing that dominates large pinned documents.
+    pinned_evidence_cache: Arc<Mutex<PinnedEvidenceCache>>,
     git_program: PathBuf,
 }
 
@@ -441,6 +451,7 @@ impl JsonFileStorage {
             worktree_paths: Arc::new(Mutex::new(None)),
             sidecars_swept: Arc::new(AtomicBool::new(false)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
+            pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
             git_program: PathBuf::from("git"),
             root,
             locker: FileLocker::new(timeout),
@@ -502,6 +513,13 @@ impl JsonFileStorage {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         crate::storage::GitRevisionResolver::with_git_program(repo_root, self.git_program.clone())
             .inspect_pinned_targets(requests, &mut cache)
+    }
+
+    /// Exclusive access to the pinned-evidence cache for one capture.
+    pub(crate) fn pinned_evidence_cache(&self) -> std::sync::MutexGuard<'_, PinnedEvidenceCache> {
+        self.pinned_evidence_cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     #[cfg(test)]

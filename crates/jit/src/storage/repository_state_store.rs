@@ -895,6 +895,7 @@ fn capture_capability_image(
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), spec.pinned());
+    let mut evidence_cache = storage.pinned_evidence_cache();
     let pinned = spec
         .pinned()
         .iter()
@@ -908,6 +909,15 @@ fn capture_capability_image(
                 })?;
             let evidence = match read {
                 Ok(read) => {
+                    let cached = evidence_cache
+                        .get(&(revision.clone(), path.clone()))
+                        .filter(|evidence| {
+                            evidence.commit_oid() == Some(read.version().as_str())
+                                && evidence.object_oid() == read.object_oid()
+                        });
+                    if let Some(evidence) = cached {
+                        return Ok(((revision.clone(), path.clone()), evidence.clone()));
+                    }
                     let commit = read.version().as_str().to_string();
                     let object_oid = read.object_oid().map(str::to_string);
                     let bytes = read.bytes().map(<[u8]>::to_vec);
@@ -945,6 +955,16 @@ fn capture_capability_image(
             Ok(((revision.clone(), path.clone()), evidence))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
+    // Mirror the target cache: a capture that pins nothing keeps the evidence
+    // a later capture reuses, and Git-unavailable evidence is never retained.
+    if !pinned.is_empty() {
+        *evidence_cache = pinned
+            .iter()
+            .filter(|(_, evidence)| evidence.commit_oid().is_some())
+            .map(|(request, evidence)| (request.clone(), evidence.clone()))
+            .collect();
+    }
+    drop(evidence_cache);
     let linked = spec
         .linked_worktree()
         .iter()
