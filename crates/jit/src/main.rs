@@ -3634,12 +3634,9 @@ fn run() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                // `error_msg` is display-payload only: the branch
-                                // selection below is driven entirely by `downcast_ref`
-                                // (typed TransitionBlockedError / IssueNotFoundError),
-                                // and the string is used solely as the GENERIC_ERROR
-                                // message body. No control flow branches on it.
-                                let error_msg = e.to_string();
+                                // Branch selection is driven entirely by typed errors
+                                // (TransitionBlockedError, IssueNotFoundError, and a
+                                // lock timeout); the message text never selects a code.
                                 let json_error = if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
                                 {
@@ -3650,10 +3647,7 @@ fn run() -> Result<()> {
                                 {
                                     jit::output::JsonError::issue_not_found(&full_id)
                                 } else {
-                                    jit::output::JsonError::new(
-                                        jit::output::ErrorCode::GenericError,
-                                        &error_msg,
-                                    )
+                                    command_json_error(&e, jit::output::ErrorCode::GenericError)
                                 };
                                 handle_json_error!(json, e, json_error);
                             }
@@ -5030,7 +5024,7 @@ fn run() -> Result<()> {
                             {
                                 JsonError::new(jit::output::ErrorCode::GateNotFound, error_str)
                             } else {
-                                JsonError::new(ErrorCode::GateError, error_str)
+                                command_json_error(&e, ErrorCode::GateError)
                             };
                             println!("{}", json_error.to_json_string()?);
                             std::process::exit(json_error.exit_code().code());
@@ -5434,6 +5428,9 @@ fn run() -> Result<()> {
 
                     let mut results = Vec::new();
                     let mut errors = Vec::new();
+                    // A lock wait that expired for any issue is reported as
+                    // contention, not as the preset's own failure.
+                    let mut lock_timed_out = false;
 
                     for id in &ids {
                         match executor.apply_gate_preset(
@@ -5449,11 +5446,17 @@ fn run() -> Result<()> {
                                 results.push((id.clone(), result, warnings));
                             }
                             Err(e) => {
+                                lock_timed_out |= jit::storage::is_lock_timeout(&e);
                                 errors.push((id.clone(), e.to_string()));
                             }
                         }
                     }
 
+                    let failure_code = if lock_timed_out {
+                        ErrorCode::LockTimeout
+                    } else {
+                        ErrorCode::PresetError
+                    };
                     if json {
                         let payload = serde_json::json!({
                             "preset": name,
@@ -5483,8 +5486,7 @@ fn run() -> Result<()> {
                                 name,
                                 errors.len()
                             );
-                            let error = JsonError::new(ErrorCode::PresetError, message)
-                                .with_details(payload);
+                            let error = JsonError::new(failure_code, message).with_details(payload);
                             println!("{}", error.to_json_string()?);
                             std::process::exit(error.exit_code().code());
                         }
@@ -5504,7 +5506,7 @@ fn run() -> Result<()> {
                             for (id, error) in &errors {
                                 eprintln!("  {} - {}", id, error);
                             }
-                            std::process::exit(ErrorCode::PresetError.exit_code().code());
+                            std::process::exit(failure_code.exit_code().code());
                         }
                     }
                 }
@@ -9511,5 +9513,59 @@ mod repository_state_classifier_tests {
         let json = profile_json_error(&error).expect("a not-found error renders a JSON error");
         assert_eq!(json.error.code, jit::output::ErrorCode::ProfileNotFound);
         assert_eq!(json.exit_code().code(), 3);
+    }
+}
+
+#[cfg(test)]
+mod lock_timeout_classification_tests {
+    //! A lock wait that expired is reported as contention wherever it surfaces:
+    //! through the shared classifier and through a handler's own JSON error,
+    //! including when a mutation session wraps it and callers add context.
+
+    use super::{command_json_error, error_to_error_code};
+    use jit::output::{ErrorCode, ExitCode};
+    use jit::storage::{LockMode, LockTimeout, RepositoryStateStoreError};
+
+    fn session_lock_timeout() -> anyhow::Error {
+        let timeout = LockTimeout {
+            mode: LockMode::Exclusive,
+            path: ".jit-bootstrap.lock".into(),
+            waited: std::time::Duration::from_secs(1),
+        };
+        anyhow::Error::new(RepositoryStateStoreError::Other(timeout.into()))
+            .context("issue update could not open its mutation session")
+    }
+
+    #[test]
+    fn test_error_to_error_code_classifies_wrapped_session_lock_timeout() {
+        assert_eq!(
+            error_to_error_code(&session_lock_timeout()),
+            ErrorCode::LockTimeout
+        );
+    }
+
+    #[test]
+    fn test_command_json_error_reports_lock_timeout_over_handler_code() {
+        [
+            ErrorCode::GenericError,
+            ErrorCode::GateError,
+            ErrorCode::PresetError,
+        ]
+        .into_iter()
+        .for_each(|handler_code| {
+            assert_eq!(
+                command_json_error(&session_lock_timeout(), handler_code).exit_code(),
+                ExitCode::LockTimeout
+            );
+        });
+    }
+
+    #[test]
+    fn test_command_json_error_keeps_handler_code_for_other_failures() {
+        let error = anyhow::anyhow!("gate registry is malformed");
+        assert_eq!(
+            command_json_error(&error, ErrorCode::GateError).exit_code(),
+            ErrorCode::GateError.exit_code()
+        );
     }
 }
