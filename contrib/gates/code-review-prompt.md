@@ -51,7 +51,7 @@ An unrun, pending, or failed peer review or judgment gate is not by itself an im
 
 Executable CI or validation gate evidence may support a blocking finding when it demonstrates an attributable failure or leaves a hard criterion materially unverified. Tie any such finding to the attributable behavior or unmet criterion shown by the evidence, not merely to the gate's status.
 
-Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists. An attributable test that re-proves a property owned by another test or a lower layer is an issue-impact finding (`@/inv/orthogonal-tests`).
+Review test adequacy from attributable implementation and test changes. Require test-first history only when explicit evidence exists. An attributable test that re-proves a property owned by another test or a lower layer, or that depends on execution order or unguarded process-wide state, is an issue-impact finding (`@/inv/orthogonal-tests`).
 
 Do not require a `# Examples` section merely because an API is public. Apply the
 repository's non-obvious-only standard: an example is warranted when it teaches
