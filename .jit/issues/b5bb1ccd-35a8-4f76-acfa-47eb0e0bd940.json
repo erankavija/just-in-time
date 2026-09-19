@@ -1,0 +1,45 @@
+{
+  "assignee": "agent:claude",
+  "claimed_at": "2026-09-19T15:41:09.847957541Z",
+  "context": {},
+  "created_at": "2026-09-19T15:41:05.901464318Z",
+  "dependencies": [],
+  "description": "Repository-image capture spends seconds of CPU per mutation on work that does not scale with the change. The work grows with the size of the repository and its pinned documents. In an adopter repository with 48k tracked files and 42 pinned revisions, one label update spends 6.4 s under the repository lock, longer than the 5 s lock timeout every concurrent caller uses.\n\n## Background\n\nFour costs dominate a CPU profile of that mutation:\n\n- `GitRevisionResolver::inspect_pinned_targets` classifies the pinned paths of each resolved commit by listing the whole commit tree recursively (`git ls-tree -r`). The output is about 9 MB per revision, independent of how many paths the capture needs. `git ls-tree` accepts the requested paths as literal pathspecs. With `-t` it reports each requested entry, including a directory requested together with a path beneath it.\n- `plan_hash` serializes the whole image, including every captured file's bytes, as JSON number arrays, twice (a length pass and a hash pass). Each captured entry already carries a SHA-256 identity of its bytes, validated at construction.\n- `CaptureSpec::discover_pinned` clones and revalidates the whole declaration for each pinned request. A capture with N pinned requests therefore costs O(N²).\n- Pinned evidence re-hashes the pinned blob bytes two or three times per capture. One mutation captures about seven times. The evidence for a request is a pure function of the commit and object it resolves to.\n\nMeasured on a clone of the adopter repository (876 issues, 48k tracked files, 1687 document references, 42 distinct pinned revisions, 129 MB of pinned blobs): 6.5 s wall for a label update that changes the issue.\n\n## Success Criteria\n\n- [hard] REQ-01: Classifying N paths at one commit produces git output proportional to N and the depth of the requested paths, independent of the number of entries in the commit tree.\n- [hard] REQ-02: Pinned-document evidence is unchanged for every target class. The classes are a present file, an executable file, a directory, a directory requested together with a path beneath it, a symlink or other unsupported entry, a path missing from the commit, a path containing pathspec-magic or glob characters, and an unresolvable revision.\n- [hard] REQ-03: The plan hash commits to each captured file's content through its validated identity rather than by serializing the bytes, and it still changes when captured content changes.\n- [hard] REQ-04: Adding a pinned request validates that request alone. Pinned evidence reused across captures is rebuilt when its request resolves to a different commit or object.\n- [hard] REQ-05: A label update that changes the issue on the adopter-scale clone runs at least 3x faster than before the change. This is evidenced by a benchmark artifact committed under the issue and linked to it.\n- [hard] REQ-06: Regression coverage fails if full-tree listing of a pinned commit is reintroduced.\n\n## Notes\n\nGit remains optional for core commands (`@/charter/D-4`); a failing git keeps recording per-reference unavailable reasons.\n\nHashing unpinned worktree documents is out of scope. Each capture hashes each document twice, and a mutation captures about seven times. Worktree bytes can change between captures, so commit-keyed reuse does not apply to them.\n",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Capture CPU benchmark",
+      "path": "dev/active/b5bb1ccd/benchmark.md"
+    }
+  ],
+  "first_ready_at": "2026-09-19T15:41:05.901464318Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-09-19T15:41:17.282774433Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-09-19T15:41:17.282774433Z",
+      "updated_by": null
+    }
+  },
+  "id": "b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940",
+  "labels": [
+    "component:core",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Repository-image capture spends seconds of CPU per mutation",
+  "updated_at": "2026-09-19T16:04:37.419589739Z"
+}

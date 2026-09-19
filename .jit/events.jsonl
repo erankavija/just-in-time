@@ -14682,3 +14682,10 @@
 {"gate_key":"code-review","id":"2c1eb415-935c-472c-81e3-70e12f6f68a3","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","timestamp":"2026-09-16T23:06:08.692347767Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"98dd54b8-b8c0-44d5-9124-3d1bc0a3bda7","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","timestamp":"2026-09-16T23:06:28.143232113Z","to":"done","type":"issue_state_changed"}
 {"id":"f9d9faa7-dde0-496d-8cf0-d5ee9ac1770e","issue_id":"9c9ac88e-ceec-4fd6-8820-7b3a3120ebee","timestamp":"2026-09-16T23:06:28.143232113Z","type":"issue_completed"}
+{"id":"1e012571-c060-4cfe-8588-9f7482850ea4","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","priority":"high","timestamp":"2026-09-19T15:41:05.901464318Z","title":"Pinned-document capture lists every commit tree in full","type":"issue_created"}
+{"from":"ready","id":"c959944d-ce66-46b8-abdb-2952b44a2ab7","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T15:41:09.847957541Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:claude","id":"6c349a89-e3d1-4342-81ff-e023ebd38689","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T15:41:09.847957541Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"9cbec7c5-6481-4027-a3e3-fd7a212781a8","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T15:41:17.282774433Z","type":"gate_added"}
+{"gate_key":"code-review","id":"a14cfe95-07e7-41cc-843e-e0975b37b9cf","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T15:41:17.282774433Z","type":"gate_added"}
+{"fields":["title","description"],"id":"2109056d-3f2b-4202-aeab-9a1d926744fb","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:02:45.574591261Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["documents"],"id":"d02e4d91-acf8-4a0b-892b-1f9bcfd54caa","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:04:37.419589739Z","type":"issue_updated","updated_by":"doc-add"}
