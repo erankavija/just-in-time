@@ -236,7 +236,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// What a mutation decides before taking the claims guard: the
-    /// configuration, invariant and gate registries, the index, and the issue
+    /// configuration that sets the lease mode, the index, and the issue
     /// `requested` names.
     ///
     /// Only issues whose ids match `requested` are read, and the target is
@@ -248,14 +248,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
-        let fixed = || {
-            vec![
-                VirtualPath::CONFIG,
-                VirtualPath::INVARIANTS,
-                VirtualPath::GATES,
-                VirtualPath::INDEX,
-            ]
-        };
+        let fixed = || vec![VirtualPath::CONFIG, VirtualPath::INDEX];
         let Some(registries) = capture_or_retry(
             session.capture(CaptureSpec::phase_one(fixed(), MUTATION_CAPTURE_BUDGET)?),
         )?
@@ -1276,7 +1269,7 @@ pub(crate) struct MutationBase {
 /// The lease inputs and target issue a mutation reads before taking the claims
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
-    /// Configuration, invariant and gate registries, index, and candidate issues.
+    /// Configuration, index, and candidate issues.
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// The issue the request names.
     pub(crate) target: Issue,
@@ -4564,9 +4557,9 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(mutation.capture_spec().pinned().is_empty());
     }
 
-    /// A mutation preflight reads the lease inputs and the requested issue, and
-    /// resolves a short id exactly as a full capture does, without the event log
-    /// or any other issue.
+    /// A mutation preflight reads the lease configuration, the index, and the
+    /// requested issue, and resolves a short id exactly as a full capture does,
+    /// without any other registry or issue.
     #[test]
     fn test_capture_mutation_preflight_reads_lease_inputs_and_target_only() {
         use crate::commands::test_helpers::{seed_issue, setup};
@@ -4590,7 +4583,8 @@ description = \"Full Rust CI pipeline must pass.\"
         let spec = preflight.image.capture_spec();
         assert_eq!(preflight.target.id, target_id);
         assert!(spec.contains_path(&VirtualPath::CONFIG));
-        assert!(spec.contains_path(&VirtualPath::GATES));
+        assert!(!spec.contains_path(&VirtualPath::GATES));
+        assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
