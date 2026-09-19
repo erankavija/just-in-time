@@ -551,13 +551,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("issue deletion", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_proposed_base(
-                    preflight.as_mut(),
-                    &std::collections::BTreeMap::new(),
-                    &[],
-                    None,
-                )?
-                else {
+                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
                     return Ok(AttemptOutcome::Retry);
                 };
                 let issues = captured_active_issues(&image)?;
@@ -575,13 +569,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_proposed_base(
-                session.as_mut(),
-                &std::collections::BTreeMap::new(),
-                &[],
-                None,
-            )?
-            else {
+            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;

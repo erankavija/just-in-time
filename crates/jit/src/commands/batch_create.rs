@@ -272,7 +272,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
-        use std::collections::BTreeMap;
 
         self.validate_batch_from_json(&defs)?;
 
@@ -293,9 +292,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_paths.push(VirtualPath::ISSUES);
 
         with_mutation_session(&self.storage, &layout, "batch issue creation", |session| {
-            let Some(image) =
-                self.capture_proposed_base(session, &BTreeMap::new(), &issue_paths, None)?
-            else {
+            let Some(image) = self.capture_mutation_base(session, &issue_paths, None)? else {
                 return Ok(SessionStep::Retry);
             };
             let declarations = crate::repository_state::declarations_from_image(&image)?;
@@ -519,11 +516,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use std::collections::BTreeMap;
-
         let mut session = self.storage.open_mutation_session(self.require_layout()?)?;
         let image = self
-            .capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
+            .capture_mutation_base(session.as_mut(), &[], None)?
             .ok_or_else(|| anyhow!("batch validation capture conflicted"))?;
         let declarations = crate::repository_state::declarations_from_image(&image)?;
         Self::collect_batch_problems_from_declarations(defs, &declarations)

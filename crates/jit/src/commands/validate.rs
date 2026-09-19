@@ -205,7 +205,30 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             &[],
             precheck_target,
-            true,
+            DocumentCapture::All,
+            false,
+        )
+    }
+
+    /// The base an issue mutation derives from: the registries, every issue,
+    /// and only the plan documents its transition rules read.
+    ///
+    /// Issue document references are left out because only whole-repository
+    /// validation reads them. They are captured after all when `precheck_target`
+    /// requires a precheck gate that validates the whole captured repository.
+    pub(crate) fn capture_mutation_base(
+        &self,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        extra_paths: &[crate::repository_state::VirtualPath],
+        precheck_target: Option<&str>,
+    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
+        self.capture_proposed_base_inner(
+            session,
+            &std::collections::BTreeMap::new(),
+            extra_paths,
+            &[],
+            precheck_target,
+            DocumentCapture::PlanOnly,
             false,
         )
     }
@@ -220,7 +243,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             &[],
             &[],
             None,
-            false,
+            DocumentCapture::None,
             true,
         )
     }
@@ -244,7 +267,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             extra_paths,
             extra_listings,
             None,
-            true,
+            DocumentCapture::All,
             false,
         )
     }
@@ -260,7 +283,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         extra_listings: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
-        capture_documents: bool,
+        documents: DocumentCapture,
         archive_scan: bool,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         use crate::repository_state::{
@@ -349,23 +372,40 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         let issues = effective_issues(&image_two, &all_ids, &effective)?;
         let mut full_config = config.clone();
         full_config.templates = effective_templates(&image_two, &config, &effective)?;
-        let (worktree_docs, pinned) = if capture_documents {
-            document_capture_closure(&issues, &full_config)?
-        } else {
-            (Vec::new(), Vec::new())
+        let precheck = match precheck_target {
+            Some(raw_target) => {
+                let target = super::resolve_issue_from_capture(&issues, raw_target)?;
+                let issue = issues
+                    .iter()
+                    .find(|issue| issue.id == target)
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
+                let gates = match effective(&image_two, ".jit/gates.toml")? {
+                    Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
+                    None => crate::declarations::GateRegistry::default(),
+                };
+                Some((issue, gates))
+            }
+            None => None,
         };
+        let documents = match &precheck {
+            Some((issue, gates))
+                if issue
+                    .gates_required
+                    .iter()
+                    .filter_map(|key| gates.gates.get(key))
+                    .any(|gate| {
+                        gate.stage == crate::declarations::GateStage::Precheck
+                            && super::is_broad_builtin_precheck(gate)
+                    }) =>
+            {
+                DocumentCapture::All
+            }
+            _ => documents,
+        };
+        let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config, documents)?;
         phase_three.discover_paths(worktree_docs)?;
         let mut capture_precheck_history = false;
-        if let Some(raw_target) = precheck_target {
-            let target = super::resolve_issue_from_capture(&issues, raw_target)?;
-            let issue = issues
-                .iter()
-                .find(|issue| issue.id == target)
-                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
-            let gates = match effective(&image_two, ".jit/gates.toml")? {
-                Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
-                None => crate::declarations::GateRegistry::default(),
-            };
+        if let Some((issue, gates)) = precheck {
             capture_precheck_history = issue
                 .gates_required
                 .iter()
@@ -1132,7 +1172,20 @@ type DocumentClosure = (
     Vec<(String, String)>,
 );
 
-/// Enumerate the phase-three document and plan-document capture closure.
+/// Which issue-linked documents a base capture reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DocumentCapture {
+    /// Every document reference and plan document, as whole-repository
+    /// validation reads them.
+    All,
+    /// Plan documents only, as issue mutations' transition rules read them.
+    PlanOnly,
+    /// No issue-linked document.
+    None,
+}
+
+/// Enumerate the phase-three document and plan-document capture closure that
+/// `documents` admits.
 ///
 /// Returns every working-tree document path to capture and every pinned-document
 /// `(revision, path)` request: a document pinned to a commit is captured as
@@ -1141,12 +1194,24 @@ type DocumentClosure = (
 /// container's derived plan-document path (mirroring plan-content projection's
 /// planning-node resolution) is added as a working-tree path so a container whose
 /// criteria live in an external plan validates against image-projected content.
-fn document_capture_closure(issues: &[Issue], config: &JitConfig) -> Result<DocumentClosure> {
+fn document_capture_closure(
+    issues: &[Issue],
+    config: &JitConfig,
+    documents: DocumentCapture,
+) -> Result<DocumentClosure> {
     use crate::document::DocumentReferenceRequests;
     use crate::repository_state::VirtualPath;
     let mut worktree = Vec::new();
     let mut pinned = Vec::new();
-    for issue in issues {
+    if documents == DocumentCapture::None {
+        return Ok((worktree, pinned));
+    }
+    let references = if documents == DocumentCapture::All {
+        issues
+    } else {
+        &[]
+    };
+    for issue in references {
         for document in &issue.documents {
             let requests = DocumentReferenceRequests::for_reference(document)?;
             worktree.extend(requests.worktree().cloned());
@@ -4329,5 +4394,47 @@ description = \"Full Rust CI pipeline must pass.\"
                 ),
             ]
         );
+    }
+
+    /// An issue mutation captures no issue document reference, working-tree or
+    /// pinned, while whole-repository validation of the same repository does.
+    #[test]
+    fn test_capture_mutation_base_excludes_issue_document_references() {
+        use crate::commands::test_helpers::{seed_issue, setup};
+        use crate::repository_state::VirtualPath;
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let issue = crate::domain::types::fixture_issue("Doc".to_string(), String::new());
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        executor
+            .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
+            .unwrap();
+        executor
+            .add_document_reference(&issue_id, "dev/pinned.md", Some("HEAD"), None, None, true)
+            .unwrap();
+        let document = VirtualPath::worktree("dev/notes.md").unwrap();
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+
+        let validation = executor
+            .capture_proposed_base(
+                session.as_mut(),
+                &std::collections::BTreeMap::new(),
+                &[],
+                None,
+            )
+            .unwrap()
+            .expect("a settled capture");
+        let mutation = executor
+            .capture_mutation_base(session.as_mut(), &[], None)
+            .unwrap()
+            .expect("a settled capture");
+
+        assert!(validation.capture_spec().contains_path(&document));
+        assert!(!validation.capture_spec().pinned().is_empty());
+        assert!(!mutation.capture_spec().contains_path(&document));
+        assert!(mutation.capture_spec().pinned().is_empty());
     }
 }

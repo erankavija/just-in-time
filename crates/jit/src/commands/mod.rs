@@ -533,6 +533,17 @@ fn checker_consumes_run_history(checker: &crate::declarations::GateChecker) -> b
     )
 }
 
+/// Whether `gate` is an automatic built-in checker that judges the whole
+/// captured repository rather than one issue's slice of it.
+pub(crate) fn is_broad_builtin_precheck(gate: &crate::declarations::GateDefinition) -> bool {
+    use crate::declarations::GateChecker;
+    gate.mode == GateMode::Auto
+        && !matches!(
+            gate.checker,
+            Some(GateChecker::Exec { .. } | GateChecker::ReviewPlaceholder)
+        )
+}
+
 fn captured_precheck_plan(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
@@ -548,11 +559,9 @@ fn captured_precheck_plan(
         .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
-    let broad_builtin = gates.iter().any(|(_, gate)| {
-        gate.mode == GateMode::Auto
-            && !matches!(gate.checker, Some(GateChecker::Exec { .. }))
-            && !matches!(gate.checker, Some(GateChecker::ReviewPlaceholder))
-    });
+    let broad_builtin = gates
+        .iter()
+        .any(|(_, gate)| is_broad_builtin_precheck(gate));
     let consumes_history = gates.iter().any(|(_, gate)| {
         gate.mode == GateMode::Auto
             && gate
@@ -2228,15 +2237,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
-        use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = production_mutation_context();
         with_mutation_session(&self.storage, &layout, "issue creation", |session| {
             let issue_id = context.identifier_at(0);
-            let Some(image) = self.capture_proposed_base(
+            let Some(image) = self.capture_mutation_base(
                 session,
-                &BTreeMap::new(),
                 &[
                     VirtualPath::ISSUES,
                     VirtualPath::data(format!("issues/{issue_id}.json"))?,
@@ -2452,16 +2459,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::finalize;
-        use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = production_mutation_context();
         with_mutation_attempts("issue update", || {
             let (expected_target, expected_lease_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) =
-                    self.capture_proposed_base(preflight.as_mut(), &BTreeMap::new(), &[], None)?
-                else {
+                let Some(image) = self.capture_mutation_base(preflight.as_mut(), &[], None)? else {
                     return Ok(AttemptOutcome::Retry);
                 };
                 let issues = captured_active_issues(&image)?;
@@ -2479,9 +2483,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .transpose()?
                 .flatten();
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) =
-                self.capture_proposed_base(session.as_mut(), &BTreeMap::new(), &[], None)?
-            else {
+            let Some(image) = self.capture_mutation_base(session.as_mut(), &[], None)? else {
                 return Ok(AttemptOutcome::Retry);
             };
             let issues = captured_active_issues(&image)?;
@@ -2640,7 +2642,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{finalize, MutationIntent};
-        use std::collections::BTreeMap;
 
         let layout = self.require_layout()?;
         let context = production_mutation_context();
@@ -2657,12 +2658,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 enforce_lease,
             ) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_proposed_base(
-                    preflight.as_mut(),
-                    &BTreeMap::new(),
-                    &[],
-                    Some(request.issue_id()),
-                )?
+                let Some(image) =
+                    self.capture_mutation_base(preflight.as_mut(), &[], Some(request.issue_id()))?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
@@ -2772,9 +2769,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .flatten();
 
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(image) = self.capture_proposed_base(
+            let Some(image) = self.capture_mutation_base(
                 session.as_mut(),
-                &BTreeMap::new(),
                 &precheck_run_paths,
                 Some(request.issue_id()),
             )?
@@ -3544,12 +3540,7 @@ mod tests {
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
         let image = executor
-            .capture_proposed_base(
-                session.as_mut(),
-                &std::collections::BTreeMap::new(),
-                &[],
-                Some(issue_id),
-            )
+            .capture_mutation_base(session.as_mut(), &[], Some(issue_id))
             .unwrap()
             .unwrap();
         let issue = captured_active_issues(&image)

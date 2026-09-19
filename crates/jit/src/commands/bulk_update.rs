@@ -355,13 +355,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             &layout,
             "bulk-update no-op verification",
             |session| {
-                let Some(image) = self.capture_proposed_base(
-                    session,
-                    &std::collections::BTreeMap::new(),
-                    &[],
-                    None,
-                )?
-                else {
+                let Some(image) = self.capture_mutation_base(session, &[], None)? else {
                     return Ok(SessionStep::Retry);
                 };
                 let active = captured_active_issues(&image)?;
