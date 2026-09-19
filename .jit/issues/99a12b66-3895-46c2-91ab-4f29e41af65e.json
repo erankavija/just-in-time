@@ -1,12 +1,21 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-09-19T21:47:35.307810408Z",
   "context": {},
   "created_at": "2026-09-19T20:52:34.029025818Z",
   "dependencies": [
     "9750b151-3471-4916-bee6-4b1221694d2e"
   ],
   "description": "Plan Mutations commit through a redo record and never scale with project history (f1dc843a) against every hard success criterion, write the concise design at dev/active/f1dc843a-redo-mutations/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Investigation",
+      "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-09-19T20:52:34.029025818Z",
   "gates_required": [
     "plan-review"
@@ -30,5 +39,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-19T20:52:34.029025818Z"
+  "updated_at": "2026-09-19T21:47:35.408319227Z"
 }
