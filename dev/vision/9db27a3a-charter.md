@@ -32,9 +32,10 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
-- D-14: Gate the v1.0 tag on the completed profile lifecycle and core maintenance
+- D-14: Gate the v1.0 tag on the completed profile lifecycle, core maintenance, and redo-record mutations
 - D-15: Fix scoped validation in core rather than weakening bracket evidence
 - D-16: Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
+- D-17: Publish each mutation through one redo record over the files it writes, so its cost never scales with project history
 
 ## Decision Details
 
@@ -241,10 +242,12 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 
 - **Chosen:** Keep the release boundary directly dependent on profiles MVP
   `9b7b5f9c`, the complete profile lifecycle `c639cfb5`, and core maintenance
-  `6eb585bc`. All reach a terminal state before the `v1.0.0` tag is created; the
-  release work consumes their delivered contracts without changing or
-  duplicating them. The lifecycle epic joined this set when D-8 was reversed:
-  the profile surface it completes is the one v1.0 ships.
+  `6eb585bc`, and redo-record mutations `f1dc843a`. All reach a terminal state
+  before the `v1.0.0` tag is created; the release work consumes their delivered
+  contracts without changing or duplicating them. The lifecycle epic joined this
+  set when D-8 was reversed: the profile surface it completes is the one v1.0
+  ships. The mutation epic joined it with D-17, because a release whose
+  mutations slow down as project history grows is not dependable.
 - **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
   to make the dependency terminal; keeping core maintenance intentionally open
   as a living epic; and copying either upstream stream's work into the release
@@ -254,7 +257,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   tagging requires the completed core fixes, the profile quickstart, and a
   profile lifecycle an adopter can recover from. A synthetic checkpoint would
   add lifecycle ceremony without changing that contract.
-- **Date:** 2026-07-15, amended 2026-08-10
+- **Date:** 2026-07-15, amended 2026-08-10 and 2026-09-19
 
 ### D-15: Scoped bracket validation is a core-maintenance prerequisite
 
@@ -303,3 +306,46 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   wrapped around them does not amortize across a single release. Distribution
   breadth is a separate decision, taken once the release path itself is proven.
 - **Date:** 2026-07-29
+
+### D-17: Mutations commit through a redo record over the files they write
+
+- **Chosen:** An issue mutation's cost scales with the files it writes, never
+  with the event log or other project history. The repository lock serializes
+  jit writers. A mutation reads the registries and the issues its derivation
+  consults, plus the plan documents a transition rule reads; issue-linked
+  documents stay with validation. Immediately before commit it compares the live
+  bytes of every file it writes with the bytes it read, and checks the event
+  log's length and tail, returning a retryable conflict on any difference. Its
+  commit point is one synced redo record under the data root's gitignored
+  `tmp/`, holding the complete new bytes of each written file and the event
+  append as an offset and its bytes. Applying the record replaces each file by
+  temp-file and rename, writes the append at its offset, and deletes the record.
+  Opening a session replays a leftover record idempotently. The change leaves the
+  storage layer with less code than it has now.
+- **Supersedes:** Decisions D11 (transaction guarantee) and D14 (capture
+  closure) of the transactional-materialization plan `cdc840ad`, archived under
+  `dev/archive/cdc840ad-repository-materialization/`. Their journaled rollback
+  kernel with backups, staging, reverse actions, and worktree companions, their
+  whole-read-set revalidation at apply, the plan hash over every captured entry,
+  and the phased capture with listing fingerprints and document closure are
+  removed rather than kept alongside the redo record.
+- **Rejected:** Keeping the rollback kernel and making its hashing cheaper, which
+  still rewrites the whole event log on every mutation and keeps the code;
+  independent atomic writes of the issue file and the event line, which let a
+  crash leave an issue changed without its event (`@/inv/event-log`); dropping
+  the preimage check, which lets jit and a concurrent `git checkout` or editor
+  silently overwrite each other; and revalidating every file a mutation read,
+  which costs a full reread to catch staleness in files the mutation does not
+  write.
+- **Reasoning:** On an 876-issue adopter repository a label update fell from
+  1.8 s to 110 ms once mutations stopped capturing documents and repeating
+  captures, and the remainder is dominated by the old mechanism: the full
+  event-log rewrite and about eight whole-file digests of it per publication,
+  plus rereading and hashing every issue at apply. Coupled-state convergence and
+  the concurrent-writer check are the guarantees worth keeping; a redo record
+  over the written files delivers both. After a crash before the commit point
+  the old state stands, and after it the next session completes the new state,
+  so no rollback, backup, or staging is needed. The accepted cost is that an
+  external edit to a file a mutation read but does not write is not detected
+  during that mutation; that makes one result stale, and corrupts nothing.
+- **Date:** 2026-09-19
