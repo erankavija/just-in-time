@@ -311,17 +311,24 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 
 - **Chosen:** An issue mutation's cost scales with the files it writes, never
   with the event log or other project history. The repository lock serializes
-  jit writers. A mutation reads the registries and the issues its derivation
-  consults, plus the plan documents a transition rule reads; issue-linked
-  documents stay with validation. Immediately before commit it compares the live
-  bytes of every file it writes with the bytes it read, and checks the event
-  log's length and tail, returning a retryable conflict on any difference. Its
-  commit point is one synced redo record under the data root's gitignored
-  `tmp/`, holding the complete new bytes of each written file and the event
-  append as an offset and its bytes. Applying the record replaces each file by
-  temp-file and rename, writes the append at its offset, and deletes the record.
-  Opening a session replays a leftover record idempotently. The change leaves the
-  storage layer with less code than it has now.
+  writers of repository state; machine-local control files (worktree identity,
+  server pid and log, claims) stay outside the lock and the record. A mutation
+  reads the registries and the issues its derivation consults, plus the plan
+  documents a transition rule reads; issue-linked documents stay with
+  validation. Immediately before commit it compares the live bytes of every file
+  it writes with the bytes it read, and checks the event log's length and tail,
+  returning a retryable conflict on any difference. Its commit point is one
+  synced redo record under the data root's gitignored `tmp/`, holding the
+  complete new bytes and mode of each written file, each deleted path, and the
+  event append as an offset and its bytes. Paths are relative to the data root
+  or the worktree, so projections, profile assets, and archived documents
+  publish through the same record. Applying the record replaces each file by
+  temp-file and rename, removes each deleted path, writes the append at its
+  offset, and deletes the record. Opening a session replays a leftover record
+  idempotently. `jit init` creates an absent data root through a small publisher
+  of its own (a synced stage directory and a no-replace rename), because no
+  `tmp/` exists before it, and writes the data root's `.gitignore` naming
+  `tmp/`. The change leaves the storage layer with less code than it has now.
 - **Supersedes:** Decisions D11 (transaction guarantee) and D14 (capture
   closure) of the transactional-materialization plan `cdc840ad`, archived under
   `dev/archive/cdc840ad-repository-materialization/`. Their journaled rollback
