@@ -110,3 +110,9 @@ kind = "advisory"
 id = "convention-convergence"
 statement = "A shared convention or abstraction has one form: work that finds it harmful or ill-fitting changes it at its source, or reports the mismatch as a blocking concern before proceeding. A local parallel variant, a private helper duplicating a shared mechanism, or a bypass around an abstraction is a defect unless it is a named, cited exception with a tracked convergence condition."
 kind = "advisory"
+
+[[invariants]]
+id = "essential-code-prose"
+statement = "Comments and rustdoc carry only what the code leaves non-obvious: a contract, an invariant, the reason behind a choice, or a pointer to evidence, each in the shortest form that conveys it. History lives in git and jit, and a module-level orientation is at most one short paragraph."
+kind = "enforced"
+enforced-by = "@/gate/code-review"

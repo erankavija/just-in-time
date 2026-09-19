@@ -91,7 +91,7 @@ Test names follow `test_<function>_<scenario>` and describe the scenario in full
 - **No unsafe code** — `#![deny(unsafe_code)]` enforced.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
-- **Public API documentation** — Document purpose and material contracts, including relevant errors and invariants. Do not require an example for every public API, and avoid tautological examples. Add examples only when they clarify non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.
+- **Comments and rustdoc** — Terse, and limited to what is essential to understand the code (`@/inv/essential-code-prose`): purpose and material contracts, including relevant errors and invariants. Add an example only when it clarifies non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.
 - **CLI commands must support `--json`** for machine-readable output. List-emitting commands wrap collections in the envelope `{"count": N, "<collection>": [...]}`.
 - **Git is optional** — Core jit commands must work without Git; claims and leases are the documented exception (`@/charter/D-4`).
 
@@ -142,6 +142,7 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **canonical-cutover** — Superseded aliases, fields, and representations are removed after cutover; compatibility code is allowed only in a named, versioned migration boundary with a tracked removal condition.
 - **architecture-dependency-direction** — Dependencies point inward: domain and graph remain pure and I/O-free; storage owns persistence; commands orchestrate domain and storage; CLI, output, and server layers adapt inputs and outputs without pushing their concerns into inner layers.
 - **convention-convergence** — A shared convention or abstraction has one form: work that finds it harmful or ill-fitting changes it at its source, or reports the mismatch as a blocking concern before proceeding. A local parallel variant, a private helper duplicating a shared mechanism, or a bypass around an abstraction is a defect unless it is a named, cited exception with a tracked convergence condition.
+- **essential-code-prose** — Comments and rustdoc carry only what the code leaves non-obvious: a contract, an invariant, the reason behind a choice, or a pointer to evidence, each in the shortest form that conveys it. History lives in git and jit, and a module-level orientation is at most one short paragraph.
 <!-- jit:invariants:end -->
 
 ## JIT workflow

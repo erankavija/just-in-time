@@ -60,6 +60,12 @@ tests do not already make clear. Treat repetitive examples for straightforward
 accessors, constants, constructors, predicates, and direct field mappings as
 avoidable documentation and CI burden, not as missing-coverage remedies.
 
+Apply the same non-obvious-only standard to attributable comments and rustdoc
+prose (`@/inv/essential-code-prose`). A comment that restates the code, narrates
+commit or task history, or runs longer than its contract needs is an
+issue-impact finding: blocking when the pattern recurs across the change,
+advisory for an isolated line.
+
 If `run_history` is non-empty, use its one latest run: structured findings, verdict, and metadata are authoritative; stdout exists only as a compatibility fallback for an unstructured legacy run. Verify that prior blocking findings have been addressed.
 
 ## Finding and verdict policy
