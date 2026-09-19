@@ -1,0 +1,40 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-19T20:52:34.029025818Z",
+  "dependencies": [
+    "99a12b66-3895-46c2-91ab-4f29e41af65e"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Mutations commit through a redo record and never scale with project history (f1dc843a) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-09-19T20:52:34.029025818Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-09-19T20:52:34.029025818Z",
+      "updated_by": null
+    }
+  },
+  "id": "df3e10fb-19f0-49af-ab19-24498f200b65",
+  "labels": [
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "component:storage",
+    "component:core",
+    "per:@/charter/D-17",
+    "type:breakdown",
+    "brackets:f1dc843a"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Mutations commit through a redo record and never scale with project history",
+  "updated_at": "2026-09-19T20:52:34.029025818Z"
+}
