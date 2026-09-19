@@ -493,7 +493,7 @@
   {
     "key": "session-record-commit",
     "title": "Session commit through the redo record",
-    "description": "A mutation's apply commits through one redo record in place of the journaled kernel, with the whole-read-set re-capture gone.\n\n## Background\n\nEvery repository publisher in the workspace converges on one seam: the mutation session's apply. Issue commands, dependency edits, template application, validation repair, profile lifecycle, configuration edits, archive execution, gate runs, project rendering, and document commands all reach the kernel through it. That makes the seam the place to change the commit mechanism with no publisher touched.\n\nApply's shape becomes: derive the record from the delta the plan carries, compare the live bytes of the files it writes and the event log's length and tail, write the record durably, apply it, and remove it. The re-capture of the whole read set and its whole-image comparison, which ran immediately before journal preparation on both backends, is gone.\n\nMachine-local control files stay outside the record and outside the lock: worktree identity, the server pid file, the server log, and claims under the version-control directory.\n\n## Success Criteria\n\n- [hard] REQ-01: The mutation session's apply builds a redo record from the plan's delta, writes it durably, applies it, and removes it, on the filesystem backend and the in-memory backend.\n- [hard] REQ-02: Publishers reach publication through the same session trait they used before, with their call sites unchanged.\n- [hard] REQ-03: Apply's only pre-commit check is over the files it writes and the event log's length and tail; the read-set re-capture and whole-image comparison are gone from both backends.\n- [hard] REQ-04: A repository left by an interruption converges on the complete old state, or on the complete new state once the next session opens.\n- [hard] REQ-05: Worktree identity, the server pid file, the server log, and claim state are carried outside the record and outside the repository write lock.\n- [hard] REQ-06: The session trait's shape is unchanged, so both out-of-crate re-implementations of it compile unmodified.\n- [hard] REQ-07: The suite passes with no test held out of the default run.\n\n## Notes\n\nExpected additive footprint is under 300 production lines, against the in-memory kernel modelling of roughly 340 lines it replaces. The transaction kernel still creates an absent data root after this change; that is its one remaining caller.\n",
+    "description": "A mutation's apply commits through one redo record in place of the journaled kernel, with the whole-read-set re-capture gone.\n\n## Background\n\nEvery repository publisher in the workspace converges on one seam: the mutation session's apply. Issue commands, dependency edits, template application, validation repair, profile lifecycle, configuration edits, archive execution, gate runs, project rendering, and document commands all reach the kernel through it. That makes the seam the place to change the commit mechanism with no publisher touched.\n\nApply's shape becomes: derive the record from the delta the plan carries, compare the live bytes of the files it writes and the event log's length and tail, write the record durably, apply it, and remove it. The re-capture of the whole read set and its whole-image comparison, which ran immediately before journal preparation on both backends, is gone.\n\nMachine-local control files stay outside the record and outside the lock: worktree identity, the server pid file, the server log, and claims under the version-control directory.\n\n## Success Criteria\n\n- [hard] REQ-01: The mutation session's apply builds a redo record from the plan's delta, writes it durably, applies it, and removes it, on the filesystem backend and the in-memory backend.\n- [hard] REQ-02: Publishers reach publication through the same session trait they used before, with their call sites unchanged.\n- [hard] REQ-03: Apply's only pre-commit check is over the files it writes and the event log's length and tail; the read-set re-capture and whole-image comparison are gone from both backends.\n- [hard] REQ-04: A repository left by an interruption converges on the complete old state, or on the complete new state once the next session opens.\n- [hard] REQ-05: Worktree identity, the server pid file, the server log, and claim state are carried outside the record and outside the repository write lock.\n- [hard] REQ-06: The session trait's shape is unchanged, so both out-of-crate re-implementations of it compile unmodified.\n- [hard] REQ-07: The suite passes with no test held out of the default run.\n\n## Notes\n\nExpected additive footprint is under 300 production lines, against the in-memory kernel modelling of roughly 340 lines it replaces. The transaction kernel's one remaining caller after this change is the creation of an absent data root.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -652,6 +652,7 @@
             "crates/jit/src/repository_state/initialize.rs",
             "crates/jit/src/repository_state/mod.rs",
             "crates/jit/src/repository_state/path.rs",
+            "crates/jit/tests/fast_rules/derived_state_repair_tests.rs",
             ".jit/.gitignore",
             ".gitignore"
           ]
@@ -704,7 +705,7 @@
   {
     "key": "kernel-retirement",
     "title": "Transaction kernel retirement",
-    "description": "The journaled transaction kernel, its journal, its staging module, its recovery arms, and its control-plane module leave the storage layer, and recovery discovery keys on the redo record.\n\n## Background\n\nWith the mutation session committing through the redo record and initialization publishing an absent root through its own module, the kernel has no caller. What goes with it is named precisely, because several of the constructs are known by descriptions rather than by their own names.\n\nThe rollback kernel is `FileTransactionKernel` with `rollback_repository_actions` and `rollback_repository_action`. Transaction backup is `prepare_repository_backup`, `restore_verified_backup`, `remove_redundant_backup`, `backup_authority`, the backups control subdirectory, and the journal's backup fields. The staging directory is the `transaction_staging` module, `stage_authority`, `prepare_staged_data_action`, `create_directory_stage_name`, the stages control subdirectory, and the journal's stage fields. Reverse actions are the two reverse-action failure-point variants and the rollback functions they bracket. The worktree companion is the companion marker constant, `CompanionDirs`, the four companion control functions, the orphan-companion sweep, and the companion-need field. With them go the journal module, the journal-shaped half of the recovery module including its thirty-six-variant failure-point enum and its injector plumbing, and the control-plane module, which has no production caller.\n\nRecovery discovery is production behaviour rather than prose: it recognizes a repository needing recovery by an external bootstrap protocol marker or an internal transactions subdirectory. Under the record the marker is a record file directly under the data root's scratch directory, so a repository whose index is absent still reaches recovery.\n\n## Success Criteria\n\n- [hard] REQ-01: No rollback kernel, reverse-action path, verified backup, staging directory, or worktree companion survives in the workspace under any spelling.\n- [hard] REQ-02: The transaction journal module, the journal-shaped recovery module, the staging module, and the control-plane module are gone, along with the failure-point enum and the injector plumbing that served them.\n- [hard] REQ-03: Both storage backends carry no modelling of the journaled kernel's phases.\n- [hard] REQ-04: Redo-record publication and the initialization root publisher are the two paths that write repository state, the second reached only for an absent data root.\n- [hard] REQ-05: Recovery discovery recognizes a pending redo record under the data root's scratch directory, and recognizes no journal location.\n- [hard] REQ-06: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n- [hard] REQ-07: The change removes more lines than it adds, across production code and tests.\n\n## Notes\n\nThe kernel module's own test module retires with the module it covers. The lock-order guard module stays: it enforces acquisition order rather than durability, and its property survives.\n",
+    "description": "The journaled transaction kernel, its journal, its staging module, its recovery arms, and its control-plane module leave the storage layer, and recovery discovery keys on the redo record.\n\n## Background\n\nWith the mutation session committing through the redo record and initialization publishing an absent root through its own module, the kernel has no caller. What goes with it is named precisely, because several of the constructs are known by descriptions rather than by their own names.\n\nThe rollback kernel is `FileTransactionKernel` with `rollback_repository_actions` and `rollback_repository_action`. Transaction backup is `prepare_repository_backup`, `restore_verified_backup`, `remove_redundant_backup`, `backup_authority`, the backups control subdirectory, and the journal's backup fields. The staging directory is the `transaction_staging` module, `stage_authority`, `prepare_staged_data_action`, `create_directory_stage_name`, the stages control subdirectory, and the journal's stage fields. Reverse actions are the two reverse-action failure-point variants and the rollback functions they bracket. The worktree companion is the companion marker constant, `CompanionDirs`, the four companion control functions, the orphan-companion sweep, and the companion-need field. With them go the journal module, the journal-shaped half of the recovery module including its thirty-six-variant failure-point enum and its injector plumbing, and the control-plane module, which has no production caller.\n\nRecovery discovery is production behaviour: it recognizes a repository needing recovery by an external bootstrap protocol marker or an internal transactions subdirectory. Under the record the marker is a record file directly under the data root's scratch directory, so a repository whose index is absent still reaches recovery.\n\n## Success Criteria\n\n- [hard] REQ-01: No rollback kernel, reverse-action path, verified backup, staging directory, or worktree companion survives in the workspace under any spelling.\n- [hard] REQ-02: The transaction journal module, the journal-shaped recovery module, the staging module, and the control-plane module are gone, along with the failure-point enum and the injector plumbing that served them.\n- [hard] REQ-03: Both storage backends carry no modelling of the journaled kernel's phases.\n- [hard] REQ-04: Redo-record publication and the initialization root publisher are the two paths that write repository state, the second reached only for an absent data root.\n- [hard] REQ-05: Recovery discovery recognizes a pending redo record under the data root's scratch directory, and recognizes no journal location.\n- [hard] REQ-06: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n- [hard] REQ-07: The change removes more lines than it adds, across production code and tests.\n\n## Notes\n\nThe kernel module's own test module retires with the module it covers. The lock-order guard module stays: it enforces acquisition order rather than durability, and its property survives.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1078,7 +1079,7 @@
   {
     "key": "event-append-encoding",
     "title": "Positioned event-log append",
-    "description": "The finalizer emits the event-log change as an offset with its bytes, so publication writes the appended lines in place.\n\n## Background\n\nEvery mutation rewrites the event log as a whole-file replacement: the composer reads the captured prefix, composes prefix plus new lines, and emits one whole-file write. The log is several megabytes and grows with project history, so the cost of a mutation grows with it. The action vocabulary has no append operation, and the log has one writer, which makes this a contained change.\n\nThe offset is the captured file length rather than a line boundary. The composer inserts one separator newline when a non-empty prefix lacks one, so the appended bytes may begin with a newline. Torn-tail certification is preserved: a prefix not ending in a newline whose final line is invalid JSON still refuses non-certifying events, and the lifecycle certifier is still the line immediately following the torn partial, which under this encoding is the first line of the appended bytes.\n\nReaders are unaffected: the log is read whole under a shared lock, which is equally correct over an in-place append.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation's record carries the event-log change as an offset with the appended bytes.\n- [hard] REQ-02: The offset is the captured file length, and appended bytes beginning with a separator newline are preserved verbatim.\n- [hard] REQ-03: Torn-tail certification behaves as it does today: an uncertified torn tail refuses non-certifying events, and the certifier is the first appended line.\n- [hard] REQ-04: The appended bytes are the only log bytes a mutation writes.\n- [hard] REQ-05: Reading the log after a positioned append yields the same parsed events as reading it after a whole-file composition of the same content.\n- [hard] REQ-06: The change adds under 150 production lines.\n\n## Notes\n\nThe delta's action vocabulary is matched exhaustively at six sites, four of them inside the kernel module, so this encoding lands once that module is gone.\n",
+    "description": "The finalizer emits the event-log change as an offset with its bytes, so publication writes the appended lines in place.\n\n## Background\n\nEvery mutation rewrites the event log as a whole-file replacement: the composer reads the captured prefix, composes prefix plus new lines, and emits one whole-file write. The log is several megabytes and grows with project history, so the cost of a mutation grows with it. The action vocabulary has no append operation, and the log has one writer, which makes this a contained change.\n\nThe offset is the captured file length rather than a line boundary. The composer inserts one separator newline when a non-empty prefix lacks one, so the appended bytes may begin with a newline. Torn-tail certification is preserved: a prefix not ending in a newline whose final line is invalid JSON still refuses non-certifying events, and the lifecycle certifier is still the line immediately following the torn partial, which under this encoding is the first line of the appended bytes.\n\nReaders are unaffected: the log is read whole under a shared lock, which is equally correct over an in-place append.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation's record carries the event-log change as an offset with the appended bytes.\n- [hard] REQ-02: The offset is the captured file length, and appended bytes beginning with a separator newline are preserved verbatim.\n- [hard] REQ-03: Torn-tail certification behaves as it does today: an uncertified torn tail refuses non-certifying events, and the certifier is the first appended line.\n- [hard] REQ-04: The appended bytes are the only log bytes a mutation writes.\n- [hard] REQ-05: Reading the log after a positioned append yields the same parsed events as reading it after a whole-file composition of the same content.\n- [hard] REQ-06: The adopter pages stating how the event log grows describe a positioned append at the captured length.\n- [hard] REQ-07: The change adds under 150 production lines.\n\n## Notes\n\nThe delta's action vocabulary is matched exhaustively at six sites, four of them inside the kernel module, so this encoding lands once that module is gone.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1087,14 +1088,18 @@
       "story:superseded-mechanism-retirement",
       "component:core",
       "component:storage",
+      "component:docs",
       "satisfies:REQ-01",
       "satisfies:REQ-02",
+      "satisfies:REQ-07",
       "per:@/charter/D-17",
       "enforces:@/invariant/event-log"
     ],
     "gates": [
       "cargo-ci",
-      "code-review"
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
     ],
     "depends_on": [
       "kernel-retirement"
@@ -1126,7 +1131,9 @@
             "crates/jit/src/repository_state/mutation.rs",
             "crates/jit/src/repository_state/image.rs",
             "crates/jit/src/storage/redo_record.rs",
-            "crates/jit/src/storage/redo_apply.rs"
+            "crates/jit/src/storage/redo_apply.rs",
+            "docs/reference/storage-format.md",
+            "docs/concepts/guarantees.md"
           ]
         }
       }
@@ -1195,7 +1202,7 @@
     ],
     "depends_on": [
       "bench-event-log-scale",
-      "redo-record-documentation"
+      "superseded-mechanism-retirement"
     ],
     "planning": {
       "outcome": "A committed artifact reports label-update latency before and after plus the line balance.",
@@ -1236,7 +1243,7 @@
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:superseded-mechanism-retirement",
       "component:docs",
       "component:gates",
       "satisfies:REQ-07",
@@ -1251,7 +1258,8 @@
       "repo-validate"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "event-append-encoding",
+      "single-pass-capture"
     ],
     "planning": {
       "outcome": "The invariant registry, the gate scope, and the charter decision name the record.",
@@ -1286,13 +1294,13 @@
   {
     "key": "storage-format-reference",
     "title": "Storage format reference states the redo record",
-    "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement, removal, and positioned append.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page describes rollback, a journal, a backup, a staging directory, a companion, and an external bootstrap control directory nowhere.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n- [hard] REQ-06: The event-log section states that the log grows by positioned append.\n",
+    "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement, removal, and positioned append.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page describes rollback, a journal, a backup, a staging directory, a companion, and an external bootstrap control directory nowhere.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:record-publication-cutover",
       "component:docs",
       "satisfies:REQ-07",
       "per:@/charter/D-17",
@@ -1303,13 +1311,12 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "data-root-ignore-entry"
     ],
     "planning": {
       "outcome": "The storage-format reference names the record's home, its publication, and its application.",
       "contract_refs": [
         "record-prose-statement",
-        "positioned-event-append",
         "init-root-publication"
       ],
       "source_refs": [
@@ -1334,13 +1341,13 @@
   {
     "key": "concepts-family-docs",
     "title": "Concept documents state the redo record",
-    "description": "The concepts family describes record-based publication and states which files under the data root are safe to remove by hand.\n\n## Background\n\nThe guarantees page is the epicentre in the adopter-facing concepts family. It describes atomic operations, states that the event log is a locked append rather than a replacement-file rename, explains that locks complement rather than extend an atomic rename, carries a recoverable profile publication section built on a durable journal with prepared and committed arms, shows a data-root layout without the scratch directory, explains partial-write recovery in terms of temp-file residue, and tells the reader to delete files matching a temp extension older than an hour.\n\nThat recipe now runs beside the directory holding the commit point, so the page must say which files under the data root are safe to remove. The design-philosophy, overview, and core-model pages each carry a lighter statement of the same mechanism.\n\n## Success Criteria\n\n- [hard] REQ-01: The guarantees page describes publication as one synced redo record over the files a mutation writes, converging forward at session open.\n- [hard] REQ-02: The recoverable-publication section describes application of a leftover record.\n- [hard] REQ-03: The stale-temporary-file guidance names the files safe to remove by hand and states that the data root's scratch directory holds the commit point.\n- [hard] REQ-04: The data-root layout in the concepts family lists the scratch directory.\n- [hard] REQ-05: The design-philosophy, overview, and core-model pages describe the same mechanism.\n- [hard] REQ-06: The event-log guarantee states growth by positioned append.\n",
+    "description": "The concepts family describes record-based publication and states which files under the data root are safe to remove by hand.\n\n## Background\n\nThe guarantees page is the epicentre in the adopter-facing concepts family. It describes atomic operations, states that the event log is a locked append rather than a replacement-file rename, explains that locks complement rather than extend an atomic rename, carries a recoverable profile publication section built on a durable journal with prepared and committed arms, shows a data-root layout without the scratch directory, explains partial-write recovery in terms of temp-file residue, and tells the reader to delete files matching a temp extension older than an hour.\n\nThat recipe now runs beside the directory holding the commit point, so the page must say which files under the data root are safe to remove. The design-philosophy, overview, and core-model pages each carry a lighter statement of the same mechanism.\n\n## Success Criteria\n\n- [hard] REQ-01: The guarantees page describes publication as one synced redo record over the files a mutation writes, converging forward at session open.\n- [hard] REQ-02: The recoverable-publication section describes application of a leftover record.\n- [hard] REQ-03: The stale-temporary-file guidance names the files safe to remove by hand and states that the data root's scratch directory holds the commit point.\n- [hard] REQ-04: The data-root layout in the concepts family lists the scratch directory.\n- [hard] REQ-05: The design-philosophy, overview, and core-model pages describe the same mechanism.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:record-publication-cutover",
       "component:docs",
       "satisfies:REQ-07",
       "per:@/charter/D-17",
@@ -1351,13 +1358,12 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "session-record-commit"
     ],
     "planning": {
       "outcome": "The concepts family describes record-based publication.",
       "contract_refs": [
-        "record-prose-statement",
-        "positioned-event-append"
+        "record-prose-statement"
       ],
       "source_refs": [
         "REQ-07",
@@ -1383,25 +1389,28 @@
   {
     "key": "profiles-reference",
     "title": "Profiles reference states the redo record",
-    "description": "The profiles reference describes profile publication and recovery as a redo record applied forward, and the bridge README points at the same contract.\n\n## Background\n\nThe reference carries the canonical adopter contract for profile publication: a typed durable journal, an external bootstrap control directory under a named protocol version, a transactions subdirectory under the data root, a verified sibling staging directory, mandatory recovery at every profile command, and rollback of a prepared transaction. Several other passages describe a profile application as one recoverable transaction.\n\nProfile application publishes through the same record as every other mutation, over data-root and worktree paths, so the section states the shared mechanism. The bridge README points readers at this page for the recoverable-publication contract and asserts that the bridge maintains no second transaction model, so it moves with the page it cites.\n\n## Success Criteria\n\n- [hard] REQ-01: The publication section describes one synced redo record carrying the profile's written files, its removed files, and its event append, applied at session open.\n- [hard] REQ-02: The page describes a typed durable journal, an external bootstrap control directory, a protocol version, a verified sibling staging directory, and prepared-transaction rollback nowhere.\n- [hard] REQ-03: Passages calling a profile application one recoverable transaction state the record.\n- [hard] REQ-04: The page states that a profile's worktree targets publish in the same record as its data-root targets.\n- [hard] REQ-05: The bridge README describes the publication contract it points at in the same terms as this page.\n- [hard] REQ-06: The page's cross-references resolve, and it restates no fact the storage reference owns.\n",
+    "description": "The profiles reference describes profile publication and recovery as a redo record applied forward, and the bridge README points at the same contract.\n\n## Background\n\nThe reference carries the canonical adopter contract for profile publication: a typed durable journal, an external bootstrap control directory under a named protocol version, a transactions subdirectory under the data root, a verified sibling staging directory, mandatory recovery at every profile command, and rollback of a prepared transaction. Several other passages describe a profile application as one recoverable transaction.\n\nProfile application publishes through the same record as every other mutation, over data-root and worktree paths, so the section states the shared mechanism. The bridge README points readers at this page for the recoverable-publication contract and asserts that the bridge maintains no second transaction model, so it moves with the page it cites.\n\n## Success Criteria\n\n- [hard] REQ-01: The publication section describes one synced redo record carrying the profile's written files, its removed files, and its event append, applied at session open.\n- [hard] REQ-02: The page describes a typed durable journal, an external bootstrap control directory, a protocol version, a verified sibling staging directory, and prepared-transaction rollback nowhere.\n- [hard] REQ-03: Passages calling a profile application one recoverable transaction state the record.\n- [hard] REQ-04: The page states that a profile's worktree targets publish in the same record as its data-root targets.\n- [hard] REQ-05: The bridge README describes the publication contract it points at in the same terms as this page.\n- [hard] REQ-06: The event catalogue's profile-lifecycle entry names the redo record as the commit point the operation reaches, and the generated events reference is regenerated from it.\n- [hard] REQ-07: The page's cross-references resolve, and it restates no fact the storage reference owns.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:record-publication-cutover",
       "component:docs",
       "component:mcp-server",
+      "component:core",
       "satisfies:REQ-07",
       "per:@/charter/D-17",
       "enforces:@/invariant/single-source-prose"
     ],
     "gates": [
+      "cargo-ci",
+      "code-review",
       "doc-review",
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "session-record-commit"
     ],
     "planning": {
       "outcome": "The profiles reference describes profile publication as a record applied forward.",
@@ -1421,7 +1430,9 @@
         "footprint": {
           "touches": [
             "docs/reference/profiles.md",
-            "mcp-server/README.md"
+            "mcp-server/README.md",
+            "docs/reference/events.md",
+            "crates/jit/src/domain/event_catalog.rs"
           ]
         }
       }
@@ -1436,7 +1447,7 @@
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:record-publication-cutover",
       "component:docs",
       "component:cli",
       "satisfies:REQ-07",
@@ -1448,7 +1459,7 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "init-root-publisher"
     ],
     "planning": {
       "outcome": "The command and recovery references describe the record and the application that recovers it.",
@@ -1487,7 +1498,7 @@
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:record-publication-cutover",
       "component:docs",
       "satisfies:REQ-07",
       "per:@/charter/D-17"
@@ -1497,7 +1508,7 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "session-record-commit"
     ],
     "planning": {
       "outcome": "The backup procedure excludes a pending redo record.",
@@ -1525,13 +1536,13 @@
   {
     "key": "rust-prose-sweep",
     "title": "Rust prose and command help state the redo record",
-    "description": "Module docs, function contracts, error strings, and the recover command's help name the redo record.\n\n## Background\n\nRoughly forty Rust doc comments across the command, storage, repository-state, and server layers describe publication as one recoverable transaction, a recovered session, or a preimage check. Error strings in the storage layer name journal, control-directory, and event-log writes. The recover command's help exists verbatim twice, once on the command enumeration and once on its implementation, and both feed adopter-facing surfaces.\n\nThe project keeps comments to what the code leaves non-obvious, so what replaces the retired prose is a short module orientation plus contract and invariant notes.\n\nThe sweep terms are: `one recoverable transaction`, `recovered session`, `preimage`, `journal`, `stage`, `staging`, `backup`, `reverse action`, and `roll back`.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust doc comment, error string, or help text in the workspace describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion.\n- [hard] REQ-02: The recover command's two copies of its help state the same behaviour and describe application of a leftover record at session open.\n- [hard] REQ-03: The storage layer's new modules carry at most one short paragraph of module orientation each.\n- [hard] REQ-04: Error strings name the redo record where they named the journal.\n- [hard] REQ-05: A sweep over the nine terms listed in this issue returns, in the workspace sources outside pinned archives, only occurrences whose sense is unrelated to publication, each named in the completion evidence.\n",
+    "description": "Module docs, function contracts, error strings, and the recover command's help name the redo record.\n\n## Background\n\nRoughly forty Rust doc comments across the command, storage, repository-state, and server layers describe publication as one recoverable transaction, a recovered session, or a preimage check. Error strings in the storage layer name journal, control-directory, and event-log writes. The recover command's help exists verbatim twice, once on the command enumeration and once on its implementation, and both feed adopter-facing surfaces.\n\nThe project keeps comments to what the code leaves non-obvious, so what replaces the retired prose is a short module orientation plus contract and invariant notes.\n\nThe sweep terms are: `one recoverable transaction`, `recovered session`, `preimage`, `journal`, `stage`, `staging`, `backup`, `reverse action`, and `roll back`.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust doc comment, error string, or help text in the workspace describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion.\n- [hard] REQ-02: The recover command's two copies of its help state the same behaviour and describe application of a leftover record at session open.\n- [hard] REQ-03: Error strings name the redo record where they named the journal.\n- [hard] REQ-04: A sweep over the nine terms listed in this issue returns, in the workspace sources outside pinned archives, only occurrences whose sense is unrelated to publication, each named in the completion evidence.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:superseded-mechanism-retirement",
       "component:core",
       "component:storage",
       "component:cli",
@@ -1546,7 +1557,7 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "event-append-encoding"
     ],
     "planning": {
       "outcome": "Module docs, error strings, and recover help name the record mechanism.",
@@ -1581,13 +1592,13 @@
   {
     "key": "generated-reference-regeneration",
     "title": "Generated references match the redo-record surface",
-    "description": "The generated storage-records, runtime-defaults, and events references are regenerated from their Rust sources and match the redo-record surface.\n\n## Background\n\nThree adopter references are generated from Rust catalogues by scripts. The storage-records reference states that records are never rewritten in place. The runtime-defaults reference states that the recover command is the single recovery entry point, which has been false since session-open recovery existed. The events reference describes a profile lifecycle event as one durable transaction commit point.\n\nThe storage-records generator's own header states that its event-log sample lines are encoded the way the repository-state finalizer publishes them, so the generator moves with the finalizer's append encoding.\n\nRegenerating after the source prose changes is what keeps the pages honest; editing generated output would edit a projection rather than its authority.\n\n## Success Criteria\n\n- [hard] REQ-01: The three generated references are produced by regeneration from their sources.\n- [hard] REQ-02: The runtime-defaults reference states that session open applies a leftover record, and claims no single recovery entry point.\n- [hard] REQ-03: The storage-records reference and its generator describe the event log's positioned append.\n- [hard] REQ-04: The events reference describes the profile lifecycle event without naming a durable transaction commit point.\n- [hard] REQ-05: Regenerating a second time produces no diff.\n",
+    "description": "The generated storage-records and runtime-defaults references are regenerated from their Rust sources and match the redo-record surface.\n\n## Background\n\nTwo adopter references are generated from Rust constants and catalogues by scripts. The storage-records reference describes how an event record reaches the log. The runtime-defaults reference states that the recover command is the single recovery entry point, which has been false since session-open recovery existed and is further from true once the kernel's journal recovery is gone.\n\nThe storage-records generator's own header states that its event-log sample lines are encoded the way the repository-state finalizer publishes them, so the generator moves with the finalizer's append encoding.\n\nRegenerating after the source prose changes is what keeps the pages honest; editing generated output would edit a projection rather than its authority.\n\n## Success Criteria\n\n- [hard] REQ-01: Both generated references are produced by regeneration from their sources.\n- [hard] REQ-02: The runtime-defaults reference states that session open applies a leftover record, and claims no single recovery entry point.\n- [hard] REQ-03: The storage-records reference and its generator describe the event log's positioned append.\n- [hard] REQ-04: Regenerating a second time produces no diff.\n",
     "type": "task",
     "priority": "high",
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:superseded-mechanism-retirement",
       "component:docs",
       "satisfies:REQ-07",
       "per:@/charter/D-17",
@@ -1616,15 +1627,14 @@
       "terminal": {
         "consumer_family": "generated reference readers",
         "test_boundary": "documentation review coverage",
-        "worker_sized_reason": "Three projections regenerated from sources another task already corrected.",
+        "worker_sized_reason": "Two projections regenerated from sources another task already corrected.",
         "footprint": {
           "touches": [
             "docs/reference/storage-records.md",
             "docs/reference/runtime-defaults.md",
-            "docs/reference/events.md",
             "scripts/generate-storage-records-reference.sh",
             "crates/jit/src/storage/reference.rs",
-            "crates/jit/src/domain/event_catalog.rs"
+            "crates/jit/src/runtime_defaults.rs"
           ]
         }
       }
@@ -1639,7 +1649,7 @@
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:superseded-mechanism-retirement",
       "component:docs",
       "satisfies:REQ-07",
       "per:@/charter/D-17",
@@ -1650,7 +1660,10 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "listing-fingerprint-retirement",
+      "document-closure-retirement",
+      "plan-hash-retirement",
+      "event-append-encoding"
     ],
     "planning": {
       "outcome": "The materialization architecture note describes record publication.",
@@ -1687,7 +1700,7 @@
     "labels": [
       "epic:redo-mutations",
       "milestone:v1.0",
-      "story:redo-record-documentation",
+      "story:mutation-cost-evidence",
       "component:docs",
       "component:testing",
       "satisfies:REQ-07",
@@ -1700,7 +1713,7 @@
       "docs-mechanical"
     ],
     "depends_on": [
-      "superseded-mechanism-retirement"
+      "publication-cost-evidence"
     ],
     "planning": {
       "outcome": "The testing guide names the redo-record harness as its publication-cost evidence.",
@@ -1733,7 +1746,7 @@
   {
     "key": "redo-record-foundation",
     "title": "Redo record foundation",
-    "description": "One redo record type, one way to write it durably, one way to apply it on either storage backend, and one proof of its crash behaviour, all reachable without changing how a mutation commits.\n\n## Background\n\nThe redo record is the commit point that replaces a journaled rollback kernel. Before any publisher moves onto it, the mechanism has to exist whole: a vocabulary of put, delete, and event-append operations over data-root and worktree paths; a synced write that makes the record durable before any live file changes; an application that is idempotent under repetition; and a scoped comparison that refuses a mutation whose write targets moved underneath it.\n\nThe work in this story adds the mechanism beside the one in use. Nothing in it changes how a mutation publishes, so the repository behaves exactly as it did while the mechanism is built and proven.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace holds one redo record type, one writer, and one application routine per storage backend, with no second type or parallel entry point expressing the same thing.\n- [hard] REQ-02: The filesystem backend and the in-memory backend step the same interruption-point enum in the same order, and one conformance suite drives both from one driver.\n- [hard] REQ-03: The mechanism is unreachable from any publisher: no command, and no mutation session, commits through the record yet, and the repository's observable publication behaviour is unchanged.\n- [hard] REQ-04: Each new module's rustdoc states its contract in at most one short paragraph of orientation, and none restates the retired kernel's protocol prose.\n- [hard] REQ-05: The mechanism's crash matrix is proven once, against the mechanism, with no consumer suite re-proving it.\n- [hard] REQ-06: The story's additions stay within the per-task line ceilings its children state, and the total added is under 1,500 lines of production code.\n",
+    "description": "One redo record type, one way to write it durably, one way to apply it on either storage backend, and one proof of its crash behaviour, all reachable without changing how a mutation commits.\n\n## Background\n\nThe redo record is the commit point that replaces a journaled rollback kernel. Before any publisher moves onto it, the mechanism has to exist whole: a vocabulary of put, delete, and event-append operations over data-root and worktree paths; a synced write that makes the record durable before any live file changes; an application that is idempotent under repetition; and a scoped comparison that refuses a mutation whose write targets moved underneath it.\n\nThe work in this phase adds the mechanism beside the one in use. Nothing in it changes how a mutation publishes, so the repository behaves exactly as it did while the mechanism is built and proven, and no adopter document goes stale.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace holds one redo record type, one writer, and one application routine per storage backend, with no second type or parallel entry point expressing the same thing.\n- [hard] REQ-02: The record's crash matrix is proven in one suite over one point enum, and no second suite in the workspace proves it.\n- [hard] REQ-03: The mechanism is unreachable from any publisher: no command, and no mutation session, commits through the record yet, and the repository's observable publication behaviour is unchanged.\n- [hard] REQ-04: Each new module's rustdoc states its contract in at most one short paragraph of orientation, and none restates the retired kernel's protocol prose.\n- [hard] REQ-05: The phase's additions stay within the per-task line ceilings its children state, and the total added is under 1,500 lines of production code.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -1775,7 +1788,7 @@
   {
     "key": "record-publication-cutover",
     "title": "Record publication cutover",
-    "description": "Every repository mutation commits through the redo record, including the creation of an absent data root, with no publisher's call site changed.\n\n## Background\n\nRepository publishers converge on one seam: the mutation session's apply. Moving the commit mechanism beneath that seam switches issue commands, dependency edits, template application, validation repair, profile lifecycle, configuration edits, archive execution, gate runs, project rendering, and document commands in one step.\n\nTwo things have to happen around it. Coverage that asserts the superseded rollback guarantee, and failure injection that names the kernel's points, are repointed or retired first, so each step compiles and passes. Creating an absent data root cannot use the record, because the record's home is inside the root that does not exist yet, so initialization gets a small publisher of its own and the scratch directory it creates carries an ignore entry composed from the repository's declarations.\n\n## Success Criteria\n\n- [hard] REQ-01: Every repository mutation in the workspace commits through one redo record, and the creation of an absent data root is the only other path that writes repository state.\n- [hard] REQ-02: No publisher's call site changed: the command layer reaches publication through the same session trait, and the diff over `crates/jit/src/commands/` contains no change to how a publisher invokes apply.\n- [hard] REQ-03: An interruption anywhere in publication leaves the complete old state, or the complete new state once the next session opens, on both storage backends.\n- [hard] REQ-04: Publication-failure injection in the workspace names interruption points the record defines, with no site left naming a point that no longer fires.\n- [hard] REQ-05: A fresh repository and a repaired existing repository both carry a data-root ignore entry for the scratch directory, and this repository's root ignore file carries no hand-maintained duplicate of it.\n- [hard] REQ-06: No half-migrated remnant survives: the suite holds no test asserting a guarantee the record does not provide, and no module holds a commit path the record replaced.\n- [hard] REQ-07: The repository's own dogfood use continues across the story: each delivered child leaves the workspace building with no warnings and the suite passing with no test held out of the default run.\n",
+    "description": "Every repository mutation commits through the redo record, including the creation of an absent data root, with no publisher's call site changed and the adopter documentation describing what the repository now does.\n\n## Background\n\nRepository publishers converge on one seam: the mutation session's apply. Moving the commit mechanism beneath that seam switches every repository publisher in one step.\n\nThree things happen around it. Coverage that asserts the superseded rollback guarantee, and failure injection that names the kernel's points, are repointed or retired first, so each step compiles and passes. Creating an absent data root cannot use the record, because the record's home is inside the root that does not exist yet, so initialization gets a small publisher of its own and the scratch directory it creates carries an ignore entry composed from the repository's declarations. And the adopter pages describing publication, recovery, the data-root layout, and the safe handling of that directory change here, because this is where the behaviour they describe changes: a backup recipe that archives the whole data root starts capturing a pending commit point the moment the seam moves.\n\n## Success Criteria\n\n- [hard] REQ-01: Every repository mutation in the workspace commits through one redo record, and the creation of an absent data root is the only other path that writes repository state.\n- [hard] REQ-02: The phase's diff across `crates/jit/src/commands/` changes no publisher's invocation of the mutation session, and every command family that published before the phase publishes after it.\n- [hard] REQ-03: Publication convergence is proven in one place: the record's own conformance suite, with each publication consumer holding at most one test that it reaches the mechanism.\n- [hard] REQ-04: The workspace contains no publication-failure injection that no longer fires, across the command layer, the storage suite, and the integration suites.\n- [hard] REQ-05: The adopter documentation surface describes publication and recovery as the repository now performs them: no page instructs an operation that would remove or archive a pending commit point, and no page describes journaled rollback of a mutation as live behaviour.\n- [hard] REQ-06: No publisher reaches a commit path the record replaced, and the suite holds no test asserting a guarantee the record does not provide.\n- [hard] REQ-07: Each delivered child leaves the workspace building with no warnings and the suite passing with no test held out of the default run.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -1785,33 +1798,42 @@
       "component:storage",
       "component:core",
       "component:testing",
+      "component:docs",
       "per:@/charter/D-17"
     ],
     "gates": [
       "cargo-ci",
       "doc-review",
+      "docs-mechanical",
       "holistic-review"
     ],
     "depends_on": [
-      "data-root-ignore-entry"
+      "storage-format-reference",
+      "concepts-family-docs",
+      "profiles-reference",
+      "cli-recovery-reference",
+      "operations-guide"
     ],
     "planning": {
-      "outcome": "Every repository mutation commits through the record, with publishers untouched.",
+      "outcome": "Every repository mutation commits through the record, with the adopter surface in step.",
       "contract_refs": [
         "publication-seam",
         "commit-conflict-check",
         "init-root-publication",
         "lock-and-record-scope",
-        "interruption-matrix-placement"
+        "interruption-matrix-placement",
+        "record-prose-statement"
       ],
       "source_refs": [
         "OD-10",
         "REQ-03",
         "REQ-04",
         "REQ-05",
+        "REQ-07",
         "OD-1",
         "OD-6",
         "OD-8",
+        "LD-3",
         "LD-10"
       ]
     }
@@ -1819,7 +1841,7 @@
   {
     "key": "superseded-mechanism-retirement",
     "title": "Superseded publication mechanism retirement",
-    "description": "The journaled rollback kernel, the phased capture beneath it, and the whole-file event-log rewrite are gone from the workspace, leaving the storage layer smaller than it was.\n\n## Background\n\nThe governing decision names ten things that go: a rollback kernel, transaction backups, a staging directory, reverse actions, worktree companions, apply-time revalidation of the whole read set, a plan hash over captured entries, phased capture, listing fingerprints, and mutation document closure. Five of the ten name no construct in the code, so the check against them runs over a construct map rather than over a name search.\n\nTwo costs scaled with project history, and both fall here. Capture read and hashed the repository across six rounds; it becomes one round in the attempt and one in the preflight. The event log was rewritten whole on every mutation; the finalizer now emits the change as an offset with its bytes, which lands in this phase because the delta's action vocabulary is matched exhaustively inside the kernel module and an earlier encoding would need unreachable arms there.\n\nOne exception is stated and stays: creating an absent data root. Everything else that wrote repository state through a second path is gone, and a source guard fails when another appears.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the ten constructs the governing decision names is absent from the workspace, checked against the construct map in the planning investigation rather than by a name search, and the completion evidence records the check construct by construct.\n- [hard] REQ-02: Creating an absent data root is the one publication path beside the redo record, named as an exception in a source guard that fails when a third appears.\n- [hard] REQ-03: Recovery discovery, the command output surface, the command schema, and the generated bridge name no retired mechanism.\n- [hard] REQ-04: A mutation performs one capture round in its attempt and one in its preflight.\n- [hard] REQ-05: The appended bytes are the only event-log bytes a mutation writes, and the log's torn-tail certification behaves as it did before.\n- [hard] REQ-06: The workspace builds with no warnings, the suite passes with no test held out of the default run, and the integration-test target count is within its budget.\n- [hard] REQ-07: The story's net effect on the workspace's Rust sources removes more lines than it adds, measured over its delivered children.\n",
+    "description": "The journaled rollback kernel, the phased capture beneath it, and the whole-file event-log rewrite are gone from the workspace, with every declaration and every document that named them restated.\n\n## Background\n\nThe governing decision names ten things that go: a rollback kernel, transaction backups, a staging directory, reverse actions, worktree companions, apply-time revalidation of the whole read set, a plan hash over captured entries, phased capture, listing fingerprints, and mutation document closure. Five of the ten name no construct in the code, so the check against them runs over a construct map rather than over a name search.\n\nTwo costs scaled with project history, and both fall here. Capture read and hashed the repository across six rounds; it becomes one round in the attempt and one in the preflight. The event log was rewritten whole on every mutation; the finalizer now emits the change as an offset with its bytes, which lands in this phase because the delta's action vocabulary is matched exhaustively inside the kernel module.\n\nThis is also where the repository's own declarations stop describing the old mechanism. The invariant statements on atomic writes and derived-state coherence hold until the positioned append and the single-pass capture land, and the security-review gate's declared scope names recovery journals until the kernel is gone. The contributor-facing architecture note and the Rust prose describing the kernel become false at the same moment.\n\nOne exception is stated and stays: creating an absent data root. Everything else that wrote repository state through a second path is gone, and a source guard fails when another appears.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the ten constructs the governing decision names is absent from the workspace, checked against the construct map in the planning investigation rather than by a name search, and the completion evidence records the check construct by construct.\n- [hard] REQ-02: Creating an absent data root is the one publication path beside the redo record, named as an exception in a source guard that fails when a third appears.\n- [hard] REQ-03: No declaration, generated projection, command output, command schema, or generated bridge definition in the repository names a retired mechanism.\n- [hard] REQ-04: The appended bytes are the only event-log bytes a mutation writes, and the log's torn-tail certification behaves as it did before.\n- [hard] REQ-05: The contributor-facing material and the Rust prose describe one mechanism, and a reader following the architecture note's reading order reaches files that exist.\n- [hard] REQ-06: The workspace builds with no warnings, the suite passes with no test held out of the default run, and the integration-test target count is within its budget.\n- [hard] REQ-07: The phase's net effect on the workspace's Rust sources removes more lines than it adds, measured over its delivered children.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -1829,19 +1851,20 @@
       "component:storage",
       "component:core",
       "component:cli",
+      "component:docs",
       "per:@/charter/D-17"
     ],
     "gates": [
       "cargo-ci",
       "doc-review",
+      "docs-mechanical",
       "holistic-review"
     ],
     "depends_on": [
-      "listing-fingerprint-retirement",
-      "document-closure-retirement",
-      "plan-hash-retirement",
       "publication-path-guards",
-      "event-append-encoding"
+      "declaration-statements",
+      "generated-reference-regeneration",
+      "architecture-materialization-doc"
     ],
     "planning": {
       "outcome": "The journaled kernel, the phased capture, and the whole-log rewrite are gone.",
@@ -1850,15 +1873,19 @@
         "publication-seam",
         "line-budget",
         "init-root-publication",
-        "positioned-event-append"
+        "positioned-event-append",
+        "record-prose-statement"
       ],
       "source_refs": [
         "OD-10",
         "REQ-02",
         "REQ-05",
         "REQ-06",
+        "REQ-07",
+        "OD-5",
         "OD-7",
         "OD-9",
+        "LD-3",
         "LD-6",
         "LD-8",
         "LD-9"
@@ -1868,7 +1895,7 @@
   {
     "key": "mutation-cost-evidence",
     "title": "Mutation cost evidence",
-    "description": "A committed artifact shows that a mutation's wall time is bounded by what it changes, on both repositories and on a repository whose event log is ten times larger.\n\n## Background\n\nThe point of the mechanism change is a cost that stops scaling with project history. Two terms carried that scaling, and both are gone by the time this phase runs: the event log rewritten whole on every mutation, and the repository re-read and re-hashed across six capture rounds.\n\nProtection is evidence, not a timing assertion. A wall-clock assertion would be the workspace's first throughput assertion, and the project's position is that elapsed time is the wrong thing to decide a test on. The evidence is a harness run over two builds, including a fixture whose event log is ten times larger with the issue set unchanged, so the log term is isolated from the issue-count term.\n\n## Success Criteria\n\n- [hard] REQ-01: A changing label update completes in under 100 milliseconds as the median of three runs, on a scratch-filesystem copy of the adopter-scale repository and of this repository, recorded in a committed artifact.\n- [hard] REQ-02: The same update on a repository whose event log is ten times larger differs by less than ten percent from the unmodified repository's median, recorded in the same artifact.\n- [hard] REQ-03: The artifact reports before and after for a changing update, an idempotent update, and a lease-refused update, and names the two builds and the machine conditions that produced it.\n- [hard] REQ-04: Every quantitative claim in the artifact traces to the committed harness, which reproduces it from the stated inputs.\n- [hard] REQ-05: The artifact records the cumulative Rust line balance of the whole epic from its base revision, and that balance removes more lines than it adds.\n- [hard] REQ-06: The suite holds no wall-clock throughput assertion, and no test is held out of the default run to keep one quiet.\n",
+    "description": "A committed artifact shows that a mutation's wall time is bounded by what it changes, and the repository's testing guide cites evidence that exists.\n\n## Background\n\nThe point of the mechanism change is a cost that stops scaling with project history. Two terms carried that scaling, and both are gone by the time this phase runs: the event log rewritten whole on every mutation, and the repository re-read and re-hashed across six capture rounds.\n\nProtection is evidence, not a timing assertion. A wall-clock assertion would be the workspace's first throughput assertion, and the project's position is that elapsed time is the wrong thing to decide a test on. The evidence is a harness run over two builds, including a fixture whose event log is ten times larger with the issue set unchanged, so the log term is isolated from the issue-count term. The guide that cites publication-cost evidence is pinned today to an artifact produced by a harness built around the journal, so it moves to the new artifact in the same phase.\n\n## Success Criteria\n\n- [hard] REQ-01: Every quantitative claim in the committed artifact traces to the committed harness, which reproduces it from the stated inputs.\n- [hard] REQ-02: The repository's testing guide and benchmark contracts cite only evidence artifacts that exist, produced by harnesses that ship.\n- [hard] REQ-03: The suite holds no wall-clock throughput assertion, and no test is held out of the default run to keep one quiet.\n- [hard] REQ-04: The epic's cumulative Rust line balance from its base revision removes more lines than it adds, recorded in the artifact.\n",
     "type": "story",
     "priority": "high",
     "labels": [
@@ -1881,72 +1908,27 @@
     ],
     "gates": [
       "doc-review",
-      "docs-mechanical",
       "holistic-review"
     ],
     "depends_on": [
-      "publication-cost-evidence"
+      "testing-guide-evidence"
     ],
     "planning": {
       "outcome": "Committed evidence shows a mutation's wall time bounded by what it changes.",
       "contract_refs": [
         "line-budget",
-        "positioned-event-append"
+        "positioned-event-append",
+        "record-prose-statement"
       ],
       "source_refs": [
         "OD-10",
         "REQ-01",
         "REQ-02",
         "REQ-06",
-        "OD-2",
-        "LD-6"
-      ]
-    }
-  },
-  {
-    "key": "redo-record-documentation",
-    "title": "Redo record documentation",
-    "description": "Every maintained document and every declaration that describes mutation publication or recovery states the redo record, and none describes journaled rollback.\n\n## Background\n\nThe mechanism is described across four surfaces: the project's own declaration registries, whose statements are the authority other prose cites; the adopter documentation under `docs/`; the contributor material under `dev/`; and the prose inside the Rust sources, including command help that reaches adopters through the schema.\n\nSome of those documents are generated from sources, so they are corrected at their source and re-rendered. Three of them instruct actions that become unsafe or misleading once the commit point lives in the data root's scratch directory. One of them already states a falsehood about the single recovery entry point, which the rewrite corrects rather than rewords. Archived work products under the archive root are pinned to the revision that produced them and stay as they are.\n\n## Success Criteria\n\n- [hard] REQ-01: Each maintained document describing mutation publication or recovery states the redo-record mechanism: file replacement by temp-file and rename, event-log growth by positioned append, one synced record as the commit point, idempotent application at session open, and initialization's synced stage with a no-replace rename.\n- [hard] REQ-02: No maintained document outside the archive root describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion as live behaviour.\n- [hard] REQ-03: Each fact with a single source of truth reaches prose by projection or citation: the invariant statements exist in one authoritative registry, with the generated projection and the shipped profile copy matching it.\n- [hard] REQ-04: Generated documents are byte-identical to a fresh regeneration from their sources.\n- [hard] REQ-05: Adopter guidance that instructs removing files under the data root, or archiving it, accounts for the pending commit point.\n- [hard] REQ-06: The adopter surface is internally consistent: the storage reference, the concepts family, the profiles reference, and the command reference describe one mechanism in compatible terms, with each fact owned by one page.\n- [hard] REQ-07: Command help describing recovery exists in one form, with its duplicate copies in the sources and on the adopter pages agreeing.\n",
-    "type": "story",
-    "priority": "high",
-    "labels": [
-      "epic:redo-mutations",
-      "milestone:v1.0",
-      "story:redo-record-documentation",
-      "component:docs",
-      "component:cli",
-      "component:core",
-      "per:@/charter/D-17"
-    ],
-    "gates": [
-      "doc-review",
-      "docs-mechanical",
-      "holistic-review"
-    ],
-    "depends_on": [
-      "declaration-statements",
-      "storage-format-reference",
-      "concepts-family-docs",
-      "profiles-reference",
-      "cli-recovery-reference",
-      "operations-guide",
-      "generated-reference-regeneration",
-      "architecture-materialization-doc",
-      "testing-guide-evidence"
-    ],
-    "planning": {
-      "outcome": "Every maintained document describing mutation publication states the redo record.",
-      "contract_refs": [
-        "record-prose-statement",
-        "positioned-event-append",
-        "init-root-publication"
-      ],
-      "source_refs": [
-        "OD-10",
         "REQ-07",
-        "OD-5",
-        "OD-8",
-        "LD-3"
+        "OD-2",
+        "LD-4",
+        "LD-6"
       ]
     }
   }
