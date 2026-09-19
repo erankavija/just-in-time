@@ -1,0 +1,48 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "063245953fd179bf4cef08495cc2e0ff6099e50d",
+  "completed_at": "2026-09-19T16:41:56.318720196Z",
+  "duration_ms": 356343,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F1",
+        "line": 3653,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "issue update --json maps lock timeouts to GENERIC_ERROR instead of LOCK_TIMEOUT."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/main.rs",
+        "id": "F2",
+        "line": 5452,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "gate preset apply discards timeout types and always emits PRESET_ERROR."
+      }
+    ],
+    "summary": "Two claim-first mutation paths still misclassify lock timeouts in JSON mode.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7cee2c64-6380-4dab-be89-3bbca61ad726",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8d724042-a7b0-497a-ac1a-b4a6d20171bd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-19T16:35:59.975597919Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 15 of 18039 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\n2026-09-19T16:36:05.165130Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\n2026-09-19T16:36:05.205582Z ERROR codex_models_manager::manager: failed to refresh available models: timeout waiting for child process to exit\nOpenAI Codex v0.154.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0ba86-65d5-7903-a44f-e7d51b859690\n--------\nuser\n--- 18024 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 063245953 `fix(jit:7cee2c64): queue on lock contention instead of failing`\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, derived-state-coherence, semantic-types, architecture-dependency-direction, convention-convergence, single-source-prose, semantic-test-assertions, shared-test-contracts, bounded-rust-build-footprint, no-ignored-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-19T16:34:14Z); code-review pending\nTruncation recovery: partitioned commit patch by source/tests/docs; split main.rs diff; performed targeted lock, command, and gate-recording reads\n\n1. **[blocking, issue-impact]** `jit issue update --json` still emits `GENERIC_ERROR` for a lock timeout. This command coordinates claims before opening its mutation session, so a timeout can reach `update_issue`; its error handler bypasses `command_json_error` at [crates/jit/src/main.rs:3653](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:3653), violating REQ-04.\n\n2. **[blocking, issue-impact]** `jit gate preset apply --json` erases each underlying error to a string, then always renders `PRESET_ERROR` at [crates/jit/src/main.rs:5452](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:5452) and [crates/jit/src/main.rs:5486](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:5486). Since preset application coordinates claims and opens mutation sessions per target, lock timeouts cannot produce the required dedicated JSON code or exit status, violating REQ-04.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two claim-first mutation paths still misclassify lock timeouts in JSON mode.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"issue update --json maps lock timeouts to GENERIC_ERROR instead of LOCK_TIMEOUT.\",\"file\":\"crates/jit/src/main.rs\",\"line\":3653,\"references\":[]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"gate preset apply discards timeout types and always emits PRESET_ERROR.\",\"file\":\"crates/jit/src/main.rs\",\"line\":5452,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
