@@ -14,6 +14,7 @@
       "path": "dev/active/b5bb1ccd/benchmark.md"
     }
   ],
+  "done_at": "2026-09-19T16:17:04.117457016Z",
   "first_ready_at": "2026-09-19T15:41:05.901464318Z",
   "gates_required": [
     "cargo-ci",
@@ -21,14 +22,14 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "pending",
-      "updated_at": "2026-09-19T15:41:17.282774433Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-19T16:16:55.870775851Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "pending",
-      "updated_at": "2026-09-19T15:41:17.282774433Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-19T16:12:56.878765219Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940",
@@ -39,7 +40,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Repository-image capture spends seconds of CPU per mutation",
-  "updated_at": "2026-09-19T16:04:37.419589739Z"
+  "updated_at": "2026-09-19T16:17:04.117457016Z"
 }

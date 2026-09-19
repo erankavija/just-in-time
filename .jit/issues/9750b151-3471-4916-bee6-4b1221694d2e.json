@@ -1,0 +1,22 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-19T16:16:27.087115945Z",
+  "dependencies": [],
+  "description": "Each mutation re-reads and re-hashes every unpinned document in the worktree about fourteen times. That keeps a label update in a large adopter repository at 1.8 s under the repository lock, and the cost grows with the total size of the referenced documents.\n\n## Background\n\nA repository-image capture reads each captured worktree file, computes its SHA-256 identity (`entry_identity`), and closes the image. `RepositoryImage::close` then recomputes the digest of every file entry (`validate_entry`), because `RepositoryEntry` variants are publicly constructible and close cannot assume their identity matches their bytes. One `issue update` runs about seven captures: three in preflight, three in the attempt, and one read-set revalidation in apply. Unpinned document references are captured as worktree files.\n\nMeasured on a clone of an adopter repository (876 issues, 1469 unpinned document references totalling 116 MB), after pinned-document capture was made cheap: a label update takes 1.8 s wall. A CPU profile attributes about 40% of it to SHA-256 over worktree entries, split evenly between capture and close, plus system time for re-reading the files.\n\n## Success Criteria\n\n- [hard] REQ-01: Closing a repository image computes no content digest for an entry whose identity was derived from its bytes by the capture boundary.\n- [hard] REQ-02: One mutation reads and hashes each unpinned worktree document at most once per capture phase whose read set it belongs to, and a document that changes between phases is still detected before publication.\n- [hard] REQ-03: A label update on the adopter-scale clone completes in under 1 s wall time, evidenced by a benchmark artifact committed under the issue and linked to it.\n\n## Notes\n\nWorktree bytes can change between captures, so reuse keyed by resolved Git commit, as pinned evidence uses, does not apply. A file-metadata key carries the racy-timestamp hazard Git's index has to handle.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-19T16:16:27.087115945Z",
+  "gates_required": [],
+  "gates_status": {},
+  "id": "9750b151-3471-4916-bee6-4b1221694d2e",
+  "labels": [
+    "component:core",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Every capture re-hashes all unpinned worktree documents",
+  "updated_at": "2026-09-19T16:16:27.087115945Z"
+}

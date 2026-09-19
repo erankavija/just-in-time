@@ -14689,3 +14689,16 @@
 {"gate_key":"code-review","id":"a14cfe95-07e7-41cc-843e-e0975b37b9cf","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T15:41:17.282774433Z","type":"gate_added"}
 {"fields":["title","description"],"id":"2109056d-3f2b-4202-aeab-9a1d926744fb","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:02:45.574591261Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["documents"],"id":"d02e4d91-acf8-4a0b-892b-1f9bcfd54caa","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:04:37.419589739Z","type":"issue_updated","updated_by":"doc-add"}
+{"id":"282137ef-ad30-426d-b39c-45bd1cdd14f7","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","priority":"high","timestamp":"2026-09-19T16:05:43.914506583Z","title":"Concurrent jit operations fail on lock contention instead of waiting","type":"issue_created"}
+{"assignee":"agent:claude","id":"6ac3fe4d-512e-44d9-9f71-8d1819f3f072","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","timestamp":"2026-09-19T16:05:44.752303575Z","type":"issue_claimed"}
+{"from":"ready","id":"9dd72e2a-f310-4a35-9859-ae97110f3728","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","timestamp":"2026-09-19T16:05:45.653669273Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:claude","id":"6b402000-4b46-4024-9ff2-bb7796e1b5e2","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","timestamp":"2026-09-19T16:05:45.653669273Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"544d9c5f-c623-4371-901e-fe2cc50fea6b","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","timestamp":"2026-09-19T16:05:46.898494994Z","type":"gate_added"}
+{"gate_key":"code-review","id":"2ad75c0e-f0bf-4e0a-b234-1581c64cd0f2","issue_id":"7cee2c64-6380-4dab-be89-3bbca61ad726","timestamp":"2026-09-19T16:05:46.898494994Z","type":"gate_added"}
+{"gate_key":"cargo-ci","id":"1c6da663-8abd-4c31-88c4-e5e5305ac2d9","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:07:31.862135409Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"deb1e41c-f3b0-40e3-92f6-d35870320b93","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:12:56.878765219Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"5ab72060-bae1-44ea-ba56-1f704145a45e","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:15:25.303419690Z","type":"gate_failed","updated_by":"auto:executor"}
+{"id":"f19af828-5e86-495f-82e5-86d3efa813d7","issue_id":"9750b151-3471-4916-bee6-4b1221694d2e","priority":"normal","timestamp":"2026-09-19T16:16:27.087115945Z","title":"Every capture re-hashes all unpinned worktree documents","type":"issue_created"}
+{"gate_key":"cargo-ci","id":"9eed9511-7035-4bc1-b4fb-d2d6b75365df","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:16:55.870775851Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"f7b10233-7acf-4519-9cd7-eb31f051bd3e","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:17:04.117457016Z","to":"done","type":"issue_state_changed"}
+{"id":"d3506fff-3ae7-4c43-85f0-381596f28b40","issue_id":"b5bb1ccd-35a8-4f76-acfa-47eb0e0bd940","timestamp":"2026-09-19T16:17:04.117457016Z","type":"issue_completed"}

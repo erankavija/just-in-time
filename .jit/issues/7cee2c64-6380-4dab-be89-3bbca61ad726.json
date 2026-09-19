@@ -1,0 +1,37 @@
+{
+  "assignee": "agent:claude",
+  "claimed_at": "2026-09-19T16:05:44.752303575Z",
+  "context": {},
+  "created_at": "2026-09-19T16:05:43.914506583Z",
+  "dependencies": [],
+  "description": "Concurrent jit operations fail on lock contention instead of queueing, and a gate checker's finished verdict can be discarded. Every lock acquisition gives up after 5 s. An adopter repository whose mutations hold the lock for several seconds therefore has to serialize, stagger, and retry every tracker call.\n\n## Background\n\nA mutation holds the repository lock chain (worktree bootstrap, bootstrap, repository write, events) while it captures and publishes. Every acquisition in that chain waits for `LOCK_TIMEOUT_SECS` (5 s), or for `JIT_LOCK_TIMEOUT` when set, and then fails. The claims-coordination lock and the claim commands use the 5 s constant and ignore `JIT_LOCK_TIMEOUT`. In an adopter repository where one mutation held the lock for 6 to 18 s, a concurrent `doc add`, `issue update`, or `gate evaluate` reliably failed with `Lock timeout`.\n\n`gate evaluate` releases the lock chain while an external checker runs and re-acquires it to record the verdict. If that re-acquisition times out, the command returns an error, and the checker's completed result is dropped without a gate run, status update, or event. A 30-minute review that happens to finish during another mutation is lost.\n\nA lock timeout is not classified. It exits `1` (generic error) on most commands and `6` (`GATE_ERROR`, already exists) from `gate evaluate --json`, so automation cannot tell contention apart from a real failure.\n\n## Success Criteria\n\n- [hard] REQ-01: With no configuration, a lock acquisition waits at least 60 s before failing.\n- [hard] REQ-02: Every file lock jit acquires, including claims coordination and the claim commands, resolves its wait from `JIT_LOCK_TIMEOUT` through one shared resolver.\n- [hard] REQ-03: When an external checker has finished, a lock timeout while re-acquiring the repository locks is retried until the locks are acquired. The completed verdict is then recorded.\n- [hard] REQ-04: A lock-acquisition timeout exits with a dedicated exit code, and in `--json` mode reports a dedicated error code, on every command including `gate evaluate`.\n- [hard] REQ-05: Two mutations started concurrently both succeed when each holds the lock for less than the configured wait.\n\n## Notes\n\nA gate evaluation that times out before its checker starts has no lock under which to record a \"not started\" run. The dedicated exit code is the signal that the gate was not evaluated.\n\nReducing how long a mutation holds the lock is tracked separately.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-19T16:05:43.914506583Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-09-19T16:05:46.898494994Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-09-19T16:05:46.898494994Z",
+      "updated_by": null
+    }
+  },
+  "id": "7cee2c64-6380-4dab-be89-3bbca61ad726",
+  "labels": [
+    "component:core",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Concurrent jit operations fail on lock contention instead of waiting",
+  "updated_at": "2026-09-19T16:05:46.898494994Z"
+}
