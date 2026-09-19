@@ -12,10 +12,13 @@
   "gates_status": {},
   "id": "f69c9b87-b76d-438e-93ed-686b07ecbd0e",
   "labels": [
-    "type:bug"
+    "type:bug",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "component:tooling"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Asset scanner reads demangled Rust symbols as paths",
-  "updated_at": "2026-09-12T16:06:28.081966694Z"
+  "updated_at": "2026-09-19T20:29:24.684060833Z"
 }

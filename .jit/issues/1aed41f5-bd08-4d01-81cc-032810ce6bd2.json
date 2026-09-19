@@ -21,10 +21,11 @@
   "id": "1aed41f5-bd08-4d01-81cc-032810ce6bd2",
   "labels": [
     "type:bug",
-    "component:frontend"
+    "component:frontend",
+    "epic:production-polish"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Clicking a graph cluster box selects its layout id as an issue",
-  "updated_at": "2026-09-16T22:09:04.990546902Z"
+  "updated_at": "2026-09-19T20:29:25.043190592Z"
 }
