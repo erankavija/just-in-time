@@ -1,13 +1,28 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-09-19T19:23:37.282507758Z",
   "context": {},
   "created_at": "2026-09-19T16:16:27.087115945Z",
   "dependencies": [],
-  "description": "Each mutation re-reads and re-hashes every unpinned document in the worktree about fourteen times. That keeps a label update in a large adopter repository at 1.8 s under the repository lock, and the cost grows with the total size of the referenced documents.\n\n## Background\n\nA repository-image capture reads each captured worktree file, computes its SHA-256 identity (`entry_identity`), and closes the image. `RepositoryImage::close` then recomputes the digest of every file entry (`validate_entry`), because `RepositoryEntry` variants are publicly constructible and close cannot assume their identity matches their bytes. One `issue update` runs about seven captures: three in preflight, three in the attempt, and one read-set revalidation in apply. Unpinned document references are captured as worktree files.\n\nMeasured on a clone of an adopter repository (876 issues, 1469 unpinned document references totalling 116 MB), after pinned-document capture was made cheap: a label update takes 1.8 s wall. A CPU profile attributes about 40% of it to SHA-256 over worktree entries, split evenly between capture and close, plus system time for re-reading the files.\n\n## Success Criteria\n\n- [hard] REQ-01: Closing a repository image computes no content digest for an entry whose identity was derived from its bytes by the capture boundary.\n- [hard] REQ-02: One mutation reads and hashes each unpinned worktree document at most once per capture phase whose read set it belongs to, and a document that changes between phases is still detected before publication.\n- [hard] REQ-03: A label update on the adopter-scale clone completes in under 1 s wall time, evidenced by a benchmark artifact committed under the issue and linked to it.\n\n## Notes\n\nWorktree bytes can change between captures, so reuse keyed by resolved Git commit, as pinned evidence uses, does not apply. A file-metadata key carries the racy-timestamp hazard Git's index has to handle.\n",
+  "description": "An issue mutation takes 0.3 s on a 1,100-issue repository and 1.3–1.8 s on an adopter repository of 876 issues, while reads of the same data take 8–75 ms. Nearly all of that time goes to capturing and hashing repository state the mutation never reads. The lock is held throughout, so concurrent agents queue behind it.\n\n## Background\n\nA mutation builds its read set as a closed repository image. One `issue update` captures about seven times:\n- three phases in a preflight session;\n- three phases again in the attempt session;\n- one read-set revalidation at apply.\n\nEach capture reads every registry, including the whole event log, and every issue file. It also reads every document referenced by any issue: working-tree files and pinned Git revisions. `RepositoryImage::close` then recomputes the SHA-256 digest of every entry the capture boundary has just hashed. The plan hash serializes each written file's bytes as a JSON number array. For an event append, that is the whole event log.\n\nThe domain work is issue-local. Documents are consumed in only two places:\n- a state transition evaluates graph rules against plan documents;\n- whole-repository validation checks document references.\n\nThe preflight session answers two questions before the claims guard is taken: whether leases are enforced, and, for lifecycle transitions, what the precheck gates need.\n\nMeasured on a tmpfs clone of the adopter repository:\n- 876 issues;\n- 1469 unpinned document references totalling 116 MB;\n- 42 pinned revisions;\n- a 3 MB event log.\n\nOn it, a label update takes 1.8 s and a refused update (no lease) takes 0.3 s on the smaller repository, because the refusal comes after six captures.\n\n## Success Criteria\n\n- [hard] REQ-01: Closing a repository image computes no content digest for an entry whose identity the capture boundary derived from its bytes.\n- [hard] REQ-02: An issue mutation captures only the plan documents its transition rules read. Issue document references, working-tree or pinned, are captured only by operations that run whole-repository validation.\n- [hard] REQ-03: A mutation attempt captures its full base once. Work done before the claims guard reads only what the lease decision needs, except where a lifecycle transition runs precheck gates outside the lock.\n- [hard] REQ-04: The plan hash commits to each written file's bytes through their content digest instead of serializing the bytes. Distinct bytes still yield distinct plan hashes.\n- [hard] REQ-05: A label update completes in under 100 ms wall time, as the median of three runs, on the adopter-scale clone and on this repository. The evidence is a benchmark artifact committed under the issue and linked to it, reporting before and after for a changing label update, an idempotent label update, and a lease-refused update.\n\n## Notes\n\nChanged files are still detected before publication: the apply-time revalidation covers the smaller read set. Replacing the whole-file event-log rewrite with a true append, and scoping transition read sets to the dependency neighbourhood, are out of scope. They are the next candidates if the target is missed or tightened.\n",
   "documents": [],
   "first_ready_at": "2026-09-19T16:16:27.087115945Z",
-  "gates_required": [],
-  "gates_status": {},
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {
+    "cargo-ci": {
+      "status": "pending",
+      "updated_at": "2026-09-19T19:23:43.243264325Z",
+      "updated_by": null
+    },
+    "code-review": {
+      "status": "pending",
+      "updated_at": "2026-09-19T19:23:43.243264325Z",
+      "updated_by": null
+    }
+  },
   "id": "9750b151-3471-4916-bee6-4b1221694d2e",
   "labels": [
     "component:core",
@@ -15,8 +30,8 @@
     "milestone:v1.0",
     "type:bug"
   ],
-  "priority": "normal",
-  "state": "ready",
-  "title": "Every capture re-hashes all unpinned worktree documents",
-  "updated_at": "2026-09-19T16:16:27.087115945Z"
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Issue mutations capture and hash far more repository state than they read",
+  "updated_at": "2026-09-19T19:23:43.640573471Z"
 }
