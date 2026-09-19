@@ -14,6 +14,54 @@
       "format": "markdown",
       "label": "Investigation",
       "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "990b47819c7a1afe93875e5b6bde64f43de681b9e9055970ecd36635b4c75400",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "228921da8ab1a56f092a98f24ee518192d7babeb748a6fae4ede07ea32be6671",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "04062d47dd8aa3e7817b14845ddb326bf6ad6472462cf04f78056151e1dc70be",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "artifact",
+      "format": "markdown",
+      "label": "Breakdown manifest",
+      "path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
     }
   ],
   "first_ready_at": "2026-09-19T20:52:34.029025818Z",
@@ -39,5 +87,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-19T21:47:35.408319227Z"
+  "updated_at": "2026-09-19T22:16:15.634358001Z"
 }
