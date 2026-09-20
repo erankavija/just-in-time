@@ -5,19 +5,51 @@
 Evidence for `21e976d1` REQ-06. Each task's delivered production footprint against the
 estimate its own Notes state, with a reason for every material difference.
 
+## Reproducing these figures
+
+Every number below is produced by [`footprint.py`](footprint.py), committed beside this
+document. Run it from the repository root:
+
+```console
+$ python3 dev/active/f1dc843a-redo-mutations/footprint.py 34d37f8be \
+    --tasks 835bae3f,555ff4be,faa668c9,35544121,4e818d10,8559f529,d591a1c8
+Net production lines per task, 34d37f8be..HEAD
+
+  35544121    +320
+  835bae3f    +252
+  4e818d10    +250
+  faa668c9    +120
+  555ff4be    +102
+  8559f529     +93
+  48e4f65c     +32
+  untagged      +8
+  d591a1c8      +0
+
+  subtotal over 7 tasks: +1137
+```
+
+The script is the authority for the table below; the table restates its output alongside
+each task's estimate. `48e4f65c` and the untagged commits are outside this phase and are
+excluded from the subtotal, which is why the seven-task figure is quoted rather than the
+whole-range total.
+
+At wave 21, `722878d4` reuses this script for ER-01's attributed balance — pass `--tasks`
+the redo-record tasks alone to get the subtotal that excludes in-epic remediation work.
+
 ## Method
 
 Net production lines, attributed by the `jit:<short-id>` tag each commit carries, over
 `34d37f8be..HEAD`. Excluded from the production count: `*_tests.rs` files, anything under a
-`tests/` directory, `crates/jit/src/storage/redo_conformance.rs` (declared
-`#[cfg(test)] mod redo_conformance;`, so the whole file is test code), and every line inside
-a `#[cfg(test)]` item, whose extent is found by matching braces from the attribute rather
-than by cutting the file at the first occurrence.
+`tests/` directory, modules declared `#[cfg(test)] mod <name>;` in a `mod.rs` or `lib.rs`
+(the script discovers these; `crates/jit/src/storage/redo_conformance.rs` is one), and every
+line inside a `#[cfg(test)]` item, whose extent is found by matching braces from the
+attribute rather than by cutting the file at the first occurrence.
 
-Both exclusions matter and a simpler method gets them wrong. Cutting each file at its first
-`#[cfg(test)]` counts `redo_conformance.rs`'s 447 test lines as production and truncates
-`memory.rs` at line 146, where two `#[cfg(test)]` function attributes sit above 200-odd
-lines of production code. That method reported 1428 where the correct figure is 1137.
+All three exclusions matter and a simpler method gets them wrong. Cutting each file at its
+first `#[cfg(test)]` counts `redo_conformance.rs`'s 447 test lines as production — its gate
+is on the declaration in `mod.rs`, not inside the file — and truncates `memory.rs` at line
+146, where two `#[cfg(test)]` function attributes sit above 200-odd lines of production
+code. That method reported 1428 where the correct figure is 1137.
 
 Net rather than cumulative: a rework commit that rewrites a block counts every rewritten
 line as an addition, so cumulative additions across a task's commits measure churn rather

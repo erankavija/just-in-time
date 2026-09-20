@@ -57,6 +57,13 @@
       "format": "markdown",
       "label": "Epic plan",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "artifact",
+      "format": "markdown",
+      "label": "Footprint measurement script",
+      "path": "dev/active/f1dc843a-redo-mutations/footprint.py"
     }
   ],
   "first_ready_at": "2026-09-20T19:15:47.229714890Z",
@@ -69,6 +76,16 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-09-20T20:26:01.862829158Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T20:28:26.662807908Z",
+      "updated_by": "auto:executor"
+    },
+    "holistic-review": {
+      "status": "failed",
+      "updated_at": "2026-09-20T20:32:33.694556715Z",
       "updated_by": "auto:executor"
     }
   },
@@ -85,5 +102,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Redo record foundation",
-  "updated_at": "2026-09-20T20:26:01.862829158Z"
+  "updated_at": "2026-09-20T20:33:43.455312515Z"
 }

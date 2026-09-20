@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0cec647070a00f4b96ca6a9f593ae65322c1bf7c",
+  "completed_at": "2026-09-20T20:32:33.384111565Z",
+  "duration_ms": 245994,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f1dc843a-redo-mutations/footprint.md",
+        "id": "F1",
+        "line": 10,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/21e976d1/requirement/REQ-06"
+        ],
+        "severity": "high",
+        "summary": "REQ-06's claimed 1,137-line total and per-task footprints are self-attested without a reproducible command, script, or independent recorded measurement."
+      }
+    ],
+    "summary": "REQ-06's reported footprint figures lack reproducible, independent measurement evidence.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "21e976d1-1650-474f-8da8-4a5e9f1207be",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d3564be2-b6b5-49ba-adc8-09ce3a9ce637",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T20:28:27.389636747Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9744 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c081-804e-71a1-9b01-a9a52334fcef\n--------\nuser\n--- 9731 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, high:** REQ-06’s reported 1,137 production-line total and per-task delivered counts are self-attested in `footprint.md`. Its method cites a floating `34d37f8be..HEAD` range and describes custom exclusions, but provides no reproducible command/script or independent recorded measurement to derive the figures. The passing cargo gate records build/test counts only; the doc-review repeats the claim rather than independently measuring it. Thus the hard quantitative criterion is unsubstantiated. (`dev/active/f1dc843a-redo-mutations/footprint.md:10`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-06's reported footprint figures lack reproducible, independent measurement evidence.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-06's claimed 1,137-line total and per-task footprints are self-attested without a reproducible command, script, or independent recorded measurement.\",\"file\":\"dev/active/f1dc843a-redo-mutations/footprint.md\",\"line\":10,\"references\":[\"@/issue/21e976d1/requirement/REQ-06\"]}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
