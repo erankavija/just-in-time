@@ -1,0 +1,577 @@
+{
+  "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "epic_short_id": "f1dc843a",
+  "current_wave": 1,
+  "parallelism_cap": 4,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "835bae3f-ae91-4edf-90b5-455284a06c28",
+          "short_id": "835bae3f",
+          "title": "Redo record vocabulary",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "fe6fa7e5-fe24-4089-bcc2-5a2a2b447007",
+          "short_id": "fe6fa7e5",
+          "title": "Benchmark harness event-log scale",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "555ff4be-dc73-48e2-a587-f9274ac97bb1",
+          "short_id": "555ff4be",
+          "title": "Durable redo record write",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
+          "short_id": "faa668c9",
+          "title": "Write-set and event-log conflict check",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "35544121-9268-4068-8248-98e9d2df16f5",
+          "short_id": "35544121",
+          "title": "File-backend record application",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "4e818d10-4433-4610-a525-29817677f87c",
+          "short_id": "4e818d10",
+          "title": "Memory-backend record application",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "issues": [
+        {
+          "id": "d591a1c8-eca2-4547-9989-ed4b972a2d37",
+          "short_id": "d591a1c8",
+          "title": "Shared interruption conformance suite",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "issues": [
+        {
+          "id": "21e976d1-1650-474f-8da8-4a5e9f1207be",
+          "short_id": "21e976d1",
+          "title": "Redo record foundation",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "doc-review",
+            "holistic-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "issues": [
+        {
+          "id": "08b8c0ef-d55d-479b-bcaf-d649a8c3a193",
+          "short_id": "08b8c0ef",
+          "title": "Data-root ignore file as a derived materialization",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "581bddcf-a189-4ab8-8349-21c64e82dc90",
+          "short_id": "581bddcf",
+          "title": "Consumer-side publication matrix retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "7658bf81-1aa1-4fee-a656-11b12c7a5b62",
+          "short_id": "7658bf81",
+          "title": "Superseded rollback coverage retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "f05a7965-9b2b-4655-8fab-e108652586c2",
+          "short_id": "f05a7965",
+          "title": "Re-homed no-follow file open",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "issues": [
+        {
+          "id": "8d7f4cec-8375-4199-9756-8d4157d2c391",
+          "short_id": "8d7f4cec",
+          "title": "Publication failure injection repoint",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "issues": [
+        {
+          "id": "0938d99e-1c0b-418b-9428-cc8a1d00ef3b",
+          "short_id": "0938d99e",
+          "title": "Session open applies a leftover record",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 10,
+      "issues": [
+        {
+          "id": "4319256e-edab-443b-814e-923d241e84f0",
+          "short_id": "4319256e",
+          "title": "Session commit through the redo record",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 11,
+      "issues": [
+        {
+          "id": "10ba2e35-5e36-4aac-b7d4-29c6141dc4e7",
+          "short_id": "10ba2e35",
+          "title": "Init publisher for an absent data root",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 12,
+      "issues": [
+        {
+          "id": "b0ee2dd6-5393-4193-a88d-f3301601234e",
+          "short_id": "b0ee2dd6",
+          "title": "Transaction kernel retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 13,
+      "issues": [
+        {
+          "id": "ccea63de-f191-497b-8941-6d5b6133b50a",
+          "short_id": "ccea63de",
+          "title": "Storage format reference states the redo record",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
+          "short_id": "ead8f86d",
+          "title": "Concept documents state the redo record",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
+          "short_id": "79252d23",
+          "title": "Profiles reference states the redo record",
+          "classification": "documentation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
+          "short_id": "e6e25f9a",
+          "title": "Deployment guide backup procedure",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 14,
+      "issues": [
+        {
+          "id": "42478e5d-90aa-472e-bca2-f628a1d883c2",
+          "short_id": "42478e5d",
+          "title": "Command and recovery references state the redo record",
+          "classification": "documentation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
+          "short_id": "4b765a1e",
+          "title": "Security review scope names live mechanisms",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical",
+            "repo-validate"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 15,
+      "issues": [
+        {
+          "id": "fbd6c859-e911-4266-8e2d-e3428f331ada",
+          "short_id": "fbd6c859",
+          "title": "Record publication cutover",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "doc-review",
+            "docs-mechanical",
+            "holistic-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 16,
+      "issues": [
+        {
+          "id": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
+          "short_id": "3d9150d7",
+          "title": "Publication path source guards",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
+          "short_id": "51eb1aa6",
+          "title": "Transaction fields leave the command output",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "mcp-ci",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
+          "short_id": "b4483ad6",
+          "title": "Positioned event-log append",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+          "short_id": "c88822a5",
+          "title": "Single-pass mutation capture",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 17,
+      "issues": [
+        {
+          "id": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
+          "short_id": "ec72359b",
+          "title": "Plan hash retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "33f97287-2561-424c-84b4-a9c30edf3212",
+          "short_id": "33f97287",
+          "title": "Listing fingerprint retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "8454236c-c254-419c-826e-0b8da050711f",
+          "short_id": "8454236c",
+          "title": "Mutation document closure retirement",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "e346d387-eee8-4657-93eb-9b64621fd900",
+          "short_id": "e346d387",
+          "title": "Rust prose and command help state the redo record",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 18,
+      "issues": [
+        {
+          "id": "816df12a-a2ff-49dc-85aa-5a7da65dabab",
+          "short_id": "816df12a",
+          "title": "Repository declarations state the redo record",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical",
+            "repo-validate"
+          ],
+          "status": "pending"
+        },
+        {
+          "id": "91168745-1434-4cf8-9442-ab8d3e9135f8",
+          "short_id": "91168745",
+          "title": "Generated storage-records reference matches the append encoding",
+          "classification": "documentation",
+          "gates": [
+            "cargo-ci",
+            "code-review",
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 19,
+      "issues": [
+        {
+          "id": "be13da79-f8df-45e2-8421-c99515470712",
+          "short_id": "be13da79",
+          "title": "Architecture materialization note rewrite",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 20,
+      "issues": [
+        {
+          "id": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+          "short_id": "e590fa91",
+          "title": "Superseded design retirement",
+          "classification": "checkpoint",
+          "gates": [
+            "cargo-ci",
+            "doc-review",
+            "docs-mechanical",
+            "holistic-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 21,
+      "issues": [
+        {
+          "id": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
+          "short_id": "722878d4",
+          "title": "Publication cost evidence",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 22,
+      "issues": [
+        {
+          "id": "8b6a9e34-60c7-45f5-b506-de20afbb98ce",
+          "short_id": "8b6a9e34",
+          "title": "Testing guide publication-cost evidence",
+          "classification": "documentation",
+          "gates": [
+            "doc-review",
+            "docs-mechanical"
+          ],
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 23,
+      "issues": [
+        {
+          "id": "ef7848ea-910d-40f7-a005-854be92229a0",
+          "short_id": "ef7848ea",
+          "title": "Mutation cost evidence",
+          "classification": "checkpoint",
+          "gates": [
+            "doc-review",
+            "holistic-review"
+          ],
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "started_at": "2026-09-20T06:25:44.651403+00:00"
+}
