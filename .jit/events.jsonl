@@ -14861,3 +14861,5 @@
 {"id":"23d06476-67a6-4e78-bf7e-49f02e0787a6","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","priority":"critical","timestamp":"2026-09-20T07:15:26.465408960Z","title":"Packaged prompt citations and policy test wording","type":"issue_created"}
 {"fields":["dependencies"],"id":"d9e25f34-be5c-4141-abe3-da2503db4047","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","timestamp":"2026-09-20T07:15:58.277568049Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"52c33d60-5298-40ff-aa1a-d9bcc6f77d91","issue_id":"21e976d1-1650-474f-8da8-4a5e9f1207be","timestamp":"2026-09-20T07:15:58.518020965Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"25f94de9-dde3-4a8b-8233-ce28487bec96","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","timestamp":"2026-09-20T07:29:29.713945780Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"124c6e70-480a-4cbf-88fd-c05a1c91bcb0","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","timestamp":"2026-09-20T07:29:29.713945780Z","type":"issue_claimed"}
