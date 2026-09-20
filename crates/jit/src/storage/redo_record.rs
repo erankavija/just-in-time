@@ -9,7 +9,7 @@
 use crate::repository_state::{
     FileMode, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
 };
-use crate::storage::atomic_write::{sync_directory, write_file_synced};
+use crate::storage::atomic_write::{create_file_synced, sync_directory};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -119,16 +119,23 @@ impl RedoRecord {
     /// applying half a mutation. The scratch directory is created when absent,
     /// with the mode every other data-root directory carries.
     ///
+    /// An occupied record path is refused rather than replaced: whatever
+    /// occupies it is a mutation no session applied, and the commit point of a
+    /// redo-only protocol cannot be overwritten without losing it. Deciding a
+    /// leftover's fate — applying a parseable record, discarding a residue —
+    /// belongs to session open.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the record cannot be serialized, the scratch
-    /// directory cannot be created, or the write or either sync fails.
+    /// Returns an error when the record cannot be serialized, the data root is
+    /// absent, the scratch directory cannot be created, the record path is
+    /// occupied, or the write or any sync fails.
     pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
         let scratch = data_root.join(RECORD_SCRATCH_DIR);
         std::fs::create_dir_all(&scratch)
             .with_context(|| format!("creating {}", scratch.display()))?;
         let path = scratch.join(RECORD_FILE_NAME);
-        write_file_synced(&path, &self.serialize()?)?;
+        create_file_synced(&path, &self.serialize()?)?;
         sync_directory(&scratch)?;
         Ok(path)
     }
@@ -468,19 +475,19 @@ mod tests {
         assert!(RedoRecord::parse(&std::fs::read(&path).unwrap()).is_ok());
     }
 
-    /// Linux-only: the kernel's refusal to fsync a character device is what
-    /// makes the sync observable at all.
-    #[cfg(target_os = "linux")]
     #[test]
-    fn test_commit_fails_when_the_record_bytes_cannot_be_synced() {
+    fn test_commit_leaves_a_record_a_previous_mutation_left_behind() {
         let data_root = tempfile::tempdir().unwrap();
-        let scratch = data_root.path().join(RECORD_SCRATCH_DIR);
-        std::fs::create_dir(&scratch).unwrap();
-        // The record's path resolves to a device the kernel refuses to fsync,
-        // so a commit that reports success is a commit that never synced.
-        std::os::unix::fs::symlink("/dev/null", scratch.join(RECORD_FILE_NAME)).unwrap();
+        let path = sample_record().commit(data_root.path()).unwrap();
+        let leftover = std::fs::read(&path).unwrap();
 
-        assert!(sample_record().commit(data_root.path()).is_err());
+        assert!(RedoRecord::default().commit(data_root.path()).is_err());
+
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            leftover,
+            "the commit overwrote a record no session had applied"
+        );
     }
 
     #[test]

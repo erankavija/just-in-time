@@ -1,5 +1,6 @@
 //! The shared file-write primitives: atomic publication (temp file + rename)
-//! and durability ([`write_file_synced`], [`sync_directory`]).
+//! and durability ([`write_file_synced`], [`create_file_synced`],
+//! [`sync_directory`]).
 //!
 //! Storage writes go through the helpers in this module so a reader never
 //! observes a partially written file (the JIT "atomic file writes" invariant).
@@ -51,12 +52,46 @@ pub(in crate::storage) fn write_file_atomic_bytes(path: &Path, content: &[u8]) -
 /// The file is created or truncated in place and synced before the handle
 /// closes, so a caller that must not proceed until its bytes survive a crash
 /// has them on return. Truncation is part of the contract: an interrupted write
-/// leaves a prefix of `content`, never a mix with what the path held. The
-/// entry naming the file is a separate durability concern — a caller that
-/// creates the file needs [`sync_directory`] on its parent as well.
+/// leaves a prefix of `content`, never a mix with what the path held. A caller
+/// whose path may hold something it must not lose reaches
+/// [`create_file_synced`] instead. The entry naming the file is a separate
+/// durability concern — a caller that creates the file needs [`sync_directory`]
+/// on its parent as well.
 pub(in crate::storage) fn write_file_synced(path: &Path, content: &[u8]) -> Result<()> {
-    let mut file =
-        fs::File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    write_synced(
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true),
+        path,
+        content,
+    )
+}
+
+/// Write `content` to `path` as a new file, refusing an occupied path, and
+/// return once those bytes are on the device.
+///
+/// The refusal is the open itself, so it holds against a concurrent writer that
+/// a caller-side existence check would race. A caller whose path is a commit
+/// point — the redo record, written before the live writes it describes —
+/// reaches this rather than [`write_file_synced`]: what occupies such a path is
+/// a mutation nobody has applied, and truncating it destroys that mutation.
+/// Resolving the leftover is the occupying caller's business, not this
+/// operation's.
+pub(in crate::storage) fn create_file_synced(path: &Path, content: &[u8]) -> Result<()> {
+    write_synced(
+        fs::OpenOptions::new().write(true).create_new(true),
+        path,
+        content,
+    )
+}
+
+/// The synced write both named operations share; `options` decides what an
+/// occupied path means.
+fn write_synced(options: &fs::OpenOptions, path: &Path, content: &[u8]) -> Result<()> {
+    let mut file = options
+        .open(path)
+        .with_context(|| format!("opening {}", path.display()))?;
     file.write_all(content)
         .with_context(|| format!("writing {}", path.display()))?;
     file.sync_all()
@@ -190,6 +225,29 @@ mod tests {
             write_file_synced(Path::new(UNSYNCABLE), b"bytes").is_err(),
             "the write returned before the bytes were synced"
         );
+    }
+
+    #[test]
+    fn test_create_file_synced_writes_the_bytes_it_was_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        let content = [0, 159, 146, 150, 255];
+
+        create_file_synced(&path, &content).unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn test_create_file_synced_leaves_an_occupied_path_as_it_found_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        let occupant = b"a record nobody applied yet";
+        write_file_synced(&path, occupant).unwrap();
+
+        assert!(create_file_synced(&path, b"replacement").is_err());
+
+        assert_eq!(std::fs::read(&path).unwrap(), occupant.to_vec());
     }
 
     #[test]
