@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "abc10581918b4f2dbfa46be8c679143d90dad82c",
+  "completed_at": "2026-09-20T08:46:40.351103907Z",
+  "duration_ms": 107924,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "44795843b9ff4ca6a56b582c06840095f5a62d7e0c7c816dd41b1d7c06c99a3d",
+  "issue_id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6ea6adb0-f27a-40b9-8c07-2e7fea130867",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T08:44:52.426984474Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-baseline: 896 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (312 ms)\n  ✓ fmt: ok (1676 ms)\n  ✓ clippy: ok (41402 ms)\n  ✓ suite-build: built in 38193 ms, warmed 17 executables (2083461704 bytes) in 70 ms (38266 ms)\n  ✓ test: 4717 passed, 0 failed, 0 skipped (21320 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4418 ms)\n  ✓ suite-clock: 25758 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1750407544/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=25758ms (80 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), so the 38 entries that appeared under /home/vkaskivuo/Projects/just-in-time/target during this run came from another process sharing it, not from this run's compilation: debug/incremental/cli_gate-3inulijlxzbc0/s-hmgpwkc22e-1dljwvf-aog6pt4q7h8e3xhssfajgyyf9, debug/incremental/cli_gate-3inulijlxzbc0/s-hmgpwkc22e-1dljwvf.lock, debug/incremental/cli_issue-2oeff5peu1krb/s-hmgpwkc063-13ra1vr-8l37tjbieslcc7ggal1p8s1xn, debug/incremental/cli_issue-2oeff5peu1krb/s-hmgpwkc063-13ra1vr.lock, debug/incremental/cli_item_validate-162hrjmeern6j/s-hmgpwkc4d8-02rbmsl-20i0b3jvho1qry5isz3zrkqjm (+33 more) (896 pre-existing entries ignored) (316 ms)\n\n",
+  "tree_dirty": true
+}

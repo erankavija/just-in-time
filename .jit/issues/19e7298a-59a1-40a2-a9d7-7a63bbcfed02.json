@@ -6,7 +6,49 @@
     "df3e10fb-19f0-49af-ab19-24498f200b65"
   ],
   "description": "A repository's event-log size stops deciding whether an issue can be claimed.\n\n## Background\n\n`jit claim acquire` captures the whole event log under a 16 MiB byte budget (`crates/jit/src/commands/claim.rs:191-194`), so a repository whose log exceeds that cannot claim an issue at all. This epic's own benchmark fixture reproduces it at 33 MB: `captured 33519044 bytes but the maximum is 16777216`. The issue-update path sets the same budget at 64 MiB (`crates/jit/src/commands/mod.rs:2186-2191`), so two mutation paths disagree on a ceiling neither states a reason for.\n\nThe claim path reads the whole log to answer a question about its tail. `captured_events` (`crates/jit/src/repository_state/mutation.rs:695`) parses every line into `Vec<Event>`, and `event_tail_reflects_claim` (`:709`) then scans that result in reverse for the most recent assignment-affecting event for one issue, stopping at the first match.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit claim acquire` succeeds on a repository whose event log exceeds 16 MiB.\n- [hard] REQ-02: The claim's convergent behaviour is unchanged: an issue already assigned to the claiming agent with its claim event present emits no event, and an issue assigned without its claim event emits exactly the missing one.\n- [hard] REQ-03: The claim and issue-update paths no longer disagree on a byte ceiling; whichever ceiling remains is derived from something, or states in prose why it holds the value it does.\n- [hard] REQ-04: A test claims against an event log larger than the previous ceiling and fails if that ceiling returns.\n\n## Notes\n\nSurfaced by this epic's benchmark work (`fe6fa7e5`) rather than by the redo-record design. It is not redo-record work and is excluded from the redo-record subtotal of the REQ-06 line balance.\n\n`c88822a5` later rewrites capture into a single pass and its REQ-03 keeps the event log in the base specification. Whatever shape this task takes must survive that rewrite or be superseded by it.",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan (f1dc843a)",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-20T08:44:00.680392145Z",
   "gates_required": [
     "cargo-ci",
@@ -23,5 +65,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Event-log size stops capping issue claims",
-  "updated_at": "2026-09-20T08:44:07.882966595Z"
+  "updated_at": "2026-09-20T08:53:41.311117456Z"
 }

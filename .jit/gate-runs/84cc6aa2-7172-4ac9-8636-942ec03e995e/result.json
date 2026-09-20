@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "abc10581918b4f2dbfa46be8c679143d90dad82c",
+  "completed_at": "2026-09-20T08:52:53.261665708Z",
+  "duration_ms": 119061,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "id": "F1",
+        "line": 520,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "Mutation publication never invokes the new write-set and event-log conflict check."
+      }
+    ],
+    "summary": "The write-set conflict checker is implemented and unit-tested but not integrated into mutation publication.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "84cc6aa2-7172-4ac9-8636-942ec03e995e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T08:50:54.200024372Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3397 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0be02-df0c-7a90-878f-75058829e88c\n--------\nuser\n--- 3384 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: abc105819, 89506137b\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit registry)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T08:44:52Z)\nTruncation recovery: narrowed current apply, helper, and test reads after a broad storage search truncated\n\n1. [blocking][issue-impact] The new check is never invoked by mutation publication. `JsonMutationSession::apply` still re-captures and compares the complete read set before calling the existing transaction kernel, while `ensure_write_set_unchanged` has callers only in its test fixture. Consequently normal mutations neither use the write-set/event-tail check nor admit changes to read-only paths, violating REQ-01 through REQ-05 and D-17. [crates/jit/src/storage/repository_state_store.rs:520] (`@/charter/D-17`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The write-set conflict checker is implemented and unit-tested but not integrated into mutation publication.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Mutation publication never invokes the new write-set and event-log conflict check.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":520,\"references\":[\"@/charter/D-17\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

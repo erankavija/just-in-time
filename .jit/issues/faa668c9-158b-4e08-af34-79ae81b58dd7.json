@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-20T07:42:26.508748354Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
@@ -7,13 +7,66 @@
     "835bae3f-ae91-4edf-90b5-455284a06c28"
   ],
   "description": "A mutation compares the live bytes of the files it writes, and the event log's length and tail, with what it read, returning a retryable conflict on any difference.\n\n## Background\n\nThe current check re-captures the mutation's entire read set immediately before publication and compares the whole image, costing a full reread of every registry, the event log, and every issue file. The replacement is scoped to the files the mutation writes, with the event log compared as its length together with its last four kilobytes.\n\nThe tail window is defined in bytes because the torn-tail protocol admits an incomplete final line in the log. The check reads: the live file's length equals the captured length, and the live last `min(len, 4096)` bytes equal the captured ones. The event log is excluded from the byte-for-byte write-set comparison so one path has one answer; until the append encoding lands, the log is a put path whose whole contents would otherwise be reread.\n\nThe accepted cost is that an external edit to a file a mutation read but does not write goes undetected during that mutation, making one result stale. The repository write lock keeps concurrent jit writers of repository state out of the window.\n\n## Success Criteria\n\n- [hard] REQ-01: Before a record is written, the live bytes of every put and delete path other than the event log are compared with the bytes the mutation read, and a difference yields a retryable conflict that changes nothing.\n- [hard] REQ-02: The event log's live length and its last `min(len, 4096)` bytes are compared with the captured ones, and a difference yields the same retryable conflict.\n- [hard] REQ-03: A file the mutation read but does not write is left out of the comparison, and its change leaves the mutation admissible.\n- [hard] REQ-04: The conflict names the path that moved.\n- [hard] REQ-05: A target the mutation expected absent passes the check when absent and refuses it when occupied.\n- [hard] REQ-06: Conflict and success behaviour are covered at the storage unit layer, including an empty log and a log shorter than the tail window.\n\n## Notes\n\nExpected additive footprint is under 150 production lines. The comparison runs under the repository write lock the session already holds.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan (f1dc843a)",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-20T07:39:08.286439071Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T08:46:40.359062851Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-09-20T08:52:53.545831029Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
   "labels": [
     "type:task",
@@ -27,5 +80,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Write-set and event-log conflict check",
-  "updated_at": "2026-09-20T07:42:26.508748354Z"
+  "updated_at": "2026-09-20T08:53:41.073802694Z"
 }

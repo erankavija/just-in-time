@@ -1,0 +1,64 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "abc10581918b4f2dbfa46be8c679143d90dad82c",
+  "completed_at": "2026-09-20T08:50:18.513362190Z",
+  "duration_ms": 214723,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_record.rs",
+        "id": "F1",
+        "line": 128,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "A newly created scratch directory is not fsynced through its data-root parent, so the synced record can be unreachable after a crash."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_record.rs",
+        "id": "F2",
+        "line": 128,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Scratch creation uses default permissions rather than the data root mode, and the test does not exercise a differing data-root mode."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/atomic_write.rs",
+        "id": "F3",
+        "line": 59,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/atomic-writes",
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "The synced writer truncates an occupied fixed redo-record path, allowing a leftover record to be overwritten instead of recovered."
+      }
+    ],
+    "summary": "The redo-record writer does not durably publish a newly created scratch directory, does not preserve data-root permissions, and can overwrite an existing redo record.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "555ff4be-dc73-48e2-a587-f9274ac97bb1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ff0d58f7-8250-417e-aeae-28dd6726d62b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T08:46:43.789579325Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10738 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0bdff-1246-7111-9634-5e0b9266dc4a\n--------\nuser\n--- 10725 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 43d8c4854, bb3cf92ae, f41fd09ae (`jit:555ff4be`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md, markdown-first); @/invariant/atomic-writes (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: re-read bounded config, policy-source, current storage line ranges, and per-commit diffs after truncated broad searches\n\n1. **[blocking][issue-impact][high]** `RedoRecord::commit` creates `tmp/` but fsyncs only `tmp/`, never its parent data root. When `tmp/` is absent, a crash after return can lose the parent’s directory entry and make the otherwise-synced redo record unreachable. This fails REQ-01’s durable commit point. [`crates/jit/src/storage/redo_record.rs:128`] References: `@/charter/D-17`.\n\n2. **[blocking][issue-impact][high]** `create_dir_all` applies the process’s default creation mode filtered by umask; it does not copy the data root’s mode. A `0700` data root can therefore get a `0755` scratch directory. The added test only compares two directories created with the same default mode, so it cannot detect this REQ-03 failure. [`crates/jit/src/storage/redo_record.rs:128`] References: none.\n\n3. **[blocking][issue-impact][high]** The new synced-write helper uses `File::create`, which truncates an occupied fixed `tmp/redo.record` path. Consequently `RedoRecord::commit` can overwrite a leftover complete record instead of preserving it for session replay, contradicting both the claimed atomic-write enforcement and D-17’s leftover-record recovery. [`crates/jit/src/storage/atomic_write.rs:59`] References: `@/invariant/atomic-writes`, `@/charter/D-17`.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The redo-record writer does not durably publish a newly created scratch directory, does not preserve data-root permissions, and can overwrite an existing redo record.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A newly created scratch directory is not fsynced through its data-root parent, so the synced record can be unreachable after a crash.\",\"file\":\"crates/jit/src/storage/redo_record.rs\",\"line\":128,\"references\":[\"@/charter/D-17\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Scratch creation uses default permissions rather than the data root mode, and the test does not exercise a differing data-root mode.\",\"file\":\"crates/jit/src/storage/redo_record.rs\",\"line\":128,\"references\":[]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The synced writer truncates an occupied fixed redo-record path, allowing a leftover record to be overwritten instead of recovered.\",\"file\":\"crates/jit/src/storage/atomic_write.rs\",\"line\":59,\"references\":[\"@/invariant/atomic-writes\",\"@/charter/D-17\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
