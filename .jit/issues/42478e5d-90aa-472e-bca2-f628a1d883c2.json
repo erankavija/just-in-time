@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "b0ee2dd6-5393-4193-a88d-f3301601234e"
+  ],
+  "description": "The command reference, the worktree-validate reference, the troubleshooting guide, the error-code reference, and the configuration reference describe the redo record and the application that recovers it.\n\n## Background\n\nThe recover command is documented on two adopter pages whose text has drifted apart, and its help exists verbatim twice in the sources, so the four copies move together. A third page, generated from the runtime constants, calls the command the single recovery entry point; rewriting the other two without it would leave the reference surface disagreeing with itself. One page tells the reader the command removes temporary files older than an hour and is safe to run at any time, which needs restating now that the data root's scratch directory holds the commit point.\n\nBeyond recovery, the command reference describes many mutations as one recoverable transaction, describes bulk update and batch create as writing a temp file and renaming, describes gate update in terms of an atomic-write primitive, and describes initialization and archive execution as staging with a no-replace rename. The troubleshooting guide explains orphaned temporary files as coordination state and carries a recovery procedure. The error-code reference names a recovery failure, and the configuration reference describes a linked-checkout override in terms of the same transaction.\n\n## Success Criteria\n\n- [hard] REQ-01: Both adopter pages describing the recover command state the same behaviour, and each describes session-open application as the recovery path.\n- [hard] REQ-02: Guidance about removing temporary files states that the data root's scratch directory holds a pending commit point and names what is safe to remove.\n- [hard] REQ-03: Command descriptions that named one recoverable transaction describe the redo record.\n- [hard] REQ-04: The recovery procedure in the troubleshooting guide describes application of a leftover record at session open.\n- [hard] REQ-05: The error-code entry for a recovery failure describes a failed application, and the configuration reference's linked-checkout passage states the record.\n- [hard] REQ-06: Initialization and archive execution are described with the publication each uses.\n- [hard] REQ-07: The runtime-defaults reference states that session open applies a leftover record, regenerated from its source constants, and claims no single recovery entry point.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "42478e5d-90aa-472e-bca2-f628a1d883c2",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:docs",
+    "component:cli",
+    "component:core",
+    "satisfies:REQ-07",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Command and recovery references state the redo record",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

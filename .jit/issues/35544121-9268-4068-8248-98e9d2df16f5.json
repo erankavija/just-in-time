@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "555ff4be-dc73-48e2-a587-f9274ac97bb1"
+  ],
+  "description": "The JSON storage backend applies a redo record to the filesystem and re-applies a leftover one idempotently, stepping through named interruption points.\n\n## Background\n\nApplying a record replaces each put path by temp-file and rename, removes each deleted path, writes the event append at its recorded offset, and removes the record. Re-application is the same code: a put overwrites, a delete tolerates an absent target, and the append rewrites the same bytes at the same offset, so a record applied twice converges on the same state. Parent directories are created as a put needs them, because both backends verify parents and a delta omitting ancestors fails apply.\n\nThe positioned append holds three conditions. The offset is the captured file length rather than a line boundary, because the event composer may begin the appended bytes with a separator newline and the torn-tail protocol admits an incomplete final line. The file is opened without append mode, since append mode ignores the offset and would double-append. Re-application truncates to the offset plus the appended length, so a longer file converges.\n\nInterruption points make the mechanism's crash matrix testable at unit cost. They are a closed enum over the steps of apply and re-application, reached through an injector the backend holds, in the shape the storage layer already uses.\n\n## Success Criteria\n\n- [hard] REQ-01: Applying a record to a data root replaces each put path, removes each delete path, writes the append at its offset, and removes the record.\n- [hard] REQ-02: A put whose parent directories are absent creates them before the replacement.\n- [hard] REQ-03: Re-applying a record over a state where some operations already landed produces the same final bytes as a single clean application, for any prefix of the operation order.\n- [hard] REQ-04: The event append is written without append mode at the recorded offset, and the file is truncated to the offset plus the appended length.\n- [hard] REQ-05: A closed interruption-point enum names each step of apply and re-application, and the backend checks every point through an injector it holds.\n- [hard] REQ-06: A record naming a path outside the data root and the worktree is refused before any live write.\n- [hard] REQ-07: The apply module is declared beside the storage layer's other public backends, so the workspace builds with no warnings while nothing calls it.\n\n## Notes\n\nExpected additive footprint is under 350 production lines. The interruption points name the steps of this mechanism alone.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "35544121-9268-4068-8248-98e9d2df16f5",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:redo-record-foundation",
+    "component:storage",
+    "satisfies:REQ-03",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "File-backend record application",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

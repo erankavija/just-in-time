@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "df3e10fb-19f0-49af-ab19-24498f200b65"
+  ],
+  "description": "A typed redo record describes one mutation's file changes as put-file, delete-file, and event-append operations over data-root and worktree paths, with a canonical serialized form.\n\n## Background\n\nRepository publication is driven today by a delta whose four action kinds are `CreateDirectory`, `WriteFile`, `SetMode`, and `DeleteFile`. The redo record is a smaller vocabulary carrying the same intent: the complete new bytes and mode of a written file, a removed path, and an event append expressed as an offset with its bytes. A put creates the parent directories its path needs, so directory creation is implied. A move is a put and a delete in one record, which is what archive execution needs when it copies a document and removes its source.\n\nPaths carry their root class, so one record holds a data-root file, a projection target in the worktree, and a profile asset. The record's home is a scratch directory under the data root. Its name ends in something other than `.tmp`, because the orphan temp sweep matches files by that extension and recurses into subdirectories.\n\n## Success Criteria\n\n- [hard] REQ-01: A redo record value holds an ordered set of put-file operations carrying path, bytes, and mode; delete-file operations carrying a path; and at most one event-append operation carrying an offset and its bytes.\n- [hard] REQ-02: Record paths are typed by root class, so one record addresses both data-root and worktree targets, and a path outside those roots is rejected at construction.\n- [hard] REQ-03: The record round-trips through its serialized form byte-identically, and a record serialized by one process parses in another.\n- [hard] REQ-04: Canonical constants name the scratch directory and the record's file name, and the record's name ends in an extension the orphan temp sweep does not match.\n- [hard] REQ-05: The module is declared beside the storage layer's other public backends, so its items are reachable from outside the crate and the workspace builds with no warnings while nothing calls them.\n- [hard] REQ-06: Round-trip and rejection behaviour are covered by unit tests over the record type.\n\n## Notes\n\nThe production module is expected to stay within 250 lines. The storage layer declares its backends publicly, so a module landing before its first caller still builds under the workspace's deny-warnings clippy run.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-20T01:05:37.007130180Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "835bae3f-ae91-4edf-90b5-455284a06c28",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:redo-record-foundation",
+    "component:storage",
+    "satisfies:REQ-03",
+    "satisfies:REQ-05",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Redo record vocabulary",
+  "updated_at": "2026-09-20T01:05:44.872725882Z"
+}

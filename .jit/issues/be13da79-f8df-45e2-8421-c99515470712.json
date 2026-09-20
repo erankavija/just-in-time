@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "33f97287-2561-424c-84b4-a9c30edf3212",
+    "8454236c-c254-419c-826e-0b8da050711f",
+    "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
+    "ec72359b-67dd-4dcd-8639-74b751b1cdf9"
+  ],
+  "description": "The materialization architecture note describes record publication in place of the sections describing the kernel, its journal, and its recovery.\n\n## Background\n\nThe note is the contributor-facing description of repository-state materialization. It is accurate today and obsolete the moment the mechanism changes: it names the kernel, the journal, and the recovery module in its layer map and its diagrams, describes the two-phase capture specification and its budgets, describes the expected-preimage check and the plan hash, describes the mutation-session contract down to composing the exact event-log content, and carries a session-open recovery section with an apply-time re-capture and a sequence diagram. Its closing pointer sends a new contributor to three files that will not exist.\n\nThe note is in the repository's permanent documentation set, so it is maintained. The archived copies under the archive root are pinned.\n\n## Success Criteria\n\n- [hard] REQ-01: The layer map, the pipeline description, and the diagrams name the redo record and its application at session open.\n- [hard] REQ-02: The capture description states one read pass with its budgets, and names no capture phase or overlap-stability check.\n- [hard] REQ-03: The commit description states the write-scoped comparison, the synced record, the apply order, and idempotent re-application.\n- [hard] REQ-04: The closing reading order points at files that exist after the change.\n- [hard] REQ-05: The pure-producer and repair-derivation sections are preserved where they remain accurate.\n- [hard] REQ-06: The core-system-design note and the architecture-pitfalls study state the same mechanism.\n\n## Notes\n\nArchived work products are pinned to the revision that produced them and stay as they are.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "be13da79-f8df-45e2-8421-c99515470712",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:superseded-design-retirement",
+    "component:docs",
+    "satisfies:REQ-07",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Architecture materialization note rewrite",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

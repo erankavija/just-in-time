@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "10ba2e35-5e36-4aac-b7d4-29c6141dc4e7"
+  ],
+  "description": "The journaled transaction kernel, its journal, its staging module, its recovery arms, and its control-plane module leave the storage layer, and recovery discovery keys on the redo record.\n\n## Background\n\nWith the mutation session committing through the redo record and initialization publishing an absent root through its own module, the kernel has no caller. What goes with it is named precisely, because several of the constructs are known by descriptions rather than by their own names.\n\nThe rollback kernel is `FileTransactionKernel` with `rollback_repository_actions` and `rollback_repository_action`. Transaction backup is `prepare_repository_backup`, `restore_verified_backup`, `remove_redundant_backup`, `backup_authority`, the backups control subdirectory, and the journal's backup fields. The staging directory is the `transaction_staging` module, `stage_authority`, `prepare_staged_data_action`, `create_directory_stage_name`, the stages control subdirectory, and the journal's stage fields. Reverse actions are the two reverse-action failure-point variants and the rollback functions they bracket. The worktree companion is the companion marker constant, `CompanionDirs`, the four companion control functions, the orphan-companion sweep, and the companion-need field. With them go the journal module, the journal-shaped half of the recovery module including its thirty-six-variant failure-point enum and its injector plumbing, and the control-plane module, which has no production caller.\n\nRecovery discovery is production behaviour: it recognizes a repository needing recovery by an external bootstrap protocol marker or an internal transactions subdirectory. Under the record the marker is a record file directly under the data root's scratch directory, so a repository whose index is absent still reaches recovery.\n\n## Success Criteria\n\n- [hard] REQ-01: No rollback kernel, reverse-action path, verified backup, staging directory, or worktree companion survives in the workspace under any spelling.\n- [hard] REQ-02: The transaction journal module, the journal-shaped recovery module, the staging module, and the control-plane module are gone, along with the failure-point enum and the injector plumbing that served them.\n- [hard] REQ-03: Both storage backends carry no modelling of the journaled kernel's phases.\n- [hard] REQ-04: Redo-record publication and the initialization root publisher are the two paths that write repository state, the second reached only for an absent data root.\n- [hard] REQ-05: Recovery discovery recognizes a pending redo record under the data root's scratch directory, and recognizes no journal location.\n- [hard] REQ-06: No dead-code allowance introduced for the kernel's unreferenced interval survives in the workspace.\n- [hard] REQ-07: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n- [hard] REQ-08: The change removes more lines than it adds, across production code and tests.\n\n## Notes\n\nThe kernel module's own test module retires with the module it covers. The lock-order guard module stays: it enforces acquisition order rather than durability, and its property survives.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b0ee2dd6-5393-4193-a88d-f3301601234e",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:storage",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/canonical-cutover"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Transaction kernel retirement",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

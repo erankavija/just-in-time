@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "b0ee2dd6-5393-4193-a88d-f3301601234e"
+  ],
+  "description": "The deployment guide's backup procedure accounts for the data root's scratch directory, so a backup carries no pending redo record.\n\n## Background\n\nThe guide tells the reader to archive the whole data root and restore it elsewhere. Under the redo record that captures a pending commit point: restoring it into a repository that never performed the mutation would apply the record at the next session open.\n\n## Success Criteria\n\n- [hard] REQ-01: The backup procedure excludes the data root's scratch directory.\n- [hard] REQ-02: The restore procedure states that a restored data root carries no pending record.\n- [hard] REQ-03: The guide states why the scratch directory is excluded, in one sentence.\n- [hard] REQ-04: The guide carries no description of journaled publication.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:docs",
+    "satisfies:REQ-07",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Deployment guide backup procedure",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

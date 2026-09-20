@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "c88822a5-b92a-4992-9521-f1c0ad145b9e"
+  ],
+  "description": "A captured listing carries child names without per-child identity, so a mutation stops hashing directory entries it does not write.\n\n## Background\n\nA captured image carries, beside its file entries, a fingerprint of each discovered directory listing: the complete set of child names with their identities. Its purpose was to detect a sibling file appearing or vanishing between capture and commit. Archive planning and the shared command module read those listings as data — which children exist, under which directory — at nine sites, so name discovery stays; the per-child identity is what goes.\n\nThe race-detection guarantee is dropped deliberately. A mutation no longer detects a directory-entry race, and the repository write lock is what makes that acceptable for the files a mutation writes.\n\n## Success Criteria\n\n- [hard] REQ-01: No listing fingerprint type and no fingerprint accessor survives in the workspace, and a captured listing carries child names without per-child identity.\n- [hard] REQ-02: Commands that consulted a listing as data still read the child names they need from the captured image.\n- [hard] REQ-03: Capture byte and name budgets still bound what a listing read may consume, and a rogue directory still refuses the capture.\n- [hard] REQ-04: The source-text policy assertion naming the fingerprint accessor is retargeted, with its reason stated where it lands.\n- [hard] REQ-05: The change removes more lines than it adds.\n\n## Notes\n\nThe budget coverage over oversized listings states a real property and survives.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "33f97287-2561-424c-84b4-a9c30edf3212",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:superseded-design-retirement",
+    "component:core",
+    "component:storage",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Listing fingerprint retirement",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

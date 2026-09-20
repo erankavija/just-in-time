@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "21e976d1-1650-474f-8da8-4a5e9f1207be"
+  ],
+  "description": "The no-follow regular-file open lives outside the transaction kernel module, where its readers already are.\n\n## Background\n\nThe kernel module exports one helper with consumers outside the transaction path: a capability-relative open that refuses symbolic links and non-regular files. Six call sites use it, five in the JSON storage backend, including the event-log read path, and one in artifact planning. It is the only kernel export that survives the kernel.\n\nMoving it first keeps the kernel's retirement a pure removal.\n\n## Success Criteria\n\n- [hard] REQ-01: The no-follow regular-file open lives in a storage module other than the transaction kernel, with its refusal of symbolic links and non-regular targets unchanged.\n- [hard] REQ-02: Every current call site reaches it at its new home, and it exists in one copy.\n- [hard] REQ-03: Its error type is independent of the transaction kernel's error enum.\n- [hard] REQ-04: Refusal of a symbolic link and of a directory is covered at the storage unit layer.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f05a7965-9b2b-4655-8fab-e108652586c2",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:storage",
+    "satisfies:REQ-05"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Re-homed no-follow file open",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

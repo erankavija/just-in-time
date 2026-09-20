@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "35544121-9268-4068-8248-98e9d2df16f5"
+  ],
+  "description": "The in-memory storage backend holds a redo record as a value and applies it by stepping through the same interruption points as the filesystem backend.\n\n## Background\n\nThe in-memory backend exists so command workflows are testable without a filesystem, and the project requires one behavioural contract across both backends. The in-memory session mirrors the filesystem kernel today by walking the same failure points in the same order over an in-memory residue, with one deliberately skipped step marked so the point set stays identical across backends.\n\nThe redo record keeps that shape and shrinks it. The in-memory backend stores the record as a value beside its state map, applies its operations to that map in the same order, and checks the same interruption points, so a crash injected at a given point means the same thing on both backends. The residue carries the record alone.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation on the in-memory backend installs a redo record as a value before it changes any state entry.\n- [hard] REQ-02: Applying the record updates put entries, removes delete entries, and extends the event entry at its recorded offset.\n- [hard] REQ-03: Re-applying a leftover record over a backend that already holds part of it leaves the backend in the same semantic state as a clean application.\n- [hard] REQ-04: The backend checks the same interruption-point values, in the same order, as the filesystem backend, and each point is reachable on both.\n- [hard] REQ-05: The in-memory residue carries the record and nothing else.\n\n## Notes\n\nExpected additive footprint is under 200 production lines, against roughly 340 lines of kernel modelling this replaces.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "4e818d10-4433-4610-a525-29817677f87c",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:redo-record-foundation",
+    "component:storage",
+    "satisfies:REQ-03",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/shared-test-contracts"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Memory-backend record application",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

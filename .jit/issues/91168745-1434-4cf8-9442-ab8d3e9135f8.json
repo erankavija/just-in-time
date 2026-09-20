@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "e346d387-eee8-4657-93eb-9b64621fd900"
+  ],
+  "description": "The generated storage-records reference is regenerated from its Rust source and describes the event log's positioned append.\n\n## Background\n\nThe storage-records reference is generated from the record definitions the binary writes with, and its generator's own header states that its event-log sample lines are encoded the way the repository-state finalizer publishes them. The finalizer's encoding changes when the log starts growing by positioned append, so the generator and the page move with it.\n\nRegenerating after the source prose changes is what keeps the page honest; editing generated output would edit a projection rather than its authority.\n\n## Success Criteria\n\n- [hard] REQ-01: The generated reference is produced by regeneration from its source.\n- [hard] REQ-02: The storage-records reference and its generator describe the event log's positioned append.\n- [hard] REQ-03: Regenerating a second time produces no diff.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "91168745-1434-4cf8-9442-ab8d3e9135f8",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:superseded-design-retirement",
+    "component:docs",
+    "satisfies:REQ-07",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Generated storage-records reference matches the append encoding",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

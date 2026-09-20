@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "4319256e-edab-443b-814e-923d241e84f0",
+    "f05a7965-9b2b-4655-8fab-e108652586c2"
+  ],
+  "description": "Repository initialization creates an absent data root through a small publisher of its own: a synced sibling stage directory published by a no-replace rename.\n\n## Background\n\nInitialization has no publication code of its own. It builds a plan and hands it to the shared mutation session, and the kernel is what allocates a stage directory beside the data root, stages every file with create-new and sync, re-verifies each staged file against a recorded identity, rebinds the parent, and publishes the root with a no-replace rename. An external journal makes an interrupted initialization recoverable.\n\nThe redo record cannot do this: its home is a scratch directory under a data root that does not exist yet. Initialization therefore keeps the creation protocol and sheds the journal around it: write the new root into a sibling stage directory, sync it, publish it with a no-replace rename, and report an occupied-root error when the destination is taken. An orphan stage left by an interrupted run is removed by the next initialization.\n\nWorktree files that initialization writes, such as the version-control attributes file, publish through the redo record like any other worktree target.\n\n## Success Criteria\n\n- [hard] REQ-01: Initializing an absent data root writes the complete scaffold into a sibling stage directory, syncs it, and publishes it with a no-replace rename.\n- [hard] REQ-02: An occupied destination yields an occupied-data-root error and leaves the existing root untouched.\n- [hard] REQ-03: An interruption before the rename leaves no data root, and the next initialization removes the stage directory it left.\n- [hard] REQ-04: Worktree files the initialization writes publish through the redo record, in the same session.\n- [hard] REQ-05: The publisher carries the creation protocol alone: no journal, no external bootstrap control directory, no post-publication identity re-verification.\n- [hard] REQ-06: Initialization reaches the transaction kernel nowhere.\n- [hard] REQ-07: Each kernel item left without a caller carries a dead-code allowance at the narrowest scope covering it, written with the removal condition \"removed when the transaction kernel retires\", and the workspace builds with no warnings.\n\n## Notes\n\nExpected additive footprint is under 250 production lines in a module of its own. This is the one publication path beside the redo record, and it exists because no scratch directory precedes the root it creates.\n\nThis removes the kernel's last publication caller. Its four storage modules keep callers, because session open still runs journal recovery: the recovery dispatch names the kernel type, the control-location enum, and the staging helpers until the kernel retires. What loses its last caller is the publication half inside the kernel module — the delta executor and the private graph it drives, together with the outcome struct's hash field, whose only reader is the apply path this task leaves. Those items are crate-private, so the compiler's dead-code lint reports them under the workspace's deny-warnings build, and the allowance is the named, versioned boundary that carries them to the task that removes them.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "10ba2e35-5e36-4aac-b7d4-29c6141dc4e7",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:storage",
+    "component:core",
+    "satisfies:REQ-05",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/atomic-writes"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Init publisher for an absent data root",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

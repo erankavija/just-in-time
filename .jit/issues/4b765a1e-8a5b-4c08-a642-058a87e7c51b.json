@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "b0ee2dd6-5393-4193-a88d-f3301601234e"
+  ],
+  "description": "The security-review gate's declared scope names the mechanisms the repository has.\n\n## Background\n\nThe gate registry declares each gate's review scope, and the security-review entry lists the areas a reviewer is expected to cover: path containment, symlink and junction races, recovery journals, untrusted manifest content, and the rest. Recovery journals stop existing when the transaction kernel retires, so the scope names an area with no code behind it and a reviewer is directed at nothing.\n\nThe registry is the authority and the rules-and-gates reference is its projection, so the line is corrected at source and the projection is re-rendered.\n\n## Success Criteria\n\n- [hard] REQ-01: The security-review gate's declared scope names no recovery journal, and it names the redo record's publication and replay in its place.\n- [hard] REQ-02: The remaining scope areas are unchanged.\n- [hard] REQ-03: The rules-and-gates reference matches the registry, produced by rendering rather than by hand.\n- [hard] REQ-04: Repository validation passes against the edited registry.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:gates",
+    "component:docs",
+    "satisfies:REQ-07",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/single-source-prose"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Security review scope names live mechanisms",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}

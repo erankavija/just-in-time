@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T01:05:37.007130180Z",
+  "dependencies": [
+    "c88822a5-b92a-4992-9521-f1c0ad145b9e"
+  ],
+  "description": "Mutation capture resolves no issue-linked document closure; document evidence stays with validation.\n\n## Background\n\nMutation capture resolves the closure of documents an issue links, plus pinned-revision evidence and linked-worktree evidence, so a mutation could certify that the documents it read had not moved. Earlier perf work narrowed mutations to plan documents; the remainder goes now, because the governing decision keeps issue-linked documents with validation.\n\nWhat survives is the whole-repository validation closure, a different construct with a similar name, and the plan documents a transition rule reads.\n\n## Success Criteria\n\n- [hard] REQ-01: No mutation document-closure function, closure type alias, or document-capture selector survives in the mutation path.\n- [hard] REQ-02: A mutation captures the plan documents a transition rule consults, and captures no other document.\n- [hard] REQ-03: Validation resolves pinned-revision evidence and linked-worktree evidence, with the mutation path free of both.\n- [hard] REQ-04: The whole-repository validation closure is unchanged.\n- [hard] REQ-05: Document-link checking keeps reporting the dangling links it reports today.\n- [hard] REQ-06: The change removes more lines than it adds.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8454236c-c254-419c-826e-0b8da050711f",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:superseded-design-retirement",
+    "component:core",
+    "satisfies:REQ-05",
+    "satisfies:REQ-06",
+    "per:@/charter/D-17"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Mutation document closure retirement",
+  "updated_at": "2026-09-20T01:05:37.007130180Z"
+}
