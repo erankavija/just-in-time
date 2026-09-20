@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "86de4ad1c19f5ddbf66fdb83bc1f72f6d8677c48",
+  "completed_at": "2026-09-20T18:56:10.983148550Z",
+  "duration_ms": 306774,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_conformance.rs",
+        "id": "F1",
+        "line": 205,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/d591a1c8/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "The suite commits the redo record before every injected interruption, so it does not prove pre-durability crashes preserve the old state."
+      }
+    ],
+    "summary": "The shared suite misses the hard pre-durability interruption property.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d591a1c8-eca2-4547-9989-ed4b972a2d37",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "81e374e6-e93f-471d-9089-1b910223f54a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T18:51:04.208838230Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6408 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c028-5c64-7382-a28b-132d62458144\n--------\nuser\n--- 6395 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 61d80be9, 29022f60, 5606543e, d7544630, dcd06217 (merge)\nPolicy sources: AGENTS.md\nResolved items: @/issue/d591a1c8/requirement/REQ-01–REQ-06 (.jit/issues/d591a1c8-eca2-4547-9989-ed4b972a2d37.json, markdown-first); @/invariant/orthogonal-tests, @/invariant/shared-test-contracts (.jit/invariants.toml, registry-first); @/charter/D-17 (dev/vision/9db27a3a-charter.md, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T18:49:25Z)\nTruncation recovery: reread targeted config, registry, charter, issue-patch, and per-file implementation evidence after a broad historical search truncated; omitted historical gate-run output was outside this issue’s impact cone.\n\n1. **[blocking][issue-impact] F1:** The suite never injects or observes an interruption before the redo record is durable. Its `committed` helper writes the record before every tested application at `crates/jit/src/storage/redo_conformance.rs:205`, while the first injectable `RedoPoint` is reached only after that commit in `crates/jit/src/storage/redo_apply.rs:124`; filesystem commit durability is completed at `crates/jit/src/storage/redo_record.rs:195-196`. Therefore the shared suite cannot establish REQ-02’s required old-state behavior for a pre-durability interruption. Reference: `@/issue/d591a1c8/requirement/REQ-02`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shared suite misses the hard pre-durability interruption property.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The suite commits the redo record before every injected interruption, so it does not prove pre-durability crashes preserve the old state.\",\"file\":\"crates/jit/src/storage/redo_conformance.rs\",\"line\":205,\"references\":[\"@/issue/d591a1c8/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
