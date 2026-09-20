@@ -705,5 +705,16 @@
       "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently.",
       "baseline_at_wave2": "+636 -32 = net +604"
     }
+  ],
+  "verifications": [
+    {
+      "id": "V-01",
+      "issue": "2d4fda72",
+      "what": "Relocation completeness: no property asserted by a deleted Rust test is now asserted by nothing.",
+      "worker_evidence": "Each of 225 phrase declarations and 20 package prohibitions individually mutated in a scratch tree and required to exit 1 before any test was deleted. docs-check-selftest.sh carries 67 assertions.",
+      "lead_evidence": "Independent textual cross-check of every literal asserted by code_review_policy_test.rs and doc_review_policy_test.rs against scripts/docs-policy-phrases.toml: 138 asserted phrases, 135 declared directly, 3 being assertion MESSAGES whose negative literals (blanket '# Examples' rule, @/inv/pid-safety, the pending-peer-review rule) are all declared as forbid entries. NOTE: the lead check did NOT cover the 229 lines deleted from repository_package.rs; that half rests on the worker's per-declaration mutation evidence plus the spot-check below.",
+      "spot_check": "test_packaged_skills_only_require_declared_project_item_kinds asserted `declares_charter || !requires_charter_address`. M8 now fails ANY unresolvable citation in package content, which rejects a superset of what the old test rejected. Stricter, not narrower; property preserved. Consequence: a packaged skill legitimately citing a markdown-first kind the package contributes would now be blocked where the old test allowed it - a possible future false positive, erring safe.",
+      "verdict": "no property lost"
+    }
   ]
 }
