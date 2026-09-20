@@ -13,7 +13,7 @@ use crate::storage::redo_apply::check_interruption;
 use crate::storage::{
     AmbiguousIdError, EventAppend, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
     IssueStore, PresetNotFoundError, PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint,
-    RedoRecord, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
+    RedoRecord, RepoWriteGuard, RepoWriteLock, RepositoryStateStoreError, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -556,7 +556,6 @@ pub struct MemoryRedoApplier {
 }
 
 impl MemoryRedoApplier {
-    /// Hold `injector` for every application this applier runs.
     pub fn new(injector: Arc<dyn RedoInterruptionInjector>) -> Self {
         Self { injector }
     }
@@ -598,6 +597,7 @@ impl MemoryRedoApplier {
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
+                ensure_operable(&state, path)?;
                 state.entries.remove(path);
                 Ok::<(), RedoApplyError>(())
             })?;
@@ -611,36 +611,65 @@ impl MemoryRedoApplier {
     }
 }
 
-/// Refuse, before the first live entry change, a path this backend's tree
-/// cannot address.
+/// Refuse a path this backend's tree cannot address.
 ///
-/// The counterpart of the file backend's pre-write path resolution: a data path
-/// while the data root is absent has no root to land in, and an ancestor that is
-/// not a directory is the no-follow parent walk's refusal. An absent ancestor is
-/// admitted, because a put creates the directories its path needs.
+/// The counterpart of the file backend's path resolution, which runs once over
+/// the whole record before the first live write and again inside each
+/// operation: a data path while the data root is absent has no root to land in,
+/// and an ancestor that is not a directory is the no-follow parent walk's
+/// refusal, reported by the same component the walk stopped at. An absent
+/// ancestor is admitted, because a put creates the directories its path needs.
 fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
     if path.root_class() == RepositoryRootClass::Data && !state.data_root_exists {
         return Err(unaddressable(path));
     }
-    path.relative()
-        .as_path()
+    let relative = path.relative().as_path();
+    let ancestors = relative
         .ancestors()
         .skip(1)
         .filter(|ancestor| !ancestor.as_os_str().is_empty())
-        .try_for_each(|ancestor| {
-            let ancestor =
-                VirtualPath::from_root(path.root_class(), RootRelativePath::parse(ancestor)?)?;
-            match state.entries.get(&ancestor) {
-                None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
-                    Ok(())
-                }
-                Some(_) => Err(unaddressable(&ancestor)),
+        .collect::<Vec<_>>();
+    // Outermost first, so the component this refuses is the one the file
+    // backend's walk reaches first.
+    ancestors.into_iter().rev().try_for_each(|ancestor| {
+        let component = ancestor
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        let ancestor =
+            VirtualPath::from_root(path.root_class(), RootRelativePath::parse(ancestor)?)?;
+        match state.entries.get(&ancestor) {
+            None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
+                Ok(())
             }
-        })
+            Some(_) => Err(RepositoryStateStoreError::UnsafeTarget(component).into()),
+        }
+    })
+}
+
+/// Refuse what the filesystem refuses at the moment one operation runs, rather
+/// than only over the state the record's application began in: an earlier put
+/// can occupy an ancestor, and the target can be a directory a put would have
+/// to rename over and a delete to unlink.
+///
+/// Every refusal leaves the operations before it applied and the record
+/// installed, as the file backend does, so the next application meets the same
+/// refusal rather than a repository the record no longer describes.
+fn ensure_operable(
+    state: &MemoryRepositoryState,
+    path: &VirtualPath,
+) -> Result<(), RedoApplyError> {
+    resolve(state, path)?;
+    match state.entries.get(path) {
+        Some(RepositoryEntry::Directory { .. }) => Err(is_a_directory(path)),
+        _ => Ok(()),
+    }
 }
 
 /// Replace a put's path with its bytes, modeling the directories it creates.
 fn put_entry(state: &mut MemoryRepositoryState, put: &PutFile) -> Result<(), RedoApplyError> {
+    ensure_operable(state, &put.path)?;
     InMemoryStorage::ensure_ancestor_dirs(state, &put.path);
     state.entries.insert(
         put.path.clone(),
@@ -667,6 +696,7 @@ fn append_events(
     let (mut bytes, mode) = match state.entries.get(&path) {
         Some(RepositoryEntry::File { content, mode }) => (content.bytes().to_vec(), *mode),
         None | Some(RepositoryEntry::Absent) => (Vec::new(), FileMode::Regular),
+        Some(RepositoryEntry::Directory { .. }) => return Err(is_a_directory(&path)),
         Some(_) => return Err(unaddressable(&path)),
     };
     // One resize covers both directions: it drops a longer log's tail, and it
@@ -694,6 +724,17 @@ fn unaddressable(path: &VirtualPath) -> RedoApplyError {
     RedoApplyError::Unaddressable {
         path: format!("{path:?}"),
     }
+}
+
+/// The refusal a directory occupying an operation's target raises, carrying the
+/// kind the filesystem raises for the same occupant, so a caller driving both
+/// backends reads one outcome.
+fn is_a_directory(path: &VirtualPath) -> RedoApplyError {
+    std::io::Error::new(
+        std::io::ErrorKind::IsADirectory,
+        format!("{path:?} is a directory"),
+    )
+    .into()
 }
 
 impl Default for InMemoryStorage {
@@ -1640,7 +1681,12 @@ mod record_tests {
         let outcome = uninterrupted().apply(&storage, &record);
 
         assert!(
-            matches!(outcome, Err(RedoApplyError::Unaddressable { .. })),
+            matches!(
+                outcome,
+                Err(RedoApplyError::Roots(RepositoryStateStoreError::UnsafeTarget(
+                    ref component
+                ))) if component == "issues"
+            ),
             "the put resolved through an ancestor that is not a directory"
         );
         assert!(
@@ -1650,6 +1696,122 @@ mod record_tests {
                 .contains_key(&data("issues/a.json")),
             "the refused put reached its path anyway"
         );
+    }
+
+    /// The file backend renames a put's bytes over its target, which fails on a
+    /// directory: the put that names one is refused where it stands, the puts
+    /// before it keep what they published, and the record stays installed for
+    /// the next application to meet the same refusal.
+    #[test]
+    fn test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created() {
+        let storage = seeded(&[], false);
+        let record = RedoRecord {
+            puts: vec![
+                put(data("issues/a.json"), b"child"),
+                put(data("issues"), b"occupier"),
+            ],
+            ..RedoRecord::default()
+        };
+        storage.commit_record(&record).unwrap();
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(&outcome, Err(RedoApplyError::Io(error))
+                if error.kind() == std::io::ErrorKind::IsADirectory),
+            "the put replaced a directory the file backend refuses to rename over: {outcome:?}"
+        );
+        assert!(
+            matches!(
+                storage.repository_state().entries.get(&data("issues")),
+                Some(RepositoryEntry::Directory { .. })
+            ),
+            "the refused put overwrote the directory at its target"
+        );
+        assert_eq!(
+            file_bytes(&storage, &data("issues/a.json")).as_deref(),
+            Some(b"child".as_slice()),
+            "the refusal undid a put that had already landed"
+        );
+        assert_eq!(
+            semantic_state(&storage).2,
+            Some(record),
+            "the refused application cleared the record that still describes it"
+        );
+    }
+
+    /// The mirror case: an earlier put occupies the ancestor a later put needs,
+    /// so the walk to its parent refuses the same component the file backend
+    /// names.
+    #[test]
+    fn test_memory_redo_applier_apply_refuses_a_put_under_an_ancestor_an_earlier_put_occupied() {
+        let storage = seeded(&[], false);
+        let record = RedoRecord {
+            puts: vec![
+                put(data("issues"), b"occupier"),
+                put(data("issues/a.json"), b"child"),
+            ],
+            ..RedoRecord::default()
+        };
+        storage.commit_record(&record).unwrap();
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(
+                outcome,
+                Err(RedoApplyError::Roots(RepositoryStateStoreError::UnsafeTarget(
+                    ref component
+                ))) if component == "issues"
+            ),
+            "the put resolved through an ancestor an earlier put had occupied"
+        );
+        assert_eq!(
+            file_bytes(&storage, &data("issues")).as_deref(),
+            Some(b"occupier".as_slice()),
+            "the refusal undid the put that occupied the ancestor"
+        );
+        assert!(
+            !storage
+                .repository_state()
+                .entries
+                .contains_key(&data("issues/a.json")),
+            "the refused put reached its path anyway"
+        );
+        assert_eq!(semantic_state(&storage).2, Some(record));
+    }
+
+    /// A delete names a file to unlink, which fails on a directory: the record
+    /// survives rather than the backend silently orphaning the directory's
+    /// children.
+    #[test]
+    fn test_memory_redo_applier_apply_refuses_a_delete_of_a_directory() {
+        let storage = seeded(&[data("issues/2026/a.json")], false);
+        let record = RedoRecord {
+            deletes: vec![data("issues/2026")],
+            ..RedoRecord::default()
+        };
+        storage.commit_record(&record).unwrap();
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(&outcome, Err(RedoApplyError::Io(error))
+                if error.kind() == std::io::ErrorKind::IsADirectory),
+            "the delete unlinked a directory the file backend refuses: {outcome:?}"
+        );
+        assert!(
+            matches!(
+                storage.repository_state().entries.get(&data("issues/2026")),
+                Some(RepositoryEntry::Directory { .. })
+            ),
+            "the refused delete removed the directory anyway"
+        );
+        assert!(
+            file_bytes(&storage, &data("issues/2026/a.json")).is_some(),
+            "the refused delete orphaned the directory's child"
+        );
+        assert_eq!(semantic_state(&storage).2, Some(record));
     }
 
     proptest! {
