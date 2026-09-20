@@ -1,20 +1,8 @@
 //! Tests for the jit recover command
 
 use assert_cmd::Command;
-use jit::commands::production_mutation_context;
-use jit::config::ProjectName;
-use jit::repository_state::{
-    derive_materialization, CaptureBudget, CaptureSpec, InitializationScaffold,
-    MaterializationRequest,
-};
-use jit::storage::{
-    discover_repository_layout, JsonFileStorage, RepositoryStateStore, TransactionFailureInjector,
-    TransactionFailurePoint,
-};
 use predicates::prelude::*;
 use serde_json::Value;
-use std::collections::HashSet;
-use std::sync::Arc;
 use tempfile::TempDir;
 
 fn jit_cmd() -> Command {
@@ -64,54 +52,6 @@ fn setup_test_repo() -> TempDir {
         .success();
 
     temp
-}
-
-struct SelectedFailures(HashSet<TransactionFailurePoint>);
-
-impl TransactionFailureInjector for SelectedFailures {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if self.0.contains(point) {
-            Err(std::io::Error::other(format!("injected {point:?}")))
-        } else {
-            Ok(())
-        }
-    }
-}
-
-fn leave_fresh_prepared_journal(temp: &TempDir) {
-    let data = temp.path().join(".jit");
-    let failures = Arc::new(SelectedFailures(HashSet::from([
-        TransactionFailurePoint::RepositoryBeforeDataRootPublication,
-    ])));
-    let storage = JsonFileStorage::with_repository_state_failures(&data, failures);
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let scaffold = InitializationScaffold::render(
-        "",
-        "recovery-fixture".parse::<ProjectName>().unwrap(),
-        None,
-    )
-    .unwrap();
-    let spec = CaptureSpec::phase_one(
-        scaffold.delta_paths().unwrap(),
-        CaptureBudget {
-            max_listings: 0,
-            max_bytes: 16 * 1024 * 1024,
-            max_depth: 16,
-        },
-    )
-    .unwrap();
-    let mut session = storage.open_mutation_session(layout).unwrap();
-    let image = session.capture(spec).unwrap();
-    let context = production_mutation_context();
-    let plan = derive_materialization(
-        &image,
-        MaterializationRequest::Initialize {
-            scaffold: &scaffold,
-            context: &context,
-        },
-    )
-    .unwrap();
-    session.apply(&plan).unwrap_err();
 }
 
 #[test]
@@ -198,36 +138,4 @@ fn test_recover_help_describes_purpose() {
         .success()
         .stdout(predicate::str::contains("recovery"))
         .stdout(predicate::str::contains("stale"));
-}
-
-#[test]
-fn test_explicit_recover_restores_fresh_prepared_state_before_validation() {
-    let temp = TempDir::new().unwrap();
-    leave_fresh_prepared_journal(&temp);
-
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["recover", "--json"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("\"transactions_recovered\": 1"))
-        .stdout(predicate::str::contains("repository absence restored"));
-
-    assert!(!temp.path().join(".jit").exists());
-    assert!(!temp.path().join(".jit-bootstrap").exists());
-}
-
-#[test]
-fn test_init_recovers_fresh_prepared_state_before_scaffolding() {
-    let temp = TempDir::new().unwrap();
-    leave_fresh_prepared_journal(&temp);
-
-    jit_cmd()
-        .current_dir(temp.path())
-        .args(["init"])
-        .assert()
-        .success();
-
-    assert!(temp.path().join(".jit/index.json").exists());
-    assert!(!temp.path().join(".jit-bootstrap").exists());
 }

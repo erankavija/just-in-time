@@ -1,35 +1,20 @@
-//! Regression coverage for the durability of an automated gate evaluation
-//! (`jit:7ca9a0dd`). The test mixes in-process injection with a subprocess
-//! assertion because the command subprocess exposes no failure injector, so
-//! the failure is injected in process and the recovered repository is then
-//! inspected from a separate process at the boundary an adopter uses.
+//! Durability of an automated gate evaluation (`jit:7ca9a0dd`): the gate run's
+//! evidence and the issue's recorded verdict are one durable change, read back
+//! from a separate process at the boundary an adopter uses.
+//!
+//! What an interrupted publication leaves behind, and what applying the
+//! leftover work converges on, is the publication mechanism's own behaviour,
+//! proven once against it in `storage::redo_conformance`
+//! (`@/inv/orthogonal-tests`).
 
 use jit::commands::CommandExecutor;
 use jit::declarations::{GateChecker, GateMode, GateStage};
-use jit::domain::{GateStatus, Priority};
-use jit::storage::{
-    IssueStore, JsonFileStorage, RepositoryStateStore, TransactionFailureInjector,
-    TransactionFailurePoint,
-};
+use jit::domain::{GateRunStatus, GateStatus, Priority};
+use jit::storage::{IssueStore, JsonFileStorage};
 use std::process::Command;
-use std::sync::Arc;
-
-/// Fails the transaction kernel at the commit decision — the point where the
-/// coupled issue/gate-run/event plan has staged and mutated its targets but has
-/// not committed, so recovery must roll every part of it back together.
-struct FailAtCommitDecision;
-
-impl TransactionFailureInjector for FailAtCommitDecision {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &TransactionFailurePoint::RepositoryBeforeCommitDecision {
-            return Err(std::io::Error::other("injected gate persistence failure"));
-        }
-        Ok(())
-    }
-}
 
 #[test]
-fn test_check_gate_persistence_failure_leaves_no_durable_gate_evidence() {
+fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains() {
     let repo = tempfile::TempDir::new().expect("create temporary repository");
     let jit_dir = repo.path().join(".jit");
     let taxonomy = jit::test_taxonomy::test_taxonomy();
@@ -50,9 +35,6 @@ fn test_check_gate_persistence_failure_leaves_no_durable_gate_evidence() {
     executor
         .initialize_fresh_repository(repo.path(), None)
         .expect("initialize fresh repository");
-    let layout = jit::storage::discover_repository_layout(repo.path(), jit_dir.as_path())
-        .expect("rediscover repository layout after initialization");
-
     executor
         .define_gate(
             "durability-check".to_string(),
@@ -91,65 +73,49 @@ fn test_check_gate_persistence_failure_leaves_no_durable_gate_evidence() {
         .add_gate(&issue_id, "durability-check".to_string())
         .expect("require the durability gate on the issue");
 
-    // REQ-01: an injected persistence failure makes check_gate return Err.
-    let injected =
-        JsonFileStorage::with_repository_state_failures(&jit_dir, Arc::new(FailAtCommitDecision));
-    let injected_executor = CommandExecutor::new(injected).with_layout(layout.clone());
-    let error = injected_executor
+    let evaluated = executor
         .check_gate(&issue_id, "durability-check")
-        .expect_err("an injected persistence failure must not be reported as a passing gate");
-    let error_text = format!("{error:#}");
-    assert!(
-        error_text.contains("injected gate persistence failure"),
-        "the surfaced error must be the injected persistence failure; error: {error_text}"
-    );
+        .expect("the automated gate evaluates");
+    assert_eq!(evaluated.status, GateRunStatus::Passed);
 
-    // REQ-02: recovery leaves the gate pending and records no failed run.
-    let recovered = JsonFileStorage::new(&jit_dir);
-    let recovered_layout = jit::storage::discover_repository_layout(repo.path(), recovered.root())
-        .expect("rediscover repository layout for recovery");
-    drop(
-        recovered
-            .open_mutation_session(recovered_layout)
-            .expect("recovery converges"),
-    );
-    let recovered_issue = recovered
+    // The evidence and the verdict are one change: a reader that opens the
+    // repository afresh finds the run beside the status it explains.
+    let durable = JsonFileStorage::new(&jit_dir);
+    let recorded = durable
         .load_issue(&issue_id)
-        .expect("load issue after persistence recovery");
-    let gate_status = recovered_issue
-        .gates_status
-        .get("durability-check")
-        .map(|state| state.status)
-        .expect("a required gate always carries a recorded status");
+        .expect("load the issue the evaluation changed");
     assert_eq!(
-        gate_status,
-        GateStatus::Pending,
-        "a failed persistence must leave no recorded gate verdict"
+        recorded.gates_status["durability-check"].status,
+        GateStatus::Passed,
+        "the evaluation's verdict must be durable on the issue"
     );
-    let gate_runs = recovered
+    let runs = durable
         .list_gate_runs_for_issue(&issue_id)
-        .expect("list gate runs after persistence recovery");
-    assert!(
-        gate_runs.is_empty(),
-        "a failed persistence must leave no gate-run record; runs: {gate_runs:?}"
+        .expect("list the gate runs the evaluation recorded");
+    assert_eq!(
+        runs.iter()
+            .filter(|run| run.gate_key == "durability-check")
+            .map(|run| run.status)
+            .collect::<Vec<_>>(),
+        vec![GateRunStatus::Passed],
+        "the verdict recorded on the issue must be explained by exactly one durable run; \
+         runs: {runs:?}"
     );
 
-    // REQ-03: a separate process reading the same repository reports that same
-    // gate status. `gate status-all` is the CLI's gate-readiness report, and it
-    // refuses to call an unpassed gate ready by exiting ValidationFailed.
+    // A separate process reading the same repository reports that same pair.
+    // `gate status-all` is the CLI's gate-readiness report; what its exit status
+    // says about readiness is its own suite's property.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(repo.path())
         .args(["gate", "status-all", &issue_id, "--json"])
         .output()
         .expect("spawn the jit gate readiness subprocess");
-    assert_eq!(
-        output.status.code(),
-        Some(jit::output::ExitCode::ValidationFailed.code()),
-        "a separate process must not report the unpassed gate as ready; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("parse the gate readiness report");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "the readiness report must be one JSON document ({error}); stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    });
     let reported = json["gates"]
         .as_array()
         .expect("the readiness report lists every required gate")
@@ -158,13 +124,15 @@ fn test_check_gate_persistence_failure_leaves_no_durable_gate_evidence() {
         .expect("the required gate appears in the readiness report");
     assert_eq!(
         reported["status"],
-        serde_json::to_value(GateStatus::Pending).expect("a gate status serializes"),
-        "the separate process must report the same non-passed status; report: {json}"
+        serde_json::to_value(GateStatus::Passed).expect("a gate status serializes"),
+        "the separate process must report the durable verdict; report: {json}"
     );
-    assert!(
+    assert_eq!(
         json["results"]
             .as_array()
-            .is_some_and(|runs| runs.is_empty()),
-        "the separate process must find no gate-run evidence for the failed attempt; report: {json}"
+            .expect("the readiness report lists the runs it found")
+            .len(),
+        1,
+        "the separate process must find the run evidence for that verdict; report: {json}"
     );
 }
