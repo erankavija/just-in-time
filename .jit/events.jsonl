@@ -14985,3 +14985,10 @@
 {"from":"in_progress","id":"173e4394-1dfa-4c04-9e09-31f3f94b6513","issue_id":"4e818d10-4433-4610-a525-29817677f87c","timestamp":"2026-09-20T17:22:05.213995425Z","to":"done","type":"issue_state_changed"}
 {"id":"7729f0db-082c-4558-a602-654cc979e017","issue_id":"4e818d10-4433-4610-a525-29817677f87c","timestamp":"2026-09-20T17:22:05.213995425Z","type":"issue_completed"}
 {"from":"backlog","id":"bd7e3f92-fbe4-40d7-83af-12e858558940","issue_id":"d591a1c8-eca2-4547-9989-ed4b972a2d37","timestamp":"2026-09-20T17:22:05.479957739Z","to":"ready","type":"issue_state_changed"}
+{"id":"fb1b9a67-97c7-4f24-8dd3-1b32780fc070","issue_id":"8559f529-dec6-40fd-befe-91d48d00d4ac","priority":"high","timestamp":"2026-09-20T17:23:01.121509697Z","title":"A record rejects an overlapping operation set","type":"issue_created"}
+{"fields":["dependencies"],"id":"0c869bb8-0d18-4fac-ad5b-14ce2744d93e","issue_id":"8559f529-dec6-40fd-befe-91d48d00d4ac","timestamp":"2026-09-20T17:23:07.787379920Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"386f7bfc-4c88-474b-b92f-c86933f5ea67","issue_id":"d591a1c8-eca2-4547-9989-ed4b972a2d37","timestamp":"2026-09-20T17:23:08.130521703Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"fa06eb0b-cbdc-4fa6-ae02-277cf77ebbfb","issue_id":"d591a1c8-eca2-4547-9989-ed4b972a2d37","timestamp":"2026-09-20T17:23:08.130521703Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["documents"],"id":"b743db53-b233-44aa-9876-5cd033ec2a3b","issue_id":"8559f529-dec6-40fd-befe-91d48d00d4ac","timestamp":"2026-09-20T17:23:25.623579116Z","type":"issue_updated","updated_by":"doc-add"}
+{"from":"ready","id":"d6b15c12-eb2b-43b5-99f6-a3d87c7c9a44","issue_id":"8559f529-dec6-40fd-befe-91d48d00d4ac","timestamp":"2026-09-20T17:23:26.003849531Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"8ee26ae6-0511-4efa-a8f8-67ab18bd3983","issue_id":"8559f529-dec6-40fd-befe-91d48d00d4ac","timestamp":"2026-09-20T17:23:26.003849531Z","type":"issue_claimed"}

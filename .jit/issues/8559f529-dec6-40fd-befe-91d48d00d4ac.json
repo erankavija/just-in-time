@@ -1,0 +1,72 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-20T17:23:26.003849531Z",
+  "context": {},
+  "created_at": "2026-09-20T17:23:01.121509697Z",
+  "dependencies": [
+    "835bae3f-ae91-4edf-90b5-455284a06c28"
+  ],
+  "description": "A redo record rejects an operation set whose paths overlap, so one record cannot mean two things.\n\n## Background\n\nA record is applied by two mechanisms, and both must read it the same way. `4e818d10`'s code review found a record they read differently: puts at `issues/a.json` and `issues` made the in-memory backend overwrite the directory entry with a file while keeping its child, where the filesystem backend fails `EISDIR` on the rename. Both backends now refuse that record identically, discovered at apply time, because each discovers its occupants then.\n\nThe overlap itself is a property of the record alone. `835bae3f` REQ-02 already rejects a path outside the selected roots at construction; an operation set whose paths overlap is the same class of defect and is checkable in the same place, without a filesystem or a state map. Rejecting it at construction stops the divergent record existing rather than relying on two mechanisms to agree about it, and it lets `d591a1c8`'s conformance suite generate records freely instead of filtering the ones that cannot be applied.\n\nThe apply-time guards stay. They answer a different question: whether the live repository holds an occupant the record did not name. Construction-time validation answers whether the record contradicts itself.\n\n## Success Criteria\n\n- [hard] REQ-01: A record is rejected at construction when one operation's path is an ancestor of another operation's path.\n- [hard] REQ-02: A record is rejected at construction when two operations name the same path, including a put and a delete of it.\n- [hard] REQ-03: The event append participates in both checks, so a record appending to the event log while a put or delete names that log is rejected.\n- [hard] REQ-04: A record parsed from its serialized form is rejected on the same terms as one built in process, so a record that reaches a process through a file is subject to the check that built it.\n- [hard] REQ-05: The rejection names both paths that overlap and which relationship they hold, so a caller can tell an ancestor conflict from a duplicate.\n- [hard] REQ-06: The rejection is covered by unit tests over the record type, at the construction and parse boundaries, including a record whose paths merely share a prefix without one containing the other, which is admissible.\n\n## Non-goals\n\nThis does not relax either backend's apply-time refusal. `35544121` and `4e818d10` both discover live occupants as they apply and must keep doing so; a record can be internally consistent and still meet a directory the repository placed at its target. This task removes a contradiction inside the record, not a conflict with the repository.\n\nA symlink or other unsupported occupant at an operation's target remains a cross-backend difference — the filesystem backend reports `ELOOP` where the in-memory backend has no analogue to model, because it has no symlinks. That is a property of the live target rather than of the record, so construction-time validation cannot close it. It belongs to `d591a1c8`'s statement of what its conformance suite covers on each backend.\n\nNo publisher composes a record yet, so nothing in production constructs one to reject; story `21e976d1` REQ-03 holds unchanged.\n\n## Notes\n\nExpected footprint is roughly 30 production lines in `crates/jit/src/storage/redo_record.rs` plus its tests. The check belongs beside the root-class rejection `835bae3f` REQ-02 established, in the same constructor and the same parse path, rather than in a separate validator a caller could skip.\n\nRaised by `4e818d10`'s worker after it fixed the apply-time divergence, and routed here rather than folded into the closed `835bae3f`.\n",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-09-20T17:23:01.121509697Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "8559f529-dec6-40fd-befe-91d48d00d4ac",
+  "labels": [
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:redo-record-foundation",
+    "component:storage",
+    "per:@/charter/D-17",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "A record rejects an overlapping operation set",
+  "updated_at": "2026-09-20T17:23:26.003849531Z"
+}
