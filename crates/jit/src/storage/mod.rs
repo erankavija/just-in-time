@@ -106,7 +106,6 @@ pub use worktree_paths::WorktreePaths;
 
 pub use memory::MemoryRedoApplier;
 
-#[allow(unused_imports)] // Public API used only in tests, not in binary
 pub use memory::InMemoryStorage;
 
 /// Typed repository readers and session lifecycle controls.

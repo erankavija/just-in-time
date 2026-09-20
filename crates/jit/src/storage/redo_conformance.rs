@@ -6,12 +6,6 @@
 //! one injector per point that both backends are handed, because both step the
 //! same [`RedoPoint`] values in the same order. A backend's own suite states
 //! only what that backend adds (`@/inv/orthogonal-tests`).
-//!
-//! Its records address regular files. What an unsupported occupant waiting at a
-//! live target raises is a property of that target rather than of the record,
-//! and the backends necessarily differ on it — `ELOOP` on the filesystem against
-//! `Unaddressable` where there are no symlinks to model — so it stays with each
-//! backend.
 
 use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
 use crate::storage::memory::test_fixtures as memory_fixtures;
@@ -35,6 +29,12 @@ use tempfile::TempDir;
 /// The state a record is applied over: pre-existing targets its operations can
 /// collide with, and whether the event log carries residue beyond the offset the
 /// record captured.
+///
+/// Every occupant it seeds is a regular file. What an unsupported occupant
+/// waiting at a target raises is a property of that target rather than of the
+/// record, and the backends necessarily differ on it — `ELOOP` on the filesystem
+/// against `Unaddressable` where there are no symlinks to model — so it stays
+/// with each backend.
 #[derive(Debug, Clone, Default)]
 struct InitialState {
     occupied: Vec<VirtualPath>,
@@ -74,6 +74,14 @@ struct FileBackend {
     roots: CapabilityRoots,
 }
 
+impl FileBackend {
+    /// Where a commit leaves the record, so a caller can read it back or cut it
+    /// down to the residue an interrupted commit leaves.
+    fn record_path(&self) -> PathBuf {
+        self.worktree.path().join(record_relative_path())
+    }
+}
+
 impl RecordBackend for FileBackend {
     type Published = BTreeMap<PathBuf, (Vec<u8>, bool)>;
 
@@ -102,7 +110,7 @@ impl RecordBackend for FileBackend {
     }
 
     fn holds_record(&self) -> bool {
-        self.worktree.path().join(record_relative_path()).exists()
+        self.record_path().exists()
     }
 }
 
@@ -355,6 +363,43 @@ proptest! {
     // Each case applies the record once per point of its pass, on both backends,
     // each application over its own repository, so the case count stays low.
     #![proptest_config(ProptestConfig::with_cases(24))]
+
+    /// The record's commit is the mutation's commit point, so an interruption
+    /// anywhere inside it leaves the repository the mutation started from: the
+    /// mutation is lost whole rather than in part.
+    ///
+    /// The commit writes the record's bytes at their final path, so a crash
+    /// leaves any proper prefix of them; the commit runs here and its output is
+    /// then cut back to that prefix, which is the same live state, because what
+    /// the commit does after a given byte writes no content anywhere else. That
+    /// a cut-back residue is no record a later session carries forward is
+    /// [`RedoRecord::parse`]'s property, proven over the same prefixes in
+    /// `redo_record`.
+    ///
+    /// The in-memory commit installs the record in one assignment and has no
+    /// interior to interrupt, so this window is the filesystem backend's alone.
+    #[test]
+    fn prop_an_interruption_during_the_records_commit_leaves_the_complete_old_state(
+        record in arbitrary_record(),
+        initial in arbitrary_initial_state(),
+    ) {
+        let backend = FileBackend::seeded(&initial);
+        let old = backend.published();
+
+        backend.commit(&record);
+
+        let complete = std::fs::read(backend.record_path()).unwrap();
+        for written in 0..complete.len() {
+            std::fs::write(backend.record_path(), &complete[..written]).unwrap();
+            prop_assert_eq!(
+                backend.published(),
+                old.clone(),
+                "a commit interrupted after {} of {} bytes reached the repository",
+                written,
+                complete.len()
+            );
+        }
+    }
 
     /// The mutation is lost whole rather than in part while the pass has written
     /// nothing: durability of the record publishes no entry of its own, and the
