@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-20T20:54:41.840239056Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
@@ -62,7 +62,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T21:47:48.989088276Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "08b8c0ef-d55d-479b-bcaf-d649a8c3a193",
   "labels": [
     "type:task",
@@ -79,5 +85,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Data-root ignore file as a derived materialization",
-  "updated_at": "2026-09-20T20:54:41.840239056Z"
+  "updated_at": "2026-09-20T21:47:48.989088276Z"
 }
