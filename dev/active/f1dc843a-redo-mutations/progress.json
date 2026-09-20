@@ -983,5 +983,72 @@
       "reason": "Invoker supplied guidance under escalation-policy entry 5 (ESC-06); the policy states guidance resets the counter.",
       "session": 2
     }
-  ]
+  ],
+  "checkpoint_reconciliation": {
+    "container": "21e976d1 (Redo record foundation, wave 6)",
+    "performed": "session 2, before the checkpoint gate, per lead-review-protocol 'Before a container's final gate'",
+    "method": "Re-read every [hard] criterion of 21e976d1, then every surfaced_pitfalls entry, asking whether any criterion NAMES the pitfall's subject. A pitfall whose subject a criterion names is a criterion violation, not a follow-up.",
+    "criteria_vs_pitfalls": [
+      {
+        "pitfall": "SP-01",
+        "subject": "dangling path citations in the epic's planning documents",
+        "verdict": "not a 21e976d1 criterion. Its criterion_subjects is epic REQ-07; owner is 8b6a9e34 (wave 22)."
+      },
+      {
+        "pitfall": "SP-02",
+        "subject": "capture byte budgets capping the event log",
+        "verdict": "not a 21e976d1 criterion. (a) closed by 19e7298a; (b) closed by ESC-05's amendment of c88822a5."
+      },
+      {
+        "pitfall": "SP-03",
+        "subject": "document.rs 64 MiB ceiling",
+        "verdict": "closed by 48e4f65c."
+      },
+      {
+        "pitfall": "SP-04",
+        "subject": "six listing-expanding capture budgets",
+        "verdict": "not a 21e976d1 criterion; epic-level, unscheduled, surfaces in the completion report."
+      },
+      {
+        "pitfall": "SP-05",
+        "subject": "epic REQ-02 unreachable",
+        "verdict": "closed by ESC-05."
+      },
+      {
+        "pitfall": "SP-06",
+        "subject": "stale #[allow(unused_imports)] on the memory re-export line",
+        "verdict": "NEEDS ACTION BEFORE THE GATE. REQ-04 reads 'builds warning-free with the mechanism uncalled, through the storage layer's declared visibility rather than through a dead-code allowance'. The MECHANISM carries no allowance — MemoryRedoApplier was split onto its own unguarded line at 0612382b4 precisely for this. So REQ-04 is satisfied on a strict reading. But the allowance sits in storage/mod.rs, the same file, and a reviewer checking REQ-04 will grep that file and find it. The worker proved removing it leaves clippy --workspace --all-targets clean. Cheaper to remove it than to argue the distinction at the gate."
+      },
+      {
+        "pitfall": "SP-07",
+        "subject": "ELOOP vs Unaddressable backend divergence",
+        "verdict": "not a violation; scoped as required. d591a1c8's module doc states what the suite covers and where the backends necessarily differ, rather than claiming an identical matrix."
+      }
+    ],
+    "evidence_requirements": [
+      {
+        "id": "ER-02",
+        "verdict": "SATISFIED. Both per-backend crash-matrix proptests deleted as subsumed, with per-proptest reasoning, and their fixtures moved into shared test_fixtures modules. One suite proves the matrix (REQ-02)."
+      },
+      {
+        "id": "ER-01",
+        "verdict": "not due until 722878d4 (wave 21); no action at this checkpoint."
+      }
+    ],
+    "open_before_gate": [
+      {
+        "item": "SP-06",
+        "action": "remove the stale allowance from storage/mod.rs"
+      },
+      {
+        "item": "REQ-05 module-doc length",
+        "detail": "redo_conformance.rs carries TWO module paragraphs: orientation, then the SP-07 divergence scoping. REQ-05 and @/inv/essential-code-prose both cap module orientation at one short paragraph. The second paragraph is a contract statement rather than orientation, and it exists because the lead required the suite to scope its coverage. Resolution: move it onto the item it describes rather than delete it, which satisfies REQ-05 literally and puts the contract on the right item. Lead-found, not reviewer-found.",
+        "action": "move the divergence paragraph onto the item it describes"
+      },
+      {
+        "item": "REQ-06 line ceiling",
+        "detail": "Total production lines added across the phase must be under 1,500; compute and record at the gate."
+      }
+    ]
+  }
 }
