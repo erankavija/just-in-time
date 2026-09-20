@@ -470,6 +470,47 @@ mod tests {
         );
     }
 
+    /// The record is the only replay source for a put that created its own
+    /// ancestors, so it outlives their publication: an interruption between the
+    /// two leaves the record for the next application to converge on.
+    #[test]
+    fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
+        let (worktree, roots) = repository();
+        let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
+        let record = RedoRecord {
+            puts: vec![put(nested, b"published")],
+            ..RedoRecord::default()
+        };
+        let committed = record.commit(&data_root(&worktree)).unwrap();
+        let published = data_root(&worktree).join("issues/2026/09/a.json");
+        // BeforeApply, BeforePut { index: 0 }, then the removal this stops at.
+        let before_removal = 2;
+
+        let outcome = RedoApplier::new(Arc::new(InterruptAt::check_number(before_removal)))
+            .apply(&roots, &record);
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
+            "the pass ran past the interruption before the record's removal"
+        );
+        assert!(
+            published.exists(),
+            "the put under fresh ancestors never reached its path"
+        );
+        assert!(
+            committed.exists(),
+            "the record was gone while the put it replays was still unfinished"
+        );
+
+        uninterrupted().apply(&roots, &record).unwrap();
+
+        assert_eq!(std::fs::read(&published).unwrap(), b"published");
+        assert!(
+            !committed.exists(),
+            "the replayed record survived its own application"
+        );
+    }
+
     #[test]
     fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
