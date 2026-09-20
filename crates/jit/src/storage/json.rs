@@ -119,11 +119,12 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
                             path.display()
                         );
                     }
-                    let mut file =
-                        super::file_transaction::open_regular_file_nofollow(&issue_dir, &leaf)
-                            .with_context(|| {
-                                format!("Failed to open issue record at {}", path.display())
-                            })?;
+                    let mut file = super::repository_state_store::open_regular_file_nofollow(
+                        &issue_dir, &leaf,
+                    )
+                    .with_context(|| {
+                        format!("Failed to open issue record at {}", path.display())
+                    })?;
                     let mut bytes = Vec::new();
                     file.read_to_end(&mut bytes).with_context(|| {
                         format!("Failed to read issue record at {}", path.display())
@@ -147,10 +148,11 @@ pub fn read_exact_store(data_root: &Path) -> Result<ExactStoreSnapshot> {
             )
         }
         Ok(_) => {
-            let mut file = super::file_transaction::open_regular_file_nofollow(&data, EVENTS_FILE)
-                .with_context(|| {
-                    format!("Failed to open event log at {}", events_path.display())
-                })?;
+            let mut file =
+                super::repository_state_store::open_regular_file_nofollow(&data, EVENTS_FILE)
+                    .with_context(|| {
+                        format!("Failed to open event log at {}", events_path.display())
+                    })?;
             let mut contents = String::new();
             file.read_to_string(&mut contents).with_context(|| {
                 format!("Failed to read event log at {}", events_path.display())
@@ -1007,7 +1009,7 @@ impl JsonFileStorage {
                 Ok(_) => {}
             }
             let mut file =
-                super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
+                super::repository_state_store::open_regular_file_nofollow(&run_dir, result_leaf)
                     .with_context(|| {
                         format!(
                             "Failed to open gate run result at {}",
@@ -1441,13 +1443,14 @@ impl IssueStore for JsonFileStorage {
             }
             Ok(_) => {}
         }
-        let mut file = super::file_transaction::open_regular_file_nofollow(&run_dir, result_leaf)
-            .with_context(|| {
-            format!(
-                "Failed to open gate run result at {}",
-                result_path.display()
-            )
-        })?;
+        let mut file =
+            super::repository_state_store::open_regular_file_nofollow(&run_dir, result_leaf)
+                .with_context(|| {
+                    format!(
+                        "Failed to open gate run result at {}",
+                        result_path.display()
+                    )
+                })?;
         let mut contents = Vec::new();
         file.read_to_end(&mut contents).with_context(|| {
             format!(
@@ -2084,9 +2087,11 @@ mod tests {
             b"outside-root",
             "the ambient path must demonstrate that the parent swap took effect"
         );
-        let mut held_file =
-            super::super::file_transaction::open_regular_file_nofollow(&run_handle, "result.json")
-                .unwrap();
+        let mut held_file = super::super::repository_state_store::open_regular_file_nofollow(
+            &run_handle,
+            "result.json",
+        )
+        .unwrap();
         let mut held_bytes = Vec::new();
         held_file.read_to_end(&mut held_bytes).unwrap();
         assert_eq!(held_bytes, b"inside");

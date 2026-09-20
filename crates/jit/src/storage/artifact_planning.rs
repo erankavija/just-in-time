@@ -13,10 +13,9 @@ use crate::domain::artifact_plan::{
     normalize_artifact_path, ArtifactPlanEntry, ArtifactVersion, PlanTarget,
 };
 use crate::repository_state::RootRelativePath;
-use crate::storage::file_transaction::open_regular_file_nofollow;
 use crate::storage::repository_state_store::{
     is_advisory_permission_denied, open_absolute_dir_nofollow, open_child_dir_nofollow,
-    RepositoryStateStoreError,
+    open_regular_file_nofollow, RepositoryStateStoreError,
 };
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
@@ -337,7 +336,7 @@ fn inspect_artifact_from_root(
     if metadata.is_file() {
         let mut file = match open_regular_file_nofollow(&parent, &leaf.to_string_lossy()) {
             Ok(file) => file,
-            Err(error) if permission_denied.skips(error.as_ref()) => {
+            Err(error) if permission_denied.skips(&error) => {
                 return Ok(ArtifactEvidence::Unsupported)
             }
             Err(error) => return Err(other(error)),
