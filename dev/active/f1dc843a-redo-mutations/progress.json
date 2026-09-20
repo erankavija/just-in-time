@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 4,
+  "current_wave": 4.5,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -86,7 +86,24 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework 1/2 dispatched (F1 backend divergence, F2 rustdoc)"
+          "status": "done"
+        }
+      ]
+    },
+    {
+      "wave_number": 4.5,
+      "note": "Inserted in session 2 rather than renumbering. Every later wave keeps its original number, because handoff.md and the escalation records cite waves 16, 21 and 22 by number and renumbering would make those citations silently wrong.",
+      "issues": [
+        {
+          "id": "8559f529-dec6-40fd-befe-91d48d00d4ac",
+          "short_id": "8559f529",
+          "title": "A record rejects an overlapping operation set",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "dispatched"
         }
       ]
     },
@@ -102,7 +119,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "blocked on 8559f529; must scope SP-07 in its coverage statement"
         }
       ]
     },
@@ -624,6 +641,19 @@
         "doc-review"
       ],
       "excluded_from_req06_subtotal": true
+    },
+    {
+      "short_id": "8559f529",
+      "title": "A record rejects an overlapping operation set",
+      "why": "4e818d10's code-review F1 found the two backends reading one record differently (puts at issues/a.json and issues). Both now refuse it identically at apply time, but the record stays constructible. Overlap is a property of the record alone, checkable where 835bae3f REQ-02 already rejects an out-of-root path. Wired ahead of d591a1c8 so its conformance suite generates records freely instead of filtering.",
+      "owner_decisions": "Lead-created autonomously: creating a task inside the epic is on the escalation policy's HANDLE AUTONOMOUSLY list. Routed here rather than folded into 835bae3f, which is closed.",
+      "status": "dispatched",
+      "gates": [
+        "cargo-ci",
+        "code-review"
+      ],
+      "excluded_from_req06_subtotal": false,
+      "subtotal_note": "This IS redo-record work, so it counts in the ER-01 subtotal normally, unlike the adjacent-defect tasks."
     }
   ],
   "escalations": [
@@ -761,6 +791,14 @@
       "detail": "storage/mod.rs carries `#[allow(unused_imports)] // Public API used only in tests, not in binary` over `pub use memory::InMemoryStorage`. The worker probed it at the lead's request: removing the allowance entirely leaves `cargo clippy --workspace --all-targets -- -D warnings` at exit 0 with no unused_imports diagnostic on any target, so whatever once made a pub re-export from a pub mod warn no longer does. The sibling `pub use redo_apply::{...}` already carries no allowance. The worker restored the line byte-for-byte and exported MemoryRedoApplier on its own unguarded line instead.",
       "disposition": "OPEN, deliberately not actioned. A one-line cleanup on a shipped export surface, outside this epic's subject. The worker declined to fold it in, correctly. Surfaces in the completion report for v1.0 triage.",
       "criterion_subjects": []
+    },
+    {
+      "id": "SP-07",
+      "found_during": "wave 4 (4e818d10 worker, disclosed)",
+      "subject": "A symlink at an operation's target diverges between the backends and cannot be closed by either",
+      "detail": "The filesystem applier reports ELOOP for a symlink or other unsupported occupant at a target; the in-memory backend has no symlinks and reports Unaddressable. The worker neither closed nor widened it, and disclosed it rather than leaving it to be found.",
+      "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it — its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
+      "criterion_subjects": []
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
@@ -883,7 +921,7 @@
       "what": "Cross-backend divergence on a constructible record; lead-verified claims that did hold.",
       "detail": "code-review F1 (blocking): a record putting issues/a.json then issues makes the memory put_entry overwrite the Directory entry with a File while keeping its child, where the filesystem applier fails on the nonempty-directory replacement and leaves its record. Memory reports success and clears the residue (memory.rs:608-610). 835bae3f REQ-02 rejects paths outside the roots at construction but nothing rejects an ancestor/descendant pair, so the record is constructible. F2 (advisory): MemoryRedoApplier::new rustdoc restates its one-field initializer (@/inv/essential-code-prose).",
       "lead_evidence": "Verified before dispatching rework: memory_file_object(path) is format!(\"memory-file:{path:?}\"), byte-identical to the inline form it replaced, so the kernel's entries are unchanged; and repository_state_store.rs never names MemoryRepositoryState.record — its only RedoRecord reference is faa668c9's ensure_write_set_unchanged, still with no production caller. So the worker's reachability audit holds and 21e976d1 REQ-03 is satisfied for this issue's work.",
-      "verdict": "FAIL - rework 1 of 2 dispatched; remedy is the reviewer's second option (memory applier rejects), construction-time validation surfaced separately rather than folded into closed 835bae3f"
+      "verdict": "RESOLVED. The worker measured RedoApplier's actual contract with three throwaway probes rather than assuming it, and matched all four rows: EISDIR for a put over a directory an earlier put created, UnsafeTarget(component) for the mirror order and for a non-directory ancestor, EISDIR for a delete of a directory. No rollback in any case — earlier operations stand and the record stays installed, which redo-only convergence requires. Two self-corrections fell out: memory walks ancestors outermost-first so UnsafeTarget names the same component, and the worker's earlier Unaddressable claim for a non-directory ancestor was the wrong error shape. F2's rustdoc deleted. Both gates green on the merged tree; code-review attribution covers 2c0d5d63b and 667460a66."
     }
   ],
   "standing_policies": [
