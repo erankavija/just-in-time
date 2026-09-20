@@ -9,7 +9,10 @@
 use crate::repository_state::{
     FileMode, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
 };
+use crate::storage::atomic_write::{sync_directory, write_file_synced};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 
 /// Scratch directory below the data root that holds the record.
 pub const RECORD_SCRATCH_DIR: &str = "tmp";
@@ -102,6 +105,32 @@ impl RedoRecord {
             bytes.extend_from_slice(&append.bytes);
         }
         Ok(bytes)
+    }
+
+    /// Write the record under `data_root`'s scratch directory, returning its
+    /// path once it is durable: the bytes are synced and the entry naming them
+    /// is fsynced. This is the mutation's commit point — the first live write
+    /// follows it, because a redo-only protocol has no way back once a live
+    /// file is replaced.
+    ///
+    /// The record is written in place rather than staged and renamed: an
+    /// interrupted write leaves a proper prefix of the serialized form, which
+    /// [`Self::parse`] rejects, so a later session skips the residue instead of
+    /// applying half a mutation. The scratch directory is created when absent,
+    /// with the mode every other data-root directory carries.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the record cannot be serialized, the scratch
+    /// directory cannot be created, or the write or either sync fails.
+    pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
+        let scratch = data_root.join(RECORD_SCRATCH_DIR);
+        std::fs::create_dir_all(&scratch)
+            .with_context(|| format!("creating {}", scratch.display()))?;
+        let path = scratch.join(RECORD_FILE_NAME);
+        write_file_synced(&path, &self.serialize()?)?;
+        sync_directory(&scratch)?;
+        Ok(path)
     }
 
     /// Parse a record from its serialized form.
@@ -384,6 +413,91 @@ mod tests {
             RedoRecord::parse(&bytes),
             Err(RedoRecordError::TrailingBytes(1))
         );
+    }
+
+    #[test]
+    fn test_commit_writes_a_record_a_later_session_parses() {
+        let data_root = tempfile::tempdir().unwrap();
+        let record = sample_record();
+
+        let path = record.commit(data_root.path()).unwrap();
+
+        assert_eq!(
+            path,
+            data_root
+                .path()
+                .join(RECORD_SCRATCH_DIR)
+                .join(RECORD_FILE_NAME)
+        );
+        assert_eq!(
+            RedoRecord::parse(&std::fs::read(&path).unwrap()).unwrap(),
+            record
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_commit_creates_an_absent_scratch_directory_with_the_data_root_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = tempfile::tempdir().unwrap();
+        let data_root = parent.path().join("data");
+        std::fs::create_dir(&data_root).unwrap();
+
+        let path = sample_record().commit(&data_root).unwrap();
+
+        let mode = |directory: &std::path::Path| {
+            std::fs::metadata(directory).unwrap().permissions().mode()
+        };
+        assert_eq!(
+            mode(path.parent().unwrap()),
+            mode(&data_root),
+            "the scratch directory does not carry the data root's mode"
+        );
+    }
+
+    #[test]
+    fn test_commit_writes_into_a_scratch_directory_that_already_exists() {
+        let data_root = tempfile::tempdir().unwrap();
+        let scratch = data_root.path().join(RECORD_SCRATCH_DIR);
+        std::fs::create_dir(&scratch).unwrap();
+
+        let path = sample_record().commit(data_root.path()).unwrap();
+
+        assert!(path.starts_with(&scratch));
+        assert!(RedoRecord::parse(&std::fs::read(&path).unwrap()).is_ok());
+    }
+
+    /// Linux-only: the kernel's refusal to fsync a character device is what
+    /// makes the sync observable at all.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_commit_fails_when_the_record_bytes_cannot_be_synced() {
+        let data_root = tempfile::tempdir().unwrap();
+        let scratch = data_root.path().join(RECORD_SCRATCH_DIR);
+        std::fs::create_dir(&scratch).unwrap();
+        // The record's path resolves to a device the kernel refuses to fsync,
+        // so a commit that reports success is a commit that never synced.
+        std::os::unix::fs::symlink("/dev/null", scratch.join(RECORD_FILE_NAME)).unwrap();
+
+        assert!(sample_record().commit(data_root.path()).is_err());
+    }
+
+    #[test]
+    fn test_commit_interrupted_partway_leaves_bytes_no_later_session_parses() {
+        let data_root = tempfile::tempdir().unwrap();
+        let path = sample_record().commit(data_root.path()).unwrap();
+        let complete = std::fs::read(&path).unwrap();
+
+        // The record is written in place, so every interruption of the write
+        // leaves a proper prefix of these bytes at the record's path.
+        (0..complete.len()).for_each(|length| {
+            std::fs::write(&path, &complete[..length]).unwrap();
+            assert!(
+                RedoRecord::parse(&std::fs::read(&path).unwrap()).is_err(),
+                "a {length}-byte residue of an interrupted write parsed as a record"
+            );
+        });
     }
 
     #[test]
