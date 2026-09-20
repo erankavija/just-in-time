@@ -582,6 +582,17 @@
       "criterion_subjects": [
         "REQ-07"
       ]
+    },
+    {
+      "id": "SP-02",
+      "found_during": "wave 1 (fe6fa7e5 worker flag, lead-verified)",
+      "subject": "Inconsistent capture byte budgets cap event-log size; jit claim acquire fails above 16 MiB",
+      "detail": "commands/claim.rs:191-194 sets CaptureBudget.max_bytes = 16 MiB on a CaptureSpec::phase_one that includes VirtualPath::EVENTS, so `jit claim acquire` errors ('captured 33519044 bytes but the maximum is 16777216') on the epic's own 10x benchmark fixture. commands/mod.rs:2186-2191 gives the issue-update path 64 MiB, which is why the label-update scenarios still run. No task in the breakdown names either constant. c88822a5 REQ-03 keeps the event log in the single-pass base specification and REQ-06 keeps capture budget-bounded, so the ceiling survives the retirement phase unless a task takes it.",
+      "disposition": "OPEN - a criterion names this subject (epic REQ-02: a ten-times event log). Not a follow-up. Decide an owner no later than wave 16 (c88822a5 single-pass-capture); create a remediation task inside the epic if no existing task covers it. Re-check before wave 21 (722878d4 publication cost evidence), which must produce REQ-02's evidence on that fixture.",
+      "criterion_subjects": [
+        "REQ-02",
+        "REQ-05"
+      ]
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00"
