@@ -1,0 +1,70 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-20T10:38:07.547698813Z",
+  "context": {},
+  "created_at": "2026-09-20T10:37:39.444683398Z",
+  "dependencies": [
+    "19e7298a-59a1-40a2-a9d7-7a63bbcfed02"
+  ],
+  "description": "The document commands stop capping the event log they capture, closing the class `19e7298a` opened.\n\n## Background\n\n`DOCUMENT_CAPTURE_BUDGET` (`crates/jit/src/commands/document.rs:5-10`) sets `max_bytes` to 64 MiB with `max_listings: 0`, and the document mutation specs declare `VirtualPath::EVENTS` (`document.rs:295`, `:375`, `:957`). A repository whose event log exceeds 64 MiB therefore cannot link a document, for the same reason `jit claim acquire` could not claim an issue above 16 MiB.\n\n`19e7298a` closed that for the claim and issue-update paths by giving both one `issue_mutation_capture_budget()` (`crates/jit/src/commands/mod.rs:155`), whose `max_bytes` is unbounded with prose stating why: a capture grows on its own only by expanding a listing, a declared path is not growth (`crates/jit/src/repository_state/image.rs:586-604`), and the payload that grows is the event log, whose size is the project's own history. `profile.rs`'s `record_capture_budget` (`:2410`) is the older precedent for the same shape.\n\n`commands/config.rs:304` and `commands/init.rs:350` carry hand-picked ceilings too, but declare no event-log path, so neither is exposed to log growth.\n\n## Success Criteria\n\n- [hard] REQ-01: A document command succeeds on a repository whose event log exceeds 64 MiB.\n- [hard] REQ-02: No capture budget that declares the event log states a byte ceiling the call site cannot derive.\n- [hard] REQ-03: The document commands' observable behaviour is otherwise unchanged.\n- [hard] REQ-04: A test exercises a document command against an event log larger than the previous ceiling and fails if that ceiling returns.\n\n## Notes\n\nNot redo-record work; excluded from the redo-record subtotal of the epic's REQ-06 line balance (`ER-01`). Converge on the existing shape rather than introducing a third form (`@/inv/convention-convergence`).",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan (f1dc843a)",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-09-20T10:37:39.444683398Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "48e4f65c-e73a-4fff-b2e9-771be7d3fb3a",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Document commands stop capping the event log",
+  "updated_at": "2026-09-20T10:38:07.945465860Z"
+}

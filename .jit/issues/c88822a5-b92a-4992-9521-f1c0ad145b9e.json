@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
+    "7226f00b-acc0-4dcd-bd85-fab6cce24b65",
     "fbd6c859-e911-4266-8e2d-e3428f331ada"
   ],
   "description": "A mutation reads the repository once instead of in three gated rounds, and the phase-to-phase coherence check goes with the phasing.\n\n## Background\n\nA changing mutation performs six capture rounds: two in a preflight session, three in the attempt session, and one at apply. The attempt rounds are an ad-hoc protocol in the command layer: a registry-only round, a round adding the event log and every indexed issue file, and a third re-reading all of it plus per-profile records, working-tree document paths, precheck prompts, and gate-run paths. An overlap-stability check gates each round against the one before it.\n\nWith publication comparing only the files it writes, the phasing has nothing left to certify. A mutation reads its base set in one pass, and a caller's named paths and listings join that same round. The apply-time round is already gone, and the preflight collapses to one round.\n\nThe first cut keeps reading every indexed issue, because dependency-graph derivation and hierarchy validation need the full issue set to detect cycles and transitive redundancy. That cost scales with issue count, which is what the latency target requires.\n\n## Success Criteria\n\n- [hard] REQ-01: A changing mutation performs one capture round in its attempt and one in its preflight, with no round gated by an overlap-stability check.\n- [hard] REQ-02: No phase-one capture specification, phase-three specification, or overlap-stability check survives in the workspace.\n- [hard] REQ-03: The capture's base specification reads the registries, the index, the event log, the indexed issue files, and the plan documents a transition rule consults; a caller's named paths and listings are added to that one round.\n- [hard] REQ-04: Gate-run result capture joins the same round, with its own further rounds gone.\n- [hard] REQ-05: A pure producer reading a path the capture did not discover still fails typed.\n- [hard] REQ-06: Capture remains budget-bounded, with no whole-worktree recursion.\n- [hard] REQ-07: The change removes more lines than it adds.\n\n## Notes\n\nThe phase-two closure-change retry test loses its referent and goes with the phasing; the property that a changed closure discards and recaptures survives as a single-pass recapture.\n",
@@ -27,5 +28,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T10:38:06.736399861Z"
 }

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b714619d613fe7dcf1f69c6eacd76a4a9faa71e5",
+  "completed_at": "2026-09-20T10:37:18.475589546Z",
+  "duration_ms": 306370,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_apply.rs",
+        "id": "F1",
+        "line": 85,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it."
+      }
+    ],
+    "summary": "The redo application path does not satisfy the backend-held interruption-injector requirement.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "35544121-9268-4068-8248-98e9d2df16f5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9546b81c-2b18-4ddc-8972-5f4203d93126",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T10:32:12.105548126Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4248 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0be5f-a1a2-7b30-a79c-d7f0b0c4982a\n--------\nuser\n--- 4235 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: feb335189, d027716ba, 8833caaeb, 970e52b63, 5e25cb205, b714619d6 (jit:35544121)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T10:30:32Z)\nTruncation recovery: narrowed the truncated storage interruption/caller search to FileTransactionKernel, transaction_recovery, and redo_apply callers\n\n1. [blocking][issue-impact] REQ-05 requires the backend to hold its interruption injector, matching the storage layer’s established kernel pattern. `apply_record` instead receives `&dyn RedoInterruptionInjector` per call, and no redo-application backend stores it; callers can therefore vary injection across applications rather than the backend owning its interruption boundary. [crates/jit/src/storage/redo_apply.rs:85] (`@/charter/D-17`)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The redo application path does not satisfy the backend-held interruption-injector requirement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it.\",\"file\":\"crates/jit/src/storage/redo_apply.rs\",\"line\":85,\"references\":[\"@/charter/D-17\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

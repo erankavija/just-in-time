@@ -596,11 +596,32 @@
       "short_id": "2d4fda72",
       "title": "Documentation assertions leave the Rust suite",
       "why": "PF-01 root cause: Rust tests assert prose in AGENTS.md and contrib/gates/*.md, duplicating docs-mechanical's M3 citations checker, and a prose-only commit is gated by neither. User directed the correction now, inside the epic.",
-      "status": "rework-1 (code-review: essential-code-prose verbosity)",
+      "status": "done",
       "gates": [
         "cargo-ci",
         "code-review",
         "docs-mechanical"
+      ],
+      "excluded_from_req06_subtotal": true
+    },
+    {
+      "short_id": "48e4f65c",
+      "title": "Document commands stop capping the event log",
+      "why": "SP-03: document.rs 64 MiB ceiling declares VirtualPath::EVENTS; same class as 19e7298a. User directed fold-in.",
+      "status": "dispatched",
+      "gates": [
+        "cargo-ci",
+        "code-review"
+      ],
+      "excluded_from_req06_subtotal": true
+    },
+    {
+      "short_id": "7226f00b",
+      "title": "Whole-log read cost and the single-pass capture specification",
+      "why": "SP-02(b): epic REQ-02 may be unreachable while c88822a5 REQ-03 keeps the whole event log in the capture base spec. User directed investigating now rather than discovering it at wave 16 or 21. Wired as a hard blocker on c88822a5.",
+      "status": "dispatched",
+      "gates": [
+        "doc-review"
       ],
       "excluded_from_req06_subtotal": true
     }
@@ -724,6 +745,26 @@
       "why_accepted": "Those survivors assert on markdown the CODE GENERATES into temp fixture repositories, testing the renderer or the profile applier. The deleted tests read the repository's OWN authored policy files through a repo_file() helper resolving CARGO_MANIFEST_DIR/../.. and asserted hand-authored prose as a contract. Different kind. The code-review gate, the designated judge of this issue's criteria, read REQ-01 in that narrower sense and recorded 'All six hard success criteria are met'.",
       "lesson": "The criterion should have said 'asserts the authored textual content of a repository policy artifact'. Recorded so the completion report does not claim the absolute form.",
       "verdict": "accepted as intended, wording noted"
+    }
+  ],
+  "standing_policies": [
+    {
+      "id": "POL-01",
+      "decided_by": "user",
+      "wave": 3,
+      "policy": "When the lead surfaces a latent defect adjacent to the epic, it creates and dispatches a task inside the epic AUTONOMOUSLY when all hold: the defect is roughly one worker's work, it is of a class the epic already touches, it changes no shipped surface, and it is recorded and excluded from the REQ-06 redo-record subtotal (ER-01). Anything large, cross-cutting, or touching a shipped surface is escalated.",
+      "applied_to": [
+        "19e7298a",
+        "2d4fda72",
+        "48e4f65c"
+      ]
+    },
+    {
+      "id": "POL-02",
+      "decided_by": "user",
+      "wave": 3,
+      "policy": "Workers may sub-delegate to read-only exploration subagents; the user's four-concurrent-worker cap counts dispatched issue-workers, not read-only helpers. Exploration should use cheap model tiers.",
+      "note": "Lead will state the cheap-tier preference in dispatch prompts."
     }
   ]
 }
