@@ -416,10 +416,12 @@ pub fn render_data_root_ignore(existing: &[u8]) -> Result<Vec<u8>, super::Manage
 ///
 /// Keeping that directory out of version control is a correctness property: a
 /// committed commit point would be applied on a checkout that never performed
-/// the mutation, and a merge would collide over it. The target is derived, not
-/// declared: its path is the data root's own ignore file and its body is the
-/// scratch directory this engine reserves ([`RECORD_SCRATCH_DIR`]), so a
-/// repository that declares nothing still gets it.
+/// the mutation, and a merge would collide over it. The file is composed from
+/// what the repository itself states: its path is the data root the repository
+/// declared, its body is the scratch directory that data root reserves
+/// ([`RECORD_SCRATCH_DIR`]), and the lines it keeps are the ones the captured
+/// file already holds. Nothing here is a vocabulary a repository has to declare,
+/// so one that declares none still gets the file.
 ///
 /// The region composes through the ONE managed-document primitive, so every
 /// authored line outside the delimiters survives unconditionally and a boundary
