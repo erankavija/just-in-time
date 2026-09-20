@@ -576,15 +576,15 @@ impl MemoryRedoApplier {
         let mut state = storage.repository_state();
         let event_log = VirtualPath::EVENTS;
         record
-            .puts
+            .puts()
             .iter()
             .map(|put| &put.path)
-            .chain(record.deletes.iter())
-            .chain(record.event_append.iter().map(|_| &event_log))
+            .chain(record.deletes().iter())
+            .chain(record.event_append().iter().map(|_| &event_log))
             .try_for_each(|path| resolve(&state, path))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
         record
-            .puts
+            .puts()
             .iter()
             .enumerate()
             .try_for_each(|(index, put)| {
@@ -592,7 +592,7 @@ impl MemoryRedoApplier {
                 put_entry(&mut state, put)
             })?;
         record
-            .deletes
+            .deletes()
             .iter()
             .enumerate()
             .try_for_each(|(index, path)| {
@@ -601,7 +601,7 @@ impl MemoryRedoApplier {
                 state.entries.remove(path);
                 Ok::<(), RedoApplyError>(())
             })?;
-        if let Some(append) = &record.event_append {
+        if let Some(append) = record.event_append() {
             check_interruption(injector, RedoPoint::BeforeEventAppend)?;
             append_events(&mut state, append)?;
         }
@@ -1411,14 +1411,15 @@ mod record_tests {
     fn test_commit_record_installs_the_record_before_any_entry_changes() {
         let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
         let before = semantic_state(&storage).0;
-        let record = RedoRecord {
-            puts: vec![put(data("index.json"), b"published")],
-            deletes: vec![worktree("stale.md")],
-            event_append: Some(EventAppend {
+        let record = RedoRecord::new(
+            vec![put(data("index.json"), b"published")],
+            vec![worktree("stale.md")],
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
             }),
-        };
+        )
+        .unwrap();
 
         storage.commit_record(&record).unwrap();
 
@@ -1437,16 +1438,12 @@ mod record_tests {
     #[test]
     fn test_commit_record_refuses_a_record_a_previous_mutation_left_behind() {
         let storage = seeded(&[], false);
-        let leftover = RedoRecord {
-            puts: vec![put(data("index.json"), b"leftover")],
-            ..RedoRecord::default()
-        };
+        let leftover =
+            RedoRecord::new(vec![put(data("index.json"), b"leftover")], Vec::new(), None).unwrap();
         storage.commit_record(&leftover).unwrap();
 
-        let outcome = storage.commit_record(&RedoRecord {
-            deletes: vec![data("index.json")],
-            ..RedoRecord::default()
-        });
+        let outcome = storage
+            .commit_record(&RedoRecord::new(Vec::new(), vec![data("index.json")], None).unwrap());
 
         assert!(
             matches!(outcome, Err(RedoApplyError::OccupiedRecord)),
@@ -1459,14 +1456,15 @@ mod record_tests {
     fn test_memory_redo_applier_apply_publishes_every_operation_the_record_names() {
         let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
-        let record = RedoRecord {
-            puts: vec![put(data("index.json"), b"published")],
-            deletes: vec![worktree("stale.md")],
-            event_append: Some(EventAppend {
+        let record = RedoRecord::new(
+            vec![put(data("index.json"), b"published")],
+            vec![worktree("stale.md")],
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: appended.to_vec(),
             }),
-        };
+        )
+        .unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
 
@@ -1490,10 +1488,12 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_removes_the_record_it_applied() {
         let storage = seeded(&[], false);
-        let record = RedoRecord {
-            puts: vec![put(data("index.json"), b"published")],
-            ..RedoRecord::default()
-        };
+        let record = RedoRecord::new(
+            vec![put(data("index.json"), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         storage.commit_record(&record).unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
@@ -1509,10 +1509,8 @@ mod record_tests {
     fn test_memory_redo_applier_apply_creates_the_directories_a_put_needs() {
         let storage = seeded(&[], false);
         let nested = data("issues/2026/a.json");
-        let record = RedoRecord {
-            puts: vec![put(nested.clone(), b"published")],
-            ..RedoRecord::default()
-        };
+        let record =
+            RedoRecord::new(vec![put(nested.clone(), b"published")], Vec::new(), None).unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
 
@@ -1533,14 +1531,16 @@ mod record_tests {
     fn test_memory_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let storage = seeded(&[], false);
         let path = worktree("scripts/publish.sh");
-        let record = RedoRecord {
-            puts: vec![PutFile {
+        let record = RedoRecord::new(
+            vec![PutFile {
                 path: path.clone(),
                 bytes: b"#!/bin/sh\n".to_vec(),
                 mode: FileMode::Executable,
             }],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
 
@@ -1562,13 +1562,15 @@ mod record_tests {
         // truncates would leave its residue behind the appended bytes.
         let storage = seeded(&[], true);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
-        let record = RedoRecord {
-            event_append: Some(EventAppend {
+        let record = RedoRecord::new(
+            Vec::new(),
+            Vec::new(),
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: appended.to_vec(),
             }),
-            ..RedoRecord::default()
-        };
+        )
+        .unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
 
@@ -1581,17 +1583,18 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_checks_every_interruption_point_in_order() {
         let storage = seeded(&[], false);
-        let record = RedoRecord {
-            puts: vec![
+        let record = RedoRecord::new(
+            vec![
                 put(data("index.json"), b"published"),
                 put(worktree("notes.md"), b"published"),
             ],
-            deletes: vec![worktree("stale.md")],
-            event_append: Some(EventAppend {
+            vec![worktree("stale.md")],
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
             }),
-        };
+        )
+        .unwrap();
         let (recorded, applier) = recording_applier();
 
         applier.apply(&storage, &record).unwrap();
@@ -1616,14 +1619,13 @@ mod record_tests {
     fn test_memory_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let storage = seeded(&[], false);
         let (recorded, applier) = recording_applier();
-        let published = RedoRecord {
-            puts: vec![put(data("index.json"), b"published")],
-            ..RedoRecord::default()
-        };
-        let removed = RedoRecord {
-            deletes: vec![data("index.json")],
-            ..RedoRecord::default()
-        };
+        let published = RedoRecord::new(
+            vec![put(data("index.json"), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let removed = RedoRecord::new(Vec::new(), vec![data("index.json")], None).unwrap();
 
         applier.apply(&storage, &published).unwrap();
         let after_first = recorded.points();
@@ -1649,13 +1651,15 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent() {
         let storage = InMemoryStorage::new();
-        let record = RedoRecord {
-            puts: vec![
+        let record = RedoRecord::new(
+            vec![
                 put(worktree("notes.md"), b"published"),
                 put(data("index.json"), b"published"),
             ],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
 
@@ -1673,10 +1677,13 @@ mod record_tests {
     fn test_memory_redo_applier_apply_refuses_a_put_under_a_non_directory_ancestor() {
         let storage = seeded(&[], false);
         storage.add_data_file("issues", "an ordinary file where a directory is needed");
-        let record = RedoRecord {
-            puts: vec![put(data("issues/a.json"), b"published")],
-            ..RedoRecord::default()
-        };
+        let record = RedoRecord::new(
+            vec![put(data("issues/a.json"), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
 
@@ -1696,22 +1703,26 @@ mod record_tests {
                 .contains_key(&data("issues/a.json")),
             "the refused put reached its path anyway"
         );
+        assert_eq!(
+            semantic_state(&storage).2,
+            Some(record),
+            "the refused application cleared the record that still describes it"
+        );
     }
 
     /// The file backend renames a put's bytes over its target, which fails on a
-    /// directory: the put that names one is refused where it stands, the puts
-    /// before it keep what they published, and the record stays installed for
-    /// the next application to meet the same refusal.
+    /// directory: a directory the repository already held refuses the put and
+    /// the record stays installed for the next application to meet the same
+    /// refusal. Two of a record's own operations can no longer create this
+    /// conflict between themselves — one naming the other's path is rejected
+    /// at construction — so the occupying directory is seeded independently
+    /// of the record under test.
     #[test]
-    fn test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created() {
+    fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
-        let record = RedoRecord {
-            puts: vec![
-                put(data("issues/a.json"), b"child"),
-                put(data("issues"), b"occupier"),
-            ],
-            ..RedoRecord::default()
-        };
+        storage.add_data_file("issues/existing.json", "residual");
+        let record =
+            RedoRecord::new(vec![put(data("issues"), b"occupier")], Vec::new(), None).unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
@@ -1729,9 +1740,9 @@ mod record_tests {
             "the refused put overwrote the directory at its target"
         );
         assert_eq!(
-            file_bytes(&storage, &data("issues/a.json")).as_deref(),
-            Some(b"child".as_slice()),
-            "the refusal undid a put that had already landed"
+            file_bytes(&storage, &data("issues/existing.json")).as_deref(),
+            Some(b"residual".as_slice()),
+            "the refusal disturbed a file the record never named"
         );
         assert_eq!(
             semantic_state(&storage).2,
@@ -1740,45 +1751,44 @@ mod record_tests {
         );
     }
 
-    /// The mirror case: an earlier put occupies the ancestor a later put needs,
-    /// so the walk to its parent refuses the same component the file backend
-    /// names.
+    /// A refusal partway through a record's operations does not roll back the
+    /// operations that already landed: redo-only convergence replays a record
+    /// forward or not at all, never partially undoes it (`@/charter/D-17`).
+    /// The earlier put and the refusing put must not overlap — one naming the
+    /// other's path is rejected at construction — so the occupying directory
+    /// is seeded independently of the record, as in the test above.
     #[test]
-    fn test_memory_redo_applier_apply_refuses_a_put_under_an_ancestor_an_earlier_put_occupied() {
+    fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
         let storage = seeded(&[], false);
-        let record = RedoRecord {
-            puts: vec![
+        storage.add_data_file("issues/existing.json", "residual");
+        let record = RedoRecord::new(
+            vec![
+                put(data("index.json"), b"published"),
                 put(data("issues"), b"occupier"),
-                put(data("issues/a.json"), b"child"),
             ],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
 
         assert!(
-            matches!(
-                outcome,
-                Err(RedoApplyError::Roots(RepositoryStateStoreError::UnsafeTarget(
-                    ref component
-                ))) if component == "issues"
-            ),
-            "the put resolved through an ancestor an earlier put had occupied"
+            matches!(&outcome, Err(RedoApplyError::Io(error))
+                if error.kind() == std::io::ErrorKind::IsADirectory),
+            "the later put replaced a directory the file backend refuses to rename over: {outcome:?}"
         );
         assert_eq!(
-            file_bytes(&storage, &data("issues")).as_deref(),
-            Some(b"occupier".as_slice()),
-            "the refusal undid the put that occupied the ancestor"
+            file_bytes(&storage, &data("index.json")).as_deref(),
+            Some(b"published".as_slice()),
+            "the refusal rolled back a put that had already landed"
         );
-        assert!(
-            !storage
-                .repository_state()
-                .entries
-                .contains_key(&data("issues/a.json")),
-            "the refused put reached its path anyway"
+        assert_eq!(
+            semantic_state(&storage).2,
+            Some(record),
+            "the refused application cleared the record that still describes it"
         );
-        assert_eq!(semantic_state(&storage).2, Some(record));
     }
 
     /// A delete names a file to unlink, which fails on a directory: the record
@@ -1787,10 +1797,7 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_delete_of_a_directory() {
         let storage = seeded(&[data("issues/2026/a.json")], false);
-        let record = RedoRecord {
-            deletes: vec![data("issues/2026")],
-            ..RedoRecord::default()
-        };
+        let record = RedoRecord::new(Vec::new(), vec![data("issues/2026")], None).unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);

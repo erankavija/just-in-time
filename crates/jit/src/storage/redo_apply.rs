@@ -115,15 +115,15 @@ impl RedoApplier {
         let injector = &*self.injector;
         let event_log = VirtualPath::EVENTS;
         record
-            .puts
+            .puts()
             .iter()
             .map(|put| &put.path)
-            .chain(record.deletes.iter())
-            .chain(record.event_append.iter().map(|_| &event_log))
+            .chain(record.deletes().iter())
+            .chain(record.event_append().iter().map(|_| &event_log))
             .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
         record
-            .puts
+            .puts()
             .iter()
             .enumerate()
             .try_for_each(|(index, put)| {
@@ -131,14 +131,14 @@ impl RedoApplier {
                 put_file(roots, put)
             })?;
         record
-            .deletes
+            .deletes()
             .iter()
             .enumerate()
             .try_for_each(|(index, path)| {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
                 delete_file(roots, path)
             })?;
-        if let Some(append) = &record.event_append {
+        if let Some(append) = record.event_append() {
             check_interruption(injector, RedoPoint::BeforeEventAppend)?;
             append_events(roots, append)?;
         }
@@ -343,14 +343,45 @@ pub(crate) mod test_fixtures {
         }
     }
 
-    /// Paths a generated record and its pre-existing state draw from: two roots,
-    /// nested and unnested, so puts and deletes collide on the same targets.
+    /// Paths a generated record's operations and its pre-existing state draw
+    /// from: two roots, nested and unnested, so a put or delete can collide
+    /// with a pre-existing occupant at the same target. No entry is an
+    /// ancestor of another, so [`arbitrary_record`] can assign each one a
+    /// role independently and stay disjoint by construction.
+    fn path_vocabulary_paths() -> [VirtualPath; 4] {
+        [
+            VirtualPath::data("index.json").unwrap(),
+            VirtualPath::data("issues/2026/a.json").unwrap(),
+            VirtualPath::worktree("notes.md").unwrap(),
+            VirtualPath::worktree("dev/plan.md").unwrap(),
+        ]
+    }
+
+    /// A single path drawn from [`path_vocabulary_paths`], for pre-existing
+    /// state that may legitimately collide with a generated record's targets.
     pub(crate) fn path_vocabulary() -> impl Strategy<Value = VirtualPath> {
+        let [a, b, c, d] = path_vocabulary_paths();
+        prop_oneof![Just(a), Just(b), Just(c), Just(d)]
+    }
+
+    /// What a generated record does with one vocabulary path.
+    ///
+    /// Every path draws its role independently of every other path's, so a
+    /// path is never assigned to both a put and a delete: the record
+    /// `arbitrary_record` builds is disjoint by construction, with nothing to
+    /// filter or reject.
+    #[derive(Debug, Clone, Copy)]
+    enum GeneratedRole {
+        Unused,
+        Put,
+        Delete,
+    }
+
+    fn generated_role() -> impl Strategy<Value = GeneratedRole> {
         prop_oneof![
-            Just(VirtualPath::data("index.json").unwrap()),
-            Just(VirtualPath::data("issues/2026/a.json").unwrap()),
-            Just(VirtualPath::worktree("notes.md").unwrap()),
-            Just(VirtualPath::worktree("dev/plan.md").unwrap()),
+            Just(GeneratedRole::Unused),
+            Just(GeneratedRole::Put),
+            Just(GeneratedRole::Delete),
         ]
     }
 
@@ -358,25 +389,35 @@ pub(crate) mod test_fixtures {
         (
             prop::collection::vec(
                 (
-                    path_vocabulary(),
+                    generated_role(),
                     prop::collection::vec(any::<u8>(), 0..8),
                     prop_oneof![Just(FileMode::Regular), Just(FileMode::Executable)],
                 ),
-                0..4,
+                path_vocabulary_paths().len(),
             ),
-            prop::collection::vec(path_vocabulary(), 0..3),
             prop::option::of(prop::collection::vec(any::<u8>(), 0..8)),
         )
-            .prop_map(|(puts, deletes, appended)| RedoRecord {
-                puts: puts
-                    .into_iter()
-                    .map(|(path, bytes, mode)| PutFile { path, bytes, mode })
-                    .collect(),
-                deletes,
-                event_append: appended.map(|bytes| EventAppend {
-                    offset: CAPTURED_LOG.len() as u64,
-                    bytes,
-                }),
+            .prop_map(|(roles, appended)| {
+                let (puts, deletes) = path_vocabulary_paths().into_iter().zip(roles).fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut puts, mut deletes), (path, (role, bytes, mode))| {
+                        match role {
+                            GeneratedRole::Unused => {}
+                            GeneratedRole::Put => puts.push(PutFile { path, bytes, mode }),
+                            GeneratedRole::Delete => deletes.push(path),
+                        }
+                        (puts, deletes)
+                    },
+                );
+                RedoRecord::new(
+                    puts,
+                    deletes,
+                    appended.map(|bytes| EventAppend {
+                        offset: CAPTURED_LOG.len() as u64,
+                        bytes,
+                    }),
+                )
+                .expect("one role per vocabulary path cannot generate an overlap")
             })
     }
 }
@@ -472,14 +513,15 @@ mod tests {
         std::fs::write(data_root(&worktree).join("index.json"), b"captured").unwrap();
         std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord {
-            puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
-            deletes: vec![VirtualPath::worktree("stale.md").unwrap()],
-            event_append: Some(EventAppend {
+        let record = RedoRecord::new(
+            vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
+            vec![VirtualPath::worktree("stale.md").unwrap()],
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
             }),
-        };
+        )
+        .unwrap();
 
         uninterrupted().apply(&roots, &record).unwrap();
 
@@ -500,10 +542,12 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_removes_the_record_it_applied() {
         let (worktree, roots) = repository();
-        let record = RedoRecord {
-            puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
-            ..RedoRecord::default()
-        };
+        let record = RedoRecord::new(
+            vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         let committed = record.commit(&data_root(&worktree)).unwrap();
 
         uninterrupted().apply(&roots, &record).unwrap();
@@ -517,13 +561,15 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_creates_the_directories_a_put_needs() {
         let (worktree, roots) = repository();
-        let record = RedoRecord {
-            puts: vec![put(
+        let record = RedoRecord::new(
+            vec![put(
                 VirtualPath::data("issues/2026/a.json").unwrap(),
                 b"published",
             )],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         uninterrupted().apply(&roots, &record).unwrap();
 
@@ -540,10 +586,7 @@ mod tests {
     fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
         let (worktree, roots) = repository();
         let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
-        let record = RedoRecord {
-            puts: vec![put(nested, b"published")],
-            ..RedoRecord::default()
-        };
+        let record = RedoRecord::new(vec![put(nested, b"published")], Vec::new(), None).unwrap();
         let committed = record.commit(&data_root(&worktree)).unwrap();
         let published = data_root(&worktree).join("issues/2026/09/a.json");
         // BeforeApply, BeforePut { index: 0 }, then the removal this stops at.
@@ -577,14 +620,16 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
-        let record = RedoRecord {
-            puts: vec![PutFile {
+        let record = RedoRecord::new(
+            vec![PutFile {
                 path: VirtualPath::worktree("scripts/publish.sh").unwrap(),
                 bytes: b"#!/bin/sh\n".to_vec(),
                 mode: FileMode::Executable,
             }],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         uninterrupted().apply(&roots, &record).unwrap();
 
@@ -686,13 +731,15 @@ mod tests {
             [CAPTURED_LOG, &b"{\"tag\":\"residue\"}\n".repeat(3)].concat(),
         )
         .unwrap();
-        let record = RedoRecord {
-            event_append: Some(EventAppend {
+        let record = RedoRecord::new(
+            Vec::new(),
+            Vec::new(),
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: appended.to_vec(),
             }),
-            ..RedoRecord::default()
-        };
+        )
+        .unwrap();
 
         uninterrupted().apply(&roots, &record).unwrap();
 
@@ -708,14 +755,18 @@ mod tests {
     fn test_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let (_worktree, roots) = repository();
         let (recorded, applier) = recording_applier();
-        let published = RedoRecord {
-            puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
-            ..RedoRecord::default()
-        };
-        let removed = RedoRecord {
-            deletes: vec![VirtualPath::data("index.json").unwrap()],
-            ..RedoRecord::default()
-        };
+        let published = RedoRecord::new(
+            vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        let removed = RedoRecord::new(
+            Vec::new(),
+            vec![VirtualPath::data("index.json").unwrap()],
+            None,
+        )
+        .unwrap();
 
         applier.apply(&roots, &published).unwrap();
         let after_first = recorded.points();
@@ -740,17 +791,18 @@ mod tests {
     fn test_redo_applier_apply_checks_every_interruption_point_in_order() {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
-        let record = RedoRecord {
-            puts: vec![
+        let record = RedoRecord::new(
+            vec![
                 put(VirtualPath::data("index.json").unwrap(), b"published"),
                 put(VirtualPath::worktree("notes.md").unwrap(), b"published"),
             ],
-            deletes: vec![VirtualPath::worktree("stale.md").unwrap()],
-            event_append: Some(EventAppend {
+            vec![VirtualPath::worktree("stale.md").unwrap()],
+            Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
             }),
-        };
+        )
+        .unwrap();
         let (recorded, applier) = recording_applier();
 
         applier.apply(&roots, &record).unwrap();
@@ -775,16 +827,18 @@ mod tests {
         let (worktree, roots) = repository();
         let outside = TempDir::new().unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("escape")).unwrap();
-        let record = RedoRecord {
-            puts: vec![
+        let record = RedoRecord::new(
+            vec![
                 put(VirtualPath::data("inside.json").unwrap(), b"published"),
                 put(
                     VirtualPath::data("escape/captured.json").unwrap(),
                     b"published",
                 ),
             ],
-            ..RedoRecord::default()
-        };
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         assert!(uninterrupted().apply(&roots, &record).is_err());
 

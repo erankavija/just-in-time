@@ -881,18 +881,18 @@ pub fn ensure_write_set_unchanged(
     record: &RedoRecord,
 ) -> Result<(), RepositoryStateStoreError> {
     record
-        .puts
+        .puts()
         .iter()
         .map(|put| &put.path)
-        .chain(record.deletes.iter())
+        .chain(record.deletes().iter())
         .filter(|path| **path != VirtualPath::EVENTS)
         .try_for_each(|path| ensure_target_unchanged(roots, captured, path))?;
-    let touches_event_log = record.event_append.is_some()
+    let touches_event_log = record.event_append().is_some()
         || record
-            .puts
+            .puts()
             .iter()
             .any(|put| put.path == VirtualPath::EVENTS)
-        || record.deletes.contains(&VirtualPath::EVENTS);
+        || record.deletes().contains(&VirtualPath::EVENTS);
     if !touches_event_log {
         return Ok(());
     }
