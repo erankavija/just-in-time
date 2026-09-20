@@ -3,6 +3,7 @@ use crate::repository_state::{
     plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
     RepositorySeedKind,
 };
+use crate::storage::{EventAppend, PutFile};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::process::Command;
 use std::sync::Mutex;
@@ -5048,4 +5049,335 @@ fn test_json_capture_retains_only_pairs_used_by_the_most_recent_capture() {
         storage.pinned_target_cache_keys(),
         vec![(revision, "docs/b.md".to_string())]
     );
+}
+
+/// A repository the pre-commit conflict check reads: seeded data-root files,
+/// the capability roots over them, and the capture a mutation took of them.
+struct WriteSetFixture {
+    _worktree: TempDir,
+    data: PathBuf,
+    storage: JsonFileStorage,
+    layout: RepositoryLayout,
+    roots: CapabilityRoots,
+}
+
+impl WriteSetFixture {
+    fn new(files: &[(&str, &[u8])]) -> Self {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir_all(data.join("issues")).unwrap();
+        for (relative, bytes) in files {
+            std::fs::write(data.join(relative), bytes).unwrap();
+        }
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+        storage.configure_repository_layout(&layout);
+        let roots = CapabilityRoots::open(&layout).unwrap().0;
+        Self {
+            _worktree: worktree,
+            data,
+            storage,
+            layout,
+            roots,
+        }
+    }
+
+    /// The image a mutation reading `paths` captured.
+    fn capture(&self, paths: impl IntoIterator<Item = VirtualPath>) -> RepositoryImage {
+        let worktree_paths = self.storage.configured_worktree_paths().unwrap();
+        capture_capability_image(
+            &self.layout,
+            &self.roots,
+            &worktree_paths,
+            &self.storage,
+            CaptureSpec::phase_one(paths, budget()).unwrap(),
+        )
+        .unwrap()
+    }
+
+    /// Change a data-root file behind the mutation's back.
+    fn write(&self, relative: &str, bytes: &[u8]) {
+        std::fs::write(self.data.join(relative), bytes).unwrap();
+    }
+
+    fn check(
+        &self,
+        image: &RepositoryImage,
+        record: &RedoRecord,
+    ) -> Result<(), RepositoryStateStoreError> {
+        ensure_write_set_unchanged(&self.roots, image, record)
+    }
+}
+
+fn data_path(relative: &str) -> VirtualPath {
+    VirtualPath::data(relative).unwrap()
+}
+
+fn put_file(path: VirtualPath, bytes: &[u8]) -> PutFile {
+    PutFile {
+        path,
+        bytes: bytes.to_vec(),
+        mode: FileMode::Regular,
+    }
+}
+
+/// An append at `offset`, the log length the mutation read.
+fn event_append(offset: u64) -> Option<EventAppend> {
+    Some(EventAppend {
+        offset,
+        bytes: b"{\"tag\":\"issue_created\"}\n".to_vec(),
+    })
+}
+
+/// Whether `error` is the retryable conflict naming `path`.
+fn names_moved_path(error: &RepositoryStateStoreError, path: &VirtualPath) -> bool {
+    matches!(
+        error,
+        RepositoryStateStoreError::RetryableConflict { path: named }
+            if named.contains(path.relative().as_str())
+    )
+}
+
+fn seeded_log() -> &'static [u8] {
+    b"{\"tag\":\"issue_created\"}\n"
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
+    let fixture = WriteSetFixture::new(&[
+        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("events.jsonl", seeded_log()),
+    ]);
+    let written = data_path("issues/one.json");
+    let removed = data_path("issues/stale.json");
+    let image = fixture.capture([written.clone(), removed.clone(), VirtualPath::EVENTS]);
+
+    let record = RedoRecord {
+        puts: vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        deletes: vec![removed],
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    assert!(fixture.check(&image, &record).is_ok());
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
+    let fixture = WriteSetFixture::new(&[
+        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("events.jsonl", seeded_log()),
+    ]);
+    let written = data_path("issues/one.json");
+    let image = fixture.capture([written.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: vec![put_file(
+            written.clone(),
+            b"{\"id\":\"one\",\"state\":\"ready\"}",
+        )],
+        deletes: Vec::new(),
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    fixture.write("issues/one.json", b"{\"id\":\"one\",\"raced\":true}");
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &written),
+        "the conflict must name the write target that moved, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed() {
+    let fixture = WriteSetFixture::new(&[
+        ("issues/stale.json", b"{\"id\":\"stale\"}"),
+        ("events.jsonl", seeded_log()),
+    ]);
+    let removed = data_path("issues/stale.json");
+    let image = fixture.capture([removed.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: vec![removed.clone()],
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    fixture.write("issues/stale.json", b"{\"id\":\"stale\",\"raced\":true}");
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &removed),
+        "the conflict must name the delete target that moved, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed() {
+    let fixture = WriteSetFixture::new(&[
+        ("index.json", b"{\"issues\":[]}"),
+        ("issues/one.json", b"{\"id\":\"one\"}"),
+        ("events.jsonl", seeded_log()),
+    ]);
+    let read_only = data_path("index.json");
+    let written = data_path("issues/one.json");
+    let image = fixture.capture([read_only, written.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        deletes: Vec::new(),
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    fixture.write("index.json", b"{\"issues\":[\"raced\"]}");
+
+    assert!(
+        fixture.check(&image, &record).is_ok(),
+        "a file the mutation read but does not write stays out of the comparison"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still_absent() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let created = data_path("issues/new.json");
+    let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: vec![put_file(created, b"{\"id\":\"new\"}")],
+        deletes: Vec::new(),
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    assert!(fixture.check(&image, &record).is_ok());
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_occupied() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let created = data_path("issues/new.json");
+    let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
+        deletes: Vec::new(),
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    fixture.write("issues/new.json", b"{\"id\":\"new\",\"raced\":true}");
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &created),
+        "the conflict must name the occupied target, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_an_event_log_whose_length_changed() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: Vec::new(),
+        event_append: event_append(seeded_log().len() as u64),
+    };
+
+    let mut grown = seeded_log().to_vec();
+    grown.extend_from_slice(b"{\"tag\":\"issue_claimed\"}\n");
+    fixture.write("events.jsonl", &grown);
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &VirtualPath::EVENTS),
+        "the conflict must name the event log, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_an_event_log_shorter_than_the_tail_window_edited_in_place(
+) {
+    let log = seeded_log();
+    assert!((log.len() as u64) < EVENT_LOG_TAIL_WINDOW);
+    let fixture = WriteSetFixture::new(&[("events.jsonl", log)]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: Vec::new(),
+        event_append: event_append(log.len() as u64),
+    };
+
+    let mut edited = log.to_vec();
+    let last = edited.len() - 2;
+    edited[last] = b'X';
+    fixture.write("events.jsonl", &edited);
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &VirtualPath::EVENTS),
+        "an in-place tail edit of a short log must conflict, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_admits_an_empty_event_log_that_is_still_empty() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", b"")]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: Vec::new(),
+        event_append: event_append(0),
+    };
+
+    assert!(fixture.check(&image, &record).is_ok());
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_refuses_an_event_log_edited_inside_the_tail_window() {
+    let log = long_log();
+    let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: Vec::new(),
+        event_append: event_append(log.len() as u64),
+    };
+
+    let mut edited = log.clone();
+    let last = edited.len() - 2;
+    edited[last] = b'X';
+    fixture.write("events.jsonl", &edited);
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &VirtualPath::EVENTS),
+        "an edit inside the tail window must conflict, got {error:?}"
+    );
+}
+
+#[test]
+fn test_ensure_write_set_unchanged_admits_an_event_log_edited_before_the_tail_window() {
+    let log = long_log();
+    let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let record = RedoRecord {
+        puts: Vec::new(),
+        deletes: Vec::new(),
+        event_append: event_append(log.len() as u64),
+    };
+
+    let mut edited = log.clone();
+    edited[0] = b'X';
+    fixture.write("events.jsonl", &edited);
+
+    assert!(
+        fixture.check(&image, &record).is_ok(),
+        "the log is compared as its length and tail window, not byte for byte"
+    );
+}
+
+/// An event log longer than the tail window, so a prefix edit falls outside it.
+fn long_log() -> Vec<u8> {
+    let line = b"{\"tag\":\"issue_created\",\"id\":\"padding-padding-padding\"}\n";
+    line.iter()
+        .copied()
+        .cycle()
+        .take((EVENT_LOG_TAIL_WINDOW as usize) + line.len() * 2)
+        .collect()
 }
