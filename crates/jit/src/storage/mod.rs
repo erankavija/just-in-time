@@ -29,6 +29,7 @@ pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
+pub mod redo_apply;
 pub mod redo_record;
 pub mod reference;
 pub mod repo_lock;
@@ -68,6 +69,9 @@ pub use json::{
 };
 pub use lock::{configured_lock_timeout, is_lock_timeout, FileLocker, LockMode, LockTimeout};
 pub use path_errors::{validate_repo_relative_path, PathReadError};
+pub use redo_apply::{
+    apply_record, NoRedoInterruptions, RedoApplyError, RedoInterruptionInjector, RedoPoint,
+};
 pub use redo_record::{
     EventAppend, PutFile, RedoRecord, RedoRecordError, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };

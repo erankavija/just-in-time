@@ -227,7 +227,9 @@ pub struct CapabilityRoots {
 }
 
 impl CapabilityRoots {
-    fn open(layout: &RepositoryLayout) -> Result<(Self, Dir, String), RepositoryStateStoreError> {
+    pub(in crate::storage) fn open(
+        layout: &RepositoryLayout,
+    ) -> Result<(Self, Dir, String), RepositoryStateStoreError> {
         let worktree = open_absolute_dir_nofollow(layout.worktree_root())?;
         ensure_capability_identity(
             &worktree,
@@ -277,7 +279,7 @@ impl CapabilityRoots {
         Ok((Self { worktree, data }, data_parent, data_leaf))
     }
 
-    fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
+    pub(in crate::storage) fn root(&self, class: RepositoryRootClass) -> Option<&Dir> {
         match class {
             RepositoryRootClass::Worktree => Some(&self.worktree),
             RepositoryRootClass::Data => self.data.as_ref(),
@@ -1605,7 +1607,7 @@ fn capture_linked_evidence(
 /// `Ok(None)` means an ancestor directory does not exist, so the target captures
 /// as absence. A symlinked or non-directory ancestor stays a hard error: it is an
 /// unsafe target, not a clean absence.
-fn open_capability_parent(
+pub(in crate::storage) fn open_capability_parent(
     root: &Dir,
     path: &Path,
 ) -> Result<Option<(Dir, String)>, RepositoryStateStoreError> {
