@@ -14754,3 +14754,5 @@
 {"fields":["description"],"id":"7bae68f0-dcd2-4cc4-be48-3b1775113f3c","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-09-19T21:57:39.736514386Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["documents"],"id":"3f04fcd5-9c38-45a5-937d-056f1bc170ab","issue_id":"99a12b66-3895-46c2-91ab-4f29e41af65e","timestamp":"2026-09-19T22:16:15.530928099Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"adc7592b-2865-4eef-bf98-f3191df9e415","issue_id":"99a12b66-3895-46c2-91ab-4f29e41af65e","timestamp":"2026-09-19T22:16:15.634358001Z","type":"issue_updated","updated_by":"doc-add"}
+{"from":"ready","id":"d6022d79-dc0a-42e5-a8ba-12be0f4f8fad","issue_id":"99a12b66-3895-46c2-91ab-4f29e41af65e","timestamp":"2026-09-20T00:51:13.411780106Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"plan-review","id":"6d4330aa-0c36-4f09-a0cb-51b8719b4e11","issue_id":"99a12b66-3895-46c2-91ab-4f29e41af65e","timestamp":"2026-09-20T00:55:26.769643411Z","type":"gate_failed","updated_by":"auto:executor"}

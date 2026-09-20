@@ -1,0 +1,51 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "df1ed163a1155409336f30ed33fed59150f67e99",
+  "completed_at": "2026-09-20T00:55:26.502502081Z",
+  "duration_ms": 252680,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f1dc843a-redo-mutations/breakdown.json",
+        "id": "F1",
+        "line": 31,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "All F-01 through F-27 manifest source references are undefined in the linked plan and investigation, causing strict source validation to fail."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f1dc843a-redo-mutations/breakdown.json",
+        "id": "F2",
+        "line": 575,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "The graph delivers the init publisher before the shared data-root .gitignore materialization, violating the plan-fixed init contract and @/charter/D-17 in an intermediate state."
+      }
+    ],
+    "summary": "The manifest has unresolved F-* sources and an ordering gap that leaves init temporarily noncompliant with D-17.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "99a12b66-3895-46c2-91ab-4f29e41af65e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8f2c6ab-1f41-4b3c-836f-3d59e08e4367",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T00:51:13.822029215Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7215 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0bc4b-be42-7272-85a6-226081b9df65\n--------\nuser\n--- 7202 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **Blocking — issue-impact:** `F-01` through `F-27` are unresolved source references. They appear throughout [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f1dc843a-redo-mutations/breakdown.json:31), but neither plan nor investigation defines any `F-*` source IDs; the investigation uses numbered claims/findings instead. Strict validation against the actual source universe fails with all 27 as unknown. Replace every `F-*` reference with a defined, stable investigation reference (or define an authoritative mapping), then rerun validation.\n\n2. **Blocking — issue-impact:** The graph permits `init-root-publisher` before the task that makes initialization emit the required data-root `.gitignore`. The plan fixes that initialization reaches the ignore-file materialization ([plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/f1dc843a-redo-mutations/plan.md:189)), and D-17 requires init to write it ([charter](/home/vkaskivuo/Projects/just-in-time/dev/vision/9db27a3a-charter.md:328)). But `init-root-publisher` depends only on commit/rehome ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f1dc843a-redo-mutations/breakdown.json:575)), while `data-root-ignore-entry` waits until after kernel retirement ([breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f1dc843a-redo-mutations/breakdown.json:631)). Rewire or split the work so the shared ignore-file composer is delivered before the init publisher.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest has unresolved F-* sources and an ordering gap that leaves init temporarily noncompliant with D-17.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"All F-01 through F-27 manifest source references are undefined in the linked plan and investigation, causing strict source validation to fail.\",\"file\":\"dev/active/f1dc843a-redo-mutations/breakdown.json\",\"line\":31},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The graph delivers the init publisher before the shared data-root .gitignore materialization, violating the plan-fixed init contract and @/charter/D-17 in an intermediate state.\",\"file\":\"dev/active/f1dc843a-redo-mutations/breakdown.json\",\"line\":575,\"references\":[\"@/charter/D-17\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

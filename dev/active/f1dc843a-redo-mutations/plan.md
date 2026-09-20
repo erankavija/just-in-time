@@ -43,8 +43,10 @@ automated gates before the next builds on it (OD-10).
    points are retired or repointed first, because both go vacuous the moment the seam
    changes. The seam then changes in three steps whose sizes are reviewable on their own:
    session open learns to apply a leftover record while the kernel still commits, apply
-   switches to the record while a delta that creates an absent root still reaches the
-   kernel, and initialization takes over that last case. The kernel then has no caller, so
+   switches to the record — after the data root's composed ignore file lands, so no
+   repository holds a commit point version control has not been asked to ignore — while a
+   delta that creates an absent root still reaches the kernel, and initialization takes
+   over that last case. The kernel then has no caller, so
    it retires in the same phase (LD-11), and the pages and the gate scope its removal
    falsifies close behind it.
 3. **Retirement.** The capture constructs, the plan hash, the transaction fields in command
@@ -197,9 +199,9 @@ repair (LD-10).
 <!-- jit:breakdown-overview:begin -->
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
-| record-vocabulary | Redo record vocabulary | task | A typed record names put-file, delete-file, and event-append operations over rooted paths. | lock-and-record-scope | REQ-03, OD-7, OD-8, F-04, F-07 | creates 1, touches 2 | — | — |
+| record-vocabulary | Redo record vocabulary | task | A typed record names put-file, delete-file, and event-append operations over rooted paths. | lock-and-record-scope | REQ-03, OD-7, OD-8, F-04, F-07, F-29 | creates 1, touches 2 | — | — |
 | record-durable-write | Durable redo record write | task | The record reaches disk synced with its directory fsynced before any live write. | redo-record-shape | REQ-03, OD-4, LD-5, F-05 | touches 2 | — | record-vocabulary |
-| record-file-replay | File-backend record application | task | The JSON backend applies a record idempotently through named interruption points. | redo-record-shape, record-commit-point | REQ-03, OD-3, OD-7, F-07, F-08 | creates 1, touches 2 | — | record-durable-write |
+| record-file-replay | File-backend record application | task | The JSON backend applies a record idempotently through named interruption points. | redo-record-shape, record-commit-point | REQ-03, OD-3, OD-7, F-07, F-08, F-29 | creates 1, touches 2 | — | record-durable-write |
 | record-memory-replay | Memory-backend record application | task | The in-memory backend holds a record as a value and steps the same interruption points. | redo-interruption-points, redo-record-shape | REQ-03, OD-3, F-01 | touches 2 | — | record-file-replay |
 | write-set-conflict-check | Write-set and event-log conflict check | task | A moved write target or event-log tail yields a retryable conflict before anything changes. | redo-record-shape, lock-and-record-scope | REQ-04, OD-4, LD-1 | touches 2 | — | record-vocabulary |
 | record-interruption-conformance | Shared interruption conformance suite | task | One suite proves the record's interruption matrix on both backends, compile-enforced. | redo-interruption-points, interruption-matrix-placement | REQ-03, OD-3, F-09, F-21 | touches 1 | — | record-memory-replay |
@@ -207,9 +209,9 @@ repair (LD-10).
 | rollback-coverage-retirement | Superseded rollback coverage retirement | task | The session suite keeps byte parity and finalizer determinism, shedding rollback coverage. | interruption-matrix-placement | REQ-06, OD-3, F-09 | touches 1 | — | redo-record-foundation |
 | publication-injection-repoint | Publication failure injection repoint | task | A publication-failure injection names an interruption point the record defines. | redo-interruption-points, interruption-matrix-placement | REQ-05, OD-3, F-24 | touches 11 | — | consumer-matrix-retirement, rollback-coverage-retirement |
 | session-record-replay-open | Session open applies a leftover record | task | Opening a session applies a leftover redo record on both backends. | publication-seam, redo-record-shape, record-commit-point | REQ-03, OD-3, F-01, F-22 | touches 4 | — | publication-injection-repoint |
-| session-record-commit | Session commit through the redo record | task | A mutation's apply commits through one redo record with no re-capture of its read set. | publication-seam, redo-record-shape, record-commit-point, commit-conflict-check, lock-and-record-scope, line-budget | REQ-03, REQ-04, REQ-05, OD-1, OD-7, LD-1, LD-2, F-01 | touches 6 | — | session-record-replay-open |
-| init-root-publisher | Init publisher for an absent data root | task | A fresh data root appears whole through a synced stage directory and a no-replace rename. | publication-seam, record-commit-point | REQ-05, OD-6, F-02 | creates 1, touches 3 | — | session-record-commit, nofollow-open-rehome |
-| data-root-ignore-entry | Data-root ignore file as a derived materialization | task | The data root's ignore file is composed from the repository's own declarations. | init-root-publication, record-commit-point | REQ-05, OD-8, LD-10, F-03, F-26 | touches 7 | — | kernel-retirement |
+| session-record-commit | Session commit through the redo record | task | A mutation's apply commits through one redo record with no re-capture of its read set. | publication-seam, redo-record-shape, record-commit-point, commit-conflict-check, lock-and-record-scope, line-budget | REQ-03, REQ-04, REQ-05, OD-1, OD-7, LD-1, LD-2, F-01 | touches 6 | — | session-record-replay-open, data-root-ignore-entry |
+| init-root-publisher | Init publisher for an absent data root | task | A fresh data root appears whole through a synced stage directory and a no-replace rename. | publication-seam, record-commit-point | REQ-05, OD-6, F-02, F-28 | creates 1, touches 3 | — | session-record-commit, nofollow-open-rehome |
+| data-root-ignore-entry | Data-root ignore file as a derived materialization | task | The data root's ignore file is composed from the repository's own declarations. | record-commit-point | REQ-05, OD-8, LD-10, F-03, F-26 | touches 7 | — | redo-record-foundation |
 | security-scope-statement | Security review scope names live mechanisms | task | The security-review scope names the mechanisms the repository has. | record-prose-statement | REQ-07, LD-3, F-13 | touches 2 | — | kernel-retirement |
 | nofollow-open-rehome | Re-homed no-follow file open | task | The no-follow regular-file open lives outside the transaction kernel module. | — | REQ-05, F-06 | touches 4 | — | redo-record-foundation |
 | kernel-retirement | Transaction kernel retirement | task | The journaled kernel with its journal, staging, recovery, and control plane leaves storage. | publication-seam, req05-construct-map, line-budget | REQ-05, REQ-06, OD-7, LD-6, F-06, F-22 | touches 11, uncertain | — | init-root-publisher |
@@ -223,7 +225,7 @@ repair (LD-10).
 | bench-event-log-scale | Benchmark harness event-log scale | task | The harness measures a label update against a ten-times larger event log. | — | REQ-02, OD-2, F-16, F-17 | touches 1 | — | — |
 | publication-cost-evidence | Publication cost evidence | task | A committed artifact reports label-update latency before and after plus the line balance. | line-budget, positioned-event-append | REQ-01, REQ-02, REQ-06, OD-2, LD-6, F-16, F-17 | creates 1, touches 1 | — | bench-event-log-scale, superseded-design-retirement |
 | declaration-statements | Repository declarations state the redo record | task | The invariant registry and the charter decision name the record. | record-prose-statement, positioned-event-append, init-root-publication | REQ-07, OD-5, LD-3, F-11 | touches 4 | — | event-append-encoding, single-pass-capture |
-| storage-format-reference | Storage format reference states the redo record | task | The storage-format reference names the record's home, its publication, and its application. | record-prose-statement, init-root-publication | REQ-07, OD-8, LD-3, LD-10, F-03 | touches 1 | — | data-root-ignore-entry |
+| storage-format-reference | Storage format reference states the redo record | task | The storage-format reference names the record's home, its publication, and its application. | record-prose-statement, init-root-publication | REQ-07, OD-8, LD-3, LD-10, F-03 | touches 1 | — | kernel-retirement |
 | concepts-family-docs | Concept documents state the redo record | task | The concepts family describes record-based publication. | record-prose-statement | REQ-07, OD-8, LD-3, F-14 | touches 4 | — | kernel-retirement |
 | profiles-reference | Profiles reference states the redo record | task | The profiles reference describes profile publication as a record applied forward. | record-prose-statement | REQ-07, OD-9, LD-3, F-13 | touches 4 | — | kernel-retirement |
 | cli-recovery-reference | Command and recovery references state the redo record | task | The command and recovery references describe the record and the application that recovers it. | record-prose-statement, init-root-publication | REQ-07, LD-3, F-19, F-20 | touches 7 | — | kernel-retirement |
@@ -289,9 +291,10 @@ flowchart LR
     N7 --> N8
     N8 --> N9
     N9 --> N10
+    N12 --> N10
     N10 --> N11
     N14 --> N11
-    N15 --> N12
+    N35 --> N12
     N15 --> N13
     N35 --> N14
     N11 --> N15
@@ -306,7 +309,7 @@ flowchart LR
     N37 --> N24
     N22 --> N25
     N16 --> N25
-    N12 --> N26
+    N15 --> N26
     N15 --> N27
     N15 --> N28
     N15 --> N29
@@ -358,9 +361,10 @@ flowchart LR
 | LD-8 `transactions_recovered` | The recover command's JSON key and its rendered line are renamed to name applied redo records, inside `transaction-output-fields`, per `@/inv/canonical-cutover`. It is the same class as OD-9: an adopter-visible name for a deleted mechanism, fed by the session-open dispatch count (`main.rs:7806, 7820, 7835, 7848`). The count survives with the name of what it now counts. |
 | LD-9 Append encoding lands after the kernel retires | `RepositoryAction` is matched exhaustively at six sites, four of them inside the kernel module, so an append variant landing earlier needs four unreachable match arms in library code that forbids panics. The append encoding therefore opens the retirement phase, beside the capture reduction it belongs with. |
 | LD-11 The kernel retires in the cutover phase | `scripts/cargo-ci.sh:520` runs `cargo clippy --workspace --all-targets -- -D warnings`, so an item that loses its last caller fails the build unless it is externally reachable. `crates/jit/src/storage/mod.rs:22` declares `pub(crate) mod file_transaction` and `:39-41` three private modules, and `FileTransactionKernel` is `pub(in crate::storage)` (`file_transaction.rs:68`), so the kernel's items are all dead-code-eligible. `init-root-publisher` takes over the absent-root branch and orphans the publication half; the four modules themselves keep callers, because session open still runs journal recovery (`repository_state_store.rs:372-411`, `:786-803`). Chosen: `kernel-retirement` moves into the cutover phase directly after `init-root-publisher`, with `nofollow-open-rehome` ahead of both, and `init-root-publisher` carries dead-code allowances at the narrowest scope covering each orphaned item, each written with the removal condition "removed when the transaction kernel retires" — the named, versioned boundary `@/inv/canonical-cutover` requires. They live across one task and reach no story checkpoint. The gate scope naming recovery journals, and the adopter pages the kernel's removal falsifies, move into the same phase. The record's own modules need no such treatment: they join the storage layer's public surface beside `json`, `memory` and `repository_state_store` (`storage/mod.rs:29-33`, `lib.rs:32`), which is their intended end state, so they compile warning-free before their first caller and no later task narrows them. Rejected: leaving an allowance to span a phase boundary, which parks a warning suppression at a reviewed checkpoint; merging the init publisher and the kernel's deletion into one task, which mixes a publication mechanism with a subsystem removal. |
-| Risk: the whole-log record window | The window opens in the cutover phase at `session-record-commit` and closes at `event-append-encoding`, the first task of the retirement phase. Inside it every mutation performs two synced multi-megabyte writes: the record holding the whole event log, then the log itself. That is slower than today, including for this repository's own dogfooding. Nine tasks and one story gate lie inside it: `init-root-publisher`, `kernel-retirement`, `data-root-ignore-entry`, then `security-scope-statement` and the five adopter-page tasks, then the cutover phase's gates. Accepted because this repository's dogfood binary is installed explicitly by `./scripts/install-jit.sh`, so it is not reinstalled from inside the window. |
-| LD-10 Data-root ignore file | Composed as a derived materialization beside the default ruleset and the default schemas, whose producer both initialization (`repository_state/initialize.rs:740`) and derived-state repair (`repository_state/mod.rs:1058`) already reach, so an existing repository gains the file at its next repair with no migration path. The task also commits this repository's `.jit/.gitignore` and removes the hand-maintained scratch entry from its root ignore file (`@/inv/convention-convergence`). The worktree attributes file is the precedent for the engine owning a version-control control file. |
+| Risk: the whole-log record window | The window opens in the cutover phase at `session-record-commit` and closes at `event-append-encoding`, the first task of the retirement phase. Inside it every mutation performs two synced multi-megabyte writes: the record holding the whole event log, then the log itself. That is slower than today, including for this repository's own dogfooding. Eight tasks and one story gate lie inside it: `init-root-publisher` and `kernel-retirement`, then `security-scope-statement` and the five adopter-page tasks, then the cutover phase's gates. Accepted because this repository's dogfood binary is installed explicitly by `./scripts/install-jit.sh`, so it is not reinstalled from inside the window. |
+| LD-10 Data-root ignore file | Composed as a derived materialization beside the default ruleset and the default schemas, whose producer both initialization (`repository_state/initialize.rs:740`) and derived-state repair (`repository_state/mod.rs:1058`) already reach, so an existing repository gains the file at its next repair with no migration path. It is independent of how a mutation commits — the file is one more data-root action in the plan initialization already publishes — so it lands before the commit swap, and a repository never holds a record under a directory version control has not been told to ignore. The task also commits this repository's `.jit/.gitignore` and removes the hand-maintained scratch entry from its root ignore file (`@/inv/convention-convergence`). The worktree attributes file is the precedent for the engine owning a version-control control file. |
 | Risk: one hot file across four tasks | `crates/jit/src/storage/repository_state_store_tests.rs` is 5,051 lines with 132 injection sites and is touched by the conformance suite, the rollback-coverage retirement, the injection repoint, and the plan-hash retirement. All four are sequential in the graph, so the overlap is landing-order-safe; it is the single hottest file in the epic and the one to rebase early. |
+| Risk: documentation staleness inside a phase | Between the task that changes behaviour and the task that rewrites the pages it falsifies, the shipped documentation describes the old mechanism. Truthfulness is a checkpoint property, enforced by each story's documentation gate over its delivered children, rather than a property of every task boundary. Accepted because the alternative — pairing every code task with its own documentation edit — splits pages across tasks that share no outcome and puts the same sentence under several owners. |
 | Risk: rollback coverage outlives its guarantee | Coverage asserting rollback reachability, and the two tests asserting interruption convergence over the kernel's point set, fail or go vacuous the moment publication changes. They retire in their own task after the record's conformance suite takes ownership of the surviving property and before the seam changes, so the property has an owner at every step. |
 | Risk: adopter contract change | Removing three fields from profile output and renaming the recover command's count are adopter-visible. They land as one cutover across output, schema, bridge and reference, with a release-note entry. |
 
@@ -369,7 +373,10 @@ flowchart LR
 - [Investigation](investigation.md) — the exhaustive consumer, construct, test, document
   and line-count inventories this plan cites rather than copies. Claim classification §1,
   prior-art supersession §2, consumer sweep §3, primitive verification §4, architecture fit
-  §5, invariant check §6, open-question facts §7, line budget §8, contradictions §9.
+  §5, invariant check §6, open-question facts §7, line budget §8, contradictions §9. Its
+  §10 finding index defines every `F-` id the manifest cites, each with the section and the
+  `file:line` that substantiate it. `OD-` and `LD-` ids resolve in this plan's decision
+  table, and `REQ-` ids in the container's success criteria.
 - [Intake brief](intake.md) — measurements, profile attribution, and the owner decisions
   settled before the epic was filed.
 - [Benchmark harness](bench.sh) — the evidence harness for REQ-01 and REQ-02.

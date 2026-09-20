@@ -70,9 +70,9 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-09-19T20:52:34.029025818Z",
-      "updated_by": null
+      "status": "failed",
+      "updated_at": "2026-09-20T00:55:26.769643411Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "99a12b66-3895-46c2-91ab-4f29e41af65e",
@@ -85,7 +85,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "planning: Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-19T22:16:15.634358001Z"
+  "updated_at": "2026-09-20T00:55:26.769643411Z"
 }

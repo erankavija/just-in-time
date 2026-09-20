@@ -2019,3 +2019,45 @@ The line-count table in §8 is unaffected by the choice: all thirty rows are ide
     forbids a second publication path; `breakdown.rs` is not a second *mechanism*, but it
     is a second *pattern*. The plan should decide whether it stays as-is, converges on one
     record, or is removed.
+
+---
+
+## 10. Finding index
+
+The planning manifest cites this investigation through stable ids. Each row states
+the finding in one sentence and names what substantiates it: a section of this
+document, and `file:line` where the fact is load-bearing. Rows marked with a
+`file:line` alone were established while reviewing the breakdown and verified in the
+working tree at HEAD.
+
+| Id | Finding | Substantiated by |
+|---|---|---|
+| F-01 | Every repository publisher reaches durable publication through one seam, `RepositoryMutationSession::apply`, which calls the kernel from a single line. | §7 Q1; §4.4; `crates/jit/src/storage/repository_state_store.rs:185`, `:507`, `:558`, `:599` |
+| F-02 | `jit init` has no publication code of its own and depends on nine kernel mechanisms for absent-root creation. | §1 claim 6 |
+| F-03 | No shipped code writes an ignore entry for the data root's scratch directory; this repository's entry is hand-maintained. | §1 claim 7; `.gitignore:15-16` |
+| F-04 | The orphan temp sweep matches files by the `.tmp` extension and recurses into subdirectories, so a record named that way would be swept. | §9 item 5; `crates/jit/src/storage/temp_cleanup.rs:85` |
+| F-05 | The shared atomic-write helper performs no `sync_all` and no parent-directory fsync, so it gives reader-visibility atomicity rather than crash durability. | §4.2; `crates/jit/src/storage/atomic_write.rs:81-117` |
+| F-06 | `open_regular_file_nofollow` has six consumers outside the transaction path, including the event-log read path, so it must be re-homed rather than deleted. | §4.5; §9 item 8; `crates/jit/src/storage/file_transaction.rs:2744` |
+| F-07 | The delta vocabulary has four action kinds, and both backends verify parent directories, so delete, directory and mode semantics are load-bearing. | §7 Q1, "Semantics the D-17 record shape lacks"; §9 item 2; `crates/jit/src/repository_state/image.rs:1334-1364` |
+| F-08 | The event log is rewritten whole on every mutation, the vocabulary has no append action, and a positioned append is feasible under three stated conditions. | §1 claim 2; §4.3 |
+| F-09 | The publication failure-point matrix is re-proven through consumers, and the only compile-enforced coverage of the point set lives in a consumer suite while the mechanism's own list covers thirty of thirty-six. | §7 Q6; §9 item 9 |
+| F-10 | `plan_hash`, `transaction_id` and `transaction_cleanup_pending` are adopter-facing fields of the profile commands' JSON output. | §9 item 4; §7 Q5 |
+| F-11 | An invariant statement exists in three physical copies, of which only the registry is authoritative. | §6.2 |
+| F-12 | A changing mutation performs six capture rounds, and phased capture is an ad-hoc protocol in the command layer whose coherence check is `has_stable_overlap`. | §1 claim 3; §1 claim 9 |
+| F-13 | `dev/architecture/repository-state-materialization.md` is accurate today and wholly obsolete after the epic, and nothing under `dev/archive/**` needs editing. | §7 Q5 |
+| F-14 | Two adopter documents instruct operations that become unsafe once the commit point lives under the data root's scratch directory. | §9 item 5; §7 Q5 |
+| F-15 | The `transaction-benchmark-evidence` contract and its harness measure the journal's phase barriers, so both go stale on the first day of the epic. | §9 item 13; §7 Q7 |
+| F-16 | The workspace has no Rust benchmark harness and no `criterion` dependency, and the project's stated position is that elapsed time is the wrong thing to decide a test on. | §7 Q7; `crates/jit/benches` absent; `crates/jit/src/storage/contention_probe.rs:1-8` |
+| F-17 | A REQ-02 fixture needs ten times the log bytes with the issue set unchanged and every line parsing. | §7 Q7, "What a 10x-event-log fixture needs" |
+| F-18 | A scratch-built suite carries source-text guards over the workspace that name the kernel module as the compiler-enforced half of the guarantee. | §7 Q6; `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs` |
+| F-19 | `docs/reference/runtime-defaults.md` already states a falsehood, that the recover command is the single recovery entry point. | §7 Q5; §9 item 12; `crates/jit/src/runtime_defaults.rs:33`, `:73` |
+| F-20 | The recover command's help exists verbatim twice in the sources and is documented on two adopter pages. | §9 item 11 |
+| F-21 | The integration-test target budget allows twelve targets and ten are used, so the epic may add none. | §7 Q6; `scripts/rust-build-budget.sh:41-43` |
+| F-22 | Recovery discovery keys on `.jit-bootstrap/transaction-protocol-v1` and `.jit/tmp/transactions`, so it must learn the record's location or a leftover record in a repository with no index goes undiscovered. | `crates/jit/src/storage/discovery.rs:71-77`, `:84-92` |
+| F-23 | `transactions_recovered` is an adopter-visible JSON key and rendered line naming a mechanism the epic deletes. | `crates/jit/src/main.rs:7806`, `:7820`, `:7835`, `:7848` |
+| F-24 | Publication-failure injection reaches nine command and test modules outside the storage layer, each naming a kernel failure point. | `crates/jit/src/commands/{profile,gate,issue,bulk_update,dependency,init,gate_check,mod,test_helpers}.rs`; `crates/jit/tests/cli_repo_workflow/profile_concurrency_tests.rs:49` |
+| F-25 | Captured listings are consumed as child-name data, not only as race evidence, so name discovery must survive the fingerprint's removal. | §3.2; `crates/jit/src/commands/archive.rs:527`, `:539`, `:574`, `:704`; `crates/jit/src/commands/mod.rs:501`, `:636`, `:1915`, `:1926` |
+| F-26 | The derived-materialization composer is reached from both initialization and derived-state repair, and the worktree attributes file is the precedent for the engine owning a version-control control file. | §7 Q1; `crates/jit/src/repository_state/initialize.rs:740`; `crates/jit/src/repository_state/mod.rs:1058`; `crates/jit/src/repository_state/path.rs:281` |
+| F-27 | `RepositoryAction` is matched exhaustively inside the kernel module, so an append variant landing before the kernel retires needs unreachable arms in library code that forbids panics. | `crates/jit/src/storage/file_transaction.rs:733`, `:1093`, `:1366`; `crates/jit/src/repository_state/materialize.rs:1251-1281` |
+| F-28 | The workspace's continuous-integration build denies warnings, and the storage layer's kernel modules are crate-private or module-private, so an item that loses its last caller fails the build. | `scripts/cargo-ci.sh:520`; `crates/jit/src/storage/mod.rs:22`, `:39-41`, `:60`, `:90-94`; `crates/jit/src/storage/file_transaction.rs:68` |
+| F-29 | The storage layer declares its backends publicly, so a module can land before its first caller and still build warning-free. | `crates/jit/src/lib.rs:32`; `crates/jit/src/storage/mod.rs:29-33` |
