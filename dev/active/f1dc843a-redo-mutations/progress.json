@@ -630,6 +630,13 @@
       "finding": "Evaluating a cargo-ci gate on main while a worker runs its own cargo-ci in a worktree oversubscribes the machine (load avg 8+). Observed twice on 555ff4be: run 1 hit LD-7's 20s per-test bound with 6 dogfood-fixture timeouts plus a 42s suite-duration budget failure; run 2 exceeded the gate's own 900s checker timeout and recorded exit=None with empty stdout.",
       "suggested_remedy": "Serialize gate evaluation against worker builds: wait for every dispatched worker in the wave to go idle before evaluating any cargo-ci gate. The 4-worker parallelism cap governs dispatch, not CPU-bound gate runs.",
       "status": "adopted by the lead for the rest of this epic"
+    },
+    {
+      "id": "PF-03",
+      "finding": "The shared cache pool served a corrupt seed. Worker faa668c9 found the pre-seeded target/ unusable: serde rlib/rmeta could not be loaded by rustc 1.97.0 (E0463) while main's identically named artifacts loaded fine; cargo clean plus a 68s rebuild fixed it. Mechanism: reclaim-worker-worktree.sh harvests every git-ignored top-level directory back into one pool 'newest file wins' (documented in worktree-dispatch-protocol.md). After wave 1 the lead reclaimed TWO independently built worktrees into the same pool, so the pool became a file-by-file merge of two build trees that were never internally consistent. dispatch-worker-worktree.sh then seeds each new worktree with `cp -al` (hardlinks), propagating that inconsistent set.",
+      "suggested_remedy": "Script-level: harvest should be per-wave-exclusive or fingerprint-keyed rather than newest-file-wins across build trees. NOT actioned -- the scripts are shared cross-project infrastructure (canonical copy lives with the skill) and changing one is escalation category 8.",
+      "lead_action": "Deleted .agents/cache-pool (23 GB) per the protocol's own remedy: 'delete it and let the next harvest rebuild it warm -- it is a cache, never a source of truth'. Adopted for the rest of this epic: harvest at most ONE worktree per wave into the pool; remove the remaining worktrees without harvesting, so two build trees are never merged.",
+      "status": "mitigated by the lead; script design raised to the user, not changed"
     }
   ]
 }
