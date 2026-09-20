@@ -572,6 +572,17 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "id": "SP-01",
+      "found_during": "wave 1 review (fe6fa7e5)",
+      "subject": "Dangling path citations in the epic's own planning documents",
+      "detail": "DOCS_FOOTPRINT=dev/active/f1dc843a-redo-mutations ./scripts/docs-mechanical.sh reports 4 MISSING citations on clean main at 60bab4d6f: crates/jit/benches, dev/benchmarks/test-suite-performance-4b7c06d0.json, .jit/.gitignore, .jit/tmp/transactions. Pre-existing, not worker-introduced (verified against clean main). The docs-mechanical gate's footprint is docs/, so these never block a task gate.",
+      "disposition": "OPEN - reconcile against epic REQ-07 before the epic's final gates. .jit/.gitignore is created by task 08b8c0ef; .jit/tmp/transactions is a retired path; the other two need a decision.",
+      "criterion_subjects": [
+        "REQ-07"
+      ]
+    }
+  ],
   "started_at": "2026-09-20T06:25:44.651403+00:00"
 }
