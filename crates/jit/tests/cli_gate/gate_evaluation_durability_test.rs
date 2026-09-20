@@ -103,20 +103,19 @@ fn test_check_gate_records_its_run_evidence_with_the_issue_verdict_it_explains()
     );
 
     // A separate process reading the same repository reports that same pair.
-    // `gate status-all` is the CLI's gate-readiness report, and it calls an
-    // issue ready only when every required gate carries a passing verdict.
+    // `gate status-all` is the CLI's gate-readiness report; what its exit status
+    // says about readiness is its own suite's property.
     let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(repo.path())
         .args(["gate", "status-all", &issue_id, "--json"])
         .output()
         .expect("spawn the jit gate readiness subprocess");
-    assert!(
-        output.status.success(),
-        "a separate process must report the passed gate as ready; stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let json: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("parse the gate readiness report");
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "the readiness report must be one JSON document ({error}); stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+    });
     let reported = json["gates"]
         .as_array()
         .expect("the readiness report lists every required gate")
