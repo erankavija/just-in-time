@@ -143,6 +143,9 @@ pub enum InitializationError {
     /// The finalizer could not compose the audit-log append.
     #[error(transparent)]
     Mutation(#[from] MutationError),
+    /// A managed-document region could not be composed over a provable boundary.
+    #[error(transparent)]
+    ManagedDocument(#[from] super::ManagedDocumentError),
     /// Existing default-rule materialization could not be derived safely.
     #[error("failed to materialize initialization rules: {0}")]
     RuleMaterialization(String),
@@ -437,6 +440,9 @@ impl InitializationScaffold {
         if self.gitattributes_line().is_some() {
             paths.push(VirtualPath::GITATTRIBUTES);
         }
+        // The data root's ignore file is composed against the captured base by
+        // the same producer derived-state repair reaches.
+        paths.push(VirtualPath::DATA_IGNORE);
         paths.extend(self.explicit_dirs()?);
         with_ancestor_dirs(paths)
     }
@@ -613,8 +619,10 @@ fn coupled_default_repair_profile<'a>(
 /// rewritten, profile provenance writes when it changes, and profile assets write
 /// unconditionally (the derivation proved them changed). The audit log is composed
 /// by the finalizer (`context`): a plain init creates it empty, a profiled init
-/// appends one aggregate lifecycle record. An empty delta (nothing to publish) is a
-/// complete no-op.
+/// appends one aggregate lifecycle record. The data root's ignore file is composed
+/// by the producer derived-state repair reaches, so it lands before the first
+/// commit point is ever written beneath the data root. An empty delta (nothing to
+/// publish) is a complete no-op.
 pub(super) fn derive_initialization(
     base: &RepositoryImage,
     scaffold: &InitializationScaffold,
@@ -648,6 +656,7 @@ pub(super) fn derive_initialization(
         actions.push(action);
     }
     push_gitattributes_action(base, scaffold, &mut actions)?;
+    actions.extend(super::materialize::compose_data_root_ignore(base)?);
     let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;

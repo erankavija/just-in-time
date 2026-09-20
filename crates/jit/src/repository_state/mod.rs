@@ -191,7 +191,7 @@ pub enum GateRegistryEditError {
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath, RECORD_SCRATCH_DIR,
 };
 pub use profile_apply::{
     applied_profile_records, claimed_target_state, compose_resolved_contributions,
@@ -1045,9 +1045,9 @@ pub enum AmbiguousOwnershipError {
 }
 
 /// The complete owned-materialization producer set: default rules and their
-/// schemas, plus every configured projection, each derived from declared authority
-/// (`@/inv/single-source-prose`). A caller cannot invoke a subset — the intent
-/// selects the whole set. Shared projection targets compose through the one
+/// schemas, the data root's ignore file, plus every configured projection, each
+/// derived from declared authority (`@/inv/single-source-prose`). A caller cannot
+/// invoke a subset — the intent selects the whole set. Shared projection targets compose through the one
 /// managed-document primitive, never last-writer-wins; `rules.toml` splices only
 /// the generated default-family spans, preserving authored content unconditionally.
 fn compose_complete(
@@ -1056,6 +1056,7 @@ fn compose_complete(
 ) -> Result<Vec<RepositoryAction>, RepositoryStateError> {
     let config = materialize::assemble_config_from_declarations(image, declarations.configuration)?;
     let mut actions = materialize::compose_default_ruleset(image, &config)?;
+    actions.extend(materialize::compose_data_root_ignore(image)?);
     actions.extend(
         // A semantic mutation is complete over EVERY declared projection.
         materialize::compose_configured_projections(image, &config, declarations, None)?.actions,
@@ -1144,7 +1145,7 @@ fn derive_repair(
 /// complete target space; this function enumerates the target space directly, so a
 /// coverage test can hold it independent of current repository state.
 ///
-/// Three families compose the result:
+/// Four families compose the result:
 /// - Default-ruleset targets: `rules.toml` is a member exactly when the capture
 ///   spec captured it AND it is present (an absent `rules.toml` is the
 ///   in-memory-defaults case `derive_repair` never materializes anything for); its
@@ -1152,6 +1153,8 @@ fn derive_repair(
 ///   configuration) are members exactly when the capture spec captured that exact
 ///   schema path. This mirrors the presence guards `derive_repair`'s default-rule
 ///   producer applies before ever comparing bytes, never the byte-diff itself.
+/// - The data root's ignore file: a member exactly when the capture spec
+///   captured it, mirroring the containment guard its producer applies.
 /// - Configured-projection targets: every projection declared in `declarations`'
 ///   configuration contributes its own target unconditionally, since a declared
 ///   projection's target is always part of the operation's capture closure.
@@ -1193,6 +1196,15 @@ pub fn repair_target_paths(
                 targets.insert(vpath);
             }
         }
+    }
+
+    // Data-root ignore family: the one target, guarded by capture-spec
+    // containment exactly as its producer guards it.
+    if image
+        .capture_spec()
+        .contains_path(&VirtualPath::DATA_IGNORE)
+    {
+        targets.insert(VirtualPath::DATA_IGNORE);
     }
 
     // Configured-projection targets: every declared projection's own target,

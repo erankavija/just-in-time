@@ -15,7 +15,7 @@ use super::{
     render_rule_block, serialize_ruleset, splice_default_membership, AmbiguousOwnershipError,
     ExpectedPreimage, FileMode, ManagedDocumentClaim, ProducerError, ProjectionInputs,
     RegionPlacement, RepositoryAction, RepositoryDeclarations, RepositoryEntry, RepositoryImage,
-    RepositoryStateError, VirtualPath,
+    RepositoryStateError, VirtualPath, RECORD_SCRATCH_DIR,
 };
 use crate::config::{JitConfig, ProjectionMode};
 use crate::declarations::invariants::InvariantRegistry;
@@ -374,6 +374,68 @@ pub(crate) fn compose_configured_projections(
         });
     }
     Ok(ConfiguredProjections { actions, counts })
+}
+
+/// Stable ownership identity for the data root's ignore file.
+const DATA_ROOT_IGNORE_OWNER: &str = "data-root-ignore";
+
+/// Stable region identity of the engine's block inside that file; its
+/// delimiters are this identity in the file's own comment syntax.
+const DATA_ROOT_IGNORE_REGION: &str = "data-root-ignore";
+
+/// Materialize the data root's ignore file, whose engine-owned region names the
+/// scratch directory holding a mutation's commit point.
+///
+/// Keeping that directory out of version control is a correctness property: a
+/// committed commit point would be applied on a checkout that never performed
+/// the mutation, and a merge would collide over it. The target is derived, not
+/// declared: its path is the data root's own ignore file and its body is the
+/// scratch directory this engine reserves ([`RECORD_SCRATCH_DIR`]), so a
+/// repository that declares nothing still gets it.
+///
+/// The region composes through the ONE managed-document primitive, so every
+/// authored line outside the delimiters survives unconditionally and a boundary
+/// the engine cannot prove — a half-delimited, duplicated, or reversed pair —
+/// refuses before any action is emitted. A target outside the captured closure
+/// is not an owned materialization and contributes nothing, exactly as the
+/// default-rule family treats an uncaptured `rules.toml`.
+///
+/// The adopter's own root ignore file is not a target here: what the engine
+/// writes it owns, and the worktree's ignore file is authored.
+pub(crate) fn compose_data_root_ignore(
+    image: &RepositoryImage,
+) -> Result<Vec<RepositoryAction>, super::ManagedDocumentError> {
+    let path = VirtualPath::DATA_IGNORE;
+    if !image.capture_spec().contains_path(&path) {
+        return Ok(Vec::new());
+    }
+    let claim = ManagedDocumentClaim::Region {
+        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+        region_id: DATA_ROOT_IGNORE_REGION.to_string(),
+        begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
+        end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
+        content: format!("/{RECORD_SCRATCH_DIR}/\n").into_bytes(),
+        placement: RegionPlacement::AppendIfAbsent,
+    };
+    compose_managed_documents(image, [(path.clone(), claim)])?
+        .into_iter()
+        .map(|(path, expected)| {
+            let entry = image.entry(&path)?;
+            let unchanged = matches!(
+                entry,
+                RepositoryEntry::File { content, mode }
+                    if content.bytes() == expected.as_slice() && *mode == FileMode::Regular
+            );
+            Ok((!unchanged).then(|| RepositoryAction::WriteFile {
+                path: path.clone(),
+                owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+                expected: ExpectedPreimage::of(entry),
+                bytes: expected,
+                mode: FileMode::Regular,
+            }))
+        })
+        .collect::<Result<Vec<_>, super::ManagedDocumentError>>()
+        .map(|actions| actions.into_iter().flatten().collect())
 }
 
 /// Materialize the default-rule family (`rules.toml`) and its baked schema files
@@ -1788,5 +1850,209 @@ kind = "advisory"
             let path = VirtualPath::data(format!("schemas/{}", schema.name)).unwrap();
             assert!(actual.contains(&path), "expected {path:?} in {actual:?}");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // The data root's ignore file
+    // -----------------------------------------------------------------------
+    /// The scratch-directory entry the composed region carries, spelled as the
+    /// ignore file's own directory addresses it.
+    fn scratch_entry() -> String {
+        format!("/{RECORD_SCRATCH_DIR}/")
+    }
+
+    /// The bytes `plan` publishes at `path`, or `None` when it writes nothing there.
+    fn written(plan: &MaterializationPlan, path: &VirtualPath) -> Option<String> {
+        plan.delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::WriteFile {
+                    path: at, bytes, ..
+                } if at == path => Some(String::from_utf8(bytes.clone()).unwrap()),
+                _ => None,
+            })
+    }
+
+    /// A repository whose ignore file holds `ignore` (absent when `None`), with
+    /// no `rules.toml` so the default-rule family contributes nothing.
+    fn image_with_ignore(ignore: Option<&str>) -> RepositoryImage {
+        let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
+        image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (".jit/rules.toml", None),
+            ("AGENTS.md", Some(&agents)),
+            (".jit/.gitignore", ignore),
+        ])
+    }
+
+    fn repair(image: &RepositoryImage) -> Result<MaterializationPlan, RepositoryStateError> {
+        let cfg = config_decls(CONFIG);
+        let (g, r) = (gates(), rules());
+        derive_declared(
+            image,
+            declarations(&cfg, &g, &r),
+            &seed(),
+            MaterializationIntent::RepairDerivedState,
+        )
+    }
+
+    /// REQ-01 (initialization half): a fresh repository's ignore file is one of
+    /// the data-root targets initialization publishes, and it names the scratch
+    /// directory that holds a mutation's commit point.
+    #[test]
+    fn test_initialization_publishes_a_data_root_ignore_file_naming_the_scratch_directory() {
+        let scaffold =
+            InitializationScaffold::render("", "ignore-test".parse::<ProjectName>().unwrap(), None)
+                .unwrap();
+        let image = absent_image(scaffold.delta_paths().unwrap());
+        let plan = derive_materialization(
+            &image,
+            MaterializationRequest::Initialize {
+                scaffold: &scaffold,
+                context: &MutationContext::preview(),
+            },
+        )
+        .unwrap();
+
+        let composed = written(&plan, &VirtualPath::DATA_IGNORE)
+            .expect("initialization publishes the data root's ignore file");
+        assert!(
+            composed.lines().any(|line| line == scratch_entry()),
+            "the composed ignore file must name the scratch directory, got: {composed:?}"
+        );
+    }
+
+    /// REQ-01 (repair half) and REQ-02: repair of a data root lacking the file
+    /// produces it, and a second repair over the produced content acts again.
+    #[test]
+    fn test_repair_produces_an_absent_data_root_ignore_file_and_then_derives_no_action() {
+        let composed = written(
+            &repair(&image_with_ignore(None)).unwrap(),
+            &VirtualPath::DATA_IGNORE,
+        )
+        .expect("repair produces the data root's ignore file when it is absent");
+        assert!(
+            composed.lines().any(|line| line == scratch_entry()),
+            "the produced ignore file must name the scratch directory, got: {composed:?}"
+        );
+
+        assert_eq!(
+            written(
+                &repair(&image_with_ignore(Some(&composed))).unwrap(),
+                &VirtualPath::DATA_IGNORE
+            ),
+            None,
+            "repairing a repository that already carries the composed file must act again"
+        );
+    }
+
+    /// REQ-03: an ignore file carrying authored lines keeps every one of them,
+    /// and the engine's own entry joins them in its delimited region.
+    #[test]
+    fn test_repair_keeps_authored_lines_beside_the_engine_region_of_the_ignore_file() {
+        let authored = "# authored by hand\nlocal-notes/\n";
+        let composed = written(
+            &repair(&image_with_ignore(Some(authored))).unwrap(),
+            &VirtualPath::DATA_IGNORE,
+        )
+        .expect("repair adds the engine's region to an authored ignore file");
+
+        assert!(
+            composed.starts_with(authored),
+            "every authored byte must survive, got: {composed:?}"
+        );
+        assert!(
+            composed.lines().any(|line| line == scratch_entry()),
+            "the engine's entry must join the authored lines, got: {composed:?}"
+        );
+    }
+
+    /// REQ-03 (ownership proof): a file whose engine region carries only one of
+    /// its two delimiters is a boundary the engine cannot prove, so the whole
+    /// derivation fails before any action is composed.
+    #[test]
+    fn test_repair_refuses_an_ignore_file_whose_engine_region_boundary_is_unprovable() {
+        let composed = written(
+            &repair(&image_with_ignore(None)).unwrap(),
+            &VirtualPath::DATA_IGNORE,
+        )
+        .unwrap();
+        let opening = composed
+            .lines()
+            .find(|line| line.ends_with(":begin"))
+            .expect("the composed region opens with a delimiter")
+            .to_string();
+
+        let outcome = repair(&image_with_ignore(Some(&format!("{opening}\n"))));
+        assert!(
+            matches!(
+                outcome,
+                Err(RepositoryStateError::ManagedDocument(
+                    crate::repository_state::ManagedDocumentError::PartialRegion(_)
+                ))
+            ),
+            "a half-delimited region must refuse before any write, got: {outcome:?}"
+        );
+    }
+
+    /// The composer emits nothing when its target sits outside the captured
+    /// closure, which is how a producer in this family stays ownership-safe: a
+    /// path the image never captured is not an owned materialization.
+    #[test]
+    fn test_data_root_ignore_is_not_composed_when_its_target_is_outside_the_capture_closure() {
+        let agents = agents_with_region("invariants", EXPECTED_ROWS.trim_end());
+        let uncaptured = image(&[
+            (".jit/config.toml", Some(CONFIG)),
+            (".jit/invariants.toml", Some(INVARIANTS)),
+            (".jit/rules.toml", None),
+            ("AGENTS.md", Some(&agents)),
+        ]);
+
+        assert_eq!(
+            written(&repair(&uncaptured).unwrap(), &VirtualPath::DATA_IGNORE),
+            None,
+            "an uncaptured ignore target must contribute no action"
+        );
+    }
+
+    /// REQ-04: the adopter's own root ignore file is neither read nor written —
+    /// it is absent from the capture closure repair reads and from every path
+    /// initialization captures or publishes.
+    #[test]
+    fn test_the_worktree_root_ignore_file_is_neither_captured_nor_written() {
+        let worktree_ignore = VirtualPath::worktree(".gitignore").unwrap();
+        let config: JitConfig = toml::from_str(CONFIG).unwrap();
+
+        let closure = validate_capture_closure(&layout(), &config, &[], None).unwrap();
+        assert!(
+            !closure.paths.contains(&worktree_ignore),
+            "derived-state repair must not read the adopter's root ignore file"
+        );
+
+        let scaffold =
+            InitializationScaffold::render("", "ignore-test".parse::<ProjectName>().unwrap(), None)
+                .unwrap();
+        let captured = scaffold.delta_paths().unwrap();
+        assert!(
+            !captured.contains(&worktree_ignore),
+            "initialization must not capture the adopter's root ignore file"
+        );
+        let plan = derive_materialization(
+            &absent_image(captured),
+            MaterializationRequest::Initialize {
+                scaffold: &scaffold,
+                context: &MutationContext::preview(),
+            },
+        )
+        .unwrap();
+        assert!(
+            plan.delta()
+                .actions()
+                .iter()
+                .all(|action| action.path() != &worktree_ignore),
+            "initialization must not write the adopter's root ignore file"
+        );
     }
 }
