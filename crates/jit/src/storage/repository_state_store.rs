@@ -10,6 +10,7 @@ use crate::repository_state::{
     RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
+use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::file_transaction::RepositoryRecoveryDisposition;
 use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
 use crate::storage::{
@@ -1630,6 +1631,40 @@ pub(in crate::storage) fn open_capability_parent(
         }
     }
     Ok(Some((current, leaf.clone())))
+}
+
+/// Open the parent directory of a repository-relative target, creating the
+/// ancestors it lacks.
+///
+/// Each directory it creates is synced into the parent that now names it before
+/// the walk descends, so a file published underneath is reachable after a crash
+/// rather than hanging off an entry the filesystem never wrote
+/// (`@/inv/atomic-writes`). An ancestor that already exists costs no sync.
+pub(in crate::storage) fn open_or_create_capability_parent(
+    root: &Dir,
+    path: &Path,
+) -> Result<(Dir, String), RepositoryStateStoreError> {
+    let components = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    let (leaf, parents) = components
+        .split_last()
+        .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(path.display().to_string()))?;
+    parents
+        .iter()
+        .try_fold(root.try_clone()?, |current, component| {
+            match current.symlink_metadata(component) {
+                Err(error) if error.kind() == ErrorKind::NotFound => {
+                    current.create_dir(component)?;
+                    sync_capability_directory(&current)?;
+                }
+                Err(error) => return Err(error.into()),
+                Ok(_) => {}
+            }
+            open_child_dir_nofollow(&current, component)
+        })
+        .map(|parent| (parent, leaf.clone()))
 }
 
 fn open_descendant_dir_nofollow(root: &Dir, path: &Path) -> Result<Dir, RepositoryStateStoreError> {

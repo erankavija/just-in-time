@@ -12,7 +12,8 @@ use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use crate::storage::repository_state_store::{
-    open_capability_parent, open_child_dir_nofollow, CapabilityRoots, RepositoryStateStoreError,
+    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
+    CapabilityRoots, RepositoryStateStoreError,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, File, OpenOptions};
@@ -162,16 +163,13 @@ fn resolve<'a>(
 }
 
 /// Replace a put's path with its bytes, creating the directories it needs.
+///
+/// Every directory the put creates is durable before the pass reaches
+/// [`RedoPoint::BeforeRecordRemoval`], so a crash cannot drop an ancestor entry
+/// while removing the record that would replay the put.
 fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError> {
     let (root, relative) = resolve(roots, &put.path)?;
-    if let Some(directories) = relative
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-    {
-        root.create_dir_all(directories)?;
-    }
-    let (parent, leaf) =
-        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&put.path))?;
+    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
     let staged = staged_name();
     write_staged(&parent, &staged, put)?;
     parent.rename(&staged, &parent, &leaf)?;
@@ -467,6 +465,47 @@ mod tests {
         assert_eq!(
             std::fs::read(data_root(&worktree).join("issues/2026/a.json")).unwrap(),
             b"published"
+        );
+    }
+
+    /// The record is the only replay source for a put that created its own
+    /// ancestors, so it outlives their publication: an interruption between the
+    /// two leaves the record for the next application to converge on.
+    #[test]
+    fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
+        let (worktree, roots) = repository();
+        let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
+        let record = RedoRecord {
+            puts: vec![put(nested, b"published")],
+            ..RedoRecord::default()
+        };
+        let committed = record.commit(&data_root(&worktree)).unwrap();
+        let published = data_root(&worktree).join("issues/2026/09/a.json");
+        // BeforeApply, BeforePut { index: 0 }, then the removal this stops at.
+        let before_removal = 2;
+
+        let outcome = RedoApplier::new(Arc::new(InterruptAt::check_number(before_removal)))
+            .apply(&roots, &record);
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
+            "the pass ran past the interruption before the record's removal"
+        );
+        assert!(
+            published.exists(),
+            "the put under fresh ancestors never reached its path"
+        );
+        assert!(
+            committed.exists(),
+            "the record was gone while the put it replays was still unfinished"
+        );
+
+        uninterrupted().apply(&roots, &record).unwrap();
+
+        assert_eq!(std::fs::read(&published).unwrap(), b"published");
+        assert!(
+            !committed.exists(),
+            "the replayed record survived its own application"
         );
     }
 
