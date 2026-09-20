@@ -98,6 +98,12 @@ pub(in crate::storage) fn sync_directory(path: &Path) -> Result<()> {
         .with_context(|| format!("syncing directory {}", path.display()))
 }
 
+/// [`sync_directory`] for a caller holding the directory as a capability rather
+/// than as a path.
+pub(in crate::storage) fn sync_capability_directory(directory: &Dir) -> std::io::Result<()> {
+    directory.try_clone()?.into_std_file().sync_all()
+}
+
 #[cfg(target_os = "linux")]
 pub(in crate::storage) fn rename_noreplace_cap(
     source_dir: &Dir,

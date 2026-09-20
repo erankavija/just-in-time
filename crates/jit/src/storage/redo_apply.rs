@@ -6,6 +6,7 @@
 //! twice converges. Nothing publishes through this module yet.
 
 use crate::repository_state::{FileMode, RepositoryRootClass, VirtualPath};
+use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::file_transaction::repository_unix_mode;
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
@@ -147,7 +148,7 @@ fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError
     let (root, relative) = resolve(roots, &put.path)?;
     if let Some(directories) = relative
         .parent()
-        .filter(|path| path.components().count() > 0)
+        .filter(|path| !path.as_os_str().is_empty())
     {
         root.create_dir_all(directories)?;
     }
@@ -158,7 +159,7 @@ fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError
     let staged = format!(".{leaf}.{}.redo.tmp", std::process::id());
     write_staged(&parent, &staged, put)?;
     parent.rename(&staged, &parent, &leaf)?;
-    sync_directory(&parent)
+    sync_capability_directory(&parent).map_err(Into::into)
 }
 
 /// Write the staged bytes with the put's mode and return once they are durable.
@@ -192,7 +193,7 @@ fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoAp
         return Ok(());
     };
     match parent.remove_file(&leaf) {
-        Ok(()) => sync_directory(&parent),
+        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
     }
@@ -219,8 +220,8 @@ fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), Re
     file.sync_all().map_err(Into::into)
 }
 
-/// Remove the applied record, tolerating a record a previous application
-/// already removed: what remains after this is no mutation.
+/// Remove the applied record, tolerating one a previous application already
+/// removed.
 fn remove_record(roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
     let data =
         roots
@@ -229,20 +230,11 @@ fn remove_record(roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
                 path: format!("{RECORD_SCRATCH_DIR}/{RECORD_FILE_NAME}"),
             })?;
     match data.remove_file(Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME)) {
-        Ok(()) => sync_directory(&open_child_dir_nofollow(data, RECORD_SCRATCH_DIR)?),
+        Ok(()) => sync_capability_directory(&open_child_dir_nofollow(data, RECORD_SCRATCH_DIR)?)
+            .map_err(Into::into),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
     }
-}
-
-/// Make a directory's entries durable: a rename or removal survives a crash
-/// only once the directory naming it is synced.
-fn sync_directory(directory: &Dir) -> Result<(), RedoApplyError> {
-    directory
-        .try_clone()?
-        .into_std_file()
-        .sync_all()
-        .map_err(Into::into)
 }
 
 fn unaddressable(path: &VirtualPath) -> RedoApplyError {
