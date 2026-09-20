@@ -119,7 +119,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched"
+          "status": "rework 1/2 dispatched (V-10 REQ-02, plus SP-06 and the REQ-05 module doc)"
         }
       ]
     },
@@ -728,7 +728,8 @@
     "2d4fda72": 1,
     "35544121": 1,
     "4e818d10": 1,
-    "8559f529": 2
+    "8559f529": 2,
+    "d591a1c8": 1
   },
   "surfaced_pitfalls": [
     {
@@ -953,6 +954,15 @@
       "lead_evidence": "Found by diffing the test inventory of both backends between main and the branch (two memory.rs names replaced by one, redo_apply.rs unchanged), then reading the deleted bodies assertion by assertion. Grepping both backends for the assertion's substance returns nothing. Not covered on the filesystem side either, and correctly so: 4e818d10's worker established that half with throwaway probes because the behaviour belongs to 35544121 under @/inv/orthogonal-tests.",
       "lead_note": "The property is still expressible under the new validation — two puts that do not contain one another, e.g. index.json and issues, against a pre-existing directory at issues. The obligation to restore it falls on the change that removed the owner, not on the closed issue.",
       "verdict": "RESOLVED. test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused restores it with a disjoint two-put record (index.json then issues, against an independently seeded directory): the first put's bytes stand, the second refuses IsADirectory, the record stays installed. The worker's audit for a SECOND lost property is the notable part and the lead verified it: the deleted mirror test also asserted no-rollback, but at the ancestor-walk guard. The worker wrote that test, watched it fail, and traced the cause rather than adjusting it to pass — apply resolves every operation's path in one batch before BeforeApply (memory.rs:578-585, mirroring redo_apply.rs), so a pre-existing bad ancestor refuses the whole record before anything lands. The only way that guard ever fired mid-pass required two operations naming one path as the other's ancestor, which this issue makes unconstructible. So the scenario is retired by the fix, not lost by redesign, and the upfront-refusal property it leaves behind is already owned by the untouched test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent."
+    },
+    {
+      "id": "V-10",
+      "issue": "d591a1c8",
+      "what": "REQ-02's pre-durability property is implied by the suite but owned by no test.",
+      "detail": "code-review F1 (blocking): committed() writes the record before every tested application (redo_conformance.rs:205), and the first injectable RedoPoint follows that commit, so no test interrupts before the record is durable. REQ-02 reads 'After an interruption before the record is durable, the repository reads back as the complete old state.'",
+      "lead_evidence": "Verified before relaying. nothing_published does assert commit publishes nothing (:251-255), and that plus 'the first live write follows BeforeApply' IMPLIES the property — but an implication drawn from two other assertions is not the owning test the criterion asks for. The structural cause: RedoInterruptionInjector is consulted only inside apply, while durability happens in RedoRecord::commit / commit_record, which has no seam. No RedoPoint value lies in the pre-durability window, so reclassifying points cannot reach it.",
+      "lead_note": "Told the worker NOT to widen RedoPoint: it is 35544121's closed enum over the apply pass, and 4e818d10 REQ-04 requires both backends to step the same values while their commits differ. If the worker concludes REQ-02 is unreachable without widening it, that returns to the lead as an escalation. Likely honest shape: a torn or absent record leaves the complete old state, observable without touching any enum. Session-open replay stays with 0938d99e (wave 9) per this issue's own Notes.",
+      "verdict": "FAIL - rework 1 of 2, bundled with the two checkpoint items so they cost one cycle rather than two"
     }
   ],
   "standing_policies": [
@@ -1038,16 +1048,19 @@
     "open_before_gate": [
       {
         "item": "SP-06",
-        "action": "remove the stale allowance from storage/mod.rs"
+        "action": "remove the stale allowance from storage/mod.rs",
+        "dispatched": "folded into d591a1c8 rework 1 of 2, rather than a separate follow-up cycle"
       },
       {
         "item": "REQ-05 module-doc length",
         "detail": "redo_conformance.rs carries TWO module paragraphs: orientation, then the SP-07 divergence scoping. REQ-05 and @/inv/essential-code-prose both cap module orientation at one short paragraph. The second paragraph is a contract statement rather than orientation, and it exists because the lead required the suite to scope its coverage. Resolution: move it onto the item it describes rather than delete it, which satisfies REQ-05 literally and puts the contract on the right item. Lead-found, not reviewer-found.",
-        "action": "move the divergence paragraph onto the item it describes"
+        "action": "move the divergence paragraph onto the item it describes",
+        "dispatched": "folded into d591a1c8 rework 1 of 2, rather than a separate follow-up cycle"
       },
       {
         "item": "REQ-06 line ceiling",
-        "detail": "Total production lines added across the phase must be under 1,500; compute and record at the gate."
+        "detail": "Total production lines added across the phase must be under 1,500; compute and record at the gate.",
+        "dispatched": "folded into d591a1c8 rework 1 of 2, rather than a separate follow-up cycle"
       }
     ]
   }
