@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bc878614d04d38b5b51e4911db0380b326c336a9",
+  "completed_at": "2026-09-20T07:32:37.095007663Z",
+  "duration_ms": 119069,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All attributable changes meet the issue's hard success criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ce053478-4926-485c-8d9f-4a5fadd033a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a7b0751d-d18e-4154-97d5-50b9c55cb4d8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T07:30:38.025445819Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `bc878614d` (`jit:ce053478`)\nPolicy sources: `AGENTS.md`\nResolved items: `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests`, `@/invariant/single-source-prose` (`.jit/invariants.toml`); `@/gate/code-review`, `@/gate/jit-validate` (`.jit/gates.toml`); `@/charter/D-17` (`dev/vision/9db27a3a-charter.md`)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T07:30:08Z); code-review pending\nTruncation recovery: none\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All attributable changes meet the issue's hard success criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
