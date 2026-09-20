@@ -658,6 +658,14 @@
         "REQ-02",
         "REQ-05"
       ]
+    },
+    {
+      "id": "SP-03",
+      "found_during": "wave 2 review of 19e7298a (lead-verified)",
+      "subject": "The event-log capture ceiling survives in document.rs after 19e7298a closed it for claim and issue-update",
+      "detail": "DOCUMENT_CAPTURE_BUDGET (crates/jit/src/commands/document.rs:5-10) sets max_bytes = 64 MiB with max_listings: 0, and its capture specs declare VirtualPath::EVENTS (document.rs:295, :375, :957). So `jit doc add` fails on a repository whose event log exceeds 64 MiB -- the identical defect 19e7298a fixed for claim (16 MiB) and issue-update (64 MiB), at a higher threshold. Verified: commands/config.rs:304 and commands/init.rs:350 also carry hand-picked 64 MiB ceilings but declare no EVENTS path, so they are not exposed to log growth.",
+      "disposition": "OPEN. 19e7298a is NOT at fault: its REQ-03 was scoped by the lead to the two paths that demonstrably disagreed, and it satisfied that exactly. The fix is now a one-liner of an established shape -- call issue_mutation_capture_budget() (commands/mod.rs:155) or apply the same u64::MAX + prose form that image.rs:594-604 and profile.rs record_capture_budget already establish. Raised to the user; folding it into this epic is a small task of the same class the user already directed be fixed now.",
+      "criterion_subjects": []
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
