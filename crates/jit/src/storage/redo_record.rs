@@ -46,7 +46,11 @@ pub struct EventAppend {
 ///
 /// A move is a put and a delete in the same record. Paths are canonical
 /// identities, so one record addresses data-root and worktree targets alike and
-/// nothing outside them; parsing re-applies that guard.
+/// nothing outside them; parsing re-applies that guard. Operation paths are
+/// pairwise disjoint — no path is an ancestor of another, and no two
+/// operations name the same path — checked identically at construction and at
+/// parse, with the event append's implicit target participating alongside
+/// every put and delete.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RedoRecord {
     pub puts: Vec<PutFile>,
@@ -55,6 +59,48 @@ pub struct RedoRecord {
 }
 
 impl RedoRecord {
+    /// Construct a record from its operation set, rejecting one whose paths
+    /// overlap: no operation's path may be an ancestor of another's, and no
+    /// two operations may name the same path. The event append's implicit
+    /// target, [`VirtualPath::EVENTS`], participates alongside every put and
+    /// delete.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedoRecordError::OverlappingAncestor`] or
+    /// [`RedoRecordError::DuplicatePath`] when the operation set contradicts
+    /// itself.
+    pub fn new(
+        puts: Vec<PutFile>,
+        deletes: Vec<VirtualPath>,
+        event_append: Option<EventAppend>,
+    ) -> Result<Self, RedoRecordError> {
+        let record = Self {
+            puts,
+            deletes,
+            event_append,
+        };
+        record.ensure_disjoint_paths()?;
+        Ok(record)
+    }
+
+    /// Reject a path that is an ancestor of another operation's path, or two
+    /// operations that name the same path.
+    fn ensure_disjoint_paths(&self) -> Result<(), RedoRecordError> {
+        let event_log = VirtualPath::EVENTS;
+        let paths: Vec<&VirtualPath> = self
+            .puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(self.deletes.iter())
+            .chain(self.event_append.iter().map(|_| &event_log))
+            .collect();
+        (0..paths.len())
+            .flat_map(|index| (index + 1..paths.len()).map(move |other| (index, other)))
+            .find_map(|(index, other)| overlap(paths[index], paths[other]))
+            .map_or(Ok(()), Err)
+    }
+
     /// The record's canonical serialized form: one JSON header line naming every
     /// operation and the length of the bytes it claims, then those bytes in the
     /// order the header names them.
@@ -180,17 +226,22 @@ impl RedoRecord {
             })
             .transpose()?;
         match content.len() - read {
-            0 => Ok(Self {
-                puts,
-                deletes,
-                event_append,
-            }),
+            0 => {
+                let record = Self {
+                    puts,
+                    deletes,
+                    event_append,
+                };
+                record.ensure_disjoint_paths()?;
+                Ok(record)
+            }
             trailing => Err(RedoRecordError::TrailingBytes(trailing)),
         }
     }
 }
 
-/// A serialized record this build cannot read.
+/// An invalid redo record: unreadable from its serialized form, or a
+/// self-contradictory operation set, whether built in process or parsed.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RedoRecordError {
     #[error("redo record carries no header line")]
@@ -203,6 +254,10 @@ pub enum RedoRecordError {
     Truncated,
     #[error("redo record carries {0} bytes beyond its last operation")]
     TrailingBytes(usize),
+    #[error("redo record path {0:?} is an ancestor of path {1:?}")]
+    OverlappingAncestor(VirtualPath, VirtualPath),
+    #[error("redo record names path {0:?} in more than one operation")]
+    DuplicatePath(VirtualPath),
     #[error(transparent)]
     Path(#[from] RepositoryLayoutError),
 }
@@ -305,6 +360,27 @@ fn take_content<'a>(
     let taken = content.get(*read..end).ok_or(RedoRecordError::Truncated)?;
     *read = end;
     Ok(taken)
+}
+
+/// The overlap between two operation paths, if any: the same path named by
+/// both, or one a containing directory of the other. Different root classes
+/// never overlap. Components are compared, not string prefixes, so
+/// `issues/a.json` and `issues/ab.json` share a spelling prefix without
+/// overlapping.
+fn overlap(a: &VirtualPath, b: &VirtualPath) -> Option<RedoRecordError> {
+    if a.root_class() != b.root_class() {
+        return None;
+    }
+    let (a_path, b_path) = (a.relative().as_path(), b.relative().as_path());
+    if a_path == b_path {
+        Some(RedoRecordError::DuplicatePath(a.clone()))
+    } else if b_path.starts_with(a_path) {
+        Some(RedoRecordError::OverlappingAncestor(a.clone(), b.clone()))
+    } else if a_path.starts_with(b_path) {
+        Some(RedoRecordError::OverlappingAncestor(b.clone(), a.clone()))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -415,6 +491,106 @@ mod tests {
             RedoRecord::parse(&escaped),
             Err(RedoRecordError::Path(_))
         ));
+    }
+
+    fn put(path: VirtualPath) -> PutFile {
+        PutFile {
+            path,
+            bytes: Vec::new(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    #[test]
+    fn test_new_rejects_a_path_that_is_an_ancestor_of_another_operations_path() {
+        let ancestor = VirtualPath::data("issues").unwrap();
+        let descendant = VirtualPath::data("issues/a.json").unwrap();
+
+        let forward = RedoRecord::new(
+            vec![put(ancestor.clone()), put(descendant.clone())],
+            Vec::new(),
+            None,
+        )
+        .unwrap_err();
+        let reversed = RedoRecord::new(
+            vec![put(descendant.clone()), put(ancestor.clone())],
+            Vec::new(),
+            None,
+        )
+        .unwrap_err();
+
+        // The ancestor is named first and the descendant second regardless of
+        // which order the operations were given in.
+        let expected = RedoRecordError::OverlappingAncestor(ancestor, descendant);
+        assert_eq!(forward, expected);
+        assert_eq!(reversed, expected);
+    }
+
+    #[test]
+    fn test_new_rejects_a_put_and_delete_naming_the_same_path() {
+        let path = VirtualPath::worktree("dev/active/note.md").unwrap();
+
+        let error = RedoRecord::new(vec![put(path.clone())], vec![path.clone()], None).unwrap_err();
+
+        assert_eq!(error, RedoRecordError::DuplicatePath(path));
+    }
+
+    #[test]
+    fn test_new_rejects_a_delete_naming_the_event_log_while_appending_to_it() {
+        let error = RedoRecord::new(
+            Vec::new(),
+            vec![VirtualPath::EVENTS],
+            Some(EventAppend {
+                offset: 0,
+                bytes: Vec::new(),
+            }),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, RedoRecordError::DuplicatePath(VirtualPath::EVENTS));
+    }
+
+    #[test]
+    fn test_parse_rejects_the_same_overlap_new_rejects() {
+        let path = VirtualPath::data("issues/a.json").unwrap();
+        let puts = vec![put(path.clone()), put(path)];
+        // Built directly through the struct literal: `serialize` carries no
+        // validation of its own, so this is the same bytes a corrupted or
+        // adversarial process could hand `parse`.
+        let bytes = RedoRecord {
+            puts: puts.clone(),
+            deletes: Vec::new(),
+            event_append: None,
+        }
+        .serialize()
+        .unwrap();
+
+        assert_eq!(
+            RedoRecord::parse(&bytes).unwrap_err(),
+            RedoRecord::new(puts, Vec::new(), None).unwrap_err(),
+        );
+    }
+
+    #[test]
+    fn test_new_accepts_paths_that_share_a_spelling_prefix_without_containment() {
+        let record = RedoRecord::new(
+            vec![
+                put(VirtualPath::data("issues/ab.json").unwrap()),
+                put(VirtualPath::data("issues/a.json").unwrap()),
+            ],
+            vec![
+                VirtualPath::worktree("issues/a").unwrap(),
+                VirtualPath::worktree("issues/ab").unwrap(),
+            ],
+            None,
+        )
+        .expect("a shared spelling prefix without containment does not overlap");
+
+        // The parse boundary applies the identical, permissive judgment.
+        assert_eq!(
+            RedoRecord::parse(&record.serialize().unwrap()).unwrap(),
+            record
+        );
     }
 
     #[test]
