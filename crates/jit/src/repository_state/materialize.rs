@@ -196,7 +196,8 @@ pub struct ValidationCaptureClosure {
 /// and listing whole-repository validation reads so it consumes only
 /// image-projected content: the engine registries (`config.toml`,
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
-/// repository index and event log, every ordinary issue record plus the complete
+/// repository index, the event log and the data root's ignore file, every
+/// ordinary issue record plus the complete
 /// `issues` listing, the schema files the effective rules reference and the ones
 /// the current configuration derives, every declared
 /// projection's documentation target and projected-kind sources, and every
@@ -225,6 +226,9 @@ pub fn validate_capture_closure(
         layout.classify_repository_relative(".jit/templates.toml")?,
         layout.classify_repository_relative(".jit/index.json")?,
         layout.classify_repository_relative(".jit/events.jsonl")?,
+        // The data root's ignore file, so derived-state repair sees the target
+        // its producer composes rather than treating it as uncaptured.
+        VirtualPath::DATA_IGNORE,
     ];
     // Every ordinary issue record named by the index, plus the complete listing
     // whole-repository validation reconciles against those ids.

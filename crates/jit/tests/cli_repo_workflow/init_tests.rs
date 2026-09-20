@@ -965,3 +965,63 @@ fn test_init_with_the_default_package_plans_archival_under_a_configured_policy()
         "a configured policy should raise no policy blocker: {plan}"
     );
 }
+
+/// REQ-06 (jit:08b8c0ef): a repository initialized fresh inside git reports no
+/// untracked scratch content in its version-control status after a mutation.
+///
+/// The second half is what makes the first non-vacuous: a commit point placed
+/// under the data root's scratch directory — the state publication leaves there
+/// — is still absent from the status, so the silence is the composed ignore
+/// file's doing rather than an empty directory's.
+#[test]
+fn test_init_inside_git_leaves_no_untracked_scratch_content_after_a_mutation() {
+    let temp = TempDir::new().unwrap();
+    assert!(Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(temp.path())
+        .status()
+        .unwrap()
+        .success());
+    assert!(jit_init(temp.path(), &[]).status.success());
+
+    let created = Command::new(jit_binary())
+        .args(["issue", "create", "A mutation"])
+        .current_dir(temp.path())
+        .output()
+        .unwrap();
+    assert!(
+        created.status.success(),
+        "jit issue create failed: {created:?}"
+    );
+
+    let scratch = format!(".jit/{}/", jit::repository_state::RECORD_SCRATCH_DIR);
+    let untracked_scratch = |label: &str| {
+        let status = Command::new("git")
+            .args(["status", "--porcelain", "-uall"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+        let rendered = String::from_utf8(status.stdout).unwrap();
+        assert!(
+            !rendered.contains(&scratch),
+            "{label}: version-control status names scratch content under {scratch}: {rendered}"
+        );
+    };
+    untracked_scratch("after a mutation");
+
+    fs::create_dir_all(
+        temp.path()
+            .join(".jit")
+            .join(jit::repository_state::RECORD_SCRATCH_DIR),
+    )
+    .unwrap();
+    fs::write(
+        temp.path()
+            .join(".jit")
+            .join(jit::repository_state::RECORD_SCRATCH_DIR)
+            .join("redo.record"),
+        b"a commit point",
+    )
+    .unwrap();
+    untracked_scratch("with a commit point under the scratch directory");
+}
