@@ -48,6 +48,13 @@
       "format": "markdown",
       "label": "Epic plan (f1dc843a)",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Relocation evidence (2d4fda72)",
+      "path": "dev/active/2d4fda72/relocation-evidence.md"
     }
   ],
   "first_ready_at": "2026-09-20T08:44:01.086019900Z",
@@ -68,5 +75,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Documentation assertions leave the Rust suite",
-  "updated_at": "2026-09-20T09:11:02.534054368Z"
+  "updated_at": "2026-09-20T09:41:56.920036063Z"
 }

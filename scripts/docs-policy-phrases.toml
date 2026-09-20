@@ -1,0 +1,551 @@
+# Policy phrases this repository's prose must carry, and the ones it must not.
+#
+# Read by scripts/docs-check-policy-phrases.sh (M9 of the `docs-mechanical`
+# gate). Each `[[document]]` names one artifact and one topic within it, and
+# declares the literals that topic's policy is made of:
+#
+#   require       the literal must be present — the policy is stated;
+#   forbid        the literal must be absent — a superseded rule must not
+#                 return, and a presence check cannot express that;
+#   exactly_once  the literal must occur exactly once — a field of a contract
+#                 whose shape is the assertion, not merely its presence.
+#
+# `normalize = true` collapses whitespace runs on both sides before matching,
+# for a phrase a document is free to re-wrap. It is weaker than an exact match,
+# so an entry declares it only where the wrapping is genuinely incidental.
+#
+# `section = { after = "…", before = "…" }` narrows an entry to the text between
+# two markers, for a phrase whose placement is the assertion: a rule that reads
+# one way under one heading says something else under another. A declared
+# marker the artifact does not carry is itself a finding.
+#
+# A `[[value]]` entry asserts over a configured value rather than prose:
+# `select` walks `file`'s TOML, where `name[field=value]` picks the array
+# element whose `field` equals `value`, and every `require` literal must occur
+# in the string it resolves to.
+#
+# Each entry's comment says why the phrase is load-bearing. A phrase nobody can
+# explain is a phrase nobody should be pinning.
+
+# --- contrib/gates/code-review-prompt.md -------------------------------------
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "attribution and fallback"
+# The reviewer's footprint comes from commits tagged with the issue's short id,
+# patch by patch so renames and deletions stay visible, and falls back to issue
+# intent — stated, not inferred — when no tagged commit exists.
+require = [
+  "jit:<short-id>",
+  "individual patch",
+  "renames and deletions",
+  "commit attribution was unavailable",
+  "Do not attribute uncommitted changes",
+  "issue intent and linked documents",
+  "current tree",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "current evidence and debt"
+# Gate evidence is the latest recorded run, and the verdict turns on
+# issue-impact blocking findings alone.
+require = [
+  "latest recorded status and exit code",
+  "newer successful run supersedes older failures",
+  "issue-impact",
+  "blocking",
+  "pre-existing",
+  "advisory",
+  "explicit evidence",
+  "if and only if",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "selective examples"
+# The review applies the repository's non-obvious-only standard for examples.
+require = [
+  "Do not require a `# Examples` section merely because an API is public",
+  "non-obvious-only standard",
+  "repetitive examples for straightforward",
+  "avoidable documentation and CI burden",
+]
+# The blanket requirement this policy replaced. Its return would reinstate the
+# documentation and CI burden the non-obvious-only standard exists to remove,
+# and only an absence check can catch a rule coming back.
+forbid = [
+  "All public APIs must have doc comments with description and `# Examples`",
+]
+
+[[document]]
+path = "AGENTS.md"
+topic = "selective examples"
+# The repository-side half of the same standard: the review prompt applies what
+# the contributor instructions declare.
+require = [
+  "Add an example only when it clarifies non-obvious behavior",
+  "one type- or module-level walkthrough",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "peer-review gate evidence"
+# Unfinished independent judgment is not an implementation defect; executable
+# evidence is what can carry a blocking finding.
+require = [
+  "Include every required gate's latest status in the evidence header",
+  "peer review or judgment gate",
+  "is not by itself an implementation defect",
+  "must not create a blocking finding or fail the verdict",
+  "Executable CI or validation gate evidence may support a blocking finding",
+  "demonstrates an attributable failure",
+  "leaves a hard criterion materially unverified",
+]
+# The blanket rule that made a pending peer-review gate block code review.
+forbid = ["A currently pending, failed, or errored required"]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "policy precedence"
+# Applicable AGENTS.md files are read root-to-path, a closer one specializing
+# the broader, and an unresolved contradiction is reported rather than guessed.
+require = [
+  "complete prose baseline",
+  "repository root",
+  "affected path",
+  "closer `AGENTS.md`",
+  "specializes",
+  "unresolved contradiction",
+  "blocking",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "bounded addressable policy"
+# Governing items are collected from a bounded set of sources and resolved
+# through their configured source of truth, never enumerated repository-wide.
+require = [
+  "applicable `AGENTS.md`",
+  "issue content",
+  "relationship labels",
+  "linked documents",
+  "attributable patches",
+  "directly implicated behavior",
+  "Do not enumerate every project item",
+  "configured source of truth",
+  "markdown-first",
+  "registry-first",
+  "rendered projection",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "relationship evidence claims"
+# A relationship label is a claim the reviewer tests, at the strength its own
+# namespace declaration gives it.
+require = [
+  "`satisfies:`",
+  "`enforces:`",
+  "`per:`",
+  "evidence claims",
+  "dangling",
+  "contradictory",
+  "unsupported",
+  "unrelated pre-existing",
+  "advisory",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "evidence header"
+# The header is a five-line contract: a field stated twice is a second header,
+# so presence alone does not express what this check needs.
+exactly_once = [
+  "Attribution:",
+  "Policy sources:",
+  "Resolved items:",
+  "Gate evidence:",
+  "Truncation recovery:",
+]
+require = ["use `none` for every empty value"]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "recorded gates and structured references"
+# References are resolved qualified IDs from the repository's own registries.
+require = [
+  "latest recorded",
+  "Do not rerun a gate that is currently recorded as passing",
+  "@/gate/jit-validate",
+  "valid resolved qualified IDs",
+  "`references`",
+  "empty array",
+  "repository's configured registries",
+  "do not invent, hardcode, or emit unresolved references",
+]
+# A portable review policy cannot require an invariant only this repository
+# declares.
+forbid = ["@/inv/pid-safety"]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "procedure, not a registry copy"
+# The prompt is a procedure. A copied registry statement rots against the
+# registry that owns it, and an embedded rubric competes with canonical prose.
+forbid = [
+  "## Review rubric",
+  "All file writes use the temp-file + atomic-rename pattern.",
+  "Every state change appends an event to events.jsonl.",
+  "Every label is namespace:value",
+  "Process-signaling code rejects sentinel or lossy PID conversions",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "read-only bounded inspection"
+# The run is inspection-only, reads in bounded calls, and recovers truncation
+# before issuing a verdict.
+require = [
+  "read-only",
+  "Do not invoke issue-lifecycle skills",
+  "diff statistics",
+  "changed-file lists",
+  "bounded calls",
+  "truncation marker",
+  "Do not issue a verdict",
+  "disposition",
+  "origin",
+]
+
+[[document]]
+path = "contrib/gates/code-review-prompt.md"
+topic = "shared findings contract"
+# The wrapper owns the findings and verdict contract; restating it here gives
+# that contract two homes.
+forbid = ["<<<JIT-FINDINGS-JSON", "Before the verdict line"]
+
+# --- the reviewer's sandbox --------------------------------------------------
+
+[[value]]
+file = ".jit/gates.toml"
+topic = "code-review reviewer sandbox"
+# The reviewer is a prompt this repository does not control the output of, run
+# over the whole checkout. The explicit read-only sandbox is what makes the
+# prompt's inspection-only instruction a boundary rather than a request.
+select = "gates[key=code-review].checker.env.REVIEWER_AGENT"
+require = ["--sandbox read-only"]
+
+# --- documentation of who owns the review contract ---------------------------
+
+[[document]]
+path = "docs/how-to/custom-gates.md"
+topic = "review policy resolution"
+normalize = true
+require = [
+  "applicable `AGENTS.md`",
+  "qualified IDs",
+  "configured source of truth",
+  "`references`",
+  "repository-specific prompt",
+  "tool-agnostic wrapper",
+]
+
+[[document]]
+path = "docs/how-to/custom-gates.md"
+topic = "findings ownership"
+normalize = true
+# Who emits, who transports, and who parses — stated exactly, because the
+# wording is what a gate author builds a wrapper against.
+require = [
+  "The reviewer emits human-readable findings, a structured findings block, and a terminal verdict.",
+  "The wrapper transports the prompt and context and determines its checker exit code from the terminal verdict.",
+  "jit parses and persists the structured findings block.",
+]
+# Both phrasings assign jit's structured-findings parsing to the wrapper.
+forbid = [
+  "parses the shared findings and verdict contract",
+  "parses the common verdict contract",
+]
+
+[[document]]
+path = "dev/index.md"
+topic = "review policy resolution"
+require = [
+  "applicable `AGENTS.md`",
+  "canonical",
+  "engineering prose",
+  "Repository-specific review",
+  "tool-agnostic",
+  "`references`",
+]
+
+[[document]]
+path = "dev/index.md"
+topic = "findings ownership"
+normalize = true
+require = [
+  "The reviewer emits human-readable findings, a structured findings block, and a terminal verdict.",
+  "The shared AI-review wrapper stays tool-agnostic: it transports the prompt and context and determines its checker exit code from the terminal verdict.",
+  "jit parses and persists the structured findings block.",
+]
+
+# --- scripts/doc-review-prompt.md --------------------------------------------
+
+[[document]]
+path = "scripts/doc-review-prompt.md"
+topic = "issue-scoped impact"
+# The documentation review is attributed the same way the code review is, keeps
+# to the smallest impact cone, and states documentation in the present tense
+# rather than narrating implementation history.
+require = [
+  "jit:<short-id>",
+  "individual commit patches",
+  "renames and deletions",
+  "Uncommitted changes",
+  "commit-based attribution was unavailable",
+  "smallest documentation impact cone",
+  "documentation that must change",
+  "pre-existing",
+  "advisory",
+  "direct present-tense statements",
+  "canonical reference",
+  "implementation history",
+  "if and only if",
+  "unresolved issue-impact blocking",
+]
+
+[[document]]
+path = "scripts/doc-review-prompt.md"
+topic = "leaf footprint"
+# Placement is the assertion: the leaf rule read under the container heading
+# would say the opposite of what it means.
+section = { after = "### Leaf review", before = "### Container review" }
+require = ["only commits tagged for the context leaf", "Do not include descendant"]
+
+[[document]]
+path = "scripts/doc-review-prompt.md"
+topic = "container footprint"
+section = { after = "### Container review", before = "## Derive the smallest documentation impact cone" }
+require = [
+  "container plus every delivered descendant",
+  "DAG-authoritative resolved children",
+  "unrelated sequencing dependencies",
+]
+
+[[document]]
+path = "scripts/doc-review-prompt.md"
+topic = "holistic container checks"
+# A container review judges the combined contract rather than replaying the
+# leaf reviews under it.
+require = [
+  "combined current documentation contract",
+  "Do not replay leaf reviews",
+  "container-level workflow coverage",
+  "cross-child terminology and example consistency",
+  "canonical placement versus duplication",
+  "discoverability",
+  "aggregate concision",
+  "union of descendant impact cones",
+]
+
+[[value]]
+file = ".jit/gates.toml"
+topic = "doc-review gate description"
+# The gate description is what an agent reads before running the prompt; it
+# states the same issue-scoped policy the prompt applies.
+select = "gates[key=doc-review].description"
+require = [
+  "issue-scoped",
+  "jit:<short-id>",
+  "impact cone",
+  "pre-existing drift",
+  "advisory",
+  "concise",
+  "fail",
+  "repository-configured hierarchy",
+  "DAG-resolved descendants",
+  "combined documentation contract",
+]
+
+[[document]]
+path = "contrib/gates/ai-review.sh"
+topic = "advisory findings pass"
+# The wrapper's own instruction to the reviewer must keep a passing verdict
+# compatible with advisory findings.
+require = ["passing verdict may include advisory findings"]
+forbid = ['Use "pass" with an empty findings array when there are none.']
+
+# --- packaged prose ----------------------------------------------------------
+
+[[document]]
+path = ".agents/skills/jit-breakdown/references/analysis-prompt.md"
+topic = "content-standard path resolution"
+# The prompt is packaged and read at a destination, so a path in it is resolved
+# from the repository root, never from the prompt file's own location.
+require = ["resolved from the repository root"]
+forbid = ["relative to this prompt file"]
+
+[[document]]
+path = "docs/reference/jit-content-standards.md"
+topic = "profile installation redirect"
+# The public page redirects an adopter to the profile that installs the
+# standard, rather than implying plain initialization carries it.
+require = [
+  "contributors to the JIT source repository",
+  "Ordinary `jit init` does not install it",
+  "profile-installed workflow policy",
+  "repositories that use plain initialization",
+  "`jit init --profile path:packages/jit-dogfood`",
+  "`jit profile apply --profile path:packages/jit-dogfood`",
+  "[Repository Profiles](profiles.md)",
+]
+# The superseded claim that no public profile-install command exists.
+forbid = ["does not expose a public profile-install command"]
+
+# --- the planning bracket's review placeholders ------------------------------
+#
+# The bracket ships built-in review placeholders. Every page and example that
+# describes it says so, and none of them may fall back to the command-backed
+# agent gates, the JIT_SRC environment, or the approval vocabulary those gates
+# carried — a reader who follows superseded text configures a bracket that no
+# longer exists.
+
+[[document]]
+path = "docs/concepts/planning-bracket.md"
+topic = "review placeholders"
+require = ["placeholder"]
+forbid = [
+  "agent plan-quality gate",
+  "agent breakdown-review gate",
+  "agent (command-backed)",
+  "JIT_SRC=",
+]
+
+[[document]]
+path = "docs/how-to/adopt-planning-bracket.md"
+topic = "review placeholders"
+require = ["placeholder"]
+forbid = [
+  "agent plan-quality gate",
+  "agent breakdown-review gate",
+  "agent (command-backed)",
+  "JIT_SRC=",
+]
+
+[[document]]
+path = "docs/examples/sdd/config.toml"
+topic = "review placeholders"
+require = ["placeholder"]
+forbid = [
+  "agent plan-quality gate",
+  "agent breakdown-review gate",
+  "agent (command-backed)",
+  "JIT_SRC=",
+]
+
+[[document]]
+path = "docs/examples/research/config.toml"
+topic = "review placeholders"
+require = ["placeholder"]
+forbid = [
+  "agent plan-quality gate",
+  "agent breakdown-review gate",
+  "agent (command-backed)",
+  "JIT_SRC=",
+]
+
+[[document]]
+path = "docs/reference/cli-commands.md"
+topic = "review placeholders"
+require = ["placeholder"]
+forbid = [
+  "agent plan-quality gate",
+  "agent breakdown-review gate",
+  "agent (command-backed)",
+  "JIT_SRC=",
+]
+
+[[document]]
+path = ".jit/templates.toml"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "docs/concepts/planning-bracket.md"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "docs/how-to/adopt-planning-bracket.md"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "docs/examples/sdd/templates.toml"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "docs/examples/research/templates.toml"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "docs/reference/cli-commands.md"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]
+
+[[document]]
+path = "profiles/jit-dogfood/manifest.toml"
+topic = "approval vocabulary"
+forbid = [
+  "Agent plan-quality review",
+  "approved plan",
+  "approved breakdown",
+  "breakdown approved",
+  "plan is approved",
+  "breakdown after plan approved",
+]

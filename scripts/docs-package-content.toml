@@ -1,0 +1,47 @@
+# Content no package this repository authors may carry.
+#
+# Read by scripts/docs-check-package-content.sh (M8 of the `docs-mechanical`
+# gate), which applies every entry to each package's assembled content: the
+# file's package-relative source, its install target, and its text.
+#
+#   forbid        the literal must appear in none of the three;
+#   forbid_token  the word must appear in no file's text, as a token rather
+#                 than a substring, so a longer word that merely contains it is
+#                 not a finding.
+#
+# Which files are checked is derived — it is whatever each manifest declares —
+# so a newly packaged file joins these prohibitions without an edit here.
+
+[[content]]
+topic = "checkout-local and deferred content"
+# A package is read at an adopter's destination. A path out of this checkout, a
+# reference to this repository's own crates or archives, an evaluation harness,
+# a deferred example domain, or a deictic phrase that only resolves here all
+# describe somewhere the reader is not.
+forbid = [
+  "/home/",
+  "crates/jit/",
+  "dev/archive/",
+  "dev/vision/",
+  "docs/examples/research/",
+  "/evals/",
+  "trigger-evals",
+  "LDPC",
+  "GLDPC",
+  "Nexus",
+  "gf2",
+  "Kani",
+  "AVX",
+  "Zen 3",
+  "PPC",
+  "QAM",
+  "SNR",
+  "this-repo",
+  "this repository",
+]
+
+[[content]]
+topic = "installed paths require no jq"
+# An installed path an adopter follows must work with what jit ships. Naming
+# this tool makes a JSON processor a prerequisite of the workflow.
+forbid_token = ["jq"]
