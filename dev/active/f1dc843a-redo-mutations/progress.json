@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework attempt 3 dispatched (ESC-06 guidance)"
+          "status": "rework 1/2 dispatched (R4: nested-put durability)"
         }
       ]
     },
@@ -686,7 +686,7 @@
   "rework_counts": {
     "555ff4be": 1,
     "2d4fda72": 1,
-    "35544121": 0
+    "35544121": 1
   },
   "surfaced_pitfalls": [
     {
@@ -821,6 +821,14 @@
       "detail": "R1 (blocking, issue-impact, redo_apply.rs:85): 'REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it. Callers can therefore vary injection across applications rather than the backend owning its interruption boundary.' At HEAD apply_record still takes `injector: &dyn RedoInterruptionInjector` (redo_apply.rs:88) and no backend holds it. R2 flagged the staging vulnerability instead; the lead dispatched rework for R2 only. R3 passed with 'All hard criteria are implemented and the prior staging vulnerability is remediated' - it re-checked the staging finding and not R1.",
       "lead_note": "Caught by the Tier 1.5 prior-findings regression check, which exists precisely because reviewers have no memory across rounds. The issue is NOT completed. The worker's original position was that the session becomes the injector holder at wiring time (4319256e), matching the kernel's `execute_repository_delta(..., &*self.injector)` pattern - arguable, but No-argue discipline forbids the lead softening REQ-05 by argument. Resolve by changing the artifact or by escalating.",
       "verdict": "FAIL confirmed at HEAD in session 2 (apply_record still took the injector per call at redo_apply.rs:88). RESOLVED by the invoker (ESC-06): change the artifact — redo_apply.rs gains a type holding Arc<dyn RedoInterruptionInjector> with apply(&self, roots, record), mirroring FileTransactionKernel (file_transaction.rs:69). The free-function form does not survive beside it (@/inv/canonical-cutover). Rework attempt 3 dispatched; the invoker's guidance reset the counter."
+    },
+    {
+      "id": "V-05",
+      "issue": "35544121",
+      "what": "Held-injector rework accepted; a new blocking durability finding replaced it.",
+      "detail": "The invoker-approved RedoApplier shape landed and was merged to main at 94fb377b7. R1 (injector held) and R2 (staging create_new + no-follow) both verified closed at HEAD. cargo-ci passed on the MERGED tree (4709 tests, zero warnings). Re-evaluating code-review against the new commits produced R4, a new finding: put_file calls root.create_dir_all(directories) at redo_apply.rs:171 and then syncs only the deepest directory, so for a put at a/b/c/file the entries for c in b, b in a, and a in the root are never fsynced. remove_record then runs, and a crash loses the nested put with no record left to replay. References @/charter/D-17 and @/inv/derived-state-coherence.",
+      "lead_note": "Lead-verified at HEAD before dispatching. This is the THIRD defect in this epic found in a new-file publication path, after 555ff4be's truncating record write and 35544121's symlink-following stage open. All three were durability or containment properties of publishing a file that did not exist before. Worth naming in the 21e976d1 checkpoint review as a pattern rather than three unrelated bugs.",
+      "verdict": "FAIL - rework attempt 1 of 2 dispatched; fix converges on FileTransactionKernel's create-then-sync-parent shape (file_transaction.rs:483-530)"
     }
   ],
   "standing_policies": [

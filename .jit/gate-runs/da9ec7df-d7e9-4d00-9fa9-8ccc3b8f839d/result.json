@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "94fb377b79b57b505dfad839dc58f49201135982",
+  "completed_at": "2026-09-20T15:39:16.275105926Z",
+  "duration_ms": 332316,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_apply.rs",
+        "id": "F1",
+        "line": 171,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Missing ancestor directory entries are not fsynced before record removal, so a crash can lose a nested put with no redo record left to replay."
+      }
+    ],
+    "summary": "Nested parent creation is not durably published before the redo record is removed.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "35544121-9268-4068-8248-98e9d2df16f5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "da9ec7df-d7e9-4d00-9fa9-8ccc3b8f839d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T15:33:43.958635596Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6308 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0bf73-b59f-7133-8af2-dc1de9768101\n--------\nuser\n--- 6295 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 94fb377b7, 2c8d2acf3, cd4195c4d, 104f275a9, f37ca8330, 3a3b90e75, b714619d6, 5e25cb205, 970e52b63, 8833caaeb, d027716ba, feb335189 (all `jit:35544121`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T15:31:50Z); prior code-review passed (exit 0, run 758ac445)\nTruncation recovery: narrowed initial truncated patch/current-source reads into individual commit patches and disjoint source ranges\n\n1. **F1 — blocking, issue-impact, high:** A nested put is not durable before the redo record is removed. [`create_dir_all`](crates/jit/src/storage/redo_apply.rs:171) creates missing ancestors, but the code syncs only the deepest directory after the rename. A crash can therefore retain record removal while losing an ancestor directory entry (and its nested file), leaving no redo record to replay. Sync each newly created parent entry before record removal, and cover fresh nested paths in recovery testing. References: `@/charter/D-17`, `@/invariant/derived-state-coherence`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Nested parent creation is not durably published before the redo record is removed.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Missing ancestor directory entries are not fsynced before record removal, so a crash can lose a nested put with no redo record left to replay.\",\"file\":\"crates/jit/src/storage/redo_apply.rs\",\"line\":171,\"references\":[\"@/charter/D-17\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

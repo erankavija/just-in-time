@@ -58,12 +58,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-20T11:14:14.945903950Z",
+      "updated_at": "2026-09-20T15:33:26.630382785Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "passed",
-      "updated_at": "2026-09-20T11:20:03.056135754Z",
+      "status": "failed",
+      "updated_at": "2026-09-20T15:39:16.587413643Z",
       "updated_by": "auto:executor"
     }
   },
@@ -80,5 +80,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "File-backend record application",
-  "updated_at": "2026-09-20T15:22:14.896477291Z"
+  "updated_at": "2026-09-20T15:39:16.587413643Z"
 }
