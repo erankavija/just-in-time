@@ -43,11 +43,14 @@ automated gates before the next builds on it (OD-10).
    points are retired or repointed first, because both go vacuous the moment the seam
    changes. The seam then changes in three steps whose sizes are reviewable on their own:
    session open learns to apply a leftover record while the kernel still commits, apply
-   switches to the record, and initialization takes over creating an absent root.
-3. **Retirement.** The kernel is unreferenced and retires, the capture constructs whose
-   consumers it held follow, the output fields go, and the event encoding lands here
-   because the delta's action vocabulary is matched exhaustively inside the kernel module
-   (LD-9).
+   switches to the record while a delta that creates an absent root still reaches the
+   kernel, and initialization takes over that last case. The kernel then has no caller, so
+   it retires in the same phase (LD-11), and the pages and the gate scope its removal
+   falsifies close behind it.
+3. **Retirement.** The capture constructs, the plan hash, the transaction fields in command
+   output, and the event encoding, which lands here because the delta's action vocabulary
+   is matched exhaustively inside the kernel module (LD-9). The declarations, the Rust
+   prose, the generated reference and the architecture note follow their sources.
 4. **Evidence.** The benchmark artifact, the line balance, and the testing guide's
    evidence contract, measured over the finished workspace.
 
@@ -84,7 +87,9 @@ sweep, and `needs_worktree_companion`. Phased capture is `CaptureSpec::phase_one
 ad-hoc protocol in `capture_proposed_base_inner`, and `has_stable_overlap`. Mutation
 document closure is `document_capture_closure`, `DocumentClosure`, and `DocumentCapture`;
 the whole-repository `validate_capture_closure` stays. The full map with `file:line` and
-sizes is investigation §1 claim 9.
+sizes is investigation §1 claim 9. Five of the ten leave with the kernel in the cutover
+phase and five in the retirement phase, so the construct-by-construct check runs at the
+later checkpoint, where the whole set is gone.
 
 Two consequences of the map are functional rather than textual. `discover_recovery_from`
 (`crates/jit/src/storage/discovery.rs:84-92`) keys recovery discovery on
@@ -121,11 +126,12 @@ ceiling in its body; each removal task carries a removal criterion of its own.
 
 ### `record-prose-statement` [plan-fixed] — What every document must say
 
-A document describing mutation publication states four things: file replacement by
-temp-file and rename; event-log growth by positioned append; one synced redo record under
-the data root's scratch directory as the commit point, applied idempotently when a session
-opens; and repository initialization's synced stage with a no-replace rename for an absent
-root. The invariant registry is the sole authority for the statement's wording; two further
+A document describing mutation publication states three things: file replacement by
+temp-file and rename; one synced redo record under the data root's scratch directory as the
+commit point, applied idempotently when a session opens; and repository initialization's
+synced stage with a no-replace rename for an absent root. How the event log grows is stated
+by `positioned-event-append`, delivered into the same pages by the task that lands that
+encoding. The invariant registry is the sole authority for the statement's wording; two further
 physical copies follow it (investigation §6.2). Every
 other document states the mechanism in its own register or cites the invariant. Nothing
 under `dev/archive/**` is edited: archived work products are pinned (investigation §7 Q5).
@@ -202,32 +208,33 @@ repair (LD-10).
 | publication-injection-repoint | Publication failure injection repoint | task | A publication-failure injection names an interruption point the record defines. | redo-interruption-points, interruption-matrix-placement | REQ-05, OD-3, F-24 | touches 11 | — | consumer-matrix-retirement, rollback-coverage-retirement |
 | session-record-replay-open | Session open applies a leftover record | task | Opening a session applies a leftover redo record on both backends. | publication-seam, redo-record-shape, record-commit-point | REQ-03, OD-3, F-01, F-22 | touches 4 | — | publication-injection-repoint |
 | session-record-commit | Session commit through the redo record | task | A mutation's apply commits through one redo record with no re-capture of its read set. | publication-seam, redo-record-shape, record-commit-point, commit-conflict-check, lock-and-record-scope, line-budget | REQ-03, REQ-04, REQ-05, OD-1, OD-7, LD-1, LD-2, F-01 | touches 5 | — | session-record-replay-open |
-| init-root-publisher | Init publisher for an absent data root | task | A fresh data root appears whole through a synced stage directory and a no-replace rename. | publication-seam, record-commit-point | REQ-05, OD-6, F-02 | creates 1, touches 3 | — | session-record-commit |
-| data-root-ignore-entry | Data-root ignore file as a derived materialization | task | The data root's ignore file is composed from the repository's own declarations. | init-root-publication, record-commit-point | REQ-05, OD-8, LD-10, F-03, F-26 | touches 7 | — | init-root-publisher |
-| nofollow-open-rehome | Re-homed no-follow file open | task | The no-follow regular-file open lives outside the transaction kernel module. | — | REQ-05, F-06 | touches 4 | — | record-publication-cutover |
-| kernel-retirement | Transaction kernel retirement | task | The journaled kernel with its journal, staging, recovery, and control plane leaves storage. | publication-seam, req05-construct-map, line-budget | REQ-05, REQ-06, OD-7, LD-6, F-06, F-22 | touches 11, uncertain | — | nofollow-open-rehome |
+| init-root-publisher | Init publisher for an absent data root | task | A fresh data root appears whole through a synced stage directory and a no-replace rename. | publication-seam, record-commit-point | REQ-05, OD-6, F-02 | creates 1, touches 3 | — | session-record-commit, nofollow-open-rehome |
+| data-root-ignore-entry | Data-root ignore file as a derived materialization | task | The data root's ignore file is composed from the repository's own declarations. | init-root-publication, record-commit-point | REQ-05, OD-8, LD-10, F-03, F-26 | touches 7 | — | kernel-retirement |
+| security-scope-statement | Security review scope names live mechanisms | task | The security-review scope names the mechanisms the repository has. | record-prose-statement | REQ-07, LD-3, F-13 | touches 2 | — | kernel-retirement |
+| nofollow-open-rehome | Re-homed no-follow file open | task | The no-follow regular-file open lives outside the transaction kernel module. | — | REQ-05, F-06 | touches 4 | — | redo-record-foundation |
+| kernel-retirement | Transaction kernel retirement | task | The journaled kernel with its journal, staging, recovery, and control plane leaves storage. | publication-seam, req05-construct-map, line-budget | REQ-05, REQ-06, OD-7, LD-6, F-06, F-22 | touches 11, uncertain | — | init-root-publisher |
 | single-pass-capture | Single-pass mutation capture | task | A mutation reads the repository once rather than in three gated rounds. | publication-seam, req05-construct-map, line-budget | REQ-01, REQ-05, REQ-06, OD-1, F-12 | touches 6 | — | record-publication-cutover |
 | listing-fingerprint-retirement | Listing fingerprint retirement | task | Repository images carry child names without listing fingerprints. | req05-construct-map, line-budget | REQ-05, REQ-06, OD-1, F-12, F-25 | touches 5, uncertain | — | single-pass-capture |
 | document-closure-retirement | Mutation document closure retirement | task | Mutation capture resolves no issue-linked document closure. | req05-construct-map, line-budget | REQ-05, REQ-06, OD-1, F-12 | touches 3 | — | single-pass-capture |
-| transaction-output-fields | Transaction fields leave the command output | task | The profile and recover commands report the redo record in their output. | publication-seam | REQ-05, REQ-07, OD-9, LD-8, F-10, F-23 | touches 8 | — | record-publication-cutover |
-| plan-hash-retirement | Plan hash retirement | task | The plan carries its delta with no digest over captured entries. | req05-construct-map, line-budget | REQ-05, REQ-06, OD-9, F-10 | touches 5 | — | transaction-output-fields, kernel-retirement |
-| publication-path-guards | Publication path source guards | task | Source guards fail when a second repository publication path appears. | publication-seam, req05-construct-map, init-root-publication | REQ-05, OD-6, F-18, F-21 | touches 1 | — | kernel-retirement |
-| event-append-encoding | Positioned event-log append | task | The finalizer emits the event-log change as an offset with its bytes. | redo-record-shape, positioned-event-append, publication-seam | REQ-01, REQ-02, OD-7, LD-9, F-08, F-27 | touches 6 | — | kernel-retirement |
+| transaction-output-fields | Transaction fields leave the command output | task | The profile and recover commands report the redo record in their output. | publication-seam | REQ-05, REQ-07, OD-9, LD-8, F-10, F-23 | touches 9 | — | record-publication-cutover |
+| plan-hash-retirement | Plan hash retirement | task | The plan carries its delta with no digest over captured entries. | req05-construct-map, line-budget | REQ-05, REQ-06, OD-9, F-10 | touches 5 | — | transaction-output-fields |
+| publication-path-guards | Publication path source guards | task | Source guards fail when a second repository publication path appears. | publication-seam, req05-construct-map, init-root-publication | REQ-05, OD-6, F-18, F-21 | touches 1 | — | record-publication-cutover |
+| event-append-encoding | Positioned event-log append | task | The finalizer emits the event-log change as an offset with its bytes. | redo-record-shape, positioned-event-append, publication-seam | REQ-01, REQ-02, OD-7, LD-9, F-08, F-27 | touches 6 | — | record-publication-cutover |
 | bench-event-log-scale | Benchmark harness event-log scale | task | The harness measures a label update against a ten-times larger event log. | — | REQ-02, OD-2, F-16, F-17 | touches 1 | — | — |
-| publication-cost-evidence | Publication cost evidence | task | A committed artifact reports label-update latency before and after plus the line balance. | line-budget, positioned-event-append | REQ-01, REQ-02, REQ-06, OD-2, LD-6, F-16, F-17 | creates 1, touches 1 | — | bench-event-log-scale, superseded-mechanism-retirement |
-| declaration-statements | Repository declarations state the redo record | task | The invariant registry, the gate scope, and the charter decision name the record. | record-prose-statement, positioned-event-append, init-root-publication | REQ-07, OD-5, LD-3, F-11 | touches 6 | — | event-append-encoding, single-pass-capture |
+| publication-cost-evidence | Publication cost evidence | task | A committed artifact reports label-update latency before and after plus the line balance. | line-budget, positioned-event-append | REQ-01, REQ-02, REQ-06, OD-2, LD-6, F-16, F-17 | creates 1, touches 1 | — | bench-event-log-scale, superseded-design-retirement |
+| declaration-statements | Repository declarations state the redo record | task | The invariant registry and the charter decision name the record. | record-prose-statement, positioned-event-append, init-root-publication | REQ-07, OD-5, LD-3, F-11 | touches 4 | — | event-append-encoding, single-pass-capture |
 | storage-format-reference | Storage format reference states the redo record | task | The storage-format reference names the record's home, its publication, and its application. | record-prose-statement, init-root-publication | REQ-07, OD-8, LD-3, LD-10, F-03 | touches 1 | — | data-root-ignore-entry |
-| concepts-family-docs | Concept documents state the redo record | task | The concepts family describes record-based publication. | record-prose-statement | REQ-07, OD-8, LD-3, F-14 | touches 4 | — | session-record-commit |
-| profiles-reference | Profiles reference states the redo record | task | The profiles reference describes profile publication as a record applied forward. | record-prose-statement | REQ-07, OD-9, LD-3, F-13 | touches 4 | — | session-record-commit |
-| cli-recovery-reference | Command and recovery references state the redo record | task | The command and recovery references describe the record and the application that recovers it. | record-prose-statement, init-root-publication | REQ-07, LD-3, F-19, F-20 | touches 5 | — | init-root-publisher |
-| operations-guide | Deployment guide backup procedure | task | The backup procedure excludes a pending redo record. | record-prose-statement | REQ-07, OD-8, LD-3, F-14 | touches 1 | — | session-record-commit |
+| concepts-family-docs | Concept documents state the redo record | task | The concepts family describes record-based publication. | record-prose-statement | REQ-07, OD-8, LD-3, F-14 | touches 4 | — | kernel-retirement |
+| profiles-reference | Profiles reference states the redo record | task | The profiles reference describes profile publication as a record applied forward. | record-prose-statement | REQ-07, OD-9, LD-3, F-13 | touches 4 | — | kernel-retirement |
+| cli-recovery-reference | Command and recovery references state the redo record | task | The command and recovery references describe the record and the application that recovers it. | record-prose-statement, init-root-publication | REQ-07, LD-3, F-19, F-20 | touches 7 | — | kernel-retirement |
+| operations-guide | Deployment guide backup procedure | task | The backup procedure excludes a pending redo record. | record-prose-statement | REQ-07, OD-8, LD-3, F-14 | touches 1 | — | kernel-retirement |
 | rust-prose-sweep | Rust prose and command help state the redo record | task | Module docs, error strings, and recover help name the record mechanism. | record-prose-statement | REQ-07, LD-3, F-20 | touches 8, uncertain | — | event-append-encoding |
-| generated-reference-regeneration | Generated references match the redo-record surface | task | The generated references match the redo-record surface. | record-prose-statement, positioned-event-append | REQ-07, LD-3, F-19 | touches 5 | — | rust-prose-sweep |
+| generated-reference-regeneration | Generated storage-records reference matches the append encoding | task | The generated storage-records reference matches the append encoding. | record-prose-statement, positioned-event-append | REQ-07, LD-3, F-19 | touches 3 | — | rust-prose-sweep |
 | architecture-materialization-doc | Architecture materialization note rewrite | task | The materialization architecture note describes record publication. | record-prose-statement, publication-seam, positioned-event-append | REQ-07, LD-3, F-13 | touches 3 | — | listing-fingerprint-retirement, document-closure-retirement, plan-hash-retirement, event-append-encoding |
 | testing-guide-evidence | Testing guide publication-cost evidence | task | The testing guide names the redo-record harness as its publication-cost evidence. | record-prose-statement, line-budget | REQ-06, REQ-07, LD-3, LD-4, F-15 | touches 4 | — | publication-cost-evidence |
-| redo-record-foundation | Redo record foundation | story | The record mechanism exists whole and proven, with no publisher on it yet. | redo-record-shape, record-commit-point, redo-interruption-points, commit-conflict-check, interruption-matrix-placement, line-budget | OD-10, REQ-03, REQ-04, OD-3, OD-7 | — | — | record-interruption-conformance, write-set-conflict-check |
-| record-publication-cutover | Record publication cutover | story | Every repository mutation commits through the record, with the adopter surface in step. | publication-seam, commit-conflict-check, init-root-publication, lock-and-record-scope, interruption-matrix-placement, record-prose-statement | OD-10, REQ-03, REQ-04, REQ-05, REQ-07, OD-1, OD-6, OD-8, LD-3, LD-10 | — | — | storage-format-reference, concepts-family-docs, profiles-reference, cli-recovery-reference, operations-guide |
-| superseded-mechanism-retirement | Superseded publication mechanism retirement | story | The journaled kernel, the phased capture, and the whole-log rewrite are gone. | req05-construct-map, publication-seam, line-budget, init-root-publication, positioned-event-append, record-prose-statement | OD-10, REQ-02, REQ-05, REQ-06, REQ-07, OD-5, OD-7, OD-9, LD-3, LD-6, LD-8, LD-9 | — | — | publication-path-guards, declaration-statements, generated-reference-regeneration, architecture-materialization-doc |
+| redo-record-foundation | Redo record foundation | story | The record mechanism exists whole and proven, with no publisher on it yet. | redo-record-shape, record-commit-point, redo-interruption-points, commit-conflict-check, interruption-matrix-placement, line-budget | OD-10, REQ-03, REQ-04, OD-3, OD-7, LD-11 | — | — | record-interruption-conformance, write-set-conflict-check |
+| record-publication-cutover | Record publication cutover | story | Mutations commit through the record, the kernel is gone, and the adopter surface is in step. | publication-seam, commit-conflict-check, init-root-publication, lock-and-record-scope, interruption-matrix-placement, record-prose-statement, req05-construct-map | OD-10, REQ-03, REQ-04, REQ-05, REQ-07, OD-1, OD-6, OD-8, LD-3, LD-10, LD-11 | — | — | storage-format-reference, concepts-family-docs, profiles-reference, cli-recovery-reference, operations-guide, security-scope-statement |
+| superseded-design-retirement | Superseded design retirement | story | The phased capture, the plan hash, and the whole-log rewrite are gone. | req05-construct-map, publication-seam, line-budget, init-root-publication, positioned-event-append, record-prose-statement | OD-10, REQ-02, REQ-05, REQ-06, REQ-07, OD-5, OD-7, OD-9, LD-3, LD-6, LD-8, LD-9 | — | — | publication-path-guards, declaration-statements, generated-reference-regeneration, architecture-materialization-doc |
 | mutation-cost-evidence | Mutation cost evidence | story | Committed evidence shows a mutation's wall time bounded by what it changes. | line-budget, positioned-event-append, record-prose-statement | OD-10, REQ-01, REQ-02, REQ-06, REQ-07, OD-2, LD-4, LD-6 | — | — | testing-guide-evidence |
 
 ```mermaid
@@ -245,82 +252,85 @@ flowchart LR
     N10["session-record-commit: Session commit through the redo record"]
     N11["init-root-publisher: Init publisher for an absent data root"]
     N12["data-root-ignore-entry: Data-root ignore file as a derived materialization"]
-    N13["nofollow-open-rehome: Re-homed no-follow file open"]
-    N14["kernel-retirement: Transaction kernel retirement"]
-    N15["single-pass-capture: Single-pass mutation capture"]
-    N16["listing-fingerprint-retirement: Listing fingerprint retirement"]
-    N17["document-closure-retirement: Mutation document closure retirement"]
-    N18["transaction-output-fields: Transaction fields leave the command output"]
-    N19["plan-hash-retirement: Plan hash retirement"]
-    N20["publication-path-guards: Publication path source guards"]
-    N21["event-append-encoding: Positioned event-log append"]
-    N22["bench-event-log-scale: Benchmark harness event-log scale"]
-    N23["publication-cost-evidence: Publication cost evidence"]
-    N24["declaration-statements: Repository declarations state the redo record"]
-    N25["storage-format-reference: Storage format reference states the redo record"]
-    N26["concepts-family-docs: Concept documents state the redo record"]
-    N27["profiles-reference: Profiles reference states the redo record"]
-    N28["cli-recovery-reference: Command and recovery references state the redo record"]
-    N29["operations-guide: Deployment guide backup procedure"]
-    N30["rust-prose-sweep: Rust prose and command help state the redo record"]
-    N31["generated-reference-regeneration: Generated references match the redo-record surface"]
-    N32["architecture-materialization-doc: Architecture materialization note rewrite"]
-    N33["testing-guide-evidence: Testing guide publication-cost evidence"]
-    N34["redo-record-foundation: Redo record foundation"]
-    N35["record-publication-cutover: Record publication cutover"]
-    N36["superseded-mechanism-retirement: Superseded publication mechanism retirement"]
-    N37["mutation-cost-evidence: Mutation cost evidence"]
+    N13["security-scope-statement: Security review scope names live mechanisms"]
+    N14["nofollow-open-rehome: Re-homed no-follow file open"]
+    N15["kernel-retirement: Transaction kernel retirement"]
+    N16["single-pass-capture: Single-pass mutation capture"]
+    N17["listing-fingerprint-retirement: Listing fingerprint retirement"]
+    N18["document-closure-retirement: Mutation document closure retirement"]
+    N19["transaction-output-fields: Transaction fields leave the command output"]
+    N20["plan-hash-retirement: Plan hash retirement"]
+    N21["publication-path-guards: Publication path source guards"]
+    N22["event-append-encoding: Positioned event-log append"]
+    N23["bench-event-log-scale: Benchmark harness event-log scale"]
+    N24["publication-cost-evidence: Publication cost evidence"]
+    N25["declaration-statements: Repository declarations state the redo record"]
+    N26["storage-format-reference: Storage format reference states the redo record"]
+    N27["concepts-family-docs: Concept documents state the redo record"]
+    N28["profiles-reference: Profiles reference states the redo record"]
+    N29["cli-recovery-reference: Command and recovery references state the redo record"]
+    N30["operations-guide: Deployment guide backup procedure"]
+    N31["rust-prose-sweep: Rust prose and command help state the redo record"]
+    N32["generated-reference-regeneration: Generated storage-records reference matches the append encoding"]
+    N33["architecture-materialization-doc: Architecture materialization note rewrite"]
+    N34["testing-guide-evidence: Testing guide publication-cost evidence"]
+    N35["redo-record-foundation: Redo record foundation"]
+    N36["record-publication-cutover: Record publication cutover"]
+    N37["superseded-design-retirement: Superseded design retirement"]
+    N38["mutation-cost-evidence: Mutation cost evidence"]
     N0 --> N1
     N1 --> N2
     N2 --> N3
     N0 --> N4
     N3 --> N5
-    N34 --> N6
-    N34 --> N7
+    N35 --> N6
+    N35 --> N7
     N6 --> N8
     N7 --> N8
     N8 --> N9
     N9 --> N10
     N10 --> N11
-    N11 --> N12
-    N35 --> N13
-    N13 --> N14
-    N35 --> N15
-    N15 --> N16
-    N15 --> N17
-    N35 --> N18
-    N18 --> N19
-    N14 --> N19
-    N14 --> N20
-    N14 --> N21
-    N22 --> N23
-    N36 --> N23
-    N21 --> N24
-    N15 --> N24
-    N12 --> N25
-    N10 --> N26
-    N10 --> N27
-    N11 --> N28
-    N10 --> N29
-    N21 --> N30
-    N30 --> N31
-    N16 --> N32
-    N17 --> N32
-    N19 --> N32
-    N21 --> N32
-    N23 --> N33
-    N5 --> N34
-    N4 --> N34
-    N25 --> N35
-    N26 --> N35
-    N27 --> N35
-    N28 --> N35
-    N29 --> N35
-    N20 --> N36
-    N24 --> N36
-    N31 --> N36
-    N32 --> N36
+    N14 --> N11
+    N15 --> N12
+    N15 --> N13
+    N35 --> N14
+    N11 --> N15
+    N36 --> N16
+    N16 --> N17
+    N16 --> N18
+    N36 --> N19
+    N19 --> N20
+    N36 --> N21
+    N36 --> N22
+    N23 --> N24
+    N37 --> N24
+    N22 --> N25
+    N16 --> N25
+    N12 --> N26
+    N15 --> N27
+    N15 --> N28
+    N15 --> N29
+    N15 --> N30
+    N22 --> N31
+    N31 --> N32
+    N17 --> N33
+    N18 --> N33
+    N20 --> N33
+    N22 --> N33
+    N24 --> N34
+    N5 --> N35
+    N4 --> N35
+    N26 --> N36
+    N27 --> N36
+    N28 --> N36
+    N29 --> N36
+    N30 --> N36
+    N13 --> N36
+    N21 --> N37
+    N25 --> N37
+    N32 --> N37
     N33 --> N37
+    N34 --> N38
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -337,7 +347,7 @@ flowchart LR
 | OD-7 Record vocabulary | Chosen: put, delete, and event-append over data-root and worktree paths, with parents created on apply, a move expressed as put plus delete, idempotent re-application, and every current kernel publisher switching. Rejected: a data-root-only record with worktree outputs re-derived afterwards, which splits one mutation across two commit points; literal writes and appends with deletes handled outside the record, which leaves archive execution and profile asset departure unrecoverable. |
 | OD-8 Scratch directory containment | Chosen: the data root carries a composed ignore file naming the scratch directory, the record's name ends in an extension the temp sweep does not match, and the two adopter documents instructing a bulk temp delete and a whole-data-root tar are rewritten. Rejected: editing the adopter's root ignore file, which the engine does not own; documentation alone, which leaves a correctness property unenforced. |
 | OD-9 Profile output fields | Chosen: `plan_hash`, `transaction_id`, and `transaction_cleanup_pending` leave the output, the schema, the bridge, and the reference in one cutover, per `@/inv/canonical-cutover`. Rejected: a re-derived plan identifier, which keeps a representation with no consumer; keeping all three, which documents a mechanism that no longer exists. |
-| OD-10 Story phases | Chosen: four stories as phase checkpoints, each carrying aggregate criteria an independent read-only reviewer can verify against repository artifacts — the mechanism built and unreached, the cutover with publishers untouched and the adopter surface in step, the retirement checked construct by construct, and the cost target on committed evidence. Every story carries `holistic-review` and `doc-review` without exception, plus `cargo-ci` where its tasks change Rust and `docs-mechanical` where they edit `docs/`. Both review gates derive their own scope from the delivered work rather than from a declared one, and the documentation gate treats an omitted required update as blocking (`scripts/doc-review-prompt.md`), which is why adopter documentation lands inside the phase that changes the behaviour it describes. A story's `depends_on` names its own maximal tasks, and every ordering edge that leaves a story runs from the dependent task to the predecessor *story*. That is what makes containment deterministic: hierarchy resolves from the DAG, a task's parent is the nearest dominating container, and a foreign story reaching a task through a task-to-task edge competes on fewest hops and then on the smallest container id (`crates/jit/src/graph/hierarchy.rs:49-68`). Routing through the story node puts every foreign container two hops further away, and a dependency into a same-tier node bounds the closure without conferring containment. Rejected: a documentation-only closing phase, whose deferral leaves the middle checkpoints unable to pass their documentation gate; dropping `doc-review` from the middle stories, which the owner's rule forbids; cross-story task-to-task edges, which assigned tasks to the wrong story and left ties decided by random ids; one flat task set, which leaves REQ-05's construct-by-construct check and the cross-task coherence checks with no owner. |
+| OD-10 Story phases | Chosen: four stories as phase checkpoints, each carrying aggregate criteria an independent read-only reviewer can verify against repository artifacts — the mechanism built and unreached, the cutover with publishers untouched and the adopter surface in step, the retirement checked construct by construct, and the cost target on committed evidence. Every story carries `holistic-review` and `doc-review` without exception, plus `cargo-ci` where its tasks change Rust and `docs-mechanical` where they edit `docs/` — the evidence phase edits `dev/` and `scripts/` only, and that gate's footprint is `docs/`, so it carries neither. Both review gates derive their own scope from the delivered work rather than from a declared one, and the documentation gate treats an omitted required update as blocking (`scripts/doc-review-prompt.md`), which is why adopter documentation lands inside the phase that changes the behaviour it describes. A story's `depends_on` names its own maximal tasks, and every ordering edge that leaves a story runs from the dependent task to the predecessor *story*. That is what makes containment deterministic: hierarchy resolves from the DAG, a task's parent is the nearest dominating container, and a foreign story reaching a task through a task-to-task edge competes on fewest hops and then on the smallest container id (`crates/jit/src/graph/hierarchy.rs:49-68`). Routing through the story node puts every foreign container two hops further away, and a dependency into a same-tier node bounds the closure without conferring containment. Rejected: a documentation-only closing phase, whose deferral leaves the middle checkpoints unable to pass their documentation gate; dropping `doc-review` from the middle stories, which the owner's rule forbids; cross-story task-to-task edges, which assigned tasks to the wrong story and left ties decided by random ids; one flat task set, which leaves REQ-05's construct-by-construct check and the cross-task coherence checks with no owner. |
 | LD-1 Lock and record scope | The repository lock serializes writers of repository state; machine-local control files — worktree identity, the server pid file and log, and claims — stay outside the lock and the record. Stated rather than inherited, because D-17's premise is unqualified and eleven writers bypass the lock. |
 | LD-2 `commands/breakdown.rs` | Left untouched: a test-reachable library API with no CLI arm, each of whose calls publishes one record. It is a second *pattern*, not a second *mechanism*, so REQ-05 is unaffected. |
 | LD-3 REQ-07 enforcement | Met by explicit sweep tasks under `doc-review`, the mechanical gate, and the documentation story's aggregate check; the mechanical gate's footprint stays `docs/`. Widening it would change a shared gate's contract for one epic's benefit. |
@@ -346,8 +356,9 @@ flowchart LR
 | LD-6 REQ-06 base | `34d37f8be`, measured with `git diff --shortstat 34d37f8be -- '*.rs'` over the workspace. |
 | LD-7 Known unrelated flake | The nextest twenty-second per-test bound against the dogfood fixture's hundred-and-twenty-second cold-build lock fires on the first full run after a rebuild. A rerun is the remedy; no task in this graph fixes it, and a rerun is not evidence of a regression. |
 | LD-8 `transactions_recovered` | The recover command's JSON key and its rendered line are renamed to name applied redo records, inside `transaction-output-fields`, per `@/inv/canonical-cutover`. It is the same class as OD-9: an adopter-visible name for a deleted mechanism, fed by the session-open dispatch count (`main.rs:7806, 7820, 7835, 7848`). The count survives with the name of what it now counts. |
-| LD-9 Append encoding lands after the kernel retires | `RepositoryAction` is matched exhaustively at six sites, four of them inside the kernel module, so an append variant landing earlier needs four unreachable match arms in library code that forbids panics. The ordering `kernel-retirement → event-append-encoding` stays, which puts the append encoding in the retirement phase beside the capture reduction it belongs with. |
-| Risk: the whole-log record window | The window opens in the cutover phase at `session-record-commit` and closes in the retirement phase at `event-append-encoding`. Inside it every mutation performs two synced multi-megabyte writes: the record holding the whole event log, then the log itself. That is slower than today, including for this repository's own dogfooding. Four tasks lie on the path between them — `init-root-publisher` and `data-root-ignore-entry` closing the cutover phase, `nofollow-open-rehome` and `kernel-retirement` opening the retirement phase — plus the cutover story's gates. Accepted because this repository's dogfood binary is installed explicitly by `./scripts/install-jit.sh`, so it is not reinstalled from inside the window. |
+| LD-9 Append encoding lands after the kernel retires | `RepositoryAction` is matched exhaustively at six sites, four of them inside the kernel module, so an append variant landing earlier needs four unreachable match arms in library code that forbids panics. The append encoding therefore opens the retirement phase, beside the capture reduction it belongs with. |
+| LD-11 The kernel retires in the cutover phase | `scripts/cargo-ci.sh:520` runs `cargo clippy --workspace --all-targets -- -D warnings`. `crates/jit/src/storage/mod.rs:22` declares `pub(crate) mod file_transaction` and `:39-41` three private modules, and `FileTransactionKernel` is `pub(in crate::storage)` (`file_transaction.rs:68`), so the subsystem is dead-code-eligible the moment it loses its last caller. That moment is `init-root-publisher`, which takes over the absent-root branch. Chosen: `kernel-retirement` moves into the cutover phase directly after it, with `nofollow-open-rehome` ahead of both, and `init-root-publisher` carries one named `#[allow(dead_code)]` whose stated removal condition is the kernel's retirement — the named, versioned boundary `@/inv/canonical-cutover` requires. The allowance lives across one task and reaches no story checkpoint. The gate scope naming recovery journals, and the adopter pages the kernel's removal falsifies, move into the same phase. Rejected: leaving the allowance to span a phase boundary, which parks a warning suppression at a reviewed checkpoint; merging the init publisher and the kernel's deletion into one task, which mixes a publication mechanism with a subsystem removal. |
+| Risk: the whole-log record window | The window opens in the cutover phase at `session-record-commit` and closes at `event-append-encoding`, the first task of the retirement phase. Inside it every mutation performs two synced multi-megabyte writes: the record holding the whole event log, then the log itself. That is slower than today, including for this repository's own dogfooding. The path between them runs `init-root-publisher` → `kernel-retirement` → `data-root-ignore-entry` → the adopter pages → the cutover gates. Accepted because this repository's dogfood binary is installed explicitly by `./scripts/install-jit.sh`, so it is not reinstalled from inside the window. |
 | LD-10 Data-root ignore file | Composed as a derived materialization beside the default ruleset and the default schemas, whose producer both initialization (`repository_state/initialize.rs:740`) and derived-state repair (`repository_state/mod.rs:1058`) already reach, so an existing repository gains the file at its next repair with no migration path. The task also commits this repository's `.jit/.gitignore` and removes the hand-maintained scratch entry from its root ignore file (`@/inv/convention-convergence`). The worktree attributes file is the precedent for the engine owning a version-control control file. |
 | Risk: one hot file across four tasks | `crates/jit/src/storage/repository_state_store_tests.rs` is 5,051 lines with 132 injection sites and is touched by the conformance suite, the rollback-coverage retirement, the injection repoint, and the plan-hash retirement. All four are sequential in the graph, so the overlap is landing-order-safe; it is the single hottest file in the epic and the one to rebase early. |
 | Risk: rollback coverage outlives its guarantee | Coverage asserting rollback reachability, and the two tests asserting interruption convergence over the kernel's point set, fail or go vacuous the moment publication changes. They retire in their own task after the record's conformance suite takes ownership of the surviving property and before the seam changes, so the property has an owner at every step. |
