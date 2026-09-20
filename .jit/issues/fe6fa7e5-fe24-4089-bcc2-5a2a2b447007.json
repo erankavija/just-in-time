@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-20T06:26:09.967947527Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
@@ -8,12 +8,24 @@
   ],
   "description": "The benchmark harness measures a label update on a repository whose event log is ten times larger, with the issue set unchanged.\n\n## Background\n\nThe harness clones two repositories onto a scratch filesystem, syncs the live data root in, and takes the median of three runs for three scenarios: a changing label update, an idempotent one, and one refused for a missing lease. It measures wall clock.\n\nIsolating the event-log term needs a fourth fixture: the same repository, the same issues, the same index, and a log ten times the bytes. The honest construction replays real event lines with fresh identifiers, because every line must parse and the log's merge behaviour assumes one record per identifier. Inflating the log during the sync step keeps the fixture a real data root that goes through the same capture and publication as the unmodified one.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness produces a fixture whose event log is at least ten times the source repository's log in bytes, with the same issue set and the same index.\n- [hard] REQ-02: Every line in the inflated log parses, and event identifiers stay unique.\n- [hard] REQ-03: The harness runs the changing, idempotent, and lease-refused scenarios against the inflated fixture and reports each median beside the unmodified one.\n- [hard] REQ-04: The harness reports the byte size of each log it compared.\n- [hard] REQ-05: The harness states the absolute paths it depends on and fails with a message naming a missing one.\n",
   "documents": [],
+  "done_at": "2026-09-20T06:46:48.387078006Z",
   "first_ready_at": "2026-09-20T01:05:37.007130180Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T06:45:50.978714575Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-20T06:44:50.308823068Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fe6fa7e5-fe24-4089-bcc2-5a2a2b447007",
   "labels": [
     "type:task",
@@ -25,7 +37,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Benchmark harness event-log scale",
-  "updated_at": "2026-09-20T06:26:09.967947527Z"
+  "updated_at": "2026-09-20T06:46:48.387078006Z"
 }
