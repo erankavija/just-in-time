@@ -20,9 +20,9 @@
       "updated_by": null
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-09-19T20:52:34.029025818Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-20T01:06:10.553257644Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "df3e10fb-19f0-49af-ab19-24498f200b65",
@@ -38,5 +38,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "breakdown: Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-20T01:05:36.751379319Z"
+  "updated_at": "2026-09-20T01:06:10.553257644Z"
 }
