@@ -1,8 +1,0 @@
-# Seeds for failure cases proptest has generated in the past. It is
-# automatically read and these particular cases re-run before any
-# novel cases are generated.
-#
-# It is recommended to check this file in to source control so that
-# everyone who runs the test benefits from these saved cases.
-cc 2add5b00de156261c568e52dc79369856b2aaf56a8a7494b87f3f0a6b0486782 # shrinks to record = RedoRecord { puts: [PutFile { path: VirtualPath { root: Data, relative: Descendant("issues/2026/a.json") }, bytes: [], mode: Regular }], deletes: [], event_append: None }, initial = ([], false)
-cc 3f25411f616d479baad4584c9b872e23e62cea0b497947dacf5bb9808e29ad0a # shrinks to record = RedoRecord { puts: [], deletes: [VirtualPath { root: Data, relative: Descendant("index.json") }], event_append: None }, initial = ([], false)
