@@ -178,9 +178,7 @@ where
     S: IssueStore + crate::storage::RepositoryStateStore,
 {
     use super::{capture_or_retry, with_mutation_session, SessionStep};
-    use crate::repository_state::{
-        finalize, CaptureBudget, CaptureSpec, MutationIntent, VirtualPath,
-    };
+    use crate::repository_state::{finalize, CaptureSpec, MutationIntent, VirtualPath};
     use crate::storage::discover_repository_layout;
 
     let layout = discover_repository_layout(worktree_root, data_root)?;
@@ -188,18 +186,13 @@ where
         issue_id: full_id.to_string(),
         agent: agent.clone(),
     }];
-    let budget = CaptureBudget {
-        max_listings: 0,
-        max_bytes: 16 * 1024 * 1024,
-        max_depth: 6,
-    };
     let build_spec = || -> Result<CaptureSpec> {
         Ok(CaptureSpec::phase_one(
             [
                 VirtualPath::data(format!("issues/{full_id}.json"))?,
                 VirtualPath::EVENTS,
             ],
-            budget,
+            super::issue_mutation_capture_budget(),
         )?)
     };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
@@ -1803,6 +1796,59 @@ mod tests {
         // A further acquire by the same agent/worktree is a complete no-op: the
         // convergent transition never emits a duplicate event.
         execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+        assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
+        Ok(())
+    }
+
+    /// Append well-formed events for unrelated issues until the log exceeds
+    /// `bytes`, so a claim over it is decided by nothing but its own tail.
+    fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()> {
+        use std::io::Write;
+
+        let path = storage.root().join("events.jsonl");
+        let mut log = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)?;
+        let mut written = fs::metadata(&path)?.len();
+        let mut ordinal = 0_u64;
+        while written <= bytes {
+            let line = serde_json::to_string(&crate::domain::Event::IssueCreated {
+                id: format!("01J0000000000000000000{ordinal:04}"),
+                issue_id: format!("00000000-0000-4000-8000-{ordinal:012}"),
+                timestamp: chrono::Utc::now(),
+                title: format!("Accumulated history {ordinal}"),
+                priority: crate::domain::Priority::Normal,
+            })?;
+            writeln!(log, "{line}")?;
+            written += line.len() as u64 + 1;
+            ordinal += 1;
+        }
+        log.flush()?;
+        Ok(())
+    }
+
+    /// A repository's accumulated history does not decide whether an issue can
+    /// be claimed: the claim capture charges no ceiling the log can outgrow, so
+    /// a log past the 16 MiB one it once held still claims and still appends
+    /// exactly one event (@/inv/event-log).
+    #[test]
+    fn test_claim_acquire_synchronized_succeeds_over_an_event_log_past_the_former_ceiling(
+    ) -> Result<()> {
+        let (temp, storage) = setup_test_repo()?;
+        let issue_id = create_test_issue(&storage, "Long History Issue")?;
+        grow_event_log_beyond(&storage, 16 * 1024 * 1024)?;
+
+        execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
+
+        assert_eq!(
+            storage
+                .load_issue(&issue_id)?
+                .assignee
+                .as_ref()
+                .map(ToString::to_string),
+            Some("agent:worker".to_string())
+        );
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
         Ok(())
     }
