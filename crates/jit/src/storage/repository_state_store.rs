@@ -1702,6 +1702,26 @@ pub(crate) fn open_child_dir_nofollow(
     Ok(Dir::from_std_file(file.into_std()))
 }
 
+/// Open `leaf` under `parent` as an ordinary file, refusing a symlink or any
+/// non-regular target without following it.
+pub(crate) fn open_regular_file_nofollow(
+    parent: &Dir,
+    leaf: &str,
+) -> Result<cap_std::fs::File, RepositoryStateStoreError> {
+    let metadata = parent.symlink_metadata(leaf)?;
+    if metadata.is_symlink() || !metadata.is_file() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(leaf.to_string()));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let file = parent.open_with(leaf, &options)?;
+    if !file.metadata()?.is_file() {
+        return Err(RepositoryStateStoreError::UnsafeTarget(leaf.to_string()));
+    }
+    Ok(file)
+}
+
 pub(crate) fn open_absolute_dir_nofollow(path: &Path) -> Result<Dir, RepositoryStateStoreError> {
     if !path.is_absolute() {
         return Err(RepositoryStateStoreError::UnsafeTarget(

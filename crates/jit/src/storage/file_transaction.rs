@@ -2512,7 +2512,7 @@ fn inspect_repository_leaf(parent: &Dir, leaf: &str) -> Result<RepositoryEntry> 
         });
     }
     if metadata.is_file() {
-        let mut file = open_regular_file_nofollow(parent, leaf)?;
+        let mut file = super::repository_state_store::open_regular_file_nofollow(parent, leaf)?;
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
         let metadata = file.metadata()?;
@@ -2741,20 +2741,6 @@ fn validate_relative(path: &str) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn open_regular_file_nofollow(parent: &Dir, leaf: &str) -> Result<cap_std::fs::File> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let file = parent.open_with(leaf, &options)?;
-    if !file.metadata()?.is_file() {
-        return Err(FileTransactionError::UnsupportedTarget {
-            path: leaf.to_string(),
-        }
-        .into());
-    }
-    Ok(file)
-}
-
 #[derive(Debug, thiserror::Error)]
 #[error("missing target parent: {0}")]
 struct MissingParent(String);
@@ -2920,7 +2906,7 @@ fn set_mode(parent: &Dir, leaf: &str, mode: Option<u32>) -> Result<()> {
     #[cfg(unix)]
     if let Some(mode) = mode {
         use cap_std::fs::PermissionsExt;
-        let file = open_regular_file_nofollow(parent, leaf)?;
+        let file = super::repository_state_store::open_regular_file_nofollow(parent, leaf)?;
         file.set_permissions(cap_std::fs::Permissions::from_mode(mode & 0o7777))?;
         file.sync_all()?;
     }
