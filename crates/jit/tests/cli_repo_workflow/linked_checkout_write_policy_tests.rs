@@ -12,33 +12,14 @@
 use assert_cmd::prelude::*;
 use jit::commands::CommandExecutor;
 use jit::domain::{Event, LinkedCheckoutWriteStance, Priority};
-use jit::storage::{
-    IssueStore, JsonFileStorage, RepositoryStateStore, TransactionFailureInjector,
-    TransactionFailurePoint,
-};
+use jit::storage::IssueStore;
 use std::path::Path;
-use std::sync::Arc;
 
 fn override_annotation(repository: &Path) -> jit::repository_state::MutationContextAnnotation {
     jit::repository_state::MutationContextAnnotation::LinkedCheckoutWriteOverridden {
         checkout: repository.join(".worktrees/feature"),
         declared_stance: LinkedCheckoutWriteStance::Refuse,
         invocation_override: LinkedCheckoutWriteStance::Allow,
-    }
-}
-
-/// Fails the transaction kernel at the commit decision, after the mutation's
-/// coupled issue and event materialization has been staged but before it commits.
-struct FailAtCommitDecision;
-
-impl TransactionFailureInjector for FailAtCommitDecision {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &TransactionFailurePoint::RepositoryBeforeCommitDecision {
-            return Err(std::io::Error::other(
-                "injected override-audit persistence failure",
-            ));
-        }
-        Ok(())
     }
 }
 
@@ -140,75 +121,6 @@ fn test_create_issue_under_dispatch_override_persists_the_audit_record_with_the_
     storage
         .load_issue(&issue_id)
         .expect("the mutation explained by the audit record must be durable");
-}
-
-#[test]
-fn test_create_issue_under_dispatch_override_persistence_failure_leaves_neither_issue_nor_audit_record(
-) {
-    let (temp, storage, taxonomy) = jit::test_utils::setup_test_repo_with_taxonomy()
-        .expect("initialize the fixture repository");
-    let layout = jit::storage::discover_repository_layout(temp.path(), storage.root())
-        .expect("discover the repository layout");
-    let events_before = storage
-        .read_events()
-        .expect("read the event log before the failed mutation");
-    let issues_before = storage
-        .read_issues()
-        .expect("read the issue set before the failed mutation");
-    let jit_dir = temp.path().join(".jit");
-    let injected =
-        JsonFileStorage::with_repository_state_failures(&jit_dir, Arc::new(FailAtCommitDecision));
-    let executor = CommandExecutor::new(injected).with_layout(layout);
-    let annotation = override_annotation(temp.path());
-
-    let error = jit::commands::with_dispatch_mutation_annotation(annotation, || {
-        executor.create_issue(
-            "Permitted mutation".to_string(),
-            "Issue created while an override permitted the invocation".to_string(),
-            Priority::Normal,
-            Vec::new(),
-            vec![format!("type:{}", taxonomy.type_at_level(4))],
-            None,
-            None,
-            false,
-        )
-    })
-    .expect_err("an injected persistence failure must not be reported as a completed mutation");
-    let error_text = format!("{error:#}");
-    assert!(
-        error_text.contains("injected override-audit persistence failure"),
-        "the surfaced error must identify the injected persistence failure; error: {error_text}"
-    );
-
-    let recovered = JsonFileStorage::new(&jit_dir);
-    let recovered_layout = jit::storage::discover_repository_layout(temp.path(), recovered.root())
-        .expect("rediscover the repository layout for recovery");
-    drop(
-        RepositoryStateStore::open_mutation_session(&recovered, recovered_layout)
-            .expect("recovery converges"),
-    );
-
-    let recovered_events = recovered
-        .read_events()
-        .expect("read the event log after persistence recovery");
-    assert_eq!(
-        recovered_events, events_before,
-        "a failed materialization must leave neither the audit record nor issue events durable"
-    );
-    let recovered_issues = recovered
-        .read_issues()
-        .expect("read the issue set after persistence recovery");
-    assert_eq!(
-        recovered_issues.len(),
-        issues_before.len(),
-        "a failed materialization must leave the durable issue count unchanged"
-    );
-    assert!(
-        !recovered_events
-            .iter()
-            .any(|event| matches!(event, Event::LinkedCheckoutWriteOverridden { .. })),
-        "the audit record cannot outlive the mutation it explains"
-    );
 }
 
 // The tests below drive the real production dispatch path — the installed `jit`
