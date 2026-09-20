@@ -1751,6 +1751,46 @@ mod record_tests {
         );
     }
 
+    /// A refusal partway through a record's operations does not roll back the
+    /// operations that already landed: redo-only convergence replays a record
+    /// forward or not at all, never partially undoes it (`@/charter/D-17`).
+    /// The earlier put and the refusing put must not overlap — one naming the
+    /// other's path is rejected at construction — so the occupying directory
+    /// is seeded independently of the record, as in the test above.
+    #[test]
+    fn test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused() {
+        let storage = seeded(&[], false);
+        storage.add_data_file("issues/existing.json", "residual");
+        let record = RedoRecord::new(
+            vec![
+                put(data("index.json"), b"published"),
+                put(data("issues"), b"occupier"),
+            ],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        storage.commit_record(&record).unwrap();
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(&outcome, Err(RedoApplyError::Io(error))
+                if error.kind() == std::io::ErrorKind::IsADirectory),
+            "the later put replaced a directory the file backend refuses to rename over: {outcome:?}"
+        );
+        assert_eq!(
+            file_bytes(&storage, &data("index.json")).as_deref(),
+            Some(b"published".as_slice()),
+            "the refusal rolled back a put that had already landed"
+        );
+        assert_eq!(
+            semantic_state(&storage).2,
+            Some(record),
+            "the refused application cleared the record that still describes it"
+        );
+    }
+
     /// A delete names a file to unlink, which fails on a directory: the record
     /// survives rather than the backend silently orphaning the directory's
     /// children.
