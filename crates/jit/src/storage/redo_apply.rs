@@ -5,12 +5,17 @@
 //! absence, the append rewrites its bytes at its offset, so a record applied
 //! twice converges. Nothing publishes through this module yet.
 
-use crate::repository_state::VirtualPath;
-use crate::storage::redo_record::{EventAppend, PutFile, RedoRecord};
-use crate::storage::repository_state_store::{
-    open_capability_parent, CapabilityRoots, RepositoryStateStoreError,
+use crate::repository_state::{FileMode, RepositoryRootClass, VirtualPath};
+use crate::storage::file_transaction::repository_unix_mode;
+use crate::storage::redo_record::{
+    EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
-use cap_std::fs::Dir;
+use crate::storage::repository_state_store::{
+    open_capability_parent, open_child_dir_nofollow, CapabilityRoots, RepositoryStateStoreError,
+};
+use cap_primitives::fs::FollowSymlinks;
+use cap_std::fs::{Dir, File, OpenOptions};
+use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
 
 /// One step of a record's application, named so an interruption matrix can stop
@@ -115,16 +120,17 @@ pub fn apply_record(
     check(injector, RedoPoint::AfterApply)
 }
 
-fn check(
-    injector: &dyn RedoInterruptionInjector,
-    point: RedoPoint,
-) -> Result<(), RedoApplyError> {
+fn check(injector: &dyn RedoInterruptionInjector, point: RedoPoint) -> Result<(), RedoApplyError> {
     injector
         .check(&point)
         .map_err(|source| RedoApplyError::Interrupted { point, source })
 }
 
 /// The root handle a path is addressed within, with its root-relative portion.
+///
+/// The parent chain is walked no-follow here rather than at the write, so a
+/// symlinked ancestor — the one escape a canonical identity cannot carry — is
+/// refused while the repository is still untouched.
 fn resolve<'a>(
     roots: &'a CapabilityRoots,
     path: &'a VirtualPath,
@@ -136,20 +142,107 @@ fn resolve<'a>(
     Ok((root, path.relative().as_path()))
 }
 
-fn put_file(_roots: &CapabilityRoots, _put: &PutFile) -> Result<(), RedoApplyError> {
+/// Replace a put's path with its bytes, creating the directories it needs.
+fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError> {
+    let (root, relative) = resolve(roots, &put.path)?;
+    if let Some(directories) = relative
+        .parent()
+        .filter(|path| path.components().count() > 0)
+    {
+        root.create_dir_all(directories)?;
+    }
+    let (parent, leaf) =
+        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&put.path))?;
+    // Staged beside the target so the rename is same-filesystem, and named with
+    // the extension the orphan sweep matches so an interrupted staging is swept.
+    let staged = format!(".{leaf}.{}.redo.tmp", std::process::id());
+    write_staged(&parent, &staged, put)?;
+    parent.rename(&staged, &parent, &leaf)?;
+    sync_directory(&parent)
+}
+
+/// Write the staged bytes with the put's mode and return once they are durable.
+fn write_staged(parent: &Dir, staged: &str, put: &PutFile) -> Result<(), RedoApplyError> {
+    let mut file = parent.create(staged)?;
+    file.write_all(&put.bytes)?;
+    set_mode(&file, put.mode)?;
+    file.sync_all().map_err(Into::into)
+}
+
+#[cfg(unix)]
+fn set_mode(file: &File, mode: FileMode) -> Result<(), RedoApplyError> {
+    use cap_std::fs::PermissionsExt;
+
+    repository_unix_mode(mode)
+        .map(|mode| file.set_permissions(cap_std::fs::Permissions::from_mode(mode)))
+        .transpose()?;
     Ok(())
 }
 
-fn delete_file(_roots: &CapabilityRoots, _path: &VirtualPath) -> Result<(), RedoApplyError> {
+#[cfg(not(unix))]
+fn set_mode(_file: &File, _mode: FileMode) -> Result<(), RedoApplyError> {
     Ok(())
 }
 
-fn append_events(_roots: &CapabilityRoots, _append: &EventAppend) -> Result<(), RedoApplyError> {
-    Ok(())
+/// Remove a deleted path, tolerating a target a previous application already
+/// removed.
+fn delete_file(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    let (root, relative) = resolve(roots, path)?;
+    let Some((parent, leaf)) = open_capability_parent(root, relative)? else {
+        return Ok(());
+    };
+    match parent.remove_file(&leaf) {
+        Ok(()) => sync_directory(&parent),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
 }
 
-fn remove_record(_roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
-    Ok(())
+/// Write the appended bytes at their offset.
+///
+/// The log is opened for positioned writing rather than in append mode, which
+/// ignores the offset and would append the bytes a second time, and it is
+/// truncated to the offset plus their length, so a log a previous application
+/// already extended converges.
+fn append_events(roots: &CapabilityRoots, append: &EventAppend) -> Result<(), RedoApplyError> {
+    let log = VirtualPath::EVENTS;
+    let (root, relative) = resolve(roots, &log)?;
+    let (parent, leaf) =
+        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&log))?;
+    let mut options = OpenOptions::new();
+    options.write(true).create(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let mut file = parent.open_with(&leaf, &options)?;
+    file.seek(SeekFrom::Start(append.offset))?;
+    file.write_all(&append.bytes)?;
+    file.set_len(append.offset + append.bytes.len() as u64)?;
+    file.sync_all().map_err(Into::into)
+}
+
+/// Remove the applied record, tolerating a record a previous application
+/// already removed: what remains after this is no mutation.
+fn remove_record(roots: &CapabilityRoots) -> Result<(), RedoApplyError> {
+    let data =
+        roots
+            .root(RepositoryRootClass::Data)
+            .ok_or_else(|| RedoApplyError::Unaddressable {
+                path: format!("{RECORD_SCRATCH_DIR}/{RECORD_FILE_NAME}"),
+            })?;
+    match data.remove_file(Path::new(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME)) {
+        Ok(()) => sync_directory(&open_child_dir_nofollow(data, RECORD_SCRATCH_DIR)?),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Make a directory's entries durable: a rename or removal survives a crash
+/// only once the directory naming it is synced.
+fn sync_directory(directory: &Dir) -> Result<(), RedoApplyError> {
+    directory
+        .try_clone()?
+        .into_std_file()
+        .sync_all()
+        .map_err(Into::into)
 }
 
 fn unaddressable(path: &VirtualPath) -> RedoApplyError {
@@ -516,7 +609,10 @@ mod tests {
 
     /// A repository seeded with `initial`, holding `record` as its committed
     /// mutation.
-    fn committed(record: &RedoRecord, initial: &(Vec<VirtualPath>, bool)) -> (TempDir, CapabilityRoots) {
+    fn committed(
+        record: &RedoRecord,
+        initial: &(Vec<VirtualPath>, bool),
+    ) -> (TempDir, CapabilityRoots) {
         let (worktree, roots) = repository();
         seed(&worktree, initial);
         record.commit(&data_root(&worktree)).unwrap();

@@ -2553,7 +2553,7 @@ fn repository_file_mode(metadata: &cap_std::fs::Metadata) -> FileMode {
     }
 }
 
-fn repository_unix_mode(mode: FileMode) -> Option<u32> {
+pub(in crate::storage) fn repository_unix_mode(mode: FileMode) -> Option<u32> {
     #[cfg(unix)]
     {
         Some(match mode {
