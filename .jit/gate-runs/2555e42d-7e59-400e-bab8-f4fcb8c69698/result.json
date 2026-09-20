@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b714619d613fe7dcf1f69c6eacd76a4a9faa71e5",
+  "completed_at": "2026-09-20T10:44:20.483264609Z",
+  "duration_ms": 429001,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/redo_apply.rs",
+        "id": "F1",
+        "line": 167,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/invariant/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "Put staging follows and truncates a predictable pre-existing entry, allowing an unrelated file to be overwritten and a symlink to be published as the target."
+      }
+    ],
+    "summary": "Predictable, symlink-following redo staging can corrupt an unrelated in-root file.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "35544121-9268-4068-8248-98e9d2df16f5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2555e42d-7e59-400e-bab8-f4fcb8c69698",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T10:37:11.481304952Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7587 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0be64-2e43-7183-a361-5b9f31437f2d\n--------\nuser\n--- 7574 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: feb335189, d027716ba, 8833caaeb, 970e52b63, 5e25cb205, b714619d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 — dev/vision/9db27a3a-charter.md; @/invariant/atomic-writes — .jit/invariants.toml\nGate evidence: cargo-ci — passed (exit 0, 2026-09-20T10:30:32.438340209+00:00)\nTruncation recovery: reread the initial and merge patches in bounded ranges; reread redo_apply.rs in ranges 1–230, 231–470, and 471–655; narrowed storage primitive inspection\n\n1. **[blocking][issue-impact]** `crates/jit/src/storage/redo_apply.rs:167` stages puts with `Dir::create` at a predictable `.{leaf}.{pid}.redo.tmp` name. That API opens an existing entry with create+truncate and follows symlinks. A pre-existing in-root symlink at that stage name can therefore overwrite an unrelated file, then be renamed onto the requested target—so the record writes a path it did not name and fails to reliably replace the put target. Use no-follow, collision-resistant create-new staging and add coverage for a pre-existing staged entry. References: `@/charter/D-17`, `@/invariant/atomic-writes`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Predictable, symlink-following redo staging can corrupt an unrelated in-root file.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Put staging follows and truncates a predictable pre-existing entry, allowing an unrelated file to be overwritten and a symlink to be published as the target.\",\"file\":\"crates/jit/src/storage/redo_apply.rs\",\"line\":167,\"references\":[\"@/charter/D-17\",\"@/invariant/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

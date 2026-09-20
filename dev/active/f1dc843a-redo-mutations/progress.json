@@ -653,6 +653,16 @@
       "resolution": "User directed moving them to docs-mechanical, as a task inside this epic (2d4fda72), accepting the REQ-06 attribution consequence recorded in ER-01.",
       "resolved_by": "user",
       "status": "closed"
+    },
+    {
+      "id": "ESC-04",
+      "wave": 3,
+      "category": "4 - issue scope change",
+      "question": "48e4f65c REQ-02 as drafted covered six listing-expanding budgets the fix deliberately does not touch",
+      "resolution": "User approved narrowing REQ-02 to budgets that declare the event log AND request no listings; the six recorded as SP-04.",
+      "resolved_by": "user",
+      "status": "closed",
+      "lead_note": "Lead drafting error, same class as V-02: the criterion was written broader than its Background's framing."
     }
   ],
   "rework_counts": {
@@ -688,6 +698,14 @@
       "subject": "The event-log capture ceiling survives in document.rs after 19e7298a closed it for claim and issue-update",
       "detail": "DOCUMENT_CAPTURE_BUDGET (crates/jit/src/commands/document.rs:5-10) sets max_bytes = 64 MiB with max_listings: 0, and its capture specs declare VirtualPath::EVENTS (document.rs:295, :375, :957). So `jit doc add` fails on a repository whose event log exceeds 64 MiB -- the identical defect 19e7298a fixed for claim (16 MiB) and issue-update (64 MiB), at a higher threshold. Verified: commands/config.rs:304 and commands/init.rs:350 also carry hand-picked 64 MiB ceilings but declare no EVENTS path, so they are not exposed to log growth.",
       "disposition": "OPEN. 19e7298a is NOT at fault: its REQ-03 was scoped by the lead to the two paths that demonstrably disagreed, and it satisfied that exactly. The fix is now a one-liner of an established shape -- call issue_mutation_capture_budget() (commands/mod.rs:155) or apply the same u64::MAX + prose form that image.rs:594-604 and profile.rs record_capture_budget already establish. Raised to the user; folding it into this epic is a small task of the same class the user already directed be fixed now.",
+      "criterion_subjects": []
+    },
+    {
+      "id": "SP-04",
+      "found_during": "48e4f65c worker survey (wave 3)",
+      "subject": "Six listing-expanding capture budgets declare the event log and keep a hand-picked byte ceiling",
+      "detail": "commands/gate.rs:251 (512 MiB, paths :296), commands/gate.rs:1110 (256 MiB, paths :1119), commands/gate_check.rs:783 (512 MiB, paths :790), commands/template.rs:35 (512 MiB, paths :388), commands/validate.rs:1256 MUTATION_CAPTURE_BUDGET (512 MiB, EVENTS discovered at validate.rs:411). All declare VirtualPath::EVENTS, so a large enough event log makes them fail the way claim did at 16 MiB and document at 64 MiB. They differ from those in one decisive respect: max_listings > 0, so max_bytes is the only bound on real capture growth there. Removing it deletes a live bound. commands/config.rs:304 and commands/init.rs:350 declare only VirtualPath::CONFIG and are confirmed unexposed.",
+      "disposition": "OPEN, and deliberately out of scope for 48e4f65c. The owner amended that issue's REQ-02 to budgets requesting no listings, matching its Background. Closing these needs a design for bounding listing expansion without a hand-picked byte number - the same problem image.rs:586-604 describes ('A budget here would restate that bound as a number this type cannot derive'). Exposure is low: the ceilings are 256-512 MiB. Not scheduled; surfaces in the completion report.",
       "criterion_subjects": []
     }
   ],
