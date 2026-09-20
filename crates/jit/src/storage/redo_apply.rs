@@ -265,7 +265,7 @@ mod tests {
     use std::collections::{BTreeMap, HashSet};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
     use tempfile::TempDir;
 
     /// The event-log bytes a mutation captured before appending to them.
@@ -564,6 +564,41 @@ mod tests {
         assert_eq!(
             std::fs::read(data_root(&worktree).join("events.jsonl")).unwrap(),
             [CAPTURED_LOG, appended].concat()
+        );
+    }
+
+    /// The injector belongs to the applier rather than to a call, so a second
+    /// application reaches the same one without being handed it.
+    #[test]
+    fn test_redo_applier_apply_checks_every_application_through_the_held_injector() {
+        let (_worktree, roots) = repository();
+        let recorded = Arc::new(RecordedPoints::default());
+        let applier = RedoApplier::new(Arc::clone(&recorded) as Arc<dyn RedoInterruptionInjector>);
+        let published = RedoRecord {
+            puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
+            ..RedoRecord::default()
+        };
+        let removed = RedoRecord {
+            deletes: vec![VirtualPath::data("index.json").unwrap()],
+            ..RedoRecord::default()
+        };
+
+        applier.apply(&roots, &published).unwrap();
+        let after_first = recorded.points();
+        applier.apply(&roots, &removed).unwrap();
+
+        assert!(
+            !after_first.is_empty(),
+            "the first application never reached the held injector"
+        );
+        assert_eq!(
+            recorded.points()[..after_first.len()],
+            after_first,
+            "the second application did not extend the first one's checks"
+        );
+        assert!(
+            recorded.points().len() > after_first.len(),
+            "the second application ran without reaching the applier's held injector"
         );
     }
 
