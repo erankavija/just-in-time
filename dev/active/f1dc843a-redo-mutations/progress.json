@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched"
+          "status": "rework-1 (code-review: symlink-following predictable put staging)"
         }
       ]
     },
@@ -657,7 +657,8 @@
   ],
   "rework_counts": {
     "555ff4be": 1,
-    "2d4fda72": 1
+    "2d4fda72": 1,
+    "35544121": 1
   },
   "surfaced_pitfalls": [
     {
@@ -710,6 +711,12 @@
       "suggested_remedy": "Script-level: harvest should be per-wave-exclusive or fingerprint-keyed rather than newest-file-wins across build trees. NOT actioned -- the scripts are shared cross-project infrastructure (canonical copy lives with the skill) and changing one is escalation category 8.",
       "lead_action": "Deleted .agents/cache-pool (23 GB) per the protocol's own remedy: 'delete it and let the next harvest rebuild it warm -- it is a cache, never a source of truth'. Adopted for the rest of this epic: harvest at most ONE worktree per wave into the pool; remove the remaining worktrees without harvesting, so two build trees are never merged.",
       "status": "mitigated by the lead; script design raised to the user, not changed"
+    },
+    {
+      "id": "PF-04",
+      "finding": "A backgrounded gate evaluation reported 'completed (exit code 0)' while the gate itself FAILED. The notification carried the exit status of the shell pipeline (`jit gate evaluate ... | tail -3`), not of the gate. Acting on that summary would have completed an issue whose code-review found a blocking corruption path.",
+      "suggested_remedy": "Never read a backgrounded gate's outcome from the task-notification exit code. Read the gate-run record, or re-query `jit issue show <id> --json` gate statuses, before drawing any conclusion.",
+      "status": "adopted by the lead"
     }
   ],
   "evidence_requirements": [
@@ -745,6 +752,14 @@
       "why_accepted": "Those survivors assert on markdown the CODE GENERATES into temp fixture repositories, testing the renderer or the profile applier. The deleted tests read the repository's OWN authored policy files through a repo_file() helper resolving CARGO_MANIFEST_DIR/../.. and asserted hand-authored prose as a contract. Different kind. The code-review gate, the designated judge of this issue's criteria, read REQ-01 in that narrower sense and recorded 'All six hard success criteria are met'.",
       "lesson": "The criterion should have said 'asserts the authored textual content of a repository policy artifact'. Recorded so the completion report does not claim the absolute form.",
       "verdict": "accepted as intended, wording noted"
+    },
+    {
+      "id": "V-03",
+      "issue": "35544121",
+      "what": "code-review round 1 found a security-relevant corruption path the lead's own review missed.",
+      "detail": "redo_apply.rs:167 staged puts with cap-std `Dir::create` at a predictable `.{leaf}.{pid}.redo.tmp` name. That call is create+truncate and follows symlinks, so a pre-existing in-root symlink at the stage name truncates an unrelated file, receives the put bytes, and is then renamed onto the put target - the record writes a path it never named. References @/charter/D-17 and @/invariant/atomic-writes.",
+      "lead_note": "The lead verified phasing, the interruption contract, line budget and caller absence, but did not inspect the staging open. Second defect in this epic caught by @/inv/atomic-writes; the first was the truncating record write in 555ff4be. Both were in new-file publication paths.",
+      "verdict": "rework dispatched"
     }
   ],
   "standing_policies": [
