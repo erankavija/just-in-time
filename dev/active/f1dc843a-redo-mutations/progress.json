@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 2,
+  "current_wave": 3,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -43,7 +43,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework-1"
+          "status": "done"
         },
         {
           "id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -585,7 +585,7 @@
       "short_id": "19e7298a",
       "title": "Event-log size stops capping issue claims",
       "why": "SP-02(a): jit claim acquire fails above a 16 MiB event log (claim.rs:191-194) while issue-update gets 64 MiB. User directed it be fixed now, inside the epic.",
-      "status": "dispatched",
+      "status": "done",
       "gates": [
         "cargo-ci",
         "code-review"
@@ -596,7 +596,7 @@
       "short_id": "2d4fda72",
       "title": "Documentation assertions leave the Rust suite",
       "why": "PF-01 root cause: Rust tests assert prose in AGENTS.md and contrib/gates/*.md, duplicating docs-mechanical's M3 citations checker, and a prose-only commit is gated by neither. User directed the correction now, inside the epic.",
-      "status": "dispatched",
+      "status": "rework-1 (code-review: essential-code-prose verbosity)",
       "gates": [
         "cargo-ci",
         "code-review",
@@ -635,7 +635,8 @@
     }
   ],
   "rework_counts": {
-    "555ff4be": 1
+    "555ff4be": 1,
+    "2d4fda72": 1
   },
   "surfaced_pitfalls": [
     {

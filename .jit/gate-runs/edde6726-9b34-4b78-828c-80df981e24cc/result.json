@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ed262565a991f0b9dee138385da6db2e27a709e8",
+  "completed_at": "2026-09-20T10:02:46.315102281Z",
+  "duration_ms": 405416,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/docs-check-package-content.sh",
+        "id": "F1",
+        "line": 4,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "high",
+        "summary": "New checker and manifest comments repeatedly exceed the concise non-obvious-only standard."
+      }
+    ],
+    "summary": "The relocated checks meet the reviewed functional criteria, but recurring excessive code commentary is an issue-impact policy defect.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2d4fda72-41e1-4cfc-88fd-eafcc48b60ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "edde6726-9b34-4b78-828c-80df981e24cc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T09:56:00.898449063Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11140 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0be3e-7de8-7940-bc40-fe00be1e75e1\n--------\nuser\n--- 11127 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 45d7a317d, dea0c466b, ae537e091, 01b577502, 893530bd3, 2a508d7c6, ed262565a\nPolicy sources: AGENTS.md\nResolved items: @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T09:54:25Z); docs-mechanical passed (exit 0, 2026-09-20T09:54:17Z); code-review pending\nTruncation recovery: recovered truncated aggregate patch reads through per-commit, per-path diffs and bounded current-file reads\n\n1. **[blocking][issue-impact] F1:** The new mechanical-checker implementation repeatedly adds lengthy explanatory comments rather than the shortest necessary contracts—for example the 47-line module header at `scripts/docs-check-package-content.sh:4`, echoed by the 28-line manifest introduction and repeated entry commentary in `scripts/docs-policy-phrases.toml`. This recurring change violates the repository’s non-obvious-only, concise-prose policy. Reference: `@/invariant/essential-code-prose`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The relocated checks meet the reviewed functional criteria, but recurring excessive code commentary is an issue-impact policy defect.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"New checker and manifest comments repeatedly exceed the concise non-obvious-only standard.\",\"file\":\"scripts/docs-check-package-content.sh\",\"line\":4,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
