@@ -458,12 +458,12 @@ mod tests {
     fn test_apply_record_writes_the_append_at_its_offset_over_a_longer_log() {
         let (worktree, roots) = repository();
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
-        // A log an interrupted application already extended: longer than the
-        // offset, so append mode would land the bytes past the residue and a
-        // pass that never truncates would leave it behind.
+        // A log an interrupted application already extended, by more than the
+        // appended bytes cover: append mode would land them past the residue,
+        // and a pass that never truncates would leave its tail behind.
         std::fs::write(
             data_root(&worktree).join("events.jsonl"),
-            [CAPTURED_LOG, b"{\"tag\":\"residue\"}\n"].concat(),
+            [CAPTURED_LOG, &b"{\"tag\":\"residue\"}\n".repeat(3)].concat(),
         )
         .unwrap();
         let record = RedoRecord {
