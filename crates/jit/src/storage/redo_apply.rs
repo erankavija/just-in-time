@@ -12,7 +12,8 @@ use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use crate::storage::repository_state_store::{
-    open_capability_parent, open_child_dir_nofollow, CapabilityRoots, RepositoryStateStoreError,
+    open_capability_parent, open_child_dir_nofollow, open_or_create_capability_parent,
+    CapabilityRoots, RepositoryStateStoreError,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, File, OpenOptions};
@@ -162,16 +163,13 @@ fn resolve<'a>(
 }
 
 /// Replace a put's path with its bytes, creating the directories it needs.
+///
+/// Every directory the put creates is durable before the pass reaches
+/// [`RedoPoint::BeforeRecordRemoval`], so a crash cannot drop an ancestor entry
+/// while removing the record that would replay the put.
 fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError> {
     let (root, relative) = resolve(roots, &put.path)?;
-    if let Some(directories) = relative
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-    {
-        root.create_dir_all(directories)?;
-    }
-    let (parent, leaf) =
-        open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&put.path))?;
+    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
     let staged = staged_name();
     write_staged(&parent, &staged, put)?;
     parent.rename(&staged, &parent, &leaf)?;
