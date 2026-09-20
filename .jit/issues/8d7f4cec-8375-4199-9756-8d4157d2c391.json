@@ -8,6 +8,7 @@
   ],
   "description": "A publication-failure injection in the workspace names an interruption point the redo record defines.\n\n## Background\n\nPublication-failure injection reaches nine command and test modules outside the storage layer: profile, gate, issue, bulk update, dependency, init, gate check, the shared command module, and the concurrent-profile-application suite. Each names a variant of the kernel's thirty-six-point enum. Once the session commits through the record, those points are never reached, and once the kernel retires they no longer compile.\n\nRepointing them ahead of the commit swap keeps each later step compiling and passing. The concurrent-profile-application suite is ported rather than retired: it owns stale-capture rejection under contention, a property the redo record has too, and it is the only test of it.\n\n## Success Criteria\n\n- [hard] REQ-01: Each publication-failure injection in the workspace names an interruption point the record defines.\n- [hard] REQ-02: The kernel's failure-point enum is referenced only by the kernel and by the storage modules that still host it.\n- [hard] REQ-03: The concurrent-profile-application suite injects a record interruption point and still asserts that a contender never publishes a stale capture.\n- [hard] REQ-04: Command-layer test helpers expose the record's points, with the kernel's points removed from their surface.\n- [hard] REQ-05: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n\n## Notes\n\nThe record's points exist at this stage while the kernel still commits, so an injection repointed here fires once the session commits through the record.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T22:17:47.353355240Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T22:17:47.353355240Z"
 }

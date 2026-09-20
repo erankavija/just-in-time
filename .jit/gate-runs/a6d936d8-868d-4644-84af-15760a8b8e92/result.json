@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "26c532f7b6574ad7a8fb6e78ecee874ed3028f6e",
+  "completed_at": "2026-09-20T22:10:31.314591162Z",
+  "duration_ms": 356917,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/repository_state/materialize.rs",
+        "id": "F1",
+        "line": 1969,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "REQ-02's idempotency assertion expects no second action, but its failure text says repair must act again."
+      }
+    ],
+    "summary": "One advisory-only test diagnostic inconsistency; hard criteria otherwise verified.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "08b8c0ef-d55d-479b-bcaf-d649a8c3a193",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a6d936d8-868d-4644-84af-15760a8b8e92",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T22:04:34.397187609Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 06c87a6a2, 7058eafbe, 44563322e, 2d5b73aca, ab8736739, 074abc401\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-1, D-4, D-17 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, canonical-cutover, convention-convergence, derived-state-coherence, essential-code-prose, no-ignored-tests, orthogonal-tests, single-source-prose (.jit/invariants.toml); @/gate/cargo-ci, jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci — passed, exit 0, 2026-09-20T21:46:07Z\nTruncation recovery: Narrowed reads recovered the relevant merged-patch and materialize test ranges; the root policy was complete in supplied context.\n\n1. [advisory][issue-impact] F1: The REQ-02 idempotency assertion correctly expects no second action, but its failure message says repair “must act again,” which contradicts the criterion and would mislead diagnosis. `crates/jit/src/repository_state/materialize.rs:1969`\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"One advisory-only test diagnostic inconsistency; hard criteria otherwise verified.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"REQ-02's idempotency assertion expects no second action, but its failure text says repair must act again.\",\"file\":\"crates/jit/src/repository_state/materialize.rs\",\"line\":1969,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

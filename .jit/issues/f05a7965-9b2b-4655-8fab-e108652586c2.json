@@ -57,6 +57,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
     }
   ],
+  "done_at": "2026-09-20T22:17:46.419806352Z",
   "first_ready_at": "2026-09-20T20:40:59.264283100Z",
   "gates_required": [
     "cargo-ci",
@@ -66,6 +67,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-09-20T21:45:08.482688259Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T22:04:14.986148701Z",
       "updated_by": "auto:executor"
     }
   },
@@ -79,7 +85,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Re-homed no-follow file open",
-  "updated_at": "2026-09-20T21:45:08.482688259Z"
+  "updated_at": "2026-09-20T22:17:46.419806352Z"
 }

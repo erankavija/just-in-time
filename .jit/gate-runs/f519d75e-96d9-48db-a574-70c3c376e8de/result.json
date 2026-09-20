@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "26c532f7b6574ad7a8fb6e78ecee874ed3028f6e",
+  "completed_at": "2026-09-20T22:04:14.673311689Z",
+  "duration_ms": 400771,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met in the current tree.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f05a7965-9b2b-4655-8fab-e108652586c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f519d75e-96d9-48db-a574-70c3c376e8de",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T21:57:33.901350109Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 66a402be3, 75f79b4cb, 9977ca4fd\nPolicy sources: AGENTS.md\nResolved items: @/issue/fbd6c859/requirement/REQ-05 (parent issue Markdown); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/no-ignored-tests, @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T21:43:27Z); code-review pending\nTruncation recovery: inspected 75f79b4cb per-parent diffs; traced inherited test retirement to 6201cb6a8; narrowed source, caller, and test reads\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met in the current tree.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

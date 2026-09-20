@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "26c532f7b6574ad7a8fb6e78ecee874ed3028f6e",
+  "completed_at": "2026-09-20T22:17:28.993654134Z",
+  "duration_ms": 416604,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six hard success criteria are satisfied by the attributed merged test changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "581bddcf-a189-4ab8-8349-21c64e82dc90",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e3c8a40d-888f-409d-a474-204a591f12ea",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T22:10:32.389438438Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 70ab515fb, 73667c5b2, 775cd9593, 3d1765ea7, ca201af9f, 26c532f7b\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/no-ignored-tests, @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/charter/D-17 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T21:48:43Z); code-review pending (no prior run)\nTruncation recovery: separate per-commit diffs, focused current-file reads, targeted test searches, and redo-conformance inspection\n\n1. No blocking or advisory findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard success criteria are satisfied by the attributed merged test changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -57,6 +57,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
     }
   ],
+  "done_at": "2026-09-20T22:17:47.054125667Z",
   "first_ready_at": "2026-09-20T20:40:58.647912404Z",
   "gates_required": [
     "cargo-ci",
@@ -66,6 +67,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-09-20T21:50:07.837124378Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T22:17:29.299436706Z",
       "updated_by": "auto:executor"
     }
   },
@@ -80,7 +86,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Consumer-side publication matrix retirement",
-  "updated_at": "2026-09-20T21:50:07.837124378Z"
+  "updated_at": "2026-09-20T22:17:47.054125667Z"
 }

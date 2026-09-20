@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 7,
+  "current_wave": 8,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -152,7 +152,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "done - cargo-ci and code-review both passed on the merged tree, zero rework rounds",
           "dispatched_at": "2026-09-20T session 3",
           "worktree": ".agents/worktrees/agent-08b8c0ef"
         },
@@ -165,7 +165,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "done - cargo-ci and code-review both passed on the merged tree, zero rework rounds",
           "dispatched_at": "2026-09-20T session 3",
           "worktree": ".agents/worktrees/agent-581bddcf"
         },
@@ -178,7 +178,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "done - cargo-ci and code-review both passed on the merged tree, zero rework rounds",
           "dispatched_at": "2026-09-20T session 3",
           "worktree": ".agents/worktrees/agent-7658bf81"
         },
@@ -191,7 +191,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched",
+          "status": "done - cargo-ci and code-review both passed on the merged tree, zero rework rounds",
           "dispatched_at": "2026-09-20T session 3",
           "worktree": ".agents/worktrees/agent-f05a7965"
         }
@@ -209,7 +209,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "ready to dispatch"
         }
       ]
     },
@@ -1199,6 +1199,18 @@
     "checkpoint": "21e976d1 DONE. cargo-ci and doc-review passed first time; holistic-review failed on self-attested REQ-06 evidence (V-11), fixed by committing footprint.py, then passed with 0 findings."
   },
   "session_3_summary": {
-    "opened": "wave 7: 08b8c0ef, 581bddcf, 7658bf81, f05a7965 dispatched in four isolated worktrees anchored to e5f109ce5"
+    "opened": "wave 7: 08b8c0ef, 581bddcf, 7658bf81, f05a7965 dispatched in four isolated worktrees anchored to e5f109ce5",
+    "closed": [
+      "7658bf81",
+      "f05a7965",
+      "08b8c0ef",
+      "581bddcf"
+    ],
+    "rework_rounds": {},
+    "note": "First four-way fan-out of the epic and the first wave to close with zero rework rounds. All four branches merged with no conflicts; the merge of 7658bf81's 2199-line deletion and f05a7965's insertion into the same file auto-merged because both context anchors survived. cargo-ci was evaluated after each merge for per-merge attribution; the final run judged the fully combined tree, where 08b8c0ef's new engine-owned derived file imposes a fixture requirement on hand-built repositories and 581bddcf had just added a new test file with its own fixtures. No integration breakage. All four code-review gates passed first time.",
+    "lead_notes": [
+      "f05a7965's worker stalled twice waiting on a background-job notification that never arrived; its work was committed, so the lead gated it on the merged tree rather than waiting. Its eventual report matched the lead's independent review on every point.",
+      "Reports truncated for 7658bf81 and 581bddcf; both tails were retrieved by SendMessage and both confirmed the lead's independent findings."
+    ]
   }
 }
