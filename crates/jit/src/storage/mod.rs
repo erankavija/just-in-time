@@ -30,6 +30,8 @@ pub mod lock_cleanup;
 pub mod memory;
 pub mod path_errors;
 pub mod redo_apply;
+#[cfg(test)]
+mod redo_conformance;
 pub mod redo_record;
 pub mod reference;
 pub mod repo_lock;

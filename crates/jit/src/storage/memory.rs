@@ -1303,20 +1303,20 @@ mod tests {
     }
 }
 
+/// This backend's own record fixtures, beside the file backend's in
+/// [`test_fixtures`](crate::storage::redo_apply::test_fixtures), so the shared
+/// conformance suite and this module's tests seed and read one backend the same
+/// way (`@/inv/shared-test-contracts`).
 #[cfg(test)]
-mod record_tests {
+pub(crate) mod test_fixtures {
     use super::*;
-    use crate::storage::redo_apply::test_fixtures::{
-        arbitrary_record, path_vocabulary, InterruptAt, RecordedPoints, CAPTURED_LOG,
-    };
-    use crate::storage::NoRedoInterruptions;
-    use proptest::prelude::*;
+    use crate::storage::redo_apply::test_fixtures::CAPTURED_LOG;
 
     /// A backend whose data root exists, holding every path in `occupied` as a
     /// captured file and an event log the record's append offset refers to.
     /// `residue` extends that log past the offset, standing for a log an
     /// interrupted application already wrote into.
-    fn seeded(occupied: &[VirtualPath], residue: bool) -> InMemoryStorage {
+    pub(crate) fn seeded(occupied: &[VirtualPath], residue: bool) -> InMemoryStorage {
         let storage = InMemoryStorage::new();
         let log = match residue {
             true => [CAPTURED_LOG, b"{\"tag\":\"residue\"}\n"].concat(),
@@ -1336,22 +1336,31 @@ mod record_tests {
         storage
     }
 
-    /// A backend seeded with `initial`, holding `record` as its committed
-    /// mutation.
-    fn committed(record: &RedoRecord, initial: &(Vec<VirtualPath>, bool)) -> InMemoryStorage {
-        let storage = seeded(&initial.0, initial.1);
-        storage.commit_record(record).unwrap();
-        storage
-    }
-
-    /// Pre-existing targets, and whether the log carries residue beyond the
-    /// offset the record captured.
-    fn arbitrary_initial_state() -> impl Strategy<Value = (Vec<VirtualPath>, bool)> {
+    /// Everything this backend holds of a mutation: the entries, whether the
+    /// data root exists, and the record still waiting to be applied.
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn semantic_state(
+        storage: &InMemoryStorage,
+    ) -> (
+        BTreeMap<VirtualPath, RepositoryEntry>,
+        bool,
+        Option<RedoRecord>,
+    ) {
+        let state = storage.repository_state();
         (
-            prop::collection::vec(path_vocabulary(), 0..3),
-            any::<bool>(),
+            state.entries.clone(),
+            state.data_root_exists,
+            state.record.clone(),
         )
     }
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::test_fixtures::{seeded, semantic_state};
+    use super::*;
+    use crate::storage::redo_apply::test_fixtures::{RecordedPoints, CAPTURED_LOG};
+    use crate::storage::NoRedoInterruptions;
 
     fn put(path: VirtualPath, bytes: &[u8]) -> PutFile {
         PutFile {
@@ -1372,24 +1381,6 @@ mod record_tests {
         let recorded = Arc::new(RecordedPoints::default());
         let injector: Arc<dyn RedoInterruptionInjector> = recorded.clone();
         (recorded, MemoryRedoApplier::new(injector))
-    }
-
-    /// Everything that decides whether two applications of one record converged:
-    /// the entries, whether the data root exists, and the residue.
-    #[allow(clippy::type_complexity)]
-    fn semantic_state(
-        storage: &InMemoryStorage,
-    ) -> (
-        BTreeMap<VirtualPath, RepositoryEntry>,
-        bool,
-        Option<RedoRecord>,
-    ) {
-        let state = storage.repository_state();
-        (
-            state.entries.clone(),
-            state.data_root_exists,
-            state.record.clone(),
-        )
     }
 
     fn file_bytes(storage: &InMemoryStorage, path: &VirtualPath) -> Option<Vec<u8>> {
@@ -1819,44 +1810,5 @@ mod record_tests {
             "the refused delete orphaned the directory's child"
         );
         assert_eq!(semantic_state(&storage).2, Some(record));
-    }
-
-    proptest! {
-        // Each case applies the record once per prefix of its operation order,
-        // each application over its own backend, so the case count stays low.
-        #![proptest_config(ProptestConfig::with_cases(24))]
-
-        /// The record's own point sequence enumerates every prefix, so an
-        /// interruption at each one, resumed, is compared against a single clean
-        /// application of the same record over the same initial state.
-        #[test]
-        fn prop_memory_re_application_after_any_interrupted_prefix_converges(
-            record in arbitrary_record(),
-            initial in arbitrary_initial_state(),
-        ) {
-            let clean = committed(&record, &initial);
-            let (recorded, applier) = recording_applier();
-            applier.apply(&clean, &record).unwrap();
-            let converged = semantic_state(&clean);
-
-            for prefix in 0..recorded.points().len() {
-                let interrupted = committed(&record, &initial);
-                let outcome = MemoryRedoApplier::new(Arc::new(InterruptAt::check_number(prefix)))
-                    .apply(&interrupted, &record);
-                prop_assert!(
-                    matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
-                    "the pass ran past the interruption at check {prefix}"
-                );
-
-                uninterrupted().apply(&interrupted, &record).unwrap();
-
-                prop_assert_eq!(
-                    semantic_state(&interrupted),
-                    converged.clone(),
-                    "re-application after check {} left a different backend",
-                    prefix
-                );
-            }
-        }
     }
 }
