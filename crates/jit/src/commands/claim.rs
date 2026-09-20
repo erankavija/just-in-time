@@ -825,7 +825,9 @@ mod tests {
     use tempfile::TempDir;
 
     // Use shared test utilities
-    use crate::test_utils::{create_test_paths, setup_test_repo, CurrentDirGuard};
+    use crate::test_utils::{
+        create_test_paths, grow_event_log_beyond, setup_test_repo, CurrentDirGuard,
+    };
 
     /// Execute claim acquire with manually constructed paths (bypassing WorktreePaths::detect)
     fn execute_claim_acquire_test(
@@ -1797,34 +1799,6 @@ mod tests {
         // convergent transition never emits a duplicate event.
         execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
-        Ok(())
-    }
-
-    /// Append well-formed events for unrelated issues until the log exceeds
-    /// `bytes`, so a claim over it is decided by nothing but its own tail.
-    fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()> {
-        use std::io::Write;
-
-        let path = storage.root().join("events.jsonl");
-        let mut log = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
-        let mut written = fs::metadata(&path)?.len();
-        let mut ordinal = 0_u64;
-        while written <= bytes {
-            let line = serde_json::to_string(&crate::domain::Event::IssueCreated {
-                id: format!("01J0000000000000000000{ordinal:04}"),
-                issue_id: format!("00000000-0000-4000-8000-{ordinal:012}"),
-                timestamp: chrono::Utc::now(),
-                title: format!("Accumulated history {ordinal}"),
-                priority: crate::domain::Priority::Normal,
-            })?;
-            writeln!(log, "{line}")?;
-            written += line.len() as u64 + 1;
-            ordinal += 1;
-        }
-        log.flush()?;
         Ok(())
     }
 

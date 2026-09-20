@@ -14946,3 +14946,4 @@
 {"gate_key":"code-review","id":"c8af10ca-2791-49bf-89e6-a43a251a2af7","issue_id":"35544121-9268-4068-8248-98e9d2df16f5","timestamp":"2026-09-20T10:44:20.788716002Z","type":"gate_failed","updated_by":"auto:executor"}
 {"assignee":"agent:jit-execution-lead","id":"913d8d58-cc31-447b-bb2a-4e63df008fe7","issue_id":"48e4f65c-e73a-4fff-b2e9-771be7d3fb3a","timestamp":"2026-09-20T11:11:35.778930401Z","type":"issue_claimed"}
 {"fields":["description"],"id":"b28c2fa8-e9bc-4488-abd0-8db6463b0d15","issue_id":"48e4f65c-e73a-4fff-b2e9-771be7d3fb3a","timestamp":"2026-09-20T11:11:36.059043082Z","type":"issue_updated","updated_by":"issue-update"}
+{"fields":["documents"],"id":"0bdbe699-d0bf-477b-8eeb-47f1240d317c","issue_id":"48e4f65c-e73a-4fff-b2e9-771be7d3fb3a","timestamp":"2026-09-20T10:48:41.303565514Z","type":"issue_updated","updated_by":"doc-add"}

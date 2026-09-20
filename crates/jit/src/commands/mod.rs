@@ -138,14 +138,15 @@ pub fn production_mutation_context() -> crate::repository_state::MutationContext
     PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| factory.borrow().create())
 }
 
-/// Bounds for the captures that mutate one named issue: a claim and a captured
-/// issue mutation.
+/// Bounds for the captures that mutate one named issue: a claim, a captured
+/// issue mutation, and a document reference edit.
 ///
-/// Both declare every path they read — one issue record, the event log, and for
-/// a gate transition the gate registry — and request no listing, so no path can
+/// Each declares every path it reads — one issue record, the event log, and for
+/// a gate transition the gate registry — and requests no listing, so no path can
 /// enter the capture that the caller did not name. Shape is what bounds it, and
 /// the depth is the deepest of those constructions: an issue record one name
-/// below the `issues` directory.
+/// below the `issues` directory. A caller reaching deeper overrides `max_depth`
+/// alone, since that is the only dimension its shape decides.
 ///
 /// `max_bytes` is unbounded because nothing here can bound it. The payload that
 /// grows is the event log, whose size is the project's own accumulated history
