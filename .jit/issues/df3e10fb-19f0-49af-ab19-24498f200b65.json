@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Mutations commit through a redo record and never scale with project history (f1dc843a) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-09-20T01:14:46.078752633Z",
   "first_ready_at": "2026-09-20T01:04:52.290718744Z",
   "gates_required": [
     "coverage-preview",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-09-19T20:52:34.029025818Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-09-20T01:13:40.878559511Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
       "status": "passed",
@@ -36,7 +37,7 @@
     "brackets:f1dc843a"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-20T01:06:10.553257644Z"
+  "updated_at": "2026-09-20T01:14:46.078752633Z"
 }

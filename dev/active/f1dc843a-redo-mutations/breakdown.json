@@ -652,13 +652,15 @@
         "test_boundary": "derived state repair coverage",
         "worker_sized_reason": "One composer beside the default-ruleset producer both entry points already reach.",
         "footprint": {
+          "creates": [
+            ".jit/.gitignore"
+          ],
           "touches": [
             "crates/jit/src/repository_state/materialize.rs",
             "crates/jit/src/repository_state/initialize.rs",
             "crates/jit/src/repository_state/mod.rs",
             "crates/jit/src/repository_state/path.rs",
             "crates/jit/tests/fast_rules/derived_state_repair_tests.rs",
-            ".jit/.gitignore",
             ".gitignore"
           ]
         }
@@ -1021,6 +1023,9 @@
             "crates/jit/src/output.rs",
             "crates/jit/src/cli.rs",
             "crates/jit/src/main.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs",
+            "crates/jit/tests/cli_issue/recover_command_tests.rs",
             "mcp-server/curated-tools.json",
             "docs/reference/cli-commands.md",
             "docs/reference/worktree-validate.md",
