@@ -154,17 +154,29 @@ fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError
     }
     let (parent, leaf) =
         open_capability_parent(root, relative)?.ok_or_else(|| unaddressable(&put.path))?;
-    // Staged beside the target so the rename is same-filesystem, and named with
-    // the extension the orphan sweep matches so an interrupted staging is swept.
-    let staged = format!(".{leaf}.{}.redo.tmp", std::process::id());
+    let staged = staged_name();
     write_staged(&parent, &staged, put)?;
     parent.rename(&staged, &parent, &leaf)?;
     sync_capability_directory(&parent).map_err(Into::into)
 }
 
+/// A stage name beside the target: random, so nothing can be waiting at it, and
+/// `.tmp`, so a staging its apply never renamed is reclaimed by the orphan
+/// sweep in [`super::temp_cleanup`].
+fn staged_name() -> String {
+    format!(".redo.{}.tmp", uuid::Uuid::new_v4().simple())
+}
+
 /// Write the staged bytes with the put's mode and return once they are durable.
+///
+/// The open creates the file or fails: an occupied stage name is never opened
+/// through, so no symlink carries the bytes elsewhere and no occupant is
+/// truncated (`@/inv/atomic-writes`).
 fn write_staged(parent: &Dir, staged: &str, put: &PutFile) -> Result<(), RedoApplyError> {
-    let mut file = parent.create(staged)?;
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let mut file = parent.open_with(staged, &options)?;
     file.write_all(&put.bytes)?;
     set_mode(&file, put.mode)?;
     file.sync_all().map_err(Into::into)
@@ -248,8 +260,9 @@ mod tests {
     use super::*;
     use crate::repository_state::{FileMode, RepositoryRootClass};
     use crate::storage::discover_repository_layout;
+    use crate::storage::temp_cleanup::cleanup_orphaned_temp_files;
     use proptest::prelude::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
@@ -444,6 +457,86 @@ mod tests {
             is_executable(&worktree.path().join("scripts/publish.sh")),
             "the published file does not carry the mode the record named"
         );
+    }
+
+    /// A stage name a test can occupy, standing in for the name a put draws at
+    /// random.
+    const OCCUPIED_STAGE: &str = ".redo.occupied.tmp";
+
+    fn ambient_directory(path: &Path) -> Dir {
+        Dir::open_ambient_dir(path, cap_std::ambient_authority()).unwrap()
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_write_staged_refuses_a_symlink_occupying_the_staged_name() {
+        let directory = TempDir::new().unwrap();
+        let unrelated = directory.path().join("unrelated.json");
+        std::fs::write(&unrelated, b"a file the record never named").unwrap();
+        // Relative and in-tree: a confined handle resolves it, where it refuses
+        // an absolute target outright.
+        std::os::unix::fs::symlink("unrelated.json", directory.path().join(OCCUPIED_STAGE))
+            .unwrap();
+        let parent = ambient_directory(directory.path());
+
+        let outcome = write_staged(
+            &parent,
+            OCCUPIED_STAGE,
+            &put(VirtualPath::data("index.json").unwrap(), b"published"),
+        );
+
+        assert!(
+            outcome.is_err(),
+            "the staging opened through a symlink waiting at its name"
+        );
+        assert_eq!(
+            std::fs::read(&unrelated).unwrap(),
+            b"a file the record never named",
+            "the staged bytes landed on a path the record never named"
+        );
+    }
+
+    #[test]
+    fn test_write_staged_refuses_a_file_occupying_the_staged_name() {
+        let directory = TempDir::new().unwrap();
+        let occupant = directory.path().join(OCCUPIED_STAGE);
+        std::fs::write(&occupant, b"a staging another application holds").unwrap();
+        let parent = ambient_directory(directory.path());
+
+        let outcome = write_staged(
+            &parent,
+            OCCUPIED_STAGE,
+            &put(VirtualPath::data("index.json").unwrap(), b"published"),
+        );
+
+        assert!(outcome.is_err(), "the staging truncated an occupied name");
+        assert_eq!(
+            std::fs::read(&occupant).unwrap(),
+            b"a staging another application holds"
+        );
+    }
+
+    #[test]
+    fn test_staged_name_is_unique_across_calls() {
+        let names = (0..64).map(|_| staged_name()).collect::<HashSet<_>>();
+
+        assert_eq!(
+            names.len(),
+            64,
+            "two stagings drew one name, which a create-new open turns into a refused put"
+        );
+    }
+
+    /// The counterpart of the record's survival: a staging is reconstructible
+    /// from the record that named it, so the sweep is its reclaim path.
+    #[test]
+    fn test_staged_name_is_reclaimed_by_the_orphan_temp_sweep() {
+        let directory = TempDir::new().unwrap();
+        let orphan = directory.path().join(staged_name());
+        std::fs::write(&orphan, b"a staging its application never renamed").unwrap();
+
+        assert_eq!(cleanup_orphaned_temp_files(directory.path(), 0).unwrap(), 1);
+        assert!(!orphan.exists(), "the sweep left the orphaned staging");
     }
 
     #[test]
