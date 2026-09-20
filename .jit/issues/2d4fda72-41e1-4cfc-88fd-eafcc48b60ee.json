@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T08:44:01.086019900Z",
+  "dependencies": [
+    "df3e10fb-19f0-49af-ab19-24498f200b65"
+  ],
+  "description": "Prose and citation assertions over markdown artifacts move from the Rust test suite to the mechanical documentation gate.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/code_review_policy_test.rs` (357 lines, 14 tests) reads `AGENTS.md` and `contrib/gates/code-review-prompt.md` as text and asserts policy phrases in them. `test_packaged_qualified_item_citations_resolve_from_installed_registries` (`crates/jit/src/profile/repository_package.rs:299`) asserts that every `@/` citation in package content resolves from the registries the package installs — the property `scripts/docs-check-citations.sh` already checks as the `docs-mechanical` gate's M3 step over its configured footprint.\n\nTwo consequences follow. One property is proven twice, by two mechanisms in two languages. And a commit that changes only prose is gated by neither: the mechanical gate's footprint is `docs/`, and a prose commit does not run the Rust suite. Three documentation commits on this epic's planning bracket left the Rust suite failing on `main` until `ce053478` repaired it.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust test asserts the textual content of a markdown artifact.\n- [hard] REQ-02: Every policy phrase `code_review_policy_test.rs` asserted is asserted by a committed checker the `docs-mechanical` gate runs.\n- [hard] REQ-03: The packaged-citation resolution property is asserted once in the workspace, by the mechanical checker.\n- [hard] REQ-04: The mechanical checkers reach `AGENTS.md` and `contrib/gates/`.\n- [hard] REQ-05: Removing a required policy phrase, and adding an unresolvable `@/` citation to package content, each fail the gate; the demonstration is recorded.\n- [hard] REQ-06: The change removes more lines of Rust than it adds.\n\n## Notes\n\nNot redo-record work, and excluded from the redo-record subtotal of the epic's REQ-06 line balance (`ER-01`): its Rust deletions must not be credited to the storage layer shrinking.",
+  "documents": [],
+  "first_ready_at": "2026-09-20T08:44:01.086019900Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "2d4fda72-41e1-4cfc-88fd-eafcc48b60ee",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "component:testing",
+    "component:docs"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Documentation assertions leave the Rust suite",
+  "updated_at": "2026-09-20T08:44:08.171467178Z"
+}
