@@ -13,14 +13,14 @@ use crate::repository_state::{
 use crate::storage::file_transaction::RepositoryRecoveryDisposition;
 use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
 use crate::storage::{
-    FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage,
+    FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage, RedoRecord,
     RepoWriteGuard, TransactionControlLocation, TransactionFailurePoint,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
 use cap_std::{ambient_authority, fs::MetadataExt as _};
 use std::collections::BTreeMap;
-use std::io::{ErrorKind, Read};
+use std::io::{ErrorKind, Read, Seek, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -219,7 +219,9 @@ pub fn discover_repository_layout(
     .map_err(Into::into)
 }
 
-struct CapabilityRoots {
+/// Open no-follow handles for the selected roots, constructed only inside the
+/// session boundary that verified their identity.
+pub struct CapabilityRoots {
     worktree: Dir,
     data: Option<Dir>,
 }
@@ -846,6 +848,124 @@ fn ensure_delta_is_captured(
         }
     }
     Ok(())
+}
+
+/// Bytes at the end of the event log the pre-commit check compares.
+///
+/// A byte window rather than the last complete line: the torn-tail protocol
+/// admits an incomplete final line, so the log's end is not a line boundary.
+pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
+
+/// Refuse a mutation whose write set moved after the mutation read it.
+///
+/// Compares the live occupant of every path `record` puts or deletes with the
+/// bytes `captured` holds for it, and the event log as its length together with
+/// its last [`EVENT_LOG_TAIL_WINDOW`] bytes — the one answer for that path, so
+/// the log's whole contents are never reread (`@/charter/D-17`). A path the
+/// mutation read but does not write is left out, so a change there leaves the
+/// mutation admissible; the repository write lock keeps concurrent writers of
+/// repository state out of the window.
+///
+/// # Errors
+///
+/// [`RepositoryStateStoreError::RetryableConflict`] names the first write target
+/// whose live state differs from the captured one, raised before anything
+/// durable is written. A path the mutation never read surfaces as a capture
+/// error, and an unreadable occupant as its I/O failure.
+pub fn ensure_write_set_unchanged(
+    roots: &CapabilityRoots,
+    captured: &RepositoryImage,
+    record: &RedoRecord,
+) -> Result<(), RepositoryStateStoreError> {
+    record
+        .puts
+        .iter()
+        .map(|put| &put.path)
+        .chain(record.deletes.iter())
+        .filter(|path| **path != VirtualPath::EVENTS)
+        .try_for_each(|path| ensure_target_unchanged(roots, captured, path))?;
+    let touches_event_log = record.event_append.is_some()
+        || record
+            .puts
+            .iter()
+            .any(|put| put.path == VirtualPath::EVENTS)
+        || record.deletes.contains(&VirtualPath::EVENTS);
+    if !touches_event_log {
+        return Ok(());
+    }
+    match captured.entry(&VirtualPath::EVENTS)? {
+        // An ordinary captured log is the only state carrying a tail to compare;
+        // any other occupant is compared like any other write target.
+        RepositoryEntry::File { content, .. } => {
+            (live_event_log_tail(roots, &VirtualPath::EVENTS)?
+                == Some(EventLogTail::of_bytes(content.bytes())))
+            .then_some(())
+            .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS))
+        }
+        _ => ensure_target_unchanged(roots, captured, &VirtualPath::EVENTS),
+    }
+}
+
+/// Compare one write target's live occupant with the captured one, byte for byte.
+fn ensure_target_unchanged(
+    roots: &CapabilityRoots,
+    captured: &RepositoryImage,
+    path: &VirtualPath,
+) -> Result<(), RepositoryStateStoreError> {
+    (inspect_capability_entry(captured.layout(), roots, path)? == *captured.entry(path)?)
+        .then_some(())
+        .ok_or_else(|| retryable_conflict(path))
+}
+
+fn retryable_conflict(path: &VirtualPath) -> RepositoryStateStoreError {
+    RepositoryStateStoreError::RetryableConflict {
+        path: format!("{path:?}"),
+    }
+}
+
+/// An event log's exact length with its last `min(length, window)` bytes.
+#[derive(Debug, PartialEq, Eq)]
+struct EventLogTail {
+    length: u64,
+    tail: Vec<u8>,
+}
+
+impl EventLogTail {
+    fn of_bytes(bytes: &[u8]) -> Self {
+        let window = usize::try_from(EVENT_LOG_TAIL_WINDOW).unwrap_or(usize::MAX);
+        Self {
+            length: bytes.len() as u64,
+            tail: bytes[bytes.len().saturating_sub(window)..].to_vec(),
+        }
+    }
+}
+
+/// Read the live log's length and tail, or `None` when no ordinary file is there.
+fn live_event_log_tail(
+    roots: &CapabilityRoots,
+    path: &VirtualPath,
+) -> Result<Option<EventLogTail>, RepositoryStateStoreError> {
+    let Some(root) = roots.root(path.root_class()) else {
+        return Ok(None);
+    };
+    let Some((parent, leaf)) = open_capability_parent(root, path.relative().as_path())? else {
+        return Ok(None);
+    };
+    match parent.symlink_metadata(&leaf) {
+        Ok(metadata) if metadata.is_file() => (),
+        Ok(_) => return Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    options._cap_fs_ext_follow(FollowSymlinks::No);
+    let mut file = parent.open_with(&leaf, &options)?;
+    let length = file.metadata()?.len();
+    let mut tail = Vec::new();
+    file.seek(SeekFrom::Start(length - length.min(EVENT_LOG_TAIL_WINDOW)))?;
+    file.read_to_end(&mut tail)?;
+    Ok(Some(EventLogTail { length, tail }))
 }
 
 /// Normalize a Git diagnostic into a stable, control-free unavailable reason.
