@@ -1,40 +1,25 @@
-# Policy phrases this repository's prose must carry, and the ones it must not.
+# Policy literals this repository's prose must carry, and the ones it must not.
+# Read by scripts/docs-check-policy-phrases.sh (M9 of `docs-mechanical`).
 #
-# Read by scripts/docs-check-policy-phrases.sh (M9 of the `docs-mechanical`
-# gate). Each `[[document]]` names one artifact and one topic within it, and
-# declares the literals that topic's policy is made of:
+# Each `[[document]]` names one artifact and one topic in it. `require` must be
+# present, `forbid` absent — a rule this repository removed, which no presence
+# check can express — and `exactly_once` present exactly once, for a contract
+# whose shape is the assertion. `normalize = true` collapses whitespace runs on
+# both sides, for a phrase the artifact may re-wrap; it is weaker than an exact
+# match. `section = { after, before }` narrows an entry to the text between two
+# markers, for a phrase whose placement is the assertion; a declared marker the
+# artifact lacks is itself a finding.
 #
-#   require       the literal must be present — the policy is stated;
-#   forbid        the literal must be absent — a superseded rule must not
-#                 return, and a presence check cannot express that;
-#   exactly_once  the literal must occur exactly once — a field of a contract
-#                 whose shape is the assertion, not merely its presence.
-#
-# `normalize = true` collapses whitespace runs on both sides before matching,
-# for a phrase a document is free to re-wrap. It is weaker than an exact match,
-# so an entry declares it only where the wrapping is genuinely incidental.
-#
-# `section = { after = "…", before = "…" }` narrows an entry to the text between
-# two markers, for a phrase whose placement is the assertion: a rule that reads
-# one way under one heading says something else under another. A declared
-# marker the artifact does not carry is itself a finding.
-#
-# A `[[value]]` entry asserts over a configured value rather than prose:
-# `select` walks `file`'s TOML, where `name[field=value]` picks the array
-# element whose `field` equals `value`, and every `require` literal must occur
-# in the string it resolves to.
-#
-# Each entry's comment says why the phrase is load-bearing. A phrase nobody can
-# explain is a phrase nobody should be pinning.
+# A `[[value]]` entry asserts over a configured value instead: `select` walks
+# `file`'s TOML, where `name[field=value]` picks the array element whose `field`
+# equals `value`, and every `require` literal must occur in the string it
+# resolves to.
 
 # --- contrib/gates/code-review-prompt.md -------------------------------------
 
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "attribution and fallback"
-# The reviewer's footprint comes from commits tagged with the issue's short id,
-# patch by patch so renames and deletions stay visible, and falls back to issue
-# intent — stated, not inferred — when no tagged commit exists.
 require = [
   "jit:<short-id>",
   "individual patch",
@@ -48,8 +33,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "current evidence and debt"
-# Gate evidence is the latest recorded run, and the verdict turns on
-# issue-impact blocking findings alone.
 require = [
   "latest recorded status and exit code",
   "newer successful run supersedes older failures",
@@ -64,16 +47,12 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "selective examples"
-# The review applies the repository's non-obvious-only standard for examples.
 require = [
   "Do not require a `# Examples` section merely because an API is public",
   "non-obvious-only standard",
   "repetitive examples for straightforward",
   "avoidable documentation and CI burden",
 ]
-# The blanket requirement this policy replaced. Its return would reinstate the
-# documentation and CI burden the non-obvious-only standard exists to remove,
-# and only an absence check can catch a rule coming back.
 forbid = [
   "All public APIs must have doc comments with description and `# Examples`",
 ]
@@ -81,8 +60,6 @@ forbid = [
 [[document]]
 path = "AGENTS.md"
 topic = "selective examples"
-# The repository-side half of the same standard: the review prompt applies what
-# the contributor instructions declare.
 require = [
   "Add an example only when it clarifies non-obvious behavior",
   "one type- or module-level walkthrough",
@@ -91,8 +68,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "peer-review gate evidence"
-# Unfinished independent judgment is not an implementation defect; executable
-# evidence is what can carry a blocking finding.
 require = [
   "Include every required gate's latest status in the evidence header",
   "peer review or judgment gate",
@@ -102,14 +77,11 @@ require = [
   "demonstrates an attributable failure",
   "leaves a hard criterion materially unverified",
 ]
-# The blanket rule that made a pending peer-review gate block code review.
 forbid = ["A currently pending, failed, or errored required"]
 
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "policy precedence"
-# Applicable AGENTS.md files are read root-to-path, a closer one specializing
-# the broader, and an unresolved contradiction is reported rather than guessed.
 require = [
   "complete prose baseline",
   "repository root",
@@ -123,8 +95,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "bounded addressable policy"
-# Governing items are collected from a bounded set of sources and resolved
-# through their configured source of truth, never enumerated repository-wide.
 require = [
   "applicable `AGENTS.md`",
   "issue content",
@@ -142,8 +112,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "relationship evidence claims"
-# A relationship label is a claim the reviewer tests, at the strength its own
-# namespace declaration gives it.
 require = [
   "`satisfies:`",
   "`enforces:`",
@@ -159,8 +127,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "evidence header"
-# The header is a five-line contract: a field stated twice is a second header,
-# so presence alone does not express what this check needs.
 exactly_once = [
   "Attribution:",
   "Policy sources:",
@@ -173,7 +139,6 @@ require = ["use `none` for every empty value"]
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "recorded gates and structured references"
-# References are resolved qualified IDs from the repository's own registries.
 require = [
   "latest recorded",
   "Do not rerun a gate that is currently recorded as passing",
@@ -184,15 +149,11 @@ require = [
   "repository's configured registries",
   "do not invent, hardcode, or emit unresolved references",
 ]
-# A portable review policy cannot require an invariant only this repository
-# declares.
 forbid = ["@/inv/pid-safety"]
 
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "procedure, not a registry copy"
-# The prompt is a procedure. A copied registry statement rots against the
-# registry that owns it, and an embedded rubric competes with canonical prose.
 forbid = [
   "## Review rubric",
   "All file writes use the temp-file + atomic-rename pattern.",
@@ -204,8 +165,6 @@ forbid = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "read-only bounded inspection"
-# The run is inspection-only, reads in bounded calls, and recovers truncation
-# before issuing a verdict.
 require = [
   "read-only",
   "Do not invoke issue-lifecycle skills",
@@ -221,8 +180,6 @@ require = [
 [[document]]
 path = "contrib/gates/code-review-prompt.md"
 topic = "shared findings contract"
-# The wrapper owns the findings and verdict contract; restating it here gives
-# that contract two homes.
 forbid = ["<<<JIT-FINDINGS-JSON", "Before the verdict line"]
 
 # --- the reviewer's sandbox --------------------------------------------------
@@ -255,14 +212,11 @@ require = [
 path = "docs/how-to/custom-gates.md"
 topic = "findings ownership"
 normalize = true
-# Who emits, who transports, and who parses — stated exactly, because the
-# wording is what a gate author builds a wrapper against.
 require = [
   "The reviewer emits human-readable findings, a structured findings block, and a terminal verdict.",
   "The wrapper transports the prompt and context and determines its checker exit code from the terminal verdict.",
   "jit parses and persists the structured findings block.",
 ]
-# Both phrasings assign jit's structured-findings parsing to the wrapper.
 forbid = [
   "parses the shared findings and verdict contract",
   "parses the common verdict contract",
@@ -295,9 +249,6 @@ require = [
 [[document]]
 path = "scripts/doc-review-prompt.md"
 topic = "issue-scoped impact"
-# The documentation review is attributed the same way the code review is, keeps
-# to the smallest impact cone, and states documentation in the present tense
-# rather than narrating implementation history.
 require = [
   "jit:<short-id>",
   "individual commit patches",
@@ -336,8 +287,6 @@ require = [
 [[document]]
 path = "scripts/doc-review-prompt.md"
 topic = "holistic container checks"
-# A container review judges the combined contract rather than replaying the
-# leaf reviews under it.
 require = [
   "combined current documentation contract",
   "Do not replay leaf reviews",
@@ -352,8 +301,6 @@ require = [
 [[value]]
 file = ".jit/gates.toml"
 topic = "doc-review gate description"
-# The gate description is what an agent reads before running the prompt; it
-# states the same issue-scoped policy the prompt applies.
 select = "gates[key=doc-review].description"
 require = [
   "issue-scoped",
@@ -371,8 +318,6 @@ require = [
 [[document]]
 path = "contrib/gates/ai-review.sh"
 topic = "advisory findings pass"
-# The wrapper's own instruction to the reviewer must keep a passing verdict
-# compatible with advisory findings.
 require = ["passing verdict may include advisory findings"]
 forbid = ['Use "pass" with an empty findings array when there are none.']
 
@@ -381,16 +326,12 @@ forbid = ['Use "pass" with an empty findings array when there are none.']
 [[document]]
 path = ".agents/skills/jit-breakdown/references/analysis-prompt.md"
 topic = "content-standard path resolution"
-# The prompt is packaged and read at a destination, so a path in it is resolved
-# from the repository root, never from the prompt file's own location.
 require = ["resolved from the repository root"]
 forbid = ["relative to this prompt file"]
 
 [[document]]
 path = "docs/reference/jit-content-standards.md"
 topic = "profile installation redirect"
-# The public page redirects an adopter to the profile that installs the
-# standard, rather than implying plain initialization carries it.
 require = [
   "contributors to the JIT source repository",
   "Ordinary `jit init` does not install it",
@@ -400,16 +341,12 @@ require = [
   "`jit profile apply --profile path:packages/jit-dogfood`",
   "[Repository Profiles](profiles.md)",
 ]
-# The superseded claim that no public profile-install command exists.
 forbid = ["does not expose a public profile-install command"]
 
 # --- the planning bracket's review placeholders ------------------------------
+# The bracket ships built-in review placeholders; a reader who follows the
+# superseded command-backed text configures a bracket that no longer exists.
 #
-# The bracket ships built-in review placeholders. Every page and example that
-# describes it says so, and none of them may fall back to the command-backed
-# agent gates, the JIT_SRC environment, or the approval vocabulary those gates
-# carried — a reader who follows superseded text configures a bracket that no
-# longer exists.
 
 [[document]]
 path = "docs/concepts/planning-bracket.md"

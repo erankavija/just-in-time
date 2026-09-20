@@ -1,31 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# docs-check-policy-phrases — declared policy phrases in this repository's prose.
-# Mechanical check M9 of the `docs-mechanical` gate.
+# docs-check-policy-phrases — mechanical check M9 of `docs-mechanical`.
 #
-# The contributor instructions, the gate prompts they drive, and the pages that
-# document who owns the review contract carry policy whose wording is the
-# policy: a phrase that quietly disappears changes what a reviewer is told to
-# do, and a superseded rule that quietly returns reinstates a burden that was
-# removed on purpose. Neither shows up as a broken link, a stale projection or
-# a dangling citation, so no other mechanical check sees it.
-#
-# The manifest declares which literal is load-bearing in which artifact, and
-# whether it must be present, absent, or present exactly once. This file states
-# no phrase and no path: it is the comparison, the manifest is the declaration,
-# and the artifacts under check are read from the tree.
+# In the contributor instructions, the gate prompts they drive, and the pages
+# documenting who owns the review contract, the wording is the policy: a phrase
+# that disappears and a superseded rule that returns are both invisible to a
+# link, projection or citation check. The manifest declares which literal is
+# load-bearing where; this file states no phrase and no path.
 #
 # Usage:
-#   docs-check-policy-phrases.sh [MANIFEST]
-#     (takes no footprint — targets are configured; the default manifest is
-#      scripts/docs-policy-phrases.toml)
+#   docs-check-policy-phrases.sh [MANIFEST]   (no footprint: targets are
+#                                              configured; default manifest
+#                                              scripts/docs-policy-phrases.toml)
 #
 # Exit codes:
 #   0 — every declared phrase holds
-#       (prints "OK: declared policy phrases hold")
-#   1 — one or more MISSING / FORBIDDEN / COUNT findings
-#   2 — usage error, or a manifest that cannot be read or does not conform
+#   1 — MISSING / FORBIDDEN / COUNT findings
+#   2 — usage error, or an unreadable or non-conforming manifest
 
 exec python3 - "$@" <<'PY'
 import os
@@ -79,8 +71,7 @@ def require_text(entry, key, where):
     return value
 
 
-# Validate the whole manifest before using any of it: a malformed declaration is
-# a usage error, never a finding a reader might try to fix in prose.
+# Validated before use: a malformed declaration is a usage error, not a finding.
 documents = []
 for index, entry in enumerate(manifest.get("document") or []):
     where = f"{manifest_path} [[document]] #{index + 1}"
@@ -102,8 +93,7 @@ for index, entry in enumerate(manifest.get("document") or []):
     required = require_phrases(entry, "require", where)
     forbidden = require_phrases(entry, "forbid", where)
     once = require_phrases(entry, "exactly_once", where)
-    # An entry that declares nothing asserts nothing, and would sit in the
-    # manifest looking like coverage.
+    # An entry that declares nothing would sit in the manifest looking like coverage.
     if not (required or forbidden or once):
         fail(f"{where}: declares no require, forbid, or exactly_once phrase")
     documents.append((path, topic, normalize, section, required, forbidden, once))

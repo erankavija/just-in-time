@@ -1,53 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# docs-check-package-content — what this repository's packages may carry.
-# Mechanical check M8 of the `docs-mechanical` gate.
+# docs-check-package-content — mechanical check M8 of `docs-mechanical`.
 #
-# A package's content is read at the destination it is applied to, not here.
-# Two consequences are checked over one assembly of each package:
-#
-#   1. a `@/kind/id` citation in package content must resolve from the
-#      registries that same package installs. `docs-check-citations.sh` (M3)
-#      deliberately leaves the `assets/` subtree alone for exactly that reason —
-#      it resolves citations against THIS repository's live registries, which is
-#      the wrong domain for content that answers elsewhere;
-#   2. no packaged file may carry content the declarations in
-#      `scripts/docs-package-content.toml` prohibit — a path out of this
-#      checkout, a deferred example domain, a deictic phrase that resolves only
-#      here, or a tool the workflow must not require.
-#
-# BOTH SIDES ARE DERIVED LIVE, and this file states neither:
-#   * the packages are the directories under `profiles` that hold a manifest —
-#     the checkout's package-source location (`PROFILE_PACKAGE_SOURCES`);
-#   * each package's content is assembled by `jit profile capture`, so a live
-#     asset is read exactly as the product draws it from the checkout;
-#   * the registries a package installs are its `keyed-array` contributions,
-#     and which registry answers which citation leader comes from the live
-#     `item_kinds` config: a registry-first kind declares the registry table
-#     its items live in, and its aliases are leaders for that same table.
-#     A kind with no table (a markdown-first kind such as `charter`) installs
-#     nothing, so a package citing one cites something its destination will not
-#     have — reported, not skipped;
-#   * the prohibited content is the manifest's, and which files it applies to is
-#     whatever each package declares.
-#
-# A leader no item kind registers is not a project-scope citation (the reserved
-# `issue` scope, and documented parse-error examples), so it is skipped — the
-# same rule M3 applies.
+# Package content is read at the destination it is applied to, so a `@/kind/id`
+# citation in it must resolve from the registries that same package installs —
+# the domain `docs-check-citations.sh` (M3) cannot judge, which is why M3 skips
+# `assets/`. Over the same assembly this also applies the manifest's content
+# prohibitions. A citation leader no item kind registers is not a project-scope
+# address and is skipped, as in M3.
 #
 # Usage:
-#   docs-check-package-content.sh [MANIFEST]
-#     (takes no footprint — targets are configured; the default manifest is
-#      scripts/docs-package-content.toml)
+#   docs-check-package-content.sh [MANIFEST]   (no footprint: targets are
+#                                               configured; default manifest
+#                                               scripts/docs-package-content.toml)
 #
 # Exit codes:
-#   0 — every packaged citation resolves, and no package carries prohibited
-#       content
-#   1 — one or more DANGLING / FORBIDDEN findings
-#   2 — usage/environment error (missing tooling, no git work tree, a manifest
-#       that cannot be read or does not conform, or a package that could not be
-#       captured or read)
+#   0 — citations resolve and no package carries prohibited content
+#   1 — DANGLING / FORBIDDEN findings
+#   2 — usage/environment error (tooling, work tree, manifest, or capture)
 
 exec python3 - "$@" <<'PY'
 import json
@@ -61,13 +32,10 @@ import tomllib
 
 ME = "docs-check-package-content"
 DEFAULT_MANIFEST = "scripts/docs-package-content.toml"
-# The checkout's package-source location: the directory `jit profile capture`
-# reads this repository's authored packages from.
-PACKAGE_SOURCES = "profiles"
+PACKAGE_SOURCES = "profiles"  # the checkout's package-source location
 MANIFEST = "manifest.toml"
 CITATION = re.compile(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)")
-# A token is a maximal run of word characters, so a prohibited word is not
-# reported inside a longer one.
+# A maximal word run, so a prohibited word is not reported inside a longer one.
 TOKEN = re.compile(r"\w+")
 
 
@@ -81,8 +49,7 @@ if len(arguments) > 1:
     print(f"{ME}: expected at most one manifest path", file=sys.stderr)
     print(f"usage: {ME}.sh [MANIFEST]", file=sys.stderr)
     sys.exit(2)
-# Resolved before the chdir below, so a caller's relative manifest keeps
-# meaning what it did where the caller stood.
+# Absolute before the chdir below, so a relative manifest keeps its meaning.
 manifest_path = os.path.abspath(arguments[0] if arguments else DEFAULT_MANIFEST)
 
 for tool in ("git", "jit"):
@@ -104,8 +71,8 @@ if not root:
     fail("not inside a git work tree (needed to reach the package sources)")
 os.chdir(root)
 
-# Citation leader -> the registry table its items are installed into. A kind
-# that declares no registry table maps to None: nothing a package can install.
+# Citation leader -> the registry table its items install into. A markdown-first
+# kind declares no table, so nothing a package installs can answer it.
 try:
     kinds = json.loads(run("jit", "config", "get", "item_kinds"))
 except json.JSONDecodeError as error:
@@ -118,9 +85,7 @@ for kind, declaration in kinds.items():
     for leader in [kind] + list(declaration.get("aliases") or []):
         table_of_leader[leader] = table
 
-# The prohibited content, validated before any of it is used: a malformed
-# declaration is a usage error, never a finding a reader might try to fix in a
-# package.
+# Validated before use: a malformed declaration is a usage error, not a finding.
 try:
     with open(manifest_path, "rb") as handle:
         declared = tomllib.load(handle)
@@ -162,8 +127,7 @@ if not packages:
     fail(f"{PACKAGE_SOURCES} publishes no profile package")
 
 findings = []
-# Capture destinations must be worktree paths, so the scratch tree lives under
-# the ignored build directory and is removed however this check ends.
+# Capture refuses a destination outside the worktree, hence the ignored build dir.
 build = os.path.join(root, "target")
 try:
     os.makedirs(build, exist_ok=True)
@@ -188,8 +152,7 @@ try:
         )
         manifest = shown["profiles"][0]["manifest"]
 
-        # The registries this package installs: one keyed-array contribution
-        # target per registry table, holding the ids it publishes there.
+        # What this package installs: ids per registry table.
         installed = {}
         for contribution in manifest.get("contribution") or []:
             if contribution.get("kind") == "keyed-array":
