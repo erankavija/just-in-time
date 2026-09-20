@@ -7,6 +7,7 @@
   ],
   "description": "One conformance suite proves the redo record's interruption matrix on both storage backends, compile-enforced over the interruption-point enum.\n\n## Background\n\nThe record's crash contract is that an interruption at any step leaves the complete old state, or the complete new state once the leftover record is applied again. That is the mechanism's own behaviour matrix, so it is proven once, against the mechanism, and each consumer proves only that it reaches the mechanism.\n\nBoth backends run the same suite, driven by generic functions over the storage trait, the pattern the storage suite already uses. Coverage is compile-enforced over the point enum: adding a point without classifying it fails the build. The list it replaces is hand-maintained and covers thirty of thirty-six points.\n\n## Success Criteria\n\n- [hard] REQ-01: One suite drives an interruption at each interruption-point value, on the filesystem backend and the in-memory backend, from the same driver.\n- [hard] REQ-02: After an interruption before the record is durable, the repository reads back as the complete old state.\n- [hard] REQ-03: After an interruption at or after the record becomes durable, re-applying the leftover record yields the complete new state, and applying it a second time yields it again.\n- [hard] REQ-04: Coverage over the point enum is compile-enforced, so a new point fails the build until it is classified.\n- [hard] REQ-05: The suite asserts semantic state rather than a copied byte inventory, and each test states one property.\n- [hard] REQ-06: The suite adds no new integration-test target.\n\n## Notes\n\nExpected footprint is under 400 test lines. The suite lives beside the mechanism in the storage layer, the cheapest layer that can observe the property. Session-open replay is a separate property with its own owner.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T17:22:05.479957739Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared interruption conformance suite",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T17:22:05.479957739Z"
 }

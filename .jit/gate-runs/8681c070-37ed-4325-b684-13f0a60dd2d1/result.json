@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "667460a660a72f5e12b64b5fc861b46fa3a0be07",
+  "completed_at": "2026-09-20T17:21:25.101644541Z",
+  "duration_ms": 529797,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The memory redo applier satisfies the issue criteria, preserves filesystem-equivalent conflict behavior, and resolves both prior review findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4e818d10-4433-4610-a525-29817677f87c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8681c070-37ed-4325-b684-13f0a60dd2d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T17:12:35.303919973Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3f2accb5a, 03a228d9e, ac02ee832, 9e0078882, 0612382b4, 4580ce93f, 2c0d5d63b, 667460a66 (`jit:4e818d10`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/21e976d1/requirement/REQ-03 (story Markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T17:10:57Z); prior code-review F1/F2 verified resolved\nTruncation recovery: reread per-commit stats and patches, current applier/test ranges, filesystem counterparts, and policy sources in bounded calls\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The memory redo applier satisfies the issue criteria, preserves filesystem-equivalent conflict behavior, and resolves both prior review findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
