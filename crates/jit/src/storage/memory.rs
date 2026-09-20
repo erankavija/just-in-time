@@ -573,8 +573,126 @@ impl MemoryRedoApplier {
         storage: &InMemoryStorage,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
-        let _ = (&self.injector, storage, record);
-        Ok(())
+        let injector = &*self.injector;
+        let mut state = storage.repository_state();
+        let event_log = VirtualPath::EVENTS;
+        record
+            .puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(record.deletes.iter())
+            .chain(record.event_append.iter().map(|_| &event_log))
+            .try_for_each(|path| resolve(&state, path))?;
+        check_interruption(injector, RedoPoint::BeforeApply)?;
+        record
+            .puts
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, put)| {
+                check_interruption(injector, RedoPoint::BeforePut { index })?;
+                put_entry(&mut state, put)
+            })?;
+        record
+            .deletes
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, path)| {
+                check_interruption(injector, RedoPoint::BeforeDelete { index })?;
+                state.entries.remove(path);
+                Ok::<(), RedoApplyError>(())
+            })?;
+        if let Some(append) = &record.event_append {
+            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+            append_events(&mut state, append)?;
+        }
+        check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
+        state.record = None;
+        check_interruption(injector, RedoPoint::AfterApply)
+    }
+}
+
+/// Refuse, before the first live entry change, a path this backend's tree
+/// cannot address.
+///
+/// The counterpart of the file backend's pre-write path resolution: a data path
+/// while the data root is absent has no root to land in, and an ancestor that is
+/// not a directory is the no-follow parent walk's refusal. An absent ancestor is
+/// admitted, because a put creates the directories its path needs.
+fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    if path.root_class() == RepositoryRootClass::Data && !state.data_root_exists {
+        return Err(unaddressable(path));
+    }
+    path.relative()
+        .as_path()
+        .ancestors()
+        .skip(1)
+        .filter(|ancestor| !ancestor.as_os_str().is_empty())
+        .try_for_each(|ancestor| {
+            let ancestor =
+                VirtualPath::from_root(path.root_class(), RootRelativePath::parse(ancestor)?)?;
+            match state.entries.get(&ancestor) {
+                None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
+                    Ok(())
+                }
+                Some(_) => Err(unaddressable(&ancestor)),
+            }
+        })
+}
+
+/// Replace a put's path with its bytes, modeling the directories it creates.
+fn put_entry(state: &mut MemoryRepositoryState, put: &PutFile) -> Result<(), RedoApplyError> {
+    InMemoryStorage::ensure_ancestor_dirs(state, &put.path);
+    state.entries.insert(
+        put.path.clone(),
+        RepositoryEntry::File {
+            content: CapturedBytes::new(memory_file_object(&put.path), put.bytes.clone())?,
+            mode: put.mode,
+        },
+    );
+    Ok(())
+}
+
+/// Write the appended bytes at their offset.
+///
+/// The log is truncated to the offset plus their length, so a log a previous
+/// application already extended converges rather than carrying its residue
+/// behind the appended bytes.
+fn append_events(
+    state: &mut MemoryRepositoryState,
+    append: &EventAppend,
+) -> Result<(), RedoApplyError> {
+    let path = VirtualPath::EVENTS;
+    let offset = usize::try_from(append.offset)
+        .map_err(|_| std::io::Error::other("event-log offset exceeds addressable memory"))?;
+    let (mut bytes, mode) = match state.entries.get(&path) {
+        Some(RepositoryEntry::File { content, mode }) => (content.bytes().to_vec(), *mode),
+        None | Some(RepositoryEntry::Absent) => (Vec::new(), FileMode::Regular),
+        Some(_) => return Err(unaddressable(&path)),
+    };
+    // One resize covers both directions: it drops a longer log's tail, and it
+    // fills the hole a positioned write past the end of a shorter one leaves.
+    bytes.resize(offset, 0);
+    bytes.extend_from_slice(&append.bytes);
+    let object = memory_file_object(&path);
+    state.entries.insert(
+        path,
+        RepositoryEntry::File {
+            content: CapturedBytes::new(object, bytes)?,
+            mode,
+        },
+    );
+    Ok(())
+}
+
+/// The capture identity of an in-memory file entry: a function of its path and
+/// its bytes alone, so two applications of one record leave the same entry.
+pub(crate) fn memory_file_object(path: &VirtualPath) -> String {
+    format!("memory-file:{path:?}")
+}
+
+fn unaddressable(path: &VirtualPath) -> RedoApplyError {
+    RedoApplyError::Unaddressable {
+        path: format!("{path:?}"),
     }
 }
 
