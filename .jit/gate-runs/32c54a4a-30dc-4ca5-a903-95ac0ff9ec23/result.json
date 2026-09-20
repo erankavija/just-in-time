@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "245508786a992ccd85fbfb133b1745b27363b4d6",
+  "completed_at": "2026-09-20T10:14:57.286069524Z",
+  "duration_ms": 428919,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six hard success criteria are met; the prior code-commentary finding was resolved by the final tagged rework.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2d4fda72-41e1-4cfc-88fd-eafcc48b60ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "32c54a4a-30dc-4ca5-a903-95ac0ff9ec23",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T10:07:48.366920068Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 45d7a317d, dea0c466b, ae537e091, 01b577502, 893530bd3, 2a508d7c6, ed262565a, 56429af24, 245508786\nPolicy sources: AGENTS.md\nResolved items: @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/canonical-cutover, @/invariant/shared-test-contracts, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/charter/D-2 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T09:54:25Z); docs-mechanical passed (exit 0, 2026-09-20T10:07:44Z)\nTruncation recovery: Re-read individual tagged patches and bounded current script, manifest, evidence, gate, and policy-source ranges after aggregate reads truncated.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard success criteria are met; the prior code-commentary finding was resolved by the final tagged rework.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

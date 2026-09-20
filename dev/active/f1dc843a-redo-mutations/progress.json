@@ -715,6 +715,15 @@
       "lead_evidence": "Independent textual cross-check of every literal asserted by code_review_policy_test.rs and doc_review_policy_test.rs against scripts/docs-policy-phrases.toml: 138 asserted phrases, 135 declared directly, 3 being assertion MESSAGES whose negative literals (blanket '# Examples' rule, @/inv/pid-safety, the pending-peer-review rule) are all declared as forbid entries. NOTE: the lead check did NOT cover the 229 lines deleted from repository_package.rs; that half rests on the worker's per-declaration mutation evidence plus the spot-check below.",
       "spot_check": "test_packaged_skills_only_require_declared_project_item_kinds asserted `declares_charter || !requires_charter_address`. M8 now fails ANY unresolvable citation in package content, which rejects a superset of what the old test rejected. Stricter, not narrower; property preserved. Consequence: a packaged skill legitimately citing a markdown-first kind the package contributes would now be blocked where the old test allowed it - a possible future false positive, erring safe.",
       "verdict": "no property lost"
+    },
+    {
+      "id": "V-02",
+      "issue": "2d4fda72",
+      "what": "REQ-01 wording is broader than what was delivered.",
+      "detail": "REQ-01 reads 'No Rust test asserts the textual content of a markdown artifact.' Taken literally that is not true at HEAD: Rust tests still read .md and assert on it, e.g. commands/validate.rs:3332 (a repaired projection region), profile/repository_package.rs:1691 and cli_repo_workflow/profile_acceptance_tests.rs:612 (profile-application output), cli_item_validate/project_render_cli_tests.rs:79,121.",
+      "why_accepted": "Those survivors assert on markdown the CODE GENERATES into temp fixture repositories, testing the renderer or the profile applier. The deleted tests read the repository's OWN authored policy files through a repo_file() helper resolving CARGO_MANIFEST_DIR/../.. and asserted hand-authored prose as a contract. Different kind. The code-review gate, the designated judge of this issue's criteria, read REQ-01 in that narrower sense and recorded 'All six hard success criteria are met'.",
+      "lesson": "The criterion should have said 'asserts the authored textual content of a repository policy artifact'. Recorded so the completion report does not claim the absolute form.",
+      "verdict": "accepted as intended, wording noted"
     }
   ]
 }
