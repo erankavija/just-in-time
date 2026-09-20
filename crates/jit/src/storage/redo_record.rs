@@ -108,31 +108,21 @@ impl RedoRecord {
     }
 
     /// Write the record under `data_root`'s scratch directory, returning its
-    /// path once it is durable: the bytes are synced and the entry naming them
-    /// is fsynced. This is the mutation's commit point — the first live write
-    /// follows it, because a redo-only protocol has no way back once a live
-    /// file is replaced.
+    /// path once it is durable: the bytes are synced and every directory entry
+    /// naming them is fsynced. This is the mutation's commit point — the first
+    /// live write follows it, because a redo-only protocol has no way back once
+    /// a live file is replaced.
     ///
     /// The record is written in place rather than staged and renamed: an
     /// interrupted write leaves a proper prefix of the serialized form, which
-    /// [`Self::parse`] rejects, so a later session skips the residue instead of
-    /// applying half a mutation. The scratch directory is created when absent,
-    /// with the mode every other data-root directory carries; a scratch
-    /// directory this call creates is fsynced through the data root before the
-    /// record enters it, because a record under a directory whose own entry a
-    /// crash takes is a record nothing can find.
-    ///
-    /// An occupied record path is refused rather than replaced: whatever
-    /// occupies it is a mutation no session applied, and the commit point of a
-    /// redo-only protocol cannot be overwritten without losing it. Deciding a
-    /// leftover's fate — applying a parseable record, discarding a residue —
-    /// belongs to session open.
+    /// [`Self::parse`] rejects, so a later session skips the residue. An
+    /// occupied record path is refused instead of replaced: what occupies it is
+    /// a mutation no session applied, and session open decides its fate.
     ///
     /// # Errors
     ///
     /// Returns an error when the record cannot be serialized, the data root is
-    /// absent, the scratch directory cannot be created, the record path is
-    /// occupied, or the write or any sync fails.
+    /// absent, the record path is occupied, or a write or sync fails.
     pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
         let scratch = data_root.join(RECORD_SCRATCH_DIR);
         if create_scratch(data_root, &scratch)? {
@@ -251,14 +241,10 @@ struct AppendHeader {
     length: u64,
 }
 
-/// Create the scratch directory when absent, reporting whether this call
-/// created it: a created directory's own entry is durable only once its parent
-/// is fsynced. The data root itself is not created here — an absent data root
-/// is a repository the caller has no business writing a record into.
-///
-/// A created directory is given the data root's own mode, so the record is as
-/// reachable as the rest of the data root rather than as reachable as the
-/// ambient umask happened to allow.
+/// Create the scratch directory when absent, with the data root's own mode,
+/// reporting whether this call created it: a created entry is durable only once
+/// its parent is fsynced, and a mode left to the umask is not the one the rest
+/// of the data root carries. An absent data root is not created here.
 fn create_scratch(data_root: &Path, scratch: &Path) -> anyhow::Result<bool> {
     match std::fs::create_dir(scratch) {
         Ok(()) => adopt_mode(data_root, scratch).map(|()| true),
