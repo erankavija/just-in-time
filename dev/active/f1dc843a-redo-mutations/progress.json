@@ -1079,5 +1079,44 @@
         "dispatched": "folded into d591a1c8 rework 1 of 2, rather than a separate follow-up cycle"
       }
     ]
+  },
+  "handoffs": [
+    "dev/active/f1dc843a-redo-mutations/handoff.md",
+    "dev/active/f1dc843a-redo-mutations/handoff-2.md"
+  ],
+  "session_2_summary": {
+    "closed": [
+      "35544121",
+      "4e818d10",
+      "8559f529",
+      "d591a1c8"
+    ],
+    "created": [
+      "8559f529"
+    ],
+    "amended": [
+      "c88822a5 REQ-03 (ESC-05)",
+      "4e818d10 Non-goals (ESC-07)",
+      "21e976d1 REQ-06 (ESC-08)"
+    ],
+    "escalations_decided_by_user": [
+      "ESC-05",
+      "ESC-06",
+      "ESC-07",
+      "ESC-08"
+    ],
+    "rework_rounds": {
+      "35544121": 2,
+      "4e818d10": 1,
+      "8559f529": 2,
+      "d591a1c8": 1
+    },
+    "lead_errors_recorded": [
+      "PF-06 dispatch contradicted 21e976d1 REQ-03",
+      "V-08 issue Notes estimate undersized 8559f529",
+      "PF-09 first line-count method wrong in both directions",
+      "unconditional echo printed a clean-tree verdict over a dirty tree"
+    ],
+    "checkpoint": "21e976d1 gates launched at session end; cargo-ci passed, doc-review and holistic-review pending"
   }
 }
