@@ -40,6 +40,8 @@ citations="$here/docs-check-citations.sh"
 projections="$here/docs-check-projections.sh"
 canonical="$here/docs-check-canonical.sh"
 policy="$here/docs-check-shipped-policy.sh"
+pkgcite="$here/docs-check-package-citations.sh"
+phrases="$here/docs-check-policy-phrases.sh"
 mechanical="$here/docs-mechanical.sh"
 
 fail=0
@@ -79,7 +81,7 @@ fixture_scripts="$fixture/scripts"
 fixture_log="$scratch/orchestrator.log"
 mkdir -p "$fixture_scripts"
 cp "$mechanical" "$fixture_scripts/docs-mechanical.sh"
-for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh docs-check-shipped-policy.sh; do
+for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh docs-check-shipped-policy.sh docs-check-package-citations.sh docs-check-policy-phrases.sh; do
   # shellcheck disable=SC2016  # $0/$* and the log variable expand in the stub.
   printf '#!/usr/bin/env bash\nprintf "%%s:%%s\\n" "$(basename "$0")" "$*" >>"$DOCS_MECHANICAL_LOG"\n' >"$fixture_scripts/$checker"
   chmod +x "$fixture_scripts/$checker"
@@ -95,6 +97,8 @@ assert_rc 0 $? "orchestrator: bare invocation succeeds in isolated fixture"
 assert_logged_footprint "docs-check-links.sh" "docs" "$fixture_log" "orchestrator: bare invocation selects adopter docs, not archival paths"
 assert_logged_footprint "docs-check-citations.sh" "docs" "$fixture_log" "orchestrator: bare invocation passes adopter docs to both footprint checkers"
 assert_logged_footprint "docs-check-shipped-policy.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the shipped-policy check, with no footprint"
+assert_logged_footprint "docs-check-package-citations.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the package-citation check, with no footprint"
+assert_logged_footprint "docs-check-policy-phrases.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the policy-phrase check, with no footprint"
 
 # An explicit environment footprint remains higher precedence than the default.
 : >"$fixture_log"
@@ -409,6 +413,180 @@ if git clone --local --no-hardlinks --quiet . "$policy_clone" 2>/dev/null; then
   assert_rc 1 "$(cat "$scratch/rc_policy_drift")" "shipped policy: a seeded stale region is a finding"
 else
   echo "FAIL: could not create isolated clone for the shipped-policy check"
+  fail=1
+fi
+echo
+
+echo "== M8 docs-check-package-citations.sh =="
+"$pkgcite" >/dev/null 2>&1
+assert_rc 0 $? "package citations: this repository's packages resolve their own citations"
+"$pkgcite" docs >/dev/null 2>&1
+assert_rc 2 $? "package citations: a footprint argument is a usage error"
+echo
+
+echo "== M9 docs-check-policy-phrases.sh =="
+# An isolated fixture: one prose artifact, one configured value, and a manifest
+# binding both. Every defect class is seeded there and reverted, so the real
+# checker is exercised without touching this repository's own policy prose.
+ph="$scratch/phrases"
+mkdir -p "$ph"
+write_phrase_fixture() {
+  printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n' \
+    >"$ph/policy.md"
+  cat >"$ph/registry.toml" <<'TOML'
+[[gates]]
+key = "fixture"
+
+  [gates.checker.env]
+  AGENT = "reviewer --sandbox read-only"
+TOML
+  cat >"$ph/manifest.toml" <<'TOML'
+[[document]]
+path = "policy.md"
+topic = "fixture policy"
+require = ["read-only"]
+forbid = ["blanket rule"]
+exactly_once = ["Attribution:"]
+
+[[document]]
+path = "policy.md"
+topic = "fixture wrapping"
+normalize = true
+require = ["The wrapper transports the prompt."]
+
+[[value]]
+file = "registry.toml"
+topic = "fixture sandbox"
+select = "gates[key=fixture].checker.env.AGENT"
+require = ["--sandbox read-only"]
+TOML
+}
+run_phrases() { (cd "$ph" && "$phrases" manifest.toml >/dev/null 2>&1); }
+
+write_phrase_fixture
+run_phrases
+assert_rc 0 $? "phrases: a fixture stating its declared policy passes"
+
+# Defect: the artifact stops stating a required phrase.
+printf '# Policy\n\nThe run is unrestricted.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n' \
+  >"$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: a removed required phrase is a finding"
+
+# Defect: a forbidden phrase returns — the case no presence check can express.
+write_phrase_fixture
+printf 'A blanket rule applies to every API.\n' >>"$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: a returning forbidden phrase is a finding"
+
+# Defect: a contract field stated twice is a second contract.
+write_phrase_fixture
+printf 'Attribution: <again>\n' >>"$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: an exactly-once field stated twice is a finding"
+
+# The normalized entry matches across the fixture's line break; the same phrase
+# is absent from the unwrapped text, so this is what `normalize` buys.
+write_phrase_fixture
+if grep -qF 'The wrapper transports the prompt.' "$ph/policy.md"; then
+  echo "FAIL: phrases fixture is unwrapped, so its clean run proves nothing about normalize"
+  fail=1
+else
+  echo "PASS: phrases: the normalized entry matched a phrase the artifact wraps"
+fi
+
+# Defect: the artifact is gone.
+write_phrase_fixture
+rm -f "$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: an unreadable declared artifact is a finding"
+
+# Defect: the configured value stops carrying what the manifest requires.
+write_phrase_fixture
+printf '[[gates]]\nkey = "fixture"\n\n  [gates.checker.env]\n  AGENT = "reviewer"\n' \
+  >"$ph/registry.toml"
+run_phrases
+assert_rc 1 $? "phrases: a configured value that dropped its literal is a finding"
+
+# Defect: the selector no longer resolves — the declaration it named is gone.
+write_phrase_fixture
+printf '[[gates]]\nkey = "other"\n' >"$ph/registry.toml"
+run_phrases
+assert_rc 1 $? "phrases: a selector resolving to nothing is a finding"
+
+# Clean again, so the reverted fixture is proven to pass rather than assumed to.
+write_phrase_fixture
+run_phrases
+assert_rc 0 $? "phrases: reverted fixture is clean"
+
+# A manifest that cannot be read, declares nothing, or declares an entry that
+# asserts nothing is an environment error, never a false-green pass.
+(cd "$ph" && "$phrases" no_such_manifest_zzz.toml >/dev/null 2>&1)
+assert_rc 2 $? "phrases: unreadable manifest is an env error"
+printf '# nothing declared\n' >"$ph/empty.toml"
+(cd "$ph" && "$phrases" empty.toml >/dev/null 2>&1)
+assert_rc 2 $? "phrases: manifest declaring no entries is an env error"
+printf '[[document]]\npath = "policy.md"\ntopic = "asserts nothing"\n' >"$ph/hollow.toml"
+(cd "$ph" && "$phrases" hollow.toml >/dev/null 2>&1)
+assert_rc 2 $? "phrases: entry asserting nothing is an env error"
+(cd "$ph" && "$phrases" manifest.toml extra.toml >/dev/null 2>&1)
+assert_rc 2 $? "phrases: a second argument is a usage error"
+echo
+
+echo "== the gate fails on a seeded policy or package defect =="
+# The property these two assertions carry is the point of the whole gate
+# membership: a commit that changes only prose must be caught by the gate that
+# prose triggers. Both seeds go into a throwaway clone, and both are read from
+# the live declarations rather than restated here.
+gate_clone="$scratch/gate-repo"
+if git clone --local --no-hardlinks --quiet . "$gate_clone" 2>/dev/null; then
+  (
+    cd "$gate_clone" || exit 3
+    DOCS_FOOTPRINT="docs/" "$mechanical" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_gate_clean"
+
+    # Seed 1: remove a required policy phrase from the artifact that states it.
+    mapfile -t declared < <(python3 -c '
+import tomllib
+manifest = tomllib.load(open("scripts/docs-policy-phrases.toml", "rb"))
+entry = next(d for d in manifest["document"] if d.get("require") and not d.get("normalize"))
+print(entry["path"])
+print(entry["require"][0])
+')
+    python3 -c '
+import sys
+path, phrase = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8").read()
+assert phrase in text, f"{path} does not state {phrase!r}"
+open(path, "w", encoding="utf-8").write(text.replace(phrase, ""))
+' "${declared[0]}" "${declared[1]}"
+    DOCS_FOOTPRINT="docs/" "$mechanical" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_gate_phrase"
+    git checkout -q -- "${declared[0]}"
+
+    # Seed 2: an unresolvable `@/` citation in package content. The id is
+    # assembled below so this harness is not itself a dangling citation.
+    region=$(python3 -c '
+import os, tomllib
+base = "profiles"
+for package in sorted(os.listdir(base)):
+    manifest = os.path.join(base, package, "manifest.toml")
+    if not os.path.isfile(manifest):
+        continue
+    for region in tomllib.load(open(manifest, "rb")).get("region", []):
+        print(os.path.join(base, package, region["source"]))
+        raise SystemExit
+')
+    printf -- '\nSeeded @/rule/%s citation.\n' "does-not-exist-zzz" >>"$region"
+    DOCS_FOOTPRINT="docs/" "$mechanical" >/dev/null 2>&1
+    echo "$?" >"$scratch/rc_gate_package"
+    git checkout -q -- "$region"
+  )
+  assert_rc 0 "$(cat "$scratch/rc_gate_clean")" "gate: an unmodified clone passes"
+  assert_rc 1 "$(cat "$scratch/rc_gate_phrase")" "gate: a removed required policy phrase fails the gate"
+  assert_rc 1 "$(cat "$scratch/rc_gate_package")" "gate: an unresolvable packaged citation fails the gate"
+else
+  echo "FAIL: could not create isolated clone for the gate-level assertions"
   fail=1
 fi
 echo

@@ -100,6 +100,8 @@ run "M3 citations" "$here/docs-check-citations.sh" "${FOOTPRINT[@]}" ${homes[@]+
 run "M5 projections" "$here/docs-check-projections.sh"
 run "M6 canonical homes" "$here/docs-check-canonical.sh"
 run "M7 shipped policy" "$here/docs-check-shipped-policy.sh"
+run "M8 package citations" "$here/docs-check-package-citations.sh"
+run "M9 policy phrases" "$here/docs-check-policy-phrases.sh"
 
 if [ "$env_error" -eq 1 ]; then
   exit 2
