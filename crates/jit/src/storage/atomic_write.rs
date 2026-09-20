@@ -1,11 +1,10 @@
 //! The shared file-write primitives: atomic publication (temp file + rename)
-//! and durability ([`write_file_synced`], [`sync_directory`]).
+//! and durability ([`write_file_synced`], [`create_file_synced`], [`sync_directory`]).
 //!
 //! Storage writes go through the helpers in this module so a reader never
 //! observes a partially written file (the JIT "atomic file writes" invariant).
 //! Atomicity is reader visibility, not durability: a caller that must not
-//! proceed until its bytes survive a crash — a redo record, written before the
-//! first live write it describes — reaches the synced operations instead.
+//! proceed until its bytes survive a crash reaches the synced operations.
 //! It lives in the storage layer because persistence is storage's responsibility:
 //! command/validation/output callers produce content and hand it here rather
 //! than touching the filesystem themselves.
@@ -46,26 +45,53 @@ pub(in crate::storage) fn write_file_atomic_bytes(path: &Path, content: &[u8]) -
     write_file_atomic_bytes_with_permissions(path, content, None)
 }
 
-/// Write `content` to `path` and return once those bytes are on the device.
+/// Write `content` to `path`, truncating it, and return once those bytes are on
+/// the device.
 ///
-/// The file is created or truncated in place and synced before the handle
-/// closes, so a caller that must not proceed until its bytes survive a crash
-/// has them on return. Truncation is part of the contract: an interrupted write
-/// leaves a prefix of `content`, never a mix with what the path held. The
-/// entry naming the file is a separate durability concern — a caller that
-/// creates the file needs [`sync_directory`] on its parent as well.
+/// An interrupted write leaves a prefix of `content`, never a mix with what the
+/// path held. A caller whose path may hold something it must not lose reaches
+/// [`create_file_synced`]; one that creates the file needs [`sync_directory`]
+/// on the parent naming it.
 pub(in crate::storage) fn write_file_synced(path: &Path, content: &[u8]) -> Result<()> {
-    let mut file =
-        fs::File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    write_synced(
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true),
+        path,
+        content,
+    )
+}
+
+/// Write `content` to `path` as a new file, refusing an occupied path, and
+/// return once those bytes are on the device.
+///
+/// The refusal is the open itself, so it holds against a concurrent writer a
+/// caller-side existence check would race. What occupies a commit point — a
+/// redo record — is a mutation nobody applied, and truncating it destroys that
+/// mutation; resolving the leftover is the occupying caller's business.
+pub(in crate::storage) fn create_file_synced(path: &Path, content: &[u8]) -> Result<()> {
+    write_synced(
+        fs::OpenOptions::new().write(true).create_new(true),
+        path,
+        content,
+    )
+}
+
+/// The synced write both operations share; `options` decides what an occupied
+/// path means.
+fn write_synced(options: &fs::OpenOptions, path: &Path, content: &[u8]) -> Result<()> {
+    let mut file = options
+        .open(path)
+        .with_context(|| format!("opening {}", path.display()))?;
     file.write_all(content)
         .with_context(|| format!("writing {}", path.display()))?;
     file.sync_all()
         .with_context(|| format!("syncing {}", path.display()))
 }
 
-/// Fsync the directory at `path`, so the entries created, renamed, or removed
-/// in it survive a crash. A file's own bytes need [`write_file_synced`]; this
-/// covers the name under which they are found.
+/// Fsync the directory at `path`, so entries created, renamed or removed in it
+/// survive a crash; a file's own bytes need one of the synced writes.
 pub(in crate::storage) fn sync_directory(path: &Path) -> Result<()> {
     fs::File::open(path)
         .and_then(|directory| directory.sync_all())
@@ -190,6 +216,29 @@ mod tests {
             write_file_synced(Path::new(UNSYNCABLE), b"bytes").is_err(),
             "the write returned before the bytes were synced"
         );
+    }
+
+    #[test]
+    fn test_create_file_synced_writes_the_bytes_it_was_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        let content = [0, 159, 146, 150, 255];
+
+        create_file_synced(&path, &content).unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn test_create_file_synced_leaves_an_occupied_path_as_it_found_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        let occupant = b"a record nobody applied yet";
+        write_file_synced(&path, occupant).unwrap();
+
+        assert!(create_file_synced(&path, b"replacement").is_err());
+
+        assert_eq!(std::fs::read(&path).unwrap(), occupant.to_vec());
     }
 
     #[test]
