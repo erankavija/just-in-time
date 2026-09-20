@@ -103,7 +103,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched"
+          "status": "rework 1/2 dispatched (V-08: pub fields bypass the check)"
         }
       ]
     },
@@ -727,7 +727,8 @@
     "555ff4be": 1,
     "2d4fda72": 1,
     "35544121": 1,
-    "4e818d10": 1
+    "4e818d10": 1,
+    "8559f529": 1
   },
   "surfaced_pitfalls": [
     {
@@ -922,6 +923,14 @@
       "detail": "code-review F1 (blocking): a record putting issues/a.json then issues makes the memory put_entry overwrite the Directory entry with a File while keeping its child, where the filesystem applier fails on the nonempty-directory replacement and leaves its record. Memory reports success and clears the residue (memory.rs:608-610). 835bae3f REQ-02 rejects paths outside the roots at construction but nothing rejects an ancestor/descendant pair, so the record is constructible. F2 (advisory): MemoryRedoApplier::new rustdoc restates its one-field initializer (@/inv/essential-code-prose).",
       "lead_evidence": "Verified before dispatching rework: memory_file_object(path) is format!(\"memory-file:{path:?}\"), byte-identical to the inline form it replaced, so the kernel's entries are unchanged; and repository_state_store.rs never names MemoryRepositoryState.record — its only RedoRecord reference is faa668c9's ensure_write_set_unchanged, still with no production caller. So the worker's reachability audit holds and 21e976d1 REQ-03 is satisfied for this issue's work.",
       "verdict": "RESOLVED. The worker measured RedoApplier's actual contract with three throwaway probes rather than assuming it, and matched all four rows: EISDIR for a put over a directory an earlier put created, UnsafeTarget(component) for the mirror order and for a non-directory ancestor, EISDIR for a delete of a directory. No rollback in any case — earlier operations stand and the record stays installed, which redo-only convergence requires. Two self-corrections fell out: memory walks ancestors outermost-first so UnsafeTarget names the same component, and the worker's earlier Unaddressable claim for a non-directory ancestor was the wrong error shape. F2's rustdoc deleted. Both gates green on the merged tree; code-review attribution covers 2c0d5d63b and 667460a66."
+    },
+    {
+      "id": "V-08",
+      "issue": "8559f529",
+      "what": "The overlap check was implemented as an optional constructor beside pub fields.",
+      "detail": "RedoRecord::new validates and parse calls the same helper, but redo_record.rs:56-58 leaves puts, deletes and event_append pub, so `RedoRecord { puts: vec![put(issues/a.json), put(issues)], ..Default::default() }` still constructs the overlapping record the task exists to prevent. REQ-01 says 'rejected at construction'; a struct literal is construction. Compounding it, the struct rustdoc at :49-53 now states 'Operation paths are pairwise disjoint ... checked identically at construction and at parse' as fact, so the type documents an invariant it permits callers to violate.",
+      "lead_note": "Caught at Tier 2 from the worker's own disclosure — it reported 'Fields stay pub ... existing struct-literal test fixtures were out of scope'. The asymmetry that makes it wrong: 835bae3f's root-class rejection lives in VirtualPath's constructor and CANNOT be bypassed, because no path reaches RedoRecord without passing it. The worker matched that check's placement without matching its unbypassability. PARTLY THE LEAD'S FAULT: the issue Notes said 'roughly 30 production lines', costing the comparison logic and not the encapsulation that makes it binding, and the worker sized to that number. The estimate is descriptive and does not override a criterion; not amended.",
+      "verdict": "FAIL - rework 1 of 2. Fields become private with read accessors; 43 struct-literal sites across four files (all tests) route through new(); the shared arbitrary_record() generator must produce disjoint sets by construction rather than prop_assume filtering, since d591a1c8 builds its conformance suite on that fixture next."
     }
   ],
   "standing_policies": [
