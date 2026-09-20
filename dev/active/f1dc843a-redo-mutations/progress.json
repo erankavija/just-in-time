@@ -86,7 +86,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "dispatched (Non-goals amended per ESC-07)"
         }
       ]
     },
@@ -681,6 +681,16 @@
       "resolution": "Change the artifact: a type in redo_apply.rs holds Arc<dyn RedoInterruptionInjector> and exposes apply(&self, roots, record), converging on FileTransactionKernel's established shape. REQ-05 is unchanged. The invoker's guidance resets the rework counter for this issue.",
       "resolved_by": "user",
       "status": "closed"
+    },
+    {
+      "id": "ESC-07",
+      "wave": 4,
+      "category": "4 - issue scope change",
+      "question": "4e818d10 REQ-01 and REQ-05 read as properties of the live memory mutation session, but LD-11 places kernel retirement in the cutover phase (b0ee2dd6) and 21e976d1 REQ-03 requires observable publication behaviour to be unchanged in this phase, so two residues coexist until wave 12.",
+      "resolution": "Add a ## Non-goals section stating the foundation-phase scope, mirroring faa668c9 (ESC-02). No criterion weakened; zero code change. Applied at 9e0078882.",
+      "resolved_by": "user",
+      "status": "closed",
+      "lead_note": "Raised BEFORE the gate ran, not after. faa668c9 is the control: the identical situation failed a full code-review round in session 1 and then passed with zero code change once the scope was stated."
     }
   ],
   "rework_counts": {
@@ -777,6 +787,13 @@
       "suggested_remedy": "Surface staleness where readiness is read. The gate-run record already carries the evidence — its stdout opens with an `Attribution:` commit list — so a `stale` flag when HEAD has moved past the attributed commits would turn a judgement call into a fact. NOT actioned: this is a shipped surface, escalation category 8.",
       "lead_action": "Adopted for the rest of this epic: after every merge, re-evaluate every AI-review gate on the issue before reading its status, and confirm the run's Attribution line covers the new commits.",
       "status": "adopted by the lead; product change raised to the user, not actioned"
+    },
+    {
+      "id": "PF-06",
+      "finding": "The lead's dispatch prompt for 4e818d10 instructed the worker to delete the memory kernel modelling, citing the issue's Notes line 'against roughly 340 lines of kernel modelling this replaces' and @/inv/canonical-cutover. Both were misread: the Notes line frames the EPIC's net line balance, and LD-11 is itself the named versioned boundary @/inv/canonical-cutover asks for, naming b0ee2dd6 as the removal condition. Following the instruction would have broken 21e976d1 REQ-03. The worker refused, stated its evidence, and proceeded additively without blocking.",
+      "suggested_remedy": "Before composing a dispatch prompt, read the parent story's criteria and grep the plan's decision table for the task's subject. The lead had read 21e976d1 REQ-03 earlier in the same session and still composed a prompt contradicting it.",
+      "lead_action": "Corrected the instruction to the worker in writing, with the evidence, and recorded the error here.",
+      "status": "lead error, corrected mid-wave"
     }
   ],
   "evidence_requirements": [
