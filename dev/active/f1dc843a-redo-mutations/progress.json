@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework-1 (code-review: symlink-following predictable put staging)"
+          "status": "BLOCKED - R1 finding unaddressed (V-04)"
         }
       ]
     },
@@ -608,7 +608,7 @@
       "short_id": "48e4f65c",
       "title": "Document commands stop capping the event log",
       "why": "SP-03: document.rs 64 MiB ceiling declares VirtualPath::EVENTS; same class as 19e7298a. User directed fold-in.",
-      "status": "dispatched",
+      "status": "done",
       "gates": [
         "cargo-ci",
         "code-review"
@@ -668,7 +668,7 @@
   "rework_counts": {
     "555ff4be": 1,
     "2d4fda72": 1,
-    "35544121": 1
+    "35544121": 2
   },
   "surfaced_pitfalls": [
     {
@@ -778,6 +778,14 @@
       "detail": "redo_apply.rs:167 staged puts with cap-std `Dir::create` at a predictable `.{leaf}.{pid}.redo.tmp` name. That call is create+truncate and follows symlinks, so a pre-existing in-root symlink at the stage name truncates an unrelated file, receives the put bytes, and is then renamed onto the put target - the record writes a path it never named. References @/charter/D-17 and @/invariant/atomic-writes.",
       "lead_note": "The lead verified phasing, the interruption contract, line budget and caller absence, but did not inspect the staging open. Second defect in this epic caught by @/inv/atomic-writes; the first was the truncating record write in 555ff4be. Both were in new-file publication paths.",
       "verdict": "rework dispatched"
+    },
+    {
+      "id": "V-04",
+      "issue": "35544121",
+      "what": "BLOCKING: code-review round 1's finding is unaddressed at HEAD and round 3 passed without re-checking it.",
+      "detail": "R1 (blocking, issue-impact, redo_apply.rs:85): 'REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it. Callers can therefore vary injection across applications rather than the backend owning its interruption boundary.' At HEAD apply_record still takes `injector: &dyn RedoInterruptionInjector` (redo_apply.rs:88) and no backend holds it. R2 flagged the staging vulnerability instead; the lead dispatched rework for R2 only. R3 passed with 'All hard criteria are implemented and the prior staging vulnerability is remediated' - it re-checked the staging finding and not R1.",
+      "lead_note": "Caught by the Tier 1.5 prior-findings regression check, which exists precisely because reviewers have no memory across rounds. The issue is NOT completed. The worker's original position was that the session becomes the injector holder at wiring time (4319256e), matching the kernel's `execute_repository_delta(..., &*self.injector)` pattern - arguable, but No-argue discipline forbids the lead softening REQ-05 by argument. Resolve by changing the artifact or by escalating.",
+      "verdict": "FAIL - issue left in_progress, carried into the handoff"
     }
   ],
   "standing_policies": [
