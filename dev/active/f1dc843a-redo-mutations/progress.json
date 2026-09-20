@@ -619,7 +619,7 @@
       "short_id": "7226f00b",
       "title": "Whole-log read cost and the single-pass capture specification",
       "why": "SP-02(b): epic REQ-02 may be unreachable while c88822a5 REQ-03 keeps the whole event log in the capture base spec. User directed investigating now rather than discovering it at wave 16 or 21. Wired as a hard blocker on c88822a5.",
-      "status": "dispatched",
+      "status": "done",
       "gates": [
         "doc-review"
       ],
@@ -707,6 +707,23 @@
       "detail": "commands/gate.rs:251 (512 MiB, paths :296), commands/gate.rs:1110 (256 MiB, paths :1119), commands/gate_check.rs:783 (512 MiB, paths :790), commands/template.rs:35 (512 MiB, paths :388), commands/validate.rs:1256 MUTATION_CAPTURE_BUDGET (512 MiB, EVENTS discovered at validate.rs:411). All declare VirtualPath::EVENTS, so a large enough event log makes them fail the way claim did at 16 MiB and document at 64 MiB. They differ from those in one decisive respect: max_listings > 0, so max_bytes is the only bound on real capture growth there. Removing it deletes a live bound. commands/config.rs:304 and commands/init.rs:350 declare only VirtualPath::CONFIG and are confirmed unexposed.",
       "disposition": "OPEN, and deliberately out of scope for 48e4f65c. The owner amended that issue's REQ-02 to budgets requesting no listings, matching its Background. Closing these needs a design for bounding listing expansion without a hand-picked byte number - the same problem image.rs:586-604 describes ('A budget here would restate that bound as a number this type cannot derive'). Exposure is low: the ceilings are 256-512 MiB. Not scheduled; surfaces in the completion report.",
       "criterion_subjects": []
+    },
+    {
+      "id": "SP-05",
+      "found_during": "7226f00b spike (wave 3), measured",
+      "subject": "Epic REQ-02 is unreachable while the capture base specification reads the event log whole",
+      "detail": "Measured on a tmpfs copy via a throwaway examples binary driving the real RepositoryMutationSession::capture, 15 iterations x 3 passes: base capture is flat at 14.2/14.5 ms; adding VirtualPath::EVENTS costs 3.2 ms at 1x (3.37 MB) and 28.6 ms at 10x (33.7 MB). Slope 0.89 ms/MB. The hardware floor is 0.81 ms/MB (fs::read + Sha256::digest at ~2.4 GB/s on SHA-NI), i.e. 91% of measured - there is no implementation slack. REQ-02's budget is 0.34 ms/MB (10% of a projected 99.3 ms over 28.96 MB). One whole-log read is 2.6x over measured and 2.4x over the floor. Projection: 99.3 ms at 1x -> 125.0 ms at 10x = +26%, against REQ-02's required <10%.",
+      "consumers": "Eleven consumers of captured log bytes. Five need the whole log and NONE is on the label-update path (mutation.rs:695 claim reflection, archive.rs:465, migrate.rs:88, validation/repository.rs:428, memory.rs:502). The label-update path has four sites and no semantic consumer: composer prefix copy (mutation.rs:1225, deleted by b4483ad6), torn-tail inspection (:1230, last line only), expected preimage (:1273, whole-log SHA-256), apply-time read-set re-capture (repository_state_store.rs:535). The last two are conflict machinery that ensure_write_set_unchanged already answers with length + 4 KiB tail.",
+      "false_premises_in_c88822a5": [
+        "'The apply-time round is already gone' - it is not; repository_state_store.rs:526-538 still re-captures the whole read set and compares it whole, a third whole-log read per changing label update.",
+        "ensure_write_set_unchanged (faa668c9) has no production caller, only repository_state_store_tests.rs:5108 - correct for the phase, but c88822a5's premise assumes it is live."
+      ],
+      "disposition": "OPEN - BLOCKING DECISION FOR THE NEXT SESSION. c88822a5 REQ-03 cannot stand as written. Proposed amendment (from the spike): the base spec takes the log as length and a bounded tail; a command that parses the log names it whole in its own capture set. Needs a per-path read mode in CaptureSpec, a captured entry carrying length+tail (EventLogTail exists but is private), and expected_of to stop deriving the log's preimage from a whole-log digest. Amending c88822a5's criteria is escalation category 4; if the amendment cannot deliver <10%, epic REQ-02 itself is at stake, which is category 3.",
+      "criterion_subjects": [
+        "REQ-01",
+        "REQ-02"
+      ],
+      "evidence": "dev/active/7226f00b/whole-log-read-cost.md"
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
