@@ -7,11 +7,11 @@
 ## Current state
 
 - Epic: `f1dc843a` — state: backlog (assignee now `agent:jit-execution-lead`)
-- Wave in progress: wave 6 of 23 — `21e976d1` checkpoint gates running at session end
-- Children summary: **15 done, 1 ready (`21e976d1`), 31 backlog** of 47
-- Active claims: `21e976d1` holds an **indefinite lease** (`--ttl 0`, reason "checkpoint gate run"). Release it or force-evict before working the issue: `jit claim release 21e976d1` / `jit claim force-evict 21e976d1`.
+- Wave in progress: **wave 7 of 23** — the first story checkpoint `21e976d1` is **done**, all three gates green
+- Children summary: **16 done, 31 backlog** of 47
+- Active claims: none. `21e976d1`'s indefinite checkpoint lease was released.
 - Open escalations: **none**. All eight are closed; four were decided by the user this session (ESC-05..ESC-08).
-- Progress file: `progress.json` in `dev/active/f1dc843a-redo-mutations/` — waves, `surfaced_pitfalls` SP-01..SP-07, `verifications` V-01..V-10, `process_findings` PF-01..PF-09, `escalations` ESC-01..ESC-08, `standing_policies` POL-01/POL-02, `evidence_requirements` ER-01/ER-02, and `checkpoint_reconciliation`.
+- Progress file: `progress.json` in `dev/active/f1dc843a-redo-mutations/` — waves, `surfaced_pitfalls` SP-01..SP-07, `verifications` V-01..V-11, `process_findings` PF-01..PF-10, `escalations` ESC-01..ESC-08, `standing_policies` POL-01/POL-02, `evidence_requirements` ER-01/ER-02, and `checkpoint_reconciliation`.
 
 ## What just happened
 
@@ -23,12 +23,12 @@
 - Amended `21e976d1` REQ-06 (ESC-08): the phase total binds (1137 of 1500), per-task figures stay estimates reported against. Created `footprint.md`, linked to `21e976d1`.
 - Closed SP-06 (stale `#[allow(unused_imports)]` in `storage/mod.rs`) inside `d591a1c8`'s last rework rather than as a separate cycle.
 - Performed the checkpoint pitfall reconciliation **before** the gate (recorded under `checkpoint_reconciliation`). It surfaced two items that would otherwise have failed the gate; both are closed.
+- **`21e976d1` done — wave 6 closed.** `cargo-ci` and `doc-review` passed first time. `holistic-review` failed once, on the lead's own evidence artifact rather than any worker's code: REQ-06's figures were self-attested with no reproducible command (V-11). Fixed by committing `footprint.py`, quoting its verbatim output, and re-running both AI gates — `holistic-review` then passed with zero findings.
 
 ## What to do next
 
-- [ ] **Read the checkpoint gate results first**: `jit issue show 21e976d1 --json`. Three gates were launched at session end (`cargo-ci`, `doc-review`, `holistic-review`) and may not have finished. Read the gate-run records, never a shell exit code (see Traps).
-- [ ] If `holistic-review` failed: its findings are the story's, not one task's. Create a remediation task inside the story and close the criterion — do not soften the reading (`lead-review-protocol.md`, No-argue discipline).
-- [ ] If all three passed: complete `21e976d1`, release its indefinite lease, then open **wave 7** — `08b8c0ef`, `581bddcf`, `7658bf81`, `f05a7965`. First genuine 4-worker fan-out; everything so far has been serial.
+- [ ] **Open wave 7** — `08b8c0ef`, `581bddcf`, `7658bf81`, `f05a7965`. All four depend only on `21e976d1`, which is done, so all four are dispatchable at once. This is the **first genuine 4-worker fan-out**; waves 1–6 were serial or paired, so the conflict heuristics and the cache-pool trap (one harvest per wave — see session 1's traps) get their first real exercise here.
+- [ ] Wave 8 (`8d7f4cec`) depends on `581bddcf` **and** `7658bf81`; wave 9 (`0938d99e`) on `8d7f4cec`; wave 10 (`4319256e`) on `08b8c0ef` **and** `0938d99e`. So the spine narrows again immediately after wave 7 — dispatch all four now rather than staging them.
 - [ ] Carry **ER-01** into `722878d4` (wave 21): report the REQ-06 balance attributed, excluding `ce053478`, `19e7298a`, `2d4fda72`, `48e4f65c`, `7226f00b`. **`8559f529` is NOT excluded** — it is redo-record work and counts in the subtotal. Reuse `footprint.md`'s method; do not re-derive it.
 - [ ] `c88822a5` (wave 16) now carries three implied consequences in its Notes: a per-path read mode in `CaptureSpec`, a captured entry carrying length+tail (`EventLogTail` is private today), and `expected_of` no longer deriving the log's preimage from a whole-log digest. Verify all three at review; they are the load-bearing part of epic REQ-02.
 - [ ] `8b6a9e34` (wave 22) still owns SP-01's live half: `dev/TESTING.md:471` cites an archived benchmark path plus the `transaction-benchmark-evidence` contract that LD-4 retires.
@@ -45,6 +45,7 @@ Session 1's trap section remains in force in full (`handoff.md`). Every one of i
 - **A task's Notes footprint estimate is not a budget, and a worker will size to it.** `8559f529`'s "roughly 30 production lines" came from an analysis that costed the comparison logic and not the encapsulation; the worker delivered exactly that and produced the bypassable check above. **State the property, not the line count — and if you state a number, say it is descriptive.** (V-08, ESC-08)
 - **Deleting a test can silently drop a property its replacement does not carry.** `8559f529` made two records unconstructible and redesigned their tests correctly, but the replacements were single-put records, so "a refusal leaves the record's earlier operations applied" lost its only owner. A backend that rolled back on refusal would have passed every test in the tree. **Diff the test inventory before and after, then read each deleted body assertion by assertion.** (V-09)
 - **A mutation experiment leaves artifacts beyond the source edit.** A deliberate mutation that fails a proptest makes proptest write a regression seed, which survives reverting the source. `d591a1c8` left one; a later reader would have hunted a defect that never existed in the tree. **Check for and remove harness-recorded state when reverting a mutation.**
+- **Evidence for a criterion must be reproducible, not asserted.** `holistic-review` failed the checkpoint on `footprint.md`: the lead had written its measurement method into prose and quoted figures from an ad-hoc script it never committed, so the numbers were self-attested. The amended REQ-06 requires each footprint to be *recorded* against its estimate, and a figure nobody can regenerate is an assertion. **Commit the generator beside any measurement a criterion rests on, quote its verbatim output, and parameterise it for the later consumer** — `footprint.py` now takes `--tasks` so `722878d4` gets ER-01's attributed subtotal without re-deriving anything. `bench.sh` already set this precedent for epic REQ-01/REQ-02. (V-11, PF-10)
 - **A naive production-line count is wrong in both directions at once.** Cutting each file at its first `#[cfg(test)]` counts `redo_conformance.rs` whole as production (it is gated by `#[cfg(test)] mod` on its **declaration** in `mod.rs`, not inside the file) and truncates `memory.rs` at line 146, where two `#[cfg(test)]` function attributes sit above 200-odd production lines. It reports 1428 where the answer is 1137. Cumulative additions across a task's commits measure churn, not footprint — `35544121` added 413 and removed 93 of its own, delivering 320. **Brace-match each `#[cfg(test)]` item's extent and report net per task; the method is written up in `footprint.md`.** (PF-09)
 - **The leak check reports the lead's own uncommitted gate-run records as suspected worker leaks.** Its snapshot is taken at dispatch; `jit gate evaluate` then writes `.jit/gate-runs/*/result.json`, `events.jsonl` and the issue file on main. They are not leaks. **Commit tracker state immediately after each gate evaluation** so the next wave's check has a clean baseline. Also: do not write `git status --porcelain && echo TREE-CLEAN` — the echo is unconditional and prints a clean verdict over a dirty tree. (Lead error this session.)
 - **`jit claim renew` does not take an issue id or `--ttl`.** It takes a **lease id** and `--extension`, unlike `acquire`/`release`, which take an issue id. `jit claim renew 21e976d1 --ttl 3600` fails with only "For more information, try '--help'".
@@ -53,7 +54,7 @@ Session 1's trap section remains in force in full (`handoff.md`). Every one of i
 
 ## Open questions needing invoker input
 
-None at the time of writing. The three checkpoint gates were still running; if `holistic-review` fails on a criterion the plan deliberately deferred, that becomes an escalation (category 4) and the resolution is a remediation task inside the story, not a softer reading of the criterion.
+None. The `21e976d1` checkpoint closed cleanly, all eight escalations are resolved, and wave 7 is dispatchable without any further decision.
 
 ## Reference artefacts
 
