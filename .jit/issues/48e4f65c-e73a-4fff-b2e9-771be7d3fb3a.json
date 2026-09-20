@@ -48,6 +48,13 @@
       "format": "markdown",
       "label": "Epic plan (f1dc843a)",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Event-log capture ceilings survey",
+      "path": "dev/active/48e4f65c/event-log-capture-ceilings.md"
     }
   ],
   "first_ready_at": "2026-09-20T10:37:39.444683398Z",
@@ -66,5 +73,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Document commands stop capping the event log",
-  "updated_at": "2026-09-20T10:38:07.945465860Z"
+  "updated_at": "2026-09-20T10:48:41.303565514Z"
 }
