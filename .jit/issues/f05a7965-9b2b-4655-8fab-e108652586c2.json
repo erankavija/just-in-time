@@ -1,12 +1,62 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-20T20:54:43.179627508Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "21e976d1-1650-474f-8da8-4a5e9f1207be"
   ],
   "description": "The no-follow regular-file open lives outside the transaction kernel module, where its readers already are.\n\n## Background\n\nThe kernel module exports one helper with consumers outside the transaction path: a capability-relative open that refuses symbolic links and non-regular files. Six call sites use it, five in the JSON storage backend, including the event-log read path, and one in artifact planning. It is the only kernel export that survives the kernel.\n\nMoving it first keeps the kernel's retirement a pure removal.\n\n## Success Criteria\n\n- [hard] REQ-01: The no-follow regular-file open lives in a storage module other than the transaction kernel, with its refusal of symbolic links and non-regular targets unchanged.\n- [hard] REQ-02: Every current call site reaches it at its new home, and it exists in one copy.\n- [hard] REQ-03: Its error type is independent of the transaction kernel's error enum.\n- [hard] REQ-04: Refusal of a symbolic link and of a directory is covered at the storage unit layer.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Epic investigation",
+      "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-09-20T20:40:59.264283100Z",
   "gates_required": [
     "cargo-ci",
@@ -23,7 +73,7 @@
     "satisfies:REQ-05"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Re-homed no-follow file open",
-  "updated_at": "2026-09-20T20:40:59.264283100Z"
+  "updated_at": "2026-09-20T20:54:43.179627508Z"
 }

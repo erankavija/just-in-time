@@ -1,12 +1,62 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-20T20:54:42.737408953Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "21e976d1-1650-474f-8da8-4a5e9f1207be"
   ],
   "description": "The storage session suite sheds the coverage of rollback reachability, journal records, verified backups, worktree companions, and kernel-point convergence, each property having an owner against the redo record or none at all.\n\n## Background\n\nPublication converges today by rolling a partially published change back through verified synced backups, and its suite proves that: reverse-action edges, rollback decisions, backup restoration, companion control directories, and stage cleanup. The redo record keeps coupled-state convergence and the concurrent-writer check, and drops rollback reachability deliberately. A half-applied record is finished forward.\n\nTwo further tests state interruption convergence over the kernel's thirty-six-variant enum: one boundary test and one that runs one hundred and eighty convergence checks in a single test. The record's conformance suite owns that property now, against the record's own points, so the kernel-enum copies go with the rest. What the session suite keeps is cross-backend byte parity and finalizer determinism, which are independent of the commit mechanism.\n\n## Success Criteria\n\n- [hard] REQ-01: The storage session suite retains no test whose assertion is that a partially published change is reversed.\n- [hard] REQ-02: The suite retains no test asserting journal contents, backup restoration, companion control directories, or staged-then-reversed publication.\n- [hard] REQ-03: The suite retains no interruption-convergence test driven by the kernel's failure-point set, and no hand-maintained list of those points.\n- [hard] REQ-04: Cross-backend byte-parity coverage and finalizer-determinism coverage survive unchanged.\n- [hard] REQ-05: The suite compiles and passes against the current publication mechanism after the change.\n- [hard] REQ-06: The change removes more test lines than it adds.\n\n## Notes\n\nThe kernel module's own test module exercises the kernel directly and retires with the module it covers.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Epic investigation",
+      "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-09-20T20:40:58.973514529Z",
   "gates_required": [
     "cargo-ci",
@@ -25,7 +75,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Superseded rollback coverage retirement",
-  "updated_at": "2026-09-20T20:40:58.973514529Z"
+  "updated_at": "2026-09-20T20:54:42.737408953Z"
 }
