@@ -27,7 +27,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Shared interruption conformance suite",
-  "updated_at": "2026-09-20T17:23:08.130521703Z"
+  "updated_at": "2026-09-20T18:17:09.711562079Z"
 }

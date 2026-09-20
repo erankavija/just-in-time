@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "121b8e83725e3632a7c9c0343d863d91279c09f1",
+  "completed_at": "2026-09-20T18:16:31.668693584Z",
+  "duration_ms": 453443,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied by the attributed implementation and tests.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8559f529-dec6-40fd-befe-91d48d00d4ac",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b9e56ee7-a37e-4fc2-b143-ecef4a744099",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T18:08:58.225609497Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a01fd5d7d, f7269a9e, 130305b5, 53dd5485, 121b8e837\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-17 — dev/vision/9db27a3a-charter.md; @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose — .jit/invariants.toml; @/gate/jit-validate — .jit/gates.toml\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T18:07:15Z); code-review pending (no prior run)\nTruncation recovery: re-read patches per commit/path; narrowed event-path evidence to crates/jit/src/repository_state/path.rs; confirmed merge’s second-parent storage diff is empty\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied by the attributed implementation and tests.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

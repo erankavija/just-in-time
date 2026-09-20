@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 4.5,
+  "current_wave": 5,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -103,7 +103,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework 2/2 dispatched (V-09: no-rollback property lost in the test redesign)"
+          "status": "done"
         }
       ]
     },
@@ -647,7 +647,7 @@
       "title": "A record rejects an overlapping operation set",
       "why": "4e818d10's code-review F1 found the two backends reading one record differently (puts at issues/a.json and issues). Both now refuse it identically at apply time, but the record stays constructible. Overlap is a property of the record alone, checkable where 835bae3f REQ-02 already rejects an out-of-root path. Wired ahead of d591a1c8 so its conformance suite generates records freely instead of filtering.",
       "owner_decisions": "Lead-created autonomously: creating a task inside the epic is on the escalation policy's HANDLE AUTONOMOUSLY list. Routed here rather than folded into 835bae3f, which is closed.",
-      "status": "dispatched",
+      "status": "done",
       "gates": [
         "cargo-ci",
         "code-review"
@@ -946,7 +946,7 @@
       "detail": "Making RedoRecord's overlap check unbypassable made two memory.rs records unconstructible, so the worker redesigned their tests — correct in principle and clearly disclosed. But test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created owned an assertion its replacement does not carry: 'the refusal undid a put that had already landed'. That is the no-rollback property — a refusal leaves the record's EARLIER operations applied — which 4e818d10's worker established by measurement and which epic REQ-03 rests on. Both replacements apply single-put records, so no earlier operation exists to preserve; the delete test is single-operation too. A backend that rolled back on refusal would pass every test in the tree.",
       "lead_evidence": "Found by diffing the test inventory of both backends between main and the branch (two memory.rs names replaced by one, redo_apply.rs unchanged), then reading the deleted bodies assertion by assertion. Grepping both backends for the assertion's substance returns nothing. Not covered on the filesystem side either, and correctly so: 4e818d10's worker established that half with throwaway probes because the behaviour belongs to 35544121 under @/inv/orthogonal-tests.",
       "lead_note": "The property is still expressible under the new validation — two puts that do not contain one another, e.g. index.json and issues, against a pre-existing directory at issues. The obligation to restore it falls on the change that removed the owner, not on the closed issue.",
-      "verdict": "FAIL - rework 2 of 2, the last attempt before escalation under policy entry 5"
+      "verdict": "RESOLVED. test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused restores it with a disjoint two-put record (index.json then issues, against an independently seeded directory): the first put's bytes stand, the second refuses IsADirectory, the record stays installed. The worker's audit for a SECOND lost property is the notable part and the lead verified it: the deleted mirror test also asserted no-rollback, but at the ancestor-walk guard. The worker wrote that test, watched it fail, and traced the cause rather than adjusting it to pass — apply resolves every operation's path in one batch before BeforeApply (memory.rs:578-585, mirroring redo_apply.rs), so a pre-existing bad ancestor refuses the whole record before anything lands. The only way that guard ever fired mid-pass required two operations naming one path as the other's ancestor, which this issue makes unconstructible. So the scenario is retired by the fix, not lost by redesign, and the upfront-refusal property it leaves behind is already owned by the untouched test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent."
     }
   ],
   "standing_policies": [
