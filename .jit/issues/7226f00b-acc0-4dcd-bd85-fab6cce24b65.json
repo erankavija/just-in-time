@@ -48,6 +48,13 @@
       "format": "markdown",
       "label": "Epic plan (f1dc843a)",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Whole-log read cost vs REQ-02",
+      "path": "dev/active/7226f00b/whole-log-read-cost.md"
     }
   ],
   "first_ready_at": "2026-09-20T10:37:39.807786601Z",
@@ -65,5 +72,5 @@
   "priority": "critical",
   "state": "in_progress",
   "title": "Whole-log read cost and the single-pass capture specification",
-  "updated_at": "2026-09-20T10:38:08.050538759Z"
+  "updated_at": "2026-09-20T11:26:37.013196880Z"
 }
