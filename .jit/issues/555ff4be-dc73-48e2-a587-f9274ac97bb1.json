@@ -7,6 +7,7 @@
   ],
   "description": "The redo record reaches disk synced, with its directory fsynced, before a mutation performs its first live write.\n\n## Background\n\nA redo-only commit protocol has no rollback: once the first live file is replaced there is no way back, so the record is already durable at that moment. The shared atomic-write helper writes a temp file and renames it, with no `sync_all` on the file and no fsync on the parent directory, so it gives reader-visibility atomicity. The one synced write primitive in the tree is the transaction kernel's staging helper, which is retiring.\n\nThe helper therefore gains the two operations the record needs: a synced file write and a directory fsync.\n\n## Success Criteria\n\n- [hard] REQ-01: Writing a redo record returns after the record's bytes are synced to disk and its containing directory is fsynced.\n- [hard] REQ-02: The shared atomic-write module exposes a synced write and a directory fsync as named operations, reached by every caller that needs either.\n- [hard] REQ-03: The scratch directory is created when absent, with a mode matching the rest of the data root.\n- [hard] REQ-04: A record write that fails partway leaves a residue a later session skips rather than replays.\n- [hard] REQ-05: Durability behaviour is covered at the storage unit layer without a wall-clock assertion.\n\n## Notes\n\nExpected additive footprint is under 120 production lines across the record writer and the atomic-write module. Per-file replacement during replay stays on the existing temp-file-and-rename path, whose crash survivability rests on the record.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T07:39:07.926677466Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/atomic-writes"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Durable redo record write",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T07:39:07.926677466Z"
 }

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "47a7eba21e647ed4772a9107c3d3de1bb79201b2",
+  "completed_at": "2026-09-20T07:38:52.882882384Z",
+  "duration_ms": 171681,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six hard criteria are met in the attributable footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "835bae3f-ae91-4edf-90b5-455284a06c28",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9e583939-61a7-45e7-a75d-c8071aefa724",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T07:36:01.201487095Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4745618ff and 47a7eba21 (`jit:835bae3f`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-types, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T07:33:31Z); code-review pending\nTruncation recovery: re-read both attributed patches in bounded ranges and inspected focused current sources\n1. No findings.\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six hard criteria are met in the attributable footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
