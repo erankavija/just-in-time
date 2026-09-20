@@ -40,7 +40,7 @@ citations="$here/docs-check-citations.sh"
 projections="$here/docs-check-projections.sh"
 canonical="$here/docs-check-canonical.sh"
 policy="$here/docs-check-shipped-policy.sh"
-pkgcite="$here/docs-check-package-citations.sh"
+pkgcontent="$here/docs-check-package-content.sh"
 phrases="$here/docs-check-policy-phrases.sh"
 mechanical="$here/docs-mechanical.sh"
 
@@ -81,7 +81,7 @@ fixture_scripts="$fixture/scripts"
 fixture_log="$scratch/orchestrator.log"
 mkdir -p "$fixture_scripts"
 cp "$mechanical" "$fixture_scripts/docs-mechanical.sh"
-for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh docs-check-shipped-policy.sh docs-check-package-citations.sh docs-check-policy-phrases.sh; do
+for checker in docs-check-links.sh docs-check-citations.sh docs-check-projections.sh docs-check-canonical.sh docs-check-shipped-policy.sh docs-check-package-content.sh docs-check-policy-phrases.sh; do
   # shellcheck disable=SC2016  # $0/$* and the log variable expand in the stub.
   printf '#!/usr/bin/env bash\nprintf "%%s:%%s\\n" "$(basename "$0")" "$*" >>"$DOCS_MECHANICAL_LOG"\n' >"$fixture_scripts/$checker"
   chmod +x "$fixture_scripts/$checker"
@@ -97,7 +97,7 @@ assert_rc 0 $? "orchestrator: bare invocation succeeds in isolated fixture"
 assert_logged_footprint "docs-check-links.sh" "docs" "$fixture_log" "orchestrator: bare invocation selects adopter docs, not archival paths"
 assert_logged_footprint "docs-check-citations.sh" "docs" "$fixture_log" "orchestrator: bare invocation passes adopter docs to both footprint checkers"
 assert_logged_footprint "docs-check-shipped-policy.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the shipped-policy check, with no footprint"
-assert_logged_footprint "docs-check-package-citations.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the package-citation check, with no footprint"
+assert_logged_footprint "docs-check-package-content.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the package-content check, with no footprint"
 assert_logged_footprint "docs-check-policy-phrases.sh" "" "$fixture_log" "orchestrator: the fan-out reaches the policy-phrase check, with no footprint"
 
 # An explicit environment footprint remains higher precedence than the default.
@@ -417,11 +417,52 @@ else
 fi
 echo
 
-echo "== M8 docs-check-package-citations.sh =="
-"$pkgcite" >/dev/null 2>&1
-assert_rc 0 $? "package citations: this repository's packages resolve their own citations"
-"$pkgcite" docs >/dev/null 2>&1
-assert_rc 2 $? "package citations: a footprint argument is a usage error"
+echo "== M8 docs-check-package-content.sh =="
+"$pkgcontent" >/dev/null 2>&1
+assert_rc 0 $? "package content: this repository's packages resolve and carry nothing prohibited"
+
+# A fixture manifest exercises the prohibition matchers against the real
+# packages without depending on which literals the live manifest declares.
+pc="$scratch/pkgcontent"
+mkdir -p "$pc"
+# A word every package's content is free of, and the longer word that contains
+# it — the pair that separates a token match from a substring match. Both are
+# assembled here so this source is not itself the content under check.
+absent_token='zzqx'
+cat >"$pc/token.toml" <<TOML
+[[content]]
+topic = "fixture token"
+forbid_token = ["$absent_token"]
+TOML
+"$pkgcontent" "$pc/token.toml" >/dev/null 2>&1
+assert_rc 0 $? "package content: a token no package names is clean"
+cat >"$pc/substring.toml" <<'TOML'
+[[content]]
+topic = "fixture substring"
+forbid = ["jit"]
+TOML
+"$pkgcontent" "$pc/substring.toml" >/dev/null 2>&1
+assert_rc 1 $? "package content: a literal the packages do carry is a finding"
+cat >"$pc/inner.toml" <<'TOML'
+[[content]]
+topic = "fixture inner word"
+forbid_token = ["ji"]
+TOML
+"$pkgcontent" "$pc/inner.toml" >/dev/null 2>&1
+assert_rc 0 $? "package content: a token match ignores a longer word containing it"
+
+# A manifest that cannot be read, declares nothing, or declares an entry that
+# prohibits nothing is an environment error, never a false-green pass.
+"$pkgcontent" "$pc/no_such_manifest_zzz.toml" >/dev/null 2>&1
+assert_rc 2 $? "package content: unreadable manifest is an env error"
+printf '# nothing declared\n' >"$pc/empty.toml"
+"$pkgcontent" "$pc/empty.toml" >/dev/null 2>&1
+assert_rc 2 $? "package content: manifest declaring no entries is an env error"
+printf '[[content]]\ntopic = "prohibits nothing"\n' >"$pc/hollow.toml"
+"$pkgcontent" "$pc/hollow.toml" >/dev/null 2>&1
+assert_rc 2 $? "package content: entry prohibiting nothing is an env error"
+"$pkgcontent" "$pc/token.toml" "$pc/empty.toml" >/dev/null 2>&1
+assert_rc 2 $? "package content: a second argument is a usage error"
 echo
 
 echo "== M9 docs-check-policy-phrases.sh =="
