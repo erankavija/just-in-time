@@ -103,7 +103,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework 1/2 dispatched (V-08: pub fields bypass the check)"
+          "status": "rework 2/2 dispatched (V-09: no-rollback property lost in the test redesign)"
         }
       ]
     },
@@ -728,7 +728,7 @@
     "2d4fda72": 1,
     "35544121": 1,
     "4e818d10": 1,
-    "8559f529": 1
+    "8559f529": 2
   },
   "surfaced_pitfalls": [
     {
@@ -848,6 +848,13 @@
       "finding": "An inherited lint allowance propagates when a worker extends an existing export statement rather than adding its own. The worker placed MemoryRedoApplier inside the allow-ed `pub use memory::{...}` line, which put a brand-new type under a suppression that story 21e976d1 REQ-04 forbids in spirit (`through declared visibility rather than a dead-code allowance`). The worker's report called it 'no dead-code allowance', literally true of the lint name and misleading about what a reviewer sees.",
       "suggested_remedy": "When reviewing a diff that adds a public item, check the visibility statement it joins, not just the item. The one-minute experiment (split the export, run clippy -D warnings on the worker's warm build) settled it without a review round and cost the lead nothing.",
       "status": "resolved in-wave at 0612382b4; technique adopted by the lead"
+    },
+    {
+      "id": "PF-08",
+      "finding": "rustc masks a struct-literal privacy error behind a later field-access error. When a test both constructs a type by struct literal AND later reads one of its fields, making the fields private surfaces only the E0616 field-access error; the E0451 construction error is dropped. The 8559f529 worker reproduced this in an isolated ten-line crate rather than asserting it.",
+      "why_it_matters": "Fixing only the errors cargo reports, then building clean, does NOT prove that no bypassing construction site remains. The build is not the proof. A textual grep for the struct-literal form is.",
+      "lead_action": "Adopted: when a change's purpose is to make a construction path unreachable, the evidence is a grep over the construction form, not a green build. Applied here — grep confirmed `RedoRecord {` survives only inside redo_record.rs's own test submodule.",
+      "status": "adopted by the lead; credited to the 8559f529 worker"
     }
   ],
   "evidence_requirements": [
@@ -931,6 +938,15 @@
       "detail": "RedoRecord::new validates and parse calls the same helper, but redo_record.rs:56-58 leaves puts, deletes and event_append pub, so `RedoRecord { puts: vec![put(issues/a.json), put(issues)], ..Default::default() }` still constructs the overlapping record the task exists to prevent. REQ-01 says 'rejected at construction'; a struct literal is construction. Compounding it, the struct rustdoc at :49-53 now states 'Operation paths are pairwise disjoint ... checked identically at construction and at parse' as fact, so the type documents an invariant it permits callers to violate.",
       "lead_note": "Caught at Tier 2 from the worker's own disclosure — it reported 'Fields stay pub ... existing struct-literal test fixtures were out of scope'. The asymmetry that makes it wrong: 835bae3f's root-class rejection lives in VirtualPath's constructor and CANNOT be bypassed, because no path reaches RedoRecord without passing it. The worker matched that check's placement without matching its unbypassability. PARTLY THE LEAD'S FAULT: the issue Notes said 'roughly 30 production lines', costing the comparison logic and not the encapsulation that makes it binding, and the worker sized to that number. The estimate is descriptive and does not override a criterion; not amended.",
       "verdict": "FAIL - rework 1 of 2. Fields become private with read accessors; 43 struct-literal sites across four files (all tests) route through new(); the shared arbitrary_record() generator must produce disjoint sets by construction rather than prop_assume filtering, since d591a1c8 builds its conformance suite on that fixture next."
+    },
+    {
+      "id": "V-09",
+      "issue": "8559f529",
+      "what": "The encapsulation rework silently dropped the no-rollback property owned by a completed issue's test.",
+      "detail": "Making RedoRecord's overlap check unbypassable made two memory.rs records unconstructible, so the worker redesigned their tests — correct in principle and clearly disclosed. But test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created owned an assertion its replacement does not carry: 'the refusal undid a put that had already landed'. That is the no-rollback property — a refusal leaves the record's EARLIER operations applied — which 4e818d10's worker established by measurement and which epic REQ-03 rests on. Both replacements apply single-put records, so no earlier operation exists to preserve; the delete test is single-operation too. A backend that rolled back on refusal would pass every test in the tree.",
+      "lead_evidence": "Found by diffing the test inventory of both backends between main and the branch (two memory.rs names replaced by one, redo_apply.rs unchanged), then reading the deleted bodies assertion by assertion. Grepping both backends for the assertion's substance returns nothing. Not covered on the filesystem side either, and correctly so: 4e818d10's worker established that half with throwaway probes because the behaviour belongs to 35544121 under @/inv/orthogonal-tests.",
+      "lead_note": "The property is still expressible under the new validation — two puts that do not contain one another, e.g. index.json and issues, against a pre-existing directory at issues. The obligation to restore it falls on the change that removed the owner, not on the closed issue.",
+      "verdict": "FAIL - rework 2 of 2, the last attempt before escalation under policy entry 5"
     }
   ],
   "standing_policies": [
