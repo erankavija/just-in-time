@@ -135,7 +135,7 @@ impl RedoRecord {
     /// occupied, or the write or any sync fails.
     pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
         let scratch = data_root.join(RECORD_SCRATCH_DIR);
-        if create_scratch(&scratch)? {
+        if create_scratch(data_root, &scratch)? {
             sync_directory(data_root)?;
         }
         let path = scratch.join(RECORD_FILE_NAME);
@@ -255,12 +255,35 @@ struct AppendHeader {
 /// created it: a created directory's own entry is durable only once its parent
 /// is fsynced. The data root itself is not created here — an absent data root
 /// is a repository the caller has no business writing a record into.
-fn create_scratch(scratch: &Path) -> anyhow::Result<bool> {
+///
+/// A created directory is given the data root's own mode, so the record is as
+/// reachable as the rest of the data root rather than as reachable as the
+/// ambient umask happened to allow.
+fn create_scratch(data_root: &Path, scratch: &Path) -> anyhow::Result<bool> {
     match std::fs::create_dir(scratch) {
-        Ok(()) => Ok(true),
+        Ok(()) => adopt_mode(data_root, scratch).map(|()| true),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
         Err(error) => Err(error).with_context(|| format!("creating {}", scratch.display())),
     }
+}
+
+/// Give `directory` the permission bits `source` carries. The mode is set after
+/// creation rather than passed to `mkdir`, whose mode the umask masks.
+#[cfg(unix)]
+fn adopt_mode(source: &Path, directory: &Path) -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mode = std::fs::metadata(source)
+        .with_context(|| format!("reading the mode of {}", source.display()))?
+        .permissions()
+        .mode();
+    std::fs::set_permissions(directory, std::fs::Permissions::from_mode(mode & 0o7777))
+        .with_context(|| format!("setting the mode of {}", directory.display()))
+}
+
+#[cfg(not(unix))]
+fn adopt_mode(_source: &Path, _directory: &Path) -> anyhow::Result<()> {
+    Ok(())
 }
 
 /// The wire spelling of a path's root-relative portion.
@@ -463,15 +486,27 @@ mod tests {
     fn test_commit_creates_an_absent_scratch_directory_with_the_data_root_mode() {
         use std::os::unix::fs::PermissionsExt;
 
+        let mode = |directory: &std::path::Path| {
+            std::fs::metadata(directory).unwrap().permissions().mode() & 0o7777
+        };
         let parent = tempfile::tempdir().unwrap();
+        // A directory the ambient umask alone shaped, so the mode the data root
+        // is given differs from it whatever that umask is: a scratch directory
+        // left to the umask carries this control's mode, not the data root's.
+        let control = parent.path().join("control");
+        std::fs::create_dir(&control).unwrap();
+        let data_mode = if mode(&control) == 0o700 {
+            0o750
+        } else {
+            0o700
+        };
+
         let data_root = parent.path().join("data");
         std::fs::create_dir(&data_root).unwrap();
+        std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(data_mode)).unwrap();
 
         let path = sample_record().commit(&data_root).unwrap();
 
-        let mode = |directory: &std::path::Path| {
-            std::fs::metadata(directory).unwrap().permissions().mode()
-        };
         assert_eq!(
             mode(path.parent().unwrap()),
             mode(&data_root),
