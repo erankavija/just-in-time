@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6adef814905ccc5c28cc9a2b6cb4d407e59707db",
+  "completed_at": "2026-09-20T09:09:24.248121490Z",
+  "duration_ms": 347448,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The scoped write-set and event-log conflict mechanism meets all current issue criteria and is adequately unit-tested.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8114d90-0b43-4792-a1ae-89e58e605dd6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T09:03:36.799900705Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 89506137b, abc105819 (merge’s concurrent second-parent changes excluded as unrelated)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); REQ-01–REQ-06 (issue markdown); @/inv/orthogonal-tests and @/inv/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T08:44:52Z); prior code-review failed (exit 1) but its integration finding is superseded by this issue’s explicit non-goal\nTruncation recovery: narrowed reads of implementation, tests, plan, investigation, charter, and merge patch\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The scoped write-set and event-log conflict mechanism meets all current issue criteria and is adequately unit-tested.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
