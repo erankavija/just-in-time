@@ -421,13 +421,11 @@ echo "== M8 docs-check-package-content.sh =="
 "$pkgcontent" >/dev/null 2>&1
 assert_rc 0 $? "package content: this repository's packages resolve and carry nothing prohibited"
 
-# A fixture manifest exercises the prohibition matchers against the real
-# packages without depending on which literals the live manifest declares.
+# Fixture manifests, so the matcher assertions do not depend on which literals
+# the live manifest declares.
 pc="$scratch/pkgcontent"
 mkdir -p "$pc"
-# A word every package's content is free of, and the longer word that contains
-# it — the pair that separates a token match from a substring match. Both are
-# assembled here so this source is not itself the content under check.
+# Assembled from a variable so this source is not itself the content under check.
 absent_token='zzqx'
 cat >"$pc/token.toml" <<TOML
 [[content]]
@@ -466,9 +464,8 @@ assert_rc 2 $? "package content: a second argument is a usage error"
 echo
 
 echo "== M9 docs-check-policy-phrases.sh =="
-# An isolated fixture: one prose artifact, one configured value, and a manifest
-# binding both. Every defect class is seeded there and reverted, so the real
-# checker is exercised without touching this repository's own policy prose.
+# An isolated fixture — one prose artifact, one configured value, one manifest —
+# so every defect class is seeded without touching this repository's own prose.
 ph="$scratch/phrases"
 mkdir -p "$ph"
 write_phrase_fixture() {
@@ -533,8 +530,7 @@ printf 'Attribution: <again>\n' >>"$ph/policy.md"
 run_phrases
 assert_rc 1 $? "phrases: an exactly-once field stated twice is a finding"
 
-# The normalized entry matches across the fixture's line break; the same phrase
-# is absent from the unwrapped text, so this is what `normalize` buys.
+# The normalized entry matched across a line break the unwrapped text lacks.
 write_phrase_fixture
 if grep -qF 'The wrapper transports the prompt.' "$ph/policy.md"; then
   echo "FAIL: phrases fixture is unwrapped, so its clean run proves nothing about normalize"
@@ -543,16 +539,14 @@ else
   echo "PASS: phrases: the normalized entry matched a phrase the artifact wraps"
 fi
 
-# A section entry reads only between its markers: the phrase it forbids sits
-# outside them in the clean fixture and is reported once it moves inside.
+# Defect: a phrase the section forbids moves from outside its markers to inside.
 write_phrase_fixture
 printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n\n## Leaf\n\nTag the leaf. Resolve the children.\n\n## Container\n\nResolve the children.\n' \
   >"$ph/policy.md"
 run_phrases
 assert_rc 1 $? "phrases: a phrase forbidden in one section is a finding there"
 
-# Defect: the declared section boundary is gone, so the entry's scope is not
-# what it declares.
+# Defect: the declared section boundary is gone, so the entry's scope is not its own.
 write_phrase_fixture
 printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n\n## Leaf\n\nTag the leaf.\n' \
   >"$ph/policy.md"
@@ -598,10 +592,8 @@ assert_rc 2 $? "phrases: a second argument is a usage error"
 echo
 
 echo "== the gate fails on a seeded policy or package defect =="
-# The property these two assertions carry is the point of the whole gate
-# membership: a commit that changes only prose must be caught by the gate that
-# prose triggers. Both seeds go into a throwaway clone, and both are read from
-# the live declarations rather than restated here.
+# The point of the gate membership: a prose-only commit must be caught by the
+# gate prose triggers. Both seeds are read from the live declarations.
 gate_clone="$scratch/gate-repo"
 if git clone --local --no-hardlinks --quiet . "$gate_clone" 2>/dev/null; then
   (
@@ -628,8 +620,8 @@ open(path, "w", encoding="utf-8").write(text.replace(phrase, ""))
     echo "$?" >"$scratch/rc_gate_phrase"
     git checkout -q -- "${declared[0]}"
 
-    # Seed 2: an unresolvable `@/` citation in package content. The id is
-    # assembled below so this harness is not itself a dangling citation.
+    # Seed 2: an unresolvable `@/` citation, its id assembled below so this
+    # harness is not itself a dangling citation.
     region=$(python3 -c '
 import os, tomllib
 base = "profiles"
