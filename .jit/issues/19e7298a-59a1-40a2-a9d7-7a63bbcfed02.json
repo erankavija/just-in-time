@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-20T09:11:02.160652079Z",
   "context": {},
   "created_at": "2026-09-20T08:44:00.680392145Z",
@@ -50,12 +50,24 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-20T09:50:25.647729442Z",
   "first_ready_at": "2026-09-20T08:44:00.680392145Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T09:50:05.440777061Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T09:45:36.783642256Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "19e7298a-59a1-40a2-a9d7-7a63bbcfed02",
   "labels": [
     "type:task",
@@ -64,7 +76,7 @@
     "component:core"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Event-log size stops capping issue claims",
-  "updated_at": "2026-09-20T09:11:02.160652079Z"
+  "updated_at": "2026-09-20T09:50:25.647729442Z"
 }

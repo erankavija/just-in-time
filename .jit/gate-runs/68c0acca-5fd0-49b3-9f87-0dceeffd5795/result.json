@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "15c815589d4fab6eb4cfa896b1abea5b57fb3535",
+  "completed_at": "2026-09-20T09:38:21.845948656Z",
+  "duration_ms": 324627,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are met; the prior blocking findings are addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "555ff4be-dc73-48e2-a587-f9274ac97bb1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "68c0acca-5fd0-49b3-9f87-0dceeffd5795",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T09:32:57.218899491Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 43d8c4854, bb3cf92ae, f41fd09ae, f6d0de256, 16ab1c42b, d62e38c0f, 65d95db23, 15c815589\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction, @/invariant/semantic-test-assertions (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-20T08:41:42Z)\nTruncation recovery: Re-read each affected commit and final implementation/test ranges separately after combined-output truncation.\n\n1. No unresolved findings. The three prior blocking findings are addressed by the final scratch-directory fsync, data-root mode adoption, and no-replace record creation.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are met; the prior blocking findings are addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

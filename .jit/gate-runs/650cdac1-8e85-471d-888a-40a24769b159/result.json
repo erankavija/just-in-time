@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "15c815589d4fab6eb4cfa896b1abea5b57fb3535",
+  "completed_at": "2026-09-20T09:48:05.409399945Z",
+  "duration_ms": 96819,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "2e79d92629a9f41572260dc34999cdb45ff828f042e7aeabcdf1673c3ec802d1",
+  "issue_id": "555ff4be-dc73-48e2-a587-f9274ac97bb1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "650cdac1-8e85-471d-888a-40a24769b159",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T09:46:28.590130805Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-baseline: 896 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (311 ms)\n  ✓ fmt: ok (1640 ms)\n  ✓ clippy: ok (29075 ms)\n  ✓ suite-build: built in 38409 ms, warmed 17 executables (2083525784 bytes) in 69 ms (38481 ms)\n  ✓ test: 4721 passed, 0 failed, 0 skipped (22305 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4447 ms)\n  ✓ suite-clock: 26770 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (9 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1750466512/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=26770ms (80 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), nothing appeared under /home/vkaskivuo/Projects/just-in-time/target during this run (896 pre-existing entries ignored) (314 ms)\n\n",
+  "tree_dirty": true
+}

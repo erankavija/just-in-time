@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-20T09:50:24.886626651Z",
   "first_ready_at": "2026-09-20T07:39:07.926677466Z",
   "gates_required": [
     "cargo-ci",
@@ -58,12 +59,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-20T08:42:07.874452Z",
+      "updated_at": "2026-09-20T09:48:05.417084857Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-20T08:50:18.809649369Z",
+      "status": "passed",
+      "updated_at": "2026-09-20T09:38:22.159074446Z",
       "updated_by": "auto:executor"
     }
   },
@@ -79,7 +80,7 @@
     "enforces:@/invariant/atomic-writes"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Durable redo record write",
-  "updated_at": "2026-09-20T08:53:41.190124752Z"
+  "updated_at": "2026-09-20T09:50:24.886626651Z"
 }
