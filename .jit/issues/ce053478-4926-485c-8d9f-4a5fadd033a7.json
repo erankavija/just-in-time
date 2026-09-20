@@ -1,0 +1,27 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-20T07:15:26.465408960Z",
+  "dependencies": [
+    "df3e10fb-19f0-49af-ab19-24498f200b65"
+  ],
+  "description": "The packaged code-review prompt cites two invariants the profile package does not contribute, and a policy test asserts AGENTS.md wording that a rewrite replaced. Both land as failures in the Rust suite, so `cargo-ci` cannot pass on any issue until they are closed.\n\n## Background\n\n`bdc314fb9` is the last green commit. `bbd53719e` introduced both failures and `ffac40f80` extended the first one; all three carry `jit:f1dc843a` and landed under the planning bracket, whose only gate is `plan-review`. No Rust gate ran on them.\n\n`test_packaged_qualified_item_citations_resolve_from_installed_registries` asserts that every `@/` citation in package content resolves from the registries the package installs. `contrib/gates/code-review-prompt.md` is package content and cites `@/inv/essential-code-prose` and `@/inv/orthogonal-tests`, which `profiles/jit-dogfood/manifest.toml` does not contribute — this repository's live registry carries them, and the dogfooding boundary makes that registry not the shipped default.\n\n`test_code_review_prompt_rejects_blanket_public_api_examples` asserts literal phrases in `AGENTS.md`. The `essential-code-prose` rewrite of the comments-and-rustdoc bullet preserved the selective-example policy but replaced the phrases \"Do not require an example for every public API\" and \"tautological examples\". The owner settled that the rewrite stands and the assertions move to the current wording.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile package contributes `essential-code-prose` and `orthogonal-tests` to the invariant registry, with statements identical to the repository registry's.\n- [hard] REQ-02: Every `@/` citation in package content resolves from the registries the package installs.\n- [hard] REQ-03: The selective-example policy test asserts the wording `AGENTS.md` now carries, and still rejects the return of the blanket `# Examples` requirement.\n- [hard] REQ-04: The workspace test suite reports no failure, so `cargo-ci` passes on an unmodified checkout.\n\n## Notes\n\nScoped to restoring the suite. It changes no redo-record code and carries no `satisfies:` label, because it delivers no part of the epic's criteria.",
+  "documents": [],
+  "first_ready_at": "2026-09-20T07:15:26.465408960Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ce053478-4926-485c-8d9f-4a5fadd033a7",
+  "labels": [
+    "type:task",
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "critical",
+  "state": "ready",
+  "title": "Packaged prompt citations and policy test wording",
+  "updated_at": "2026-09-20T07:15:58.277568049Z"
+}

@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
+    "ce053478-4926-485c-8d9f-4a5fadd033a7",
     "d591a1c8-eca2-4547-9989-ed4b972a2d37",
     "faa668c9-158b-4e08-af34-79ae81b58dd7"
   ],
@@ -27,5 +28,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Redo record foundation",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T07:15:58.518020965Z"
 }

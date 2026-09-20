@@ -14858,3 +14858,6 @@
 {"gate_key":"doc-review","id":"427dced2-98fc-404f-a8e9-75a52e350bf6","issue_id":"fe6fa7e5-fe24-4089-bcc2-5a2a2b447007","timestamp":"2026-09-20T06:45:50.978714575Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"d5e3ea1c-bd26-4575-b9f4-fbaf90ea145a","issue_id":"fe6fa7e5-fe24-4089-bcc2-5a2a2b447007","timestamp":"2026-09-20T06:46:48.387078006Z","to":"done","type":"issue_state_changed"}
 {"id":"62a40cbc-5366-4802-9989-2f4bec3e394a","issue_id":"fe6fa7e5-fe24-4089-bcc2-5a2a2b447007","timestamp":"2026-09-20T06:46:48.387078006Z","type":"issue_completed"}
+{"id":"23d06476-67a6-4e78-bf7e-49f02e0787a6","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","priority":"critical","timestamp":"2026-09-20T07:15:26.465408960Z","title":"Packaged prompt citations and policy test wording","type":"issue_created"}
+{"fields":["dependencies"],"id":"d9e25f34-be5c-4141-abe3-da2503db4047","issue_id":"ce053478-4926-485c-8d9f-4a5fadd033a7","timestamp":"2026-09-20T07:15:58.277568049Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"52c33d60-5298-40ff-aa1a-d9bcc6f77d91","issue_id":"21e976d1-1650-474f-8da8-4a5e9f1207be","timestamp":"2026-09-20T07:15:58.518020965Z","type":"issue_updated","updated_by":"dependency-add"}
