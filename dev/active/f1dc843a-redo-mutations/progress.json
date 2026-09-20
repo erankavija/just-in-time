@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 1,
+  "current_wave": 2,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -16,7 +16,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "fe6fa7e5-fe24-4089-bcc2-5a2a2b447007",
@@ -27,7 +27,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -569,8 +569,30 @@
       ]
     }
   ],
-  "created_during_execution": [],
-  "escalations": [],
+  "created_during_execution": [
+    {
+      "short_id": "ce053478",
+      "title": "Packaged prompt citations and policy test wording",
+      "why": "main was red since bbd53719e; three docs(jit:f1dc843a) planning-bracket commits broke the Rust suite (packaged prompt cited unshipped invariants; AGENTS.md rewrite dropped asserted phrases). cargo-ci could not pass for any issue.",
+      "owner_decisions": "User chose: ship the two invariants in the profile package; update the policy test's phrases. Lead additionally replaced four literal invariant-count assertions with derived ones (@/inv/single-source-prose, @/inv/orthogonal-tests).",
+      "status": "done",
+      "gates": [
+        "cargo-ci",
+        "code-review"
+      ]
+    }
+  ],
+  "escalations": [
+    {
+      "id": "ESC-01",
+      "wave": 1,
+      "category": "8 - shared infrastructure / 6 - architectural decision",
+      "question": "How to close packaged-prompt citations of unshipped invariants, and which side gives on the AGENTS.md phrase assertions",
+      "resolution": "Ship essential-code-prose and orthogonal-tests in profiles/jit-dogfood/manifest.toml; update the test's expected phrases keeping the negative blanket-examples guard.",
+      "resolved_by": "user",
+      "status": "closed"
+    }
+  ],
   "rework_counts": {},
   "surfaced_pitfalls": [
     {
@@ -595,5 +617,13 @@
       ]
     }
   ],
-  "started_at": "2026-09-20T06:25:44.651403+00:00"
+  "started_at": "2026-09-20T06:25:44.651403+00:00",
+  "process_findings": [
+    {
+      "id": "PF-01",
+      "finding": "The planning bracket's planning node carries only plan-review. Documentation commits under it changed AGENTS.md and packaged gate content, both asserted by the Rust suite, with no Rust gate in their path. main went red for three commits undetected.",
+      "suggested_remedy": "Consider a cargo-ci gate on the planning node in .jit/templates.toml. NOT actioned: the template is shipped-profile content and a gate change is a scope change requiring owner approval.",
+      "status": "raised to user, not actioned"
+    }
+  ]
 }
