@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-20T20:54:42.310220290Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
@@ -62,7 +62,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T21:50:07.837124378Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "581bddcf-a189-4ab8-8349-21c64e82dc90",
   "labels": [
     "type:task",
@@ -76,5 +82,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Consumer-side publication matrix retirement",
-  "updated_at": "2026-09-20T20:54:42.310220290Z"
+  "updated_at": "2026-09-20T21:50:07.837124378Z"
 }
