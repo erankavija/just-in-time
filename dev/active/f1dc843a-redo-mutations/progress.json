@@ -86,7 +86,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "dispatched (Non-goals amended per ESC-07)"
+          "status": "rework 1/2 dispatched (F1 backend divergence, F2 rustdoc)"
         }
       ]
     },
@@ -696,7 +696,8 @@
   "rework_counts": {
     "555ff4be": 1,
     "2d4fda72": 1,
-    "35544121": 1
+    "35544121": 1,
+    "4e818d10": 1
   },
   "surfaced_pitfalls": [
     {
@@ -752,6 +753,14 @@
         "REQ-02"
       ],
       "evidence": "dev/active/7226f00b/whole-log-read-cost.md"
+    },
+    {
+      "id": "SP-06",
+      "found_during": "wave 4 (4e818d10 worker probe, reported not actioned)",
+      "subject": "A stale #[allow(unused_imports)] on the memory re-export line",
+      "detail": "storage/mod.rs carries `#[allow(unused_imports)] // Public API used only in tests, not in binary` over `pub use memory::InMemoryStorage`. The worker probed it at the lead's request: removing the allowance entirely leaves `cargo clippy --workspace --all-targets -- -D warnings` at exit 0 with no unused_imports diagnostic on any target, so whatever once made a pub re-export from a pub mod warn no longer does. The sibling `pub use redo_apply::{...}` already carries no allowance. The worker restored the line byte-for-byte and exported MemoryRedoApplier on its own unguarded line instead.",
+      "disposition": "OPEN, deliberately not actioned. A one-line cleanup on a shipped export surface, outside this epic's subject. The worker declined to fold it in, correctly. Surfaces in the completion report for v1.0 triage.",
+      "criterion_subjects": []
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
@@ -794,6 +803,12 @@
       "suggested_remedy": "Before composing a dispatch prompt, read the parent story's criteria and grep the plan's decision table for the task's subject. The lead had read 21e976d1 REQ-03 earlier in the same session and still composed a prompt contradicting it.",
       "lead_action": "Corrected the instruction to the worker in writing, with the evidence, and recorded the error here.",
       "status": "lead error, corrected mid-wave"
+    },
+    {
+      "id": "PF-07",
+      "finding": "An inherited lint allowance propagates when a worker extends an existing export statement rather than adding its own. The worker placed MemoryRedoApplier inside the allow-ed `pub use memory::{...}` line, which put a brand-new type under a suppression that story 21e976d1 REQ-04 forbids in spirit (`through declared visibility rather than a dead-code allowance`). The worker's report called it 'no dead-code allowance', literally true of the lint name and misleading about what a reviewer sees.",
+      "suggested_remedy": "When reviewing a diff that adds a public item, check the visibility statement it joins, not just the item. The one-minute experiment (split the export, run clippy -D warnings on the worker's warm build) settled it without a review round and cost the lead nothing.",
+      "status": "resolved in-wave at 0612382b4; technique adopted by the lead"
     }
   ],
   "evidence_requirements": [
@@ -861,6 +876,14 @@
       "detail": "test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published (redo_apply.rs:475) owns the property that the record outlives a fresh nested put's publication, and it was GREEN BEFORE the fix — the worker disclosed this rather than letting it pass as evidence. The sync itself has no failure seam at this layer: sync_capability_directory operates on an already-open handle via try_clone + sync_all, so the 0o300 no-read-permission trick that makes redo_record's path-based sync_directory observable does not apply here. Adding a RedoPoint for directory creation would widen the point enum that 4e818d10 REQ-04 and d591a1c8 REQ-01 require both backends to share, and the in-memory backend has no directories, so that seam would be wrong.",
       "lead_note": "Accepted, not waived. @/inv/orthogonal-tests requires an owning test at the cheapest layer THAT CAN OBSERVE the property; no layer here observes it cheaply. The ordering is structural — the sync sits inside the create arm before the walk descends — and was verified by reading, by the code-review gate that raised the finding, and by the gate's explicit recheck. Precedent: open_capability_parent likewise has no owning test and is proven through its consumers. Carried to the 21e976d1 checkpoint (wave 6) so holistic-review sees it rather than discovering it.",
       "verdict": "accepted with the gap named"
+    },
+    {
+      "id": "V-07",
+      "issue": "4e818d10",
+      "what": "Cross-backend divergence on a constructible record; lead-verified claims that did hold.",
+      "detail": "code-review F1 (blocking): a record putting issues/a.json then issues makes the memory put_entry overwrite the Directory entry with a File while keeping its child, where the filesystem applier fails on the nonempty-directory replacement and leaves its record. Memory reports success and clears the residue (memory.rs:608-610). 835bae3f REQ-02 rejects paths outside the roots at construction but nothing rejects an ancestor/descendant pair, so the record is constructible. F2 (advisory): MemoryRedoApplier::new rustdoc restates its one-field initializer (@/inv/essential-code-prose).",
+      "lead_evidence": "Verified before dispatching rework: memory_file_object(path) is format!(\"memory-file:{path:?}\"), byte-identical to the inline form it replaced, so the kernel's entries are unchanged; and repository_state_store.rs never names MemoryRepositoryState.record — its only RedoRecord reference is faa668c9's ensure_write_set_unchanged, still with no production caller. So the worker's reachability audit holds and 21e976d1 REQ-03 is satisfied for this issue's work.",
+      "verdict": "FAIL - rework 1 of 2 dispatched; remedy is the reviewer's second option (memory applier rejects), construction-time validation surfaced separately rather than folded into closed 835bae3f"
     }
   ],
   "standing_policies": [

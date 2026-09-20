@@ -55,7 +55,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T16:52:42.194708750Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-09-20T17:01:29.004971051Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4e818d10-4433-4610-a525-29817677f87c",
   "labels": [
     "type:task",
@@ -70,5 +81,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Memory-backend record application",
-  "updated_at": "2026-09-20T16:45:00.600226252Z"
+  "updated_at": "2026-09-20T17:01:29.004971051Z"
 }

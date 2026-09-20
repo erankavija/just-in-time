@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4580ce93fe66e310ac0c65f2f102e2c9ff9e5a2b",
+  "completed_at": "2026-09-20T17:01:28.690512753Z",
+  "duration_ms": 517786,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/memory.rs",
+        "id": "F1",
+        "line": 644,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/shared-test-contracts",
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "Memory application accepts ancestor/descendant puts that filesystem application rejects, then clears the redo residue."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/memory.rs",
+        "id": "F2",
+        "line": 559,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Constructor rustdoc restates the one-field initializer without a material contract."
+      }
+    ],
+    "summary": "The memory redo applier can diverge from filesystem behavior for structurally conflicting but serializable records.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4e818d10-4433-4610-a525-29817677f87c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d9e65b67-f9ac-4a91-949f-d80b0783febe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T16:52:50.904262839Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6319 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0bfbc-20c0-79d3-8f21-38dd9085bbef\n--------\nuser\n--- 6306 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3f2accb5a, 03a228d9e, ac02ee832, 9e0078882, 0612382b4, 4580ce93f; uncommitted metadata excluded\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md), @/invariant/shared-test-contracts and @/invariant/essential-code-prose (.jit/invariants.toml), @/issue/4e818d10/requirement/REQ-03 and @/issue/21e976d1/requirement/REQ-03 (issue descriptions)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: recovered truncated combined outputs with per-commit/path patches and narrow current-source, config, and plan reads\n\n1. **F1 — blocking, issue-impact (high):** `MemoryRedoApplier` does not model filesystem node semantics for valid records containing ancestor/descendant puts. A record that first puts `issues/a.json` and then puts `issues` causes `put_entry` to overwrite the in-memory `Directory` entry at `issues` with a `File` while retaining its child; the filesystem applier instead fails when replacing that nonempty directory and leaves its redo record. The memory path reports success and clears its residue at `memory.rs:608-610`, so the two backends do not share the required behavioral contract. Add structural record validation or make the memory applier reject the same operation, with a regression test. References: @/invariant/shared-test-contracts, @/charter/D-17. (`crates/jit/src/storage/memory.rs:644`)\n\n2. **F2 — advisory, issue-impact (low):** The rustdoc on `MemoryRedoApplier::new` merely restates its one-field initializer (“Hold `injector`…”). Remove it or replace it with a material contract. Reference: @/invariant/essential-code-prose. (`crates/jit/src/storage/memory.rs:559`)\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The memory redo applier can diverge from filesystem behavior for structurally conflicting but serializable records.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Memory application accepts ancestor/descendant puts that filesystem application rejects, then clears the redo residue.\",\"file\":\"crates/jit/src/storage/memory.rs\",\"line\":644,\"references\":[\"@/invariant/shared-test-contracts\",\"@/charter/D-17\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Constructor rustdoc restates the one-field initializer without a material contract.\",\"file\":\"crates/jit/src/storage/memory.rs\",\"line\":559,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

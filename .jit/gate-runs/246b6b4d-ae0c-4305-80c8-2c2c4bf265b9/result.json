@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "4580ce93fe66e310ac0c65f2f102e2c9ff9e5a2b",
+  "completed_at": "2026-09-20T16:52:42.187043319Z",
+  "duration_ms": 95920,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "6639cfb61082b323525372e90eff6a84a7787e163a99ef9f25a007d12474cd57",
+  "issue_id": "4e818d10-4433-4610-a525-29817677f87c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "246b6b4d-ae0c-4305-80c8-2c2c4bf265b9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T16:51:06.266942189Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "  ✓ incremental-baseline: 896 entries already present under /home/vkaskivuo/Projects/just-in-time/target, none of them this run's (364 ms)\n  ✓ fmt: ok (1645 ms)\n  ✓ clippy: ok (28814 ms)\n  ✓ suite-build: built in 38290 ms, warmed 17 executables (2085880968 bytes) in 72 ms (38365 ms)\n  ✓ test: 4722 passed, 0 failed, 0 skipped (21676 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4464 ms)\n  ✓ suite-clock: 26157 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1752686328/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=26157ms (80 ms)\n  ✓ incremental-state: ban in force (CARGO_INCREMENTAL=0), so the 2 entries that appeared under /home/vkaskivuo/Projects/just-in-time/target during this run came from another process sharing it, not from this run's compilation: debug/incremental/jit-3sm2iorz1e3xy/s-hmh3auv803-1njbiko-b239kuys8f4yt5m1aba7pnjp4, debug/incremental/jit-3sm2iorz1e3xy/s-hmh3auv803-1njbiko.lock (896 pre-existing entries ignored) (330 ms)\n\n",
+  "tree_dirty": false
+}
