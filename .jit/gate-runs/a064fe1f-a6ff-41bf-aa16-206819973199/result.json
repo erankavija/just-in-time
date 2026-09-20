@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ba925f0a5a4170d2ba2287dc645c2cd64274b5a8",
+  "completed_at": "2026-09-20T01:04:31.863415412Z",
+  "duration_ms": 172707,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f1dc843a-redo-mutations/plan.md",
+        "id": "F1",
+        "line": 36,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The plan says five phases but enumerates four and OD-10 defines four stories; change five to four."
+      }
+    ],
+    "summary": "All required validation, rendering, and native dry-run checks pass; one advisory phase-count inconsistency remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "99a12b66-3895-46c2-91ab-4f29e41af65e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a064fe1f-a6ff-41bf-aa16-206819973199",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-20T01:01:39.155772287Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. **Advisory · issue-impact · low:** [plan.md:36](dev/active/f1dc843a-redo-mutations/plan.md:36) says five phases, but enumerates four; [OD-10](dev/active/f1dc843a-redo-mutations/plan.md:353) and the manifest define four stories. Change “five” to “four.”\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All required validation, rendering, and native dry-run checks pass; one advisory phase-count inconsistency remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The plan says five phases but enumerates four and OD-10 defines four stories; change five to four.\",\"file\":\"dev/active/f1dc843a-redo-mutations/plan.md\",\"line\":36}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

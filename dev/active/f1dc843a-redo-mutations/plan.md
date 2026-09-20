@@ -33,7 +33,7 @@ publication through `RepositoryMutationSession::apply`
 `:599`). The kernel is called from one line of that body (`:558`). The record is introduced
 beneath the seam with no publisher changed.
 
-The ordering follows from the seam, and it runs as five phases, each a story that passes its
+The ordering follows from the seam, and it runs as four phases, each a story that passes its
 automated gates before the next builds on it (OD-10).
 
 1. **Foundation.** The record, its durable write, its application on both backends, the
