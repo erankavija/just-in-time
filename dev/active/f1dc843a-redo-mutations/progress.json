@@ -1009,6 +1009,45 @@
       "lead_note": "The reviewer applied a sharper reading of the amendment than the lead did. Amended REQ-06 requires each task's footprint to be RECORDED against its estimate; a figure nobody can regenerate is an assertion, not a record. The failure was in the artifact the lead created to satisfy the criterion, not in anything a worker built.",
       "resolution": "footprint.py committed beside footprint.md, its verbatim output quoted, reproducing all seven per-task figures and the 1137 subtotal. It takes --tasks so 722878d4 gets ER-01's attributed subtotal without re-deriving the method. Re-ran holistic-review (pass, 0 findings) and doc-review (pass) on the corrected tree.",
       "verdict": "PASS on re-run; checkpoint complete"
+    },
+    {
+      "id": "V-12",
+      "issue": "7658bf81",
+      "what": "REQ-04's 'survive unchanged' was verified independently of the worker's report, not accepted from it.",
+      "detail": "The lead extracted every top-level item (attributes and doc comments included) from repository_state_store_tests.rs at e5f109ce5 and at the worker's HEAD, hashed each body, and compared: 59 removed, 0 added, 0 changed. The only differing item is the SelectedFailures impl block, whose is_consumed lost its last caller with the deletions. Every test_conformance_*_match_across_backends and finalizer-determinism test is byte-identical. Script kept in the session scratchpad; the method is a brace-matched item extractor, the same shape footprint.py uses.",
+      "lead_note": "REQ-04 is the criterion a deletion task is most likely to breach silently, and a worker's own claim of 'unchanged' is exactly the self-attestation V-11 rejected. Verifying it mechanically costs one script.",
+      "status": "verified, no finding"
+    },
+    {
+      "id": "V-13",
+      "issue": "7658bf81",
+      "what": "Three surviving tests still name TransactionFailurePoint; the lead read all three before accepting REQ-03.",
+      "detail": "test_conformance_empty_delta_ignores_armed_injectors, test_existing_data_root_replacement_during_publication_never_succeeds, and test_absent_data_parent_replacement_during_publication_never_succeeds each iterate a hand-picked three-point list. Each asserts data-root replacement safety or empty-delta short-circuiting, not interruption convergence. They are injection SITES, which plan contract interruption-matrix-placement hands to 8d7f4cec (wave 8) to repoint onto record interruption points.",
+      "lead_note": "Deleting them would have satisfied a literal reading of REQ-03's 'no hand-maintained list of those points' and broken wave 8's contract. REQ-03's subject is the failure-point SET, not any selection from it.",
+      "status": "verified, no finding"
+    },
+    {
+      "id": "V-14",
+      "issue": "581bddcf",
+      "what": "The gate-durability test was rewritten rather than trimmed; the lead checked that the rewrite did not drop the old test's unique property.",
+      "detail": "The deleted test asserted that an injected persistence failure makes check_gate return Err rather than report a pass. Owners at HEAD confirmed to exist and to assert exactly that: commands/gate_check.rs test_update_issue_state_surfaces_postcheck_persistence_failure and commands/gate.rs test_pass_gate_manual_attestation_surfaces_persistence_failure. Retained-test counts independently confirmed: 1 profile publication test, 1 gate-durability test, 5 recover-command tests, 15 of 16 linked-checkout policy tests.",
+      "status": "verified, no finding"
+    },
+    {
+      "id": "V-15",
+      "issue": "581bddcf",
+      "what": "581bddcf REQ-05 is satisfied only on the merged tree, not on its own branch.",
+      "detail": "REQ-05 forbids an exhaustive classification of the publication failure-point set surviving outside the mechanism's own suite. On 581bddcf's branch alone, repository_state_store_tests.rs still carries the 180-check matrix; 7658bf81 removes it on a sibling branch. Both land in wave 7.",
+      "lead_note": "Evaluate both issues' code-review and cargo-ci gates AFTER both merges. A per-branch evaluation would judge 581bddcf REQ-05 against a tree that does not exist.",
+      "status": "open until both wave-7 merges land"
+    },
+    {
+      "id": "V-16",
+      "issue": "7658bf81 -> 10ba2e35 / b0ee2dd6",
+      "what": "Carry-forward: occupied-root refusal now rests on a test module that itself retires.",
+      "detail": "7658bf81 deleted the session suite's occupied-root refusal coverage, deferring it to file_transaction.rs's own test module. That module retires with the kernel in b0ee2dd6 (wave 12). Its replacement owner must land in 10ba2e35 (wave 11, init publisher, F-28) FIRST. Wave order already places 11 before 12.",
+      "lead_note": "Verify at 10ba2e35's review that it actually covers refusal of an occupied destination -- @/inv/atomic-writes' 'an occupied destination is never overwritten' -- rather than assuming the ordering carries the property.",
+      "status": "open, owned by wave 11 review"
     }
   ],
   "standing_policies": [
