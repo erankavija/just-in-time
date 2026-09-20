@@ -1068,6 +1068,14 @@
       "wave": 3,
       "policy": "Workers may sub-delegate to read-only exploration subagents; the user's four-concurrent-worker cap counts dispatched issue-workers, not read-only helpers. Exploration should use cheap model tiers.",
       "note": "Lead will state the cheap-tier preference in dispatch prompts."
+    },
+    {
+      "id": "POL-03",
+      "decided_by": "user",
+      "wave": 7,
+      "policy": "The gate's incremental-compilation ban is reversed in full and directly, with no jit issue tracking the reversal, after wave 7 closes. Remove the CARGO_INCREMENTAL=0 export from scripts/cargo-ci.sh and its three enforcement points (the runtime assertion in that script, the script-text check in scripts/rust-build-budget.sh, and build_profile_policy_tests.rs), and amend the bounded-rust-build-footprint invariant text and dev/benchmarks/rust-build-budgets/README.md's provenance in the SAME change so no document still states a ban that is gone.",
+      "evidence": "The ban (jit:57d0eb79) rests on dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, which measured target/debug/incremental at 19 GiB on a tree of 140 integration targets and 712 executables. dev/archive/c639cfb5-jit-profiles-complete/active/handoff-12.md records the owner's 2026-08-13 finding that every measurement in that study is obsolete and that five sites still cite it; this ban is one of them. Today's tree reports 10 integration targets and 14 executables. Cargo.toml's [profile.dev] and [profile.test] already set incremental = true, so the ban applies to gate runs only.",
+      "note": "Timing is deliberate: wave 7's four issues are judged by the same gate their workers ran. The change lands on a clean main after the wave closes, so any new failure mode surfaces against main rather than mid-wave. Wave 8 onward runs on the new gate. Related finding: PF-11."
     }
   ],
   "session": 3,
