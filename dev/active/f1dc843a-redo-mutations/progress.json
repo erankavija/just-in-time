@@ -119,7 +119,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "blocked on 8559f529; must scope SP-07 in its coverage statement"
+          "status": "dispatched"
         }
       ]
     },
@@ -870,6 +870,12 @@
       ],
       "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently.",
       "baseline_at_wave2": "+636 -32 = net +604"
+    },
+    {
+      "id": "ER-02",
+      "owner": "d591a1c8 (wave 5), carried to 21e976d1 (wave 6)",
+      "requirement": "The conformance suite must SUBSUME the two per-backend crash-matrix proptests (prop_re_application_after_any_interrupted_prefix_converges in redo_apply.rs, prop_memory_re_application_after_any_interrupted_prefix_converges in memory.rs), or state per proptest why it proves something the suite does not.",
+      "why": "Story 21e976d1 REQ-02 requires the crash matrix proven in ONE suite with 'no second suite in the workspace' proving it. Both proptests prove exactly that matrix today. Adding the conformance suite without dispositioning them leaves three things proving one property and fails the checkpoint — a duplication defect under @/inv/orthogonal-tests. Flagged in the dispatch rather than discovered at the gate, since the checkpoint is the next wave."
     }
   ],
   "verifications": [
