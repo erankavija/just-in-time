@@ -117,7 +117,10 @@ impl RedoRecord {
     /// interrupted write leaves a proper prefix of the serialized form, which
     /// [`Self::parse`] rejects, so a later session skips the residue instead of
     /// applying half a mutation. The scratch directory is created when absent,
-    /// with the mode every other data-root directory carries.
+    /// with the mode every other data-root directory carries; a scratch
+    /// directory this call creates is fsynced through the data root before the
+    /// record enters it, because a record under a directory whose own entry a
+    /// crash takes is a record nothing can find.
     ///
     /// An occupied record path is refused rather than replaced: whatever
     /// occupies it is a mutation no session applied, and the commit point of a
@@ -132,8 +135,9 @@ impl RedoRecord {
     /// occupied, or the write or any sync fails.
     pub fn commit(&self, data_root: &Path) -> anyhow::Result<PathBuf> {
         let scratch = data_root.join(RECORD_SCRATCH_DIR);
-        std::fs::create_dir_all(&scratch)
-            .with_context(|| format!("creating {}", scratch.display()))?;
+        if create_scratch(&scratch)? {
+            sync_directory(data_root)?;
+        }
         let path = scratch.join(RECORD_FILE_NAME);
         create_file_synced(&path, &self.serialize()?)?;
         sync_directory(&scratch)?;
@@ -245,6 +249,18 @@ struct PathHeader {
 struct AppendHeader {
     offset: u64,
     length: u64,
+}
+
+/// Create the scratch directory when absent, reporting whether this call
+/// created it: a created directory's own entry is durable only once its parent
+/// is fsynced. The data root itself is not created here — an absent data root
+/// is a repository the caller has no business writing a record into.
+fn create_scratch(scratch: &Path) -> anyhow::Result<bool> {
+    match std::fs::create_dir(scratch) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
+        Err(error) => Err(error).with_context(|| format!("creating {}", scratch.display())),
+    }
 }
 
 /// The wire spelling of a path's root-relative portion.
@@ -460,6 +476,34 @@ mod tests {
             mode(path.parent().unwrap()),
             mode(&data_root),
             "the scratch directory does not carry the data root's mode"
+        );
+    }
+
+    /// A data root entries can be created in but not opened for reading: its
+    /// fsync fails, and the record write that follows it never runs. A commit
+    /// that skips that fsync reaches the write, and the record is there to find.
+    #[cfg(unix)]
+    #[test]
+    fn test_commit_fsyncs_the_data_root_before_writing_into_a_scratch_it_created() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let parent = tempfile::tempdir().unwrap();
+        let data_root = parent.path().join("data");
+        std::fs::create_dir(&data_root).unwrap();
+        let restrict = |mode| {
+            std::fs::set_permissions(&data_root, std::fs::Permissions::from_mode(mode)).unwrap()
+        };
+        restrict(0o300);
+
+        let outcome = sample_record().commit(&data_root);
+
+        let record = data_root.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME);
+        let wrote_record = record.exists();
+        restrict(0o700);
+        assert!(outcome.is_err(), "the unsyncable data root went unreported");
+        assert!(
+            !wrote_record,
+            "the record was written under a scratch directory the data root never made durable"
         );
     }
 
