@@ -103,7 +103,7 @@ pub use warnings::StorageWarning;
 pub use worktree_paths::WorktreePaths;
 
 #[allow(unused_imports)] // Public API used only in tests, not in binary
-pub use memory::InMemoryStorage;
+pub use memory::{InMemoryStorage, MemoryRedoApplier};
 
 /// Typed repository readers and session lifecycle controls.
 ///

@@ -5,7 +5,9 @@
 //! absence, the append rewrites its bytes at its offset, so a record applied
 //! twice converges. Nothing publishes through this module yet.
 
-use crate::repository_state::{FileMode, RepositoryRootClass, VirtualPath};
+use crate::repository_state::{
+    CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
+};
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::file_transaction::repository_unix_mode;
 use crate::storage::redo_record::{
@@ -69,8 +71,14 @@ pub enum RedoApplyError {
         #[source]
         source: std::io::Error,
     },
+    #[error("a redo record no application consumed is already committed")]
+    OccupiedRecord,
     #[error(transparent)]
     Roots(#[from] RepositoryStateStoreError),
+    #[error(transparent)]
+    Path(#[from] RepositoryLayoutError),
+    #[error(transparent)]
+    Capture(#[from] CaptureError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
 }
@@ -113,13 +121,13 @@ impl RedoApplier {
             .chain(record.deletes.iter())
             .chain(record.event_append.iter().map(|_| &event_log))
             .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
-        check(injector, RedoPoint::BeforeApply)?;
+        check_interruption(injector, RedoPoint::BeforeApply)?;
         record
             .puts
             .iter()
             .enumerate()
             .try_for_each(|(index, put)| {
-                check(injector, RedoPoint::BeforePut { index })?;
+                check_interruption(injector, RedoPoint::BeforePut { index })?;
                 put_file(roots, put)
             })?;
         record
@@ -127,20 +135,26 @@ impl RedoApplier {
             .iter()
             .enumerate()
             .try_for_each(|(index, path)| {
-                check(injector, RedoPoint::BeforeDelete { index })?;
+                check_interruption(injector, RedoPoint::BeforeDelete { index })?;
                 delete_file(roots, path)
             })?;
         if let Some(append) = &record.event_append {
-            check(injector, RedoPoint::BeforeEventAppend)?;
+            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
             append_events(roots, append)?;
         }
-        check(injector, RedoPoint::BeforeRecordRemoval)?;
+        check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
         remove_record(roots)?;
-        check(injector, RedoPoint::AfterApply)
+        check_interruption(injector, RedoPoint::AfterApply)
     }
 }
 
-fn check(injector: &dyn RedoInterruptionInjector, point: RedoPoint) -> Result<(), RedoApplyError> {
+/// Put one point to `injector`, naming it in the interruption it reports. Every
+/// backend's pass reaches its points through this, so an interruption is
+/// reported the same way whichever backend raised it.
+pub(in crate::storage) fn check_interruption(
+    injector: &dyn RedoInterruptionInjector,
+    point: RedoPoint,
+) -> Result<(), RedoApplyError> {
     injector
         .check(&point)
         .map_err(|source| RedoApplyError::Interrupted { point, source })
@@ -271,8 +285,105 @@ fn unaddressable(path: &VirtualPath) -> RedoApplyError {
     }
 }
 
+/// The record vocabulary every backend's application is tested against.
+///
+/// One home for it, so a backend's suite states what that backend adds rather
+/// than restating the record shape and the interruption seam
+/// (`@/inv/shared-test-contracts`).
+#[cfg(test)]
+pub(crate) mod test_fixtures {
+    use super::*;
+    use crate::storage::redo_record::PutFile;
+    use proptest::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    /// The event-log bytes a mutation captured before appending to them.
+    pub(crate) const CAPTURED_LOG: &[u8] = b"{\"tag\":\"issue_created\"}\n";
+
+    /// Records every point the pass checks, in order.
+    #[derive(Default)]
+    pub(crate) struct RecordedPoints(Mutex<Vec<RedoPoint>>);
+
+    impl RecordedPoints {
+        pub(crate) fn points(&self) -> Vec<RedoPoint> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    impl RedoInterruptionInjector for RecordedPoints {
+        fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
+            self.0.lock().unwrap().push(point.clone());
+            Ok(())
+        }
+    }
+
+    /// Interrupts the pass at its `at`-th check, so exactly the steps before it
+    /// ran.
+    pub(crate) struct InterruptAt {
+        at: usize,
+        seen: AtomicUsize,
+    }
+
+    impl InterruptAt {
+        pub(crate) fn check_number(at: usize) -> Self {
+            Self {
+                at,
+                seen: AtomicUsize::new(0),
+            }
+        }
+    }
+
+    impl RedoInterruptionInjector for InterruptAt {
+        fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
+            match self.seen.fetch_add(1, Ordering::Relaxed) == self.at {
+                true => Err(std::io::Error::other(format!("interrupted at {point:?}"))),
+                false => Ok(()),
+            }
+        }
+    }
+
+    /// Paths a generated record and its pre-existing state draw from: two roots,
+    /// nested and unnested, so puts and deletes collide on the same targets.
+    pub(crate) fn path_vocabulary() -> impl Strategy<Value = VirtualPath> {
+        prop_oneof![
+            Just(VirtualPath::data("index.json").unwrap()),
+            Just(VirtualPath::data("issues/2026/a.json").unwrap()),
+            Just(VirtualPath::worktree("notes.md").unwrap()),
+            Just(VirtualPath::worktree("dev/plan.md").unwrap()),
+        ]
+    }
+
+    pub(crate) fn arbitrary_record() -> impl Strategy<Value = RedoRecord> {
+        (
+            prop::collection::vec(
+                (
+                    path_vocabulary(),
+                    prop::collection::vec(any::<u8>(), 0..8),
+                    prop_oneof![Just(FileMode::Regular), Just(FileMode::Executable)],
+                ),
+                0..4,
+            ),
+            prop::collection::vec(path_vocabulary(), 0..3),
+            prop::option::of(prop::collection::vec(any::<u8>(), 0..8)),
+        )
+            .prop_map(|(puts, deletes, appended)| RedoRecord {
+                puts: puts
+                    .into_iter()
+                    .map(|(path, bytes, mode)| PutFile { path, bytes, mode })
+                    .collect(),
+                deletes,
+                event_append: appended.map(|bytes| EventAppend {
+                    offset: CAPTURED_LOG.len() as u64,
+                    bytes,
+                }),
+            })
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::test_fixtures::*;
     use super::*;
     use crate::repository_state::{FileMode, RepositoryRootClass};
     use crate::storage::discover_repository_layout;
@@ -280,12 +391,8 @@ mod tests {
     use proptest::prelude::*;
     use std::collections::{BTreeMap, HashSet};
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
     use tempfile::TempDir;
-
-    /// The event-log bytes a mutation captured before appending to them.
-    const CAPTURED_LOG: &[u8] = b"{\"tag\":\"issue_created\"}\n";
 
     /// A repository whose worktree holds its data root, with capability handles
     /// for both.
@@ -321,48 +428,6 @@ mod tests {
         let recorded = Arc::new(RecordedPoints::default());
         let injector: Arc<dyn RedoInterruptionInjector> = recorded.clone();
         (recorded, RedoApplier::new(injector))
-    }
-
-    /// Records every point the pass checks, in order.
-    #[derive(Default)]
-    struct RecordedPoints(Mutex<Vec<RedoPoint>>);
-
-    impl RecordedPoints {
-        fn points(&self) -> Vec<RedoPoint> {
-            self.0.lock().unwrap().clone()
-        }
-    }
-
-    impl RedoInterruptionInjector for RecordedPoints {
-        fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
-            self.0.lock().unwrap().push(point.clone());
-            Ok(())
-        }
-    }
-
-    /// Interrupts the pass at its `at`-th check, so exactly the steps before it
-    /// ran.
-    struct InterruptAt {
-        at: usize,
-        seen: AtomicUsize,
-    }
-
-    impl InterruptAt {
-        fn check_number(at: usize) -> Self {
-            Self {
-                at,
-                seen: AtomicUsize::new(0),
-            }
-        }
-    }
-
-    impl RedoInterruptionInjector for InterruptAt {
-        fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
-            match self.seen.fetch_add(1, Ordering::Relaxed) == self.at {
-                true => Err(std::io::Error::other(format!("interrupted at {point:?}"))),
-                false => Ok(()),
-            }
-        }
     }
 
     /// Every file under `root`, keyed by its root-relative path, with the bytes
@@ -731,43 +796,6 @@ mod tests {
             !outside.path().join("captured.json").exists(),
             "the application wrote outside the selected roots"
         );
-    }
-
-    /// Paths a generated record and its pre-existing state draw from: two roots,
-    /// nested and unnested, so puts and deletes collide on the same targets.
-    fn path_vocabulary() -> impl Strategy<Value = VirtualPath> {
-        prop_oneof![
-            Just(VirtualPath::data("index.json").unwrap()),
-            Just(VirtualPath::data("issues/2026/a.json").unwrap()),
-            Just(VirtualPath::worktree("notes.md").unwrap()),
-            Just(VirtualPath::worktree("dev/plan.md").unwrap()),
-        ]
-    }
-
-    fn arbitrary_record() -> impl Strategy<Value = RedoRecord> {
-        (
-            prop::collection::vec(
-                (
-                    path_vocabulary(),
-                    prop::collection::vec(any::<u8>(), 0..8),
-                    prop_oneof![Just(FileMode::Regular), Just(FileMode::Executable)],
-                ),
-                0..4,
-            ),
-            prop::collection::vec(path_vocabulary(), 0..3),
-            prop::option::of(prop::collection::vec(any::<u8>(), 0..8)),
-        )
-            .prop_map(|(puts, deletes, appended)| RedoRecord {
-                puts: puts
-                    .into_iter()
-                    .map(|(path, bytes, mode)| PutFile { path, bytes, mode })
-                    .collect(),
-                deletes,
-                event_append: appended.map(|bytes| EventAppend {
-                    offset: CAPTURED_LOG.len() as u64,
-                    bytes,
-                }),
-            })
     }
 
     /// Pre-existing targets, and whether the log carries residue beyond the
