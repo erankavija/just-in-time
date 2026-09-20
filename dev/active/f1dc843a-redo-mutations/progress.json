@@ -43,7 +43,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "rework-1"
         },
         {
           "id": "faa668c9-158b-4e08-af34-79ae81b58dd7",
@@ -54,7 +54,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -580,6 +580,29 @@
         "cargo-ci",
         "code-review"
       ]
+    },
+    {
+      "short_id": "19e7298a",
+      "title": "Event-log size stops capping issue claims",
+      "why": "SP-02(a): jit claim acquire fails above a 16 MiB event log (claim.rs:191-194) while issue-update gets 64 MiB. User directed it be fixed now, inside the epic.",
+      "status": "dispatched",
+      "gates": [
+        "cargo-ci",
+        "code-review"
+      ],
+      "excluded_from_req06_subtotal": true
+    },
+    {
+      "short_id": "2d4fda72",
+      "title": "Documentation assertions leave the Rust suite",
+      "why": "PF-01 root cause: Rust tests assert prose in AGENTS.md and contrib/gates/*.md, duplicating docs-mechanical's M3 citations checker, and a prose-only commit is gated by neither. User directed the correction now, inside the epic.",
+      "status": "dispatched",
+      "gates": [
+        "cargo-ci",
+        "code-review",
+        "docs-mechanical"
+      ],
+      "excluded_from_req06_subtotal": true
     }
   ],
   "escalations": [
@@ -591,9 +614,29 @@
       "resolution": "Ship essential-code-prose and orthogonal-tests in profiles/jit-dogfood/manifest.toml; update the test's expected phrases keeping the negative blanket-examples guard.",
       "resolved_by": "user",
       "status": "closed"
+    },
+    {
+      "id": "ESC-02",
+      "wave": 2,
+      "category": "4 - issue scope change",
+      "question": "code-review failed faa668c9 for not wiring the check into publication, which the plan forbids in this phase",
+      "resolution": "User approved stating the foundation-phase non-goal in faa668c9's description, mirroring 835bae3f REQ-05. Gate passed afterwards with no code change.",
+      "resolved_by": "user",
+      "status": "closed"
+    },
+    {
+      "id": "ESC-03",
+      "wave": 2,
+      "category": "8 - shared infrastructure / 6 - architectural",
+      "question": "Rust tests assert non-Rust artifacts; where should prose checks live",
+      "resolution": "User directed moving them to docs-mechanical, as a task inside this epic (2d4fda72), accepting the REQ-06 attribution consequence recorded in ER-01.",
+      "resolved_by": "user",
+      "status": "closed"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "555ff4be": 1
+  },
   "surfaced_pitfalls": [
     {
       "id": "SP-01",
