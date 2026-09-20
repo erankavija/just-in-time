@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 3,
+  "current_wave": 4,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework 1/2 dispatched (R4: nested-put durability)"
+          "status": "done"
         }
       ]
     },
@@ -770,6 +770,13 @@
       "finding": "A backgrounded gate evaluation reported 'completed (exit code 0)' while the gate itself FAILED. The notification carried the exit status of the shell pipeline (`jit gate evaluate ... | tail -3`), not of the gate. Acting on that summary would have completed an issue whose code-review found a blocking corruption path.",
       "suggested_remedy": "Never read a backgrounded gate's outcome from the task-notification exit code. Read the gate-run record, or re-query `jit issue show <id> --json` gate statuses, before drawing any conclusion.",
       "status": "adopted by the lead"
+    },
+    {
+      "id": "PF-05",
+      "finding": "A gate result recorded as `passed` does not say which tree it judged. `jit issue show --json` and `jit gate status-all` report gates[].status with last_run_at and nothing relating that run to HEAD. 35544121's code-review read `passed` from an 11:14Z run while the module it reviewed had since been rewritten (130 lines in the exact file its only finding pointed at). Accepting that readout would have completed the issue on a review of code that no longer existed.",
+      "suggested_remedy": "Surface staleness where readiness is read. The gate-run record already carries the evidence — its stdout opens with an `Attribution:` commit list — so a `stale` flag when HEAD has moved past the attributed commits would turn a judgement call into a fact. NOT actioned: this is a shipped surface, escalation category 8.",
+      "lead_action": "Adopted for the rest of this epic: after every merge, re-evaluate every AI-review gate on the issue before reading its status, and confirm the run's Attribution line covers the new commits.",
+      "status": "adopted by the lead; product change raised to the user, not actioned"
     }
   ],
   "evidence_requirements": [
@@ -828,7 +835,15 @@
       "what": "Held-injector rework accepted; a new blocking durability finding replaced it.",
       "detail": "The invoker-approved RedoApplier shape landed and was merged to main at 94fb377b7. R1 (injector held) and R2 (staging create_new + no-follow) both verified closed at HEAD. cargo-ci passed on the MERGED tree (4709 tests, zero warnings). Re-evaluating code-review against the new commits produced R4, a new finding: put_file calls root.create_dir_all(directories) at redo_apply.rs:171 and then syncs only the deepest directory, so for a put at a/b/c/file the entries for c in b, b in a, and a in the root are never fsynced. remove_record then runs, and a crash loses the nested put with no record left to replay. References @/charter/D-17 and @/inv/derived-state-coherence.",
       "lead_note": "Lead-verified at HEAD before dispatching. This is the THIRD defect in this epic found in a new-file publication path, after 555ff4be's truncating record write and 35544121's symlink-following stage open. All three were durability or containment properties of publishing a file that did not exist before. Worth naming in the 21e976d1 checkpoint review as a pattern rather than three unrelated bugs.",
-      "verdict": "FAIL - rework attempt 1 of 2 dispatched; fix converges on FileTransactionKernel's create-then-sync-parent shape (file_transaction.rs:483-530)"
+      "verdict": "RESOLVED. open_or_create_capability_parent (repository_state_store.rs:1636) creates and syncs one level at a time inside the NotFound arm only, so a/b/c syncs root, a and b before the walk descends, and put_file's existing sync covers c. An existing ancestor costs no fsync. A symlinked ancestor still takes the Ok arm and is refused by open_child_dir_nofollow. cargo-ci passed on the merged tree (4710 tests); code-review passed with 0 findings, attribution covering fc698cfe3/2920ded44/c72c700c7."
+    },
+    {
+      "id": "V-06",
+      "issue": "35544121",
+      "what": "The fsync ordering the R4 fix establishes has no owning test; only the crash-window ordering does.",
+      "detail": "test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published (redo_apply.rs:475) owns the property that the record outlives a fresh nested put's publication, and it was GREEN BEFORE the fix — the worker disclosed this rather than letting it pass as evidence. The sync itself has no failure seam at this layer: sync_capability_directory operates on an already-open handle via try_clone + sync_all, so the 0o300 no-read-permission trick that makes redo_record's path-based sync_directory observable does not apply here. Adding a RedoPoint for directory creation would widen the point enum that 4e818d10 REQ-04 and d591a1c8 REQ-01 require both backends to share, and the in-memory backend has no directories, so that seam would be wrong.",
+      "lead_note": "Accepted, not waived. @/inv/orthogonal-tests requires an owning test at the cheapest layer THAT CAN OBSERVE the property; no layer here observes it cheaply. The ordering is structural — the sync sits inside the create arm before the walk descends — and was verified by reading, by the code-review gate that raised the finding, and by the gate's explicit recheck. Precedent: open_capability_parent likewise has no owning test and is proven through its consumers. Carried to the 21e976d1 checkpoint (wave 6) so holistic-review sees it rather than discovering it.",
+      "verdict": "accepted with the gap named"
     }
   ],
   "standing_policies": [
