@@ -9,6 +9,7 @@
   ],
   "description": "One redo record type, one way to write it durably, one way to apply it on either storage backend, and one proof of its crash behaviour, all reachable without changing how a mutation commits.\n\n## Background\n\nThe redo record is the commit point that replaces a journaled rollback kernel. Before any publisher moves onto it, the mechanism has to exist whole: a vocabulary of put, delete, and event-append operations over data-root and worktree paths; a synced write that makes the record durable before any live file changes; an application that is idempotent under repetition; and a scoped comparison that refuses a mutation whose write targets moved underneath it.\n\nThe work in this phase adds the mechanism beside the one in use. Nothing in it changes how a mutation publishes, so the repository behaves exactly as it did while the mechanism is built and proven, and no adopter document goes stale. The storage layer declares its backends publicly, which is what lets a module land before its first caller under a build that denies warnings.\n\n## Success Criteria\n\n- [hard] REQ-01: The workspace holds one redo record type, one writer, and one application routine per storage backend, with no second type or parallel entry point expressing the same thing.\n- [hard] REQ-02: The record's crash matrix is proven in one suite over one point enum, and no second suite in the workspace proves it.\n- [hard] REQ-03: The mechanism is unreachable from any publisher: no command, and no mutation session, commits through the record yet, and the repository's observable publication behaviour is unchanged.\n- [hard] REQ-04: The workspace builds warning-free with the mechanism uncalled, through the storage layer's declared visibility rather than through a dead-code allowance.\n- [hard] REQ-05: Each new module's rustdoc states its contract in at most one short paragraph of orientation, and none restates the retired kernel's protocol prose.\n- [hard] REQ-06: The phase's additions stay within the per-task line ceilings its children state, and the total added is under 1,500 lines of production code.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T19:15:47.229714890Z",
   "gates_required": [
     "cargo-ci",
     "doc-review",
@@ -26,7 +27,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Redo record foundation",
-  "updated_at": "2026-09-20T07:15:58.518020965Z"
+  "updated_at": "2026-09-20T19:15:47.229714890Z"
 }

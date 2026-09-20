@@ -49,8 +49,16 @@
       "format": "markdown",
       "label": "Epic plan",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "artifact",
+      "format": "markdown",
+      "label": "Interruption conformance suite",
+      "path": "crates/jit/src/storage/redo_conformance.rs"
     }
   ],
+  "done_at": "2026-09-20T19:15:46.860573747Z",
   "first_ready_at": "2026-09-20T17:22:05.479957739Z",
   "gates_required": [
     "cargo-ci",
@@ -59,12 +67,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-20T18:51:03.506087030Z",
+      "updated_at": "2026-09-20T19:08:05.539928038Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-20T18:56:11.300047292Z",
+      "status": "passed",
+      "updated_at": "2026-09-20T19:15:22.443701393Z",
       "updated_by": "auto:executor"
     }
   },
@@ -81,7 +89,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Shared interruption conformance suite",
-  "updated_at": "2026-09-20T18:56:11.300047292Z"
+  "updated_at": "2026-09-20T19:15:46.860573747Z"
 }
