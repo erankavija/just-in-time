@@ -638,5 +638,20 @@
       "lead_action": "Deleted .agents/cache-pool (23 GB) per the protocol's own remedy: 'delete it and let the next harvest rebuild it warm -- it is a cache, never a source of truth'. Adopted for the rest of this epic: harvest at most ONE worktree per wave into the pool; remove the remaining worktrees without harvesting, so two build trees are never merged.",
       "status": "mitigated by the lead; script design raised to the user, not changed"
     }
+  ],
+  "evidence_requirements": [
+    {
+      "id": "ER-01",
+      "owner": "722878d4 (publication cost evidence, wave 21)",
+      "requirement": "Report the REQ-06 line balance ATTRIBUTED, not just as one number. Report (a) the literal cumulative total LD-6 names -- `git diff --shortstat 34d37f8be -- '*.rs'` -- which is what REQ-06 is judged on, and (b) the redo-record-only subtotal, excluding in-epic remediation work that is not redo-record work.",
+      "why": "The measurement is a blunt tree diff and cannot separate redo-record work from anything else landing in the window. Three in-epic tasks are not redo-record work: ce053478 (net +18, done), the claim-ceiling task, and the prose-checks task (projected ~-390 from deleting code_review_policy_test.rs and the packaged-citation test). If the redo-record work alone were net positive, that -390 would flip the total negative and REQ-06 would read green while the epic's premise -- that the storage layer ends smaller -- stayed unproven.",
+      "excluded_from_subtotal": [
+        "ce053478",
+        "claim-ceiling task",
+        "prose-checks task"
+      ],
+      "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently.",
+      "baseline_at_wave2": "+636 -32 = net +604"
+    }
   ]
 }
