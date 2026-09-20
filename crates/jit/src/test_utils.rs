@@ -9,7 +9,7 @@ use crate::commands::ProfileSelector;
 use crate::profile::{capture_package_tree, CapturedPackageTree, ProfilePackage};
 use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
-use crate::storage::{discover_repository_layout, FileLocker, JsonFileStorage};
+use crate::storage::{discover_repository_layout, FileLocker, IssueStore, JsonFileStorage};
 use crate::test_taxonomy::{test_taxonomy, TestTaxonomy};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -871,6 +871,34 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     fs::create_dir(temp.path().join(".git"))?;
 
     Ok((temp, storage))
+}
+
+/// Append well-formed events for unrelated issues until the log exceeds
+/// `bytes`, so a capture over it is decided by nothing but its own tail.
+pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()> {
+    use std::io::Write;
+
+    let path = storage.root().join("events.jsonl");
+    let mut log = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)?;
+    let mut written = fs::metadata(&path)?.len();
+    let mut ordinal = 0_u64;
+    while written <= bytes {
+        let line = serde_json::to_string(&crate::domain::Event::IssueCreated {
+            id: format!("01J0000000000000000000{ordinal:04}"),
+            issue_id: format!("00000000-0000-4000-8000-{ordinal:012}"),
+            timestamp: chrono::Utc::now(),
+            title: format!("Accumulated history {ordinal}"),
+            priority: crate::domain::Priority::Normal,
+        })?;
+        writeln!(log, "{line}")?;
+        written += line.len() as u64 + 1;
+        ordinal += 1;
+    }
+    log.flush()?;
+    Ok(())
 }
 
 /// Build a repository from the fixture's explicitly declared custom taxonomy.

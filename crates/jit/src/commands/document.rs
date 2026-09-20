@@ -2,12 +2,15 @@
 
 use super::*;
 
-const DOCUMENT_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+/// Bounds for one document reference edit, which mutates one named issue while
+/// also reading the document and its assets: the shared issue-mutation bounds
+/// at the depth those worktree paths reach.
+fn document_capture_budget() -> crate::repository_state::CaptureBudget {
     crate::repository_state::CaptureBudget {
-        max_listings: 0,
-        max_bytes: 64 * 1024 * 1024,
         max_depth: 8,
-    };
+        ..super::issue_mutation_capture_budget()
+    }
+}
 
 struct DerivedDocumentMutation<T> {
     outcome: T,
@@ -1581,7 +1584,7 @@ fn document_capture_spec(
     let (worktree_paths, data_paths): (Vec<_>, Vec<_>) = paths
         .into_iter()
         .partition(|path| path.root_class() == RepositoryRootClass::Worktree);
-    let mut spec = CaptureSpec::phase_one(data_paths, DOCUMENT_CAPTURE_BUDGET)?;
+    let mut spec = CaptureSpec::phase_one(data_paths, document_capture_budget())?;
     spec.discover_paths(worktree_paths)?;
     Ok(spec)
 }
@@ -2145,5 +2148,42 @@ mod tests {
         ));
         assert!(storage.load_issue(&id).unwrap().documents.is_empty());
         assert!(storage.read_events().unwrap().is_empty());
+    }
+
+    /// A repository's accumulated history does not decide whether a document can
+    /// be linked: the document capture charges no ceiling the log can outgrow,
+    /// so a log past the 64 MiB one it once held still links (jit:48e4f65c).
+    #[test]
+    fn test_add_document_reference_succeeds_over_an_event_log_past_the_former_ceiling() -> Result<()>
+    {
+        let (temp, storage) = crate::test_utils::setup_test_repo()?;
+        let executor =
+            CommandExecutor::new(storage.clone()).with_layout(storage.configured_layout()?);
+        let (issue_id, _) = executor.create_issue(
+            "Long History Issue".to_string(),
+            String::new(),
+            crate::domain::Priority::Normal,
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            false,
+        )?;
+        std::fs::create_dir_all(temp.path().join("docs"))?;
+        std::fs::write(temp.path().join("docs/plan.md"), "# Plan\n")?;
+        crate::test_utils::grow_event_log_beyond(&storage, 64 * 1024 * 1024)?;
+
+        executor.add_document_reference(&issue_id, "docs/plan.md", None, None, None, false)?;
+
+        assert_eq!(
+            storage
+                .load_issue(&issue_id)?
+                .documents
+                .iter()
+                .map(|document| document.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["docs/plan.md"]
+        );
+        Ok(())
     }
 }
