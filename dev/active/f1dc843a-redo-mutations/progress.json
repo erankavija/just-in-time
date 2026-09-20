@@ -70,7 +70,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "BLOCKED - R1 finding unaddressed (V-04)"
+          "status": "rework attempt 3 dispatched (ESC-06 guidance)"
         }
       ]
     },
@@ -663,12 +663,30 @@
       "resolved_by": "user",
       "status": "closed",
       "lead_note": "Lead drafting error, same class as V-02: the criterion was written broader than its Background's framing."
+    },
+    {
+      "id": "ESC-05",
+      "wave": 3,
+      "category": "4 - issue scope change (with 3 - epic criteria at stake)",
+      "question": "SP-05: epic REQ-02 is unreachable while c88822a5 REQ-03 keeps the whole event log in the capture base specification. Amend c88822a5, amend epic REQ-02's threshold, or defer to wave 21?",
+      "resolution": "Amend c88822a5 REQ-03 (option A). Epic REQ-02 is untouched. Amendment applied in session 2; the spike dev/active/7226f00b/whole-log-read-cost.md is linked to c88822a5 as its evidence, and the Background's two false premises were corrected in the same edit (the apply-time round is NOT already gone; ensure_write_set_unchanged has no production caller yet).",
+      "resolved_by": "user",
+      "status": "closed"
+    },
+    {
+      "id": "ESC-06",
+      "wave": 3,
+      "category": "5 - rework exceeded MAX_REWORK_ATTEMPTS (with 4 - issue scope change as the rejected alternative)",
+      "question": "V-04: 35544121 REQ-05 requires 'an injector it holds' and apply_record takes one per call. Change the artifact, amend REQ-05, or accept the worker's reading?",
+      "resolution": "Change the artifact: a type in redo_apply.rs holds Arc<dyn RedoInterruptionInjector> and exposes apply(&self, roots, record), converging on FileTransactionKernel's established shape. REQ-05 is unchanged. The invoker's guidance resets the rework counter for this issue.",
+      "resolved_by": "user",
+      "status": "closed"
     }
   ],
   "rework_counts": {
     "555ff4be": 1,
     "2d4fda72": 1,
-    "35544121": 2
+    "35544121": 0
   },
   "surfaced_pitfalls": [
     {
@@ -718,7 +736,7 @@
         "'The apply-time round is already gone' - it is not; repository_state_store.rs:526-538 still re-captures the whole read set and compares it whole, a third whole-log read per changing label update.",
         "ensure_write_set_unchanged (faa668c9) has no production caller, only repository_state_store_tests.rs:5108 - correct for the phase, but c88822a5's premise assumes it is live."
       ],
-      "disposition": "OPEN - BLOCKING DECISION FOR THE NEXT SESSION. c88822a5 REQ-03 cannot stand as written. Proposed amendment (from the spike): the base spec takes the log as length and a bounded tail; a command that parses the log names it whole in its own capture set. Needs a per-path read mode in CaptureSpec, a captured entry carrying length+tail (EventLogTail exists but is private), and expected_of to stop deriving the log's preimage from a whole-log digest. Amending c88822a5's criteria is escalation category 4; if the amendment cannot deliver <10%, epic REQ-02 itself is at stake, which is category 3.",
+      "disposition": "RESOLVED by the invoker (session 2, ESC-05): option A. c88822a5 REQ-03 is amended to read the event log as length and a bounded tail, with a command that parses the log naming it whole in its own capture set. Epic REQ-02 stands unchanged; projected difference falls under 1 %. The amendment's three implied consequences are stated in c88822a5's Notes so they are delivered by that issue rather than falling between issues: a per-path read mode in CaptureSpec, a captured entry carrying length+tail (EventLogTail made reachable), and expected_of no longer deriving the log's preimage from a whole-log digest. The spike is linked to c88822a5 as its evidence. Re-measure at 722878d4 (wave 21) before accepting REQ-02.",
       "criterion_subjects": [
         "REQ-01",
         "REQ-02"
@@ -802,7 +820,7 @@
       "what": "BLOCKING: code-review round 1's finding is unaddressed at HEAD and round 3 passed without re-checking it.",
       "detail": "R1 (blocking, issue-impact, redo_apply.rs:85): 'REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it. Callers can therefore vary injection across applications rather than the backend owning its interruption boundary.' At HEAD apply_record still takes `injector: &dyn RedoInterruptionInjector` (redo_apply.rs:88) and no backend holds it. R2 flagged the staging vulnerability instead; the lead dispatched rework for R2 only. R3 passed with 'All hard criteria are implemented and the prior staging vulnerability is remediated' - it re-checked the staging finding and not R1.",
       "lead_note": "Caught by the Tier 1.5 prior-findings regression check, which exists precisely because reviewers have no memory across rounds. The issue is NOT completed. The worker's original position was that the session becomes the injector holder at wiring time (4319256e), matching the kernel's `execute_repository_delta(..., &*self.injector)` pattern - arguable, but No-argue discipline forbids the lead softening REQ-05 by argument. Resolve by changing the artifact or by escalating.",
-      "verdict": "FAIL - issue left in_progress, carried into the handoff"
+      "verdict": "FAIL confirmed at HEAD in session 2 (apply_record still took the injector per call at redo_apply.rs:88). RESOLVED by the invoker (ESC-06): change the artifact — redo_apply.rs gains a type holding Arc<dyn RedoInterruptionInjector> with apply(&self, roots, record), mirroring FileTransactionKernel (file_transaction.rs:69). The free-function form does not survive beside it (@/inv/canonical-cutover). Rework attempt 3 dispatched; the invoker's guidance reset the counter."
     }
   ],
   "standing_policies": [
@@ -823,6 +841,15 @@
       "wave": 3,
       "policy": "Workers may sub-delegate to read-only exploration subagents; the user's four-concurrent-worker cap counts dispatched issue-workers, not read-only helpers. Exploration should use cheap model tiers.",
       "note": "Lead will state the cheap-tier preference in dispatch prompts."
+    }
+  ],
+  "session": 2,
+  "rework_counter_resets": [
+    {
+      "issue": "35544121",
+      "previous_count": 2,
+      "reason": "Invoker supplied guidance under escalation-policy entry 5 (ESC-06); the policy states guidance resets the counter.",
+      "session": 2
     }
   ]
 }
