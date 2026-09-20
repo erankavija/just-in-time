@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-20T16:00:33.212675856Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "35544121-9268-4068-8248-98e9d2df16f5"
   ],
   "description": "The in-memory storage backend holds a redo record as a value and applies it by stepping through the same interruption points as the filesystem backend.\n\n## Background\n\nThe in-memory backend exists so command workflows are testable without a filesystem, and the project requires one behavioural contract across both backends. The in-memory session mirrors the filesystem kernel today by walking the same failure points in the same order over an in-memory residue, with one deliberately skipped step marked so the point set stays identical across backends.\n\nThe redo record keeps that shape and shrinks it. The in-memory backend stores the record as a value beside its state map, applies its operations to that map in the same order, and checks the same interruption points, so a crash injected at a given point means the same thing on both backends. The residue carries the record alone.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation on the in-memory backend installs a redo record as a value before it changes any state entry.\n- [hard] REQ-02: Applying the record updates put entries, removes delete entries, and extends the event entry at its recorded offset.\n- [hard] REQ-03: Re-applying a leftover record over a backend that already holds part of it leaves the backend in the same semantic state as a clean application.\n- [hard] REQ-04: The backend checks the same interruption-point values, in the same order, as the filesystem backend, and each point is reachable on both.\n- [hard] REQ-05: The in-memory residue carries the record and nothing else.\n\n## Notes\n\nExpected additive footprint is under 200 production lines, against roughly 340 lines of kernel modelling this replaces.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-20T15:59:17.112912736Z",
   "gates_required": [
     "cargo-ci",
@@ -25,7 +68,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Memory-backend record application",
-  "updated_at": "2026-09-20T15:59:17.112912736Z"
+  "updated_at": "2026-09-20T16:00:33.212675856Z"
 }
