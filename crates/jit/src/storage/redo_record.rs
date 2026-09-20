@@ -14,8 +14,7 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// Scratch directory below the data root that holds the record.
-pub const RECORD_SCRATCH_DIR: &str = "tmp";
+pub use crate::repository_state::RECORD_SCRATCH_DIR;
 
 /// The record's file name below [`RECORD_SCRATCH_DIR`].
 ///

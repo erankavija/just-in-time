@@ -34,6 +34,25 @@ pub(crate) fn seed_issue(storage: &InMemoryStorage, issue: Issue) {
     storage.seed_issue_fixture(&issue);
 }
 
+/// Seed the data root's engine-owned ignore file when the fixture lacks it, with
+/// the exact bytes its producer composes.
+pub(crate) fn seed_data_root_ignore(storage: &InMemoryStorage) {
+    if storage
+        .read_repo_file(".jit/.gitignore")
+        .expect("memory fixture ignore path is valid")
+        .is_some()
+    {
+        return;
+    }
+    let bytes = crate::repository_state::render_data_root_ignore(b"")
+        .expect("the engine-owned ignore region composes over an empty document");
+    seed_repo_file(
+        storage,
+        ".jit/.gitignore",
+        std::str::from_utf8(&bytes).expect("the composed ignore file is UTF-8"),
+    );
+}
+
 /// Seed one exact authored gate-registry precondition.
 pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegistry) {
     let bytes = crate::declarations::serialize_gate_registry(registry)
@@ -164,6 +183,10 @@ fn with_session_race(
 }
 
 /// Attach the explicit synthetic layout to an in-memory executor fixture.
+///
+/// The fixture repository is back-filled with the state every real repository
+/// carries and no test authors by hand: the minimum configuration, and the
+/// data root's engine-owned ignore file, whose absence is derived-state drift.
 pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
     if storage
         .read_repo_file(".jit/config.toml")
@@ -172,6 +195,7 @@ pub fn memory_executor(storage: InMemoryStorage) -> CommandExecutor<InMemoryStor
     {
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
     }
+    seed_data_root_ignore(&storage);
     let layout = storage.repository_layout();
     CommandExecutor::new(storage).with_layout(layout)
 }

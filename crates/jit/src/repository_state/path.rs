@@ -4,6 +4,13 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
+/// The data root's scratch directory, which holds a mutation's commit point.
+///
+/// Reserved from every semantic identity: what sits there is engine state
+/// mid-publication, never repository content. The data root's ignore file names
+/// it so version control never carries a commit point a checkout never made.
+pub const RECORD_SCRATCH_DIR: &str = "tmp";
+
 /// A normalized path relative to one selected repository root.
 ///
 /// [`Root`](RootRelativePath::Root) denotes the selected root itself;
@@ -200,7 +207,9 @@ mod identity {
                 RepositoryRootClass::Worktree => {
                     path == ".jit-bootstrap" || path.starts_with(".jit-bootstrap/")
                 }
-                RepositoryRootClass::Data => path == "tmp" || path.starts_with("tmp/"),
+                RepositoryRootClass::Data => path
+                    .strip_prefix(super::RECORD_SCRATCH_DIR)
+                    .is_some_and(|rest| rest.is_empty() || rest.starts_with('/')),
             };
             if reserved {
                 Err(RepositoryLayoutError::ReservedTransactionPath(self))
@@ -277,6 +286,9 @@ mod identity {
         /// Project-defined gate-preset directory under the data root
         /// (`.jit/config/gate-presets`).
         GATE_PRESETS: Data = "config/gate-presets";
+        /// Version-control ignore file under the data root (`.jit/.gitignore`),
+        /// naming what version control must not carry from the data root.
+        DATA_IGNORE: Data = ".gitignore";
         /// Managed gitattributes file at the worktree root (`.gitattributes`).
         GITATTRIBUTES: Worktree = ".gitattributes";
     }

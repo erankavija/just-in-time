@@ -43,8 +43,7 @@ fn executor_for(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
         "index.json",
         &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []}).to_string(),
     );
-    let layout = storage.repository_layout();
-    CommandExecutor::new(storage).with_layout(layout)
+    jit::commands::test_helpers::memory_executor(storage)
 }
 
 /// A `dependency-shape` graph rule: every `type:task` must depend on a

@@ -16,6 +16,7 @@ where each comes up.
 
 ```
 .jit/
+├── .gitignore        # Engine-owned ignore entries for the data root
 ├── index.json        # Issue index for fast queries; carries the format version
 ├── config.toml       # Repository configuration
 ├── gates.toml        # Gate registry definitions
@@ -43,7 +44,11 @@ reaches the repository.
 
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock
-files, and `tmp/`. The store's fixed lock set under `.jit/` is
+files, and `tmp/`. The data root's own `.gitignore` is derived state, not
+authored: its delimited engine-owned region names `tmp/`, so a repository never
+commits what publication stages there. Initialization writes it and
+`jit validate --fix` restores it, each preserving every line outside that
+region, and the repository's root ignore file is neither read nor written. The store's fixed lock set under `.jit/` is
 `.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
