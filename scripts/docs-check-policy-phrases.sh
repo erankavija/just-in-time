@@ -91,6 +91,14 @@ for index, entry in enumerate(manifest.get("document") or []):
     normalize = entry.get("normalize", False)
     if not isinstance(normalize, bool):
         fail(f"{where}: normalize must be a boolean")
+    section = entry.get("section")
+    if section is not None:
+        if not isinstance(section, dict) or set(section) - {"after", "before"}:
+            fail(f"{where}: section must be a table of after and optional before")
+        section = (
+            require_text(section, "after", where),
+            require_text(section, "before", where) if "before" in section else None,
+        )
     required = require_phrases(entry, "require", where)
     forbidden = require_phrases(entry, "forbid", where)
     once = require_phrases(entry, "exactly_once", where)
@@ -98,7 +106,7 @@ for index, entry in enumerate(manifest.get("document") or []):
     # manifest looking like coverage.
     if not (required or forbidden or once):
         fail(f"{where}: declares no require, forbid, or exactly_once phrase")
-    documents.append((path, topic, normalize, required, forbidden, once))
+    documents.append((path, topic, normalize, section, required, forbidden, once))
 
 values = []
 for index, entry in enumerate(manifest.get("value") or []):
@@ -142,11 +150,24 @@ def collapse(text):
 
 findings = []
 
-for path, topic, normalize, required, forbidden, once in documents:
+for path, topic, normalize, section, required, forbidden, once in documents:
     text = text_of(path)
     if text is None:
         findings.append(f"MISSING: {path} ({topic}): the artifact cannot be read")
         continue
+    if section is not None:
+        after, before = section
+        _, marker, text = text.partition(after)
+        if not marker:
+            findings.append(f"MISSING: {path} ({topic}): has no section opening {after!r}")
+            continue
+        if before is not None:
+            text, marker, _ = text.partition(before)
+            if not marker:
+                findings.append(
+                    f"MISSING: {path} ({topic}): section {after!r} is not bounded by {before!r}"
+                )
+                continue
     haystack = collapse(text) if normalize else text
     needle = collapse if normalize else (lambda phrase: phrase)
     findings += [

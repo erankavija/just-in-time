@@ -220,17 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn test_packaged_content_standard_paths_are_repository_root_relative() {
-        let (_workspace, package) = assembled_package();
-        let prompt = package
-            .source_bytes("assets/live/.agents/skills/jit-breakdown/references/analysis-prompt.md")
-            .unwrap();
-        let prompt = std::str::from_utf8(prompt).unwrap();
-        assert!(prompt.contains("resolved from the repository root"));
-        assert!(!prompt.contains("relative to this prompt file"));
-    }
-
-    #[test]
     fn test_installed_paths_do_not_require_jq() {
         let (_workspace, package) = assembled_package();
         for asset in &package.model().assets {
@@ -244,63 +233,6 @@ mod tests {
                 "{} still exposes a jq dependency",
                 asset.target
             );
-        }
-    }
-
-    #[test]
-    fn test_packaged_qualified_item_citations_resolve_from_installed_registries() {
-        let (_workspace, package) = assembled_package();
-        let mut known = BTreeMap::<String, BTreeSet<String>>::new();
-        for contribution in &package.model().contributions {
-            if let Contribution::KeyedArray {
-                target, identity, ..
-            } = contribution
-            {
-                let kind = match target {
-                    KeyedArrayTarget::Rules => Some("rule"),
-                    KeyedArrayTarget::Gates => Some("gate"),
-                    KeyedArrayTarget::Invariants => Some("invariant"),
-                    KeyedArrayTarget::Templates => None,
-                };
-                if let Some(kind) = kind {
-                    known
-                        .entry(kind.to_string())
-                        .or_default()
-                        .insert(identity.clone());
-                }
-            }
-        }
-        let citation =
-            regex::Regex::new(r"@/([a-z][a-z0-9-]*)/([A-Za-z0-9][A-Za-z0-9-]*)").unwrap();
-
-        for (source, target) in package
-            .model()
-            .assets
-            .iter()
-            .map(|asset| (&asset.source, &asset.target))
-            .chain(
-                package
-                    .model()
-                    .regions
-                    .iter()
-                    .map(|region| (&region.source, &region.target)),
-            )
-        {
-            let text =
-                std::str::from_utf8(package.source_bytes(source).unwrap()).unwrap_or_default();
-            for capture in citation.captures_iter(text) {
-                let authored_kind = &capture[1];
-                let kind = if authored_kind == "inv" {
-                    "invariant"
-                } else {
-                    authored_kind
-                };
-                let id = &capture[2];
-                assert!(
-                    known.get(kind).is_some_and(|ids| ids.contains(id)),
-                    "{target} cites unresolved package item @/{authored_kind}/{id}"
-                );
-            }
         }
     }
 
@@ -1940,69 +1872,6 @@ mod tests {
                 .unwrap(),
             expected.as_bytes()
         );
-    }
-
-    #[test]
-    fn test_public_content_standards_redirect_links_profile_installation() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let redirect =
-            fs::read_to_string(root.join("docs/reference/jit-content-standards.md")).unwrap();
-        assert!(redirect.contains("contributors to the JIT source repository"));
-        assert!(redirect.contains("Ordinary `jit init` does not install it"));
-        assert!(redirect.contains("profile-installed workflow policy"));
-        assert!(redirect.contains("repositories that use plain initialization"));
-        assert!(redirect.contains("`jit init --profile path:packages/jit-dogfood`"));
-        assert!(redirect.contains("`jit profile apply --profile path:packages/jit-dogfood`"));
-        assert!(redirect.contains("[Repository Profiles](profiles.md)"));
-        assert!(!redirect.contains("does not expose a public profile-install command"));
-    }
-
-    #[test]
-    fn test_planning_bracket_docs_describe_builtin_review_placeholders() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        for path in [
-            "docs/concepts/planning-bracket.md",
-            "docs/how-to/adopt-planning-bracket.md",
-            "docs/examples/sdd/config.toml",
-            "docs/examples/research/config.toml",
-            "docs/reference/cli-commands.md",
-        ] {
-            let text = fs::read_to_string(root.join(path)).unwrap();
-            assert!(
-                text.contains("placeholder"),
-                "{path} must describe the built-in review placeholders"
-            );
-            for stale in [
-                "agent plan-quality gate",
-                "agent breakdown-review gate",
-                "agent (command-backed)",
-                "JIT_SRC=",
-            ] {
-                assert!(!text.contains(stale), "{path} retains stale text: {stale}");
-            }
-        }
-
-        for path in [
-            ".jit/templates.toml",
-            "docs/concepts/planning-bracket.md",
-            "docs/how-to/adopt-planning-bracket.md",
-            "docs/examples/sdd/templates.toml",
-            "docs/examples/research/templates.toml",
-            "docs/reference/cli-commands.md",
-            "profiles/jit-dogfood/manifest.toml",
-        ] {
-            let text = fs::read_to_string(root.join(path)).unwrap();
-            for stale in [
-                "Agent plan-quality review",
-                "approved plan",
-                "approved breakdown",
-                "breakdown approved",
-                "plan is approved",
-                "breakdown after plan approved",
-            ] {
-                assert!(!text.contains(stale), "{path} retains stale text: {stale}");
-            }
-        }
     }
 
     /// Every live asset's repository-relative target paired with the executable

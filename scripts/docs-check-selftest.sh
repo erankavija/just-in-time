@@ -431,7 +431,7 @@ echo "== M9 docs-check-policy-phrases.sh =="
 ph="$scratch/phrases"
 mkdir -p "$ph"
 write_phrase_fixture() {
-  printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n' \
+  printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n\n## Leaf\n\nTag the leaf.\n\n## Container\n\nResolve the children.\n' \
     >"$ph/policy.md"
   cat >"$ph/registry.toml" <<'TOML'
 [[gates]]
@@ -453,6 +453,13 @@ path = "policy.md"
 topic = "fixture wrapping"
 normalize = true
 require = ["The wrapper transports the prompt."]
+
+[[document]]
+path = "policy.md"
+topic = "fixture section"
+section = { after = "## Leaf", before = "## Container" }
+require = ["Tag the leaf."]
+forbid = ["Resolve the children."]
 
 [[value]]
 file = "registry.toml"
@@ -494,6 +501,22 @@ if grep -qF 'The wrapper transports the prompt.' "$ph/policy.md"; then
 else
   echo "PASS: phrases: the normalized entry matched a phrase the artifact wraps"
 fi
+
+# A section entry reads only between its markers: the phrase it forbids sits
+# outside them in the clean fixture and is reported once it moves inside.
+write_phrase_fixture
+printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n\n## Leaf\n\nTag the leaf. Resolve the children.\n\n## Container\n\nResolve the children.\n' \
+  >"$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: a phrase forbidden in one section is a finding there"
+
+# Defect: the declared section boundary is gone, so the entry's scope is not
+# what it declares.
+write_phrase_fixture
+printf '# Policy\n\nThe run is read-only.\n\nAttribution: <commits>\n\nThe wrapper\ntransports the prompt.\n\n## Leaf\n\nTag the leaf.\n' \
+  >"$ph/policy.md"
+run_phrases
+assert_rc 1 $? "phrases: an unbounded declared section is a finding"
 
 # Defect: the artifact is gone.
 write_phrase_fixture
