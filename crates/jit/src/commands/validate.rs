@@ -4056,8 +4056,7 @@ source-of-truth = \"registry-first\"
             &serde_json::json!({"schema_version": 2, "all_ids": ids, "deleted_ids": []})
                 .to_string(),
         );
-        let layout = storage.repository_layout();
-        CommandExecutor::new(storage).with_layout(layout)
+        crate::commands::test_helpers::memory_executor(storage)
     }
 
     fn issue_with_labels(title: &str, body: &str, labels: &[&str]) -> Issue {

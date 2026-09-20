@@ -71,7 +71,7 @@ pub(crate) use managed_document::compose_managed_documents;
 pub use managed_document::{
     render_managed_document, ManagedDocumentClaim, ManagedDocumentError, RegionPlacement,
 };
-pub use materialize::{assemble_config, render_capture_closure};
+pub use materialize::{assemble_config, render_capture_closure, render_data_root_ignore};
 pub use package_tree::{
     finalize_package_tree_capture, CapturedTreeFile, PackageTreeCapture, PackageTreeCaptureError,
     TreeFileDisposition, TreeFileOutcome,

@@ -873,6 +873,20 @@ pub fn setup_test_repo() -> Result<(TempDir, JsonFileStorage)> {
     Ok((temp, storage))
 }
 
+/// Seed the data root's engine-owned ignore file at `data_root` with the exact
+/// bytes its producer composes.
+///
+/// A fixture that assembles a data root by hand rather than through
+/// initialization is missing derived state every real repository carries, which
+/// whole-repository validation reports as drift. Seeding it from the producer's
+/// own rendering keeps the fixture free of a hand-maintained copy
+/// (`@/inv/single-source-prose`).
+pub fn seed_data_root_ignore(data_root: &Path) -> Result<()> {
+    let bytes = crate::repository_state::render_data_root_ignore(b"")?;
+    fs::write(data_root.join(".gitignore"), bytes)?;
+    Ok(())
+}
+
 /// Append well-formed events for unrelated issues until the log exceeds
 /// `bytes`, so a capture over it is decided by nothing but its own tail.
 pub fn grow_event_log_beyond(storage: &JsonFileStorage, bytes: u64) -> Result<()> {

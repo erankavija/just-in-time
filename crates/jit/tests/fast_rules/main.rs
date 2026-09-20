@@ -53,8 +53,7 @@ fn memory_executor(
             .to_string(),
         );
     }
-    let layout = storage.repository_layout();
-    jit::commands::CommandExecutor::new(storage).with_layout(layout)
+    jit::commands::test_helpers::memory_executor(storage)
 }
 
 fn fixture_issue(title: String, description: String) -> jit::domain::Issue {

@@ -23,6 +23,7 @@ fn setup_repo(config_toml: &str) -> (TempDir, CommandExecutor<JsonFileStorage>) 
     let jit_dir = temp.path().join(".jit");
     fs::create_dir(&jit_dir).unwrap();
     fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
+    jit::test_utils::seed_data_root_ignore(&jit_dir).unwrap();
     let storage = JsonFileStorage::new(&jit_dir);
     let layout = jit::storage::discover_repository_layout(temp.path(), storage.root()).unwrap();
     let executor = CommandExecutor::new(storage).with_layout(layout);

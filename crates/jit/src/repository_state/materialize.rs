@@ -387,6 +387,30 @@ const DATA_ROOT_IGNORE_OWNER: &str = "data-root-ignore";
 /// delimiters are this identity in the file's own comment syntax.
 const DATA_ROOT_IGNORE_REGION: &str = "data-root-ignore";
 
+/// The engine-owned region claim over the data root's ignore file: the scratch
+/// directory this engine reserves, delimited by the region identity in the
+/// file's own comment syntax.
+fn data_root_ignore_claim() -> ManagedDocumentClaim {
+    ManagedDocumentClaim::Region {
+        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
+        region_id: DATA_ROOT_IGNORE_REGION.to_string(),
+        begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
+        end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
+        content: format!("/{RECORD_SCRATCH_DIR}/\n").into_bytes(),
+        placement: RegionPlacement::AppendIfAbsent,
+    }
+}
+
+/// The data root's ignore file as [`compose_data_root_ignore`] composes it over
+/// `existing`, without an image to capture it from.
+///
+/// A repository fixture seeds the bytes the producer would publish through this
+/// rendering rather than a hand-maintained copy of them
+/// (`@/inv/single-source-prose`).
+pub fn render_data_root_ignore(existing: &[u8]) -> Result<Vec<u8>, super::ManagedDocumentError> {
+    super::render_managed_document(existing, &[data_root_ignore_claim()])
+}
+
 /// Materialize the data root's ignore file, whose engine-owned region names the
 /// scratch directory holding a mutation's commit point.
 ///
@@ -413,15 +437,7 @@ pub(crate) fn compose_data_root_ignore(
     if !image.capture_spec().contains_path(&path) {
         return Ok(Vec::new());
     }
-    let claim = ManagedDocumentClaim::Region {
-        owner: DATA_ROOT_IGNORE_OWNER.to_string(),
-        region_id: DATA_ROOT_IGNORE_REGION.to_string(),
-        begin: format!("# jit:{DATA_ROOT_IGNORE_REGION}:begin").into_bytes(),
-        end: format!("# jit:{DATA_ROOT_IGNORE_REGION}:end").into_bytes(),
-        content: format!("/{RECORD_SCRATCH_DIR}/\n").into_bytes(),
-        placement: RegionPlacement::AppendIfAbsent,
-    };
-    compose_managed_documents(image, [(path.clone(), claim)])?
+    compose_managed_documents(image, [(path.clone(), data_root_ignore_claim())])?
         .into_iter()
         .map(|(path, expected)| {
             let entry = image.entry(&path)?;

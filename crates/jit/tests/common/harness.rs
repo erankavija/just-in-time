@@ -46,8 +46,7 @@ impl TestHarness {
         // in-memory backend models its state in one aggregate map keyed by
         // virtual path and never touches these paths on the real filesystem
         // unless a case roots the store somewhere it wants read.
-        let layout = storage.repository_layout();
-        let executor = CommandExecutor::new(storage.clone()).with_layout(layout);
+        let executor = jit::commands::test_helpers::memory_executor(storage.clone());
         Self { executor, storage }
     }
 
