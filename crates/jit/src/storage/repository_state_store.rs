@@ -1321,7 +1321,10 @@ fn apply_memory_action(
             state.entries.insert(
                 path.clone(),
                 RepositoryEntry::File {
-                    content: CapturedBytes::new(format!("memory-file:{path:?}"), bytes.clone())?,
+                    content: CapturedBytes::new(
+                        crate::storage::memory::memory_file_object(path),
+                        bytes.clone(),
+                    )?,
                     mode: *mode,
                 },
             );

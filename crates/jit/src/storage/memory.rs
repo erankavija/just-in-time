@@ -9,9 +9,11 @@ use crate::repository_state::{
     gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
     RepositoryRootClass, RootRelativePath, VirtualPath,
 };
+use crate::storage::redo_apply::check_interruption;
 use crate::storage::{
-    AmbiguousIdError, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError, IssueStore,
-    PresetNotFoundError, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
+    AmbiguousIdError, EventAppend, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
+    IssueStore, PresetNotFoundError, PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint,
+    RedoRecord, RepoWriteGuard, RepoWriteLock, MIN_ID_PREFIX_LENGTH,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -53,6 +55,11 @@ pub(crate) struct MemoryRepositoryState {
         BTreeMap<crate::repository_state::VirtualPath, crate::repository_state::RepositoryEntry>,
     pub(crate) data_root_exists: bool,
     pub(crate) recovery: Option<MemoryRecoveryResidue>,
+    /// The redo record a committed mutation left beside the entries, and the
+    /// whole of what its application replays: the backend holds no snapshot of
+    /// the state the record moves away from, because the record is applied
+    /// forward.
+    pub(crate) record: Option<RedoRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +86,7 @@ impl MemoryRepositoryState {
             entries: self.entries.clone(),
             data_root_exists: self.data_root_exists,
             recovery: None,
+            record: None,
         }
     }
 }
@@ -510,6 +518,181 @@ impl InMemoryStorage {
                     .context("Failed to deserialize event from repository image")
             })
             .collect()
+    }
+}
+
+impl InMemoryStorage {
+    /// Install `record` as the residue this backend applies forward, changing no
+    /// state entry.
+    ///
+    /// The in-memory commit point, mirroring [`RedoRecord::commit`]: an
+    /// installed record is refused rather than replaced, because what occupies
+    /// the slot is a mutation no application consumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedoApplyError::OccupiedRecord`] when a record is already
+    /// installed.
+    pub fn commit_record(&self, record: &RedoRecord) -> Result<(), RedoApplyError> {
+        let mut state = self.repository_state();
+        match state.record {
+            Some(_) => Err(RedoApplyError::OccupiedRecord),
+            None => {
+                state.record = Some(record.clone());
+                Ok(())
+            }
+        }
+    }
+}
+
+/// The in-memory backend's record application, holding the injector every
+/// application it runs checks its points through.
+///
+/// The counterpart of [`RedoApplier`](crate::storage::RedoApplier) over the
+/// entry map: the same [`RedoPoint`] values in the same order, so an injected
+/// interruption means the same thing on either backend.
+pub struct MemoryRedoApplier {
+    injector: Arc<dyn RedoInterruptionInjector>,
+}
+
+impl MemoryRedoApplier {
+    /// Hold `injector` for every application this applier runs.
+    pub fn new(injector: Arc<dyn RedoInterruptionInjector>) -> Self {
+        Self { injector }
+    }
+
+    /// Apply `record` to `storage`'s entries and remove it, checking every
+    /// [`RedoPoint`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedoApplyError`] when a path is unaddressable or an injected
+    /// point interrupts the pass.
+    pub fn apply(
+        &self,
+        storage: &InMemoryStorage,
+        record: &RedoRecord,
+    ) -> Result<(), RedoApplyError> {
+        let injector = &*self.injector;
+        let mut state = storage.repository_state();
+        let event_log = VirtualPath::EVENTS;
+        record
+            .puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(record.deletes.iter())
+            .chain(record.event_append.iter().map(|_| &event_log))
+            .try_for_each(|path| resolve(&state, path))?;
+        check_interruption(injector, RedoPoint::BeforeApply)?;
+        record
+            .puts
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, put)| {
+                check_interruption(injector, RedoPoint::BeforePut { index })?;
+                put_entry(&mut state, put)
+            })?;
+        record
+            .deletes
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, path)| {
+                check_interruption(injector, RedoPoint::BeforeDelete { index })?;
+                state.entries.remove(path);
+                Ok::<(), RedoApplyError>(())
+            })?;
+        if let Some(append) = &record.event_append {
+            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+            append_events(&mut state, append)?;
+        }
+        check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
+        state.record = None;
+        check_interruption(injector, RedoPoint::AfterApply)
+    }
+}
+
+/// Refuse, before the first live entry change, a path this backend's tree
+/// cannot address.
+///
+/// The counterpart of the file backend's pre-write path resolution: a data path
+/// while the data root is absent has no root to land in, and an ancestor that is
+/// not a directory is the no-follow parent walk's refusal. An absent ancestor is
+/// admitted, because a put creates the directories its path needs.
+fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    if path.root_class() == RepositoryRootClass::Data && !state.data_root_exists {
+        return Err(unaddressable(path));
+    }
+    path.relative()
+        .as_path()
+        .ancestors()
+        .skip(1)
+        .filter(|ancestor| !ancestor.as_os_str().is_empty())
+        .try_for_each(|ancestor| {
+            let ancestor =
+                VirtualPath::from_root(path.root_class(), RootRelativePath::parse(ancestor)?)?;
+            match state.entries.get(&ancestor) {
+                None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
+                    Ok(())
+                }
+                Some(_) => Err(unaddressable(&ancestor)),
+            }
+        })
+}
+
+/// Replace a put's path with its bytes, modeling the directories it creates.
+fn put_entry(state: &mut MemoryRepositoryState, put: &PutFile) -> Result<(), RedoApplyError> {
+    InMemoryStorage::ensure_ancestor_dirs(state, &put.path);
+    state.entries.insert(
+        put.path.clone(),
+        RepositoryEntry::File {
+            content: CapturedBytes::new(memory_file_object(&put.path), put.bytes.clone())?,
+            mode: put.mode,
+        },
+    );
+    Ok(())
+}
+
+/// Write the appended bytes at their offset.
+///
+/// The log is truncated to the offset plus their length, so a log a previous
+/// application already extended converges rather than carrying its residue
+/// behind the appended bytes.
+fn append_events(
+    state: &mut MemoryRepositoryState,
+    append: &EventAppend,
+) -> Result<(), RedoApplyError> {
+    let path = VirtualPath::EVENTS;
+    let offset = usize::try_from(append.offset)
+        .map_err(|_| std::io::Error::other("event-log offset exceeds addressable memory"))?;
+    let (mut bytes, mode) = match state.entries.get(&path) {
+        Some(RepositoryEntry::File { content, mode }) => (content.bytes().to_vec(), *mode),
+        None | Some(RepositoryEntry::Absent) => (Vec::new(), FileMode::Regular),
+        Some(_) => return Err(unaddressable(&path)),
+    };
+    // One resize covers both directions: it drops a longer log's tail, and it
+    // fills the hole a positioned write past the end of a shorter one leaves.
+    bytes.resize(offset, 0);
+    bytes.extend_from_slice(&append.bytes);
+    let object = memory_file_object(&path);
+    state.entries.insert(
+        path,
+        RepositoryEntry::File {
+            content: CapturedBytes::new(object, bytes)?,
+            mode,
+        },
+    );
+    Ok(())
+}
+
+/// The capture identity of an in-memory file entry: a function of its path and
+/// its bytes alone, so two applications of one record leave the same entry.
+pub(crate) fn memory_file_object(path: &VirtualPath) -> String {
+    format!("memory-file:{path:?}")
+}
+
+fn unaddressable(path: &VirtualPath) -> RedoApplyError {
+    RedoApplyError::Unaddressable {
+        path: format!("{path:?}"),
     }
 }
 
@@ -1076,5 +1259,435 @@ mod tests {
             matches!(result, Err(PathReadError::InvalidPath(_))),
             "empty path must be rejected as InvalidPath"
         );
+    }
+}
+
+#[cfg(test)]
+mod record_tests {
+    use super::*;
+    use crate::storage::redo_apply::test_fixtures::{
+        arbitrary_record, path_vocabulary, InterruptAt, RecordedPoints, CAPTURED_LOG,
+    };
+    use crate::storage::NoRedoInterruptions;
+    use proptest::prelude::*;
+
+    /// A backend whose data root exists, holding every path in `occupied` as a
+    /// captured file and an event log the record's append offset refers to.
+    /// `residue` extends that log past the offset, standing for a log an
+    /// interrupted application already wrote into.
+    fn seeded(occupied: &[VirtualPath], residue: bool) -> InMemoryStorage {
+        let storage = InMemoryStorage::new();
+        let log = match residue {
+            true => [CAPTURED_LOG, b"{\"tag\":\"residue\"}\n"].concat(),
+            false => CAPTURED_LOG.to_vec(),
+        };
+        storage.add_data_file(
+            VirtualPath::EVENTS.relative().as_path(),
+            &String::from_utf8(log).unwrap(),
+        );
+        occupied.iter().for_each(|path| {
+            let relative = path.relative().as_path();
+            match path.root_class() {
+                RepositoryRootClass::Data => storage.add_data_file(relative, "captured"),
+                RepositoryRootClass::Worktree => storage.add_worktree_file(relative, "captured"),
+            }
+        });
+        storage
+    }
+
+    /// A backend seeded with `initial`, holding `record` as its committed
+    /// mutation.
+    fn committed(record: &RedoRecord, initial: &(Vec<VirtualPath>, bool)) -> InMemoryStorage {
+        let storage = seeded(&initial.0, initial.1);
+        storage.commit_record(record).unwrap();
+        storage
+    }
+
+    /// Pre-existing targets, and whether the log carries residue beyond the
+    /// offset the record captured.
+    fn arbitrary_initial_state() -> impl Strategy<Value = (Vec<VirtualPath>, bool)> {
+        (
+            prop::collection::vec(path_vocabulary(), 0..3),
+            any::<bool>(),
+        )
+    }
+
+    fn put(path: VirtualPath, bytes: &[u8]) -> PutFile {
+        PutFile {
+            path,
+            bytes: bytes.to_vec(),
+            mode: FileMode::Regular,
+        }
+    }
+
+    /// An applier whose held injector lets every point proceed.
+    fn uninterrupted() -> MemoryRedoApplier {
+        MemoryRedoApplier::new(Arc::new(NoRedoInterruptions))
+    }
+
+    /// An applier over a recorder the caller keeps, so the points its
+    /// applications checked stay readable.
+    fn recording_applier() -> (Arc<RecordedPoints>, MemoryRedoApplier) {
+        let recorded = Arc::new(RecordedPoints::default());
+        let injector: Arc<dyn RedoInterruptionInjector> = recorded.clone();
+        (recorded, MemoryRedoApplier::new(injector))
+    }
+
+    /// Everything that decides whether two applications of one record converged:
+    /// the entries, whether the data root exists, and the residue.
+    #[allow(clippy::type_complexity)]
+    fn semantic_state(
+        storage: &InMemoryStorage,
+    ) -> (
+        BTreeMap<VirtualPath, RepositoryEntry>,
+        bool,
+        Option<RedoRecord>,
+    ) {
+        let state = storage.repository_state();
+        (
+            state.entries.clone(),
+            state.data_root_exists,
+            state.record.clone(),
+        )
+    }
+
+    fn file_bytes(storage: &InMemoryStorage, path: &VirtualPath) -> Option<Vec<u8>> {
+        match storage.repository_state().entries.get(path) {
+            Some(RepositoryEntry::File { content, .. }) => Some(content.bytes().to_vec()),
+            _ => None,
+        }
+    }
+
+    fn data(relative: &str) -> VirtualPath {
+        VirtualPath::data(relative).unwrap()
+    }
+
+    fn worktree(relative: &str) -> VirtualPath {
+        VirtualPath::worktree(relative).unwrap()
+    }
+
+    #[test]
+    fn test_commit_record_installs_the_record_before_any_entry_changes() {
+        let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
+        let before = semantic_state(&storage).0;
+        let record = RedoRecord {
+            puts: vec![put(data("index.json"), b"published")],
+            deletes: vec![worktree("stale.md")],
+            event_append: Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
+            }),
+        };
+
+        storage.commit_record(&record).unwrap();
+
+        assert_eq!(
+            semantic_state(&storage).0,
+            before,
+            "committing the record moved a state entry the record has not been applied to"
+        );
+        assert_eq!(
+            semantic_state(&storage).2,
+            Some(record),
+            "the committed record is not the backend's residue"
+        );
+    }
+
+    #[test]
+    fn test_commit_record_refuses_a_record_a_previous_mutation_left_behind() {
+        let storage = seeded(&[], false);
+        let leftover = RedoRecord {
+            puts: vec![put(data("index.json"), b"leftover")],
+            ..RedoRecord::default()
+        };
+        storage.commit_record(&leftover).unwrap();
+
+        let outcome = storage.commit_record(&RedoRecord {
+            deletes: vec![data("index.json")],
+            ..RedoRecord::default()
+        });
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::OccupiedRecord)),
+            "a second commit replaced a record no application consumed"
+        );
+        assert_eq!(semantic_state(&storage).2, Some(leftover));
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_publishes_every_operation_the_record_names() {
+        let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
+        let appended = b"{\"tag\":\"issue_claimed\"}\n";
+        let record = RedoRecord {
+            puts: vec![put(data("index.json"), b"published")],
+            deletes: vec![worktree("stale.md")],
+            event_append: Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: appended.to_vec(),
+            }),
+        };
+
+        uninterrupted().apply(&storage, &record).unwrap();
+
+        assert_eq!(
+            file_bytes(&storage, &data("index.json")).as_deref(),
+            Some(b"published".as_slice())
+        );
+        assert!(
+            !storage
+                .repository_state()
+                .entries
+                .contains_key(&worktree("stale.md")),
+            "the deleted path survived the application"
+        );
+        assert_eq!(
+            file_bytes(&storage, &VirtualPath::EVENTS),
+            Some([CAPTURED_LOG, appended].concat())
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_removes_the_record_it_applied() {
+        let storage = seeded(&[], false);
+        let record = RedoRecord {
+            puts: vec![put(data("index.json"), b"published")],
+            ..RedoRecord::default()
+        };
+        storage.commit_record(&record).unwrap();
+
+        uninterrupted().apply(&storage, &record).unwrap();
+
+        assert_eq!(
+            semantic_state(&storage).2,
+            None,
+            "the applied record is still there for a later session to apply again"
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_creates_the_directories_a_put_needs() {
+        let storage = seeded(&[], false);
+        let nested = data("issues/2026/a.json");
+        let record = RedoRecord {
+            puts: vec![put(nested.clone(), b"published")],
+            ..RedoRecord::default()
+        };
+
+        uninterrupted().apply(&storage, &record).unwrap();
+
+        assert_eq!(
+            file_bytes(&storage, &nested).as_deref(),
+            Some(b"published".as_slice())
+        );
+        assert!(
+            matches!(
+                storage.repository_state().entries.get(&data("issues/2026")),
+                Some(RepositoryEntry::Directory { .. })
+            ),
+            "the put reached its path without the directories it needs"
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_gives_each_put_the_mode_it_carries() {
+        let storage = seeded(&[], false);
+        let path = worktree("scripts/publish.sh");
+        let record = RedoRecord {
+            puts: vec![PutFile {
+                path: path.clone(),
+                bytes: b"#!/bin/sh\n".to_vec(),
+                mode: FileMode::Executable,
+            }],
+            ..RedoRecord::default()
+        };
+
+        uninterrupted().apply(&storage, &record).unwrap();
+
+        assert!(
+            matches!(
+                storage.repository_state().entries.get(&path),
+                Some(RepositoryEntry::File {
+                    mode: FileMode::Executable,
+                    ..
+                })
+            ),
+            "the published entry does not carry the mode the record named"
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_writes_the_append_at_its_offset_over_a_longer_log() {
+        // A log an interrupted application already extended: a pass that never
+        // truncates would leave its residue behind the appended bytes.
+        let storage = seeded(&[], true);
+        let appended = b"{\"tag\":\"issue_claimed\"}\n";
+        let record = RedoRecord {
+            event_append: Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: appended.to_vec(),
+            }),
+            ..RedoRecord::default()
+        };
+
+        uninterrupted().apply(&storage, &record).unwrap();
+
+        assert_eq!(
+            file_bytes(&storage, &VirtualPath::EVENTS),
+            Some([CAPTURED_LOG, appended].concat())
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_checks_every_interruption_point_in_order() {
+        let storage = seeded(&[], false);
+        let record = RedoRecord {
+            puts: vec![
+                put(data("index.json"), b"published"),
+                put(worktree("notes.md"), b"published"),
+            ],
+            deletes: vec![worktree("stale.md")],
+            event_append: Some(EventAppend {
+                offset: CAPTURED_LOG.len() as u64,
+                bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
+            }),
+        };
+        let (recorded, applier) = recording_applier();
+
+        applier.apply(&storage, &record).unwrap();
+
+        assert_eq!(
+            recorded.points(),
+            vec![
+                RedoPoint::BeforeApply,
+                RedoPoint::BeforePut { index: 0 },
+                RedoPoint::BeforePut { index: 1 },
+                RedoPoint::BeforeDelete { index: 0 },
+                RedoPoint::BeforeEventAppend,
+                RedoPoint::BeforeRecordRemoval,
+                RedoPoint::AfterApply,
+            ]
+        );
+    }
+
+    /// The injector belongs to the applier rather than to a call, so a second
+    /// application reaches the same one without being handed it.
+    #[test]
+    fn test_memory_redo_applier_apply_checks_every_application_through_the_held_injector() {
+        let storage = seeded(&[], false);
+        let (recorded, applier) = recording_applier();
+        let published = RedoRecord {
+            puts: vec![put(data("index.json"), b"published")],
+            ..RedoRecord::default()
+        };
+        let removed = RedoRecord {
+            deletes: vec![data("index.json")],
+            ..RedoRecord::default()
+        };
+
+        applier.apply(&storage, &published).unwrap();
+        let after_first = recorded.points();
+        applier.apply(&storage, &removed).unwrap();
+
+        assert!(
+            !after_first.is_empty(),
+            "the first application never reached the held injector"
+        );
+        assert_eq!(
+            recorded.points()[..after_first.len()],
+            after_first,
+            "the second application did not extend the first one's checks"
+        );
+        assert!(
+            recorded.points().len() > after_first.len(),
+            "the second application ran without reaching the applier's held injector"
+        );
+    }
+
+    /// The counterpart of the file backend's absent data capability: a record
+    /// addressing the data root before it exists changes nothing at all.
+    #[test]
+    fn test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent() {
+        let storage = InMemoryStorage::new();
+        let record = RedoRecord {
+            puts: vec![
+                put(worktree("notes.md"), b"published"),
+                put(data("index.json"), b"published"),
+            ],
+            ..RedoRecord::default()
+        };
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::Unaddressable { .. })),
+            "the record reached a data root the backend does not hold"
+        );
+        assert!(
+            storage.repository_state().entries.is_empty(),
+            "a live write ran before the record was refused"
+        );
+    }
+
+    #[test]
+    fn test_memory_redo_applier_apply_refuses_a_put_under_a_non_directory_ancestor() {
+        let storage = seeded(&[], false);
+        storage.add_data_file("issues", "an ordinary file where a directory is needed");
+        let record = RedoRecord {
+            puts: vec![put(data("issues/a.json"), b"published")],
+            ..RedoRecord::default()
+        };
+
+        let outcome = uninterrupted().apply(&storage, &record);
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::Unaddressable { .. })),
+            "the put resolved through an ancestor that is not a directory"
+        );
+        assert!(
+            !storage
+                .repository_state()
+                .entries
+                .contains_key(&data("issues/a.json")),
+            "the refused put reached its path anyway"
+        );
+    }
+
+    proptest! {
+        // Each case applies the record once per prefix of its operation order,
+        // each application over its own backend, so the case count stays low.
+        #![proptest_config(ProptestConfig::with_cases(24))]
+
+        /// The record's own point sequence enumerates every prefix, so an
+        /// interruption at each one, resumed, is compared against a single clean
+        /// application of the same record over the same initial state.
+        #[test]
+        fn prop_memory_re_application_after_any_interrupted_prefix_converges(
+            record in arbitrary_record(),
+            initial in arbitrary_initial_state(),
+        ) {
+            let clean = committed(&record, &initial);
+            let (recorded, applier) = recording_applier();
+            applier.apply(&clean, &record).unwrap();
+            let converged = semantic_state(&clean);
+
+            for prefix in 0..recorded.points().len() {
+                let interrupted = committed(&record, &initial);
+                let outcome = MemoryRedoApplier::new(Arc::new(InterruptAt::check_number(prefix)))
+                    .apply(&interrupted, &record);
+                prop_assert!(
+                    matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
+                    "the pass ran past the interruption at check {prefix}"
+                );
+
+                uninterrupted().apply(&interrupted, &record).unwrap();
+
+                prop_assert_eq!(
+                    semantic_state(&interrupted),
+                    converged.clone(),
+                    "re-application after check {} left a different backend",
+                    prefix
+                );
+            }
+        }
     }
 }

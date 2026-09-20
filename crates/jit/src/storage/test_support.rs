@@ -156,6 +156,7 @@ impl InMemoryStorage {
             entries,
             data_root_exists,
             recovery: None,
+            record: None,
         };
         Ok(())
     }
