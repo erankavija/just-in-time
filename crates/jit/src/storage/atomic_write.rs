@@ -1,7 +1,11 @@
-//! The shared atomic file-write primitive (temp file + rename).
+//! The shared file-write primitives: atomic publication (temp file + rename)
+//! and durability ([`write_file_synced`], [`sync_directory`]).
 //!
 //! Storage writes go through the helpers in this module so a reader never
 //! observes a partially written file (the JIT "atomic file writes" invariant).
+//! Atomicity is reader visibility, not durability: a caller that must not
+//! proceed until its bytes survive a crash — a redo record, written before the
+//! first live write it describes — reaches the synced operations instead.
 //! It lives in the storage layer because persistence is storage's responsibility:
 //! command/validation/output callers produce content and hand it here rather
 //! than touching the filesystem themselves.
@@ -17,6 +21,7 @@ use anyhow::{Context, Result};
 use cap_std::fs::Dir;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -39,6 +44,32 @@ pub(in crate::storage) fn write_file_atomic(path: &Path, content: &str) -> Resul
 /// Write arbitrary bytes to `path` atomically (temp file + rename).
 pub(in crate::storage) fn write_file_atomic_bytes(path: &Path, content: &[u8]) -> Result<()> {
     write_file_atomic_bytes_with_permissions(path, content, None)
+}
+
+/// Write `content` to `path` and return once those bytes are on the device.
+///
+/// The file is created or truncated in place and synced before the handle
+/// closes, so a caller that must not proceed until its bytes survive a crash
+/// has them on return. Truncation is part of the contract: an interrupted write
+/// leaves a prefix of `content`, never a mix with what the path held. The
+/// entry naming the file is a separate durability concern — a caller that
+/// creates the file needs [`sync_directory`] on its parent as well.
+pub(in crate::storage) fn write_file_synced(path: &Path, content: &[u8]) -> Result<()> {
+    let mut file =
+        fs::File::create(path).with_context(|| format!("creating {}", path.display()))?;
+    file.write_all(content)
+        .with_context(|| format!("writing {}", path.display()))?;
+    file.sync_all()
+        .with_context(|| format!("syncing {}", path.display()))
+}
+
+/// Fsync the directory at `path`, so the entries created, renamed, or removed
+/// in it survive a crash. A file's own bytes need [`write_file_synced`]; this
+/// covers the name under which they are found.
+pub(in crate::storage) fn sync_directory(path: &Path) -> Result<()> {
+    fs::File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .with_context(|| format!("syncing directory {}", path.display()))
 }
 
 #[cfg(target_os = "linux")]
@@ -123,6 +154,59 @@ fn cleanup_temp(path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A character device the kernel refuses to fsync, so a call reporting that
+    /// refusal is a call that reached fsync rather than one that only opened the
+    /// path. Linux-only: the refusal is this kernel's contract.
+    #[cfg(target_os = "linux")]
+    const UNSYNCABLE: &str = "/dev/null";
+
+    #[test]
+    fn test_write_file_synced_writes_the_bytes_it_was_given() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        let content = [0, 159, 146, 150, 255];
+
+        write_file_synced(&path, &content).unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), content);
+    }
+
+    #[test]
+    fn test_write_file_synced_leaves_no_bytes_of_a_longer_predecessor() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("redo.record");
+        write_file_synced(&path, b"a considerably longer predecessor").unwrap();
+
+        write_file_synced(&path, b"short").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"short".to_vec());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_write_file_synced_reports_a_sync_the_kernel_refuses() {
+        assert!(
+            write_file_synced(Path::new(UNSYNCABLE), b"bytes").is_err(),
+            "the write returned before the bytes were synced"
+        );
+    }
+
+    #[test]
+    fn test_sync_directory_accepts_the_directory_it_is_given() {
+        let dir = tempfile::tempdir().unwrap();
+
+        sync_directory(dir.path()).unwrap();
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_sync_directory_reports_a_sync_the_kernel_refuses() {
+        assert!(
+            sync_directory(Path::new(UNSYNCABLE)).is_err(),
+            "the directory sync returned without reaching fsync"
+        );
+    }
 
     #[test]
     fn test_write_file_atomic_writes_full_content() {

@@ -3,13 +3,13 @@
 //! This module provides deterministic worktree ID generation and persistence
 //! to support parallel multi-agent work with git worktrees.
 
+use crate::storage::atomic_write::{sync_directory, write_file_synced};
 use crate::storage::StorageWarning;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Worktree identity persisted in `<worktree>/.jit/worktree.json`.
@@ -227,41 +227,25 @@ pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
 /// Write worktree identity atomically using temp file + rename pattern.
 ///
 /// This ensures the file is never in a partially written state, even if
-/// the process crashes mid-write.
+/// the process crashes mid-write. The identity outlives a crash: its bytes and
+/// the rename that publishes them go through the shared synced operations.
 fn write_identity_atomic(path: &Path, identity: &WorktreeIdentity) -> Result<()> {
-    use tempfile::NamedTempFile;
-
-    // Serialize to JSON
     let json =
         serde_json::to_string_pretty(identity).context("Failed to serialize worktree identity")?;
 
     // Create temp file in the same directory as target (required for atomic rename)
     let parent = path.parent().context("No parent directory")?;
-    let mut temp_file = NamedTempFile::new_in(parent).context("Failed to create temp file")?;
+    let temp_file =
+        tempfile::NamedTempFile::new_in(parent).context("Failed to create temp file")?;
 
-    // Write content
-    temp_file
-        .write_all(json.as_bytes())
-        .context("Failed to write to temp file")?;
-
-    // Fsync to ensure data is on disk
-    temp_file
-        .as_file()
-        .sync_all()
-        .context("Failed to fsync temp file")?;
+    write_file_synced(temp_file.path(), json.as_bytes())?;
 
     // Atomic rename (persist handles cross-filesystem moves if needed)
     temp_file
         .persist(path)
         .context("Failed to persist temp file")?;
 
-    // Fsync parent directory to ensure rename is durable
-    let parent_file = fs::File::open(parent).context("Failed to open parent directory")?;
-    parent_file
-        .sync_all()
-        .context("Failed to fsync parent directory")?;
-
-    Ok(())
+    sync_directory(parent)
 }
 
 /// Hex encoding helper (since we don't want to add hex crate dependency)
