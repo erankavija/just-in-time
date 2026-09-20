@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8ad8988a540c392418d4371cb587f5b972eac5fb33a25bbf0fe4f2b8ae8fbfb8 # shrinks to record = RedoRecord { puts: [], deletes: [VirtualPath { root: Worktree, relative: Descendant("notes.md") }], event_append: None }, initial = InitialState { occupied: [], residue: false }

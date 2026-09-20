@@ -285,21 +285,108 @@ fn unaddressable(path: &VirtualPath) -> RedoApplyError {
     }
 }
 
-/// The record vocabulary every backend's application is tested against.
+/// The record vocabulary every backend's application is tested against, and the
+/// filesystem backend's own repository fixtures.
 ///
-/// One home for it, so a backend's suite states what that backend adds rather
+/// One home for them, so a backend's suite states what that backend adds rather
 /// than restating the record shape and the interruption seam
 /// (`@/inv/shared-test-contracts`).
 #[cfg(test)]
 pub(crate) mod test_fixtures {
     use super::*;
+    use crate::storage::discover_repository_layout;
     use crate::storage::redo_record::PutFile;
     use proptest::prelude::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
     use std::sync::Mutex;
+    use tempfile::TempDir;
 
     /// The event-log bytes a mutation captured before appending to them.
     pub(crate) const CAPTURED_LOG: &[u8] = b"{\"tag\":\"issue_created\"}\n";
+
+    /// The data root's name below the worktree [`repository`] builds.
+    const DATA_ROOT_NAME: &str = ".jit";
+
+    /// A repository whose worktree holds its data root, with capability handles
+    /// for both.
+    pub(crate) fn repository() -> (TempDir, CapabilityRoots) {
+        let worktree = TempDir::new().unwrap();
+        std::fs::create_dir(worktree.path().join(DATA_ROOT_NAME)).unwrap();
+        let layout =
+            discover_repository_layout(worktree.path(), worktree.path().join(DATA_ROOT_NAME))
+                .unwrap();
+        let roots = CapabilityRoots::open(&layout).unwrap().0;
+        (worktree, roots)
+    }
+
+    pub(crate) fn data_root(worktree: &TempDir) -> PathBuf {
+        worktree.path().join(DATA_ROOT_NAME)
+    }
+
+    /// The committed record's path below the worktree, so a reading of what a
+    /// record published can leave the record itself out.
+    pub(crate) fn record_relative_path() -> PathBuf {
+        Path::new(DATA_ROOT_NAME)
+            .join(RECORD_SCRATCH_DIR)
+            .join(RECORD_FILE_NAME)
+    }
+
+    /// Hold every path in `occupied` as a captured file and an event log the
+    /// record's append offset refers to. `residue` extends that log past the
+    /// offset, standing for a log an interrupted application already wrote into.
+    pub(crate) fn seed_repository(worktree: &TempDir, occupied: &[VirtualPath], residue: bool) {
+        let log = match residue {
+            true => [CAPTURED_LOG, b"{\"tag\":\"residue\"}\n"].concat(),
+            false => CAPTURED_LOG.to_vec(),
+        };
+        std::fs::write(data_root(worktree).join("events.jsonl"), log).unwrap();
+        occupied.iter().for_each(|path| {
+            let target = match path.root_class() {
+                RepositoryRootClass::Data => data_root(worktree),
+                RepositoryRootClass::Worktree => worktree.path().to_path_buf(),
+            }
+            .join(path.relative().as_path());
+            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+            std::fs::write(target, b"captured").unwrap();
+        });
+    }
+
+    /// Every file under `root`, keyed by its root-relative path, with the bytes
+    /// and the executable bit that decide whether two repositories converged.
+    pub(crate) fn snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, bool)> {
+        std::fs::read_dir(root)
+            .unwrap()
+            .flat_map(|entry| {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                match entry.file_type().unwrap().is_dir() {
+                    true => snapshot(&path)
+                        .into_iter()
+                        .map(|(nested, content)| {
+                            (PathBuf::from(entry.file_name()).join(nested), content)
+                        })
+                        .collect::<BTreeMap<_, _>>(),
+                    false => BTreeMap::from([(
+                        PathBuf::from(entry.file_name()),
+                        (std::fs::read(&path).unwrap(), is_executable(&path)),
+                    )]),
+                }
+            })
+            .collect()
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn is_executable(path: &Path) -> bool {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o111 != 0
+    }
+
+    #[cfg(not(unix))]
+    pub(crate) fn is_executable(_path: &Path) -> bool {
+        false
+    }
 
     /// Records every point the pass checks, in order.
     #[derive(Default)]
@@ -318,25 +405,23 @@ pub(crate) mod test_fixtures {
         }
     }
 
-    /// Interrupts the pass at its `at`-th check, so exactly the steps before it
+    /// Interrupts the pass at one named point, so exactly the steps before it
     /// ran.
-    pub(crate) struct InterruptAt {
-        at: usize,
-        seen: AtomicUsize,
-    }
+    ///
+    /// Keyed on the point rather than on a check count, and therefore stateless:
+    /// one injector interrupts every backend it is handed to at the same step of
+    /// the record's application.
+    pub(crate) struct InterruptAt(RedoPoint);
 
     impl InterruptAt {
-        pub(crate) fn check_number(at: usize) -> Self {
-            Self {
-                at,
-                seen: AtomicUsize::new(0),
-            }
+        pub(crate) fn point(point: RedoPoint) -> Self {
+            Self(point)
         }
     }
 
     impl RedoInterruptionInjector for InterruptAt {
         fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
-            match self.seen.fetch_add(1, Ordering::Relaxed) == self.at {
+            match *point == self.0 {
                 true => Err(std::io::Error::other(format!("interrupted at {point:?}"))),
                 false => Ok(()),
             }
@@ -426,29 +511,11 @@ pub(crate) mod test_fixtures {
 mod tests {
     use super::test_fixtures::*;
     use super::*;
-    use crate::repository_state::{FileMode, RepositoryRootClass};
-    use crate::storage::discover_repository_layout;
+    use crate::repository_state::FileMode;
     use crate::storage::temp_cleanup::cleanup_orphaned_temp_files;
-    use proptest::prelude::*;
-    use std::collections::{BTreeMap, HashSet};
-    use std::path::PathBuf;
+    use std::collections::HashSet;
     use std::sync::Arc;
     use tempfile::TempDir;
-
-    /// A repository whose worktree holds its data root, with capability handles
-    /// for both.
-    fn repository() -> (TempDir, CapabilityRoots) {
-        let worktree = TempDir::new().unwrap();
-        std::fs::create_dir(worktree.path().join(".jit")).unwrap();
-        let layout =
-            discover_repository_layout(worktree.path(), worktree.path().join(".jit")).unwrap();
-        let roots = CapabilityRoots::open(&layout).unwrap().0;
-        (worktree, roots)
-    }
-
-    fn data_root(worktree: &TempDir) -> PathBuf {
-        worktree.path().join(".jit")
-    }
 
     fn put(path: VirtualPath, bytes: &[u8]) -> PutFile {
         PutFile {
@@ -469,42 +536,6 @@ mod tests {
         let recorded = Arc::new(RecordedPoints::default());
         let injector: Arc<dyn RedoInterruptionInjector> = recorded.clone();
         (recorded, RedoApplier::new(injector))
-    }
-
-    /// Every file under `root`, keyed by its root-relative path, with the bytes
-    /// and the executable bit that decide whether two repositories converged.
-    fn snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, bool)> {
-        std::fs::read_dir(root)
-            .unwrap()
-            .flat_map(|entry| {
-                let entry = entry.unwrap();
-                let path = entry.path();
-                match entry.file_type().unwrap().is_dir() {
-                    true => snapshot(&path)
-                        .into_iter()
-                        .map(|(nested, content)| {
-                            (PathBuf::from(entry.file_name()).join(nested), content)
-                        })
-                        .collect::<BTreeMap<_, _>>(),
-                    false => BTreeMap::from([(
-                        PathBuf::from(entry.file_name()),
-                        (std::fs::read(&path).unwrap(), is_executable(&path)),
-                    )]),
-                }
-            })
-            .collect()
-    }
-
-    #[cfg(unix)]
-    fn is_executable(path: &Path) -> bool {
-        use std::os::unix::fs::PermissionsExt;
-
-        std::fs::metadata(path).unwrap().permissions().mode() & 0o111 != 0
-    }
-
-    #[cfg(not(unix))]
-    fn is_executable(_path: &Path) -> bool {
-        false
     }
 
     #[test]
@@ -589,11 +620,10 @@ mod tests {
         let record = RedoRecord::new(vec![put(nested, b"published")], Vec::new(), None).unwrap();
         let committed = record.commit(&data_root(&worktree)).unwrap();
         let published = data_root(&worktree).join("issues/2026/09/a.json");
-        // BeforeApply, BeforePut { index: 0 }, then the removal this stops at.
-        let before_removal = 2;
 
-        let outcome = RedoApplier::new(Arc::new(InterruptAt::check_number(before_removal)))
-            .apply(&roots, &record);
+        let outcome =
+            RedoApplier::new(Arc::new(InterruptAt::point(RedoPoint::BeforeRecordRemoval)))
+                .apply(&roots, &record);
 
         assert!(
             matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
@@ -850,82 +880,5 @@ mod tests {
             !outside.path().join("captured.json").exists(),
             "the application wrote outside the selected roots"
         );
-    }
-
-    /// Pre-existing targets, and whether the log carries residue beyond the
-    /// offset the record captured.
-    fn arbitrary_initial_state() -> impl Strategy<Value = (Vec<VirtualPath>, bool)> {
-        (
-            prop::collection::vec(path_vocabulary(), 0..3),
-            any::<bool>(),
-        )
-    }
-
-    fn seed(worktree: &TempDir, (occupied, residue): &(Vec<VirtualPath>, bool)) {
-        let log = match residue {
-            true => [CAPTURED_LOG, b"{\"tag\":\"residue\"}\n"].concat(),
-            false => CAPTURED_LOG.to_vec(),
-        };
-        std::fs::write(data_root(worktree).join("events.jsonl"), log).unwrap();
-        occupied.iter().for_each(|path| {
-            let target = match path.root_class() {
-                RepositoryRootClass::Data => data_root(worktree),
-                RepositoryRootClass::Worktree => worktree.path().to_path_buf(),
-            }
-            .join(path.relative().as_path());
-            std::fs::create_dir_all(target.parent().unwrap()).unwrap();
-            std::fs::write(target, b"captured").unwrap();
-        });
-    }
-
-    /// A repository seeded with `initial`, holding `record` as its committed
-    /// mutation.
-    fn committed(
-        record: &RedoRecord,
-        initial: &(Vec<VirtualPath>, bool),
-    ) -> (TempDir, CapabilityRoots) {
-        let (worktree, roots) = repository();
-        seed(&worktree, initial);
-        record.commit(&data_root(&worktree)).unwrap();
-        (worktree, roots)
-    }
-
-    proptest! {
-        // Each case applies the record once per prefix of its operation order,
-        // each application over its own repository, so the case count stays low.
-        #![proptest_config(ProptestConfig::with_cases(24))]
-
-        /// The record's own point sequence enumerates every prefix, so an
-        /// interruption at each one, resumed, is compared against a single clean
-        /// application of the same record over the same initial state.
-        #[test]
-        fn prop_re_application_after_any_interrupted_prefix_converges(
-            record in arbitrary_record(),
-            initial in arbitrary_initial_state(),
-        ) {
-            let (clean, clean_roots) = committed(&record, &initial);
-            let (recorded, applier) = recording_applier();
-            applier.apply(&clean_roots, &record).unwrap();
-            let converged = snapshot(clean.path());
-
-            for prefix in 0..recorded.points().len() {
-                let (interrupted, interrupted_roots) = committed(&record, &initial);
-                let outcome = RedoApplier::new(Arc::new(InterruptAt::check_number(prefix)))
-                    .apply(&interrupted_roots, &record);
-                prop_assert!(
-                    matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
-                    "the pass ran past the interruption at check {prefix}"
-                );
-
-                uninterrupted().apply(&interrupted_roots, &record).unwrap();
-
-                prop_assert_eq!(
-                    snapshot(interrupted.path()),
-                    converged.clone(),
-                    "re-application after check {} left a different repository",
-                    prefix
-                );
-            }
-        }
     }
 }
