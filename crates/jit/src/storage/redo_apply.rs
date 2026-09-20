@@ -18,6 +18,7 @@ use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, File, OpenOptions};
 use std::io::{ErrorKind, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 /// One step of a record's application, named so an interruption matrix can stop
 /// the pass at it.
@@ -73,52 +74,69 @@ pub enum RedoApplyError {
     Io(#[from] std::io::Error),
 }
 
-/// Apply `record` to `roots` and remove it, checking every [`RedoPoint`].
+/// The filesystem backend's record application, holding the injector every
+/// application it runs checks its points through.
 ///
-/// Every path is resolved before the first live write, so a record naming a
-/// target outside the selected roots changes nothing.
-///
-/// # Errors
-///
-/// Returns [`RedoApplyError`] when a path is unaddressable, an injected point
-/// interrupts the pass, or the filesystem refuses an operation.
-pub fn apply_record(
-    roots: &CapabilityRoots,
-    record: &RedoRecord,
-    injector: &dyn RedoInterruptionInjector,
-) -> Result<(), RedoApplyError> {
-    let event_log = VirtualPath::EVENTS;
-    record
-        .puts
-        .iter()
-        .map(|put| &put.path)
-        .chain(record.deletes.iter())
-        .chain(record.event_append.iter().map(|_| &event_log))
-        .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
-    check(injector, RedoPoint::BeforeApply)?;
-    record
-        .puts
-        .iter()
-        .enumerate()
-        .try_for_each(|(index, put)| {
-            check(injector, RedoPoint::BeforePut { index })?;
-            put_file(roots, put)
-        })?;
-    record
-        .deletes
-        .iter()
-        .enumerate()
-        .try_for_each(|(index, path)| {
-            check(injector, RedoPoint::BeforeDelete { index })?;
-            delete_file(roots, path)
-        })?;
-    if let Some(append) = &record.event_append {
-        check(injector, RedoPoint::BeforeEventAppend)?;
-        append_events(roots, append)?;
+/// The injector is the boundary's rather than a call's, so no caller can vary
+/// interruption between two applications of the same applier.
+pub struct RedoApplier {
+    injector: Arc<dyn RedoInterruptionInjector>,
+}
+
+impl RedoApplier {
+    /// Hold `injector` for every application this applier runs.
+    pub fn new(injector: Arc<dyn RedoInterruptionInjector>) -> Self {
+        Self { injector }
     }
-    check(injector, RedoPoint::BeforeRecordRemoval)?;
-    remove_record(roots)?;
-    check(injector, RedoPoint::AfterApply)
+
+    /// Apply `record` to `roots` and remove it, checking every [`RedoPoint`].
+    ///
+    /// Every path is resolved before the first live write, so a record naming a
+    /// target outside the selected roots changes nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RedoApplyError`] when a path is unaddressable, an injected
+    /// point interrupts the pass, or the filesystem refuses an operation.
+    pub fn apply(
+        &self,
+        roots: &CapabilityRoots,
+        record: &RedoRecord,
+    ) -> Result<(), RedoApplyError> {
+        let injector = &*self.injector;
+        let event_log = VirtualPath::EVENTS;
+        record
+            .puts
+            .iter()
+            .map(|put| &put.path)
+            .chain(record.deletes.iter())
+            .chain(record.event_append.iter().map(|_| &event_log))
+            .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
+        check(injector, RedoPoint::BeforeApply)?;
+        record
+            .puts
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, put)| {
+                check(injector, RedoPoint::BeforePut { index })?;
+                put_file(roots, put)
+            })?;
+        record
+            .deletes
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, path)| {
+                check(injector, RedoPoint::BeforeDelete { index })?;
+                delete_file(roots, path)
+            })?;
+        if let Some(append) = &record.event_append {
+            check(injector, RedoPoint::BeforeEventAppend)?;
+            append_events(roots, append)?;
+        }
+        check(injector, RedoPoint::BeforeRecordRemoval)?;
+        remove_record(roots)?;
+        check(injector, RedoPoint::AfterApply)
+    }
 }
 
 fn check(injector: &dyn RedoInterruptionInjector, point: RedoPoint) -> Result<(), RedoApplyError> {
@@ -294,6 +312,19 @@ mod tests {
         }
     }
 
+    /// An applier whose held injector lets every point proceed.
+    fn uninterrupted() -> RedoApplier {
+        RedoApplier::new(Arc::new(NoRedoInterruptions))
+    }
+
+    /// An applier over a recorder the caller keeps, so the points its
+    /// applications checked stay readable.
+    fn recording_applier() -> (Arc<RecordedPoints>, RedoApplier) {
+        let recorded = Arc::new(RecordedPoints::default());
+        let injector: Arc<dyn RedoInterruptionInjector> = recorded.clone();
+        (recorded, RedoApplier::new(injector))
+    }
+
     /// Records every point the pass checks, in order.
     #[derive(Default)]
     struct RecordedPoints(Mutex<Vec<RedoPoint>>);
@@ -373,7 +404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_publishes_every_operation_the_record_names() {
+    fn test_redo_applier_apply_publishes_every_operation_the_record_names() {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("index.json"), b"captured").unwrap();
         std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
@@ -387,7 +418,7 @@ mod tests {
             }),
         };
 
-        apply_record(&roots, &record, &NoRedoInterruptions).unwrap();
+        uninterrupted().apply(&roots, &record).unwrap();
 
         assert_eq!(
             std::fs::read(data_root(&worktree).join("index.json")).unwrap(),
@@ -404,7 +435,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_removes_the_record_it_applied() {
+    fn test_redo_applier_apply_removes_the_record_it_applied() {
         let (worktree, roots) = repository();
         let record = RedoRecord {
             puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
@@ -412,7 +443,7 @@ mod tests {
         };
         let committed = record.commit(&data_root(&worktree)).unwrap();
 
-        apply_record(&roots, &record, &NoRedoInterruptions).unwrap();
+        uninterrupted().apply(&roots, &record).unwrap();
 
         assert!(
             !committed.exists(),
@@ -421,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_creates_the_directories_a_put_needs() {
+    fn test_redo_applier_apply_creates_the_directories_a_put_needs() {
         let (worktree, roots) = repository();
         let record = RedoRecord {
             puts: vec![put(
@@ -431,7 +462,7 @@ mod tests {
             ..RedoRecord::default()
         };
 
-        apply_record(&roots, &record, &NoRedoInterruptions).unwrap();
+        uninterrupted().apply(&roots, &record).unwrap();
 
         assert_eq!(
             std::fs::read(data_root(&worktree).join("issues/2026/a.json")).unwrap(),
@@ -440,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_gives_each_put_the_mode_it_carries() {
+    fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
         let record = RedoRecord {
             puts: vec![PutFile {
@@ -451,7 +482,7 @@ mod tests {
             ..RedoRecord::default()
         };
 
-        apply_record(&roots, &record, &NoRedoInterruptions).unwrap();
+        uninterrupted().apply(&roots, &record).unwrap();
 
         assert!(
             is_executable(&worktree.path().join("scripts/publish.sh")),
@@ -540,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_writes_the_append_at_its_offset_over_a_longer_log() {
+    fn test_redo_applier_apply_writes_the_append_at_its_offset_over_a_longer_log() {
         let (worktree, roots) = repository();
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
         // A log an interrupted application already extended, by more than the
@@ -559,7 +590,7 @@ mod tests {
             ..RedoRecord::default()
         };
 
-        apply_record(&roots, &record, &NoRedoInterruptions).unwrap();
+        uninterrupted().apply(&roots, &record).unwrap();
 
         assert_eq!(
             std::fs::read(data_root(&worktree).join("events.jsonl")).unwrap(),
@@ -572,8 +603,7 @@ mod tests {
     #[test]
     fn test_redo_applier_apply_checks_every_application_through_the_held_injector() {
         let (_worktree, roots) = repository();
-        let recorded = Arc::new(RecordedPoints::default());
-        let applier = RedoApplier::new(Arc::clone(&recorded) as Arc<dyn RedoInterruptionInjector>);
+        let (recorded, applier) = recording_applier();
         let published = RedoRecord {
             puts: vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             ..RedoRecord::default()
@@ -603,7 +633,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_record_checks_every_interruption_point_in_order() {
+    fn test_redo_applier_apply_checks_every_interruption_point_in_order() {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
         let record = RedoRecord {
@@ -617,9 +647,9 @@ mod tests {
                 bytes: b"{\"tag\":\"issue_claimed\"}\n".to_vec(),
             }),
         };
-        let recorded = RecordedPoints::default();
+        let (recorded, applier) = recording_applier();
 
-        apply_record(&roots, &record, &recorded).unwrap();
+        applier.apply(&roots, &record).unwrap();
 
         assert_eq!(
             recorded.points(),
@@ -637,7 +667,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_apply_record_refuses_a_path_outside_the_roots_before_any_live_write() {
+    fn test_redo_applier_apply_refuses_a_path_outside_the_roots_before_any_live_write() {
         let (worktree, roots) = repository();
         let outside = TempDir::new().unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("escape")).unwrap();
@@ -652,7 +682,7 @@ mod tests {
             ..RedoRecord::default()
         };
 
-        assert!(apply_record(&roots, &record, &NoRedoInterruptions).is_err());
+        assert!(uninterrupted().apply(&roots, &record).is_err());
 
         assert!(
             !data_root(&worktree).join("inside.json").exists(),
@@ -753,23 +783,20 @@ mod tests {
             initial in arbitrary_initial_state(),
         ) {
             let (clean, clean_roots) = committed(&record, &initial);
-            let recorded = RecordedPoints::default();
-            apply_record(&clean_roots, &record, &recorded).unwrap();
+            let (recorded, applier) = recording_applier();
+            applier.apply(&clean_roots, &record).unwrap();
             let converged = snapshot(clean.path());
 
             for prefix in 0..recorded.points().len() {
                 let (interrupted, interrupted_roots) = committed(&record, &initial);
-                let outcome = apply_record(
-                    &interrupted_roots,
-                    &record,
-                    &InterruptAt::check_number(prefix),
-                );
+                let outcome = RedoApplier::new(Arc::new(InterruptAt::check_number(prefix)))
+                    .apply(&interrupted_roots, &record);
                 prop_assert!(
                     matches!(outcome, Err(RedoApplyError::Interrupted { .. })),
                     "the pass ran past the interruption at check {prefix}"
                 );
 
-                apply_record(&interrupted_roots, &record, &NoRedoInterruptions).unwrap();
+                uninterrupted().apply(&interrupted_roots, &record).unwrap();
 
                 prop_assert_eq!(
                     snapshot(interrupted.path()),
