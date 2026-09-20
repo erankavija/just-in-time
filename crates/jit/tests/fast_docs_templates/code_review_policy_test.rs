@@ -67,8 +67,7 @@ fn test_code_review_prompt_rejects_blanket_public_api_examples() {
     }
 
     for required in [
-        "Do not require an example for every public API",
-        "tautological examples",
+        "Add an example only when it clarifies non-obvious behavior",
         "one type- or module-level walkthrough",
     ] {
         assert!(

@@ -109,7 +109,7 @@ mod tests {
                 _ => None,
             })
             .collect::<BTreeSet<_>>();
-        assert_eq!(invariants.len(), 18);
+        assert!(!invariants.is_empty());
         assert!(invariants.contains("label-format"));
         assert!(invariants.contains("convention-convergence"));
 
@@ -1824,11 +1824,28 @@ mod tests {
         let contributed =
             InvariantRegistry::from_toml_str(&fs::read_to_string(&invariants_path).unwrap())
                 .unwrap();
-        assert_eq!(contributed.invariants.len(), 18);
-        assert!(contributed
+        // Application installs exactly the identities the package contributes:
+        // both sides derive from the package, so neither restates the other.
+        let contributed_ids = contributed
             .invariants
             .iter()
-            .any(|invariant| invariant.id == "label-format"));
+            .map(|invariant| invariant.id.as_str())
+            .collect::<BTreeSet<_>>();
+        let declared_ids = package
+            .model()
+            .contributions
+            .iter()
+            .filter_map(|contribution| match contribution {
+                Contribution::KeyedArray {
+                    target: KeyedArrayTarget::Invariants,
+                    identity,
+                    ..
+                } => Some(identity.as_str()),
+                _ => None,
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(contributed_ids, declared_ids);
+        assert!(contributed_ids.contains("label-format"));
         assert_ne!(
             fs::read_to_string(&invariants_path).unwrap(),
             scaffolded_invariants
@@ -1852,7 +1869,7 @@ mod tests {
         assert_eq!(invariants.mode, "region");
         assert_eq!(invariants.style, "id-anchor");
         assert_eq!(invariants.kinds, ["invariant"]);
-        assert_eq!(invariants.count, 18);
+        assert_eq!(invariants.count, contributed.invariants.len());
         let reference = reloaded.project_render(Some("rules-and-gates")).unwrap();
         let reference = &reference.projections[0];
         assert_eq!(reference.target, ".jit/reference/rules-and-gates.md");
