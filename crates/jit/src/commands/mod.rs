@@ -138,6 +138,30 @@ pub fn production_mutation_context() -> crate::repository_state::MutationContext
     PRODUCTION_MUTATION_CONTEXT_FACTORY.with(|factory| factory.borrow().create())
 }
 
+/// Bounds for the captures that mutate one named issue: a claim and a captured
+/// issue mutation.
+///
+/// Both declare every path they read — one issue record, the event log, and for
+/// a gate transition the gate registry — and request no listing, so no path can
+/// enter the capture that the caller did not name. Shape is what bounds it, and
+/// the depth is the deepest of those constructions: an issue record one name
+/// below the `issues` directory.
+///
+/// `max_bytes` is unbounded because nothing here can bound it. The payload that
+/// grows is the event log, whose size is the project's own accumulated history
+/// (`@/charter/D-17`); a number stated here would decide how much history a
+/// repository may accumulate before an issue can no longer be claimed at all,
+/// which is what a 16 MiB ceiling on this capture did (jit:19e7298a).
+fn issue_mutation_capture_budget() -> crate::repository_state::CaptureBudget {
+    use crate::repository_state::{CaptureBudget, VirtualPath};
+
+    CaptureBudget {
+        max_listings: 0,
+        max_bytes: u64::MAX,
+        max_depth: VirtualPath::ISSUES.relative().depth().saturating_add(1),
+    }
+}
+
 /// An annotation installed for as long as this guard lives.
 ///
 /// This is the mechanism behind the dispatch-scoped annotation: dropping the guard
@@ -2163,9 +2187,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{
-            finalize, CaptureBudget, CaptureSpec, RepositoryEntry, VirtualPath,
-        };
+        use crate::repository_state::{finalize, CaptureSpec, RepositoryEntry, VirtualPath};
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
@@ -2182,14 +2204,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if request.captures_gate_registry() {
                     paths.insert(VirtualPath::GATES);
                 }
-                let spec = CaptureSpec::phase_one(
-                    paths,
-                    CaptureBudget {
-                        max_listings: 0,
-                        max_bytes: 64 * 1024 * 1024,
-                        max_depth: 4,
-                    },
-                )?;
+                let spec = CaptureSpec::phase_one(paths, issue_mutation_capture_budget())?;
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
