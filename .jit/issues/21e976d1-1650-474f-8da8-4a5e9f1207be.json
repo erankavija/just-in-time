@@ -66,6 +66,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/footprint.py"
     }
   ],
+  "done_at": "2026-09-20T20:40:57.965113919Z",
   "first_ready_at": "2026-09-20T19:15:47.229714890Z",
   "gates_required": [
     "cargo-ci",
@@ -80,12 +81,12 @@
     },
     "doc-review": {
       "status": "passed",
-      "updated_at": "2026-09-20T20:28:26.662807908Z",
+      "updated_at": "2026-09-20T20:40:32.049254637Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "status": "failed",
-      "updated_at": "2026-09-20T20:32:33.694556715Z",
+      "status": "passed",
+      "updated_at": "2026-09-20T20:37:42.502235223Z",
       "updated_by": "auto:executor"
     }
   },
@@ -100,7 +101,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Redo record foundation",
-  "updated_at": "2026-09-20T20:33:43.455312515Z"
+  "updated_at": "2026-09-20T20:40:57.965113919Z"
 }

@@ -7,6 +7,7 @@
   ],
   "description": "Each publication consumer keeps one test that it goes through the shared publication mechanism, in place of a copy of the mechanism's crash matrix.\n\n## Background\n\nThe project requires a mechanism's behaviour matrix to be proven once against the mechanism, with each consumer proving only that it reaches it. Publication violates that in four places. A profile-lifecycle suite drives the whole failure-point set through `profile apply` and classifies it with a compile-enforced thirty-six-arm match. A gate-durability test, two linked-checkout write-policy tests, and two recover-command tests each re-inject a commit-decision or prepared-state failure to restate the same convergence property.\n\nThe record's own conformance suite already owns the matrix and restores compile-enforced coverage of the point set, so the consumer copies have an owner to defer to. This is also the largest single-file reduction available outside the kernel.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile-lifecycle interruption suite no longer enumerates a publication failure-point set, and `profile apply` retains one test asserting that it publishes through the shared session.\n- [hard] REQ-02: Gate evaluation retains one test asserting that a gate run's durable evidence is coupled to the issue change.\n- [hard] REQ-03: The linked-checkout write-policy suite retains its policy coverage, with publication convergence left to the mechanism's suite.\n- [hard] REQ-04: The recover command's suite retains its command-contract tests, with journal-shaped prepared state left out.\n- [hard] REQ-05: No exhaustive classification of a publication failure-point set survives outside the mechanism's own suite.\n- [hard] REQ-06: The change removes more test lines than it adds.\n\n## Notes\n\nStale-capture rejection under concurrent profile application is a separate property with its own suite and survives untouched here.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T20:40:58.647912404Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Consumer-side publication matrix retirement",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T20:40:58.647912404Z"
 }

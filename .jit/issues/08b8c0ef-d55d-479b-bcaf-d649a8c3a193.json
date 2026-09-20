@@ -7,6 +7,7 @@
   ],
   "description": "The data root's ignore file naming the scratch directory is composed from the repository's own declarations, so initialization and derived-state repair both produce it.\n\n## Background\n\nThe commit point lives in a scratch directory under the data root. Keeping that directory out of version control is a correctness property: a committed record would be applied on a checkout that never performed the mutation, and a merge would collide over it.\n\nNo shipped code writes an ignore entry. This repository ignores the directory through a hand-maintained entry in its root ignore file, which an adopter running initialization does not get, and which an existing repository would need a migration to gain.\n\nA derived materialization answers both. The default ruleset and the default schemas are composed from what the repository declares and emitted by one producer that initialization and derived-state repair both reach, so an existing repository converges on the correct content at its next repair rather than through a migration path. The data root's ignore file joins that family. The worktree attributes file is the precedent for the engine owning a version-control control file: a declared well-known path with an ownership identity and a typed claim outcome.\n\nThe composer is independent of how a mutation commits: the ignore file is one more data-root action in the plan initialization already publishes. It lands before the first record is written under the scratch directory, so no repository holds a commit point the engine has not asked version control to ignore.\n\n## Success Criteria\n\n- [hard] REQ-01: One composer emits the data root's ignore file from the repository's declarations, naming the scratch directory, and both initialization and derived-state repair reach it.\n- [hard] REQ-02: Running derived-state repair on a repository whose data root lacks the file produces it, and running it again produces no action.\n- [hard] REQ-03: An ignore file carrying authored lines beside the engine's keeps those lines, with the engine's ownership boundary proven before any write.\n- [hard] REQ-04: The adopter's root ignore file is left unread and unwritten.\n- [hard] REQ-05: This repository's data root carries the composed ignore file, and the hand-maintained scratch-directory entry in its root ignore file is gone.\n- [hard] REQ-06: A repository initialized fresh reports no untracked scratch content in its version-control status after a mutation.\n- [hard] REQ-07: The file is composed through the publication in use when this lands, with no dependency on how a mutation commits.\n\n## Notes\n\nExpected additive footprint is under 120 production lines. The composer emits nothing when the target sits outside the captured closure, which is how the neighbouring default-ruleset producer stays ownership-safe.\n",
   "documents": [],
+  "first_ready_at": "2026-09-20T20:40:58.323019953Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -26,7 +27,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Data-root ignore file as a derived materialization",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-20T20:40:58.323019953Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 6,
+  "current_wave": 7,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -136,7 +136,7 @@
             "doc-review",
             "holistic-review"
           ],
-          "status": "ready; reconciliation done, REQ-06 amended per ESC-08"
+          "status": "done - cargo-ci, doc-review, holistic-review all passed"
         }
       ]
     },
@@ -739,7 +739,8 @@
     "35544121": 1,
     "4e818d10": 1,
     "8559f529": 2,
-    "d591a1c8": 1
+    "d591a1c8": 1,
+    "21e976d1": 1
   },
   "surfaced_pitfalls": [
     {
@@ -872,6 +873,12 @@
       "finding": "A naive production-line count is wrong in two directions at once. Cutting each file at its first #[cfg(test)] counted redo_conformance.rs's 447 test lines as production (the file is gated by #[cfg(test)] mod on its DECLARATION in mod.rs, not inside the file) and truncated memory.rs at line 146, where two #[cfg(test)] function attributes sit above 200-odd production lines. It reported 1428 where the correct figure is 1137. Cumulative additions across a task's commits measure churn, not footprint: 35544121 added 413 and removed 93 of its own across three rounds, delivering 320.",
       "lead_action": "Measure by brace-matching each #[cfg(test)] item's extent, excluding cfg(test)-declared modules whole, and report net per task attributed by the jit: commit tag. Method written into footprint.md so 722878d4 (wave 21, ER-01) reuses it rather than re-deriving it.",
       "status": "adopted by the lead"
+    },
+    {
+      "id": "PF-10",
+      "finding": "Evidence offered for a criterion must be reproducible, not asserted. The lead wrote a measurement method into prose and quoted figures from an ad-hoc script it never committed. holistic-review rejected the figures as self-attested.",
+      "lead_action": "Commit the generator alongside any measurement an issue's criteria rest on, quote its verbatim output, and make it parameterised for the later consumer. Applies directly to ER-01 at wave 21 and to epic REQ-01/REQ-02's benchmark evidence, where bench.sh already sets the right precedent.",
+      "status": "adopted by the lead"
     }
   ],
   "evidence_requirements": [
@@ -979,6 +986,15 @@
       "lead_evidence": "Verified before relaying. nothing_published does assert commit publishes nothing (:251-255), and that plus 'the first live write follows BeforeApply' IMPLIES the property — but an implication drawn from two other assertions is not the owning test the criterion asks for. The structural cause: RedoInterruptionInjector is consulted only inside apply, while durability happens in RedoRecord::commit / commit_record, which has no seam. No RedoPoint value lies in the pre-durability window, so reclassifying points cannot reach it.",
       "lead_note": "Told the worker NOT to widen RedoPoint: it is 35544121's closed enum over the apply pass, and 4e818d10 REQ-04 requires both backends to step the same values while their commits differ. If the worker concludes REQ-02 is unreachable without widening it, that returns to the lead as an escalation. Likely honest shape: a torn or absent record leaves the complete old state, observable without touching any enum. Session-open replay stays with 0938d99e (wave 9) per this issue's own Notes.",
       "verdict": "RESOLVED. prop_an_interruption_during_the_records_commit_leaves_the_complete_old_state runs the real commit, cuts its output back to every proper prefix of the bytes written, and asserts the repository reads complete-old at each. RedoPoint untouched: the worker confirmed widening it could not have helped, since no injector call exists in the commit path to carry a new variant. Filesystem backend alone, with the reason in the test — InMemoryStorage::commit_record is a single assignment (memory.rs:536-545, lead-verified) so its pre-durability window has no interior. The completed-commit instant stays covered on both backends by prop_nothing_is_published_before_the_pass_reaches_its_first_live_write; proper prefixes and the complete commit are different instants, so the two do not overlap."
+    },
+    {
+      "id": "V-11",
+      "issue": "21e976d1",
+      "what": "holistic-review failed the checkpoint on the lead's own evidence artifact, not on any worker's code.",
+      "detail": "F1 (blocking): 'REQ-06's claimed 1,137-line total and per-task footprints are self-attested without a reproducible command, script, or independent recorded measurement' (footprint.md:10). cargo-ci and doc-review both passed on the same tree.",
+      "lead_note": "The reviewer applied a sharper reading of the amendment than the lead did. Amended REQ-06 requires each task's footprint to be RECORDED against its estimate; a figure nobody can regenerate is an assertion, not a record. The failure was in the artifact the lead created to satisfy the criterion, not in anything a worker built.",
+      "resolution": "footprint.py committed beside footprint.md, its verbatim output quoted, reproducing all seven per-task figures and the 1137 subtotal. It takes --tasks so 722878d4 gets ER-01's attributed subtotal without re-deriving the method. Re-ran holistic-review (pass, 0 findings) and doc-review (pass) on the corrected tree.",
+      "verdict": "PASS on re-run; checkpoint complete"
     }
   ],
   "standing_policies": [
@@ -1089,7 +1105,8 @@
       "35544121",
       "4e818d10",
       "8559f529",
-      "d591a1c8"
+      "d591a1c8",
+      "21e976d1"
     ],
     "created": [
       "8559f529"
@@ -1115,8 +1132,9 @@
       "PF-06 dispatch contradicted 21e976d1 REQ-03",
       "V-08 issue Notes estimate undersized 8559f529",
       "PF-09 first line-count method wrong in both directions",
-      "unconditional echo printed a clean-tree verdict over a dirty tree"
+      "unconditional echo printed a clean-tree verdict over a dirty tree",
+      "V-11/PF-10 REQ-06 evidence was self-attested with no committed generator"
     ],
-    "checkpoint": "21e976d1 gates launched at session end; cargo-ci passed, doc-review and holistic-review pending"
+    "checkpoint": "21e976d1 DONE. cargo-ci and doc-review passed first time; holistic-review failed on self-attested REQ-06 evidence (V-11), fixed by committing footprint.py, then passed with 0 findings."
   }
 }
