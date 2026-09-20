@@ -50,12 +50,14 @@ pub struct EventAppend {
 /// pairwise disjoint — no path is an ancestor of another, and no two
 /// operations name the same path — checked identically at construction and at
 /// parse, with the event append's implicit target participating alongside
-/// every put and delete.
+/// every put and delete. Fields are private so [`Self::new`] and [`Self::parse`]
+/// are the only ways to reach an instance; a caller who can hold one has had it
+/// checked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RedoRecord {
-    pub puts: Vec<PutFile>,
-    pub deletes: Vec<VirtualPath>,
-    pub event_append: Option<EventAppend>,
+    puts: Vec<PutFile>,
+    deletes: Vec<VirtualPath>,
+    event_append: Option<EventAppend>,
 }
 
 impl RedoRecord {
@@ -82,6 +84,21 @@ impl RedoRecord {
         };
         record.ensure_disjoint_paths()?;
         Ok(record)
+    }
+
+    /// Every put, in application order.
+    pub fn puts(&self) -> &[PutFile] {
+        &self.puts
+    }
+
+    /// Every delete, in application order.
+    pub fn deletes(&self) -> &[VirtualPath] {
+        &self.deletes
+    }
+
+    /// The event append, if the mutation appended to the log.
+    pub fn event_append(&self) -> Option<&EventAppend> {
+        self.event_append.as_ref()
     }
 
     /// Reject a path that is an ancestor of another operation's path, or two

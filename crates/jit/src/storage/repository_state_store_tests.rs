@@ -5153,11 +5153,12 @@ fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
     let removed = data_path("issues/stale.json");
     let image = fixture.capture([written.clone(), removed.clone(), VirtualPath::EVENTS]);
 
-    let record = RedoRecord {
-        puts: vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
-        deletes: vec![removed],
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        vec![removed],
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     assert!(fixture.check(&image, &record).is_ok());
 }
@@ -5170,14 +5171,15 @@ fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
     ]);
     let written = data_path("issues/one.json");
     let image = fixture.capture([written.clone(), VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: vec![put_file(
+    let record = RedoRecord::new(
+        vec![put_file(
             written.clone(),
             b"{\"id\":\"one\",\"state\":\"ready\"}",
         )],
-        deletes: Vec::new(),
-        event_append: event_append(seeded_log().len() as u64),
-    };
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     fixture.write("issues/one.json", b"{\"id\":\"one\",\"raced\":true}");
 
@@ -5196,11 +5198,12 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
     ]);
     let removed = data_path("issues/stale.json");
     let image = fixture.capture([removed.clone(), VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: vec![removed.clone()],
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        Vec::new(),
+        vec![removed.clone()],
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     fixture.write("issues/stale.json", b"{\"id\":\"stale\",\"raced\":true}");
 
@@ -5221,11 +5224,12 @@ fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed
     let read_only = data_path("index.json");
     let written = data_path("issues/one.json");
     let image = fixture.capture([read_only, written.clone(), VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
-        deletes: Vec::new(),
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     fixture.write("index.json", b"{\"issues\":[\"raced\"]}");
 
@@ -5240,11 +5244,12 @@ fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
     let created = data_path("issues/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: vec![put_file(created, b"{\"id\":\"new\"}")],
-        deletes: Vec::new(),
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        vec![put_file(created, b"{\"id\":\"new\"}")],
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     assert!(fixture.check(&image, &record).is_ok());
 }
@@ -5254,11 +5259,12 @@ fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
     let created = data_path("issues/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
-        deletes: Vec::new(),
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     fixture.write("issues/new.json", b"{\"id\":\"new\",\"raced\":true}");
 
@@ -5273,11 +5279,12 @@ fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_
 fn test_ensure_write_set_unchanged_refuses_an_event_log_whose_length_changed() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: Vec::new(),
-        event_append: event_append(seeded_log().len() as u64),
-    };
+    let record = RedoRecord::new(
+        Vec::new(),
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
 
     let mut grown = seeded_log().to_vec();
     grown.extend_from_slice(b"{\"tag\":\"issue_claimed\"}\n");
@@ -5297,11 +5304,7 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_shorter_than_the_tail_wi
     assert!((log.len() as u64) < EVENT_LOG_TAIL_WINDOW);
     let fixture = WriteSetFixture::new(&[("events.jsonl", log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: Vec::new(),
-        event_append: event_append(log.len() as u64),
-    };
+    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
 
     let mut edited = log.to_vec();
     let last = edited.len() - 2;
@@ -5319,11 +5322,7 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_shorter_than_the_tail_wi
 fn test_ensure_write_set_unchanged_admits_an_empty_event_log_that_is_still_empty() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", b"")]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: Vec::new(),
-        event_append: event_append(0),
-    };
+    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(0)).unwrap();
 
     assert!(fixture.check(&image, &record).is_ok());
 }
@@ -5333,11 +5332,7 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_edited_inside_the_tail_w
     let log = long_log();
     let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: Vec::new(),
-        event_append: event_append(log.len() as u64),
-    };
+    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
 
     let mut edited = log.clone();
     let last = edited.len() - 2;
@@ -5356,11 +5351,7 @@ fn test_ensure_write_set_unchanged_admits_an_event_log_edited_before_the_tail_wi
     let log = long_log();
     let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord {
-        puts: Vec::new(),
-        deletes: Vec::new(),
-        event_append: event_append(log.len() as u64),
-    };
+    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
 
     let mut edited = log.clone();
     edited[0] = b'X';
