@@ -43,17 +43,25 @@ as the `docs-mechanical` gate's **M9 policy phrases** step.
 | `test_code_review_prompt_does_not_duplicate_common_findings_contract` | **negative**: 2 wrapper-contract literals absent | `…` / `shared findings contract` **`forbid`** |
 | `test_code_review_gate_uses_explicit_read_only_sandbox` | the `code-review` gate's reviewer command runs `--sandbox read-only` | **`[[value]]`** `.jit/gates.toml`, `select = "gates[key=code-review].checker.env.REVIEWER_AGENT"`, `require = ["--sandbox read-only"]` |
 
-### `test_packaged_qualified_item_citations_resolve_from_installed_registries` (deleted)
+### Package-content tests in `crates/jit/src/profile/repository_package.rs` (deleted)
 
-Every `@/kind/id` in package content resolves from the registries that package
-installs. Now `scripts/docs-check-package-citations.sh`, the gate's **M8 package
-citations** step. It captures each package under `profiles/` with `jit profile
-capture`, reads its assembled manifest, indexes its `keyed-array` contributions
-per registry table, and resolves each citation leader through the live
-`item_kinds` configuration — a registry-first kind names the table its items live
-in, and its aliases lead to the same table. `docs-check-citations.sh` (M3) keeps
-excluding `profiles/*/assets/*`, because it resolves against *this* repository's
-registries, which is the wrong domain for content read at a destination.
+All now live in `scripts/docs-check-package-content.sh`, the gate's **M8 package
+content** step. It captures each package under `profiles/` with `jit profile
+capture` and walks the content that manifest declares, once, for both halves.
+
+| Deleted test | Property | Now |
+| --- | --- | --- |
+| `test_packaged_qualified_item_citations_resolve_from_installed_registries` | every `@/kind/id` in package content resolves from the registries that package installs | M8's citation half: the package's `keyed-array` contributions indexed per registry table, and each citation leader resolved through the live `item_kinds` configuration — a registry-first kind names the table its items live in, and its aliases lead to the same table |
+| `test_jit_dogfood_package_contains_no_deferred_or_checkout_local_content` | 19 literals absent from every packaged file's source, target and text | `[[content]]` / `checkout-local and deferred content` **`forbid`** in `scripts/docs-package-content.toml` |
+| `test_installed_paths_do_not_require_jq` | no packaged file names `jq` as a token | `[[content]]` / `installed paths require no jq` **`forbid_token`** |
+| `test_packaged_skills_only_require_declared_project_item_kinds` | a packaged skill must not require an undeclared item kind | M8's citation half, more strictly: a `@/charter/…` address in packaged content resolves to nothing, because a markdown-first kind installs no registry — reported rather than permitted |
+
+`docs-check-citations.sh` (M3) keeps excluding `profiles/*/assets/*`, because it
+resolves against *this* repository's registries, which is the wrong domain for
+content read at a destination.
+
+Each of the 20 prohibitions was injected into package content and required to
+exit 1 naming that literal, before the Rust tests were deleted.
 
 ### Sibling tests removed under REQ-01
 
@@ -64,7 +72,7 @@ registries, which is the wrong domain for content read at a destination.
 | `…::test_doc_review_prompt_distinguishes_leaf_footprint_from_container_footprint` | 2 phrases **inside the leaf section**, 3 **inside the container section** | two entries with `section = { after, before }` — placement, not mere presence |
 | `…::test_doc_review_prompt_defines_holistic_container_checks` | 8 phrases | `doc-review-prompt.md` / `holistic container checks` `require` |
 | `…::test_ai_review_wrapper_allows_passing_advisory_findings` | 1 phrase, 1 **negative** in `contrib/gates/ai-review.sh` | `ai-review.sh` / `advisory findings pass` `require` + `forbid` |
-| `repository_package.rs::test_packaged_content_standard_paths_are_repository_root_relative` | 1 phrase, 1 **negative** in the breakdown analysis prompt | `.agents/skills/jit-breakdown/references/analysis-prompt.md` entry |
+| `repository_package.rs::test_packaged_content_standard_paths_are_repository_root_relative` | 1 phrase, 1 **negative** in the breakdown analysis prompt | `.agents/skills/jit-breakdown/references/analysis-prompt.md` entry (M9) |
 | `…::test_public_content_standards_redirect_links_profile_installation` | 7 phrases, 1 **negative** | `docs/reference/jit-content-standards.md` entry |
 | `…::test_planning_bracket_docs_describe_builtin_review_placeholders` | `placeholder` present and 4 superseded phrases absent across 5 artifacts; 6 approval-vocabulary phrases absent across 7 artifacts | 12 entries under topics `review placeholders` and `approval vocabulary` |
 
@@ -98,7 +106,7 @@ $ printf '\nSeeded @/rule/does-not-exist-zzz citation.\n' \
     >> profiles/jit-dogfood/assets/regions/agents-jit-guidance.md
 $ DOCS_FOOTPRINT=docs/ ./scripts/docs-mechanical.sh
 …
-== M8 package citations ==
+== M8 package content ==
 DANGLING: jit-dogfood: AGENTS.md cites unresolved package item @/rule/does-not-exist-zzz
 
 == M9 policy phrases ==
@@ -115,8 +123,10 @@ restating them.
 
 ## Footprint (REQ-04)
 
-M8 and M9 take **no footprint argument**. Their targets are configured — M9's by
-its manifest, M8's by the package directories under `profiles/` — which is the
+M8 and M9 take **no footprint argument** (each takes an optional manifest path,
+which the self-test uses and the gate omits). Their targets are configured —
+M9's by its manifest, M8's by the package directories under `profiles/` and its
+own manifest — which is the
 contract `.jit/gates.toml` already states for this gate: *"A checker whose
 targets are fixed by configuration takes none."* `DOCS_FOOTPRINT` stays `docs/`,
 so the adopter documentation surface is unchanged and no other checker's scope
@@ -125,5 +135,5 @@ moved. The gate's `inputs.roots` already cover `AGENTS.md`, `contrib`,
 
 ## Line balance (REQ-06)
 
-0 Rust lines added, 609 removed (`repository_package.rs` 131,
+0 Rust lines added, 707 removed (`repository_package.rs` 229,
 `code_review_policy_test.rs` 356, `doc_review_policy_test.rs` 120, `main.rs` 2).
