@@ -57,12 +57,24 @@
       "path": "dev/active/48e4f65c/event-log-capture-ceilings.md"
     }
   ],
+  "done_at": "2026-09-20T11:25:54.045881417Z",
   "first_ready_at": "2026-09-20T10:37:39.444683398Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-20T11:21:06.132826907Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-20T11:25:39.404953793Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "48e4f65c-e73a-4fff-b2e9-771be7d3fb3a",
   "labels": [
     "type:task",
@@ -71,7 +83,7 @@
     "component:core"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Document commands stop capping the event log",
-  "updated_at": "2026-09-20T11:12:16.376766439Z"
+  "updated_at": "2026-09-20T11:25:54.045881417Z"
 }
