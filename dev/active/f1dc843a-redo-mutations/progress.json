@@ -1054,6 +1054,21 @@
       "status": "closed",
       "lead_note": "Same class as ESC-04: the criterion was written broader than the issue's surface. Drafted by this lead when it created the task under POL-01 during wave 12's review.",
       "placement_refinement": "The owner's option named fbd6c859 as the checkpoint. On checking, fbd6c859 cannot see all of it either — be13da79 belongs to e590fa91 (wave 20), not to fbd6c859 (wave 15) — so putting the contributor-document clause there would have recreated the same unsatisfiability one level up. No new criterion was added, because two existing ones already name the subject and adding a third would be a duplication defect under @/inv/orthogonal-tests: fbd6c859 REQ-05 covers the adopter surface ('no page or declared gate scope names a journaled mechanism as live', and the external bootstrap control directory is part of the journaled mechanism), and e590fa91 REQ-04 covers the contributor half ('The contributor-facing material and the Rust prose describe one mechanism, and a reader following the architecture note's reading order reaches files that exist'), with be13da79 as its dependency. The owner's principle — the fact is checked by a node that can see all of it — is satisfied by the existing pair."
+    },
+    {
+      "id": "ESC-11",
+      "wave": 13,
+      "category": "4 - suspected gate false positive, with 5 - rework at MAX_REWORK_ATTEMPTS",
+      "question": "ccea63de and ead8f86d both failed doc-review in round 2 claiming production publishes the event log through a positioned EventAppend, and both stand at the rework limit.",
+      "evidence": "At HEAD 5e5fd42fa the only production RedoRecord constructor passes None (repository_state_store.rs:1001). Every other EventAppend construction is inside a #[cfg(test)] module (redo_record.rs from :428, memory.rs from :1033, redo_apply.rs from :360) or in RedoRecord::parse, which yields one only from a record that already carries it. The reviewer's verdicts contradict one another: on both issues it PASSED the false positioned-append text in round 0 and FAILED the true whole-file text in round 2, and on ccea63de the failing run 0786da7a judged event-log text identical to text it passed at f62e0b9b (round 2 changed only the torn-record sentence).",
+      "diagnosis": "The failing reviewer made the capability-for-behaviour error PF-20 records for the lead's own dispatch prompts: it read the EventAppend type, the parse path and the applier's positioned write, and took them for what production does.",
+      "resolution": "Owner chose one fresh re-evaluation of doc-review on both issues with the pages unchanged, run with --force because the gate memoizes verdicts over unchanged inputs (PF-19) and a plain re-run would return the cached failure. If either fails again on the same claim, that is the same root cause three times (escalation 5a) and the lead returns with a structural remedy for the reviewer rather than rewording the page.",
+      "resolved_by": "user",
+      "status": "closed",
+      "rejected": [
+        "Adding a sentence about the unused event-append capability, which puts internal detail in adopter docs that b4483ad6 must remove in wave 16.",
+        "Rewording to a positioned append, which would make both pages false against the code."
+      ]
     }
   ],
   "rework_counts": {

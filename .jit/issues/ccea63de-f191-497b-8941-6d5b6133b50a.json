@@ -57,13 +57,13 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "passed",
-      "updated_at": "2026-09-21T18:01:28.414066143Z",
+      "status": "failed",
+      "updated_at": "2026-09-21T18:23:38.919569186Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-09-21T18:00:12.647195190Z",
+      "updated_at": "2026-09-21T18:22:47.532854113Z",
       "updated_by": "auto:executor"
     }
   },
@@ -81,5 +81,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-09-21T18:01:28.414066143Z"
+  "updated_at": "2026-09-21T18:23:38.919569186Z"
 }

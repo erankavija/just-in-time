@@ -1,0 +1,51 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e5fd42fa8e02661aa5484bf04537320403f41be",
+  "completed_at": "2026-09-21T18:26:50.915158468Z",
+  "duration_ms": 89645,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/guarantees.md",
+        "id": "F1",
+        "line": 100,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "medium",
+        "summary": "The guarantees page says events.jsonl is carried and published as a complete replacement, but the redo record stores an offset-based EventAppend applied with positioned writing."
+      },
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/storage-format.md",
+        "id": "F2",
+        "line": 93,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The storage reference repeats the pre-existing whole-file event-log replacement claim, contrary to the offset-based EventAppend implementation."
+      }
+    ],
+    "summary": "The prior cleanup defect is fixed, but this issue now inaccurately documents event-log publication as a whole-file replacement.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ead8f86d-2e45-4144-98e7-2f814b643091",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "745157de-2690-4718-931c-e2ef9a713b29",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T18:25:21.269469006Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15996 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c537-284b-71c3-afb2-6b6135043b46\n--------\nuser\n--- 15983 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `ead8f86d` is a leaf task; I reviewed its eight individually tagged commit patches. The prior cleanup finding is fixed. One issue-authored event-log claim remains inaccurate.\n\n1. **F1 — medium, blocking, issue-impact:** [docs/concepts/guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:100) says event logging carries and replaces the complete `events.jsonl`. The current redo record instead contains an `EventAppend` with bytes and an offset, which is applied by positioned writing. Restore the append-specific description in the record and application explanations.\n\n2. **F2 — medium, advisory, pre-existing:** [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:93) likewise describes `events.jsonl` as a complete-file replacement. This was introduced by sibling issue `ccea63de`, not this leaf; it should be corrected separately for consistency.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The prior cleanup defect is fixed, but this issue now inaccurately documents event-log publication as a whole-file replacement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The guarantees page says events.jsonl is carried and published as a complete replacement, but the redo record stores an offset-based EventAppend applied with positioned writing.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":100,\"references\":[\"@/charter/D-17\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The storage reference repeats the pre-existing whole-file event-log replacement claim, contrary to the offset-based EventAppend implementation.\",\"file\":\"docs/reference/storage-format.md\",\"line\":93}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

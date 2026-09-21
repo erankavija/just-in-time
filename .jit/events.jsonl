@@ -15183,3 +15183,10 @@
 {"gate_key":"code-review","id":"34ca72d5-4f88-4d75-9c16-62bb7578a42a","issue_id":"79252d23-23ab-4c04-9327-8d2986f361d8","timestamp":"2026-09-21T18:19:03.217186038Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"bc18de26-4ca2-4f07-90cc-34aa18edf85b","issue_id":"79252d23-23ab-4c04-9327-8d2986f361d8","timestamp":"2026-09-21T18:19:35.677222393Z","to":"done","type":"issue_state_changed"}
 {"id":"0ece7ed1-2fbb-478a-90d4-1d152d69361b","issue_id":"79252d23-23ab-4c04-9327-8d2986f361d8","timestamp":"2026-09-21T18:19:35.677222393Z","type":"issue_completed"}
+{"id":"66f99498-1d3a-4e69-a5df-f09b400fecab","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","priority":"high","timestamp":"2026-09-21T18:22:44.474249665Z","title":"Record documentation states that an unreadable leftover record is refused","type":"issue_created"}
+{"gate_key":"docs-mechanical","id":"f2682cc8-883d-4350-a33c-b1d312d82cfa","issue_id":"ccea63de-f191-497b-8941-6d5b6133b50a","timestamp":"2026-09-21T18:22:47.532854113Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["dependencies"],"id":"f166ed39-7d34-46c5-8db6-a06824dc1c4d","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","timestamp":"2026-09-21T18:22:55.827836517Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"81d8e470-8802-4205-b7bb-fe5cdae66681","issue_id":"fbd6c859-e911-4266-8e2d-e3428f331ada","timestamp":"2026-09-21T18:22:56.305258029Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"doc-review","id":"068c3b12-1408-4ad8-97a8-43d696e010d5","issue_id":"ccea63de-f191-497b-8941-6d5b6133b50a","timestamp":"2026-09-21T18:23:38.919569186Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"89aac1b3-a34d-4d3f-9f00-6bd91b49d201","issue_id":"ead8f86d-2e45-4144-98e7-2f814b643091","timestamp":"2026-09-21T18:25:20.631703490Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"3cdcae9a-1225-42f2-a5da-6284ebb22b89","issue_id":"ead8f86d-2e45-4144-98e7-2f814b643091","timestamp":"2026-09-21T18:26:51.224267453Z","type":"gate_failed","updated_by":"auto:executor"}

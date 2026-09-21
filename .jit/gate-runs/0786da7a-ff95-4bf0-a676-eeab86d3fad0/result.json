@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5e5fd42fa8e02661aa5484bf04537320403f41be",
+  "completed_at": "2026-09-21T18:23:38.602378898Z",
+  "duration_ms": 50344,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 92,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/inv/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "The redo-record reference says event mutations replace the complete event log, but the current record carries and applies a positioned event append."
+      }
+    ],
+    "summary": "The attributed redo-record reference inaccurately documents event-log publication as a whole-file replacement.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ccea63de-f191-497b-8941-6d5b6133b50a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0786da7a-ff95-4bf0-a676-eeab86d3fad0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T18:22:48.257656122Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 28977 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c534-d29d-7a21-a052-c986a4e692d5\n--------\nuser\n--- 28964 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf type and DAG resolution shows no children. I inspected the six reachable `jit:ccea63de` commits individually; their union changes only `docs/reference/storage-format.md`. Uncommitted workflow state was excluded. The prior run had no unresolved blocking finding.\n\nThe redo-record documentation correctly covers its location, commit point, recovery, and engine-owned ignore entry, but its event-log description disagrees with the current implementation.\n\n1. **F1 — blocking, issue-impact, high:** The issue-authored publication contract says event mutations replace `events.jsonl` with complete bytes, but a redo record instead carries an event append at the captured offset and applies it after puts and removals. Update the event-log wording, forward-pass order, and idempotency description to document the positioned append. [`docs/reference/storage-format.md:92`](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:92)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The attributed redo-record reference inaccurately documents event-log publication as a whole-file replacement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The redo-record reference says event mutations replace the complete event log, but the current record carries and applies a positioned event append.\",\"file\":\"docs/reference/storage-format.md\",\"line\":92,\"references\":[\"@/charter/D-17\",\"@/inv/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

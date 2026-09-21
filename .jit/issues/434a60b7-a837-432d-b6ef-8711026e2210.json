@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-09-21T18:22:44.474249665Z",
+  "dependencies": [
+    "0938d99e-1c0b-418b-9428-cc8a1d00ef3b"
+  ],
+  "description": "The redo record's own documentation states that an unreadable leftover record is refused at session open, as the code does.\n\n## Background\n\n`RedoRecord::commit` writes the record in place rather than staging and renaming it, so an interrupted write leaves a truncated file at the record's path. Its rustdoc says such a prefix is one that `RedoRecord::parse` rejects, \"so a later session skips the residue\". That was never the behaviour: `jit:0938d99e` made session open read the leftover record and turn any parse failure into `UnreadableRedoRecord`, refusing to proceed. The refusal is deliberate — a torn write and a committed record later corrupted on disk both fail to parse, and discarding the second would lose a mutation that may already be partly applied.\n\nThe claim contradicts the sentence that follows it in the same comment, which correctly says that session open decides the fate of an occupied record path. It also propagated: `jit:ccea63de` transcribed it faithfully into the storage-format reference, where two independent reviews and the lead caught it, and the reference was corrected in that issue's second rework round. The source it came from was not.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::commit`'s documentation states that an interrupted write leaves a record that session open refuses, and does not say it is skipped or discarded.\n- [hard] REQ-02: No Rust doc comment, comment, or error string in the workspace states that an unreadable leftover record is skipped, discarded, or ignored.\n- [hard] REQ-03: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n\n## Notes\n\nCreated by the execution lead under POL-01 during wave 13's review. Excluded from the epic's REQ-06 redo-record subtotal per ER-01.\n\nA documentation change only: the refusal is `jit:0938d99e`'s reviewed behaviour, owned by `test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it`, and this task changes no code path. The operator procedure for removing an unreadable record belongs to the recovery references, not here.\n",
+  "documents": [],
+  "first_ready_at": "2026-09-21T18:22:44.474249665Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "434a60b7-a837-432d-b6ef-8711026e2210",
+  "labels": [
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:storage",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/essential-code-prose",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Record documentation states that an unreadable leftover record is refused",
+  "updated_at": "2026-09-21T18:22:55.827836517Z"
+}
