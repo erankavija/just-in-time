@@ -17,6 +17,7 @@
       "path": "dev/active/7226f00b/whole-log-read-cost.md"
     }
   ],
+  "first_ready_at": "2026-09-21T20:58:06.621376704Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -35,7 +36,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-09-20T15:24:14.583519395Z"
+  "updated_at": "2026-09-21T20:58:06.621376704Z"
 }

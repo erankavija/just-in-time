@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 15,
+  "current_wave": 16,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -672,7 +672,7 @@
             "docs-mechanical",
             "holistic-review"
           ],
-          "status": "in_progress — story checkpoint gates"
+          "status": "done — cargo-ci, docs-mechanical, doc-review and holistic-review passed; both reviews 0 findings on clean trees. Pitfall reconciliation recorded under checkpoint_reconciliation_fbd6c859."
         }
       ]
     },
@@ -688,7 +688,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "ready — next"
         },
         {
           "id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
@@ -702,7 +702,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next"
         },
         {
           "id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
@@ -715,7 +715,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next"
         },
         {
           "id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
@@ -726,7 +726,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "ready — next"
         }
       ]
     },
@@ -1652,6 +1652,11 @@
       "session": 4,
       "path": "dev/active/f1dc843a-redo-mutations/handoff-3.md",
       "note": "Index is one past the highest existing handoff; session 3 left none. Session 3's record is session_3_summary."
+    },
+    {
+      "session": 6,
+      "path": "dev/active/f1dc843a-redo-mutations/handoff-4.md",
+      "note": "Session 5 left no handoff; session 6 reconstructed its state from progress.json and the gate-run records."
     }
   ],
   "session_2_summary": {
@@ -1915,5 +1920,30 @@
   "checkpoint_reconciliation_fbd6c859": {
     "performed": "session 6, before fbd6c859's gates, per lead-review-protocol 'Before a container's final gate'",
     "result": "No pitfall is an open violation of an fbd6c859 criterion. SP-09 and SP-10 (session 5) verified closed in the code. SP-19 closed by b7c99dcb. SP-25 is owned by 42478e5d, a child of this story, and must be closed before the checkpoint runs. SP-08, SP-17 and SP-21 concern the charter and contributor docs owned by later-story tasks (816df12a, be13da79), outside REQ-05's adopter surface. SP-18, SP-20, SP-22, SP-23 and SP-24 name no criterion and surface in the completion report."
+  },
+  "session_6_summary": {
+    "waves_closed": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "story_closed": "fbd6c859 Record publication cutover",
+    "created": [
+      "b7c99dcb (POL-01, .jit-bootstrap reservation)",
+      "434a60b7 (POL-01, unreadable-record rustdoc)"
+    ],
+    "escalations": [
+      "ESC-09",
+      "ESC-09-followup",
+      "ESC-10",
+      "ESC-11",
+      "ESC-12",
+      "ESC-13"
+    ],
+    "notable": "Transaction kernel retired (b0ee2dd6, net -4367 lines). Record vocabulary gained make-directory (OD-7 amended). jit recover reports a failed leftover record as recovery_failed (ESC-13). ccea63de carries owner decision @/issue/ccea63de/decision/D-1.",
+    "epic_counts_at_close": "34 done, 4 ready (wave 16), 12 backlog including the epic"
   }
 }

@@ -7,6 +7,7 @@
   ],
   "description": "Source guards fail when a second repository publication path appears, retargeted from the kernel they name today.\n\n## Background\n\nA scratch-built suite carries source-text guards over the workspace: no raw filesystem writes in the command layer, no predecessor or compatibility module, one canonical renderer owner, one package-tree publisher, and a capture that addresses no source by pathname. Its header names the kernel module as the compiler-enforced half of the guarantee, and several guards name the kernel and the atomic-write module directly.\n\nWith the kernel gone, the guards retarget onto what carries the property: the redo record is the one mechanism that writes repository state, and the initialization root publisher is its single named exception.\n\n## Success Criteria\n\n- [hard] REQ-01: A guard fails when a module other than the redo record and the initialization root publisher writes repository state directly.\n- [hard] REQ-02: The named exception for creating an absent data root is stated once, in the guard, with its reason.\n- [hard] REQ-03: Guards naming the retired kernel modules are retargeted, with the reason stated where each lands.\n- [hard] REQ-04: The suite adds no new integration-test target.\n- [hard] REQ-05: The guards assert a semantic property rather than a copied inventory of file names.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T20:58:05.715182175Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -23,7 +24,7 @@
     "enforces:@/invariant/convention-convergence"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Publication path source guards",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T20:58:05.715182175Z"
 }

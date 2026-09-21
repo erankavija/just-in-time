@@ -68,6 +68,13 @@
       "format": "markdown",
       "label": "Session 4 handoff",
       "path": "dev/active/f1dc843a-redo-mutations/handoff-3.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Session 6 handoff",
+      "path": "dev/active/f1dc843a-redo-mutations/handoff-4.md"
     }
   ],
   "first_ready_at": "2026-09-19T20:28:46.980500035Z",
@@ -91,5 +98,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-21T14:14:01.510570879Z"
+  "updated_at": "2026-09-21T20:59:06.892681077Z"
 }

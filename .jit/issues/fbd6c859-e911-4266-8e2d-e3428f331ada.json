@@ -15,6 +15,7 @@
   ],
   "description": "Every repository mutation commits through the redo record, the journaled kernel is gone, and the adopter documentation describes what the repository now does.\n\n## Background\n\nRepository publishers converge on one seam: the mutation session's apply. Moving the commit mechanism beneath that seam switches every repository publisher in one step.\n\nThree things happen around it. Coverage that asserts the superseded rollback guarantee, and failure injection that names the kernel's points, are repointed or retired first, so each step compiles and passes. Creating an absent data root cannot use the record, because the record's home is inside the root that does not exist yet, so initialization gets a small publisher of its own and the scratch directory it creates carries an ignore entry composed from the repository's declarations. Initialization is also the kernel's last caller, so the kernel retires inside this phase: the interval where it sits unreferenced is one task long, spanned by a named dead-code allowance that the retiring task removes.\n\nThe adopter pages describing publication, recovery, the data-root layout, and the safe handling of that directory change here: a backup recipe that archives the whole data root starts capturing a pending commit point the moment the seam moves.\n\n## Success Criteria\n\n- [hard] REQ-01: Every repository mutation in the workspace commits through one redo record, and the creation of an absent data root is the only other path that writes repository state.\n- [hard] REQ-02: The phase's diff across `crates/jit/src/commands/` changes no publisher's invocation of the mutation session, and every command family that published before the phase publishes after it.\n- [hard] REQ-03: Publication convergence is proven in one place: the record's own conformance suite, with each publication consumer holding at most one test that it reaches the mechanism.\n- [hard] REQ-04: The workspace contains no publication-failure injection that no longer fires, across the command layer, the storage suite, and the integration suites.\n- [hard] REQ-05: The adopter documentation surface describes publication and recovery as the repository now performs them: no page instructs an operation that would remove or archive a pending commit point, and no page or declared gate scope names a journaled mechanism as live.\n- [hard] REQ-06: No commit path the record replaced survives in the workspace, and the suite holds no test asserting a guarantee the record does not provide.\n- [hard] REQ-07: No dead-code allowance introduced during the phase survives it, and the workspace builds with no warnings at each delivered child.\n- [hard] REQ-08: Each delivered child leaves the suite passing with no test held out of the default run.\n",
   "documents": [],
+  "done_at": "2026-09-21T20:58:05.348097763Z",
   "first_ready_at": "2026-09-21T20:46:48.476231485Z",
   "gates_required": [
     "cargo-ci",
@@ -57,7 +58,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record publication cutover",
-  "updated_at": "2026-09-21T20:57:41.618948464Z"
+  "updated_at": "2026-09-21T20:58:05.348097763Z"
 }
