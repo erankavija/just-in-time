@@ -48,6 +48,194 @@
       "format": "markdown",
       "label": "Epic plan",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "c460576a71a820cc444f652cd70263d38a1a807be0e46b5f3a62566e4ca1c05a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/troubleshooting.md",
+          "resolved_path": "docs/how-to/troubleshooting.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "86cf09354906a93315c5602572cdeff962afae0e48e003adeb7e0cb0e4055474",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ec8dccf22ce7b0c02d029ad4db4609846394e27b0dbdcc1ebb2ff1bec80c9019",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "51533000fb800ebce2f90a6952455c537cc3e401d7cde0b341dd71f87ac4ad52",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "design-philosophy.md",
+          "resolved_path": "docs/concepts/design-philosophy.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "875b59f7db738a342f195ca93579938b8383b17ecaf0143360aa06251122c77e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": null,
+      "path": "docs/concepts/guarantees.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "247c3ea759e46394520ad58001b51a652b162dd6281eab6330a9544866fefe3d",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../AGENTS.md",
+          "resolved_path": "AGENTS.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d01c6500b40078bc3bb13607f3c4cbc0c0d9e5e657227db51f9866fc1afced01",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "guarantees.md",
+          "resolved_path": "docs/concepts/guarantees.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5e7e9edc89660dac8e2cf4565efc63158ffe1b452682e860201761d99d7f7e66",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/quickstart.md",
+          "resolved_path": "docs/tutorials/quickstart.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "fca83276b3da0fe575b282dde091c49e58ab6dafc1b227f0300fb3d8292d5fd2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/multi-agent-coordination.md",
+          "resolved_path": "docs/how-to/multi-agent-coordination.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "86cf09354906a93315c5602572cdeff962afae0e48e003adeb7e0cb0e4055474",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": null,
+      "path": "docs/concepts/design-philosophy.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "5e7e9edc89660dac8e2cf4565efc63158ffe1b452682e860201761d99d7f7e66",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/quickstart.md",
+          "resolved_path": "docs/tutorials/quickstart.md"
+        },
+        {
+          "asset_type": "directory",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../how-to/",
+          "resolved_path": "docs/how-to"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "86cf09354906a93315c5602572cdeff962afae0e48e003adeb7e0cb0e4055474",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "318348624f12eb20388346b71cb995c8592c8d6456078c56213fab66ee975dd2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": null,
+      "path": "docs/concepts/overview.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "d01c6500b40078bc3bb13607f3c4cbc0c0d9e5e657227db51f9866fc1afced01",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "guarantees.md",
+          "resolved_path": "docs/concepts/guarantees.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "98f0915c35a8869ae2e8bf5cd830f04321e616fa734a62c616bdf963d1a952af",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5ea9c44d5656f93d13638d46310dd44f970196c511fd2d42f0e66364e453aac1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5a236c4b956f3b132b692966f158017ed81d2e621beb349cd14318f3c87f369e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/gate-presets.md",
+          "resolved_path": "docs/reference/gate-presets.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c2d5bc07c13e36f7427673510f01c5b04cb4d870a7034b206222dc6d543761c0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/software-development.md",
+          "resolved_path": "docs/how-to/software-development.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": null,
+      "path": "docs/concepts/core-model.md"
     }
   ],
   "first_ready_at": "2026-09-21T16:03:09.606058262Z",
@@ -70,5 +258,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Concept documents state the redo record",
-  "updated_at": "2026-09-21T16:14:29.880686627Z"
+  "updated_at": "2026-09-21T16:22:30.323804676Z"
 }

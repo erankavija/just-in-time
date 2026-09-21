@@ -317,8 +317,9 @@ Issues are stored as JSON files in `.jit/issues/{id}.json`:
 ```
 
 **Storage guarantees:**
+- One redo record per mutation, over every file that mutation writes
 - Atomic writes (write-temp-rename pattern)
-- No partial writes from crashes
+- No partial writes from crashes; an interrupted mutation is applied forward at the next session
 - JSON validation on read
 - Git-optional (works without version control)
 
@@ -1258,7 +1259,7 @@ timeout 300 work_on_issue "$ISSUE" || {
 
 ### Coordination Model
 
-- Atomic file writes, not an atomic `issue claim` or `claim-next` selection
+- One redo record publishes a mutation's files; `issue claim` and `claim-next` selection remain non-atomic
 - Exclusive advisory leases via `jit claim acquire`; enforcement remains configuration-controlled
 - Decentralized polling (no coordinator daemon)
 - Simple assignee format with type prefix

@@ -59,32 +59,58 @@ JIT keeps the dependency graph transitively reduced. When `A→B→C` already ho
 
 ### Atomic Operations
 
-**Guarantee:** Replacement writes are published atomically through the storage
-layer's temp-file-and-rename path. (`@/invariant/atomic-writes`)
-
-The storage layer writes a unique temporary file in the target's directory and
-renames it onto the target. Keeping both paths in one directory makes the rename
-a same-filesystem operation, so readers do not observe a partially written
-replacement (`crates/jit/src/storage/atomic_write.rs`).
+**Guarantee:** A mutation is published through one durable redo record over the
+files it writes, and each of those files is replaced by temp-file-and-rename.
+(`@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`,
+`@/charter/D-17`)
 
 **How it works:**
 
-The atomic-write primitive gives each temporary file a process-and-call-specific
-name, avoiding collisions between writers before rename. It is an atomic file
-replacement mechanism, not a multi-file transaction.
+Before it touches anything live, a mutation describes everything it will write:
+the directories it creates, the complete new bytes of every file it publishes,
+the paths it removes, and the bytes it adds to the event log at the offset it
+captured as the log's length. That description is the **redo record**. JIT writes
+it as `redo.record` in the data root's scratch directory, `.jit/tmp/`, syncs its
+bytes and fsyncs the directory entries naming them, and only then writes a live
+file. The record's durable write is the mutation's commit point
+(`crates/jit/src/storage/redo_record.rs`).
 
-`events.jsonl` follows a different persistence path: JIT opens it in append mode
-and serializes each append with the repository write lock and `.events.lock`
-(`crates/jit/src/storage/json.rs`). It is a locked append, not a replacement-file
-rename.
+Applying it is one forward pass: make the directories, replace the files, remove
+the deleted paths, write the event-log bytes at their offset, then remove the
+record. Every step tolerates being redone — a directory already present, a
+replacement that overwrites, a removal whose target is already gone, an append
+rewritten at the same offset — so applying a record twice reaches the same state
+as applying it once (`crates/jit/src/storage/redo_apply.rs`).
+
+**Converging forward:**
+
+Recovery runs forward only. A crash between the commit point and the record's
+removal leaves the record in place; the next session opened over the repository
+reads it and applies it before anything else mutates, so an interrupted mutation
+completes rather than unwinds (`crates/jit/src/storage/repository_state_store.rs`). Session
+opening is the one recovery boundary, and every mutating command passes through
+it — as does `jit recover`, whose whole job is to reach it.
+
+**How one file lands:**
+
+A replacement stages its bytes beside the target under a unique `.tmp` name,
+syncs them, and renames onto the target. Keeping both paths in one directory
+makes the rename a same-filesystem operation, so readers never observe a
+partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
+
+`events.jsonl` is never rewritten whole: the record carries only the bytes the
+mutation adds and the offset they belong at, so publishing a mutation costs what
+it changes rather than what the repository has accumulated (`@/charter/D-17`).
+Those bytes are written under the repository write lock and `.events.lock`;
+event readers take the same lock shared (`crates/jit/src/storage/json.rs`).
 
 **Multi-agent safety:**
 
 JIT also uses advisory file locks to coordinate operations that share mutable
 state. The locks are released with their guards and work only among cooperating
-processes; they complement, rather than extend, an atomic rename into a global
-transaction. Advisory work-lease coordination uses `.git/jit/locks/claims.lock`
-(`crates/jit/src/storage/lock.rs`).
+processes; they serialize competing writers rather than joining unrelated
+commands into one operation. Advisory work-lease coordination uses
+`.git/jit/locks/claims.lock` (`crates/jit/src/storage/lock.rs`).
 
 **Example - Two agents claiming simultaneously:**
 
@@ -110,22 +136,28 @@ sequenceDiagram
 **Benefits:**
 
 - **No partial replacement:** Readers do not observe a partially written target file.
+- **No half-finished mutation:** A mutation interrupted after its commit point is applied at the next session open; one interrupted before it never started.
+- **Cost bounded by the change:** The record carries the bytes a mutation writes, not a rewrite of what preceded them.
 - **Coordinated operations:** Cooperating JIT processes use advisory locks where shared access must be serialized.
 
 ### Recoverable Profile Publication
 
-Applying a repository profile is a coordinated multi-file operation,
-which is a stronger problem than one atomic replacement. JIT validates the
-complete planned repository image before publication and uses a durable
-transaction journal so handled failures roll back exactly and interrupted work
-is recovered before any later mutation. A prepared journal converges to the old
-state; a committed journal verifies the new state and finishes cleanup.
+Applying a repository profile writes many files at once, which is a stronger
+problem than one atomic replacement. JIT validates the complete planned
+repository image before publication, then publishes every file that application
+writes through a single redo record. A failure before the record is durable
+leaves the repository untouched, because nothing live has been written yet.
 
-This guarantee is bounded to JIT-managed publication under its locks and
-recovery protocol; it does not make unrelated external filesystem writes
-transactional. The canonical command, conflict, journal-location, provenance,
-and lifecycle contract is in
-[Repository Profiles](../reference/profiles.md#publication-rollback-and-recovery).
+Past the record, publication only converges forward. A record left by a crash is
+applied at the next session open, ahead of any later mutation: the same forward
+pass, over a repository that may already carry part of it. Re-applying an
+operation the interrupted run had already performed changes nothing, so a
+half-applied profile becomes a fully applied one.
+
+This guarantee covers the files JIT publishes under its own locks and recovery
+protocol; writes another process makes to those files stay outside it. The
+canonical command, conflict, record-location, provenance, and lifecycle contract
+is in [Repository Profiles](../reference/profiles.md).
 
 ### Event Logging
 
@@ -280,8 +312,9 @@ jit issue show abc123
 
 **2. Scoped atomic operations**
 
-Replacement-file writes, locked event appends, and lease acquisition each have
-their own scope; none makes unrelated repository updates one transaction:
+One mutation publishes every file it writes through one redo record, and lease
+acquisition has a scope of its own; neither joins unrelated commands into one
+operation:
 
 ```bash
 # Agent 1 acquires an advisory lease atomically (in a Git worktree).
@@ -374,6 +407,8 @@ worktree of the repository.
 ├── issues/{id}.json          # Issue data
 ├── index.json                # Issue index
 ├── gates.toml                # Gate registry
+├── tmp/                      # Scratch space; git-ignored
+│   └── redo.record           # A pending mutation's commit point
 └── events.jsonl              # Append-only event log
 
 .git/jit/
@@ -395,22 +430,28 @@ JIT is designed to handle failures gracefully without data loss or corruption.
 
 ### Partial Write Recovery
 
-**Scenario:** Process crashes during file write.
+**Scenario:** Process crashes mid-mutation.
 
 **Recovery:**
 
-Atomic replacement writes use a same-directory temporary file and rename:
+Where the crash falls relative to the commit point decides the outcome. Before
+the record is durable, no live file has been written and the mutation simply did
+not happen. After it, the record survives the crash and the next session applies
+it:
 
 ```bash
-# During an interrupted replacement:
-.jit/issues/.abc123.json.<pid>.<sequence>.tmp  # Incomplete temporary file
-.jit/issues/abc123.json                        # Previous version intact
+# After an interrupted mutation:
+.jit/tmp/redo.record                           # The mutation, waiting to be applied
+.jit/issues/.redo.<hex>.tmp                    # Staging a rename did not reach
+.jit/issues/abc123.json                        # Previous or new version, never torn
 
-# Run recovery to clean provably stale temporary files and locks.
+# Every mutating command applies the record before its own work. This one also
+# clears provably stale temporary files and locks.
 jit recover
 ```
 
-**Result:** No corruption, no data loss, previous state preserved.
+**Result:** No corruption, no data loss; a mutation either never started or is
+carried to completion.
 
 ### Corrupted JSON Detection
 
@@ -449,18 +490,34 @@ Error: Failed to deserialize data: expected value at line 15 column 3
 
 ### Stale Temporary Files
 
-**Scenario:** Crash leaves `.tmp` files behind.
+**Scenario:** Crash leaves staging files behind.
 
-**Impact:** Harmless. Read operations only consider `.json` files, so an orphaned
-`.tmp` sibling is never served and never corrupts state.
+**Impact:** Harmless. Read operations only consider the published file names, so
+an orphaned staging sibling is never served and never corrupts state.
+
+**Safe to remove by hand:** files whose name ends in `.tmp`, anywhere under
+`.jit/`. Each one is a staging file whose rename never happened. Give them the
+age `jit recover` does — one hour by default — so a sweep leaves staging that a
+running mutation is about to rename.
+
+**Not safe to remove:** the data root's scratch directory, `.jit/tmp/`, and the
+record it holds. That record, `redo.record`, is a mutation's commit point: the
+mutation may already be partly written to live files, and the record is the only
+thing that can finish it. Its name deliberately does not end in `.tmp`, so a
+sweep for staging files cannot match it
+(`crates/jit/src/storage/redo_record.rs`). Leave it where it is — the next
+mutating command applies it.
 
 **Cleanup:**
 
 ```bash
-# jit recover removes orphaned .tmp files older than one hour (ordinary claim
-# commands do not run temp-file cleanup).
+# Applies a pending record through its session open, then removes orphaned .tmp
+# files older than one hour (ordinary claim commands do not run temp-file
+# cleanup).
+jit recover
 
-# Manual cleanup at any time
+# Manual sweep at any time. Match the .tmp suffix, which the scratch directory
+# and its record do not carry.
 find .jit -name '*.tmp' -mmin +60 -delete
 ```
 

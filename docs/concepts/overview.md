@@ -72,7 +72,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 
 **Solution: JIT integrates coordination and quality**
 - CLI-first with JSON output (fast, reliable)
-- Atomic file writes plus advisory leases for exclusive coordination
+- Recoverable record-based publication plus advisory leases for exclusive coordination
 - Explicit dependency DAG (clear work order)
 - Gates integrate quality into workflow (not external)
 - MCP tools for agent frameworks (standardized interface)
@@ -97,7 +97,9 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 ├── issues/                    # One JSON file per issue
 │   └── <uuid>.json            # Issue state, dependencies, gates
 ├── gate-runs/                 # Recorded gate runs
-└── schemas/                   # JSON Schema files referenced by rules.toml
+├── schemas/                   # JSON Schema files referenced by rules.toml
+└── tmp/                       # Scratch space; git-ignored
+    └── redo.record            # A mutation in flight, applied by the next mutating command
 ```
 
 See [Storage Format](../reference/storage-format.md) for the authoritative layout, including per-project files.
@@ -138,8 +140,10 @@ jit issue update abc123 --state done
 ```
 
 **Key Insight:** JIT has no central coordination server. Agents share repository
-state; atomic writes keep files whole, and `jit claim acquire` provides advisory
-leases when exclusive coordination is needed.
+state; each mutation is published through one redo record that keeps its files
+whole and carries an interrupted mutation to completion at the next session, and
+`jit claim acquire` provides advisory leases when exclusive coordination is
+needed.
 
 ## Domain Examples
 
