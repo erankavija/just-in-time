@@ -220,13 +220,17 @@ pub trait RepositoryStateStore {
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
 }
 
-/// The record a crash left, applied and cleared: one, or none.
+/// The record [`read_leftover_record`] found, applied and cleared: one, or
+/// none.
 ///
 /// # Errors
 ///
-/// A record this open cannot read or apply stays where it is, for the next one.
-fn apply_leftover_record(roots: &CapabilityRoots) -> Result<usize, RepositoryStateStoreError> {
-    let Some(record) = read_leftover_record(roots)? else {
+/// A record this open cannot apply stays where it is, for the next one.
+fn apply_leftover_record(
+    roots: &CapabilityRoots,
+    record: Option<RedoRecord>,
+) -> Result<usize, RepositoryStateStoreError> {
+    let Some(record) = record else {
         return Ok(0);
     };
     RedoApplier::new(Arc::new(NoRedoInterruptions))
@@ -235,9 +239,11 @@ fn apply_leftover_record(roots: &CapabilityRoots) -> Result<usize, RepositorySta
     Ok(1)
 }
 
-/// A repository holding no record pays one look at the record's own name: the
-/// parent walk stops at an absent scratch directory and the open at an absent
-/// record, and nothing there is enumerated or otherwise read.
+/// Runs before any recovery pass, so a record it refuses is refused over an
+/// untouched repository. A repository holding no record pays one look at the
+/// record's own name: the parent walk stops at an absent scratch directory and
+/// the open at an absent record, and nothing there is enumerated or otherwise
+/// read.
 fn read_leftover_record(
     roots: &CapabilityRoots,
 ) -> Result<Option<RedoRecord>, RepositoryStateStoreError> {
@@ -268,8 +274,9 @@ fn read_leftover_record(
 /// [`apply_leftover_record`] over the record the in-memory backend holds.
 fn apply_memory_leftover_record(
     storage: &InMemoryStorage,
+    record: Option<RedoRecord>,
 ) -> Result<usize, RepositoryStateStoreError> {
-    let Some(record) = storage.repository_state().record.clone() else {
+    let Some(record) = record else {
         return Ok(0);
     };
     MemoryRedoApplier::new(Arc::new(NoRedoInterruptions))
@@ -446,6 +453,14 @@ impl RepositoryStateStore for JsonFileStorage {
         // so this pre-recovery view is authoritative for the external pass; the
         // main kernel is rebuilt from a fresh view afterward.
         let (pre_roots, pre_parent, pre_leaf) = CapabilityRoots::open(&layout)?;
+        // Read before the first recovery pass, apply after the last: a record
+        // this session cannot read is refused while the repository is still
+        // exactly as it was found, and a readable one is carried to the apply
+        // below rather than read a second time, so a repository holding none
+        // still pays one by-name look. The bytes are safe to carry because the
+        // bootstrap lock above is held until this session ends, and no other
+        // session can open — and so write a record — while it is.
+        let leftover_record = read_leftover_record(&pre_roots)?;
         let recovery_kernel = FileTransactionKernel::for_repository_layout(
             layout.clone(),
             pre_roots.worktree.try_clone()?,
@@ -494,7 +509,7 @@ impl RepositoryStateStore for JsonFileStorage {
                 // state, and after journal recovery, whose rollback would undo
                 // what the record published. The record lives inside the data
                 // root, so the absent-root branch has none to apply.
-                let applied_records = apply_leftover_record(&roots)?;
+                let applied_records = apply_leftover_record(&roots, leftover_record)?;
                 (
                     Some(repository_guard),
                     internal_transactions,
@@ -545,18 +560,25 @@ impl RepositoryStateStore for InMemoryStorage {
         failures.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
         let mut state = self.repository_state();
         let data_exists = state.data_root_exists;
+        // Read before recovery and applied after it, as on the JSON backend.
+        // The value cannot be malformed here, so nothing is refused; taking it
+        // at the same moment keeps one reading of when a record is decided.
+        let leftover_record = state.record.clone();
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
         }
         recover_memory_state(&mut state, failures.as_ref())?;
+        // The root recovery left, not the one it found: the JSON open rediscovers
+        // its capabilities after recovery and gates the apply on those.
+        let recovered_data_root = state.data_root_exists;
         drop(state);
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositorySweepCompanions)?;
         }
         // Where the JSON open applies it, gated on the data root for the same
         // reason: a record's home is inside it.
-        let applied_records = match data_exists {
-            true => apply_memory_leftover_record(self)?,
+        let applied_records = match recovered_data_root {
+            true => apply_memory_leftover_record(self, leftover_record)?,
             false => 0,
         };
         Ok(Box::new(MemoryMutationSession {
