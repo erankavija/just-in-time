@@ -238,6 +238,7 @@
       "path": "docs/concepts/core-model.md"
     }
   ],
+  "done_at": "2026-09-21T19:15:19.164814918Z",
   "first_ready_at": "2026-09-21T16:03:09.606058262Z",
   "gates_required": [
     "doc-review",
@@ -245,8 +246,8 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T18:26:51.224267453Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T19:13:34.839449288Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -267,7 +268,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Concept documents state the redo record",
-  "updated_at": "2026-09-21T18:26:51.224267453Z"
+  "updated_at": "2026-09-21T19:15:19.164814918Z"
 }

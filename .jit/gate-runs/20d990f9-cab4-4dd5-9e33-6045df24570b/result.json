@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a4ad73db33c7a4660a4e9b46fe4000b6479484ab",
+  "completed_at": "2026-09-21T19:13:34.524769116Z",
+  "duration_ms": 106770,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue's concept documentation accurately describes the current redo-record publication model.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ead8f86d-2e45-4144-98e7-2f814b643091",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20d990f9-cab4-4dd5-9e33-6045df24570b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T19:11:47.754632427Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children; reviewed eight individually tagged commits. Their union affects four concept pages.\n\nThe prior event-log finding is not valid against the current production path: production records `events.jsonl` as a complete file write; the generic `EventAppend` replay path is not emitted there. The concept updates accurately cover redo publication, recovery, and safe temp-file cleanup.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's concept documentation accurately describes the current redo-record publication model.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

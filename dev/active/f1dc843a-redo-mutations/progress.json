@@ -489,7 +489,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
+          "status": "in_progress — rework round 3 under ESC-12 (counter reset to 1)"
         },
         {
           "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
@@ -500,7 +500,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
+          "status": "done — docs-mechanical and doc-review passed; doc-review on a fresh --force evaluation under ESC-11 after two rework rounds"
         },
         {
           "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
@@ -1069,6 +1069,16 @@
         "Adding a sentence about the unused event-append capability, which puts internal detail in adopter docs that b4483ad6 must remove in wave 16.",
         "Rewording to a positioned append, which would make both pages false against the code."
       ]
+    },
+    {
+      "id": "ESC-12",
+      "wave": 13,
+      "category": "5a - same root-cause finding three times, with 5 - rework past MAX_REWORK_ATTEMPTS",
+      "question": "ccea63de failed doc-review a third time on the claim that production publishes the event log by positioned append, which the code contradicts.",
+      "resolution": "Owner chose to drop the event-log write mechanism from the storage-format reference: the page states the write contract, and whole-file versus positioned writing is volatile mechanism that changes in wave 16. The owner also permitted making other parts of the section terser where that helps. One further rework on ccea63de; owner guidance resets its rework counter per the escalation policy.",
+      "resolved_by": "user",
+      "status": "closed",
+      "follow_on": "The review prompt's capability-versus-behaviour gap stays open as a candidate improvement, not blocking. 42478e5d's dispatch will direct it to describe the recovery contract without event-log write mechanics. guarantees.md (ead8f86d, closed) keeps its correct mechanism statement; b4483ad6 REQ-06 owns flipping it."
     }
   ],
   "rework_counts": {
@@ -1082,7 +1092,7 @@
     "0938d99e": 1,
     "4319256e": 1,
     "10ba2e35": 1,
-    "ccea63de": 2,
+    "ccea63de": 1,
     "ead8f86d": 2,
     "79252d23": 1
   },
@@ -1678,6 +1688,12 @@
       "previous_count": 2,
       "reason": "Invoker supplied guidance under escalation-policy entry 5 (ESC-06); the policy states guidance resets the counter.",
       "session": 2
+    },
+    {
+      "issue": "ccea63de",
+      "previous_count": 2,
+      "reason": "Owner guidance under ESC-12 resets the counter.",
+      "session": 6
     }
   ],
   "checkpoint_reconciliation": {
