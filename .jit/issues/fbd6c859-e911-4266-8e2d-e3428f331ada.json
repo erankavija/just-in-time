@@ -22,7 +22,13 @@
     "docs-mechanical",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-21T20:51:15.886977006Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fbd6c859-e911-4266-8e2d-e3428f331ada",
   "labels": [
     "type:story",
@@ -38,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record publication cutover",
-  "updated_at": "2026-09-21T20:48:15.510879103Z"
+  "updated_at": "2026-09-21T20:51:15.886977006Z"
 }
