@@ -330,11 +330,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// conflict and the driver re-runs this whole closure against a fresh
     /// capture, so a confirmed candidate is never stale by more than one
     /// failed apply attempt -- the same guarantee any pre-change per-issue
-    /// outcome had. A zero-action delta is a kernel-level no-op short-
-    /// circuited before any journal, control-directory, or event-log write
-    /// (`execute_repository_delta`'s `if delta.actions().is_empty()` guard,
-    /// mirrored by `MemoryMutationSession::apply`), so a successful
-    /// confirmation leaves no observable trace and still counts as exactly
+    /// outcome had. A zero-action delta is a session-level no-op short-
+    /// circuited before any record or event-log write (the empty-action arm of
+    /// each backend's `apply`), so a successful confirmation leaves no
+    /// observable trace and still counts as exactly
     /// one session open, matching the `C * J + 1` budget (jit 412925b9,
     /// round 4).
     fn confirm_bulk_noop_candidates(
@@ -401,10 +400,9 @@ impl<S: IssueStore> CommandExecutor<S> {
                 // capture, apply raises a retryable conflict and the driver
                 // re-runs this whole closure against a fresh capture, so a
                 // confirmed candidate is never stale by more than one failed
-                // apply attempt. The kernel short-circuits a zero-action
-                // delta before any journal, control, or event write (see
-                // `execute_repository_delta` / `MemoryMutationSession::apply`),
-                // so a successful confirmation leaves no observable trace.
+                // apply attempt. A session short-circuits a zero-action
+                // delta before any record or event write, so a successful
+                // confirmation leaves no observable trace.
                 let plan = finalize(&layout, &image, &context, &[])?;
                 Ok(SessionStep::Apply(plan, confirmed))
             },

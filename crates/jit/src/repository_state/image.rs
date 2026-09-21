@@ -1494,7 +1494,7 @@ impl RepositoryDelta {
     /// cannot collide: two not-yet-created targets cannot share physical storage.
     /// A hard link introduced only after capture is a distinct, second-layer
     /// concern: it changes a captured identity and is rejected by the held-session
-    /// pre-journal revalidation as a retryable conflict.
+    /// pre-commit write-set check as a retryable conflict.
     fn reject_physical_aliases(actions: &[RepositoryAction]) -> Result<(), DeltaError> {
         let mut by_identity: BTreeMap<&EntryIdentity, &VirtualPath> = BTreeMap::new();
         for action in actions {

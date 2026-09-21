@@ -71,9 +71,9 @@ impl RepositoryExportIntent {
 
     /// Select an absent repository target for one complete snapshot tree.
     ///
-    /// The resulting multi-action delta is recoverable and rollbackable through
-    /// repository transactions; it does not claim rename-style observer
-    /// isolation while the individual tree entries are published.
+    /// The resulting multi-action delta is replayed forward by its redo
+    /// record; it does not claim rename-style observer isolation while the
+    /// individual tree entries are published.
     pub(crate) fn new_tree(
         target: VirtualPath,
         mut directories: BTreeSet<RootRelativePath>,

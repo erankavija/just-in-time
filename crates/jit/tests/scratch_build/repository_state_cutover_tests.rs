@@ -1,9 +1,9 @@
 //! Known current-tree regressions forbidden by the repository-state cutover.
 //!
 //! Publisher access itself is compiler-enforced rather than asserted here: the
-//! in-repository writers (`storage::atomic_write`) and the transaction kernel
-//! (`storage::file_transaction`) are `pub(in crate::storage)`, so `crate::commands`
-//! cannot name them and a regression fails the build. This file covers the
+//! in-repository writers (`storage::atomic_write`) and the absent-root
+//! publisher (`storage::init_publish`) are `pub(in crate::storage)`, so
+//! `crate::commands` cannot name them and a regression fails the build. This file covers the
 //! properties visibility cannot express — deleted modules and wrappers,
 //! canonical renderer ownership, and the modules that must reach the filesystem
 //! only through a named discipline or not at all — because `std::fs` is public
