@@ -80,7 +80,9 @@ pub enum RedoApplyError {
     Path(#[from] RepositoryLayoutError),
     #[error(transparent)]
     Capture(#[from] CaptureError),
-    #[error(transparent)]
+    /// Named rather than transparent, so the failure stays in the error chain a
+    /// caller classifies an exit code from.
+    #[error("redo application failed: {0}")]
     Io(#[from] std::io::Error),
 }
 
