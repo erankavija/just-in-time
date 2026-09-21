@@ -140,12 +140,16 @@ under `dev/archive/**` is edited: archived work products are pinned (investigati
 
 ### `redo-record-shape` [implementation-produced] — The record vocabulary
 
-Three operations over data-root and worktree paths: put file with bytes and mode, delete
-file, append events at an offset with its bytes. Parent directories are created as a put
-needs them, because both backends verify parents and a delta omitting ancestors fails apply
-(investigation §7 Q1). A move is a put and a delete in one record, which is what archive
-execution is. Re-application is idempotent: a put overwrites, a delete tolerates absence, an
-append rewrites the same bytes at the same offset (OD-7).
+Four operations over data-root and worktree paths: make directory, put file with bytes and
+mode, delete file, append events at an offset with its bytes, applied in that order. Parent
+directories are created as an operation needs them, because both backends verify parents and
+a delta omitting ancestors fails apply (investigation §7 Q1). A make-directory operation
+therefore carries only a directory no other operation's path lies beneath — the empty
+directory a tree export creates, which no put would otherwise reach (ESC-09). A move is a
+put and a delete in one record, which is what archive execution is. Re-application is
+idempotent: a make-directory succeeds on the directory it already made and refuses any other
+occupant, a put overwrites, a delete tolerates absence, an append rewrites the same bytes at
+the same offset (OD-7).
 
 ### `record-commit-point` [implementation-produced] — Durability of the record
 
