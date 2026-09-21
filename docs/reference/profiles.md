@@ -386,9 +386,10 @@ without writing. Successful reapplication of an exact installation returns
 `unchanged` for every package of the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
-into one validated, recoverable transaction. The scaffold and the complete
-dependency-ordered profile selection are planned and published together; no
-member of that selection is published separately. For an existing repository,
+into one validated, recoverable publication. The scaffold and the complete
+dependency-ordered profile selection are planned together and reach the
+repository through one redo record; no member of that selection is published
+separately. For an existing repository,
 `jit profile apply` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
@@ -492,7 +493,8 @@ authorities for generated schemas, default-rule assertions, configured
 projections, and installed profile targets. `jit validate` reports an owned
 target that is missing, stale, has the wrong executable mode, or is unexpected.
 For provenance-proven derived-state repairs, `jit validate --fix` recomputes
-the complete final-state plan and publishes it in one recoverable transaction.
+the complete final-state plan and publishes it through one redo record, as
+every other mutation publishes.
 It preserves authored rule comments, order, policy, and all unmanaged document
 bytes; it never treats a conventional filename as proof of ownership.
 
@@ -515,49 +517,58 @@ see the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 ## Publication, rollback, and recovery
 
 Before writing, JIT captures the relevant repository state, builds a
-deterministic final-state plan, and validates the complete overlay. It rebuilds
-that plan while holding the repository-wide mutation lock before publication.
-Package, path, conflict, and validation failures discovered before transaction
-preparation leave repository targets unchanged.
+deterministic final-state plan, and validates the complete overlay. Capture,
+planning, and publication all happen inside one session holding the
+repository-wide mutation lock, and a write set that moved since the capture
+refuses the publication rather than overwriting it, so the command retries from
+a fresh capture. Package, path, conflict, and validation failures discovered
+before the record is written leave every repository target unchanged.
 
-Publication is a recoverable multi-file transaction, not a claim that the host
-filesystem can atomically rename an entire directory tree. An ordinary handled
-failure before the commit point is returned only after JIT restores and verifies
-the exact old state. If interruption or rollback uncertainty prevents that
-proof, JIT retains a typed durable journal in one of two machine-local control
-areas:
+An application publishes through one redo record, the same record every JIT
+mutation publishes through. The record carries the complete new bytes of every
+file the application writes, the paths it removes, and the bytes it appends to
+the event log at the offset the capture observed. Writing that record into the
+data root's machine-local scratch area and syncing it is the commit point:
+before it, nothing of the application has been published; after it, the
+application is decided. JIT then applies the record forward and removes it.
+This is a recoverable multi-file publication, not a claim that the host
+filesystem can atomically rename an entire directory tree.
 
-- repository-sibling `.jit-bootstrap/`, marked by
-  `transaction-protocol-v1`, for initialization when `.jit/` did not yet exist;
-- `.jit/tmp/transactions/` for an existing repository.
+A profile writes worktree targets — its assets and its managed regions —
+alongside data-root targets: the registries its contributions reach, its
+provenance record, and the event log. Both are operations of the one record, so
+an application never commits its worktree half apart from its data-root half.
+The [Storage Format](storage-format.md) reference defines the data root's
+layout, which of its files are machine-local, and how a file there is replaced.
 
-When the selected data root does not exist, JIT assembles the complete root in a
-verified sibling staging directory while the external bootstrap journal remains
-outside it. One atomic no-replace rename publishes that complete root. An
-occupied destination is never overwritten; the losing operation fails and a
-retry treats the now-existing root through the ordinary existing-root path.
+Nothing is rolled back. An interruption before the commit point leaves no
+published bytes to undo; an interruption after it leaves the record where the
+next session that opens the repository finds it, and that session applies it
+before any command reads or writes through it. Applying a record reaches the
+same repository state however often it runs, so an interrupted application is
+resumed rather than reverted, and repository state converges to the old targets
+before the commit point and the new ones after it. It cannot protect against
+unrelated programs modifying those paths outside JIT's locks, storage checks,
+and record application.
 
-Every later mutating JIT command runs mandatory recovery before normal
-repository services start. A prepared journal is rolled back to the old state; a
-committed journal verifies the new state and completes cleanup. Recovery
-therefore converges to all-old or all-new JIT-managed targets. It cannot protect
-against unrelated programs modifying those paths outside JIT's locks, storage
-checks, and recovery protocol.
+Profiled `jit init` publishes a data root that does not exist yet, so its
+record is made durable inside the new root before that root is published: one
+rename commits the data root and the record carrying the same application's
+worktree targets together. An interruption leaves either no root at all or a
+root carrying the record the next session applies. An occupied destination is
+never overwritten; the losing operation fails, and a retry proceeds through the
+ordinary existing-root path.
 
-An applied result may include a `transaction_cleanup_pending` warning after the
-commit point. In that case the new repository state is authoritative and the
-retained committed journal is cleanup work for mandatory recovery, not a failed
-application.
-
-Successful application writes a canonical provenance record at
-`.jit/profiles/<profile-id>.json` (therefore the `jit-dogfood` ID selects the
-matching filename). Every changed or applied package has its own provenance
-record. One repository-scoped `profile_lifecycle` audit event records the
-operation and its per-profile outcomes for the complete selection. Each record
-stores the profile ID, version, origin, package hash, resolved public variable
-values with their source kinds, and sorted ownership claims. Each claim names
-one semantic declaration, file target, or managed region together with its
-published-base fingerprint and retention intent. That fingerprint is what
+Successful application writes a canonical provenance record named by the
+profile ID, in the applied-profile record directory the [Storage
+Format](storage-format.md) reference lays out. Every changed or applied package
+has its own provenance record. One repository-scoped `profile_lifecycle` audit
+event records the operation and its per-profile outcomes for the complete
+selection; the redo record that publishes the targets is what appends it. Each
+provenance record stores the profile ID, version, origin, package hash,
+resolved public variable values with their source kinds, and sorted ownership
+claims. Each claim names one semantic declaration, file target, or managed
+region together with its published-base fingerprint and retention intent. That fingerprint is what
 [`jit profile validate`](cli-commands.md#jit-profile-validate) holds the
 repository's current content against, so it names the profile that diverged and
 the contribution that did. A managed region whose published body encloses a
@@ -568,8 +579,9 @@ base is not the whole of what sits between its delimiters. Validation and repair
 reuse the stored resolved variable values but load effective configuration from
 the declared registries; they do not read the current process environment. The
 audit event carries the resolved target hashes but never the resolved values.
-The record does not state why a package was applied, so it reads the same
-whether the adopter named that package or received it as another's dependency.
+A provenance record does not state why a package was applied, so it reads the
+same whether the adopter named that package or received it as another's
+dependency.
 
 The origin says where the applied bytes were read from: the repository
 directory holding the package, carried as a worktree-relative location, so
