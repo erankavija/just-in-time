@@ -57,8 +57,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-09-21T09:51:57.710359860Z",
+      "status": "failed",
+      "updated_at": "2026-09-21T10:12:32.977015710Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -81,5 +81,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-09-21T10:01:27.108232794Z"
+  "updated_at": "2026-09-21T10:12:32.977015710Z"
 }
