@@ -28,9 +28,9 @@ const _: () = assert!(LOCK_TIMEOUT_SECS >= 60);
 /// contended file lock.
 pub const LOCK_POLL_INTERVAL_MS: u64 = 10;
 
-/// Minimum age, in seconds, at which `cleanup_orphaned_temp_files` sweeps an
-/// orphaned `*.tmp` file (1 hour). Passed by the `jit recover` command, the
-/// single recovery entry point.
+/// Minimum age, in seconds, at which `jit recover` sweeps an orphaned `*.tmp`
+/// file (1 hour). A pending redo record is not a `*.tmp` file; session open
+/// applies it instead.
 pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 
 /// Default time-to-live, in seconds, for a lease created by `jit claim acquire`,
@@ -70,7 +70,7 @@ pub fn render_reference_markdown() -> String {
         (
             "Temp-file cleanup threshold",
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
-            "Minimum age at which `cleanup_orphaned_temp_files` sweeps an orphaned `*.tmp` file. Passed by the `jit recover` command, the single recovery entry point.",
+            "Minimum age at which `jit recover` removes an orphaned `*.tmp` file under `.jit/`. A pending redo record is not swept: every session open applies a leftover record (see [Publication and Recovery](storage-format.md#publication-and-recovery)).",
         ),
         (
             "Claim lease TTL",

@@ -48,6 +48,444 @@
       "format": "markdown",
       "label": "Epic plan",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "29342eb4508378acc7daffe555ca6d1f087baa7246c9420f09321c61f8c6a459",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "89027e14b1660abb5dac33aa7399946f312d502302b2591f9380e5356ca0f1e1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "error-codes.md",
+          "resolved_path": "docs/reference/error-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "33ec2bbe7657d6618cce9ec5e78738fe79f426614a8dead7ed88cd1665afb9e9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "events.md",
+          "resolved_path": "docs/reference/events.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8260fc3073ffeaf7b60cc6b70009b497b0b46e864bd19e5a2ebbb9bd1c4ba4fe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5e7e9edc89660dac8e2cf4565efc63158ffe1b452682e860201761d99d7f7e66",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/quickstart.md",
+          "resolved_path": "docs/tutorials/quickstart.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7e9179c8f7bb19fe33902f0c3a0eced332bd95efbe01229b6472d5c24da34d70",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../mcp-server/curated-tools.json",
+          "resolved_path": "mcp-server/curated-tools.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6c7271281fe7af9adc684eeaef9b85218bd614471ffa1eb9331507fcaed8d97c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ad3cff6f141b528da80cf2c3b78fe70440e984a9525348f79ea6386ebd929aa2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "a75f123fe3bf0eef09727cd2e6a73b72eea46c07f3d69a491e0d7111d0be3491",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/hierarchy-resolution.md",
+          "resolved_path": "docs/concepts/hierarchy-resolution.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5322e72afd12561aa5d9d68348c993a17054219b43d9d24f4ecb3cec051ff414",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/planning-bracket.md",
+          "resolved_path": "docs/concepts/planning-bracket.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "86cf09354906a93315c5602572cdeff962afae0e48e003adeb7e0cb0e4055474",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "74d8fa8df7ba9a61fada7d41534922b85c7b0ad37b508ebe5c8150d34461b71c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/mcp-integration.md",
+          "resolved_path": "docs/how-to/mcp-integration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5a236c4b956f3b132b692966f158017ed81d2e621beb349cd14318f3c87f369e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "gate-presets.md",
+          "resolved_path": "docs/reference/gate-presets.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "98f0915c35a8869ae2e8bf5cd830f04321e616fa734a62c616bdf963d1a952af",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://github.com/BurntSushi/ripgrep",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7b26dab4af70ad227c2da408ea2680b6004c1c0c144f43485dd7d2d1b09c9cdf",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-records.md",
+          "resolved_path": "docs/reference/storage-records.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d0a0d73aa7a2e4cf36216c54d40ac69a6a0e3d71a9548ff209af971bc1b9436",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../mcp-server/README.md",
+          "resolved_path": "mcp-server/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7b5b96e926a39fcc555d289ac0bc9474b743337667e241639ab3dccda7b96c99",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "cli-commands",
+      "path": "docs/reference/cli-commands.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "0c6d27ca7e54a49336ac585ed6b428ed1ba8636759460aa89194c91666aa2703",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "accf347d5f32b93a8a20639b61d1d03e649b78081fcee39b18cd2fcba18e19f0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "claim.md",
+          "resolved_path": "docs/reference/claim.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7b5b96e926a39fcc555d289ac0bc9474b743337667e241639ab3dccda7b96c99",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ad3cff6f141b528da80cf2c3b78fe70440e984a9525348f79ea6386ebd929aa2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2f11c000dc5f28801596fab38e631fd5097200a9853cc062e50861169908548f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/parallel-work-worktrees.md",
+          "resolved_path": "docs/tutorials/parallel-work-worktrees.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5ab220a30f693e362c78bef0403607933b66e2c8253e9c7ac72b8289d0aefa23",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/troubleshooting.md",
+          "resolved_path": "docs/how-to/troubleshooting.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "29342eb4508378acc7daffe555ca6d1f087baa7246c9420f09321c61f8c6a459",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "worktree-validate",
+      "path": "docs/reference/worktree-validate.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "fca83276b3da0fe575b282dde091c49e58ab6dafc1b227f0300fb3d8292d5fd2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "multi-agent-coordination.md",
+          "resolved_path": "docs/how-to/multi-agent-coordination.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ad3cff6f141b528da80cf2c3b78fe70440e984a9525348f79ea6386ebd929aa2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "29342eb4508378acc7daffe555ca6d1f087baa7246c9420f09321c61f8c6a459",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "accf347d5f32b93a8a20639b61d1d03e649b78081fcee39b18cd2fcba18e19f0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/claim.md",
+          "resolved_path": "docs/reference/claim.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "866e8342a0d4cafa95cbeeed2e9ce25cfad35cb66c7e2d4cd517ad108e747003",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/guarantees.md",
+          "resolved_path": "docs/concepts/guarantees.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7b5b96e926a39fcc555d289ac0bc9474b743337667e241639ab3dccda7b96c99",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "troubleshooting",
+      "path": "docs/how-to/troubleshooting.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "33ec2bbe7657d6618cce9ec5e78738fe79f426614a8dead7ed88cd1665afb9e9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "events.md",
+          "resolved_path": "docs/reference/events.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "ad3cff6f141b528da80cf2c3b78fe70440e984a9525348f79ea6386ebd929aa2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "runtime-defaults.md",
+          "resolved_path": "docs/reference/runtime-defaults.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8260fc3073ffeaf7b60cc6b70009b497b0b46e864bd19e5a2ebbb9bd1c4ba4fe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "89027e14b1660abb5dac33aa7399946f312d502302b2591f9380e5356ca0f1e1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "error-codes.md",
+          "resolved_path": "docs/reference/error-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "0c6d27ca7e54a49336ac585ed6b428ed1ba8636759460aa89194c91666aa2703",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "fca83276b3da0fe575b282dde091c49e58ab6dafc1b227f0300fb3d8292d5fd2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/multi-agent-coordination.md",
+          "resolved_path": "docs/how-to/multi-agent-coordination.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2f11c000dc5f28801596fab38e631fd5097200a9853cc062e50861169908548f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/parallel-work-worktrees.md",
+          "resolved_path": "docs/tutorials/parallel-work-worktrees.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7b5b96e926a39fcc555d289ac0bc9474b743337667e241639ab3dccda7b96c99",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "f71486ef3690c72329800a5aaa9d1f4f9d1d0d9210250c224121e0760afbed7a",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "example-config.toml",
+          "resolved_path": "docs/reference/example-config.toml"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6c7271281fe7af9adc684eeaef9b85218bd614471ffa1eb9331507fcaed8d97c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "configuration",
+      "path": "docs/reference/configuration.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "7b5b96e926a39fcc555d289ac0bc9474b743337667e241639ab3dccda7b96c99",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "runtime-defaults",
+      "path": "docs/reference/runtime-defaults.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6c7271281fe7af9adc684eeaef9b85218bd614471ffa1eb9331507fcaed8d97c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "error-codes",
+      "path": "docs/reference/error-codes.md"
     }
   ],
   "first_ready_at": "2026-09-21T16:03:08.028889250Z",
@@ -74,5 +512,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T19:52:01.175528915Z"
+  "updated_at": "2026-09-21T19:57:14.496923020Z"
 }

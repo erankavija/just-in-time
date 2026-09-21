@@ -415,17 +415,18 @@ pub enum Commands {
         leases: bool,
     },
 
-    /// Run recovery routines to fix common issues
+    /// Run recovery: apply a leftover redo record, then the repair routines
     ///
-    /// Performs automatic recovery operations:
-    /// - Cleans up stale locks from crashed processes (PID check)
-    /// - Rebuilds corrupted claims index from append-only log
-    /// - Evicts expired leases
-    /// - Removes orphaned temp files (older than 1 hour)
+    /// Like every mutating command, applies a leftover redo record when its
+    /// session opens, then in sequence:
     /// - Repairs declaration-derived state through the `jit validate --fix` path
+    /// - In a Git repository: cleans up stale claim locks from crashed processes
+    ///   (PID check), rebuilds a corrupted claims index from its append-only log,
+    ///   and evicts expired leases; without Git, skips these with a warning
+    /// - Removes orphaned `*.tmp` files under `.jit/` (older than 1 hour)
     ///
-    /// Safe to run at any time: cleanup removes only provably stale data, and
-    /// derived-state repair uses the transactional validation path.
+    /// Safe to run at any time: it removes only provably stale data and never
+    /// the pending redo record.
     Recover {
         #[arg(long)]
         json: bool,

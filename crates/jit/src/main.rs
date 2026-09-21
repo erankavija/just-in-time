@@ -581,6 +581,35 @@ fn command_json_error(error: &anyhow::Error, code: ErrorCode) -> jit::output::Js
     JsonError::new(code, error.to_string())
 }
 
+/// Whether session open failed on the leftover redo record: it did not parse,
+/// or applying it failed.
+fn is_leftover_record_failure(error: &anyhow::Error) -> bool {
+    use jit::storage::RepositoryStateStoreError;
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<RepositoryStateStoreError>(),
+            Some(
+                RepositoryStateStoreError::UnreadableRedoRecord { .. }
+                    | RepositoryStateStoreError::RedoApply(_)
+            )
+        )
+    })
+}
+
+/// Report a `jit recover` failure as `recovery_failed` and exit.
+fn exit_recovery_failed(error: &anyhow::Error, json: bool) -> ! {
+    if json {
+        let output = command_json_error(error, ErrorCode::RecoveryFailed);
+        match output.to_json_string() {
+            Ok(rendered) => println!("{rendered}"),
+            Err(render) => eprintln!("Error: {render}"),
+        }
+        std::process::exit(output.exit_code().code());
+    }
+    eprintln!("Recovery failed: {error}");
+    std::process::exit(1);
+}
+
 fn claim_json_error(error: &anyhow::Error, fallback_code: ErrorCode) -> jit::output::JsonError {
     let classified = error_to_error_code(error);
     let code = if classified == ErrorCode::GenericError {
@@ -2484,7 +2513,16 @@ fn run() -> Result<()> {
             drop(session);
             recovered
         } else {
-            let guard = storage.open_and_retain_mutation_session(executor_layout.clone())?;
+            let guard = storage
+                .open_and_retain_mutation_session(executor_layout.clone())
+                .map_err(|error| match &command {
+                    // Applying the leftover record is `jit recover`'s own work,
+                    // so its failure is a recovery failure, not a startup one.
+                    Commands::Recover { json } if is_leftover_record_failure(&error) => {
+                        exit_recovery_failed(&error, *json)
+                    }
+                    _ => error,
+                })?;
             let recovered = guard.recovery_report().recovered_count();
             retained_mutation_session = Some(guard);
             recovered
@@ -7863,16 +7901,7 @@ fn run() -> Result<()> {
                         }
                     }
                 }
-                Err(e) => {
-                    if json {
-                        let output = command_json_error(&e, jit::output::ErrorCode::RecoveryFailed);
-                        println!("{}", output.to_json_string()?);
-                        std::process::exit(output.exit_code().code());
-                    } else {
-                        eprintln!("Recovery failed: {}", e);
-                        std::process::exit(1);
-                    }
-                }
+                Err(e) => exit_recovery_failed(&e, json),
             }
         }
         Commands::Migrate(migrate_cmd) => match migrate_cmd {

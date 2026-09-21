@@ -1,7 +1,7 @@
 # Troubleshooting Guide
 
 > **Diátaxis Type:** How-To  
-> **Last Updated:** 2026-02-02
+> **Last Updated:** 2026-09-21
 
 Solutions for common issues with parallel work and claim coordination.
 
@@ -231,14 +231,73 @@ The claims index can always be rebuilt from the append-only `claims.jsonl` log.
 ### Coordination-State Repair
 
 `jit validate` reports repository validation findings. Stale locks, expired
-leases, orphaned temporary files, and a corrupted claims index are coordination
-state for `jit recover` to repair.
+leases, and a corrupted claims index are coordination state for `jit recover` to
+repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+from the scratch directory `.jit/tmp/`: that record is a pending mutation's
+commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
+names what is safe to remove by hand.
 
 ```bash
 # Repair only provably stale coordination data, then validate the repository.
 jit recover
 jit validate
 ```
+
+### Interrupted Mutation
+
+A mutation interrupted after its commit point leaves its redo record in
+`.jit/tmp/`. The next mutating command applies the record when its session
+opens, before its own work, so the interrupted mutation completes; `jit recover`
+applies it without other work. Leave the record in place. The record and its
+application are defined in
+[Publication and Recovery](../reference/storage-format.md#publication-and-recovery).
+
+### Leftover Record Fails to Apply
+
+**Symptom:**
+```
+Error: applying the leftover redo record failed: <cause>
+```
+
+**Cause:** Session open could not apply the record, for example because a path
+it writes is not writable or a file occupies a directory it creates. The record
+stays in place.
+
+**Solution:** Fix the named cause and rerun the command. Application can be
+repeated, so the part already applied does no harm.
+
+### Unreadable Leftover Record
+
+**Symptom:**
+```
+Error: leftover redo record tmp/redo.record is not readable: <reason>
+```
+
+Every mutating command, `jit recover` included, fails this way until the record
+is dealt with. Read-only commands still run and show the repository without the
+pending mutation. JIT refuses the record rather than skipping it, because a
+record damaged after it was committed may belong to a partly applied mutation.
+
+**Solution:** Copy the record (`redo.record` in `.jit/tmp/`) outside `.jit/`,
+then act on the reason:
+
+- `redo record carries no header line` or `redo record holds fewer content
+  bytes than its header declares`: what an interrupted write of the record
+  leaves. The record is written before any other file of its mutation, so an
+  interrupted record write means the mutation changed nothing. Remove the record
+  (`rm .jit/tmp/redo.record`) and rerun the interrupted command. A complete
+  record cut short later by something other than JIT gives the same reasons,
+  and JIT cannot tell the two apart: remove the record only when the last JIT
+  mutation was interrupted (crash, kill, power loss) and nothing has touched the
+  record since. Otherwise, treat it as the last case.
+- `redo record format version <N> is not supported`: a JIT build with a
+  different record format wrote it. Run a build that reads that format; it
+  applies the record.
+- Any other reason: an interrupted write cannot produce it, so the record was
+  complete and was changed afterwards. Its mutation may be partly applied, and
+  JIT cannot finish it. Restore the repository from its last commit or backup
+  (`git status` shows what changed), which discards the mutation along with any
+  other uncommitted work, then remove the record and run `jit validate`.
 
 ---
 
@@ -435,7 +494,7 @@ When things are badly broken:
 # 1. Check what's wrong
 jit validate
 
-# 2. Run automatic recovery
+# 2. Apply any leftover redo record at session open, then run the repair routines
 jit recover
 
 # 3. Verify fixed

@@ -994,7 +994,7 @@ impl ErrorCode {
             ErrorCode::GenericError => {
                 "A command failed without a more specific public classification."
             }
-            ErrorCode::RecoveryFailed => "Repository recovery failed.",
+            ErrorCode::RecoveryFailed => "Applying a leftover redo record, or a recovery routine, failed.",
             ErrorCode::ClaimAcquireError => "Claim acquisition failed.",
             ErrorCode::ClaimReleaseError => "Claim release failed.",
             ErrorCode::ClaimRenewError => "Claim renewal failed.",
