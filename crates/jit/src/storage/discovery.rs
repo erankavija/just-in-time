@@ -16,12 +16,12 @@
 //! An explicit `JIT_DATA_DIR` override always takes precedence over discovery;
 //! that check lives in the caller (`main.rs`), not here.
 
+use crate::storage::redo_record::{RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use std::path::{Path, PathBuf};
 
 /// Marker file that distinguishes an initialized `.jit` repository from a bare
 /// or partial `.jit` directory. Kept in sync with `json::INDEX_FILE`.
 const INDEX_FILE: &str = "index.json";
-const TRANSACTION_PROTOCOL_MARKER: &str = "transaction-protocol-v1";
 
 /// Walk upward from `start`, using `exists` to probe each candidate path, to
 /// find the nearest ancestor directory containing an initialized `.jit`
@@ -70,11 +70,10 @@ pub fn discover_jit_dir(start: &Path) -> Option<PathBuf> {
 
 /// Discover the nearest repository that may need mutation-time recovery.
 ///
-/// In addition to an initialized `.jit/index.json`, this recognizes the two
-/// durable journal locations that must remain reachable before normal
-/// validation: `.jit-bootstrap/transaction-protocol-v1` and
-/// `.jit/tmp/transactions`. A random bare `.jit/` still does not capture
-/// discovery.
+/// In addition to an initialized `.jit/index.json`, this recognizes a pending
+/// redo record under the data root's scratch directory, so a repository whose
+/// index a crash left unwritten still reaches the session open that applies it.
+/// A random bare `.jit/` still does not capture discovery.
 pub fn discover_recovery_jit_dir(start: &Path) -> Option<PathBuf> {
     discover_recovery_from(start, Path::exists)
 }
@@ -84,13 +83,8 @@ pub fn discover_recovery_from(start: &Path, exists: impl Fn(&Path) -> bool) -> O
     for ancestor in start.ancestors() {
         let jit = ancestor.join(".jit");
         let initialized = exists(&jit.join(INDEX_FILE));
-        let internal_recovery = exists(&jit.join("tmp").join("transactions"));
-        let external_recovery = exists(
-            &ancestor
-                .join(".jit-bootstrap")
-                .join(TRANSACTION_PROTOCOL_MARKER),
-        );
-        if initialized || internal_recovery || external_recovery {
+        let pending_record = exists(&jit.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME));
+        if initialized || pending_record {
             return Some(jit);
         }
         if exists(&ancestor.join(".git")) {
@@ -247,20 +241,12 @@ mod tests {
     }
 
     #[test]
-    fn test_recovery_discovery_finds_external_fresh_root_journal() {
+    fn test_recovery_discovery_finds_a_pending_record_without_an_index() {
         let set = HashSet::from([
             PathBuf::from("/repo/.git"),
-            PathBuf::from("/repo/.jit-bootstrap/transaction-protocol-v1"),
-        ]);
-        let found = discover_recovery_from(Path::new("/repo/sub"), exists_in(set));
-        assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
-    }
-
-    #[test]
-    fn test_recovery_discovery_finds_internal_no_index_journal() {
-        let set = HashSet::from([
-            PathBuf::from("/repo/.git"),
-            PathBuf::from("/repo/.jit/tmp/transactions"),
+            PathBuf::from("/repo/.jit")
+                .join(RECORD_SCRATCH_DIR)
+                .join(RECORD_FILE_NAME),
         ]);
         let found = discover_recovery_from(Path::new("/repo/sub"), exists_in(set));
         assert_eq!(found, Some(PathBuf::from("/repo/.jit")));
