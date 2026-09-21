@@ -983,6 +983,13 @@
       "suggested_remedy": "Commit tracker state after each claim/evaluate pair before reading a `Tree:` line as a statement about the source tree; `git status --porcelain` separates the two.",
       "status": "recorded",
       "session": 5
+    },
+    {
+      "id": "PF-16",
+      "finding": "A worker's completion report does not mean its processes have exited, and a lead message sent to a reported-done worker puts it back to work. The lead sent w-0938d99e an added @/inv/essential-code-prose constraint just as it reported; the worker resumed and started rebuilding in its worktree while the lead merged the branch and evaluated cargo-ci on main. The two builds collided: suite-clock 97493 ms and suite-build 54114 ms against a 22.4 s / 0.6 s warm baseline, load average 10.3, with the worker's own rust-lld and rustc processes visible in its worktree target. The gate's FAIL said nothing about the tree.",
+      "suggested_remedy": "Confirm a worker is IDLE (ListAgents, not its report) before merging or gating its branch. Deliver any added constraint before dispatch, not after a report; when one must be sent late, expect the worker to resume and do not start a gate until it goes idle again.",
+      "status": "adopted by the lead",
+      "session": 5
     }
   ],
   "evidence_requirements": [
