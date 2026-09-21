@@ -1,9 +1,9 @@
 //! Recovered layout-aware repository capture and mutation sessions.
 //!
 //! Session orchestration lives here; an apply publishes through one redo record
-//! and an opening session applies the record a crash left. A delta over an
-//! absent data root is the exception, published by the capability-confined
-//! [`FileTransactionKernel`] until initialization takes it over (jit:b0ee2dd6).
+//! and an opening session applies the record a crash left. A delta creating an
+//! absent data root is the exception, published by [`init_publish`] because the
+//! record's home is inside the root that does not exist yet.
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
@@ -820,9 +820,9 @@ impl MemoryMutationSession {
     }
 }
 
-/// Publish a delta whose data root does not exist yet, as the transaction
-/// kernel publishes one on the filesystem: the record's home is inside the root
-/// the delta creates, so this one delta reaches the entry map directly.
+/// Publish a delta whose data root does not exist yet, as the init publisher
+/// publishes one on the filesystem: the record's home is inside the root the
+/// delta creates, so this one delta reaches the entry map directly.
 fn publish_absent_memory_root(
     layout: &RepositoryLayout,
     storage: &InMemoryStorage,
@@ -1393,8 +1393,8 @@ fn memory_listing(
 }
 
 /// Require that an action's parent directory already exists, mirroring the JSON
-/// kernel's `open_parent` (which walks every intermediate component under the root
-/// capability and fails with `MissingParent` when one is absent). Only intermediate
+/// backend's parent walk (every intermediate component under the root
+/// capability, failing when one is absent). Only intermediate
 /// directories are checked; the root capability itself (empty relative) always
 /// exists and is never a parent to verify. Because every `CreateDirectory` goes
 /// through this same check, a present `Directory` entry implies all its ancestors

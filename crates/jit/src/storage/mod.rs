@@ -61,8 +61,9 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-// Storage-only: the transaction kernel publishes into repository roots, so no
-// command may name it. Commands publish through `RepositoryStateStore` sessions.
+// Storage-only: the transaction kernel recovers journals inside repository
+// roots, so no command may name it. Commands publish through
+// `RepositoryStateStore` sessions.
 pub(in crate::storage) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,

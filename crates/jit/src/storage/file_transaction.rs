@@ -3,6 +3,11 @@
 //! The caller owns serialization and passes a held repository write guard. This
 //! module owns only storage mechanics: synchronized stages, a versioned journal,
 //! identity-checked forward/reverse actions, durable decisions, and cleanup.
+//!
+//! No publisher reaches the publication half any more: session open recovers
+//! the journals a crash left here, and that is the whole of this module's
+//! remaining work. The items the publication half left without a caller carry a
+//! dead-code allowance each until the module retires (jit:b0ee2dd6).
 
 use super::atomic_write::rename_noreplace_cap;
 use super::repo_lock::RepoWriteGuard;
@@ -62,9 +67,9 @@ pub(in crate::storage) enum TransactionControlLocation {
 /// Capability-based transaction service rooted at an already-open repository
 /// parent directory. No publication operation accepts an ambient path.
 ///
-/// Storage-only by construction: repository publication is reachable to the rest
-/// of the crate solely through `RepositoryStateStore` mutation sessions, so
-/// `crate::commands` cannot name this type.
+/// Storage-only by construction: this type is reachable to the rest of the
+/// crate solely through `RepositoryStateStore` mutation sessions, so
+/// `crate::commands` cannot name it.
 pub(in crate::storage) struct FileTransactionKernel {
     injector: Arc<dyn TransactionFailureInjector>,
     repository: RepositoryKernelRoots,
