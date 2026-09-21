@@ -61,6 +61,11 @@
       "status": "passed",
       "updated_at": "2026-09-21T11:17:03.899894033Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-09-21T11:24:12.717871211Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "4319256e-edab-443b-814e-923d241e84f0",
@@ -80,5 +85,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Session commit through the redo record",
-  "updated_at": "2026-09-21T11:17:03.899894033Z"
+  "updated_at": "2026-09-21T11:24:12.717871211Z"
 }

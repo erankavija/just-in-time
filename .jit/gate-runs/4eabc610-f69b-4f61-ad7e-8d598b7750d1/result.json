@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fd87464571fd4c9497e7c958f74ddcbfe299d744",
+  "completed_at": "2026-09-21T11:24:12.412255390Z",
+  "duration_ms": 400928,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "id": "F1",
+        "line": 664,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "CreateDirectory actions mutate state before the redo record is committed, allowing an interruption or commit failure to leave partial state without recovery."
+      }
+    ],
+    "summary": "Directory materialization can escape the redo record and leave unrecoverable partial state.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4319256e-edab-443b-814e-923d241e84f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4eabc610-f69b-4f61-ad7e-8d598b7750d1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T11:17:31.484140291Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 11063 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c3af-7bef-7dc1-a24c-15728e728328\n--------\nuser\n--- 11050 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 41c5f5f70, cc7b5de16, 99823fc5a, 749f3408a, d638b0496, fd8746457 (`jit:4319256e`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: narrowed reads of applicable config, resolved-item sources, individual commit patches, and affected source/test ranges\n\n1. F1 — **blocking, issue-impact**: Directory actions mutate state before the redo record is committed. Both backends create all `CreateDirectory` entries after the conflict check but before installing the record ([repository_state_store.rs:664](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:664), [repository_state_store.rs:772](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:772)). An interruption or record-commit failure in that window leaves newly created directories with no redo record for the next session to replay or roll back, so the repository is neither the complete old nor new state. Further, `AlreadyExists` is accepted without verifying that the occupant is a directory ([repository_state_store.rs:1003](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:1003)); a raced regular-file occupant can therefore leave a committed record that cannot apply. This violates recoverable complete-state publication. References: @/charter/D-17, @/invariant/derived-state-coherence.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Directory materialization can escape the redo record and leave unrecoverable partial state.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CreateDirectory actions mutate state before the redo record is committed, allowing an interruption or commit failure to leave partial state without recovery.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":664,\"references\":[\"@/charter/D-17\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
