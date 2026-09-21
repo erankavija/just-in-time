@@ -55,7 +55,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-09-21T19:59:31.003207427Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "434a60b7-a837-432d-b6ef-8711026e2210",
   "labels": [
     "epic:redo-mutations",
@@ -69,5 +75,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record documentation states that an unreadable leftover record is refused",
-  "updated_at": "2026-09-21T19:52:01.574974949Z"
+  "updated_at": "2026-09-21T19:59:31.003207427Z"
 }
