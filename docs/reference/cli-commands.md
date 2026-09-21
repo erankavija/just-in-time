@@ -634,7 +634,7 @@ record; `path:<DIR>` reads a package directory relative to the worktree.
 `jit init` accepts the same ordered selector stream. A path selector is confined
 to the worktree, including when the data root is nested there. A path package
 whose declared id shadows a selected recorded id is rejected. The applied-profile record is
-defined in [Repository Profiles](profiles.md#publication-rollback-and-recovery),
+defined in [Repository Profiles](profiles.md#publication-and-recovery),
 including where it lives and what it stores, so a package obtained from a
 repository directory can be found again on later runs. A recorded location is
 confined to the worktree. If it no longer holds a readable package, the command
@@ -729,7 +729,7 @@ divergences among everything else it checks, under the `profile-ownership` rule.
 What each divergence means for the package that owns it, and which of
 [`reconfigure`](#jit-profile-reconfigure), [`upgrade`](#jit-profile-upgrade), and
 [`capture`](#jit-profile-capture) resolves it, is described in
-[Repository Profiles](profiles.md#publication-rollback-and-recovery).
+[Repository Profiles](profiles.md#publication-and-recovery).
 
 ### `jit profile diff`
 
