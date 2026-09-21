@@ -111,12 +111,12 @@ Recovery is that same forward pass. A session that opens over a leftover record
 applies it, removes it, and only then serves the command. Application is
 idempotent: a directory already present is accepted, a write overwrites, and
 a removal tolerates absence, so an interrupted application converges on the
-same state however often it is replayed. A record whose own write was
-interrupted is a proper prefix of the serialized form, which no session parses,
-so the residue is skipped rather than applied. Repository discovery
-recognizes a pending record as well as an initialized `index.json`, so a
-repository whose index a crash left unwritten still reaches the session open
-that applies its record.
+same state however often it is replayed. A leftover record that does not
+parse, including one whose own write was interrupted, is refused: the session
+open fails with an error naming the record and does not proceed. Repository
+discovery recognizes a pending record as well as an initialized `index.json`,
+so a repository whose index a crash left unwritten still reaches the session
+open that applies its record.
 
 ## Issue JSON Schema
 
