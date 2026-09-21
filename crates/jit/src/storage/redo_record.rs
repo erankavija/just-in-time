@@ -195,10 +195,11 @@ impl RedoRecord {
     /// a live file is replaced.
     ///
     /// The record is written in place rather than staged and renamed: an
-    /// interrupted write leaves a proper prefix of the serialized form, which
-    /// [`Self::parse`] rejects, so a later session skips the residue. An
-    /// occupied record path is refused instead of replaced: what occupies it is
-    /// a mutation no session applied, and session open decides its fate.
+    /// interrupted write leaves a truncated record, which [`Self::parse`]
+    /// rejects; session open then refuses to proceed with
+    /// `UnreadableRedoRecord` rather than skipping it. An occupied record path
+    /// is refused instead of replaced: what occupies it is a mutation no
+    /// session applied, and session open decides its fate.
     ///
     /// # Errors
     ///
