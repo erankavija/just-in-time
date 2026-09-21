@@ -446,19 +446,22 @@ impl JsonFileStorage {
         }
     }
 
-    /// Construct storage with deterministic recovered-session failure injection.
+    /// Construct storage whose mutation sessions are interrupted at the moments
+    /// `interruptions` selects.
     #[cfg(feature = "test-support")]
     #[doc(hidden)]
-    pub fn with_repository_state_failures<P: AsRef<Path>>(
+    pub fn with_mutation_interruptions<P: AsRef<Path>>(
         root: P,
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     ) -> Self {
-        let mut storage = Self::new(root);
-        storage.repository_state_failures = failures;
-        storage
+        Self::with_repository_state_failures(
+            root,
+            crate::storage::KernelInterruptions::new(interruptions),
+        )
     }
 
-    /// Construct storage with deterministic recovered-session failure injection.
+    /// Construct storage whose mutation sessions are interrupted at the moments
+    /// `interruptions` selects.
     ///
     /// Crate-internal twin of the `test-support`-gated public constructor
     /// above: same body, `pub(crate)` visibility, so internal callers resolve
@@ -468,7 +471,22 @@ impl JsonFileStorage {
     /// an ordinary non-test build with the feature off.
     #[cfg(not(feature = "test-support"))]
     #[allow(dead_code)]
-    pub(crate) fn with_repository_state_failures<P: AsRef<Path>>(
+    pub(crate) fn with_mutation_interruptions<P: AsRef<Path>>(
+        root: P,
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
+    ) -> Self {
+        Self::with_repository_state_failures(
+            root,
+            crate::storage::KernelInterruptions::new(interruptions),
+        )
+    }
+
+    /// Construct storage with deterministic kernel-boundary failure injection.
+    ///
+    /// Kernel vocabulary, so the storage layer's own suite reaches boundaries
+    /// no session moment stands for; every other consumer injects through
+    /// [`with_mutation_interruptions`](Self::with_mutation_interruptions).
+    pub(in crate::storage) fn with_repository_state_failures<P: AsRef<Path>>(
         root: P,
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     ) -> Self {

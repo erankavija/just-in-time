@@ -3086,7 +3086,8 @@ mod tests {
         ScalarTarget, SetStringTarget,
     };
     use crate::storage::{
-        discover_repository_layout, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
+        discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
+        RepositoryStateStoreError,
     };
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
@@ -3132,23 +3133,23 @@ mod tests {
         }
     }
 
-    impl crate::storage::TransactionFailureInjector for PublicationCounter {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-            if point == &crate::storage::TransactionFailurePoint::RepositoryBeforeControlCreation {
+    impl crate::storage::MutationInterruptionInjector for PublicationCounter {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            if point == &MutationPoint::Redo(RedoPoint::BeforeApply) {
                 self.0.fetch_add(1, Ordering::SeqCst);
             }
             Ok(())
         }
     }
 
-    /// Fail one named kernel boundary, then let the next recovered session run.
+    /// Fail one named session moment, then let the next recovered session run.
     struct FailOnce {
-        point: crate::storage::TransactionFailurePoint,
+        point: MutationPoint,
         fired: AtomicBool,
     }
 
     impl FailOnce {
-        fn at(point: crate::storage::TransactionFailurePoint) -> Arc<Self> {
+        fn at(point: MutationPoint) -> Arc<Self> {
             Arc::new(Self {
                 point,
                 fired: AtomicBool::new(false),
@@ -3156,8 +3157,8 @@ mod tests {
         }
     }
 
-    impl crate::storage::TransactionFailureInjector for FailOnce {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+    impl crate::storage::MutationInterruptionInjector for FailOnce {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
             if point == &self.point && !self.fired.swap(true, Ordering::SeqCst) {
                 return Err(std::io::Error::other(format!("injected {point:?}")));
             }
@@ -4189,11 +4190,9 @@ placement = "append"
         )
         .unwrap();
         let events_before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let storage = JsonFileStorage::with_repository_state_failures(
+        let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
-            FailOnce::at(
-                crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
-            ),
+            FailOnce::at(MutationPoint::Redo(RedoPoint::BeforeApply)),
         );
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
@@ -5506,7 +5505,7 @@ template = true
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
         let right = package_declaring(&temp, "vendor/right", "right", &[]);
         let publications = PublicationCounter::new();
-        let storage = JsonFileStorage::with_repository_state_failures(
+        let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
             publications.clone(),
         );
@@ -5554,7 +5553,7 @@ template = true
         let events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let records = ["left", "right"].map(|id| record_for(&temp, id));
         let publications = PublicationCounter::new();
-        let storage = JsonFileStorage::with_repository_state_failures(
+        let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
             publications.clone(),
         );
@@ -5593,11 +5592,9 @@ template = true
         let left = package_declaring(&temp, "vendor/left", "left", &[]);
         let right = package_declaring(&temp, "vendor/right", "right", &[]);
         let original_events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
-        let storage = JsonFileStorage::with_repository_state_failures(
+        let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
-            FailOnce::at(
-                crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
-            ),
+            FailOnce::at(MutationPoint::Redo(RedoPoint::BeforeApply)),
         );
         let selectors = [package_selector(&left), package_selector(&right)];
         let executor = CommandExecutor::new(storage.clone())
@@ -8263,7 +8260,7 @@ target = "docs/guide.md"
             .expect("the authored package captures");
 
         let publications = PublicationCounter::new();
-        let counted = CommandExecutor::new(JsonFileStorage::with_repository_state_failures(
+        let counted = CommandExecutor::new(JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
             publications.clone(),
         ))

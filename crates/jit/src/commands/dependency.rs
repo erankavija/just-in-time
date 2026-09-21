@@ -1027,13 +1027,15 @@ fn derive_reduced_graph_intents(
 #[cfg(test)]
 mod captured_tests {
     use super::*;
-    use crate::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
+    use crate::storage::{
+        InMemoryStorage, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
+    };
 
     #[derive(Default)]
-    struct OneFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
+    struct OneFailure(std::sync::Mutex<Option<MutationPoint>>);
 
-    impl crate::storage::TransactionFailureInjector for OneFailure {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+    impl crate::storage::MutationInterruptionInjector for OneFailure {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
             let mut selected = self.0.lock().unwrap();
             if selected.as_ref() == Some(point) {
                 selected.take();
@@ -1079,11 +1081,11 @@ mod captured_tests {
     #[test]
     fn test_dependency_removal_and_auto_ready_recover_together() {
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            MutationPoint::Redo(RedoPoint::BeforeApply),
         ))));
-        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        let storage = InMemoryStorage::with_mutation_interruptions(failures);
         storage.add_data_file("config.toml", "");
-        let recovered = storage.without_repository_state_failures();
+        let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
 
         let mut dependency =

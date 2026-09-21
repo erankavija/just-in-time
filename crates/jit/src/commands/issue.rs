@@ -826,7 +826,7 @@ mod tests {
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use crate::domain::State;
-    use crate::storage::InMemoryStorage;
+    use crate::storage::{InMemoryStorage, MutationPoint, RedoPoint};
     use std::collections::HashMap;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -835,19 +835,19 @@ mod tests {
 
     struct SessionOpenCounter(AtomicUsize);
 
-    impl crate::storage::TransactionFailureInjector for SessionOpenCounter {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-            if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+    impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            if point == &MutationPoint::SessionOpen {
                 self.0.fetch_add(1, Ordering::SeqCst);
             }
             Ok(())
         }
     }
 
-    struct DeleteFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
+    struct DeleteFailure(std::sync::Mutex<Option<MutationPoint>>);
 
-    impl crate::storage::TransactionFailureInjector for DeleteFailure {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+    impl crate::storage::MutationInterruptionInjector for DeleteFailure {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
             let mut selected = self.0.lock().unwrap();
             if selected.as_ref() == Some(point) {
                 selected.take();
@@ -911,7 +911,7 @@ mod tests {
     #[test]
     fn test_check_auto_transitions_opens_sessions_only_for_eligible_backlog_issues() {
         let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let eligible =
@@ -2075,11 +2075,11 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(DeleteFailure(std::sync::Mutex::new(Some(
-            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            MutationPoint::Redo(RedoPoint::BeforeApply),
         ))));
-        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        let storage = InMemoryStorage::with_mutation_interruptions(failures);
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
-        let recovered = storage.without_repository_state_failures();
+        let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
         let dependency =
             crate::domain::types::fixture_issue("Dependency".to_string(), String::new());

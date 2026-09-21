@@ -1645,17 +1645,17 @@ mod tests {
     use crate::domain::{
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
-    use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage};
+    use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
-    struct FailNthCommitDecision {
+    struct FailNthPublication {
         remaining: Mutex<usize>,
     }
 
-    impl FailNthCommitDecision {
+    impl FailNthPublication {
         fn new(nth: usize) -> Arc<Self> {
             Arc::new(Self {
                 remaining: Mutex::new(nth),
@@ -1663,9 +1663,9 @@ mod tests {
         }
     }
 
-    impl crate::storage::TransactionFailureInjector for FailNthCommitDecision {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-            if point != &crate::storage::TransactionFailurePoint::RepositoryBeforeCommitDecision {
+    impl crate::storage::MutationInterruptionInjector for FailNthPublication {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            if point != &MutationPoint::Redo(RedoPoint::BeforeApply) {
                 return Ok(());
             }
 
@@ -3919,12 +3919,10 @@ source-of-truth = "markdown-first"
             .add_gate(&issue_id, "postcheck".to_string())
             .unwrap();
 
-        // The Gated transition is the first commit decision. The automated
+        // The Gated transition is the first publication. The automated
         // postcheck's coupled issue/run/event publication is the second.
-        let failures = FailNthCommitDecision::new(2);
-        let storage = executor
-            .storage()
-            .with_repository_state_failure_view(failures);
+        let failures = FailNthPublication::new(2);
+        let storage = executor.storage().with_mutation_interruption_view(failures);
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor

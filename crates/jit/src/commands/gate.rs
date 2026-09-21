@@ -1868,14 +1868,14 @@ enforce_leases = "off"
         );
     }
 
-    /// Fail the transaction kernel once, at the selected control point, then
-    /// let every later point through. Shared by every gate-command durability
+    /// Interrupt the mutation session once, at the selected moment, then let
+    /// every later moment through. Shared by every gate-command durability
     /// test in this module, whatever repository state the command publishes.
     #[derive(Default)]
-    struct OneFailure(std::sync::Mutex<Option<crate::storage::TransactionFailurePoint>>);
+    struct OneFailure(std::sync::Mutex<Option<crate::storage::MutationPoint>>);
 
-    impl crate::storage::TransactionFailureInjector for OneFailure {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+    impl crate::storage::MutationInterruptionInjector for OneFailure {
+        fn check(&self, point: &crate::storage::MutationPoint) -> std::io::Result<()> {
             let mut selected = self.0.lock().unwrap();
             if selected.as_ref() == Some(point) {
                 selected.take();
@@ -1890,11 +1890,11 @@ enforce_leases = "off"
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
         ))));
-        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        let storage = InMemoryStorage::with_mutation_interruptions(failures);
         seed_repo_file(&storage, ".jit/config.toml", "");
-        let recovered = storage.without_repository_state_failures();
+        let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
@@ -1927,9 +1927,9 @@ enforce_leases = "off"
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::TransactionFailurePoint::RepositoryAfterAction { action: 0 },
+            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
         ))));
-        let storage = InMemoryStorage::with_repository_state_failures(failures);
+        let storage = InMemoryStorage::with_mutation_interruptions(failures);
         seed_repo_file(
             &storage,
             ".jit/config.toml",
@@ -1938,7 +1938,7 @@ enforce_leases = "off"
         let issue = crate::domain::types::fixture_issue("Preset target".into(), String::new());
         let issue_id = issue.id.clone();
         seed_issue(&storage, issue);
-        let recovered = storage.without_repository_state_failures();
+        let recovered = storage.without_mutation_interruptions();
         let layout = storage.repository_layout();
         let executor = CommandExecutor::new(storage).with_layout(layout.clone());
 
@@ -1976,15 +1976,13 @@ enforce_leases = "off"
             .add_gate(&issue_id, "manual-gate".to_string())
             .unwrap();
 
-        // The attestation's own publication is the first commit decision this
-        // view sees: the fixture above was seeded through the clean storage.
+        // The attestation's own publication is the first this view sees: the
+        // fixture above was seeded through the clean storage.
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::TransactionFailurePoint::RepositoryBeforeCommitDecision,
+            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
         ))));
-        let injected = executor
-            .storage()
-            .with_repository_state_failure_view(failures);
-        let recovered = injected.without_repository_state_failures();
+        let injected = executor.storage().with_mutation_interruption_view(failures);
+        let recovered = injected.without_mutation_interruptions();
         let layout = injected.repository_layout();
         let attesting = crate::commands::test_helpers::memory_executor(injected);
 

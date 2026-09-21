@@ -6,7 +6,7 @@ use crate::commands::CommandExecutor;
 use crate::declarations::GateRegistry;
 use crate::domain::Issue;
 use crate::repository_state::RepositoryIndex;
-use crate::storage::{InMemoryStorage, IssueStore};
+use crate::storage::{InMemoryStorage, IssueStore, MutationPoint};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
@@ -64,9 +64,9 @@ pub(crate) fn seed_gate_registry(storage: &InMemoryStorage, registry: &GateRegis
     );
 }
 
-/// Count session opens via the once-per-session-open failure-point probe
-/// (`TransactionFailurePoint::RepositoryRecoveryExternal`), injecting no
-/// failure. Shared by tests that assert a session-open budget.
+/// Count session opens via [`MutationPoint::SessionOpen`], the moment every
+/// session open crosses exactly once, injecting no failure. Shared by tests
+/// that assert a session-open budget.
 pub(crate) struct SessionOpenCounter(AtomicUsize);
 
 impl SessionOpenCounter {
@@ -79,9 +79,9 @@ impl SessionOpenCounter {
     }
 }
 
-impl crate::storage::TransactionFailureInjector for SessionOpenCounter {
-    fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        if point == &MutationPoint::SessionOpen {
             self.0.fetch_add(1, Ordering::SeqCst);
         }
         Ok(())
@@ -97,15 +97,15 @@ pub(crate) enum SessionRaceAction {
 /// Performs one repository write when a session reaches `point` for the
 /// `trigger`th time, standing in for a concurrent writer at that boundary.
 struct SessionRace {
-    point: crate::storage::TransactionFailurePoint,
+    point: MutationPoint,
     trigger: usize,
     hits: std::sync::atomic::AtomicUsize,
     storage: Mutex<Option<InMemoryStorage>>,
     action: Mutex<Option<SessionRaceAction>>,
 }
 
-impl crate::storage::TransactionFailureInjector for SessionRace {
-    fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+impl crate::storage::MutationInterruptionInjector for SessionRace {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
         if point == &self.point
             && self.hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1 == self.trigger
         {
@@ -142,12 +142,7 @@ pub(crate) fn with_open_race(
     trigger: usize,
     action: SessionRaceAction,
 ) -> InMemoryStorage {
-    with_session_race(
-        storage,
-        crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal,
-        trigger,
-        action,
-    )
+    with_session_race(storage, MutationPoint::SessionOpen, trigger, action)
 }
 
 /// Race `action` against the first apply, after its session captured the read
@@ -156,17 +151,12 @@ pub(crate) fn with_apply_race(
     storage: InMemoryStorage,
     action: SessionRaceAction,
 ) -> InMemoryStorage {
-    with_session_race(
-        storage,
-        crate::storage::TransactionFailurePoint::RepositoryBeforeReadSetRevalidation,
-        1,
-        action,
-    )
+    with_session_race(storage, MutationPoint::BeforeCommitCheck, 1, action)
 }
 
 fn with_session_race(
     storage: InMemoryStorage,
-    point: crate::storage::TransactionFailurePoint,
+    point: MutationPoint,
     trigger: usize,
     action: SessionRaceAction,
 ) -> InMemoryStorage {
@@ -177,7 +167,7 @@ fn with_session_race(
         storage: Mutex::new(None),
         action: Mutex::new(Some(action)),
     });
-    let raced = storage.with_repository_state_failure_view(race.clone());
+    let raced = storage.with_mutation_interruption_view(race.clone());
     *race.storage.lock().unwrap() = Some(raced.clone());
     raced
 }

@@ -608,9 +608,10 @@ mod tests {
         }
     }
 
-    impl crate::storage::TransactionFailureInjector for PublicationCounter {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
-            if point == &crate::storage::TransactionFailurePoint::RepositoryBeforeControlCreation {
+    impl crate::storage::MutationInterruptionInjector for PublicationCounter {
+        fn check(&self, point: &crate::storage::MutationPoint) -> std::io::Result<()> {
+            if point == &crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply)
+            {
                 self.0.fetch_add(1, Ordering::SeqCst);
             }
             Ok(())
@@ -917,7 +918,7 @@ source-of-truth = \"registry-first\"\n";
             &["base"],
         );
         let publications = PublicationCounter::new();
-        let storage = JsonFileStorage::with_repository_state_failures(
+        let storage = JsonFileStorage::with_mutation_interruptions(
             repo.path().join(".jit"),
             publications.clone(),
         );
