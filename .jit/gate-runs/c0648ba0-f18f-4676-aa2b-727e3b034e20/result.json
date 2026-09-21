@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3f6880ea35ee157a6d388b961a25830d0dfcafe2",
+  "completed_at": "2026-09-21T20:55:20.521402867Z",
+  "duration_ms": 106167,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Combined redo-record documentation accurately covers publication, recovery, storage, profiles, gate scope, and backup handling.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "fbd6c859-e911-4266-8e2d-e3428f331ada",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c0648ba0-f18f-4676-aa2b-727e3b034e20",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T20:53:34.353910975Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution used the story plus all 17 delivered DAG-resolved task descendants. I inspected their individually tagged commits with rename detection; every included issue had tagged commits, so no fallback attribution was needed. The current tree confirms the combined redo-record contract across storage, recovery, profiles, gate scope, and backups.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Combined redo-record documentation accurately covers publication, recovery, storage, profiles, gate scope, and backup handling.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -28,6 +28,11 @@
       "updated_at": "2026-09-21T20:51:15.886977006Z",
       "updated_by": "auto:executor"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T20:55:20.827970207Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-09-21T20:53:33.615371953Z",
@@ -49,5 +54,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Record publication cutover",
-  "updated_at": "2026-09-21T20:53:33.615371953Z"
+  "updated_at": "2026-09-21T20:55:20.827970207Z"
 }
