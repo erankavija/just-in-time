@@ -184,11 +184,15 @@ The served repository is a host directory and outlives both.
 ## Backup and Recovery
 
 The container serves the repository in place, so a deployment is backed up the
-same way a native one is: archive the repository's `.jit/` directory.
+same way a native one is: archive the repository's `.jit/` directory, excluding
+its `tmp/` scratch directory.
 
 ```bash
-tar czf jit-backup-$(date +%Y%m%d).tar.gz -C .jit .
+tar czf jit-backup-$(date +%Y%m%d).tar.gz --exclude=./tmp -C .jit .
 ```
+
+`tmp/` can hold a mutation's redo record mid-flight, and carrying that record
+into a restore would replay a mutation the restored repository never made.
 
 Restore into a stopped deployment:
 
@@ -197,6 +201,9 @@ docker compose down
 tar xzf jit-backup-YYYYMMDD.tar.gz -C .jit
 docker compose up -d
 ```
+
+A data root restored this way carries no pending redo record, since the backup
+excluded the scratch directory that would have held it.
 
 ## Environment Variables
 
