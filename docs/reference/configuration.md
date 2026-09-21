@@ -533,9 +533,10 @@ runs inside a linked non-primary checkout whose declared stance is `"refuse"`
 and this variable resolves the invocation to `"allow"`, the mutation records a
 `linked_checkout_write_overridden` event (see the
 [event reference](events.md)) naming the checkout, the declaration that would
-have refused, and the override that permitted the invocation. That record is
-composed into the same transaction as the mutation it accompanies, so the two
-become durable together or neither does.
+have refused, and the override that permitted the invocation. That event
+publishes with the mutation as one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery)), so the
+two become durable together or neither does.
 
 Two cases record nothing, because no override outranked a refusal in either:
 setting the variable to `"refuse"`, and running under a repository that already

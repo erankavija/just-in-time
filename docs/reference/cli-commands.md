@@ -388,23 +388,20 @@ unaccounted entries also blocks. The marker's `ArchivePublication.source` is
 `null` because it is executor-generated ownership metadata, not a copied or
 moved repository artifact.
 
-Execution stages and verifies bytes, validates supported local links in the
-proposed mirror layout, and publishes with atomic no-replace semantics. It then
-applies only the plan's unpinned reference changes and invalidates cached asset
-metadata for those moved references. One `artifact_archive_executed` event is
-made durable after publications and reference changes but before any source is
-deleted. A source is removed only when every selected durable reference points
-to its destination and its SHA-256 and size still match the recorded identity.
-If a later publication or reference update fails after an earlier publication
-succeeded, the failing invocation first records the exact successful durable
-subset; failed publications and uncommitted deletions are not claimed.
+Execution verifies each source against its recorded SHA-256 and size and
+validates supported local links in the proposed mirror layout. It then publishes
+one redo record ([Publication and Recovery](storage-format.md#publication-and-recovery)) holding the new mirror files, the plan's unpinned
+reference changes with cached asset metadata cleared for the moved references,
+one `artifact_archive_executed` event, and the removal of each planned source
+whose SHA-256 and size still match the recorded identity. A destination is
+written only where it was absent; an occupied destination with different content
+fails execution.
 
-Deletion failures and files edited after planning are non-fatal
-`deletion-failed` warnings; the source remains. Rerun the same command after an
-interruption. Execution adopts identical occupied mirror content, repairs an
+A source edited after planning is a non-fatal `deletion-failed` warning; the
+source remains. Execution adopts identical occupied mirror content, records an
 unrecorded adopted state with one reconciling event, discovers residual sources
 through the inverse mirror layout, and retries only safe remaining work. A
-stable no-op rerun appends no event. Destinations are never overwritten.
+stable no-op rerun appends no event.
 
 For execution, `--execute --json` prints a distinct schema-version-1 execution
 result. Its top-level fields are `schema_version`, `target`,
@@ -555,9 +552,12 @@ repository package, use a `path:` selector because a fresh repository has no
 applied-profile record to read. The
 resolution and recorded-location failure behavior are defined below. For a
 fresh repository, the neutral scaffold and profile projection are planned,
-validated, and published together. If the data root is absent, JIT stages the complete root
-beside its destination and publishes it with an atomic no-replace rename; an
-occupied destination is never overwritten. The same flag can complete and apply
+validated, and published together. If the data root is absent, JIT writes the
+complete root beside its destination and publishes it with a no-replace rename,
+so an occupied destination is never overwritten; worktree files the command
+writes travel inside that root as a redo record, applied once the root is in
+place. Over an existing data root, initialization publishes one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery)). The same flag can complete and apply
 the profile to an existing partial repository. See
 [Repository Profiles](profiles.md) for the canonical package, conflict,
 transaction, recovery, and lifecycle contract.
@@ -625,8 +625,8 @@ order, with repeated roots reported as `unchanged`. Otherwise it is `null`.
 ## Profile Commands
 
 Profile inspection works without an initialized repository. Application targets
-the current JIT repository and runs mandatory transaction recovery before
-planning or writing.
+the current JIT repository and applies a leftover redo record before planning or
+writing.
 
 Profile commands that select packages take one or more repeatable `--profile <SELECTOR>` flags.
 `id:<PROFILE_ID>` reads the location named by the repository's applied-profile
@@ -786,8 +786,8 @@ the whole decision including the parts that would fail.
 
 ### `jit profile apply`
 
-Apply a profile package read from a repository location through one
-recoverable multi-target transaction:
+Apply a profile package read from a repository location through one redo
+record:
 
 ```bash
 jit profile apply --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
@@ -813,9 +813,9 @@ optional `transaction_id`, non-fatal cleanup warnings, and the target and
 declaration decisions in the shared vocabulary. Exact reapplication of a whole
 set is a successful no-op. Human output uses the same identity, origin, status,
 and per-target decisions. Application
-and all coupled derived targets use the canonical recoverable multi-target
-transaction described in [Repository Profiles](profiles.md), including strict
-managed-region composition.
+and all coupled derived targets publish through that one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery)), with strict managed-region composition as described in
+[Repository Profiles](profiles.md).
 
 Unknown IDs are not-found errors (exit `3`). A dependency that resolves through
 no route fails the application before anything is written, naming the package
@@ -861,8 +861,8 @@ later occurrences report `unchanged` and carry no target decisions, because the
 first occurrence accounts for the publication they observe. Without `--dry-run`,
 JSON returns `ProfileComposedApplyResult` in the standard count-wrapped envelope
 `{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per corresponding
-rehearsal observation. A published run uses the same recoverable multi-target
-transaction as `jit profile apply` and appends one profile-lifecycle audit event
+rehearsal observation. A published run publishes one redo record, as
+`jit profile apply` does, and appends one profile-lifecycle audit event
 naming the operation and each profile's outcome.
 
 An owned target whose content diverged from what this profile recorded is
@@ -937,10 +937,10 @@ not already declare enters the package, and a declaration the package published
 that the repository no longer holds keeps its authored value rather than being
 dropped or defaulted.
 
-Publication is whole and recoverable. The destination ends up holding exactly
+Publication is one redo record. The destination ends up holding exactly
 the manifest, the declared asset sources, and the declared region sources: a
 source the manifest stopped declaring, and any other file the destination held,
-is removed in the same transaction. The manifest is republished whole, so a
+is removed in the same record. The manifest is republished whole, so a
 contribution it stopped declaring does not survive in the captured package. A
 capture that changes nothing publishes nothing.
 
@@ -1034,8 +1034,8 @@ contributes nothing to the package and is admitted only so an archive repacked
 with ordinary tools still reads.
 
 A refused add publishes nothing and leaves no partially extracted package: the
-archive is read into memory and the whole tree is published through one
-recoverable transaction, exactly as a capture is.
+archive is read into memory and the whole tree is published through one redo
+record, exactly as a capture is.
 
 `--dry-run` performs the same archive validation and reports the exact package
 tree publication without writing the destination, provenance, or an event.
@@ -1229,7 +1229,7 @@ jit issue update --filter "label:milestone:v0.9" --remove-label "milestone:v0.9"
 
 **Bulk operation semantics:**
 - **Literal updates:** Sets exactly what you specify (no auto-transitions)
-- **Atomic per-issue:** Each issue update is atomic (write temp + rename)
+- **Atomic per-issue:** Each issue update publishes its own redo record
 - **Predictable:** Safer for large-scale changes
 - **Clear reporting:** Shows modified/skipped/error counts
 
@@ -1289,7 +1289,7 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 - gates not present in the gate registry.
 
 On success, issues, index membership, events, and dependency edges publish as one
-recoverable repository mutation.
+redo record.
 
 **Dry-run.** `--dry-run` performs the same native validation and preserves exit
 code `2` for validation errors, but allocates no ids and writes no issues, index,
@@ -1785,7 +1785,8 @@ Edit an existing gate definition in the registry without hand-editing the
 registry file. Only the fields you pass change; every other field keeps its
 current value. The gate KEY is the gate's identity and cannot be changed. This
 edits the registry definition only; per-issue gate status (`gates_status`) is
-left untouched. The write is atomic (temp-file + rename).
+left untouched. The registry change and its `gate_definition_updated` event
+publish as one redo record.
 
 **Usage:**
 ```bash
@@ -1827,9 +1828,6 @@ checker. A gate that already has a native checker keeps it; otherwise supply
 Switching to `manual` drops the checker. At least one field must be provided; an
 update with no fields is an `INVALID_ARGUMENT` error. Updating a key that is not
 in the registry is a `GATE_NOT_FOUND` error.
-
-The write goes through the canonical atomic-write primitive (temp file + rename)
-and appends a `gate_definition_updated` event to the event log.
 
 **Examples:**
 ```bash
@@ -3506,15 +3504,20 @@ The human error reports the same cause, and no repair target is written.
 
 ### `jit recover`
 
-Run the recovery routines: clear locks left by dead processes (checked by PID),
-rebuild the claims index from the append-only log, evict expired leases, and
-remove temp files older than an hour.
+Like every mutating command, apply a leftover redo record when the session
+opens ([Publication and Recovery](storage-format.md#publication-and-recovery)),
+then run the repair routines in sequence: repair declaration-derived state
+through the `jit validate --fix` path; in a Git repository, clear claim locks
+left by dead processes (checked by PID), rebuild the claims index from its
+append-only log, and evict expired leases; and remove orphaned `*.tmp` files
+under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
 
 ```bash
 jit recover [--json]
 ```
 
-It removes only provably stale data, so it is safe to run at any time.
+It removes only provably stale data and never the pending redo record, so it is
+safe to run at any time.
 
 ## Template Commands
 
@@ -3662,7 +3665,7 @@ missing registry store is never rendered as an empty block. Rendering is
 two-phase: every projection is rendered and its target's final bytes materialized
 in memory before publication, so any such failure — even in a later projection
 of a whole-`[projection.*]` run — leaves every target byte-identical. All changed
-targets then publish through one recoverable repository transaction. JSON uses
+targets then publish through one redo record. JSON uses
 the list envelope `{"count": N, "projections": [...]}`, each entry `{name, target,
 mode, style, kinds, count}`. Under `--json` the pre-write guards above surface the
 `VALIDATION_FAILED` envelope; any other command failure (for example, an
@@ -3887,8 +3890,9 @@ For every issue missing one of the fields, the value is derived from
 `.jit/events.jsonl`: the first `issue_state_changed` into `ready`, the first
 `issue_claimed`, and the first `issue_state_changed` into `done`, respectively.
 Only still-absent fields are filled — an existing timestamp is never overwritten,
-preserving first-occurrence semantics. Updated issues are written atomically and
-a single `lifecycle_timestamps_backfilled` event records the count.
+preserving first-occurrence semantics. Updated issues and a single
+`lifecycle_timestamps_backfilled` event recording the count publish as one redo
+record.
 
 The command is **idempotent**: when no issue is missing a timestamp it writes
 nothing, appends no event, and reports `issues_updated: 0`. An issue whose event

@@ -318,8 +318,9 @@ behavior depends on the arguments.
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
 fixes, transitive-reduction violations, pending state transitions) and owned
 derived-state drift (default rules and schemas, configured projections, and
-provenance-proven profile targets). Derived repairs use one recoverable
-transaction and preserve authored or unmanaged bytes. Ambiguous ownership and
+provenance-proven profile targets). Derived repairs publish through one redo
+record ([Publication and Recovery](storage-format.md#publication-and-recovery))
+and preserve authored or unmanaged bytes. Ambiguous ownership and
 unresolvable provenance are reported without writes. Coordination state — stale
 locks, the claims index, expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
@@ -431,7 +432,7 @@ The pre-commit hook runs similar validation automatically. Use `jit validate` fo
 
 ## jit recover
 
-Run automatic recovery routines.
+Apply a leftover redo record and run the repair routines.
 
 ### Synopsis
 
@@ -441,16 +442,20 @@ jit recover [OPTIONS]
 
 ### Description
 
-Runs the coordination-recovery routines under `.git/jit/` in sequence:
-1. Clean up stale lock files (those owned by dead processes)
-2. Rebuild the claims index from the append-only claims log
-3. Evict expired leases
-4. Remove leftover temporary files
+Like every mutating command, `jit recover` applies a leftover redo record when
+its session opens
+([Publication and Recovery](storage-format.md#publication-and-recovery)). It
+then runs, in sequence:
+1. Repair declaration-derived state through the `jit validate --fix` path
+2. In a Git repository, the coordination routines under `.git/jit/`: clear
+   claim locks left by dead processes (checked by PID), rebuild the claims index
+   from its append-only log, and evict expired leases. Without Git they are
+   skipped with a warning.
+3. Remove orphaned `*.tmp` files under `.jit/` older than the
+   [cleanup threshold](runtime-defaults.md)
 
-This repairs multi-agent coordination state. It is a different repair set from
-`jit validate --fix`, which fixes repairable rule/graph/state findings and
-provenance-proven derived-state drift. Derived repairs use one recoverable
-transaction; ambiguous ownership or provenance fails without writes.
+It removes only provably stale data and never the pending redo record, so it is
+safe to run at any time.
 
 ### Options
 
