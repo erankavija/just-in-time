@@ -68,28 +68,27 @@ files it writes, and each of those files is replaced by temp-file-and-rename.
 
 Before it touches anything live, a mutation describes everything it will write:
 the directories it creates, the complete new bytes of every file it publishes,
-the paths it removes, and the bytes it adds to the event log at the offset it
-captured as the log's length. That description is the **redo record**. JIT writes
+and the paths it removes. That description is the **redo record**. JIT writes
 it as `redo.record` in the data root's scratch directory, `.jit/tmp/`, syncs its
 bytes and fsyncs the directory entries naming them, and only then writes a live
 file. The record's durable write is the mutation's commit point
 (`crates/jit/src/storage/redo_record.rs`).
 
 Applying it is one forward pass: make the directories, replace the files, remove
-the deleted paths, write the event-log bytes at their offset, then remove the
-record. Every step tolerates being redone — a directory already present, a
-replacement that overwrites, a removal whose target is already gone, an append
-rewritten at the same offset — so applying a record twice reaches the same state
-as applying it once (`crates/jit/src/storage/redo_apply.rs`).
+the deleted paths, then remove the record. Every step tolerates being redone — a
+directory already present, a replacement that overwrites, a removal whose target
+is already gone — so applying a record twice reaches the same state as applying
+it once (`crates/jit/src/storage/redo_apply.rs`).
 
 **Converging forward:**
 
 Recovery runs forward only. A crash between the commit point and the record's
 removal leaves the record in place; the next session opened over the repository
 reads it and applies it before anything else mutates, so an interrupted mutation
-completes rather than unwinds (`crates/jit/src/storage/repository_state_store.rs`). Session
-opening is the one recovery boundary, and every mutating command passes through
-it — as does `jit recover`, whose whole job is to reach it.
+completes rather than unwinds
+(`crates/jit/src/storage/repository_state_store.rs`). Session opening is the one
+recovery boundary, and every mutating command passes through it — as does
+`jit recover`, whose whole job is to reach it.
 
 **How one file lands:**
 
@@ -98,11 +97,11 @@ syncs them, and renames onto the target. Keeping both paths in one directory
 makes the rename a same-filesystem operation, so readers never observe a
 partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
 
-`events.jsonl` is never rewritten whole: the record carries only the bytes the
-mutation adds and the offset they belong at, so publishing a mutation costs what
-it changes rather than what the repository has accumulated (`@/charter/D-17`).
-Those bytes are written under the repository write lock and `.events.lock`;
-event readers take the same lock shared (`crates/jit/src/storage/json.rs`).
+`events.jsonl` travels in the record like any other file: a mutation that
+records events carries the log's complete new bytes as one replacement, applied
+by the same temp-file-and-rename. The record is applied under the repository
+write lock and `.events.lock`; event readers take the same lock shared
+(`crates/jit/src/storage/json.rs`).
 
 **Multi-agent safety:**
 
@@ -137,7 +136,6 @@ sequenceDiagram
 
 - **No partial replacement:** Readers do not observe a partially written target file.
 - **No half-finished mutation:** A mutation interrupted after its commit point is applied at the next session open; one interrupted before it never started.
-- **Cost bounded by the change:** The record carries the bytes a mutation writes, not a rewrite of what preceded them.
 - **Coordinated operations:** Cooperating JIT processes use advisory locks where shared access must be serialized.
 
 ### Recoverable Profile Publication
