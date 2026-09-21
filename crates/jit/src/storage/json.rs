@@ -10,7 +10,7 @@ use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
-    SUPPORTED_INDEX_SCHEMA_VERSION,
+    BOOTSTRAP_LOCK_FILE, SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
@@ -420,7 +420,7 @@ impl JsonFileStorage {
         let bootstrap_lock_path = root
             .parent()
             .unwrap_or_else(|| Path::new("."))
-            .join(".jit-bootstrap.lock");
+            .join(BOOTSTRAP_LOCK_FILE);
         // Shared by canonical path so a nested repo's data-root-parent bootstrap
         // lock is the very same reentrant instance as its worktree-root bootstrap
         // lock (they name one file), while a disjoint data root's parent lock is a
@@ -639,7 +639,7 @@ impl JsonFileStorage {
         worktree_root: &Path,
     ) -> Result<RepoWriteGuard> {
         RepoWriteLock::shared_for_lock_path(
-            worktree_root.join(".jit-bootstrap.lock"),
+            worktree_root.join(BOOTSTRAP_LOCK_FILE),
             crate::storage::lock::configured_lock_timeout(),
         )
         .acquire()

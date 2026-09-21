@@ -191,7 +191,7 @@ pub enum GateRegistryEditError {
 pub use overlay::{apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath, RECORD_SCRATCH_DIR,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, RECORD_SCRATCH_DIR,
 };
 pub use profile_apply::{
     applied_profile_records, claimed_target_state, compose_resolved_contributions,
