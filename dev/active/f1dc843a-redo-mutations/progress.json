@@ -1157,6 +1157,18 @@
       "resolution": "Lead corrected the prose rather than gating the exports (22dd9455f). The exports are plan-conformant: plan decision LD-11 states the record's own modules 'join the storage layer's public surface beside json, memory and repository_state_store ... which is their intended end state', and RedoPoint plus its injector trait have been unconditionally public since wave 1. Gating MutationPoint would have made a local parallel variant of that convention (@/inv/convention-convergence).",
       "why_lead_edited": "The finding was a statement of fact about visibility the lead had already verified, with no design judgement left for a worker; a rework dispatch would have cost a fresh worktree and a cold build for a six-line comment. Both gates were re-run over the corrected tree so no jit:8d7f4cec-attributed commit goes unreviewed (PF-05).",
       "verdict": "closed"
+    },
+    {
+      "id": "V-18",
+      "issue": "0938d99e",
+      "what": "The lead's doc/code density check, and the prose commit it wrongly set aside.",
+      "detail": "The lead measured repository_state_store.rs whole-file at 157 doc / 1908 code = 0.08 and concluded the worker's prose needed no tightening. The denominator is almost entirely code the worker did not touch: it wrote 73 production lines there. Measured over the added hunks the figure is 0.301, between json.rs at 0.282 and redo_apply.rs at 0.374. The whole-file number could not answer the question it was used to answer.",
+      "class": "Same error as PF-09 (session 2): a line count wrong because of where it was cut.",
+      "consequence": "The lead told the worker nothing needed tightening, the worker stopped mid-pass leaving the edits uncommitted, and the lead committed them as a non-merge salvage point. The worker then reported the tree at that commit was gate-green (suite-clock 22609 ms), which the lead had not known.",
+      "resolution": "Commit amended to `docs(jit:0938d99e): cut prose the code already states` (cdfb91dc0) and merged. The pass removes doc lines restating their signature, a restatement of RedoApplier::apply's idempotency contract already carried on the applier, and two comments narrating an order the code shows; the call-site comment is reduced to the three reasons for the placement.",
+      "accepted_losses": "The private fn's `# Errors` block no longer names UnreadableRedoRecord and RedoApply, and the call-site comment no longer says 'before any capture'. The error contract is still stated in prose; REQ-01's before-capture property is owned by its test.",
+      "method_note": "Judge an added-prose question over the ADDED hunks. A whole-file ratio is a flag for a file the work created, and noise for a file the work appended to.",
+      "verdict": "closed"
     }
   ],
   "standing_policies": [
