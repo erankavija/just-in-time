@@ -387,10 +387,9 @@ without writing. Successful reapplication of an exact installation returns
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated, recoverable publication. The scaffold and the complete
-dependency-ordered profile selection are planned together and reach one commit
-point, carried by the redo record [Publication, rollback, and
-recovery](#publication-rollback-and-recovery) defines; no member of that
-selection is published separately. For an existing repository,
+dependency-ordered profile selection are planned together and reach the one
+commit point [Publication and recovery](#publication-and-recovery) describes;
+no member of that selection is published separately. For an existing repository,
 `jit profile apply` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
@@ -515,49 +514,30 @@ JSON `VALIDATION_FAILED` error envelope retain the underlying target, delimiter,
 or provenance cause so an operator can repair the authority rather than guess;
 see the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
-## Publication, rollback, and recovery
+## Publication and recovery
 
 Before writing, JIT captures the relevant repository state, builds a
-deterministic final-state plan, and validates the complete overlay. Capture,
-planning, and publication all happen inside one session holding the
-repository-wide mutation lock, and a write set that moved since the capture
-refuses the publication rather than overwriting it, so the command retries from
-a fresh capture. Package, path, conflict, and validation failures discovered
-before the record is written leave every repository target unchanged.
+deterministic final-state plan, and validates the complete overlay. Package,
+path, conflict, and validation failures discovered before publication leave
+every repository target unchanged.
 
-An application publishes through one redo record, the same record every JIT
-mutation publishes through. The record carries the complete new bytes of every
-file the application writes, the paths it removes, and the bytes it appends to
-the event log at the offset the capture observed. Writing that record into the
-data root's machine-local scratch area and syncing it is the commit point:
-before it, nothing of the application has been published; after it, the
-application is decided. JIT then applies the record forward and removes it.
-This is a recoverable multi-file publication, not a claim that the host
-filesystem can atomically rename an entire directory tree.
+A profile application publishes through one redo record, the record every JIT
+mutation publishes through; [Publication and
+Recovery](storage-format.md#publication-and-recovery) in the storage reference
+defines what the record carries, its commit point, and how a session open
+applies a record an interruption left. A profile adds no publication path of its
+own. In a repository whose data root exists, an application's worktree targets
+— assets and managed regions — and its data-root targets — the registries its
+contributions reach, its provenance records, and its `profile_lifecycle` event
+— are operations of that one record, so an application never commits its
+worktree half apart from its data-root half.
 
-A profile writes worktree targets — its assets and its managed regions —
-alongside data-root targets: the registries its contributions reach, its
-provenance record, and the event log. Both are operations of the one record, so
-an application never commits its worktree half apart from its data-root half.
-The [Storage Format](storage-format.md) reference defines the data root's
-layout, which of its files are machine-local, and how a file there is replaced.
-
-Nothing is rolled back. An interruption before the commit point leaves no
-published bytes to undo; an interruption after it leaves the record where the
-next session that opens the repository finds it, and that session applies it
-before any command reads or writes through it. Applying a record reaches the
-same repository state however often it runs, so an interrupted application is
-resumed rather than reverted, and repository state converges to the old targets
-before the commit point and the new ones after it. It cannot protect against
-unrelated programs modifying those paths outside JIT's locks, storage checks,
-and record application.
-
-Profiled `jit init` publishes a data root that does not exist yet, so its
-record is made durable inside the new root before that root is published: one
-rename commits the data root and the record carrying the same application's
-worktree targets together. An interruption leaves either no root at all or a
-root carrying the record the next session applies. An occupied destination is
-never overwritten; the losing operation fails, and a retry proceeds through the
+Profiled `jit init` publishes a data root that does not exist yet. When the
+application has worktree targets, its record is committed inside the new root
+before that root is published, so one rename commits the data root and the
+record carrying those worktree targets together; an application with no
+worktree targets publishes the new root alone. An occupied destination is never
+overwritten; the losing operation fails, and a retry proceeds through the
 ordinary existing-root path.
 
 Successful application writes a canonical provenance record named by the
@@ -565,7 +545,7 @@ profile ID, in the applied-profile record directory the [Storage
 Format](storage-format.md) reference lays out. Every changed or applied package
 has its own provenance record. One repository-scoped `profile_lifecycle` audit
 event records the operation and its per-profile outcomes for the complete
-selection; the redo record that publishes the targets is what appends it. Each
+selection, published by the same redo record as the targets. Each
 provenance record stores the profile ID, version, origin, package hash,
 resolved public variable values with their source kinds, and sorted ownership
 claims. Each claim names one semantic declaration, file target, or managed
