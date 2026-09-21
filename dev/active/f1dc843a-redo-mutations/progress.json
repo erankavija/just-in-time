@@ -395,8 +395,27 @@
         "id": "OC-01",
         "subject": "apply_uncommitted applies worktree operations with no commit point",
         "why": "Epic REQ-03 requires every repository mutation to publish through one redo record and to survive an interruption at every step; epic REQ-05 permits no second publication path beside the record except jit init. A delta over an absent data root that creates no root has nowhere to put a record, so the worker applies its worktree operations directly. An interruption mid-apply leaves partial worktree state with nothing to replay — the same defect class that blocked wave 10 as F1.",
-        "status": "reachability under investigation by the worker before the lead renders a verdict"
-      }
+        "status": "resolved by the lead autonomously — rework round 1 directed",
+        "evidence": "Worker investigation, read-only: only `jit init` reaches apply with an absent data root (every other command is gated by storage.validate(), main.rs:2597 -> json.rs:695-698; the three arms skipping it apply no delta; the two other possibly-absent-layout sessions are recovery-only). `derive_initialization` cannot emit a worktree-only absent-root delta — events_action writes Data(events.jsonl) unconditionally when absent (initialize.rs:869-882), and the profiled path is a strict superset. Nothing below the derivation enforces it: neither RepositoryDelta::new/validate_action nor the seam inspects root classes.",
+        "regression_in_kind": "The pre-change kernel journaled this case externally under the worktree's .jit-bootstrap (file_transaction.rs:958-962), recovered at every session open, so an interruption used to complete forward or roll back. apply_uncommitted has no commit point, so the same interruption leaves partial worktree state with nothing to replay. Unreachable, but a narrowing of epic REQ-03 rather than an inherited hole.",
+        "why_not_escalated": "Epic REQ-05 already decides it: 'no second publication path exists beside the redo record. The one exception is jit init.' A branch publishing worktree files with no commit point is a second publication path, and the exception names init alone. The lead is enforcing an existing criterion, not choosing a new architecture, which escalation-policy puts under 'choosing implementation approach when there is a clearly better option'.",
+        "remedy_directed": "Typed refusal on both backends keyed on 'no data-class action AND at least one worktree-class action', so the (false, true) empty-delta no-op is not caught; apply_uncommitted removed once callerless; test_conformance_worktree_only_absent_root_materializes_no_data_root (repository_state_store_tests.rs:949) rewritten to assert the shared refusal on both backends; the falsified rustdoc corrected. No structural guard below the derivation — the seam is the enforcement point. Estimated ~30 production lines net negative."
+      },
+      "accepted_judgment_calls": [
+        {
+          "call": "decision 1 — the record is committed inside the stage, before the rename",
+          "verdict": "accepted; OD-6 is silent on init's record home, and this makes publishing the root and committing its worktree targets one act. Consequence recorded: a fresh .jit carries an empty tmp/, covered by LD-10's ignore entry."
+        },
+        {
+          "call": "decision 3 — data-parent-replacement test repointed to MutationPoint::BeforeCommitCheck",
+          "verdict": "accepted; the property moves to the seam's revalidate_layout_capabilities, and declining a second pre-rename revalidation is sound because the pinned parent is the capability semantics the design rests on. A second revalidation would also have made REQ-02's occupied destination unreachable."
+        },
+        {
+          "call": "decision 4 — leave_recoverable_journal drives the kernel directly",
+          "verdict": "accepted; cfg(test) only, so the lib-build dead-code allowances REQ-07 covers are unaffected. It retires with the kernel at b0ee2dd6."
+        }
+      ],
+      "footprint_against_note": "292 net production lines against the issue's under-250 Notes estimate. Reason recorded rather than the estimate retrofitted (ESC-08 precedent): 97 lines are REQ-07's dead-code allowances, whose volume the note did not anticipate (rustfmt expands a struct-variant body once it carries an attribute); the publisher module itself is 137 lines, under the note, and publisher-attributable production outside it is 58. No criterion binds the figure."
     },
     {
       "wave_number": 12,
@@ -906,7 +925,8 @@
     "d591a1c8": 1,
     "21e976d1": 1,
     "0938d99e": 1,
-    "4319256e": 1
+    "4319256e": 1,
+    "10ba2e35": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1017,6 +1037,14 @@
       "criterion_subjects": "epic REQ-07",
       "owner": "816df12a REQ-07 (wave 18) — assigned by the owner under ESC-09-followup, so this is closed by assignment rather than deferred.",
       "verify_at": "epic completion reconciliation: dev/vision/9db27a3a-charter.md D-17, both enumerations."
+    },
+    {
+      "id": "SP-09",
+      "wave": 11,
+      "subject": "The init publisher's stage name is deterministic (`<leaf>.stage`), so a repository configured with a data root named X.stage beside one named X would have the second one's stage reclaim the first one's root. The bootstrap lock serializes the sessions but cannot prevent it.",
+      "criterion_subjects": "none — no epic or issue criterion names it",
+      "verdict": "accepted, not guarded. Self-inflicted configuration; OD-6 asks for the deterministic name, and a marker protocol would be new mechanism for a case nobody hits.",
+      "owner": "surfaces in the completion report"
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
