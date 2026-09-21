@@ -390,10 +390,12 @@ moved repository artifact.
 
 Execution verifies each source against its recorded SHA-256 and size and
 validates supported local links in the proposed mirror layout. It then publishes
-one redo record ([Publication and Recovery](storage-format.md#publication-and-recovery)) holding the new mirror files, the plan's unpinned
-reference changes with cached asset metadata cleared for the moved references,
-one `artifact_archive_executed` event, and the removal of each planned source
-whose SHA-256 and size still match the recorded identity. A destination is
+one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery))
+holding the new mirror files, the plan's unpinned reference changes with cached
+asset metadata cleared for the moved references, one `artifact_archive_executed`
+event, and the removal of each planned source whose SHA-256 and size still match
+the recorded identity. A destination is
 written only where it was absent; an occupied destination with different content
 fails execution.
 
@@ -555,9 +557,11 @@ fresh repository, the neutral scaffold and profile projection are planned,
 validated, and published together. If the data root is absent, JIT writes the
 complete root beside its destination and publishes it with a no-replace rename,
 so an occupied destination is never overwritten; worktree files the command
-writes travel inside that root as a redo record, applied once the root is in
-place. Over an existing data root, initialization publishes one redo record
-([Publication and Recovery](storage-format.md#publication-and-recovery)). The same flag can complete and apply
+writes are committed as a redo record inside that root and applied once the root
+is in place. Over an existing data root, initialization publishes one redo
+record
+([Publication and Recovery](storage-format.md#publication-and-recovery)).
+The same flag can complete and apply
 the profile to an existing partial repository. See
 [Repository Profiles](profiles.md) for the canonical package, conflict,
 transaction, recovery, and lifecycle contract.
@@ -813,8 +817,8 @@ optional `transaction_id`, non-fatal cleanup warnings, and the target and
 declaration decisions in the shared vocabulary. Exact reapplication of a whole
 set is a successful no-op. Human output uses the same identity, origin, status,
 and per-target decisions. Application
-and all coupled derived targets publish through that one redo record
-([Publication and Recovery](storage-format.md#publication-and-recovery)), with strict managed-region composition as described in
+and all coupled derived targets publish through that one redo record, with
+strict managed-region composition as described in
 [Repository Profiles](profiles.md).
 
 Unknown IDs are not-found errors (exit `3`). A dependency that resolves through
