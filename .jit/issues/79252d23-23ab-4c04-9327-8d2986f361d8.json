@@ -48,6 +48,168 @@
       "format": "markdown",
       "label": "Epic plan",
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "a322497bfaaa5e0664e3db8f4337edacb712cbdf3e0916a11061907f186c5343",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "release-policy.md",
+          "resolved_path": "docs/reference/release-policy.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7dc9bd2dc4d7b1965f731e35d2dab588f8a7c5fd436fbaaf77293ad356da1bf8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "318348624f12eb20388346b71cb995c8592c8d6456078c56213fab66ee975dd2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "storage-format.md",
+          "resolved_path": "docs/reference/storage-format.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "28aa13595c54dd4651d2594769a8dadfc69c5f5e468f4c2b3a54fa8ed8f1f215",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/adopt-planning-bracket.md",
+          "resolved_path": "docs/how-to/adopt-planning-bracket.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5ea9c44d5656f93d13638d46310dd44f970196c511fd2d42f0e66364e453aac1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8260fc3073ffeaf7b60cc6b70009b497b0b46e864bd19e5a2ebbb9bd1c4ba4fe",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/validation-rules.md",
+          "resolved_path": "docs/how-to/validation-rules.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5a236c4b956f3b132b692966f158017ed81d2e621beb349cd14318f3c87f369e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "gate-presets.md",
+          "resolved_path": "docs/reference/gate-presets.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "98f0915c35a8869ae2e8bf5cd830f04321e616fa734a62c616bdf963d1a952af",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6313aee7d918567a65b1b46f1ecf79c32a656046774a7bb0cab20306e2ca6f78",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../examples/README.md",
+          "resolved_path": "docs/examples/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa88a6efac48fa4effa073f2fd63778bcae9ce59da84273d821d932e09fd68ab",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../INSTALL.md",
+          "resolved_path": "INSTALL.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Repository Profiles reference",
+      "path": "docs/reference/profiles.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "cba8155f17bde0e9a4fe5c2e7df4a390a786f3ab07fa3c84d7f58665d1d4d63b",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../dev/architecture/cli-and-mcp-strategy.md",
+          "resolved_path": "dev/architecture/cli-and-mcp-strategy.md"
+        },
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://modelcontextprotocol.io/",
+          "resolved_path": null
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5ea9c44d5656f93d13638d46310dd44f970196c511fd2d42f0e66364e453aac1",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/reference/cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "cab3b7ce1e442f8f9ce2291f76a093b4e394a03b975678dffb85691e8943ddd3",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/reference/profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "9291c5ad2ab7563400af0b2cefa5e2ac7f489deb75ab47c0e3d0c5f8fe3a7257",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../README.md",
+          "resolved_path": "README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa88a6efac48fa4effa073f2fd63778bcae9ce59da84273d821d932e09fd68ab",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../INSTALL.md",
+          "resolved_path": "INSTALL.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "7e9179c8f7bb19fe33902f0c3a0eced332bd95efbe01229b6472d5c24da34d70",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "curated-tools.json",
+          "resolved_path": "mcp-server/curated-tools.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "74d8fa8df7ba9a61fada7d41534922b85c7b0ad37b508ebe5c8150d34461b71c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../docs/how-to/mcp-integration.md",
+          "resolved_path": "docs/how-to/mcp-integration.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "MCP bridge README",
+      "path": "mcp-server/README.md"
     }
   ],
   "first_ready_at": "2026-09-21T16:03:08.670862831Z",
@@ -74,5 +236,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T16:22:25.254005975Z"
+  "updated_at": "2026-09-21T16:38:25.330781011Z"
 }
