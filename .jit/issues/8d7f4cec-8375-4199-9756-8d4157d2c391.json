@@ -61,6 +61,11 @@
       "status": "passed",
       "updated_at": "2026-09-21T08:53:24.570982485Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T09:00:32.299002858Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "8d7f4cec-8375-4199-9756-8d4157d2c391",
@@ -78,5 +83,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-09-21T08:53:24.570982485Z"
+  "updated_at": "2026-09-21T09:00:32.299002858Z"
 }

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "49aa77c4dffad770c7a300fb9a06a42d5d301c1f",
+  "completed_at": "2026-09-21T09:00:31.979237727Z",
+  "duration_ms": 403822,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped criteria are satisfied; no unresolved findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8d7f4cec-8375-4199-9756-8d4157d2c391",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "14bf1e31-f977-404e-8d59-b8b7e45011f6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T08:53:48.157216440Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2581293, 6c0c6c3, bade7ca, 8828f68, 641665f (merge), 5effd64, d68deb2, 49aa77c\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/no-ignored-tests, @/invariant/architecture-dependency-direction, @/invariant/canonical-cutover, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-21T08:52:59Z); code-review pending\nTruncation recovery: Re-read merge and command patches by path, narrowed kernel-reference search outside storage, and inspected current storage and concurrency-test ranges\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped criteria are satisfied; no unresolved findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

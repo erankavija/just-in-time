@@ -60,8 +60,9 @@ mime_guess = { version = "2", optional = true }
 
 [dev-dependencies]
 # Enables jit's test-support feature so this crate's own #[cfg(test)] modules
-# can reach jit's interruption-injection surface (e.g.
-# MutationInterruptionInjector) the same way the jit crate's own tests do.
+# can reach jit's interruption-entry surface (e.g.
+# JsonFileStorage::with_mutation_interruptions) the same way the jit crate's
+# own tests do.
 jit = { path = "../jit", features = ["test-support"] }
 # Enables this crate's own test-support feature for its test builds, so the
 # `jit-server` binary the integration suite spawns carries the drain-deadline
