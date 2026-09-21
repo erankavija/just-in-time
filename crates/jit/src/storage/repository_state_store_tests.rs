@@ -1564,59 +1564,51 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
     ));
 }
 
+/// A whole worktree swapped between capture and the commit check is what the
+/// held capabilities cannot see by themselves, so the apply's revalidation is
+/// what refuses to publish a new data root beneath the replacement.
 #[cfg(unix)]
 #[test]
-fn test_absent_data_parent_replacement_during_publication_never_succeeds() {
-    for point in [
-        TransactionFailurePoint::RepositoryBeforeDataRootPublication,
-        TransactionFailurePoint::RepositoryAfterDataParentBindingCheck,
-        TransactionFailurePoint::RepositoryBeforeCommitDecision,
-    ] {
-        let outer = TempDir::new().unwrap();
-        let worktree = outer.path().join("project");
-        let data = worktree.join(".jit");
-        let replacement = outer.path().join("replacement-project");
-        let detached = outer.path().join("detached-project");
-        std::fs::create_dir(&worktree).unwrap();
-        std::fs::create_dir(&replacement).unwrap();
-        std::fs::write(replacement.join("replacement-marker"), b"live").unwrap();
+fn test_absent_data_parent_replacement_before_publication_never_succeeds() {
+    let outer = TempDir::new().unwrap();
+    let worktree = outer.path().join("project");
+    let data = worktree.join(".jit");
+    let replacement = outer.path().join("replacement-project");
+    let detached = outer.path().join("detached-project");
+    std::fs::create_dir(&worktree).unwrap();
+    std::fs::create_dir(&replacement).unwrap();
+    std::fs::write(replacement.join("replacement-marker"), b"live").unwrap();
 
-        let hook_worktree = worktree.clone();
-        let hook_replacement = replacement.clone();
-        let hook_detached = detached.clone();
-        let injector = Arc::new(HookAt {
-            point,
-            hook: Mutex::new(Some(Box::new(move || {
-                std::fs::rename(&hook_worktree, &hook_detached).unwrap();
-                std::fs::rename(&hook_replacement, &hook_worktree).unwrap();
-            }))),
-        });
-        let layout = discover_repository_layout(&worktree, &data).unwrap();
-        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
-        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-        let path = VirtualPath::data("index.json").unwrap();
-        let spec = CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
-            .unwrap();
-        let image = session.capture(spec).unwrap();
-        let delta = RepositoryDelta::new(
-            &layout,
-            vec![RepositoryAction::write_file(
-                path,
-                "root-publication",
-                ExpectedPreimage::Absent,
-                b"{}".to_vec(),
-                FileMode::Regular,
-            )],
-        )
-        .unwrap();
+    let hook_worktree = worktree.clone();
+    let injector = HookAtMoment::new(MutationPoint::BeforeCommitCheck, move || {
+        std::fs::rename(&hook_worktree, &detached).unwrap();
+        std::fs::rename(&replacement, &hook_worktree).unwrap();
+    });
+    let layout = discover_repository_layout(&worktree, &data).unwrap();
+    let storage = JsonFileStorage::with_mutation_interruptions(&data, injector);
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let path = VirtualPath::data("index.json").unwrap();
+    let spec =
+        CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget()).unwrap();
+    let image = session.capture(spec).unwrap();
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            path,
+            "root-publication",
+            ExpectedPreimage::Absent,
+            b"{}".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
 
-        assert!(session.apply(&test_plan(&image, &delta)).is_err());
-        assert_eq!(
-            std::fs::read(worktree.join("replacement-marker")).unwrap(),
-            b"live"
-        );
-        assert!(!data.exists());
-    }
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    assert_eq!(
+        std::fs::read(worktree.join("replacement-marker")).unwrap(),
+        b"live"
+    );
+    assert!(!data.exists());
 }
 
 #[cfg(unix)]
@@ -3759,4 +3751,219 @@ fn scratch_entries(scratch: &Path) -> BTreeSet<std::ffi::OsString> {
         .unwrap()
         .map(|entry| entry.unwrap().file_name())
         .collect()
+}
+
+/// A hook run once at one mutation moment, after which the session proceeds.
+struct HookAtMoment {
+    point: MutationPoint,
+    hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
+}
+
+impl HookAtMoment {
+    fn new(point: MutationPoint, hook: impl FnOnce() + Send + 'static) -> Arc<Self> {
+        Arc::new(Self {
+            point,
+            hook: Mutex::new(Some(Box::new(hook))),
+        })
+    }
+}
+
+impl crate::storage::MutationInterruptionInjector for HookAtMoment {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        if point == &self.point {
+            if let Some(hook) = self.hook.lock().unwrap().take() {
+                hook();
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Every transaction-kernel boundary one session reached, in order.
+#[derive(Default)]
+struct RecordedKernelBoundaries(Mutex<Vec<TransactionFailurePoint>>);
+
+impl RecordedKernelBoundaries {
+    fn reached(&self) -> Vec<TransactionFailurePoint> {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+impl crate::storage::TransactionFailureInjector for RecordedKernelBoundaries {
+    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
+        self.0.lock().unwrap().push(point.clone());
+        Ok(())
+    }
+}
+
+/// The sibling stage a publication of `data` writes its new root into.
+fn sibling_stage(data: &Path) -> PathBuf {
+    let leaf = data.file_name().and_then(|leaf| leaf.to_str()).unwrap();
+    data.with_file_name(crate::storage::init_publish::stage_name(leaf))
+}
+
+/// REQ-01: the complete scaffold stands in the sibling stage while nothing
+/// occupies the destination, so the rename alone is what makes it the root.
+#[test]
+fn test_absent_data_root_publishes_a_complete_sibling_stage_by_rename() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let stage = sibling_stage(&data);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    let observed = Arc::new(Mutex::new(None));
+    let (seen, staged, destination) = (Arc::clone(&observed), stage.clone(), data.clone());
+    let storage = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        HookAtMoment::new(MutationPoint::BeforeRootPublication, move || {
+            *seen.lock().unwrap() = Some((
+                std::fs::read(staged.join("index.json")).ok(),
+                destination.exists(),
+            ));
+        }),
+    );
+
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .unwrap();
+
+    assert_eq!(
+        observed.lock().unwrap().take(),
+        Some((Some(b"{}".to_vec()), false)),
+        "the stage must hold the whole scaffold while the destination is still absent"
+    );
+    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
+    assert!(!stage.exists(), "the rename must leave no stage behind");
+}
+
+/// REQ-02: the refusal is the no-replace rename itself, so it holds against a
+/// root published after every check this session could make.
+#[test]
+fn test_occupied_destination_refuses_absent_root_publication_and_leaves_it_untouched() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    let occupant = data.clone();
+    let storage = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        HookAtMoment::new(MutationPoint::BeforeRootPublication, move || {
+            std::fs::create_dir(&occupant).unwrap();
+            std::fs::write(occupant.join("index.json"), b"occupied").unwrap();
+        }),
+    );
+
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+
+    assert!(matches!(
+        session.apply(&test_plan(&image, &initialization_delta(&layout))),
+        Err(RepositoryStateStoreError::OccupiedDataRoot { .. })
+    ));
+    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"occupied");
+}
+
+/// REQ-03: an interruption before the rename publishes nothing at all, and the
+/// stage it leaves is the next publication's to reclaim.
+#[test]
+fn test_interrupted_absent_root_publication_leaves_no_root_and_the_next_reclaims_its_stage() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let stage = sibling_stage(&data);
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    let interrupted = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        InterruptAtMoment::new(MutationPoint::BeforeRootPublication),
+    );
+    let mut session = interrupted.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    assert!(session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .is_err());
+    drop(session);
+
+    assert!(!data.exists(), "an interruption before the rename publishes nothing");
+    assert!(stage.exists(), "the interrupted publication's stage outlives it");
+
+    let next = JsonFileStorage::new(&data);
+    let mut session = next.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .unwrap();
+
+    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
+    assert!(!stage.exists(), "the next publication reclaims the orphan stage");
+}
+
+/// REQ-04: the worktree targets travel in a redo record the stage carries into
+/// the published root, so the session that publishes the root commits them.
+#[test]
+fn test_absent_root_publication_carries_its_worktree_targets_in_the_redo_record() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let note = worktree.path().join("note.txt");
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+
+    let interrupted = JsonFileStorage::with_mutation_interruptions(
+        &data,
+        InterruptAtMoment::new(MutationPoint::Redo(RedoPoint::BeforePut { index: 0 })),
+    );
+    let mut session = interrupted.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    assert!(session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .is_err());
+    drop(session);
+
+    assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
+    assert!(!note.exists(), "no worktree target precedes its record");
+    assert!(
+        data.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME).exists(),
+        "the published root must carry the record its worktree targets wait in"
+    );
+
+    let next = JsonFileStorage::new(&data);
+    let session = next
+        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
+        .unwrap();
+
+    assert_eq!(session.recovery_report().applied_records, 1);
+    assert_eq!(std::fs::read(&note).unwrap(), b"note");
+}
+
+/// REQ-05, REQ-06: the publisher carries the creation protocol alone. The
+/// kernel's failure points name its every boundary, so an apply reaching none
+/// of them wrote no journal, opened no bootstrap control, and re-verified no
+/// published identity.
+#[test]
+fn test_absent_root_publication_reaches_no_transaction_kernel_boundary() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let boundaries = Arc::new(RecordedKernelBoundaries::default());
+    let storage = JsonFileStorage::with_repository_state_failures(
+        &data,
+        Arc::clone(&boundaries) as Arc<dyn crate::storage::TransactionFailureInjector>,
+    );
+
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session.capture(initial_spec()).unwrap();
+    let before_apply = boundaries.reached();
+    session
+        .apply(&test_plan(&image, &initialization_delta(&layout)))
+        .unwrap();
+
+    assert_eq!(
+        boundaries.reached(),
+        before_apply,
+        "publishing an absent data root reached a transaction-kernel boundary"
+    );
+    assert!(
+        !worktree.path().join(".jit-bootstrap").exists(),
+        "the publisher opened an external bootstrap control directory"
+    );
 }

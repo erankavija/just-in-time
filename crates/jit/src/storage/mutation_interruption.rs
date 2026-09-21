@@ -16,6 +16,10 @@ pub enum MutationPoint {
     /// A held session's apply, before it checks its capture against the live
     /// repository.
     BeforeCommitCheck,
+    /// An absent data root's staged scaffold, before the no-replace rename
+    /// publishes it. The record its stage carries is already durable here, so
+    /// this is the moment the publication becomes irreversible.
+    BeforeRootPublication,
     /// One step of that session's redo-record application.
     Redo(RedoPoint),
 }
