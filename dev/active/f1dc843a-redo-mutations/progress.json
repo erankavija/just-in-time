@@ -642,7 +642,7 @@
             "code-review"
           ],
           "created_during_execution": true,
-          "status": "in_progress — dispatched, round 1"
+          "status": "done — cargo-ci (warm, suite-clock 22559 ms) and code-review (0 findings) passed on the merged tree, zero rework rounds. code-review reported Tree: dirty because the preceding cargo-ci run left its own uncommitted gate record; no source was dirty."
         }
       ],
       "dispatch": {
@@ -1299,6 +1299,12 @@
       "finding": "Session 6 dispatched waves 10-14 without moving any issue to in_progress. The lead acquired leases (`jit claim acquire`) and relied on the assignee field, but never ran `jit issue claim`, which is what promotes an issue to in_progress. Issues went ready -> done directly, and the tracker showed no work in flight while workers were running. The owner noticed.",
       "cause": "Wave 10's first `jit issue claim <id> agent:worker` was refused because the issue was already assigned to agent:jit-execution-lead; the lead switched to lease acquisition and never returned to issue claim.",
       "fix": "Claim every dispatched issue with `jit issue claim <id> agent:jit-execution-lead` (the refusal message itself says re-claiming as the assignee succeeds and promotes to in_progress), and confirm the state reads in_progress before sending the worker. Leases are separate: they are still needed for gate evaluation and state updates."
+    },
+    {
+      "id": "PF-23",
+      "session": 6,
+      "finding": "Sequential gate runs in one shell batch leave each earlier run's gate record uncommitted, so every later run in the batch reports Tree: dirty. Separately, the lead wrote progress.json twice while a gate was running.",
+      "fix": "Commit .jit/ between sequential gate evaluations, and never write tracked files while a gate is running."
     }
   ],
   "evidence_requirements": [

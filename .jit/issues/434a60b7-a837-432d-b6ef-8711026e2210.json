@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T20:06:40.441588127Z",
   "first_ready_at": "2026-09-21T18:22:44.474249665Z",
   "gates_required": [
     "cargo-ci",
@@ -57,8 +58,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-09-21T19:59:31.003207427Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T20:03:39.324618208Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T20:05:59.631105128Z",
       "updated_by": "auto:executor"
     }
   },
@@ -73,7 +79,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Record documentation states that an unreadable leftover record is refused",
-  "updated_at": "2026-09-21T19:59:31.003207427Z"
+  "updated_at": "2026-09-21T20:06:40.441588127Z"
 }
