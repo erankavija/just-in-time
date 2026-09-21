@@ -99,7 +99,7 @@ JIT (Just-In-Time) is a **CLI-first issue tracker** designed for **AI agent orch
 ├── gate-runs/                 # Recorded gate runs
 ├── schemas/                   # JSON Schema files referenced by rules.toml
 └── tmp/                       # Scratch space; git-ignored
-    └── redo.record            # A mutation in flight, applied by the next session
+    └── redo.record            # A mutation in flight, applied by the next mutating command
 ```
 
 See [Storage Format](../reference/storage-format.md) for the authoritative layout, including per-project files.

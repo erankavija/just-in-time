@@ -88,8 +88,8 @@ Recovery runs forward only. A crash between the commit point and the record's
 removal leaves the record in place; the next session opened over the repository
 reads it and applies it before anything else mutates, so an interrupted mutation
 completes rather than unwinds (`crates/jit/src/storage/repository_state_store.rs`). Session
-opening is the one recovery boundary, and it runs whether the next command is
-`jit recover` or ordinary work.
+opening is the one recovery boundary, and every mutating command passes through
+it — as does `jit recover`, whose whole job is to reach it.
 
 **How one file lands:**
 
@@ -445,7 +445,7 @@ it:
 .jit/issues/.redo.<hex>.tmp                    # Staging a rename did not reach
 .jit/issues/abc123.json                        # Previous or new version, never torn
 
-# Any command that opens a session applies the record first. This one also
+# Every mutating command applies the record before its own work. This one also
 # clears provably stale temporary files and locks.
 jit recover
 ```
@@ -505,8 +505,8 @@ record it holds. That record, `redo.record`, is a mutation's commit point: the
 mutation may already be partly written to live files, and the record is the only
 thing that can finish it. Its name deliberately does not end in `.tmp`, so a
 sweep for staging files cannot match it
-(`crates/jit/src/storage/redo_record.rs`). Leave it where it is — the next jit
-command applies it.
+(`crates/jit/src/storage/redo_record.rs`). Leave it where it is — the next
+mutating command applies it.
 
 **Cleanup:**
 
