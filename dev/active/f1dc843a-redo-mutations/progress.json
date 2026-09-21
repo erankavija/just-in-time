@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 8,
+  "current_wave": 10,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -315,9 +315,23 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "in_progress — review round 1 FAILED (code-review F1); rework 1 of 2 dispatched",
+          "dispatch": {
+            "session": 5,
+            "tier": "opus",
+            "note": "session 5 left no handoff; the failed gate record was uncommitted and was committed by session 6 at 036ad483d"
+          }
         }
-      ]
+      ],
+      "review_round_1": {
+        "cargo_ci": "passed (exit 0), run before code-review, commit fd8746457",
+        "code_review": "FAILED, 1 blocking finding, run 4eabc610",
+        "F1": "CreateDirectory actions mutate state before the redo record is committed (repository_state_store.rs:664 JSON, :772 memory), and AlreadyExists at :1003 accepts a non-directory occupant. References @/charter/D-17, @/inv/derived-state-coherence.",
+        "lead_confirmation": "Both halves confirmed independently against the source at HEAD; the ordering and the unchecked occupant are as cited.",
+        "scope_finding": "The gap is not removable by deletion: repository_state/export.rs CreateTree carries an explicit directories set, so some deltas hold a CreateDirectory with no put beneath. Every other producer (mutation.rs issues/gate-runs/gate-presets, archive.rs ancestors) always writes beneath the directory it creates.",
+        "escalated": "ESC-09 — remedy contradicts plan decision OD-7",
+        "remedy_directed": "Extend the record with a make-directory operation per the amended OD-7; delete create_delta_directories and its memory twin; cover the directory paths in the write-set comparison; fix the redo_record_for / create_delta_directories prose contradiction."
+      }
     },
     {
       "wave_number": 11,
@@ -813,6 +827,16 @@
       "resolved_by": "user",
       "status": "closed",
       "lead_note": "8559f529's overrun is the lead's drafting error; 4e818d10's is the cross-backend refusal guard its code review required after the estimate was written; 835bae3f's two lines are measurement noise."
+    },
+    {
+      "id": "ESC-09",
+      "wave": 10,
+      "category": "6 - architectural decision with significant trade-offs",
+      "question": "4319256e code-review F1: a delta's CreateDirectory is materialized ahead of the record's commit point, so an interruption leaves a directory outside the record. Plan decision OD-7 fixed the vocabulary at put/delete/event-append with parents created on apply, which has no representation for a directory no put lands beneath (repository_state/export.rs CreateTree carries an explicit directories set).",
+      "resolution": "Amend OD-7: the record gains a make-directory operation carrying only a directory no other operation's path lies beneath, applied before the puts, idempotent, with a non-directory occupant a typed refusal. The pairwise-disjoint path contract is unchanged. Rejected alternative: narrowing empty-directory support, which would silently drop empty directories from `jit snapshot export --format directory`. 4319256e's criteria are untouched. Plan amended in-place at OD-7.",
+      "resolved_by": "user",
+      "status": "closed",
+      "lead_note": "Lead confirmed both halves of F1 independently at HEAD before escalating: create_delta_directories at repository_state_store.rs:664 precedes record.commit, memory twin at :772; ErrorKind::AlreadyExists at :1003 accepts a non-directory occupant. Also found a prose contradiction the worker shipped: redo_record_for's doc says a directory no put lands beneath 'is not created', while create_delta_directories says it 'is made here'."
     }
   ],
   "rework_counts": {
@@ -823,7 +847,8 @@
     "8559f529": 2,
     "d591a1c8": 1,
     "21e976d1": 1,
-    "0938d99e": 1
+    "0938d99e": 1,
+    "4319256e": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1288,7 +1313,7 @@
       "note": "Observation carried alongside the waves, not a second measurement project. Known live risk: a worker's FIRST gate run in a freshly seeded worktree measured suite-clock 43.0/43.3 s and failed the budget; the same targets passed once settled (LD-7 signature, worse than the 31.8 s previously recorded)."
     }
   ],
-  "session": 5,
+  "session": 6,
   "rework_counter_resets": [
     {
       "issue": "35544121",
