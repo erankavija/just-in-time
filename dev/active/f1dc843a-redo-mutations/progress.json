@@ -1022,6 +1022,13 @@
         "wave 9 post-rework, PRE-BUILT and host idle: suite-build 897 ms, test 39879 ms, suite-clock 44377 ms, FAIL, 4715 passed",
         "wave 9 post-rework, second run, identical tree and binaries: test 17746 ms, suite-clock 22495 ms, PASS"
       ]
+    },
+    {
+      "id": "PF-18",
+      "finding": "The rework template's mandatory pre-commit audit cannot run in a worktree-isolated worker. Both commands read `.jit/gate-runs/*/result.json` and `jit gate status <id> code-review --all`, but gate-run records are written in the lead's checkout after the worker's branch was cut, and the protocol forbids the worker reaching into checkout-specific paths. w-0938d99e ran both and reported empty output, correctly, having worked from the lead's verbatim quotation of the finding instead.",
+      "suggested_remedy": "The lead must paste every prior finding verbatim into the rework message and treat the audit block as the lead's own pre-dispatch step, not the worker's. Alternatively the lead exports the findings into the worker's worktree. Done correctly this round by quoting F1 in full; the template should stop asking the worker for output it cannot produce.",
+      "status": "recorded; affects the jit-execution-lead skill's rework-prompt-template.md, outside this epic's scope",
+      "session": 5
     }
   ],
   "evidence_requirements": [
