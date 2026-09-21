@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-09-21T19:45:08.171949586Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "b0ee2dd6-5393-4193-a88d-f3301601234e"
   ],
   "description": "The command reference, the worktree-validate reference, the troubleshooting guide, the error-code reference, and the configuration reference describe the redo record and the application that recovers it.\n\n## Background\n\nThe recover command is documented on two adopter pages whose text has drifted apart, and its help exists verbatim twice in the sources, so the four copies move together. A third page, generated from the runtime constants, calls the command the single recovery entry point; rewriting the other two without it would leave the reference surface disagreeing with itself. One page tells the reader the command removes temporary files older than an hour and is safe to run at any time, which needs restating now that the data root's scratch directory holds the commit point.\n\nBeyond recovery, the command reference describes many mutations as one recoverable transaction, describes bulk update and batch create as writing a temp file and renaming, describes gate update in terms of an atomic-write primitive, and describes initialization and archive execution as staging with a no-replace rename. The troubleshooting guide explains orphaned temporary files as coordination state and carries a recovery procedure. The error-code reference names a recovery failure, and the configuration reference describes a linked-checkout override in terms of the same transaction.\n\n## Success Criteria\n\n- [hard] REQ-01: Both adopter pages describing the recover command state the same behaviour, and each describes session-open application as the recovery path.\n- [hard] REQ-02: Guidance about removing temporary files states that the data root's scratch directory holds a pending commit point and names what is safe to remove.\n- [hard] REQ-03: Command descriptions that named one recoverable transaction describe the redo record.\n- [hard] REQ-04: The recovery procedure in the troubleshooting guide describes application of a leftover record at session open.\n- [hard] REQ-05: The error-code entry for a recovery failure describes a failed application, and the configuration reference's linked-checkout passage states the record.\n- [hard] REQ-06: Initialization and archive execution are described with the publication each uses.\n- [hard] REQ-07: The runtime-defaults reference states that session open applies a leftover record, regenerated from its source constants, and claims no single recovery entry point.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T16:03:08.028889250Z",
   "gates_required": [
     "cargo-ci",
@@ -31,5 +74,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T16:03:08.028889250Z"
+  "updated_at": "2026-09-21T19:45:08.416096318Z"
 }
