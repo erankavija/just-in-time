@@ -1,8 +1,8 @@
 //! Recovered layout-aware repository capture and mutation sessions.
 //!
-//! Session orchestration lives here. Durable publication belongs to the
-//! capability-confined [`FileTransactionKernel`]; an opening session recovers
-//! its journals and then applies the redo record a crash left.
+//! Session orchestration lives here; durable publication belongs to the
+//! capability-confined [`FileTransactionKernel`], and an opening session
+//! applies the redo record a crash left.
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
@@ -37,23 +37,20 @@ pub struct RepositoryApplyOutcome {
     pub actions_applied: usize,
 }
 
-/// Residue carried forward while opening one repository mutation session:
-/// transaction journals the kernel left, and the leftover redo record the open
-/// applied.
+/// Residue one session open carried forward.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RecoveryDispatchReport {
     /// External journals or orphan controls recovered in deterministic id order.
     pub external_transactions: Vec<String>,
     /// Internal data-root journals recovered in deterministic id order.
     pub internal_transactions: Vec<String>,
-    /// Leftover redo records applied before the session admitted a capture:
-    /// one, or none. A record is the whole of one mutation, so an open that
-    /// finds one carries exactly that mutation forward.
+    /// Leftover redo records applied: one, or none, because a record is the
+    /// whole of one mutation.
     pub applied_records: usize,
 }
 
 impl RecoveryDispatchReport {
-    /// Total residue this open carried forward.
+    /// Journals recovered plus records applied.
     pub fn recovered_count(&self) -> usize {
         self.external_transactions.len() + self.internal_transactions.len() + self.applied_records
     }
@@ -223,19 +220,11 @@ pub trait RepositoryStateStore {
     ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
 }
 
-/// Apply the leftover redo record under `roots`' data root, reporting how many
-/// records this pass applied: one, or none.
-///
-/// A record is applied forward and re-applied idempotently, so an open that
-/// meets one carries its mutation to completion whether or not an earlier open
-/// got part of the way. The pass runs under the repository write lock, because
-/// the record's operations are writes of repository state.
+/// The record a crash left, applied and cleared: one, or none.
 ///
 /// # Errors
 ///
-/// Returns [`RepositoryStateStoreError::UnreadableRedoRecord`] naming a record
-/// that cannot be read, and [`RepositoryStateStoreError::RedoApply`] when the
-/// pass itself fails; both leave the record in place for the next open.
+/// A record this open cannot read or apply stays where it is, for the next one.
 fn apply_leftover_record(roots: &CapabilityRoots) -> Result<usize, RepositoryStateStoreError> {
     let Some(record) = read_leftover_record(roots)? else {
         return Ok(0);
@@ -246,12 +235,9 @@ fn apply_leftover_record(roots: &CapabilityRoots) -> Result<usize, RepositorySta
     Ok(1)
 }
 
-/// The record waiting under the data root's scratch directory, or `None`.
-///
-/// Checking the scratch directory for the record by name is the whole cost of a
-/// repository holding none: the parent walk stops at an absent scratch
-/// directory and the open stops at an absent record, so nothing is enumerated
-/// and nothing else is read.
+/// A repository holding no record pays one look at the record's own name: the
+/// parent walk stops at an absent scratch directory and the open at an absent
+/// record, and nothing there is enumerated or otherwise read.
 fn read_leftover_record(
     roots: &CapabilityRoots,
 ) -> Result<Option<RedoRecord>, RepositoryStateStoreError> {
@@ -279,8 +265,7 @@ fn read_leftover_record(
     })
 }
 
-/// The in-memory counterpart of [`apply_leftover_record`] over the record this
-/// backend holds beside its entries.
+/// [`apply_leftover_record`] over the record the in-memory backend holds.
 fn apply_memory_leftover_record(
     storage: &InMemoryStorage,
 ) -> Result<usize, RepositoryStateStoreError> {
@@ -505,11 +490,10 @@ impl RepositoryStateStore for JsonFileStorage {
                 external_transactions.extend(swept_companions);
                 external_transactions.sort();
                 external_transactions.dedup();
-                // Last, under the repository and event-log locks and before any
-                // capture: journal recovery may roll a prepared transaction back,
-                // and a rollback running after the record would undo what the
-                // record published. The record's own home is inside the data
-                // root, so an absent one holds none.
+                // Inside both locks, because the record writes repository
+                // state, and after journal recovery, whose rollback would undo
+                // what the record published. The record lives inside the data
+                // root, so the absent-root branch has none to apply.
                 let applied_records = apply_leftover_record(&roots)?;
                 (
                     Some(repository_guard),
@@ -569,9 +553,8 @@ impl RepositoryStateStore for InMemoryStorage {
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositorySweepCompanions)?;
         }
-        // Mirror the JSON open's last recovery step: the record is applied after
-        // journal recovery has converged, and only where a data root could have
-        // held one.
+        // Where the JSON open applies it, gated on the data root for the same
+        // reason: a record's home is inside it.
         let applied_records = match data_exists {
             true => apply_memory_leftover_record(self)?,
             false => 0,
