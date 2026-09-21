@@ -495,7 +495,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-09-21T20:24:43.892343402Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "42478e5d-90aa-472e-bca2-f628a1d883c2",
   "labels": [
     "type:task",
@@ -512,5 +518,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T19:57:14.496923020Z"
+  "updated_at": "2026-09-21T20:24:43.892343402Z"
 }
