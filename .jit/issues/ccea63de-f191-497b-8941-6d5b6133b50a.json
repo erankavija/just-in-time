@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T19:44:11.390185649Z",
   "first_ready_at": "2026-09-21T16:03:08.980275069Z",
   "gates_required": [
     "doc-review",
@@ -57,8 +58,8 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T19:29:53.678851549Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T19:43:43.636659601Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -79,7 +80,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-09-21T19:42:25.418152725Z"
+  "updated_at": "2026-09-21T19:44:11.390185649Z"
 }
