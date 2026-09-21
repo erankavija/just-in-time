@@ -497,8 +497,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-09-21T20:24:43.892343402Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T20:27:36.945312874Z",
       "updated_by": "auto:executor"
     }
   },
@@ -518,5 +518,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T20:24:43.892343402Z"
+  "updated_at": "2026-09-21T20:27:36.945312874Z"
 }
