@@ -564,7 +564,7 @@ record
 The same flag can complete and apply
 the profile to an existing partial repository. See
 [Repository Profiles](profiles.md) for the canonical package, conflict,
-transaction, recovery, and lifecycle contract.
+publication, recovery, and lifecycle contract.
 
 Profile variables can be supplied with `--values-file <PATH>` (a TOML file with
 one `[variables]` string table) and repeated `--set NAME=VALUE` flags. Values
