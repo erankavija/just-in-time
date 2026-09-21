@@ -62,7 +62,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-21T15:55:41.143430907Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b0ee2dd6-5393-4193-a88d-f3301601234e",
   "labels": [
     "type:task",
@@ -78,5 +84,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Transaction kernel retirement",
-  "updated_at": "2026-09-21T15:30:33.966757078Z"
+  "updated_at": "2026-09-21T15:55:41.143430907Z"
 }
