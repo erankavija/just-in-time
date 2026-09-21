@@ -501,6 +501,11 @@
       "updated_at": "2026-09-21T20:27:36.945312874Z",
       "updated_by": "auto:executor"
     },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-09-21T20:32:03.426109731Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-09-21T20:29:54.952590091Z",
@@ -523,5 +528,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T20:29:54.952590091Z"
+  "updated_at": "2026-09-21T20:32:03.426109731Z"
 }
