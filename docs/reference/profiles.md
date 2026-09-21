@@ -387,9 +387,10 @@ without writing. Successful reapplication of an exact installation returns
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated, recoverable publication. The scaffold and the complete
-dependency-ordered profile selection are planned together and reach the
-repository through one redo record; no member of that selection is published
-separately. For an existing repository,
+dependency-ordered profile selection are planned together and reach one commit
+point, carried by the redo record [Publication, rollback, and
+recovery](#publication-rollback-and-recovery) defines; no member of that
+selection is published separately. For an existing repository,
 `jit profile apply` uses the same profile planner and publisher.
 The request, result, error, and manifest schemas are available through
 `jit --schema`; the same command family is exposed through the generated MCP
