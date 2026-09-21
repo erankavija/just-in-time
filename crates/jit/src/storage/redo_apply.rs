@@ -3,8 +3,8 @@
 //! One forward pass over the record's operations, then the record is removed.
 //! Re-application is the same pass: a put overwrites, a delete tolerates
 //! absence, the append rewrites its bytes at its offset, so a record applied
-//! twice converges. A session open applies the record a crash left; no
-//! mutation writes one until apply commits through it (jit:4319256e).
+//! twice converges. A session's apply writes one and applies it; a session open
+//! applies the one a crash left.
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
@@ -678,6 +678,52 @@ mod tests {
 
     fn ambient_directory(path: &Path) -> Dir {
         Dir::open_ambient_dir(path, cap_std::ambient_authority()).unwrap()
+    }
+
+    /// A put replaces whatever occupies its path. A symlink there is the one
+    /// occupant that could carry the bytes, or a mode, somewhere the roots do
+    /// not reach: the staged write plus rename replaces the link itself.
+    #[cfg(unix)]
+    #[test]
+    fn test_redo_applier_apply_replaces_a_symlink_at_its_target_without_following_it() {
+        use crate::storage::redo_apply::test_fixtures::is_executable;
+
+        let (worktree, roots) = repository();
+        let outside = TempDir::new().unwrap();
+        let outside_target = outside.path().join("outside.txt");
+        std::fs::write(&outside_target, b"outside").unwrap();
+        let target = VirtualPath::data("index.json").unwrap();
+        std::os::unix::fs::symlink(&outside_target, data_root(&worktree).join("index.json"))
+            .unwrap();
+        let record = RedoRecord::new(
+            vec![PutFile {
+                path: target.clone(),
+                bytes: b"published".to_vec(),
+                mode: FileMode::Executable,
+            }],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+
+        uninterrupted().apply(&roots, &record).unwrap();
+
+        let published = data_root(&worktree).join("index.json");
+        assert!(
+            !published.symlink_metadata().unwrap().is_symlink(),
+            "the link is still at the target the put replaced"
+        );
+        assert_eq!(std::fs::read(&published).unwrap(), b"published");
+        assert!(is_executable(&published));
+        assert_eq!(
+            std::fs::read(&outside_target).unwrap(),
+            b"outside",
+            "the put reached a file outside the repository roots"
+        );
+        assert!(
+            !is_executable(&outside_target),
+            "the put's mode reached a file outside the repository roots"
+        );
     }
 
     #[cfg(unix)]

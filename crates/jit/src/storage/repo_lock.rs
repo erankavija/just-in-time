@@ -6,10 +6,9 @@
 //! remains available when `.jit/` does not yet exist. Neither requires git
 //! (`@/charter/D-4`). A
 //! [`RepositoryStateStore`](crate::storage::RepositoryStateStore) session holds
-//! this chain across recovery, capture, read-set revalidation, and transactional
-//! apply. A concurrent publisher therefore observes the session's start or its
-//! end, never a midpoint, and recovery can only roll back its transaction's own
-//! actions.
+//! this chain across recovery, capture, its pre-commit check, and the
+//! application of its redo record. A concurrent publisher therefore observes the
+//! session's start or its end, never a midpoint.
 //!
 //! # Reentrancy
 //!

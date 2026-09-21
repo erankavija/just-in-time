@@ -129,8 +129,8 @@ pub trait IssueStore: Clone {
     /// guard drops.
     ///
     /// [`RepositoryStateStore`] sessions retain this as their outer
-    /// serialization guard across recovery, capture, read-set revalidation, and
-    /// transactional apply. The lock is
+    /// serialization guard across recovery, capture, the pre-commit check, and
+    /// the application of the redo record. The lock is
     /// [reentrant](repo_lock::RepoWriteLock#reentrancy) so a retained startup
     /// session can reenter the same backend boundary.
     ///

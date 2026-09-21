@@ -1213,8 +1213,8 @@ impl IssueStore for JsonFileStorage {
             //
             // Caller audit (fc744df6): production consumers use the returned owned
             // value for display, resolution, validation, or as a mutation snapshot.
-            // Mutations publish through `RepositoryStateStore`, which revalidates
-            // that snapshot under the repository write lock. The old `_lock` guard
+            // Mutations publish through `RepositoryStateStore`, which compares the
+            // files it writes under the repository write lock. The old `_lock` guard
             // was local and dropped before this method returned, so no caller ever
             // inherited serialization from it.
             return self.read_json(&issue_path);

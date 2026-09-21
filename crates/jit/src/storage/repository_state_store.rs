@@ -1,8 +1,9 @@
 //! Recovered layout-aware repository capture and mutation sessions.
 //!
-//! Session orchestration lives here; durable publication belongs to the
-//! capability-confined [`FileTransactionKernel`], and an opening session
-//! applies the redo record a crash left.
+//! Session orchestration lives here; an apply publishes through one redo record
+//! and an opening session applies the record a crash left. A delta over an
+//! absent data root is the exception, published by the capability-confined
+//! [`FileTransactionKernel`] until initialization takes it over (jit:b0ee2dd6).
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
@@ -204,7 +205,7 @@ pub trait RepositoryMutationSession {
     fn recovery_report(&self) -> &RecoveryDispatchReport;
     /// Capture one complete bounded image after recovery has converged.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
-    /// Revalidate the complete image and publish one complete semantic plan.
+    /// Publish one complete semantic plan, refused if the files it writes moved.
     fn apply(
         &mut self,
         plan: &MaterializationPlan,
@@ -557,22 +558,12 @@ impl RepositoryStateStore for InMemoryStorage {
         let reentry = LayoutReentry(self.active_mutation_layout());
         let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
         let guard = self.acquire_repo_write_lock()?;
-        // Model the kernel's recovery boundaries so both backends fail identically
-        // when one is injected: external recovery always runs; the internal
-        // recovery and orphan-companion sweep run only when the data root already
-        // exists, matching the JSON session-open guard sequence.
-        let failures = self.repository_state_failures();
         let interruptions = self.mutation_interruptions();
         interruptions.check(&MutationPoint::SessionOpen)?;
-        failures.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
         let (data_exists, leftover_record) = {
             let state = self.repository_state();
             (state.data_root_exists, state.record.clone())
         };
-        if data_exists {
-            failures.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
-            failures.check(&TransactionFailurePoint::RepositorySweepCompanions)?;
-        }
         // Where the JSON open applies it, gated on the data root for the same
         // reason: a record's home is inside it.
         let applied_records = match data_exists {
@@ -745,7 +736,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
         #[cfg(feature = "test-support")]
         if self.storage.consume_repository_state_apply_conflict() {
             return Err(RepositoryStateStoreError::RetryableConflict {
-                path: "injected memory read-set conflict".into(),
+                path: "injected memory write-set conflict".into(),
             });
         }
         let interruptions = self.storage.mutation_interruptions();

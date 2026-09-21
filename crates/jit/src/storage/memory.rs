@@ -40,7 +40,6 @@ pub struct InMemoryStorage {
     repo_lock: Arc<RepoWriteLock>,
     /// Canonical aggregate repository image used by recovered mutation sessions.
     pub(crate) repository_state: Arc<Mutex<MemoryRepositoryState>>,
-    pub(crate) repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     /// Interruption seam for the session's own moments: its open, its
     /// pre-commit check, and the steps of its redo-record application.
     pub(crate) mutation_interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
@@ -88,7 +87,6 @@ impl InMemoryStorage {
             root_path: root_path.into(),
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
-            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             #[cfg(feature = "test-support")]
@@ -115,15 +113,6 @@ impl InMemoryStorage {
             ),
         )
         .expect("an in-memory store always has a valid nested synthetic layout")
-    }
-
-    #[cfg(test)]
-    pub(in crate::storage) fn with_repository_state_failures(
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
-    ) -> Self {
-        let mut storage = Self::new();
-        storage.repository_state_failures = failures;
-        storage
     }
 
     /// An in-memory store whose mutation sessions are interrupted at the
@@ -200,12 +189,6 @@ impl InMemoryStorage {
         self.repository_state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
-    }
-
-    pub(crate) fn repository_state_failures(
-        &self,
-    ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
-        Arc::clone(&self.repository_state_failures)
     }
 
     pub(crate) fn mutation_interruptions(
