@@ -1532,6 +1532,9 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
         } => (owner, expected),
     };
     validate_owner(owner)?;
+    if super::path::is_bootstrap_lock(action.path()) {
+        return Err(DeltaError::EngineControlTarget(action.path().clone()));
+    }
     if let Some(identity) = expected.identity() {
         identity
             .validate()
@@ -1697,6 +1700,8 @@ pub enum DeltaError {
     },
     #[error("delta action owner is empty or contains control characters")]
     InvalidOwner,
+    #[error("delta action targets machine-local engine control at {0:?}")]
+    EngineControlTarget(VirtualPath),
     #[error("delta action is invalid: {0}")]
     InvalidAction(String),
 }
@@ -2312,6 +2317,67 @@ mod tests {
                     identity,
                     mode: FileMode::Regular,
                 },
+            }],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_delta_refuses_every_action_targeting_the_worktree_bootstrap_lock() {
+        use crate::repository_state::BOOTSTRAP_LOCK_FILE;
+
+        let identity = EntryIdentity::for_bytes("42:1", b"lock").unwrap();
+        let file = ExpectedPreimage::File {
+            identity: identity.clone(),
+            mode: FileMode::Regular,
+        };
+        let lock = VirtualPath::worktree(BOOTSTRAP_LOCK_FILE).unwrap();
+        let below = VirtualPath::worktree(format!("{BOOTSTRAP_LOCK_FILE}/stage")).unwrap();
+        let actions = [
+            RepositoryAction::WriteFile {
+                path: lock.clone(),
+                owner: "write".into(),
+                expected: file.clone(),
+                bytes: b"clobber".to_vec(),
+                mode: FileMode::Regular,
+            },
+            RepositoryAction::DeleteFile {
+                path: lock.clone(),
+                owner: "delete".into(),
+                expected: file.clone(),
+            },
+            RepositoryAction::SetMode {
+                path: lock.clone(),
+                owner: "mode".into(),
+                expected: file,
+                mode: FileMode::Executable,
+            },
+            RepositoryAction::CreateDirectory {
+                path: below,
+                owner: "create".into(),
+                expected: ExpectedPreimage::Absent,
+            },
+        ];
+        for action in actions {
+            assert!(
+                matches!(
+                    RepositoryDelta::new(&layout(), vec![action.clone()]),
+                    Err(DeltaError::EngineControlTarget(target)) if target == *action.path()
+                ),
+                "{action:?} must not reach the lock file",
+            );
+        }
+
+        // The refusal covers that path alone: a worktree name merely prefixed by
+        // it is ordinary content.
+        assert!(RepositoryDelta::new(
+            &layout(),
+            vec![RepositoryAction::WriteFile {
+                path: VirtualPath::worktree(format!("{BOOTSTRAP_LOCK_FILE}ed")).unwrap(),
+                owner: "write".into(),
+                expected: ExpectedPreimage::Absent,
+                bytes: b"ordinary".to_vec(),
+                mode: FileMode::Regular,
             }],
         )
         .is_ok());

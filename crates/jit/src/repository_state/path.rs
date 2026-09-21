@@ -11,6 +11,31 @@ use std::path::{Component, Path, PathBuf};
 /// it so version control never carries a commit point a checkout never made.
 pub const RECORD_SCRATCH_DIR: &str = "tmp";
 
+/// The worktree's bootstrap lock file, which serializes every session sharing
+/// one worktree over the init publisher's sibling stage.
+pub const BOOTSTRAP_LOCK_FILE: &str = ".jit-bootstrap.lock";
+
+/// Whether `path` names the worktree bootstrap lock, or something below it.
+///
+/// No mutation may target it. Publication writes a file by staging it and
+/// renaming it into place, so such an action replaces the inode every current
+/// holder — the mutating session included — holds its `flock` on, and the next
+/// acquirer locks the replacement freely while the mutation is still running.
+///
+/// Unlike [`RECORD_SCRATCH_DIR`] the lock is not reserved from the identity
+/// itself: it sits among worktree content, so capture must still be able to name
+/// it as an entry it observed.
+pub(crate) fn is_bootstrap_lock(path: &VirtualPath) -> bool {
+    matches!(path.root_class(), RepositoryRootClass::Worktree)
+        && enters(path.relative().as_str(), BOOTSTRAP_LOCK_FILE)
+}
+
+/// Whether `path` is `reserved` itself or sits below it, by whole components.
+fn enters(path: &str, reserved: &str) -> bool {
+    path.strip_prefix(reserved)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 /// A normalized path relative to one selected repository root.
 ///
 /// [`Root`](RootRelativePath::Root) denotes the selected root itself;
@@ -201,18 +226,17 @@ mod identity {
             &self.relative
         }
 
+        /// The data root's scratch directory is the one namespace no semantic
+        /// identity may name: what sits there is engine state mid-publication,
+        /// which no repository path addresses. The worktree has no such
+        /// namespace; its one engine-control file sits among repository content
+        /// and is refused where mutation targets are validated, not here
+        /// ([`is_bootstrap_lock`](super::is_bootstrap_lock)).
         fn checked(self) -> Result<Self, RepositoryLayoutError> {
-            let path = self.relative.as_str();
-            let reserved = match self.root {
-                RepositoryRootClass::Worktree => {
-                    path == ".jit-bootstrap" || path.starts_with(".jit-bootstrap/")
-                }
-                RepositoryRootClass::Data => path
-                    .strip_prefix(super::RECORD_SCRATCH_DIR)
-                    .is_some_and(|rest| rest.is_empty() || rest.starts_with('/')),
-            };
+            let reserved = matches!(self.root, RepositoryRootClass::Data)
+                && super::enters(self.relative.as_str(), super::RECORD_SCRATCH_DIR);
             if reserved {
-                Err(RepositoryLayoutError::ReservedTransactionPath(self))
+                Err(RepositoryLayoutError::ReservedControlPath(self))
             } else {
                 Ok(self)
             }
@@ -447,14 +471,6 @@ impl RepositoryLayout {
             .ok()
             .map(RootRelativePath::parse)
             .transpose()?;
-        if let Some(relative) = &nested_data_relative {
-            let path = relative.as_str();
-            if path == ".jit-bootstrap" || path.starts_with(".jit-bootstrap/") {
-                return Err(RepositoryLayoutError::ReservedTransactionPath(
-                    VirtualPath::worktree(path)?,
-                ));
-            }
-        }
         let proof = InjectivityProof {
             worktree_identity: worktree.identity.clone(),
             data_identity: data.identity.clone(),
@@ -623,9 +639,9 @@ pub enum RepositoryLayoutError {
     /// A physical path is outside both roots.
     #[error("path '{0}' is outside both repository roots")]
     OutsideRepositoryRoots(PathBuf),
-    /// Semantic state entered a transaction-control namespace.
-    #[error("virtual path {0:?} is reserved for transaction control")]
-    ReservedTransactionPath(VirtualPath),
+    /// Semantic state entered a machine-local engine-control path.
+    #[error("virtual path {0:?} is reserved for engine control")]
+    ReservedControlPath(VirtualPath),
     /// Boundary evidence omitted a stable root identity.
     #[error("repository root '{0}' has an invalid boundary identity")]
     InvalidRootIdentity(PathBuf),
@@ -711,10 +727,6 @@ mod tests {
             RepositoryLayout::new(root("/repo/../escape"), root("/data")),
             Err(RepositoryLayoutError::LexicalEscape(_))
         ));
-        assert!(matches!(
-            RepositoryLayout::new(root("/repo"), root("/repo/.jit-bootstrap/data")),
-            Err(RepositoryLayoutError::ReservedTransactionPath(_))
-        ));
     }
 
     #[test]
@@ -785,10 +797,18 @@ mod tests {
     }
 
     #[test]
-    fn test_virtual_path_rejects_control_namespaces() {
-        assert!(VirtualPath::worktree(".jit-bootstrap/tx").is_err());
-        assert!(VirtualPath::data("tmp/tx").is_err());
-        assert!(VirtualPath::worktree("../outside").is_err());
+    fn test_virtual_path_reserves_the_data_scratch_and_nothing_in_the_worktree() {
+        // The data root's scratch directory and its subtree are the one namespace
+        // no semantic identity may name.
+        assert!(VirtualPath::data(RECORD_SCRATCH_DIR).is_err());
+        assert!(VirtualPath::data(format!("{RECORD_SCRATCH_DIR}/record.json")).is_err());
+        // A longer name that merely starts with it is ordinary.
+        assert!(VirtualPath::data(format!("{RECORD_SCRATCH_DIR}orary")).is_ok());
+        // The worktree reserves nothing. Its one engine-control file sits among
+        // repository content, is observable there, and is refused as a mutation
+        // target rather than as an identity.
+        assert!(VirtualPath::worktree(BOOTSTRAP_LOCK_FILE).is_ok());
+        assert!(VirtualPath::worktree(format!("{BOOTSTRAP_LOCK_FILE}/below")).is_ok());
     }
 
     #[test]
@@ -821,20 +841,13 @@ mod tests {
     }
 
     #[test]
-    fn test_virtual_path_serde_rejects_reserved_namespaces() {
+    fn test_virtual_path_serde_rejects_the_reserved_namespace() {
         let layout = RepositoryLayout::new(root("/repo"), root("/repo/.jit")).unwrap();
-        for encoded in [
-            serde_json::json!({
-                "root": "worktree",
-                "relative": ".jit-bootstrap/transaction",
-            }),
-            serde_json::json!({
-                "root": "data",
-                "relative": "tmp/transaction",
-            }),
-        ] {
-            assert!(deserialize_path(&layout, encoded).is_err());
-        }
+        let encoded = serde_json::json!({
+            "root": "data",
+            "relative": format!("{RECORD_SCRATCH_DIR}/record.json"),
+        });
+        assert!(deserialize_path(&layout, encoded).is_err());
     }
 
     #[test]
