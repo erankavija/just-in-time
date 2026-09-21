@@ -144,7 +144,7 @@ impl InMemoryStorage {
     }
 
     #[cfg(test)]
-    pub(crate) fn with_repository_state_failures(
+    pub(in crate::storage) fn with_repository_state_failures(
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     ) -> Self {
         let mut storage = Self::new();
@@ -175,30 +175,19 @@ impl InMemoryStorage {
         }
     }
 
+    /// A view sharing this backend's state whose sessions are interrupted at
+    /// the moments `interruptions` selects.
+    ///
     /// Reachable under `feature = "test-support"` in addition to `cfg(test)`:
     /// `commands::test_helpers::with_open_race` calls it, and `test_helpers`
     /// itself is reachable independent of `cfg(test)` when the feature is
     /// enabled without a test build (e.g. `cargo clippy --features
-    /// test-support`). `with_repository_state_failures` and
-    /// `without_repository_state_failures` stay `cfg(test)`-only: every other
+    /// test-support`). `with_mutation_interruptions` and
+    /// `without_mutation_interruptions` stay `cfg(test)`-only: every other
     /// caller lives inside `#[cfg(test)]` test modules, which always compile
     /// with `test-support` active via the crate's own dev-dependency. Unused
     /// in the `feature`-on/`cfg(test)`-off configuration itself, since its
     /// only non-`cfg(test)` caller (`with_open_race`) is unreached there too.
-    #[cfg(any(test, feature = "test-support"))]
-    #[allow(dead_code)]
-    pub(crate) fn with_repository_state_failure_view(
-        &self,
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
-    ) -> Self {
-        Self {
-            repository_state_failures: failures,
-            ..self.clone()
-        }
-    }
-
-    /// A view sharing this backend's state whose sessions are interrupted at
-    /// the moments `interruptions` selects.
     #[cfg(any(test, feature = "test-support"))]
     #[allow(dead_code)]
     pub(crate) fn with_mutation_interruption_view(

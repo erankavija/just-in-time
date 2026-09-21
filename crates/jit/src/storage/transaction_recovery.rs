@@ -16,10 +16,10 @@ pub(crate) enum RecoveryState {
 ///
 /// The shared `Repository` prefix is intentional: every variant names a step
 /// of the one repository-write transaction kernel, not an accidental
-/// collision. `test-support`-off builds narrow this type's own exposure to
-/// `pub(crate)` (see `storage::mod`), which lets clippy's default
-/// `avoid-breaking-exported-api` guard stop suppressing `enum_variant_names`
-/// for it; silence that lint explicitly rather than rename call sites.
+/// collision. `storage::mod` keeps this type inside the storage layer, which
+/// lets clippy's default `avoid-breaking-exported-api` guard stop suppressing
+/// `enum_variant_names` for it; silence that lint explicitly rather than rename
+/// call sites.
 ///
 /// Four boundaries name the phase barriers rather than an action edge, and
 /// carry no action index because the kernel crosses each of them exactly once

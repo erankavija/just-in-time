@@ -86,22 +86,14 @@ pub use repository_state_store::{
     discover_repository_layout, RecoveryDispatchReport, RepositoryApplyOutcome,
     RepositoryMutationSession, RepositoryStateStore, RepositoryStateStoreError,
 };
-pub(crate) use transaction_recovery::FileTransactionError;
-// Failure-injection seam: the definitions in `transaction_recovery` compile
-// unconditionally (production code threads them through every
-// `repository_check` site), but their exposure as crate public API is gated
-// behind `test-support`. The `pub(crate)` twin keeps every internal caller's
-// resolution (`crate::storage::TransactionFailurePoint`, etc.) identical in
-// both feature states.
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
-#[cfg(feature = "test-support")]
-pub use transaction_recovery::{
-    FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
-};
-#[cfg(not(feature = "test-support"))]
-pub(crate) use transaction_recovery::{
+pub(crate) use transaction_recovery::FileTransactionError;
+// Kernel-only failure-injection seam: the kernel's own boundaries are named by
+// the modules that host it, and a consumer injects a session through
+// `MutationPoint` instead.
+pub(in crate::storage) use transaction_recovery::{
     FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
 };
 pub use warnings::StorageWarning;

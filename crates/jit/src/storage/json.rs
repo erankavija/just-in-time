@@ -446,37 +446,6 @@ impl JsonFileStorage {
         }
     }
 
-    /// Construct storage with deterministic recovered-session failure injection.
-    #[cfg(feature = "test-support")]
-    #[doc(hidden)]
-    pub fn with_repository_state_failures<P: AsRef<Path>>(
-        root: P,
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
-    ) -> Self {
-        let mut storage = Self::new(root);
-        storage.repository_state_failures = failures;
-        storage
-    }
-
-    /// Construct storage with deterministic recovered-session failure injection.
-    ///
-    /// Crate-internal twin of the `test-support`-gated public constructor
-    /// above: same body, `pub(crate)` visibility, so internal callers resolve
-    /// identically whether or not the feature is enabled. Its only callers are
-    /// `#[cfg(test)]` code, which activates `test-support` via the crate's own
-    /// dev-dependency and so compiles the `pub` twin above instead; unused in
-    /// an ordinary non-test build with the feature off.
-    #[cfg(not(feature = "test-support"))]
-    #[allow(dead_code)]
-    pub(crate) fn with_repository_state_failures<P: AsRef<Path>>(
-        root: P,
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
-    ) -> Self {
-        let mut storage = Self::new(root);
-        storage.repository_state_failures = failures;
-        storage
-    }
-
     /// Construct storage whose mutation sessions are interrupted at the moments
     /// `interruptions` selects.
     #[cfg(feature = "test-support")]
@@ -496,7 +465,10 @@ impl JsonFileStorage {
     ///
     /// Crate-internal twin of the `test-support`-gated public constructor
     /// above: same body, `pub(crate)` visibility, so internal callers resolve
-    /// identically whether or not the feature is enabled.
+    /// identically whether or not the feature is enabled. Its only callers are
+    /// `#[cfg(test)]` code, which activates `test-support` via the crate's own
+    /// dev-dependency and so compiles the `pub` twin above instead; unused in
+    /// an ordinary non-test build with the feature off.
     #[cfg(not(feature = "test-support"))]
     #[allow(dead_code)]
     pub(crate) fn with_mutation_interruptions<P: AsRef<Path>>(
@@ -507,6 +479,20 @@ impl JsonFileStorage {
             root,
             crate::storage::KernelInterruptions::new(interruptions),
         )
+    }
+
+    /// Construct storage with deterministic kernel-boundary failure injection.
+    ///
+    /// Kernel vocabulary, so the storage layer's own suite reaches boundaries
+    /// no session moment stands for; every other consumer injects through
+    /// [`with_mutation_interruptions`](Self::with_mutation_interruptions).
+    pub(in crate::storage) fn with_repository_state_failures<P: AsRef<Path>>(
+        root: P,
+        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    ) -> Self {
+        let mut storage = Self::new(root);
+        storage.repository_state_failures = failures;
+        storage
     }
 
     #[cfg(test)]
