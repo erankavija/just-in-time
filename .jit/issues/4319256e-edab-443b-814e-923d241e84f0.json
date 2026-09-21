@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-09-21T10:22:35.138107309Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
@@ -74,5 +74,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Session commit through the redo record",
-  "updated_at": "2026-09-21T10:22:35.138107309Z"
+  "updated_at": "2026-09-21T11:14:52.948344333Z"
 }

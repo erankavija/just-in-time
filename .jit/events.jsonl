@@ -15096,3 +15096,4 @@
 {"fields":["documents"],"id":"6114db0e-3025-4527-8b8e-f2064943eab5","issue_id":"4319256e-edab-443b-814e-923d241e84f0","timestamp":"2026-09-21T10:22:34.732422275Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"ready","id":"e5ed21e3-52de-440f-b2a9-e2e7100b2f25","issue_id":"4319256e-edab-443b-814e-923d241e84f0","timestamp":"2026-09-21T10:22:35.138107309Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"348fcbc7-fce8-4246-999a-23268e0d9093","issue_id":"4319256e-edab-443b-814e-923d241e84f0","timestamp":"2026-09-21T10:22:35.138107309Z","type":"issue_claimed"}
+{"assignee":"agent:jit-execution-lead","id":"b357d558-7768-4eb2-8178-a1912e4256b6","issue_id":"4319256e-edab-443b-814e-923d241e84f0","timestamp":"2026-09-21T11:14:52.948344333Z","type":"issue_claimed"}
