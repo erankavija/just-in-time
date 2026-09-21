@@ -1000,6 +1000,17 @@
       "resolution": "Owner chose: 816df12a (wave 18) gains REQ-07 for the charter's D-17 body, since it already edits the charter at source and re-renders under doc-review and docs-mechanical; the lead edits the epic's Notes as a factual sync changing no criterion. Both applied at 0218efa73. No new task.",
       "resolved_by": "user",
       "status": "closed"
+    },
+    {
+      "id": "ESC-10",
+      "wave": 13,
+      "category": "4 - issue scope change (lead drafting error)",
+      "question": "b7c99dcb REQ-01's second clause — 'no document describes an external bootstrap control directory as a live location' — reached every document in the repository. Two still do, and both are owned elsewhere: docs/reference/profiles.md by 79252d23 (in flight) and dev/architecture/repository-state-materialization.md by be13da79 (wave 19). The criterion was unsatisfiable inside b7c99dcb's own wave.",
+      "resolution": "Owner chose to narrow the clause to documents this issue owns, with a document owned by another issue reported rather than edited, and to move the whole-repository sweep to a checkpoint that can see all of it. Applied to b7c99dcb's description.",
+      "resolved_by": "user",
+      "status": "closed",
+      "lead_note": "Same class as ESC-04: the criterion was written broader than the issue's surface. Drafted by this lead when it created the task under POL-01 during wave 12's review.",
+      "placement_refinement": "The owner's option named fbd6c859 as the checkpoint. On checking, fbd6c859 cannot see all of it either — be13da79 belongs to e590fa91 (wave 20), not to fbd6c859 (wave 15) — so putting the contributor-document clause there would have recreated the same unsatisfiability one level up. No new criterion was added, because two existing ones already name the subject and adding a third would be a duplication defect under @/inv/orthogonal-tests: fbd6c859 REQ-05 covers the adopter surface ('no page or declared gate scope names a journaled mechanism as live', and the external bootstrap control directory is part of the journaled mechanism), and e590fa91 REQ-04 covers the contributor half ('The contributor-facing material and the Rust prose describe one mechanism, and a reader following the architecture note's reading order reaches files that exist'), with be13da79 as its dependency. The owner's principle — the fact is checked by a node that can see all of it — is satisfied by the existing pair."
     }
   ],
   "rework_counts": {
@@ -1165,6 +1176,14 @@
       "criterion_subjects": "none — e6e25f9a's four criteria are about the scratch directory only.",
       "raised_by": "worker-e6e25f9a, flagged rather than fixed, correctly: it is outside the issue's criteria.",
       "status": "open — candidate follow-up, no owner; surfaces in the completion report unless the owner wants it scheduled."
+    },
+    {
+      "id": "SP-14",
+      "wave": 13,
+      "subject": "docs/reference/storage-format.md's legacy UUID `.lock` sidecar sweep paragraph predates this epic and was not verified against current code by the worker that rewrote the page around it.",
+      "criterion_subjects": "none in this epic",
+      "raised_by": "worker-ccea63de, reported rather than touched — correct, since verifying it is outside the issue's five criteria.",
+      "status": "open — no owner; surfaces in the completion report"
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
@@ -1500,6 +1519,13 @@
       "subject": "10ba2e35 REQ-06 — initialization reaches the kernel nowhere",
       "method": "Read the session construction path.",
       "result": "repository_state_store.rs drops the kernel once recovery completes ('Recovery is the whole of the kernel's remaining work, and it is done.'), so the session cannot reach it. REQ-06 met structurally, beyond the worker's failure-point recording test."
+    },
+    {
+      "id": "V-20",
+      "session": 6,
+      "wave": 13,
+      "subject": "Ownership of the two documents b7c99dcb surfaced, and of the two flags worker-ccea63de raised",
+      "result": "All four have owners, each verified against the owning issue's criteria rather than assumed. docs/reference/profiles.md -> 79252d23 REQ-02 (names the external bootstrap control directory, the protocol version and the staging directory) and REQ-03 (the transaction_cleanup_pending passage). dev/architecture/repository-state-materialization.md -> be13da79 REQ-01 and REQ-04, backstopped by e590fa91 REQ-04. `jit recover`'s 'Transactions recovered' line and its transactions_recovered JSON key -> 51eb1aa6 REQ-05 (wave 16), which names both the machine-readable output and the rendered line; note that e346d387's REQ-01 does NOT reach it, since that criterion covers doc comments, error strings and help text rather than output, and its nine sweep terms do not include a bare 'transaction'. The legacy UUID .lock sidecar paragraph ccea63de flagged predates the epic and has no owner — recorded as SP-14."
     }
   ],
   "standing_policies": [
