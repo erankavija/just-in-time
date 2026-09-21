@@ -107,12 +107,24 @@
       "path": "docs/how-to/deployment.md"
     }
   ],
+  "done_at": "2026-09-21T16:22:04.492959880Z",
   "first_ready_at": "2026-09-21T16:03:09.297349208Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T16:21:35.398404413Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-21T16:19:51.849605281Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
   "labels": [
     "type:task",
@@ -124,7 +136,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Deployment guide backup procedure",
-  "updated_at": "2026-09-21T16:17:10.585358467Z"
+  "updated_at": "2026-09-21T16:22:04.492959880Z"
 }

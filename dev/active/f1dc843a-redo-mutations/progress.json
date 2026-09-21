@@ -524,7 +524,13 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — dispatched, round 1"
+          "status": "done — docs-mechanical and doc-review both passed on the merged tree, zero rework rounds, reviewer verdict pass with 0 findings",
+          "review": {
+            "tier": "sonnet, matched to four criteria on one page",
+            "lead_tier_2": "All four verified in the diff. REQ-01: --exclude=./tmp on the tar command plus the prose. REQ-02 and REQ-03 read as written and at the page's voice. REQ-04 swept independently: the page's only journal-shaped match is `journalctl` in a systemd troubleshooting snippet, which is a log command rather than a description of journaled publication.",
+            "lead_check": "The worker grounded the path in the code rather than guessing: RECORD_SCRATCH_DIR is \"tmp\" at repository_state/path.rs:12, so `.jit/tmp/redo.record` is the real location, and it verified --exclude=./tmp actually drops the directory from a `-C .jit .` archive with a local tar run.",
+            "merge": "clean, no .jit conflict — main's copy of the issue already carried the plan link from before the dispatch anchor, so the worker's doc link appended without divergence."
+          }
         },
         {
           "id": "b7c99dcb",
@@ -1151,6 +1157,14 @@
       "owner": "be13da79 (wave 19, Architecture materialization note rewrite) — verified to own it: its REQ-01 covers the layer map and diagrams, and its REQ-04 is exactly this ('The closing reading order points at files that exist after the change'). Closed by assignment, not deferred.",
       "raised_by": "worker-b0ee2dd6, flagged rather than edited because the plan assigns the note to its own task.",
       "verify_at": "wave 19, and again at the epic completion reconciliation."
+    },
+    {
+      "id": "SP-13",
+      "wave": 13,
+      "subject": "The deployment guide's backup still archives the whole of `.jit/` apart from the scratch directory, which sweeps up machine-local state the storage-format reference declares gitignored: worktree.json, server.log, server.pid.json and the fixed lock files. Restoring them onto another host is probably harmless (locks are advisory and recreated, the pid file goes stale) but the guide does not say so.",
+      "criterion_subjects": "none — e6e25f9a's four criteria are about the scratch directory only.",
+      "raised_by": "worker-e6e25f9a, flagged rather than fixed, correctly: it is outside the issue's criteria.",
+      "status": "open — candidate follow-up, no owner; surfaces in the completion report unless the owner wants it scheduled."
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",

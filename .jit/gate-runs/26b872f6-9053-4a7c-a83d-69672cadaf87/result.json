@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c5872ec6da5b18ae633f3ff71d41019f5b8d2665",
+  "completed_at": "2026-09-21T16:21:35.081862759Z",
+  "duration_ms": 98391,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's backup and recovery documentation is complete, accurate, and discoverable.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "26b872f6-9053-4a7c-a83d-69672cadaf87",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T16:19:56.690853968Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf (configured level 4; no resolved DAG children). I inspected both reachable `jit:e6e25f9a` commits individually; the merge repeats the documentation patch. The current guide retains that patch.\n\nThe narrow impact cone is [docs/how-to/deployment.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/deployment.md:184). It excludes `.jit/tmp/`, explains the redo-record risk in one sentence, and states the restored backup has no pending redo record. The current storage implementation confirms the record resides in the data root scratch directory. No journaled-publication description remains in the guide.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's backup and recovery documentation is complete, accurate, and discoverable.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
