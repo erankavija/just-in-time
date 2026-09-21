@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a667633c10fd28bb88b41d85247e9978ef457259",
+  "completed_at": "2026-09-21T10:01:26.789036686Z",
+  "duration_ms": 549979,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/repository_state_store.rs",
+        "id": "F1",
+        "line": 458,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Journal recovery can mutate the repository before a malformed redo record is parsed and rejected, violating REQ-05."
+      }
+    ],
+    "summary": "Malformed redo-record recovery can mutate a concurrent kernel journal before returning its typed error.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0938d99e-1c0b-418b-9428-cc8a1d00ef3b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "93ec890c-591e-4c48-8551-392f41086289",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T09:52:16.810034763Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7149 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c361-7180-7cf3-a7c9-64099e9ceffb\n--------\nuser\n--- 7136 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 13 `jit:0938d99e` commits (a4f8788d, 4befe0fa, 2a577b7f, c916ed24, 82705b7f, cbd9a1a7, 0f9d1598, cdfb91dc, 80dc3e77, 1f69f1c6, 2b6a0122, a667633c, 1f5e2c7d)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/atomic-writes, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no recorded run)\nTruncation recovery: narrowed affected patches, merge-parent diffs, current source ranges, and record-of-past artifact inspection\n\n1. **F1 — blocking, issue-impact (high):** REQ-05 is violated when a malformed redo record coexists with a recoverable kernel journal. Session open performs external and internal journal recovery before parsing the redo record ([repository_state_store.rs:458](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:458), [repository_state_store.rs:485](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store.rs:485)); prepared journal recovery rolls back actions and cleans control state before the later record parse at line 497. The added malformed-record test seeds no journal, so it misses this mutation-before-error path. Validate the leftover record before any recovery that can mutate the repository.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Malformed redo-record recovery can mutate a concurrent kernel journal before returning its typed error.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Journal recovery can mutate the repository before a malformed redo record is parsed and rejected, violating REQ-05.\",\"file\":\"crates/jit/src/storage/repository_state_store.rs\",\"line\":458,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

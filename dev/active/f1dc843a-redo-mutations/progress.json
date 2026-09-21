@@ -277,9 +277,24 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "rework 1 of 2 — code-review F1 blocking on REQ-05",
+          "dispatch": {
+            "session": 5,
+            "tier": "opus",
+            "worktree": ".agents/worktrees/agent-0938d99e",
+            "anchor": "b552c8a74",
+            "plan_linked_before_dispatch": true
+          }
         }
-      ]
+      ],
+      "review_round_1": {
+        "cargo_ci": "passed on the merged tree, suite-clock 22703 ms, 4714 tests",
+        "code_review": "FAILED, 1 blocking finding",
+        "F1": "REQ-05 is violated when a malformed record coexists with a recoverable kernel journal: external recovery (:458), internal recovery (:485) and the companion sweep (:487) all mutate before the record is parsed inside apply_leftover_record (:497), so the typed refusal does not leave the repository unchanged. The malformed-record test seeds no journal and misses the path.",
+        "lead_confirmation": "Confirmed independently against the source at HEAD; the ordering is as cited.",
+        "criteria": "REQ-01, 02, 03, 04, 06 met and verified by the lead; REQ-05 unmet.",
+        "remedy_directed": "Split read-and-validate from apply: validate before the first mutating recovery pass, keep the apply after journal recovery. Must not cost a second probe on a record-free repository (REQ-04), must not move journal recovery (REQ-06), must keep apply before any capture (REQ-01). Test must seed a malformed record alongside a recoverable journal and compare every repository byte."
+      }
     },
     {
       "wave_number": 10,
@@ -800,7 +815,8 @@
     "4e818d10": 1,
     "8559f529": 2,
     "d591a1c8": 1,
-    "21e976d1": 1
+    "21e976d1": 1,
+    "0938d99e": 1
   },
   "surfaced_pitfalls": [
     {
