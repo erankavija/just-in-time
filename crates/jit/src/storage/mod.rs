@@ -28,6 +28,7 @@ pub mod json;
 pub mod lock;
 pub mod lock_cleanup;
 pub mod memory;
+pub mod mutation_interruption;
 pub mod path_errors;
 pub mod redo_apply;
 #[cfg(test)]
@@ -70,6 +71,8 @@ pub use json::{
     RetainedSessionSuspendedError,
 };
 pub use lock::{configured_lock_timeout, is_lock_timeout, FileLocker, LockMode, LockTimeout};
+pub(in crate::storage) use mutation_interruption::KernelInterruptions;
+pub use mutation_interruption::{MutationInterruptionInjector, MutationPoint};
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use redo_apply::{
     NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint,

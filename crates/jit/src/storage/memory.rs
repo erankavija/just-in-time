@@ -152,6 +152,18 @@ impl InMemoryStorage {
         storage
     }
 
+    /// An in-memory store whose mutation sessions are interrupted at the
+    /// moments `interruptions` selects.
+    #[cfg(any(test, feature = "test-support"))]
+    #[allow(dead_code)]
+    pub(crate) fn with_mutation_interruptions(
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
+    ) -> Self {
+        let mut storage = Self::new();
+        storage.repository_state_failures = crate::storage::KernelInterruptions::new(interruptions);
+        storage
+    }
+
     /// A view sharing this backend's aggregate state, lock, and layout tracker but
     /// with a clean failure injector. Mirrors opening a fresh `JsonFileStorage`
     /// over the same on-disk root for recovery: same state, no injected faults.
@@ -181,6 +193,20 @@ impl InMemoryStorage {
     ) -> Self {
         Self {
             repository_state_failures: failures,
+            ..self.clone()
+        }
+    }
+
+    /// A view sharing this backend's state whose sessions are interrupted at
+    /// the moments `interruptions` selects.
+    #[cfg(any(test, feature = "test-support"))]
+    #[allow(dead_code)]
+    pub(crate) fn with_mutation_interruption_view(
+        &self,
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
+    ) -> Self {
+        Self {
+            repository_state_failures: crate::storage::KernelInterruptions::new(interruptions),
             ..self.clone()
         }
     }

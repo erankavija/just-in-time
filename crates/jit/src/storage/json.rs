@@ -477,6 +477,38 @@ impl JsonFileStorage {
         storage
     }
 
+    /// Construct storage whose mutation sessions are interrupted at the moments
+    /// `interruptions` selects.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn with_mutation_interruptions<P: AsRef<Path>>(
+        root: P,
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
+    ) -> Self {
+        Self::with_repository_state_failures(
+            root,
+            crate::storage::KernelInterruptions::new(interruptions),
+        )
+    }
+
+    /// Construct storage whose mutation sessions are interrupted at the moments
+    /// `interruptions` selects.
+    ///
+    /// Crate-internal twin of the `test-support`-gated public constructor
+    /// above: same body, `pub(crate)` visibility, so internal callers resolve
+    /// identically whether or not the feature is enabled.
+    #[cfg(not(feature = "test-support"))]
+    #[allow(dead_code)]
+    pub(crate) fn with_mutation_interruptions<P: AsRef<Path>>(
+        root: P,
+        interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
+    ) -> Self {
+        Self::with_repository_state_failures(
+            root,
+            crate::storage::KernelInterruptions::new(interruptions),
+        )
+    }
+
     #[cfg(test)]
     pub(crate) fn with_git_program<P: AsRef<Path>, G: Into<PathBuf>>(
         root: P,
