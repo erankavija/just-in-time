@@ -244,60 +244,6 @@ require = [
   "jit parses and persists the structured findings block.",
 ]
 
-# --- scripts/doc-review-prompt.md --------------------------------------------
-
-[[document]]
-path = "scripts/doc-review-prompt.md"
-topic = "issue-scoped impact"
-require = [
-  "jit:<short-id>",
-  "individual commit patches",
-  "renames and deletions",
-  "Uncommitted changes",
-  "commit-based attribution was unavailable",
-  "smallest documentation impact cone",
-  "documentation that must change",
-  "pre-existing",
-  "advisory",
-  "direct present-tense statements",
-  "canonical reference",
-  "implementation history",
-  "if and only if",
-  "unresolved issue-impact blocking",
-]
-
-[[document]]
-path = "scripts/doc-review-prompt.md"
-topic = "leaf footprint"
-# Placement is the assertion: the leaf rule read under the container heading
-# would say the opposite of what it means.
-section = { after = "### Leaf review", before = "### Container review" }
-require = ["only commits tagged for the context leaf", "Do not include descendant"]
-
-[[document]]
-path = "scripts/doc-review-prompt.md"
-topic = "container footprint"
-section = { after = "### Container review", before = "## Derive the smallest documentation impact cone" }
-require = [
-  "container plus every delivered descendant",
-  "DAG-authoritative resolved children",
-  "unrelated sequencing dependencies",
-]
-
-[[document]]
-path = "scripts/doc-review-prompt.md"
-topic = "holistic container checks"
-require = [
-  "combined current documentation contract",
-  "Do not replay leaf reviews",
-  "container-level workflow coverage",
-  "cross-child terminology and example consistency",
-  "canonical placement versus duplication",
-  "discoverability",
-  "aggregate concision",
-  "union of descendant impact cones",
-]
-
 [[value]]
 file = ".jit/gates.toml"
 topic = "doc-review gate description"
