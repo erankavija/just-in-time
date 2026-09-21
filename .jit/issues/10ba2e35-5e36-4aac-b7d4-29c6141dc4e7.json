@@ -59,7 +59,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-21T15:07:55.252521291Z",
+      "updated_at": "2026-09-21T15:21:27.006276495Z",
       "updated_by": "auto:executor"
     }
   },
@@ -78,5 +78,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Init publisher for an absent data root",
-  "updated_at": "2026-09-21T15:07:55.252521291Z"
+  "updated_at": "2026-09-21T15:21:27.006276495Z"
 }
