@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0218efa73a5743a2b86f607d2810387cd9705539",
+  "completed_at": "2026-09-21T14:23:06.130626563Z",
+  "duration_ms": 494039,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The redo-record session cutover satisfies the issue criteria; the prior directory-publication finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4319256e-edab-443b-814e-923d241e84f0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "74ea24b4-0073-4dbd-bc0e-9251e6ad5c9d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T14:14:52.090657109Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 41c5f5f70, cc7b5de16, 99823fc5a, 749f3408a, d638b0496, fd8746457, 036ad483d, 5d82c8f5a, a2c9dda74, 572272e93, 0218efa73\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/atomic-writes, @/invariant/shared-test-contracts, @/invariant/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-21T14:13:54Z)\nTruncation recovery: path-scoped reads of tagged patches, redo protocol, session implementations, conformance tests, and policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The redo-record session cutover satisfies the issue criteria; the prior directory-publication finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

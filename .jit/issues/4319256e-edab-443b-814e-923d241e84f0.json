@@ -51,6 +51,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T14:23:22.533739622Z",
   "first_ready_at": "2026-09-21T10:19:41.310470813Z",
   "gates_required": [
     "cargo-ci",
@@ -63,8 +64,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T11:24:12.717871211Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T14:23:06.453679817Z",
       "updated_by": "auto:executor"
     }
   },
@@ -83,7 +84,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Session commit through the redo record",
-  "updated_at": "2026-09-21T14:14:19.851687079Z"
+  "updated_at": "2026-09-21T14:23:22.533739622Z"
 }

@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 10,
+  "current_wave": 11,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -315,7 +315,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — review round 1 FAILED (code-review F1); rework 1 of 2 dispatched",
+          "status": "done — cargo-ci and code-review both passed on the merged tree after one rework round (F1 + lead H1); reviewer verdict pass, 0 findings",
           "dispatch": {
             "session": 5,
             "tier": "opus",
@@ -331,6 +331,26 @@
         "scope_finding": "The gap is not removable by deletion: repository_state/export.rs CreateTree carries an explicit directories set, so some deltas hold a CreateDirectory with no put beneath. Every other producer (mutation.rs issues/gate-runs/gate-presets, archive.rs ancestors) always writes beneath the directory it creates.",
         "escalated": "ESC-09 — remedy contradicts plan decision OD-7",
         "remedy_directed": "Extend the record with a make-directory operation per the amended OD-7; delete create_delta_directories and its memory twin; cover the directory paths in the write-set comparison; fix the redo_record_for / create_delta_directories prose contradiction."
+      },
+      "review_round_2": {
+        "worker_tier": "opus",
+        "cargo_ci_worker_branch": "run 1 cold FAILED (2 fixture tests timed out at the 20 s nextest bound, suite-clock 51471 ms); run 2 warm passed, suite-clock 22080 ms",
+        "cargo_ci_merged_tree": "run 1 on main cold FAILED the suite-duration budget alone at 44379 ms with all 4717 tests passing; run 2 warm PASSED, suite-clock 22223 ms, duration 24972 ms",
+        "pol_04_timings_warm": {
+          "fmt_ms": 1615,
+          "clippy_ms": 294,
+          "suite_build_ms": 649,
+          "test_ms": 17493,
+          "doctest_ms": 4711,
+          "suite_clock_ms": 22223,
+          "flags": "none — every step within the session-4 reference figures"
+        },
+        "lead_tier_1_5": "F1 confirmed closed at HEAD independently before the gate: publish_through_record on both backends now runs redo_record_for, the write-set check, then commit with nothing between (repository_state_store.rs:662-668 JSON, :761-769 memory); make_directory inspects the occupant no-follow and refuses a non-directory (redo_apply.rs:201-212); ensure_write_set_unchanged_against chains record.make_directories() into the comparison (:942-947).",
+        "lead_tier_2": "REQ-01..REQ-09 all met. REQ-06 specifically re-checked: the two out-of-crate changes (crates/server/src/lib.rs, crates/jit/tests/cli_issue/recover_command_tests.rs) are test-module RedoRecord::new call sites, not re-implementations of the session trait, whose shape is unchanged. REQ-08 re-checked: BeforeMakeDirectory is constructed in redo_apply.rs, memory.rs, point_samples() and both order tests, so no point survives unconstructed.",
+        "lead_tier_2_5": "Surfaced two stale statements of the three-operation vocabulary that the OD-7 amendment had not reached, both lead-owned rather than worker-owned: plan.md's redo-record-shape contract section (fixed at 308623469) and two owner-owned texts escalated as ESC-09's follow-up.",
+        "lead_tier_2_75": "plan.md is the only linked doc; the deferred-language grep returns nothing.",
+        "lead_tier_3": "The conformance suite's classify stays exhaustive with no wildcard, point_samples is [RedoPoint; 7], and full_record carries a made directory, so the matrix and all three proptests drive the new operation on both backends. The snapshot fixture moved to SnapshotEntry so the file backend can observe an empty directory at all — without it the convergence half of the proof would have been vacuous for exactly the new operation. Accepted as in scope: same suite, same property.",
+        "worker_footprint": "+77 net production lines against the issue's under-300 note; workspace diff 8 files, +475/-130."
       }
     },
     {
@@ -345,7 +365,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "pending — next"
         }
       ]
     },
@@ -837,6 +857,15 @@
       "resolved_by": "user",
       "status": "closed",
       "lead_note": "Lead confirmed both halves of F1 independently at HEAD before escalating: create_delta_directories at repository_state_store.rs:664 precedes record.commit, memory twin at :772; ErrorKind::AlreadyExists at :1003 accepts a non-directory occupant. Also found a prose contradiction the worker shipped: redo_record_for's doc says a directory no put lands beneath 'is not created', while create_delta_directories says it 'is made here'."
+    },
+    {
+      "id": "ESC-09-followup",
+      "wave": 10,
+      "category": "3 - epic criteria adjacent / 4 - issue scope change",
+      "question": "ESC-09 left two owner-owned texts stating the superseded three-operation vocabulary — the charter's D-17 body (two enumerations) and epic f1dc843a's own Notes — and epic REQ-07 names their subject, so neither is a follow-up. No child issue owned either.",
+      "resolution": "Owner chose: 816df12a (wave 18) gains REQ-07 for the charter's D-17 body, since it already edits the charter at source and re-renders under doc-review and docs-mechanical; the lead edits the epic's Notes as a factual sync changing no criterion. Both applied at 0218efa73. No new task.",
+      "resolved_by": "user",
+      "status": "closed"
     }
   ],
   "rework_counts": {
@@ -951,6 +980,14 @@
         "REQ-03",
         "REQ-05"
       ]
+    },
+    {
+      "id": "SP-08",
+      "wave": 10,
+      "subject": "The charter's D-17 body enumerates the record's contents and its application in the superseded three-operation form.",
+      "criterion_subjects": "epic REQ-07",
+      "owner": "816df12a REQ-07 (wave 18) — assigned by the owner under ESC-09-followup, so this is closed by assignment rather than deferred.",
+      "verify_at": "epic completion reconciliation: dev/vision/9db27a3a-charter.md D-17, both enumerations."
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
