@@ -654,7 +654,7 @@
           "4b765a1e": "sonnet",
           "434a60b7": "sonnet"
         },
-        "briefing": "42478e5d carries SP-16 (a careful operator procedure for UnreadableRedoRecord, grounded in the parse error that distinguishes a torn write), cites storage-format.md#publication-and-recovery rather than restating it (PF-21), describes no event-log write mechanics (ESC-12), and leaves the transactions_recovered rename to 51eb1aa6. All three prompts state the writing standard: terse, plain, on point."
+        "briefing": "42478e5d carries SP-25 (a careful operator procedure for UnreadableRedoRecord, grounded in the parse error that distinguishes a torn write), cites storage-format.md#publication-and-recovery rather than restating it (PF-21), describes no event-log write mechanics (ESC-12), and leaves the transactions_recovered rename to 51eb1aa6. All three prompts state the writing standard: terse, plain, on point."
       }
     },
     {
@@ -967,7 +967,7 @@
       "wave": 13,
       "policy": "POL-01",
       "title": "Bootstrap namespace reservation retires with the kernel",
-      "origin": "SP-10, flagged by worker-b0ee2dd6 during wave 12 and escalated by the lead because retiring a reserved-path guard changes which worktree paths a mutation may target.",
+      "origin": "SP-19, flagged by worker-b0ee2dd6 during wave 12 and escalated by the lead because retiring a reserved-path guard changes which worktree paths a mutation may target.",
       "owner_decision": "Owner chose a new task in wave 13 over leaving it recorded or folding it into ccea63de, so code and page cut over together without stretching a documentation task into Rust changes.",
       "er_01": "Excluded from the epic's REQ-06 redo-record subtotal per ER-01.",
       "dag": "depends on b0ee2dd6; fbd6c859 (its story) depends on it, which is what backs its membership labels — jit validate reported 3 unbacked labels until that edge was added."
@@ -1137,183 +1137,6 @@
     "ead8f86d": 2,
     "79252d23": 1
   },
-  "surfaced_pitfalls": [
-    {
-      "id": "SP-01",
-      "found_during": "wave 1 review (fe6fa7e5)",
-      "subject": "Dangling path citations in the epic's own planning documents",
-      "detail": "DOCS_FOOTPRINT=dev/active/f1dc843a-redo-mutations ./scripts/docs-mechanical.sh reports 4 MISSING citations on clean main at 60bab4d6f: crates/jit/benches, dev/benchmarks/test-suite-performance-4b7c06d0.json, .jit/.gitignore, .jit/tmp/transactions. Pre-existing, not worker-introduced (verified against clean main). The docs-mechanical gate's footprint is docs/, so these never block a task gate.",
-      "disposition": "RESOLVED to owners (wave 2 analysis), none blocking. (1) .jit/.gitignore -- created by 08b8c0ef (wave 7), citation resolves then. (2) .jit/tmp/transactions -- the retired kernel path; goes with b0ee2dd6 kernel-retirement (wave 12). (3) crates/jit/benches -- investigation.md:2050 finding F-16 cites it AS ABSENT ('crates/jit/benches absent') to evidence that no Rust benchmark harness exists. The prose is correct and the path's absence is its point; the M3 checker cannot tell a citation-of-absence from a dangling one. No action. (4) dev/benchmarks/test-suite-performance-4b7c06d0.json -- ARCHIVED to dev/archive/4b7c06d0-test-suite-performance/benchmarks/. Still cited live by dev/TESTING.md:471, which is permanent_paths living documentation, alongside the contract name `transaction-benchmark-evidence` that plan decision LD-4 retires with the journal. OWNER: 8b6a9e34 (wave 22, Testing guide publication-cost evidence). Verify both the path and the contract name are gone there.",
-      "criterion_subjects": [
-        "REQ-07"
-      ]
-    },
-    {
-      "id": "SP-02",
-      "found_during": "wave 1 (fe6fa7e5 worker flag, lead-verified)",
-      "subject": "Inconsistent capture byte budgets cap event-log size; jit claim acquire fails above 16 MiB",
-      "detail": "commands/claim.rs:191-194 sets CaptureBudget.max_bytes = 16 MiB on a CaptureSpec::phase_one that includes VirtualPath::EVENTS, so `jit claim acquire` errors ('captured 33519044 bytes but the maximum is 16777216') on the epic's own 10x benchmark fixture. commands/mod.rs:2186-2191 gives the issue-update path 64 MiB, which is why the label-update scenarios still run. No task in the breakdown names either constant. c88822a5 REQ-03 keeps the event log in the single-pass base specification and REQ-06 keeps capture budget-bounded, so the ceiling survives the retirement phase unless a task takes it. REFINED (wave 2): the whole-log PARSE (captured_events, mutation.rs:695, called only at :884 under MutationIntent::ClaimIssue) is claim-specific, so a label update never pays it and the benchmark medians stand. Two consequences split apart. (a) The claim ceiling is a real latent product bug -- `jit claim acquire` fails above 16 MiB -- but it is NOT on the path REQ-01/REQ-02 evidence measures. (b) The residual REQ-02 risk is different: the finalizer's whole-log copy (mutation.rs:1224, `.to_vec()` + compose_events) is addressed by b4483ad6 positioned-event-append, but capture still READS the log whole into the image, which c88822a5 REQ-03 explicitly preserves. A 33 MB read is roughly 10-15 ms against a ~100 ms budget, i.e. at or over REQ-02's 10 % margin, with no parse cost to remove.",
-      "disposition": "OPEN, split. (a) claim 16 MiB ceiling: create a remediation task inside the epic; it blocks no criterion but is an adjacent latent bug the epic surfaced. (b) REQ-02 margin from the whole-log read: this is the one that can fail a criterion. Decide at wave 16 (c88822a5) whether the single-pass base specification can take the log as length+tail rather than whole bytes, given the only whole-log consumer left is the claim path. Re-measure at wave 21 (722878d4) before accepting REQ-02.",
-      "criterion_subjects": [
-        "REQ-02",
-        "REQ-05"
-      ]
-    },
-    {
-      "id": "SP-03",
-      "found_during": "wave 2 review of 19e7298a (lead-verified)",
-      "subject": "The event-log capture ceiling survives in document.rs after 19e7298a closed it for claim and issue-update",
-      "detail": "DOCUMENT_CAPTURE_BUDGET (crates/jit/src/commands/document.rs:5-10) sets max_bytes = 64 MiB with max_listings: 0, and its capture specs declare VirtualPath::EVENTS (document.rs:295, :375, :957). So `jit doc add` fails on a repository whose event log exceeds 64 MiB -- the identical defect 19e7298a fixed for claim (16 MiB) and issue-update (64 MiB), at a higher threshold. Verified: commands/config.rs:304 and commands/init.rs:350 also carry hand-picked 64 MiB ceilings but declare no EVENTS path, so they are not exposed to log growth.",
-      "disposition": "OPEN. 19e7298a is NOT at fault: its REQ-03 was scoped by the lead to the two paths that demonstrably disagreed, and it satisfied that exactly. The fix is now a one-liner of an established shape -- call issue_mutation_capture_budget() (commands/mod.rs:155) or apply the same u64::MAX + prose form that image.rs:594-604 and profile.rs record_capture_budget already establish. Raised to the user; folding it into this epic is a small task of the same class the user already directed be fixed now.",
-      "criterion_subjects": []
-    },
-    {
-      "id": "SP-04",
-      "found_during": "48e4f65c worker survey (wave 3)",
-      "subject": "Six listing-expanding capture budgets declare the event log and keep a hand-picked byte ceiling",
-      "detail": "commands/gate.rs:251 (512 MiB, paths :296), commands/gate.rs:1110 (256 MiB, paths :1119), commands/gate_check.rs:783 (512 MiB, paths :790), commands/template.rs:35 (512 MiB, paths :388), commands/validate.rs:1256 MUTATION_CAPTURE_BUDGET (512 MiB, EVENTS discovered at validate.rs:411). All declare VirtualPath::EVENTS, so a large enough event log makes them fail the way claim did at 16 MiB and document at 64 MiB. They differ from those in one decisive respect: max_listings > 0, so max_bytes is the only bound on real capture growth there. Removing it deletes a live bound. commands/config.rs:304 and commands/init.rs:350 declare only VirtualPath::CONFIG and are confirmed unexposed.",
-      "disposition": "OPEN, and deliberately out of scope for 48e4f65c. The owner amended that issue's REQ-02 to budgets requesting no listings, matching its Background. Closing these needs a design for bounding listing expansion without a hand-picked byte number - the same problem image.rs:586-604 describes ('A budget here would restate that bound as a number this type cannot derive'). Exposure is low: the ceilings are 256-512 MiB. Not scheduled; surfaces in the completion report.",
-      "criterion_subjects": []
-    },
-    {
-      "id": "SP-05",
-      "found_during": "7226f00b spike (wave 3), measured",
-      "subject": "Epic REQ-02 is unreachable while the capture base specification reads the event log whole",
-      "detail": "Measured on a tmpfs copy via a throwaway examples binary driving the real RepositoryMutationSession::capture, 15 iterations x 3 passes: base capture is flat at 14.2/14.5 ms; adding VirtualPath::EVENTS costs 3.2 ms at 1x (3.37 MB) and 28.6 ms at 10x (33.7 MB). Slope 0.89 ms/MB. The hardware floor is 0.81 ms/MB (fs::read + Sha256::digest at ~2.4 GB/s on SHA-NI), i.e. 91% of measured - there is no implementation slack. REQ-02's budget is 0.34 ms/MB (10% of a projected 99.3 ms over 28.96 MB). One whole-log read is 2.6x over measured and 2.4x over the floor. Projection: 99.3 ms at 1x -> 125.0 ms at 10x = +26%, against REQ-02's required <10%.",
-      "consumers": "Eleven consumers of captured log bytes. Five need the whole log and NONE is on the label-update path (mutation.rs:695 claim reflection, archive.rs:465, migrate.rs:88, validation/repository.rs:428, memory.rs:502). The label-update path has four sites and no semantic consumer: composer prefix copy (mutation.rs:1225, deleted by b4483ad6), torn-tail inspection (:1230, last line only), expected preimage (:1273, whole-log SHA-256), apply-time read-set re-capture (repository_state_store.rs:535). The last two are conflict machinery that ensure_write_set_unchanged already answers with length + 4 KiB tail.",
-      "false_premises_in_c88822a5": [
-        "'The apply-time round is already gone' - it is not; repository_state_store.rs:526-538 still re-captures the whole read set and compares it whole, a third whole-log read per changing label update.",
-        "ensure_write_set_unchanged (faa668c9) has no production caller, only repository_state_store_tests.rs:5108 - correct for the phase, but c88822a5's premise assumes it is live."
-      ],
-      "disposition": "RESOLVED by the invoker (session 2, ESC-05): option A. c88822a5 REQ-03 is amended to read the event log as length and a bounded tail, with a command that parses the log naming it whole in its own capture set. Epic REQ-02 stands unchanged; projected difference falls under 1 %. The amendment's three implied consequences are stated in c88822a5's Notes so they are delivered by that issue rather than falling between issues: a per-path read mode in CaptureSpec, a captured entry carrying length+tail (EventLogTail made reachable), and expected_of no longer deriving the log's preimage from a whole-log digest. The spike is linked to c88822a5 as its evidence. Re-measure at 722878d4 (wave 21) before accepting REQ-02.",
-      "criterion_subjects": [
-        "REQ-01",
-        "REQ-02"
-      ],
-      "evidence": "dev/active/7226f00b/whole-log-read-cost.md"
-    },
-    {
-      "id": "SP-06",
-      "found_during": "wave 4 (4e818d10 worker probe, reported not actioned)",
-      "subject": "A stale #[allow(unused_imports)] on the memory re-export line",
-      "detail": "storage/mod.rs carries `#[allow(unused_imports)] // Public API used only in tests, not in binary` over `pub use memory::InMemoryStorage`. The worker probed it at the lead's request: removing the allowance entirely leaves `cargo clippy --workspace --all-targets -- -D warnings` at exit 0 with no unused_imports diagnostic on any target, so whatever once made a pub re-export from a pub mod warn no longer does. The sibling `pub use redo_apply::{...}` already carries no allowance. The worker restored the line byte-for-byte and exported MemoryRedoApplier on its own unguarded line instead.",
-      "disposition": "OPEN, deliberately not actioned. A one-line cleanup on a shipped export surface, outside this epic's subject. The worker declined to fold it in, correctly. Surfaces in the completion report for v1.0 triage.",
-      "criterion_subjects": []
-    },
-    {
-      "id": "SP-07",
-      "found_during": "wave 4 (4e818d10 worker, disclosed)",
-      "subject": "A symlink at an operation's target diverges between the backends and cannot be closed by either",
-      "detail": "The filesystem applier reports ELOOP for a symlink or other unsupported occupant at a target; the in-memory backend has no symlinks and reports Unaddressable. The worker neither closed nor widened it, and disclosed it rather than leaving it to be found.",
-      "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it — its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
-      "criterion_subjects": []
-    },
-    {
-      "id": "SP-08",
-      "found_during": "wave 8 review (8d7f4cec), Tier 2.5 sweep",
-      "subject": "The architecture note still presents the kernel's FailurePoint as the test seam",
-      "detail": "dev/architecture/repository-state-materialization.md:422-423 reads 'Every durability boundary and action edge is a stable FailurePoint ... and a TransactionFailureInjector lets tests interrupt or race the kernel at each one'. Still true after 8d7f4cec -- the kernel keeps both, now pub(in crate::storage) -- but no longer the seam a consumer reaches, which is MutationPoint. Not falsified, so not a wave-8 failure.",
-      "disposition": "OWNER: be13da79 (wave 19, Architecture materialization note rewrite), whose REQ-01 and REQ-03 cover this section. Verify the paragraph names the record's interruption vocabulary there.",
-      "criterion_subjects": [
-        "REQ-07"
-      ]
-    },
-    {
-      "id": "SP-09",
-      "found_during": "wave 9 (0938d99e), worker-flagged",
-      "subject": "The session-open record applier cannot be interrupted by a consumer injector",
-      "detail": "apply_leftover_record constructs RedoApplier::new(Arc::new(NoRedoInterruptions)) unconditionally. Storage retains only the kernel-bridged TransactionFailureInjector, so a MutationInterruptionInjector cannot reach a session-open application. Nothing is unproven today: the record's crash matrix is owned by redo_conformance, and 0938d99e's own criteria do not require interrupting the session-open pass.",
-      "disposition": "OWNER: 4319256e (wave 10, Session commit through the redo record), whose REQ-04 requires a repository left by an interruption to converge. The injector must be plumbed to both backends there.",
-      "criterion_subjects": [
-        "REQ-03"
-      ]
-    },
-    {
-      "id": "SP-10",
-      "found_during": "wave 9 (0938d99e), worker-flagged",
-      "subject": "Recovery discovery keys on the kernel's control locations only",
-      "detail": "storage/discovery.rs:84-92 decides whether a repository needs recovery dispatch from the kernel's two control locations, so a leftover record in a repository with no index goes undiscovered by CLI data-dir discovery.",
-      "disposition": "The plan's req05-construct-map assigns this to the cutover phase; plan.md:99 states it as a known consequence. Verify it is closed by the cutover story before the epic's own gates run.",
-      "criterion_subjects": [
-        "REQ-03",
-        "REQ-05"
-      ]
-    },
-    {
-      "id": "SP-08",
-      "wave": 10,
-      "subject": "The charter's D-17 body enumerates the record's contents and its application in the superseded three-operation form.",
-      "criterion_subjects": "epic REQ-07",
-      "owner": "816df12a REQ-07 (wave 18) — assigned by the owner under ESC-09-followup, so this is closed by assignment rather than deferred.",
-      "verify_at": "epic completion reconciliation: dev/vision/9db27a3a-charter.md D-17, both enumerations."
-    },
-    {
-      "id": "SP-09",
-      "wave": 11,
-      "subject": "The init publisher's stage name is deterministic (`<leaf>.stage`), so a repository configured with a data root named X.stage beside one named X would have the second one's stage reclaim the first one's root. The bootstrap lock serializes the sessions but cannot prevent it.",
-      "criterion_subjects": "none — no epic or issue criterion names it",
-      "verdict": "accepted, not guarded. Self-inflicted configuration; OD-6 asks for the deterministic name, and a marker protocol would be new mechanism for a case nobody hits.",
-      "owner": "surfaces in the completion report"
-    },
-    {
-      "id": "SP-10",
-      "wave": 12,
-      "subject": "The `.jit-bootstrap` reserved namespace outlives the mechanism that used it. repository_state/path.rs:208 and :452 still refuse `.jit-bootstrap` and `.jit-bootstrap/*` as mutation targets, but nothing writes there since the kernel's external control location went. The live `.jit-bootstrap.lock` is a sibling path the guard does not match, so the dead directory is guarded while the live lock file is not.",
-      "criterion_subjects": "No issue criterion names it. b0ee2dd6 REQ-01/REQ-02 enumerate five constructs and four modules, none of which is this; epic REQ-05's enumeration does not name it either. @/inv/canonical-cutover names it generically as a superseded representation.",
-      "raised_by": "worker-b0ee2dd6, flagged rather than deleted unasked — the correct call, since removing a reserved-path guard changes which worktree paths a mutation may target.",
-      "bearing_on_wave_13": "ccea63de REQ-04 requires the storage-format page to carry no description of an external bootstrap control directory. The page and the code will then disagree about whether the name is reserved.",
-      "status": "open — lead to put it to the owner before wave 13's documentation work lands"
-    },
-    {
-      "id": "SP-11",
-      "wave": 12,
-      "subject": "The worktree-root bootstrap lock's second job is gone. It no longer serializes companions and external journals across disjoint-data-root sessions; it now serializes only absent-root publication, where two sessions sharing a worktree can still race the init publisher's sibling stage.",
-      "criterion_subjects": "none directly; the plan's lock-and-record-scope contract (LD-1) states the lock's scope.",
-      "verdict": "Lock kept and its prose corrected by the worker; test_session_disjoint_sessions_serialize_on_worktree_bootstrap still owns the property. Recorded in case LD-1's scope statement wants restating when a documentation task reaches it.",
-      "owner": "surfaces in the completion report"
-    },
-    {
-      "id": "SP-12",
-      "wave": 12,
-      "subject": "dev/architecture/repository-state-materialization.md still names file_transaction and the transaction kernel (3 matches at wave 12's close), and its closing reading order sends a contributor to files that no longer exist.",
-      "criterion_subjects": "epic REQ-07",
-      "owner": "be13da79 (wave 19, Architecture materialization note rewrite) — verified to own it: its REQ-01 covers the layer map and diagrams, and its REQ-04 is exactly this ('The closing reading order points at files that exist after the change'). Closed by assignment, not deferred.",
-      "raised_by": "worker-b0ee2dd6, flagged rather than edited because the plan assigns the note to its own task.",
-      "verify_at": "wave 19, and again at the epic completion reconciliation."
-    },
-    {
-      "id": "SP-13",
-      "wave": 13,
-      "subject": "The deployment guide's backup still archives the whole of `.jit/` apart from the scratch directory, which sweeps up machine-local state the storage-format reference declares gitignored: worktree.json, server.log, server.pid.json and the fixed lock files. Restoring them onto another host is probably harmless (locks are advisory and recreated, the pid file goes stale) but the guide does not say so.",
-      "criterion_subjects": "none — e6e25f9a's four criteria are about the scratch directory only.",
-      "raised_by": "worker-e6e25f9a, flagged rather than fixed, correctly: it is outside the issue's criteria.",
-      "status": "open — candidate follow-up, no owner; surfaces in the completion report unless the owner wants it scheduled."
-    },
-    {
-      "id": "SP-14",
-      "wave": 13,
-      "subject": "docs/reference/storage-format.md's legacy UUID `.lock` sidecar sweep paragraph predates this epic and was not verified against current code by the worker that rewrote the page around it.",
-      "criterion_subjects": "none in this epic",
-      "raised_by": "worker-ccea63de, reported rather than touched — correct, since verifying it is outside the issue's five criteria.",
-      "status": "open — no owner; surfaces in the completion report"
-    },
-    {
-      "id": "SP-15",
-      "wave": 13,
-      "subject": "docs/concepts/guarantees.md:634 (Graceful Degradation) says that with a malformed events.jsonl line, 'issue operations, which append rather than re-read the log, keep working'. Some mutations do parse the captured log: captured_events at repository_state/mutation.rs:694 runs parse_known_events and returns MalformedRecord on failure, and the claim path uses it.",
-      "criterion_subjects": "none in this epic — it concerns read tolerance, not publication or cost.",
-      "raised_by": "worker-ead8f86d during rework, reported rather than fixed, correctly: it predates the issue.",
-      "status": "open — no owner; surfaces in the completion report"
-    },
-    {
-      "id": "SP-16",
-      "wave": 13,
-      "subject": "An interruption during the record's own write (inside RedoRecord::commit, before its fsync completes) leaves a truncated redo.record, and the next session open refuses it with UnreadableRedoRecord. The repository's files are the complete old state, so epic REQ-03 holds by its letter, but every mutating command fails until an operator removes the record by hand — and whether a given unreadable record is safe to remove is the torn-versus-corrupted question the refusal exists to avoid answering automatically.",
-      "criterion_subjects": "42478e5d REQ-04 (the troubleshooting guide's recovery procedure) and REQ-05 (the error-code entry for a recovery failure describes a failed application).",
-      "owner": "42478e5d (wave 14). The lead will brief it explicitly at dispatch: the operator procedure for UnreadableRedoRecord, including how to tell a torn write (the parse error names 'fewer content bytes than the header declares') from other corruption, must be written with care rather than as 'delete the file'.",
-      "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do."
-    }
-  ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
     {
@@ -1677,7 +1500,7 @@
       "session": 6,
       "wave": 13,
       "subject": "Ownership of the two documents b7c99dcb surfaced, and of the two flags worker-ccea63de raised",
-      "result": "All four have owners, each verified against the owning issue's criteria rather than assumed. docs/reference/profiles.md -> 79252d23 REQ-02 (names the external bootstrap control directory, the protocol version and the staging directory) and REQ-03 (the transaction_cleanup_pending passage). dev/architecture/repository-state-materialization.md -> be13da79 REQ-01 and REQ-04, backstopped by e590fa91 REQ-04. `jit recover`'s 'Transactions recovered' line and its transactions_recovered JSON key -> 51eb1aa6 REQ-05 (wave 16), which names both the machine-readable output and the rendered line; note that e346d387's REQ-01 does NOT reach it, since that criterion covers doc comments, error strings and help text rather than output, and its nine sweep terms do not include a bare 'transaction'. The legacy UUID .lock sidecar paragraph ccea63de flagged predates the epic and has no owner — recorded as SP-14."
+      "result": "All four have owners, each verified against the owning issue's criteria rather than assumed. docs/reference/profiles.md -> 79252d23 REQ-02 (names the external bootstrap control directory, the protocol version and the staging directory) and REQ-03 (the transaction_cleanup_pending passage). dev/architecture/repository-state-materialization.md -> be13da79 REQ-01 and REQ-04, backstopped by e590fa91 REQ-04. `jit recover`'s 'Transactions recovered' line and its transactions_recovered JSON key -> 51eb1aa6 REQ-05 (wave 16), which names both the machine-readable output and the rendered line; note that e346d387's REQ-01 does NOT reach it, since that criterion covers doc comments, error strings and help text rather than output, and its nine sweep terms do not include a bare 'transaction'. The legacy UUID .lock sidecar paragraph ccea63de flagged predates the epic and has no owner — recorded as SP-23."
     }
   ],
   "standing_policies": [
@@ -1883,5 +1706,191 @@
     "open_for_user": "Whether crates/jit is split along its layer boundaries, and when. Layer sizes and the recommendation are in handoff-3.md.",
     "verification": "cargo-ci green on main at 1fce64b78 (4704 tests, 63 doctests, 0 skipped, 0 ignored); docs-mechanical green on all seven checks.",
     "housekeeping": "All experiment target directories under /data removed. Six stale worktrees from earlier epics still hold disk on / and carry unmerged commits -- not this epic's, untouched."
-  }
+  },
+  "surfaced_pitfalls": [
+    {
+      "id": "SP-01",
+      "found_during": "wave 1 review (fe6fa7e5)",
+      "subject": "Dangling path citations in the epic's own planning documents",
+      "detail": "DOCS_FOOTPRINT=dev/active/f1dc843a-redo-mutations ./scripts/docs-mechanical.sh reports 4 MISSING citations on clean main at 60bab4d6f: crates/jit/benches, dev/benchmarks/test-suite-performance-4b7c06d0.json, .jit/.gitignore, .jit/tmp/transactions. Pre-existing, not worker-introduced (verified against clean main). The docs-mechanical gate's footprint is docs/, so these never block a task gate.",
+      "disposition": "RESOLVED to owners (wave 2 analysis), none blocking. (1) .jit/.gitignore -- created by 08b8c0ef (wave 7), citation resolves then. (2) .jit/tmp/transactions -- the retired kernel path; goes with b0ee2dd6 kernel-retirement (wave 12). (3) crates/jit/benches -- investigation.md:2050 finding F-16 cites it AS ABSENT ('crates/jit/benches absent') to evidence that no Rust benchmark harness exists. The prose is correct and the path's absence is its point; the M3 checker cannot tell a citation-of-absence from a dangling one. No action. (4) dev/benchmarks/test-suite-performance-4b7c06d0.json -- ARCHIVED to dev/archive/4b7c06d0-test-suite-performance/benchmarks/. Still cited live by dev/TESTING.md:471, which is permanent_paths living documentation, alongside the contract name `transaction-benchmark-evidence` that plan decision LD-4 retires with the journal. OWNER: 8b6a9e34 (wave 22, Testing guide publication-cost evidence). Verify both the path and the contract name are gone there.",
+      "criterion_subjects": [
+        "REQ-07"
+      ]
+    },
+    {
+      "id": "SP-02",
+      "found_during": "wave 1 (fe6fa7e5 worker flag, lead-verified)",
+      "subject": "Inconsistent capture byte budgets cap event-log size; jit claim acquire fails above 16 MiB",
+      "detail": "commands/claim.rs:191-194 sets CaptureBudget.max_bytes = 16 MiB on a CaptureSpec::phase_one that includes VirtualPath::EVENTS, so `jit claim acquire` errors ('captured 33519044 bytes but the maximum is 16777216') on the epic's own 10x benchmark fixture. commands/mod.rs:2186-2191 gives the issue-update path 64 MiB, which is why the label-update scenarios still run. No task in the breakdown names either constant. c88822a5 REQ-03 keeps the event log in the single-pass base specification and REQ-06 keeps capture budget-bounded, so the ceiling survives the retirement phase unless a task takes it. REFINED (wave 2): the whole-log PARSE (captured_events, mutation.rs:695, called only at :884 under MutationIntent::ClaimIssue) is claim-specific, so a label update never pays it and the benchmark medians stand. Two consequences split apart. (a) The claim ceiling is a real latent product bug -- `jit claim acquire` fails above 16 MiB -- but it is NOT on the path REQ-01/REQ-02 evidence measures. (b) The residual REQ-02 risk is different: the finalizer's whole-log copy (mutation.rs:1224, `.to_vec()` + compose_events) is addressed by b4483ad6 positioned-event-append, but capture still READS the log whole into the image, which c88822a5 REQ-03 explicitly preserves. A 33 MB read is roughly 10-15 ms against a ~100 ms budget, i.e. at or over REQ-02's 10 % margin, with no parse cost to remove.",
+      "disposition": "OPEN, split. (a) claim 16 MiB ceiling: create a remediation task inside the epic; it blocks no criterion but is an adjacent latent bug the epic surfaced. (b) REQ-02 margin from the whole-log read: this is the one that can fail a criterion. Decide at wave 16 (c88822a5) whether the single-pass base specification can take the log as length+tail rather than whole bytes, given the only whole-log consumer left is the claim path. Re-measure at wave 21 (722878d4) before accepting REQ-02.",
+      "criterion_subjects": [
+        "REQ-02",
+        "REQ-05"
+      ]
+    },
+    {
+      "id": "SP-03",
+      "found_during": "wave 2 review of 19e7298a (lead-verified)",
+      "subject": "The event-log capture ceiling survives in document.rs after 19e7298a closed it for claim and issue-update",
+      "detail": "DOCUMENT_CAPTURE_BUDGET (crates/jit/src/commands/document.rs:5-10) sets max_bytes = 64 MiB with max_listings: 0, and its capture specs declare VirtualPath::EVENTS (document.rs:295, :375, :957). So `jit doc add` fails on a repository whose event log exceeds 64 MiB -- the identical defect 19e7298a fixed for claim (16 MiB) and issue-update (64 MiB), at a higher threshold. Verified: commands/config.rs:304 and commands/init.rs:350 also carry hand-picked 64 MiB ceilings but declare no EVENTS path, so they are not exposed to log growth.",
+      "disposition": "OPEN. 19e7298a is NOT at fault: its REQ-03 was scoped by the lead to the two paths that demonstrably disagreed, and it satisfied that exactly. The fix is now a one-liner of an established shape -- call issue_mutation_capture_budget() (commands/mod.rs:155) or apply the same u64::MAX + prose form that image.rs:594-604 and profile.rs record_capture_budget already establish. Raised to the user; folding it into this epic is a small task of the same class the user already directed be fixed now.",
+      "criterion_subjects": []
+    },
+    {
+      "id": "SP-04",
+      "found_during": "48e4f65c worker survey (wave 3)",
+      "subject": "Six listing-expanding capture budgets declare the event log and keep a hand-picked byte ceiling",
+      "detail": "commands/gate.rs:251 (512 MiB, paths :296), commands/gate.rs:1110 (256 MiB, paths :1119), commands/gate_check.rs:783 (512 MiB, paths :790), commands/template.rs:35 (512 MiB, paths :388), commands/validate.rs:1256 MUTATION_CAPTURE_BUDGET (512 MiB, EVENTS discovered at validate.rs:411). All declare VirtualPath::EVENTS, so a large enough event log makes them fail the way claim did at 16 MiB and document at 64 MiB. They differ from those in one decisive respect: max_listings > 0, so max_bytes is the only bound on real capture growth there. Removing it deletes a live bound. commands/config.rs:304 and commands/init.rs:350 declare only VirtualPath::CONFIG and are confirmed unexposed.",
+      "disposition": "OPEN, and deliberately out of scope for 48e4f65c. The owner amended that issue's REQ-02 to budgets requesting no listings, matching its Background. Closing these needs a design for bounding listing expansion without a hand-picked byte number - the same problem image.rs:586-604 describes ('A budget here would restate that bound as a number this type cannot derive'). Exposure is low: the ceilings are 256-512 MiB. Not scheduled; surfaces in the completion report.",
+      "criterion_subjects": []
+    },
+    {
+      "id": "SP-05",
+      "found_during": "7226f00b spike (wave 3), measured",
+      "subject": "Epic REQ-02 is unreachable while the capture base specification reads the event log whole",
+      "detail": "Measured on a tmpfs copy via a throwaway examples binary driving the real RepositoryMutationSession::capture, 15 iterations x 3 passes: base capture is flat at 14.2/14.5 ms; adding VirtualPath::EVENTS costs 3.2 ms at 1x (3.37 MB) and 28.6 ms at 10x (33.7 MB). Slope 0.89 ms/MB. The hardware floor is 0.81 ms/MB (fs::read + Sha256::digest at ~2.4 GB/s on SHA-NI), i.e. 91% of measured - there is no implementation slack. REQ-02's budget is 0.34 ms/MB (10% of a projected 99.3 ms over 28.96 MB). One whole-log read is 2.6x over measured and 2.4x over the floor. Projection: 99.3 ms at 1x -> 125.0 ms at 10x = +26%, against REQ-02's required <10%.",
+      "consumers": "Eleven consumers of captured log bytes. Five need the whole log and NONE is on the label-update path (mutation.rs:695 claim reflection, archive.rs:465, migrate.rs:88, validation/repository.rs:428, memory.rs:502). The label-update path has four sites and no semantic consumer: composer prefix copy (mutation.rs:1225, deleted by b4483ad6), torn-tail inspection (:1230, last line only), expected preimage (:1273, whole-log SHA-256), apply-time read-set re-capture (repository_state_store.rs:535). The last two are conflict machinery that ensure_write_set_unchanged already answers with length + 4 KiB tail.",
+      "false_premises_in_c88822a5": [
+        "'The apply-time round is already gone' - it is not; repository_state_store.rs:526-538 still re-captures the whole read set and compares it whole, a third whole-log read per changing label update.",
+        "ensure_write_set_unchanged (faa668c9) has no production caller, only repository_state_store_tests.rs:5108 - correct for the phase, but c88822a5's premise assumes it is live."
+      ],
+      "disposition": "RESOLVED by the invoker (session 2, ESC-05): option A. c88822a5 REQ-03 is amended to read the event log as length and a bounded tail, with a command that parses the log naming it whole in its own capture set. Epic REQ-02 stands unchanged; projected difference falls under 1 %. The amendment's three implied consequences are stated in c88822a5's Notes so they are delivered by that issue rather than falling between issues: a per-path read mode in CaptureSpec, a captured entry carrying length+tail (EventLogTail made reachable), and expected_of no longer deriving the log's preimage from a whole-log digest. The spike is linked to c88822a5 as its evidence. Re-measure at 722878d4 (wave 21) before accepting REQ-02.",
+      "criterion_subjects": [
+        "REQ-01",
+        "REQ-02"
+      ],
+      "evidence": "dev/active/7226f00b/whole-log-read-cost.md"
+    },
+    {
+      "id": "SP-06",
+      "found_during": "wave 4 (4e818d10 worker probe, reported not actioned)",
+      "subject": "A stale #[allow(unused_imports)] on the memory re-export line",
+      "detail": "storage/mod.rs carries `#[allow(unused_imports)] // Public API used only in tests, not in binary` over `pub use memory::InMemoryStorage`. The worker probed it at the lead's request: removing the allowance entirely leaves `cargo clippy --workspace --all-targets -- -D warnings` at exit 0 with no unused_imports diagnostic on any target, so whatever once made a pub re-export from a pub mod warn no longer does. The sibling `pub use redo_apply::{...}` already carries no allowance. The worker restored the line byte-for-byte and exported MemoryRedoApplier on its own unguarded line instead.",
+      "disposition": "OPEN, deliberately not actioned. A one-line cleanup on a shipped export surface, outside this epic's subject. The worker declined to fold it in, correctly. Surfaces in the completion report for v1.0 triage.",
+      "criterion_subjects": []
+    },
+    {
+      "id": "SP-07",
+      "found_during": "wave 4 (4e818d10 worker, disclosed)",
+      "subject": "A symlink at an operation's target diverges between the backends and cannot be closed by either",
+      "detail": "The filesystem applier reports ELOOP for a symlink or other unsupported occupant at a target; the in-memory backend has no symlinks and reports Unaddressable. The worker neither closed nor widened it, and disclosed it rather than leaving it to be found.",
+      "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it — its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
+      "criterion_subjects": []
+    },
+    {
+      "id": "SP-08",
+      "found_during": "wave 8 review (8d7f4cec), Tier 2.5 sweep",
+      "subject": "The architecture note still presents the kernel's FailurePoint as the test seam",
+      "detail": "dev/architecture/repository-state-materialization.md:422-423 reads 'Every durability boundary and action edge is a stable FailurePoint ... and a TransactionFailureInjector lets tests interrupt or race the kernel at each one'. Still true after 8d7f4cec -- the kernel keeps both, now pub(in crate::storage) -- but no longer the seam a consumer reaches, which is MutationPoint. Not falsified, so not a wave-8 failure.",
+      "disposition": "OWNER: be13da79 (wave 19, Architecture materialization note rewrite), whose REQ-01 and REQ-03 cover this section. Verify the paragraph names the record's interruption vocabulary there.",
+      "criterion_subjects": [
+        "REQ-07"
+      ]
+    },
+    {
+      "id": "SP-09",
+      "found_during": "wave 9 (0938d99e), worker-flagged",
+      "subject": "The session-open record applier cannot be interrupted by a consumer injector",
+      "detail": "apply_leftover_record constructs RedoApplier::new(Arc::new(NoRedoInterruptions)) unconditionally. Storage retains only the kernel-bridged TransactionFailureInjector, so a MutationInterruptionInjector cannot reach a session-open application. Nothing is unproven today: the record's crash matrix is owned by redo_conformance, and 0938d99e's own criteria do not require interrupting the session-open pass.",
+      "disposition": "OWNER: 4319256e (wave 10, Session commit through the redo record), whose REQ-04 requires a repository left by an interruption to converge. The injector must be plumbed to both backends there.",
+      "criterion_subjects": [
+        "REQ-03"
+      ]
+    },
+    {
+      "id": "SP-10",
+      "found_during": "wave 9 (0938d99e), worker-flagged",
+      "subject": "Recovery discovery keys on the kernel's control locations only",
+      "detail": "storage/discovery.rs:84-92 decides whether a repository needs recovery dispatch from the kernel's two control locations, so a leftover record in a repository with no index goes undiscovered by CLI data-dir discovery.",
+      "disposition": "The plan's req05-construct-map assigns this to the cutover phase; plan.md:99 states it as a known consequence. Verify it is closed by the cutover story before the epic's own gates run.",
+      "criterion_subjects": [
+        "REQ-03",
+        "REQ-05"
+      ]
+    },
+    {
+      "id": "SP-17",
+      "wave": 10,
+      "subject": "The charter's D-17 body enumerates the record's contents and its application in the superseded three-operation form.",
+      "criterion_subjects": "epic REQ-07",
+      "owner": "816df12a REQ-07 (wave 18) — assigned by the owner under ESC-09-followup, so this is closed by assignment rather than deferred.",
+      "verify_at": "epic completion reconciliation: dev/vision/9db27a3a-charter.md D-17, both enumerations.",
+      "renumbered_from": "SP-08 (collided with an earlier session's SP-08)"
+    },
+    {
+      "id": "SP-18",
+      "wave": 11,
+      "subject": "The init publisher's stage name is deterministic (`<leaf>.stage`), so a repository configured with a data root named X.stage beside one named X would have the second one's stage reclaim the first one's root. The bootstrap lock serializes the sessions but cannot prevent it.",
+      "criterion_subjects": "none — no epic or issue criterion names it",
+      "verdict": "accepted, not guarded. Self-inflicted configuration; OD-6 asks for the deterministic name, and a marker protocol would be new mechanism for a case nobody hits.",
+      "owner": "surfaces in the completion report",
+      "renumbered_from": "SP-09 (collided with an earlier session's SP-09)"
+    },
+    {
+      "id": "SP-19",
+      "wave": 12,
+      "subject": "The `.jit-bootstrap` reserved namespace outlives the mechanism that used it. repository_state/path.rs:208 and :452 still refuse `.jit-bootstrap` and `.jit-bootstrap/*` as mutation targets, but nothing writes there since the kernel's external control location went. The live `.jit-bootstrap.lock` is a sibling path the guard does not match, so the dead directory is guarded while the live lock file is not.",
+      "criterion_subjects": "No issue criterion names it. b0ee2dd6 REQ-01/REQ-02 enumerate five constructs and four modules, none of which is this; epic REQ-05's enumeration does not name it either. @/inv/canonical-cutover names it generically as a superseded representation.",
+      "raised_by": "worker-b0ee2dd6, flagged rather than deleted unasked — the correct call, since removing a reserved-path guard changes which worktree paths a mutation may target.",
+      "bearing_on_wave_13": "ccea63de REQ-04 requires the storage-format page to carry no description of an external bootstrap control directory. The page and the code will then disagree about whether the name is reserved.",
+      "status": "open — lead to put it to the owner before wave 13's documentation work lands",
+      "renumbered_from": "SP-10 (collided with an earlier session's SP-10)"
+    },
+    {
+      "id": "SP-20",
+      "wave": 12,
+      "subject": "The worktree-root bootstrap lock's second job is gone. It no longer serializes companions and external journals across disjoint-data-root sessions; it now serializes only absent-root publication, where two sessions sharing a worktree can still race the init publisher's sibling stage.",
+      "criterion_subjects": "none directly; the plan's lock-and-record-scope contract (LD-1) states the lock's scope.",
+      "verdict": "Lock kept and its prose corrected by the worker; test_session_disjoint_sessions_serialize_on_worktree_bootstrap still owns the property. Recorded in case LD-1's scope statement wants restating when a documentation task reaches it.",
+      "owner": "surfaces in the completion report",
+      "renumbered_from": "SP-11 (collided with an earlier session's SP-11)"
+    },
+    {
+      "id": "SP-21",
+      "wave": 12,
+      "subject": "dev/architecture/repository-state-materialization.md still names file_transaction and the transaction kernel (3 matches at wave 12's close), and its closing reading order sends a contributor to files that no longer exist.",
+      "criterion_subjects": "epic REQ-07",
+      "owner": "be13da79 (wave 19, Architecture materialization note rewrite) — verified to own it: its REQ-01 covers the layer map and diagrams, and its REQ-04 is exactly this ('The closing reading order points at files that exist after the change'). Closed by assignment, not deferred.",
+      "raised_by": "worker-b0ee2dd6, flagged rather than edited because the plan assigns the note to its own task.",
+      "verify_at": "wave 19, and again at the epic completion reconciliation.",
+      "renumbered_from": "SP-12 (collided with an earlier session's SP-12)"
+    },
+    {
+      "id": "SP-22",
+      "wave": 13,
+      "subject": "The deployment guide's backup still archives the whole of `.jit/` apart from the scratch directory, which sweeps up machine-local state the storage-format reference declares gitignored: worktree.json, server.log, server.pid.json and the fixed lock files. Restoring them onto another host is probably harmless (locks are advisory and recreated, the pid file goes stale) but the guide does not say so.",
+      "criterion_subjects": "none — e6e25f9a's four criteria are about the scratch directory only.",
+      "raised_by": "worker-e6e25f9a, flagged rather than fixed, correctly: it is outside the issue's criteria.",
+      "status": "open — candidate follow-up, no owner; surfaces in the completion report unless the owner wants it scheduled.",
+      "renumbered_from": "SP-13 (collided with an earlier session's SP-13)"
+    },
+    {
+      "id": "SP-23",
+      "wave": 13,
+      "subject": "docs/reference/storage-format.md's legacy UUID `.lock` sidecar sweep paragraph predates this epic and was not verified against current code by the worker that rewrote the page around it.",
+      "criterion_subjects": "none in this epic",
+      "raised_by": "worker-ccea63de, reported rather than touched — correct, since verifying it is outside the issue's five criteria.",
+      "status": "open — no owner; surfaces in the completion report",
+      "renumbered_from": "SP-14 (collided with an earlier session's SP-14)"
+    },
+    {
+      "id": "SP-24",
+      "wave": 13,
+      "subject": "docs/concepts/guarantees.md:634 (Graceful Degradation) says that with a malformed events.jsonl line, 'issue operations, which append rather than re-read the log, keep working'. Some mutations do parse the captured log: captured_events at repository_state/mutation.rs:694 runs parse_known_events and returns MalformedRecord on failure, and the claim path uses it.",
+      "criterion_subjects": "none in this epic — it concerns read tolerance, not publication or cost.",
+      "raised_by": "worker-ead8f86d during rework, reported rather than fixed, correctly: it predates the issue.",
+      "status": "open — no owner; surfaces in the completion report",
+      "renumbered_from": "SP-15 (collided with an earlier session's SP-15)"
+    },
+    {
+      "id": "SP-25",
+      "wave": 13,
+      "subject": "An interruption during the record's own write (inside RedoRecord::commit, before its fsync completes) leaves a truncated redo.record, and the next session open refuses it with UnreadableRedoRecord. The repository's files are the complete old state, so epic REQ-03 holds by its letter, but every mutating command fails until an operator removes the record by hand — and whether a given unreadable record is safe to remove is the torn-versus-corrupted question the refusal exists to avoid answering automatically.",
+      "criterion_subjects": "42478e5d REQ-04 (the troubleshooting guide's recovery procedure) and REQ-05 (the error-code entry for a recovery failure describes a failed application).",
+      "owner": "42478e5d (wave 14). The lead will brief it explicitly at dispatch: the operator procedure for UnreadableRedoRecord, including how to tell a torn write (the parse error names 'fewer content bytes than the header declares') from other corruption, must be written with care rather than as 'delete the file'.",
+      "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do.",
+      "renumbered_from": "SP-16 (collided with an earlier session's SP-16)"
+    }
+  ]
 }
