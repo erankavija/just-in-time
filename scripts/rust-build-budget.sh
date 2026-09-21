@@ -11,8 +11,8 @@
 #
 # The inputs are injectable so every failure mode has an independent
 # regression fixture that needs no compilation (REQ-04):
-#   --root DIR           workspace root holding Cargo.toml, crates/jit/Cargo.toml
-#                        and scripts/cargo-ci.sh (policy sources); default: the
+#   --root DIR           workspace root holding Cargo.toml and
+#                        crates/jit/Cargo.toml (policy sources); default: the
 #                        directory above this script.
 #   --metadata-json FILE pre-captured `cargo metadata --no-deps
 #                        --format-version=1`; default: run it live under --root.
@@ -211,7 +211,6 @@ fi
 # REQ-03: build/gate policy assertions against the injected policy sources.
 workspace_manifest="$ROOT/Cargo.toml"
 jit_manifest="$ROOT/crates/jit/Cargo.toml"
-gate_script="$ROOT/scripts/cargo-ci.sh"
 
 # Debug profile: dev and test both bound to line tables (no full debugger
 # payload). Mirrors the compile-time assertion in
@@ -223,17 +222,6 @@ for profile in dev test; do
     errors+=("profile drift: [profile.${profile}].debug is ${debug:-unset}, expected \"line-tables-only\". Corrective area: restore the bounded debug info in ${workspace_manifest#"$ROOT"/} (@/inv/single-source-prose; see build_profile_policy_tests.rs).")
   fi
 done
-
-# Gate incremental policy: the gate script disables incremental compilation, so
-# broad gate builds accumulate no incremental state.
-incremental_mode="disabled"
-if [ ! -r "$gate_script" ]; then
-  echo "rust-build-budget: cannot read gate script $gate_script" >&2
-  exit 2
-fi
-if ! grep -Eq '^[[:space:]]*export[[:space:]]+CARGO_INCREMENTAL=0' "$gate_script"; then
-  errors+=("incremental-policy drift: ${gate_script#"$ROOT"/} no longer exports CARGO_INCREMENTAL=0. Corrective area: keep the gate's incremental compilation disabled (see build_profile_policy_tests.rs).")
-fi
 
 # Dependency-feature policy: no remote JSON Schema resolution, one TLS backend.
 # Mirrors crates/jit/tests/scratch_build/dependency_feature_policy_tests.rs.
@@ -272,4 +260,4 @@ fi
 
 # REQ-06: one concise, parseable success line. cargo-ci.sh's summarize_pass
 # folds it into the persisted gate summary.
-echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} incremental=${incremental_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status}"
+echo "rust-build-budget: integration-targets=${target_count}/${MAX_INTEGRATION_TARGETS} active-executables=${#executables[@]} bytes=${executable_bytes}/${MAX_EXECUTABLE_BYTES} profile=${profile_mode} dep-features=${dep_feature_policy} suite-duration=${suite_duration_status}"

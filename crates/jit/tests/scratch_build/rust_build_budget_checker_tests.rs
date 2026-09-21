@@ -3,9 +3,9 @@
 //! REQ-04: every budget and policy the checker enforces has an independent
 //! fixture that needs no compilation. Each fixture feeds the checker synthetic
 //! `cargo metadata` / `cargo test --no-run --message-format=json` JSON and a
-//! synthetic policy root (a workspace manifest, the jit crate manifest, and the
-//! gate script), so the failure modes are exercised deterministically here
-//! rather than only when the real repository happens to drift.
+//! synthetic policy root (a workspace manifest and the jit crate manifest), so
+//! the failure modes are exercised deterministically here rather than only when
+//! the real repository happens to drift.
 //!
 //! Executable sizes are modelled with sparse files (`File::set_len`): `stat`
 //! reports the requested byte count while the file occupies no disk blocks, so a
@@ -61,8 +61,6 @@ jsonschema = { version = \"0.46\", default-features = false }
 ureq = { version = \"3\", default-features = false, features = [\"rustls\", \"gzip\"] }
 ";
 
-const COMPLIANT_GATE_SCRIPT: &str = "#!/usr/bin/env bash\nexport CARGO_INCREMENTAL=0\n";
-
 fn write(path: &Path, contents: &str) {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).expect("create fixture parent dir");
@@ -83,7 +81,6 @@ impl Fixture {
         let root = dir.path();
         write(&root.join("Cargo.toml"), COMPLIANT_WORKSPACE_MANIFEST);
         write(&root.join("crates/jit/Cargo.toml"), COMPLIANT_JIT_MANIFEST);
-        write(&root.join("scripts/cargo-ci.sh"), COMPLIANT_GATE_SCRIPT);
         Fixture { dir }
     }
 
@@ -286,33 +283,6 @@ incremental = true
             && stderr.contains("line-tables-only"),
         "diagnostic must name observed debug value, the expected value, and \
          corrective area: {stderr}"
-    );
-}
-
-#[test]
-fn test_checker_fails_on_incremental_policy_drift() {
-    if !jq_available() {
-        eprintln!("SKIP: jq not on PATH");
-        return;
-    }
-    let fx = Fixture::compliant();
-    write(
-        &fx.root().join("scripts/cargo-ci.sh"),
-        "#!/usr/bin/env bash\n# incremental no longer disabled\n",
-    );
-    let metadata = fx.write_metadata(11);
-    let a = fx.sparse_exe("a", EXACT_HALF_GIB);
-    let artifacts = fx.write_artifacts(&[(&a, true)]);
-
-    let out = fx.run(&metadata, &artifacts);
-    let stderr = String::from_utf8_lossy(&out.stderr);
-    assert!(
-        !out.status.success(),
-        "incremental-policy drift must fail: {stderr}"
-    );
-    assert!(
-        stderr.contains("incremental-policy drift") && stderr.contains("CARGO_INCREMENTAL=0"),
-        "diagnostic must name the missing policy and corrective area: {stderr}"
     );
 }
 

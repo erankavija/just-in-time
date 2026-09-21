@@ -1,24 +1,13 @@
-//! Regression coverage for jit:57d0eb79's build-profile and
-//! incremental-compilation policy.
+//! Regression coverage for jit:57d0eb79's build-profile policy.
 //!
 //! REQ-01/02: the workspace manifest bounds `[profile.dev]`/`[profile.test]`
 //! debug info to `line-tables-only` and states the incremental-compilation
 //! intent explicitly, rather than relying on Cargo's undocumented default, so
-//! ordinary interactive builds keep line-number backtraces without embedding a
-//! full debugger payload in every test executable.
-//! REQ-03: `scripts/cargo-ci.sh` overrides that interactive default and
-//! disables incremental compilation for every Rust compilation step the gate
-//! runs, so broad gate builds do not accumulate incremental state.
-//! REQ-04: the gate makes that property deterministic itself — a dedicated
-//! step judges the ban rather than relying on a one-off manual isolated-run
-//! observation. jit:0708d692 settled what that step judges: the ban's value in
-//! its own environment, which every compilation the run performed inherited.
-//! The target directory is shared with every other process that compiles the
-//! checkout, and no filesystem comparison can attribute a write to a writer, so
-//! entries that appear during a run are reported as an observation about the
-//! machine instead of deciding the verdict. `scripts/cargo-ci-selftest.sh` runs
-//! the shipped gate over incremental state seeded before and during a run, and
-//! a mutant gate whose export is gone, and asserts which of the three fails.
+//! builds keep line-number backtraces without embedding a full debugger payload
+//! in every test executable. That manifest setting governs gate runs too: the
+//! gate's separate ban on incremental compilation is retired, because a gate
+//! run against a warm target directory does have a later rebuild to amortize
+//! against — every agent worktree run and every local re-check is one.
 //!
 //! jit:6d10e5d4 added two more policies this file covers. First, the
 //! dependency-package override `[profile.dev.package."*"].opt-level = 1`:
@@ -111,104 +100,6 @@ fn shell_function_body<'a>(script: &'a str, name: &str) -> &'a str {
         .find("\n}\n")
         .unwrap_or_else(|| panic!("`{name}` must be closed at column zero"));
     &script[start..start + end]
-}
-
-#[test]
-fn test_cargo_ci_disables_incremental_compilation_before_the_first_step() {
-    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
-        .expect("read scripts/cargo-ci.sh");
-
-    // Matched as a whole line: a mention inside a comment satisfies a substring
-    // search while leaving incremental compilation on for every gate step.
-    let export_pos = script
-        .find("\nexport CARGO_INCREMENTAL=0\n")
-        .unwrap_or_else(|| {
-            panic!(
-                "scripts/cargo-ci.sh must export CARGO_INCREMENTAL=0 as a live \
-                 statement of its own"
-            )
-        });
-    let baseline_pos = script
-        .find("run_step incremental-baseline")
-        .expect("scripts/cargo-ci.sh must record the pre-compilation incremental baseline first");
-    let first_step_pos = script
-        .find("run_step fmt")
-        .expect("scripts/cargo-ci.sh must run the fmt step");
-
-    assert!(
-        export_pos < baseline_pos && baseline_pos < first_step_pos,
-        "CARGO_INCREMENTAL=0 must be exported before the first gate step so it \
-         covers every Rust compilation the gate performs (fmt, clippy, test, \
-         doctest)"
-    );
-    assert!(
-        script[baseline_pos..first_step_pos].contains("if [ \"$failed\" -ne 0 ]"),
-        "a baseline the gate could not record leaves the incremental policy \
-         unjudgeable for the whole run, so it must exit before the expensive \
-         fmt, clippy, test, doctest, and budget steps"
-    );
-}
-
-#[test]
-fn test_cargo_ci_judges_the_incremental_ban_by_its_runtime_value() {
-    let script = fs::read_to_string(workspace_root().join("scripts/cargo-ci.sh"))
-        .expect("read scripts/cargo-ci.sh");
-
-    let baseline_pos = script
-        .find("run_step incremental-baseline")
-        .expect("scripts/cargo-ci.sh must record an incremental baseline before compiling");
-    let first_step_pos = script
-        .find("run_step fmt")
-        .expect("scripts/cargo-ci.sh must run the fmt step");
-    let verdict_pos = script
-        .find("run_step incremental-state")
-        .unwrap_or_else(|| {
-            panic!(
-                "scripts/cargo-ci.sh must run a deterministic \"incremental-state\" \
-             gate step; exporting CARGO_INCREMENTAL=0 alone does not verify \
-             that no incremental state came back"
-            )
-        });
-    let test_step_pos = script
-        .find("run_step test ")
-        .expect("scripts/cargo-ci.sh must run the test step");
-
-    assert!(
-        baseline_pos < first_step_pos,
-        "the baseline must be taken before any compilation, or it cannot \
-         separate what this run produced from what was already there"
-    );
-    assert!(
-        verdict_pos > test_step_pos,
-        "the incremental-state check must run after compilation (the test \
-         step), so it observes what the gate's own builds actually left \
-         behind on disk"
-    );
-
-    let baseline_impl = shell_function_body(&script, "capture_incremental_baseline");
-    let verdict_impl = shell_function_body(&script, "check_gate_incremental_policy");
-    assert!(
-        baseline_impl.contains("incremental_entries")
-            && verdict_impl.contains("incremental_entries"),
-        "both steps must read the target directory through one snapshot helper, \
-         so the two snapshots they compare are taken the same way \
-         (@/inv/convention-convergence)"
-    );
-    assert!(
-        verdict_impl.contains("CARGO_INCREMENTAL"),
-        "the verdict must be the ban's value in the step's own environment — the \
-         condition every compilation this run performed inherited — because that \
-         is the only thing about the ban a gate run can establish. A shared \
-         target directory cannot attribute a write to a writer"
-    );
-    assert!(
-        verdict_impl.contains("$INCREMENTAL_BASELINE") && verdict_impl.contains("comm -13"),
-        "what appeared since the baseline must still be reported alongside that \
-         verdict, as an observation about the machine: the target directory is \
-         shared with every other process that compiles the checkout, and an \
-         editor's rust-analyzer repopulates `incremental` within seconds of it \
-         being cleared"
-    );
 }
 
 /// The shell variable `scripts/cargo-ci.sh` measures the suite clock into. The

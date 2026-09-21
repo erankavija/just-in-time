@@ -184,7 +184,7 @@ its measured suite and its `excluded-tests` step, on warm Cargo artifacts,
 pointing it with `--root` at the workspace that run compiled. The checker derives the integration-test
 target count and unique active test-executable bytes from `cargo metadata` and
 `cargo test --workspace --no-run --message-format=json`, and asserts the debug
-profile, gate incremental, and dependency-feature policies, failing the gate when
+profile and dependency-feature policies, failing the gate when
 a budget or policy is exceeded (jit:3f73423b). Its inputs are injectable
 (`--metadata-json`, `--artifacts-json`, `--root`), so
 `scratch_build/rust_build_budget_checker_tests.rs` exercises each failure mode
@@ -295,7 +295,7 @@ since `jit gate evaluate` reuses a recorded verdict over unchanged declared inpu
 A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
 change, not re-checked on every gate run: a full clean rebuild on every gate invocation would
-defeat the point of the interactive incremental-build policy described next. See
+defeat the point of the incremental-build policy described next. See
 [dev/benchmarks/rust-build-efficiency/report.md](benchmarks/rust-build-efficiency/report.md)
 ("Comparison and acceptance thresholds") for the acceptance criteria and the measured
 comparison they were applied to; "Benchmarking a build-topology change" below describes the
@@ -317,21 +317,17 @@ harness that produces both.
   `overflow-checks` still hold everywhere. The measured build cost of the override, against the
   matched unoptimized arm and both fixed 25% ceilings, is in
   [dev/benchmarks/dependency-profile-6d10e5d4/](benchmarks/dependency-profile-6d10e5d4/).
-- **Incremental compilation** — both profiles also state `incremental = true` explicitly, for
-  ordinary interactive development, where the cost amortizes across many rebuilds of the same
-  tree. `scripts/cargo-ci.sh` overrides this with `CARGO_INCREMENTAL=0` for every gate step,
-  since a gate run compiles once and exits with no later rebuild to amortize against; a
-  dedicated `incremental-state` gate step then fails the run when that ban was not in force,
-  asserting `CARGO_INCREMENTAL=0` in its own environment — the condition every compilation
-  the run performed inherited. Incremental state that appears under the target directory,
-  whether before the run or during it, is reported against the baseline the
-  `incremental-baseline` step records and does not decide the verdict: the directory is
-  shared with everything else that compiles the checkout, an editor's rust-analyzer writes it
-  continuously and repopulates it within seconds of it being cleared, and no filesystem
-  comparison can attribute a write to a writer. So there is nothing to clear before a gate
-  run. The residual that leaves is a child process the gate spawns which overrides the ban
-  against the same target directory; `scripts/cargo-ci.sh` states it where the assertion
-  lives.
+- **Incremental compilation** — both profiles state `incremental = true` explicitly rather
+  than leaving Cargo's default undocumented, and that setting governs gate runs too:
+  `scripts/cargo-ci.sh` overrides it nowhere. The premise that it once did — that a gate run
+  compiles once and exits with no later rebuild to amortize against — does not hold for the
+  runs that dominate the repository's build cost. Every agent worktree run and every local
+  re-check reruns the gate against a warm target directory, where one edited crate recompiles
+  instead of the workspace: 54.1 s against 25.3 s over the `clippy` and `suite-build` steps,
+  at no cost to a cold run. The derivation is under "Provenance" in
+  [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
+  What it costs is disk — about 3.9 GB of incremental state per target directory, which the
+  reclaim path in the worktree dispatch protocol already prunes.
 - **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
   `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
   run that must bypass the cache. Opting an existing target directory into a wrapper changes
@@ -377,12 +373,9 @@ test target or dependency feature:
   execution model and subsystem it matches.
 - **Active test-executable bytes over budget** — the linked executables grew past the
   ceiling. Check whether a new dependency pulled in unexpectedly large debug info, or whether
-  the debug/incremental profile policy above regressed, before adding more test code to the
-  same suites.
+  the debug profile policy above regressed, before adding more test code to the same suites.
 - **Profile drift** — `[profile.dev]` or `[profile.test]` in the workspace `Cargo.toml` no
   longer sets `debug = "line-tables-only"`. Restore it.
-- **Incremental-policy drift** — `scripts/cargo-ci.sh` no longer exports
-  `CARGO_INCREMENTAL=0` before its first step. Restore the export.
 - **Remote resolver reintroduction** — `jsonschema` in `crates/jit/Cargo.toml` no longer sets
   `default-features = false`, or explicitly re-enables a `resolve-*`/`tls-*` feature. Disable
   default features (and drop the explicit feature) again.

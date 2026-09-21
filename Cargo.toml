@@ -13,11 +13,11 @@ authors = ["erankavija"]
 # expansions) that dominated a representative test executable's size (jit:57d0eb79;
 # that measurement's provenance, and the executable-bytes budget this profile
 # keeps the tree inside, are in dev/benchmarks/rust-build-budgets/README.md).
-# `incremental` is stated explicitly so ordinary interactive builds keep
-# Cargo's default rather than depend on an undocumented one;
-# scripts/cargo-ci.sh overrides it with CARGO_INCREMENTAL=0 for gate runs,
-# where accumulated incremental state has no interactive rebuild to amortize
-# against.
+# `incremental` is stated explicitly rather than left at an undocumented Cargo
+# default. It governs gate runs too: scripts/cargo-ci.sh no longer overrides it,
+# because a gate run against a warm target directory does have a later rebuild
+# to amortize against — every agent worktree run and every local re-check is one
+# (dev/benchmarks/rust-build-budgets/README.md, "Provenance").
 debug = "line-tables-only"
 incremental = true
 

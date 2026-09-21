@@ -30,13 +30,14 @@ reconstruction of it. One `./scripts/cargo-ci.sh` run reports all three on its
 | quantity | command |
 | --- | --- |
 | integration-test targets | `cargo metadata --no-deps --format-version=1 \| jq '[.packages[].targets[] \| select(.kind[] == "test")] \| length'` |
-| active test-executable bytes | `CARGO_INCREMENTAL=0 cargo test --workspace --no-run --message-format=json \| jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and .executable != null) \| .executable' \| sort -u \| xargs stat -c %s \| awk '{s+=$1} END {print s}'` |
+| active test-executable bytes | `cargo test --workspace --no-run --message-format=json \| jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and .executable != null) \| .executable' \| sort -u \| xargs stat -c %s \| awk '{s+=$1} END {print s}'` |
 | suite clock | `./scripts/cargo-ci.sh`, `suite-clock` line |
 
-`CARGO_INCREMENTAL=0` in the second command is load-bearing. `scripts/cargo-ci.sh`
-exports it for every gate step, and the same tree relinked incrementally
-measured 1,600,239,368 bytes against the gate's 1,596,001,608: measure this
-budget the way the gate does or the number is not the enforced one.
+The second command inherits the workspace manifest's incremental setting, as
+every gate step now does: measure this budget the way the gate does or the
+number is not the enforced one. The choice moves the figure slightly — the same
+tree measured 1,600,239,368 bytes relinked incrementally against 1,596,001,608
+without — which is why the command states no override rather than one.
 
 ## What the tree measures
 
@@ -111,11 +112,42 @@ cold failure recurs, not v1.0 work.
 The archived `73482aa1` study holds the pre-optimization baseline, the original
 derivation of these budgets — including the 12-target figure, chosen there as a
 design ceiling for the consolidation it proposed rather than measured from a
-consolidated tree — and the measurements behind two policies this document does
-not re-derive and does not change: the `debug = "line-tables-only"` setting on
-`[profile.dev]`/`[profile.test]`, and the gate's `CARGO_INCREMENTAL=0` export.
-Those measurements stay valid as the record of what was observed then; the
-study's topology tables describe the tree before that consolidation landed and
-are history. The matched-methodology comparison produced by the same protocol,
+consolidated tree — and the measurements behind two policies. One this document
+does not re-derive and does not change: the `debug = "line-tables-only"` setting
+on `[profile.dev]`/`[profile.test]`. The other, the gate's `CARGO_INCREMENTAL=0`
+export, is **retired**, and the paragraph below records why. The study's
+measurements stay valid as the record of what was observed then; its topology
+tables describe the tree before that consolidation landed and are history.
+
+### The gate's incremental ban, retired 2026-09-21
+
+The ban rested on that study's measurement of 19 GiB of incremental state on a
+tree of 140 integration targets and 712 test executables, and on the premise
+that a gate run compiles once and exits with no later rebuild to amortize
+against. Both have lapsed. Today's tree reports 10 targets and 14 executables,
+and the runs that dominate the repository's build cost are repeat runs against a
+warm target directory: every agent worktree run and every local re-check.
+
+Measured on this tree at commit `498bd2449`, 24 cores, isolated target
+directories on NVMe, the gate's two compile steps after touching one file under
+`crates/jit/src/storage/`:
+
+| step | ban in force | incremental |
+| --- | --- | --- |
+| `clippy` | 29,276 ms | 16,691 ms |
+| `suite-build` | 25,133 ms | 8,608 ms |
+| subtotal | **54,409 ms** | **25,299 ms** |
+
+A cold run pays nothing for it (`clippy` 43,731 ms against 44,159 ms;
+`suite-build` 55,783 ms against 54,959 ms). What it costs is disk: the target
+directory measures 3.3 GB without incremental state and 7.1 GB with it.
+
+The ban's three enforcement points — the export in `scripts/cargo-ci.sh`, the
+script-text check in `scripts/rust-build-budget.sh`, and the two assertions in
+`build_profile_policy_tests.rs` — are removed with it, along with the gate's
+`incremental-baseline` and `incremental-state` steps and the three
+`scripts/cargo-ci-selftest.sh` scenarios that exercised them. The workspace
+manifest's `[profile.dev]`/`[profile.test]` `incremental = true` is now the one
+declaration of the policy, and `build_profile_policy_tests.rs` still asserts it. The matched-methodology comparison produced by the same protocol,
 including its fresh-target acceptance thresholds, is
 [../rust-build-efficiency/report.md](../rust-build-efficiency/report.md).

@@ -8,6 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **The gate's ban on incremental compilation.** `scripts/cargo-ci.sh` exported
+  `CARGO_INCREMENTAL=0` for every step, and three sites enforced that export: a
+  runtime `incremental-state` verdict in the gate itself, a script-text check in
+  `scripts/rust-build-budget.sh`, and two assertions in
+  `build_profile_policy_tests.rs`. The ban rested on 19 GiB of incremental state
+  measured on a tree of 140 integration targets and 712 test executables, and on
+  the premise that a gate run compiles once and exits with no later rebuild to
+  amortize against. The tree now reports 10 targets and 14 executables, and the
+  runs that dominate its build cost are repeat runs against a warm target
+  directory. Measured over the `clippy` and `suite-build` steps after one edited
+  file, 54,409 ms with the ban against 25,299 ms without, at no cost to a cold
+  run and about 3.9 GB of incremental state per target directory. The
+  `incremental-baseline` and `incremental-state` steps, the three
+  `scripts/cargo-ci-selftest.sh` scenarios that exercised them, and the
+  `incremental=` field of the budget checker's summary line are gone with it.
+  The workspace manifest's `[profile.dev]`/`[profile.test]`
+  `incremental = true` is now the single declaration of the policy, and
+  `build_profile_policy_tests.rs` still asserts it.
+
 - **Build provenance, the stale-binary guard, and the disk-backed gate
   `TMPDIR`.** `crates/jit/build.rs` stamped a commit, a dirty flag, and a build
   timestamp into the binary; `jit --version` and `jit version --json` reported
