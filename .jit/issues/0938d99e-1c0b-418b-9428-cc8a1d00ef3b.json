@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T10:19:41.016268108Z",
   "first_ready_at": "2026-09-21T09:11:27.205018135Z",
   "gates_required": [
     "cargo-ci",
@@ -62,8 +63,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T10:01:27.108232794Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T10:19:10.973508294Z",
       "updated_by": "auto:executor"
     }
   },
@@ -79,7 +80,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-09-21T10:13:53.009200980Z"
+  "updated_at": "2026-09-21T10:19:41.016268108Z"
 }

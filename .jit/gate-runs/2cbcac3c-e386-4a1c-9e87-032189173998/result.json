@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "718c70afbeb870e49c4a0e8b25191175ff7638a1",
+  "completed_at": "2026-09-21T10:19:10.662943341Z",
+  "duration_ms": 290391,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are satisfied; prior F1 is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0938d99e-1c0b-418b-9428-cc8a1d00ef3b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2cbcac3c-e386-4a1c-9e87-032189173998",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T10:14:20.271692529Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 19 `jit:0938d99e` commits (a4f8788d through 35a754fa)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/shared-test-contracts (.jit/invariants.toml); @/issue/0938d99e/requirement/REQ-03 (issue Markdown)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (exit 1, F1 addressed)\nTruncation recovery: targeted reads of final recovery implementation, tests, consumers, merge-parent patches, and prior F1 record; omitted truncated material was historical gate/progress records\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are satisfied; prior F1 is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

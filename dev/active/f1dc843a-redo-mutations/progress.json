@@ -277,7 +277,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "rework 1 of 2 — code-review F1 blocking on REQ-05",
+          "status": "done — cargo-ci and code-review both passed on the merged tree after one rework round (F1, REQ-05)",
           "dispatch": {
             "session": 5,
             "tier": "opus",
@@ -294,6 +294,13 @@
         "lead_confirmation": "Confirmed independently against the source at HEAD; the ordering is as cited.",
         "criteria": "REQ-01, 02, 03, 04, 06 met and verified by the lead; REQ-05 unmet.",
         "remedy_directed": "Split read-and-validate from apply: validate before the first mutating recovery pass, keep the apply after journal recovery. Must not cost a second probe on a record-free repository (REQ-04), must not move journal recovery (REQ-06), must keep apply before any capture (REQ-01). Test must seed a malformed record alongside a recoverable journal and compare every repository byte."
+      },
+      "review_round_2": {
+        "cargo_ci": "passed, suite-clock 22495 ms, 4715 tests (one added for F1)",
+        "code_review": "passed, 0 findings, prior F1 recorded as addressed",
+        "tier_1_5": "F1 confirmed closed at HEAD independently by the lead before the merge: read_leftover_record at :463 precedes external recovery :473, internal :500, sweep :503; apply unchanged at :512.",
+        "lock_claim_verified": "The worker carries parsed bytes across the write-lock boundary rather than re-reading. Verified: acquire_worktree_bootstrap_lock and acquire_bootstrap_write_lock are both taken before CapabilityRoots::open and held for the session's life, so no other session can open, and therefore none can write a record, between read and apply. Re-reading would have cost a record-free repository two by-name looks and broken REQ-04.",
+        "uncited_fix_accepted": "Memory backend gated its apply on the data root recovery FOUND; the JSON open rediscovers capabilities after recovery and gates on the root recovery LEFT. Worker closed the parity gap in the same commit. In scope: same function, same property, both backends."
       }
     },
     {
@@ -897,6 +904,27 @@
       "disposition": "OWNER: be13da79 (wave 19, Architecture materialization note rewrite), whose REQ-01 and REQ-03 cover this section. Verify the paragraph names the record's interruption vocabulary there.",
       "criterion_subjects": [
         "REQ-07"
+      ]
+    },
+    {
+      "id": "SP-09",
+      "found_during": "wave 9 (0938d99e), worker-flagged",
+      "subject": "The session-open record applier cannot be interrupted by a consumer injector",
+      "detail": "apply_leftover_record constructs RedoApplier::new(Arc::new(NoRedoInterruptions)) unconditionally. Storage retains only the kernel-bridged TransactionFailureInjector, so a MutationInterruptionInjector cannot reach a session-open application. Nothing is unproven today: the record's crash matrix is owned by redo_conformance, and 0938d99e's own criteria do not require interrupting the session-open pass.",
+      "disposition": "OWNER: 4319256e (wave 10, Session commit through the redo record), whose REQ-04 requires a repository left by an interruption to converge. The injector must be plumbed to both backends there.",
+      "criterion_subjects": [
+        "REQ-03"
+      ]
+    },
+    {
+      "id": "SP-10",
+      "found_during": "wave 9 (0938d99e), worker-flagged",
+      "subject": "Recovery discovery keys on the kernel's control locations only",
+      "detail": "storage/discovery.rs:84-92 decides whether a repository needs recovery dispatch from the kernel's two control locations, so a leftover record in a repository with no index goes undiscovered by CLI data-dir discovery.",
+      "disposition": "The plan's req05-construct-map assigns this to the cutover phase; plan.md:99 states it as a known consequence. Verify it is closed by the cutover story before the epic's own gates run.",
+      "criterion_subjects": [
+        "REQ-03",
+        "REQ-05"
       ]
     }
   ],
