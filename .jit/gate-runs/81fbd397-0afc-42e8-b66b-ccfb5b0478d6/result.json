@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a1f63b8bff4673ee1a2ee5c8e954a91bbc70eacf",
+  "completed_at": "2026-09-21T20:36:25.637178626Z",
+  "duration_ms": 261438,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/troubleshooting.md",
+        "id": "F1",
+        "line": 259,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Troubleshooting says jit recover reports leftover-record failures with the generic Error: form, but current recover wraps unreadable and apply failures as Recovery failed: and recovery_failed in JSON."
+      },
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/worktree-validate.md",
+        "id": "F2",
+        "line": 478,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The jit recover human-output sample omits Transactions recovered and Derived-state targets repaired; its lines predate this issue’s documentation patch."
+      }
+    ],
+    "summary": "Troubleshooting gives jit recover startup-record failures the wrong human error form; a pre-existing output sample is also incomplete.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "42478e5d-90aa-472e-bca2-f628a1d883c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "81fbd397-0afc-42e8-b66b-ccfb5b0478d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T20:32:04.198705343Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6871 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c5ab-2b05-7d33-a725-8c34776cb200\n--------\nuser\n--- 6858 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `967154657`, `a7b789d50`, `9165f6c68`, `1b1853a9`, `b85921129`, `484206f19`, `523c47597`, `f0eaf9c36`, `62813b56b`, `0152263f2`, `a1f63b8b`\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-4`, `@/charter/D-17` (`dev/vision/9db27a3a-charter.md`); `@/invariant/atomic-writes`, `@/invariant/canonical-cutover`, `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests`, `@/invariant/single-source-prose` (`.jit/invariants.toml`)\nGate evidence: cargo-ci passed (0); docs-mechanical passed (0); doc-review failed (1)\nTruncation recovery: narrowed merge-parent, current documentation, implementation, projection, and attribution reads; historical event/gate/progress records excluded\n\n1. **F1 — blocking, issue-impact, medium:** [troubleshooting.md:259](</home/vkaskivuo/Projects/just-in-time/docs/how-to/troubleshooting.md:259>) and :273–276 present the generic `Error:` form as applying or reading a leftover record for every mutating command, including `jit recover`. Current `jit recover` routes both unreadable-record and apply failures through `exit_recovery_failed`, producing `Recovery failed: …` for human output and `recovery_failed` for JSON. Update these samples and qualify the command-specific behavior. References: `@/invariant/single-source-prose`.\n\n2. **F2 — advisory, pre-existing, medium:** [worktree-validate.md:478](</home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:478>) omits `Transactions recovered` and `Derived-state targets repaired` from the human-output sample. Those lines predate this issue’s patch, while current output emits both. References: `@/invariant/single-source-prose`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Troubleshooting gives jit recover startup-record failures the wrong human error form; a pre-existing output sample is also incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Troubleshooting says jit recover reports leftover-record failures with the generic Error: form, but current recover wraps unreadable and apply failures as Recovery failed: and recovery_failed in JSON.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":259,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The jit recover human-output sample omits Transactions recovered and Derived-state targets repaired; its lines predate this issue’s documentation patch.\",\"file\":\"docs/reference/worktree-validate.md\",\"line\":478,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
