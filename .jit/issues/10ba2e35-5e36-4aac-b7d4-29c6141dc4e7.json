@@ -56,7 +56,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-21T15:07:55.252521291Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "10ba2e35-5e36-4aac-b7d4-29c6141dc4e7",
   "labels": [
     "type:task",
@@ -72,5 +78,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Init publisher for an absent data root",
-  "updated_at": "2026-09-21T14:24:32.221800274Z"
+  "updated_at": "2026-09-21T15:07:55.252521291Z"
 }

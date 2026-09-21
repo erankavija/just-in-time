@@ -374,7 +374,29 @@
             "plan_linked_before_dispatch": true
           }
         }
-      ]
+      ],
+      "review_round_1": {
+        "cargo_ci_worker_branch": "7 runs, 3 warm passes; every cold run failed on the same dogfood-fixture timeouts plus the suite-duration budget",
+        "cargo_ci_merged_tree": "run 1 cold FAILED (6 timeouts: the two test_utils profiled-fixture tests and the four fast_rules cli_warnings tests, all last in the run; suite-clock 60110 ms). Run 2 returned the memoized cold verdict (PF-19). Run 3 with --force PASSED warm: 4722 passed, suite-clock 22364 ms, duration 25070 ms.",
+        "pol_04_timings_warm": {
+          "fmt_ms": 1633,
+          "clippy_ms": 262,
+          "suite_build_ms": 602,
+          "test_ms": 17577,
+          "doctest_ms": 4770,
+          "suite_clock_ms": 22364,
+          "flags": "none — every step within the session-4 reference figures"
+        },
+        "lead_tier_2_5": "clean; the two init.rs matches are about the profile decision and scaffold state, not publication mechanism.",
+        "lead_tier_2_75": "plan.md is the only linked doc; no deferred language. The worker's 'not done, deliberately' documents all have owners in the wave plan: ccea63de, ead8f86d, 79252d23, e6e25f9a, 42478e5d (waves 13-14), 4b765a1e for rules-and-gates.md (wave 14), 8b6a9e34 for dev/TESTING.md (wave 22).",
+        "open_question": "Worker decision 2 (RedoApplier::apply_uncommitted) — reachability query sent to the worker before the verdict; see the wave's open_concern."
+      },
+      "open_concern": {
+        "id": "OC-01",
+        "subject": "apply_uncommitted applies worktree operations with no commit point",
+        "why": "Epic REQ-03 requires every repository mutation to publish through one redo record and to survive an interruption at every step; epic REQ-05 permits no second publication path beside the record except jit init. A delta over an absent data root that creates no root has nowhere to put a record, so the worker applies its worktree operations directly. An interruption mid-apply leaves partial worktree state with nothing to replay — the same defect class that blocked wave 10 as F1.",
+        "status": "reachability under investigation by the worker before the lead renders a verdict"
+      }
     },
     {
       "wave_number": 12,
@@ -1127,6 +1149,14 @@
       "suggested_remedy": "The lead must paste every prior finding verbatim into the rework message and treat the audit block as the lead's own pre-dispatch step, not the worker's. Alternatively the lead exports the findings into the worker's worktree. Done correctly this round by quoting F1 in full; the template should stop asking the worker for output it cannot produce.",
       "status": "recorded; affects the jit-execution-lead skill's rework-prompt-template.md, outside this epic's scope",
       "session": 5
+    },
+    {
+      "id": "PF-19",
+      "session": 6,
+      "wave": 11,
+      "finding": "`jit gate evaluate` takes a prior run's verdict over the same declared inputs instead of executing, so a cold-target cargo-ci FAILURE is memoized and a plain re-run on the unchanged tree returns the cached fail with duration 0 ms and exit code n/a ('Verdict: taken from run <id> over the same declared inputs'). `--force` executes the checker unconditionally and is required for every warm re-run after a cold failure.",
+      "why_it_matters": "POL-04's known cold-target trap and this memoization compose badly: the cold run fails on fixture timeouts and the suite-duration budget, and without --force the wave cannot clear the gate on an unchanged tree. Observed twice this session on 10ba2e35.",
+      "action": "Every warm re-run after a cold cargo-ci failure uses `jit gate evaluate <id> cargo-ci --force`."
     }
   ],
   "evidence_requirements": [
@@ -1306,6 +1336,22 @@
       "accepted_losses": "The private fn's `# Errors` block no longer names UnreadableRedoRecord and RedoApply, and the call-site comment no longer says 'before any capture'. The error contract is still stated in prose; REQ-01's before-capture property is owned by its test.",
       "method_note": "Judge an added-prose question over the ADDED hunks. A whole-file ratio is a flag for a file the work created, and noise for a file the work appended to.",
       "verdict": "closed"
+    },
+    {
+      "id": "V-18",
+      "session": 6,
+      "wave": 11,
+      "subject": "10ba2e35 REQ-07 allowance form",
+      "method": "Counted the allowances and their wording across the three kernel modules, and checked for any module-scope blanket.",
+      "result": "66 allowances, all reading `#[allow(dead_code, reason = \"removed when the transaction kernel retires\")]` with zero wording variants, none at module scope (no `#![allow]`, no bare `#[allow(dead_code)]`). Spot-checked transaction_recovery.rs: per-enum and per-variant, with live variants left unannotated. REQ-07 met."
+    },
+    {
+      "id": "V-19",
+      "session": 6,
+      "wave": 11,
+      "subject": "10ba2e35 REQ-06 — initialization reaches the kernel nowhere",
+      "method": "Read the session construction path.",
+      "result": "repository_state_store.rs drops the kernel once recovery completes ('Recovery is the whole of the kernel's remaining work, and it is done.'), so the session cannot reach it. REQ-06 met structurally, beyond the worker's failure-point recording test."
     }
   ],
   "standing_policies": [
