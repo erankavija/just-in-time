@@ -5,8 +5,8 @@ use crate::repository_state::{
 };
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
-    data_root as redo_root, record_relative_path, repository as redo_repository, seed_repository,
-    snapshot, CAPTURED_LOG,
+    data_root as redo_root, record_relative_path, record_scratch_relative_path,
+    repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -2966,6 +2966,7 @@ fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
     let image = fixture.capture([written.clone(), removed.clone(), VirtualPath::EVENTS]);
 
     let record = RedoRecord::new(
+        Vec::new(),
         vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
         vec![removed],
         event_append(seeded_log().len() as u64),
@@ -2984,6 +2985,7 @@ fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
     let written = data_path("issues/one.json");
     let image = fixture.capture([written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
+        Vec::new(),
         vec![put_file(
             written.clone(),
             b"{\"id\":\"one\",\"state\":\"ready\"}",
@@ -3012,6 +3014,7 @@ fn test_ensure_write_set_unchanged_refuses_a_delete_target_whose_bytes_changed()
     let image = fixture.capture([removed.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
         Vec::new(),
+        Vec::new(),
         vec![removed.clone()],
         event_append(seeded_log().len() as u64),
     )
@@ -3037,6 +3040,7 @@ fn test_ensure_write_set_unchanged_admits_a_read_but_unwritten_file_that_changed
     let written = data_path("issues/one.json");
     let image = fixture.capture([read_only, written.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
+        Vec::new(),
         vec![put_file(written, b"{\"id\":\"one\",\"state\":\"ready\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
@@ -3057,6 +3061,7 @@ fn test_ensure_write_set_unchanged_admits_a_target_expected_absent_that_is_still
     let created = data_path("issues/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
+        Vec::new(),
         vec![put_file(created, b"{\"id\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
@@ -3072,6 +3077,7 @@ fn test_ensure_write_set_unchanged_refuses_a_target_expected_absent_that_became_
     let created = data_path("issues/new.json");
     let image = fixture.capture([created.clone(), VirtualPath::EVENTS]);
     let record = RedoRecord::new(
+        Vec::new(),
         vec![put_file(created.clone(), b"{\"id\":\"new\"}")],
         Vec::new(),
         event_append(seeded_log().len() as u64),
@@ -3092,6 +3098,7 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_whose_length_changed() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
     let image = fixture.capture([VirtualPath::EVENTS]);
     let record = RedoRecord::new(
+        Vec::new(),
         Vec::new(),
         Vec::new(),
         event_append(seeded_log().len() as u64),
@@ -3116,7 +3123,13 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_shorter_than_the_tail_wi
     assert!((log.len() as u64) < EVENT_LOG_TAIL_WINDOW);
     let fixture = WriteSetFixture::new(&[("events.jsonl", log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
+    let record = RedoRecord::new(
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        event_append(log.len() as u64),
+    )
+    .unwrap();
 
     let mut edited = log.to_vec();
     let last = edited.len() - 2;
@@ -3134,7 +3147,7 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_shorter_than_the_tail_wi
 fn test_ensure_write_set_unchanged_admits_an_empty_event_log_that_is_still_empty() {
     let fixture = WriteSetFixture::new(&[("events.jsonl", b"")]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(0)).unwrap();
+    let record = RedoRecord::new(Vec::new(), Vec::new(), Vec::new(), event_append(0)).unwrap();
 
     assert!(fixture.check(&image, &record).is_ok());
 }
@@ -3144,7 +3157,13 @@ fn test_ensure_write_set_unchanged_refuses_an_event_log_edited_inside_the_tail_w
     let log = long_log();
     let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
+    let record = RedoRecord::new(
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        event_append(log.len() as u64),
+    )
+    .unwrap();
 
     let mut edited = log.clone();
     let last = edited.len() - 2;
@@ -3163,7 +3182,13 @@ fn test_ensure_write_set_unchanged_admits_an_event_log_edited_before_the_tail_wi
     let log = long_log();
     let fixture = WriteSetFixture::new(&[("events.jsonl", &log)]);
     let image = fixture.capture([VirtualPath::EVENTS]);
-    let record = RedoRecord::new(Vec::new(), Vec::new(), event_append(log.len() as u64)).unwrap();
+    let record = RedoRecord::new(
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        event_append(log.len() as u64),
+    )
+    .unwrap();
 
     let mut edited = log.clone();
     edited[0] = b'X';
@@ -3226,7 +3251,7 @@ impl FileSessionBackend {
 }
 
 impl SessionRecordBackend for FileSessionBackend {
-    type Published = BTreeMap<PathBuf, (Vec<u8>, bool)>;
+    type Published = BTreeMap<PathBuf, SnapshotEntry>;
 
     fn seeded() -> Self {
         let (worktree, _roots) = redo_repository();
@@ -3261,9 +3286,10 @@ impl SessionRecordBackend for FileSessionBackend {
     }
 
     fn published(&self) -> Self::Published {
-        let mut files = snapshot(self.worktree.path());
-        files.remove(&record_relative_path());
-        files
+        let mut entries = snapshot(self.worktree.path());
+        entries.remove(&record_relative_path());
+        entries.remove(&record_scratch_relative_path());
+        entries
     }
 
     fn holds_record(&self) -> bool {
@@ -3344,6 +3370,7 @@ impl crate::storage::MutationInterruptionInjector for InterruptAtMoment {
 /// interrupted mutation captured.
 fn leftover_record() -> RedoRecord {
     RedoRecord::new(
+        Vec::new(),
         vec![put_file(leftover_target(), LEFTOVER_BYTES)],
         Vec::new(),
         event_append(CAPTURED_LOG.len() as u64),

@@ -149,6 +149,7 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     let temp = setup_test_repo();
     let published = temp.path().join("applied-by-recovery.md");
     RedoRecord::new(
+        Vec::new(),
         vec![PutFile {
             path: jit::repository_state::VirtualPath::worktree("applied-by-recovery.md").unwrap(),
             bytes: b"published by the leftover record\n".to_vec(),
