@@ -9,7 +9,7 @@ use crate::repository_state::{
     gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
     RepositoryRootClass, RootRelativePath, VirtualPath,
 };
-use crate::storage::redo_apply::check_interruption;
+use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
     AmbiguousIdError, EventAppend, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
     IssueStore, PresetNotFoundError, PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint,
@@ -547,13 +547,21 @@ impl MemoryRedoApplier {
         let mut state = storage.repository_state();
         let event_log = VirtualPath::EVENTS;
         record
-            .puts()
+            .make_directories()
             .iter()
-            .map(|put| &put.path)
+            .chain(record.puts().iter().map(|put| &put.path))
             .chain(record.deletes().iter())
             .chain(record.event_append().iter().map(|_| &event_log))
             .try_for_each(|path| resolve(&state, path))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
+        record
+            .make_directories()
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, path)| {
+                check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
+                make_directory(&mut state, path)
+            })?;
         record
             .puts()
             .iter()
@@ -582,16 +590,27 @@ impl MemoryRedoApplier {
     }
 }
 
-/// Hold `path` as a directory entry, with every ancestor it needs.
+/// Make one directory entry, with every ancestor it needs.
 ///
-/// The counterpart of the file backend's directory creation, whose parent walk
-/// creates the ancestors a target needs.
-pub(in crate::storage) fn ensure_directory(state: &mut MemoryRepositoryState, path: &VirtualPath) {
-    InMemoryStorage::ensure_ancestor_dirs(state, path);
-    state
-        .entries
-        .entry(path.clone())
-        .or_insert_with(|| memory_directory_entry(path.relative().as_path()));
+/// The counterpart of the file backend's [`make_directory`](crate::storage::redo_apply),
+/// refusing the same occupants: a directory already there is the re-application
+/// case, and anything else is the refusal a record that can never apply raises.
+fn make_directory(
+    state: &mut MemoryRepositoryState,
+    path: &VirtualPath,
+) -> Result<(), RedoApplyError> {
+    resolve(state, path)?;
+    match state.entries.get(path) {
+        None | Some(RepositoryEntry::Absent) | Some(RepositoryEntry::Directory { .. }) => {
+            InMemoryStorage::ensure_ancestor_dirs(state, path);
+            state
+                .entries
+                .entry(path.clone())
+                .or_insert_with(|| memory_directory_entry(path.relative().as_path()));
+            Ok(())
+        }
+        Some(_) => Err(occupied_directory(path)),
+    }
 }
 
 fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
@@ -612,7 +631,8 @@ fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
 /// operation: a data path while the data root is absent has no root to land in,
 /// and an ancestor that is not a directory is the no-follow parent walk's
 /// refusal, reported by the same component the walk stopped at. An absent
-/// ancestor is admitted, because a put creates the directories its path needs.
+/// ancestor is admitted, because an operation creates the directories its path
+/// needs.
 fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
     if path.root_class() == RepositoryRootClass::Data && !state.data_root_exists {
         return Err(unaddressable(path));
@@ -1397,6 +1417,7 @@ mod record_tests {
         let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
         let before = semantic_state(&storage).0;
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(data("index.json"), b"published")],
             vec![worktree("stale.md")],
             Some(EventAppend {
@@ -1423,12 +1444,18 @@ mod record_tests {
     #[test]
     fn test_commit_record_refuses_a_record_a_previous_mutation_left_behind() {
         let storage = seeded(&[], false);
-        let leftover =
-            RedoRecord::new(vec![put(data("index.json"), b"leftover")], Vec::new(), None).unwrap();
+        let leftover = RedoRecord::new(
+            Vec::new(),
+            vec![put(data("index.json"), b"leftover")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         storage.commit_record(&leftover).unwrap();
 
-        let outcome = storage
-            .commit_record(&RedoRecord::new(Vec::new(), vec![data("index.json")], None).unwrap());
+        let outcome = storage.commit_record(
+            &RedoRecord::new(Vec::new(), Vec::new(), vec![data("index.json")], None).unwrap(),
+        );
 
         assert!(
             matches!(outcome, Err(RedoApplyError::OccupiedRecord)),
@@ -1442,6 +1469,7 @@ mod record_tests {
         let storage = seeded(&[data("index.json"), worktree("stale.md")], false);
         let appended = b"{\"tag\":\"issue_claimed\"}\n";
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(data("index.json"), b"published")],
             vec![worktree("stale.md")],
             Some(EventAppend {
@@ -1474,6 +1502,7 @@ mod record_tests {
     fn test_memory_redo_applier_apply_removes_the_record_it_applied() {
         let storage = seeded(&[], false);
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(data("index.json"), b"published")],
             Vec::new(),
             None,
@@ -1494,8 +1523,13 @@ mod record_tests {
     fn test_memory_redo_applier_apply_creates_the_directories_a_put_needs() {
         let storage = seeded(&[], false);
         let nested = data("issues/2026/a.json");
-        let record =
-            RedoRecord::new(vec![put(nested.clone(), b"published")], Vec::new(), None).unwrap();
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![put(nested.clone(), b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
 
         uninterrupted().apply(&storage, &record).unwrap();
 
@@ -1517,6 +1551,7 @@ mod record_tests {
         let storage = seeded(&[], false);
         let path = worktree("scripts/publish.sh");
         let record = RedoRecord::new(
+            Vec::new(),
             vec![PutFile {
                 path: path.clone(),
                 bytes: b"#!/bin/sh\n".to_vec(),
@@ -1550,6 +1585,7 @@ mod record_tests {
         let record = RedoRecord::new(
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: appended.to_vec(),
@@ -1569,6 +1605,7 @@ mod record_tests {
     fn test_memory_redo_applier_apply_checks_every_interruption_point_in_order() {
         let storage = seeded(&[], false);
         let record = RedoRecord::new(
+            vec![data("templates")],
             vec![
                 put(data("index.json"), b"published"),
                 put(worktree("notes.md"), b"published"),
@@ -1588,6 +1625,7 @@ mod record_tests {
             recorded.points(),
             vec![
                 RedoPoint::BeforeApply,
+                RedoPoint::BeforeMakeDirectory { index: 0 },
                 RedoPoint::BeforePut { index: 0 },
                 RedoPoint::BeforePut { index: 1 },
                 RedoPoint::BeforeDelete { index: 0 },
@@ -1605,12 +1643,14 @@ mod record_tests {
         let storage = seeded(&[], false);
         let (recorded, applier) = recording_applier();
         let published = RedoRecord::new(
+            Vec::new(),
             vec![put(data("index.json"), b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
-        let removed = RedoRecord::new(Vec::new(), vec![data("index.json")], None).unwrap();
+        let removed =
+            RedoRecord::new(Vec::new(), Vec::new(), vec![data("index.json")], None).unwrap();
 
         applier.apply(&storage, &published).unwrap();
         let after_first = recorded.points();
@@ -1637,6 +1677,7 @@ mod record_tests {
     fn test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent() {
         let storage = InMemoryStorage::new();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![
                 put(worktree("notes.md"), b"published"),
                 put(data("index.json"), b"published"),
@@ -1663,6 +1704,7 @@ mod record_tests {
         let storage = seeded(&[], false);
         storage.add_data_file("issues", "an ordinary file where a directory is needed");
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(data("issues/a.json"), b"published")],
             Vec::new(),
             None,
@@ -1706,8 +1748,13 @@ mod record_tests {
     fn test_memory_redo_applier_apply_refuses_a_put_over_a_pre_existing_directory() {
         let storage = seeded(&[], false);
         storage.add_data_file("issues/existing.json", "residual");
-        let record =
-            RedoRecord::new(vec![put(data("issues"), b"occupier")], Vec::new(), None).unwrap();
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![put(data("issues"), b"occupier")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);
@@ -1747,6 +1794,7 @@ mod record_tests {
         let storage = seeded(&[], false);
         storage.add_data_file("issues/existing.json", "residual");
         let record = RedoRecord::new(
+            Vec::new(),
             vec![
                 put(data("index.json"), b"published"),
                 put(data("issues"), b"occupier"),
@@ -1782,7 +1830,8 @@ mod record_tests {
     #[test]
     fn test_memory_redo_applier_apply_refuses_a_delete_of_a_directory() {
         let storage = seeded(&[data("issues/2026/a.json")], false);
-        let record = RedoRecord::new(Vec::new(), vec![data("issues/2026")], None).unwrap();
+        let record =
+            RedoRecord::new(Vec::new(), Vec::new(), vec![data("issues/2026")], None).unwrap();
         storage.commit_record(&record).unwrap();
 
         let outcome = uninterrupted().apply(&storage, &record);

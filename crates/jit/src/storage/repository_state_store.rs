@@ -661,7 +661,6 @@ impl JsonMutationSession {
     ) -> Result<(), RepositoryStateStoreError> {
         let record = redo_record_for(image, delta)?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
-        create_delta_directories(&self.roots, delta)?;
         record
             .commit(self.layout.data_root())
             .map_err(RepositoryStateStoreError::Transaction)?;
@@ -766,11 +765,7 @@ impl MemoryMutationSession {
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
         let record = redo_record_for(image, delta)?;
-        {
-            let mut state = self.storage.repository_state();
-            ensure_memory_write_set_unchanged(&state, image, &record)?;
-            create_memory_delta_directories(&mut state, delta);
-        }
+        ensure_memory_write_set_unchanged(&self.storage.repository_state(), image, &record)?;
         self.storage
             .commit_record(&record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
@@ -884,8 +879,9 @@ pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
 
 /// Refuse a mutation whose write set moved after the mutation read it.
 ///
-/// Compares the live occupant of every path `record` puts or deletes with the
-/// bytes `captured` holds for it, and the event log as its length together with
+/// Compares the live occupant of every path `record` makes a directory at, puts
+/// or deletes with what `captured` holds for it, and the event log as its length
+/// together with
 /// its last [`EVENT_LOG_TAIL_WINDOW`] bytes — the one answer for that path, so
 /// the log's whole contents are never reread (`@/charter/D-17`). A path the
 /// mutation read but does not write is left out, so a change there leaves the
@@ -944,9 +940,9 @@ fn ensure_write_set_unchanged_against(
     live_log_tail: &dyn Fn() -> Result<Option<EventLogTail>, RepositoryStateStoreError>,
 ) -> Result<(), RepositoryStateStoreError> {
     record
-        .puts()
+        .make_directories()
         .iter()
-        .map(|put| &put.path)
+        .chain(record.puts().iter().map(|put| &put.path))
         .chain(record.deletes().iter())
         .filter(|path| **path != VirtualPath::EVENTS)
         .try_for_each(|path| ensure_target_unchanged(captured, path, live))?;
@@ -981,55 +977,50 @@ fn ensure_target_unchanged(
         .ok_or_else(|| retryable_conflict(path))
 }
 
-/// Create the directories `delta` names, ahead of the record's commit.
+/// Every directory `delta` creates that no other action's path lies beneath.
 ///
-/// A directory holds no content, so it is not one of the files a record
-/// publishes (`@/charter/D-17`), and a put creates only the directories its own
-/// path needs. A directory the mutation creates and writes nothing beneath —
-/// initialization's issues directory is the one the engine composes — is made
-/// here. Creation is additive and idempotent, so an interruption before the
-/// commit point leaves an empty directory the next attempt reuses.
-fn create_delta_directories(
-    roots: &CapabilityRoots,
-    delta: &RepositoryDelta,
-) -> Result<(), RepositoryStateStoreError> {
-    created_directories(delta).try_for_each(|path| {
-        let root = roots
-            .root(path.root_class())
-            .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(format!("{path:?}")))?;
-        let (parent, leaf) = open_or_create_capability_parent(root, path.relative().as_path())?;
-        match parent.create_dir(&leaf) {
-            Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
-            Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(()),
-            Err(error) => Err(error.into()),
-        }
-    })
+/// The rest are created by the operation that lands under them, so carrying them
+/// too would put an ancestor and its descendant in one record — the overlap
+/// [`RedoRecord::new`] refuses (OD-7).
+fn made_directories(delta: &RepositoryDelta) -> impl Iterator<Item = &VirtualPath> {
+    delta
+        .actions()
+        .iter()
+        .filter_map(|action| match action {
+            RepositoryAction::CreateDirectory { path, .. } => Some(path),
+            _ => None,
+        })
+        .filter(|directory| {
+            !delta
+                .actions()
+                .iter()
+                .any(|action| lies_beneath(action.path(), directory))
+        })
 }
 
-/// [`create_delta_directories`] over the in-memory backend's entry map.
-fn create_memory_delta_directories(state: &mut MemoryRepositoryState, delta: &RepositoryDelta) {
-    created_directories(delta)
-        .for_each(|path| crate::storage::memory::ensure_directory(state, path));
-}
-
-fn created_directories(delta: &RepositoryDelta) -> impl Iterator<Item = &VirtualPath> {
-    delta.actions().iter().filter_map(|action| match action {
-        RepositoryAction::CreateDirectory { path, .. } => Some(path),
-        _ => None,
-    })
+/// Whether `path` lies strictly beneath `directory`: the same root, and every
+/// component of `directory` a prefix of `path`'s.
+fn lies_beneath(path: &VirtualPath, directory: &VirtualPath) -> bool {
+    path != directory
+        && path.root_class() == directory.root_class()
+        && path
+            .relative()
+            .as_path()
+            .starts_with(directory.relative().as_path())
 }
 
 /// The redo record that publishes `delta` over the repository `captured` read.
 ///
-/// A directory the delta creates is no operation of its own: a put creates the
-/// directories its path needs (OD-7). A directory no put lands beneath is
-/// therefore not created, and is made by the first mutation that writes into it.
-/// A mode change republishes the captured file's own bytes under the new mode,
-/// which the write-set comparison has just confirmed are still the live ones.
+/// A directory another action's path lies beneath is created by that action, so
+/// only the rest reach the record as make-directory operations (OD-7); their own
+/// ancestors are created on apply. A mode change republishes the captured file's
+/// own bytes under the new mode, which the write-set comparison has just
+/// confirmed are still the live ones.
 fn redo_record_for(
     captured: &RepositoryImage,
     delta: &RepositoryDelta,
 ) -> Result<RedoRecord, RepositoryStateStoreError> {
+    let make_directories = made_directories(delta).cloned().collect();
     let puts = delta
         .actions()
         .iter()
@@ -1055,7 +1046,7 @@ fn redo_record_for(
             _ => None,
         })
         .collect();
-    RedoRecord::new(puts, deletes, None)
+    RedoRecord::new(make_directories, puts, deletes, None)
         .map_err(|source| RepositoryStateStoreError::Other(source.into()))
 }
 

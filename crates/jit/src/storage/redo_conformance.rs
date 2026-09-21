@@ -10,8 +10,9 @@
 use crate::repository_state::{FileMode, RepositoryEntry, VirtualPath};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
-    arbitrary_record, data_root, path_vocabulary, record_relative_path, repository,
-    seed_repository, snapshot, InterruptAt, RecordedPoints, CAPTURED_LOG,
+    arbitrary_record, data_root, directory_vocabulary_paths, path_vocabulary, record_relative_path,
+    record_scratch_relative_path, repository, seed_repository, snapshot, InterruptAt,
+    RecordedPoints, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::repository_state_store::CapabilityRoots;
 use crate::storage::{
@@ -83,7 +84,7 @@ impl FileBackend {
 }
 
 impl RecordBackend for FileBackend {
-    type Published = BTreeMap<PathBuf, (Vec<u8>, bool)>;
+    type Published = BTreeMap<PathBuf, SnapshotEntry>;
 
     fn seeded(initial: &InitialState) -> Self {
         let (worktree, roots) = repository();
@@ -104,9 +105,10 @@ impl RecordBackend for FileBackend {
     }
 
     fn published(&self) -> Self::Published {
-        let mut files = snapshot(self.worktree.path());
-        files.remove(&record_relative_path());
-        files
+        let mut entries = snapshot(self.worktree.path());
+        entries.remove(&record_relative_path());
+        entries.remove(&record_scratch_relative_path());
+        entries
     }
 
     fn holds_record(&self) -> bool {
@@ -165,7 +167,8 @@ enum Interrupted {
 fn classify(point: &RedoPoint) -> Interrupted {
     match point {
         RedoPoint::BeforeApply => Interrupted::NothingPublished,
-        RedoPoint::BeforePut { .. }
+        RedoPoint::BeforeMakeDirectory { .. }
+        | RedoPoint::BeforePut { .. }
         | RedoPoint::BeforeDelete { .. }
         | RedoPoint::BeforeEventAppend
         | RedoPoint::BeforeRecordRemoval => Interrupted::PartlyPublished,
@@ -177,9 +180,10 @@ fn classify(point: &RedoPoint) -> Interrupted {
 /// classified; this list fails
 /// [`test_the_matrix_drives_an_interruption_at_every_point_on_both_backends`] on
 /// a point nobody drives.
-fn point_samples() -> [RedoPoint; 6] {
+fn point_samples() -> [RedoPoint; 7] {
     [
         RedoPoint::BeforeApply,
+        RedoPoint::BeforeMakeDirectory { index: 0 },
         RedoPoint::BeforePut { index: 0 },
         RedoPoint::BeforeDelete { index: 0 },
         RedoPoint::BeforeEventAppend,
@@ -188,15 +192,17 @@ fn point_samples() -> [RedoPoint; 6] {
     ]
 }
 
-/// A record reaching every point of the pass: two puts, a delete, and an append
-/// over disjoint vocabulary paths.
+/// A record reaching every point of the pass: a made directory, two puts, a
+/// delete, and an append over disjoint vocabulary paths.
 fn full_record() -> RedoRecord {
     let published = |path| PutFile {
         path,
         bytes: b"published".to_vec(),
         mode: FileMode::Regular,
     };
+    let [directory, _] = directory_vocabulary_paths();
     RedoRecord::new(
+        vec![directory],
         vec![
             published(VirtualPath::data("index.json").unwrap()),
             published(VirtualPath::worktree("notes.md").unwrap()),
@@ -355,6 +361,35 @@ fn test_the_matrix_drives_an_interruption_at_every_point_on_both_backends() {
         assert!(
             interrupted_at(&memory.apply(injector, &record), point),
             "the in-memory pass ran past {point:?}"
+        );
+    });
+}
+
+/// A made directory something other than a directory occupies is a typed
+/// refusal on both backends, rather than a silent success that leaves the
+/// record's target un-made. The generated matrix never produces this case: its
+/// directory vocabulary is disjoint from the paths it seeds occupants at,
+/// because every other occupant is a convergence case rather than a refusal.
+#[test]
+fn test_a_non_directory_occupying_a_made_directory_is_refused_on_both_backends() {
+    let [directory, _] = directory_vocabulary_paths();
+    let initial = InitialState {
+        occupied: vec![directory.clone()],
+        residue: false,
+    };
+    let record = RedoRecord::new(vec![directory], Vec::new(), Vec::new(), None).unwrap();
+    let file = committed::<FileBackend>(&initial, &record);
+    let memory = committed::<MemoryBackend>(&initial, &record);
+
+    let outcomes = [
+        file.apply(Arc::new(NoRedoInterruptions), &record),
+        memory.apply(Arc::new(NoRedoInterruptions), &record),
+    ];
+
+    outcomes.iter().for_each(|outcome| {
+        assert!(
+            matches!(outcome, Err(RedoApplyError::OccupiedDirectory { .. })),
+            "a record whose directory a regular file occupies was applied: {outcome:?}"
         );
     });
 }

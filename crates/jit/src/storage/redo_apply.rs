@@ -1,10 +1,11 @@
 //! Applying a redo record to the repository's filesystem roots.
 //!
 //! One forward pass over the record's operations, then the record is removed.
-//! Re-application is the same pass: a put overwrites, a delete tolerates
-//! absence, the append rewrites its bytes at its offset, so a record applied
-//! twice converges. A session's apply writes one and applies it; a session open
-//! applies the one a crash left.
+//! Re-application is the same pass: a made directory tolerates a directory
+//! already there, a put overwrites, a delete tolerates absence, the append
+//! rewrites its bytes at its offset, so a record applied twice converges. A
+//! session's apply writes one and applies it; a session open applies the one a
+//! crash left.
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
@@ -33,6 +34,8 @@ use std::sync::Arc;
 pub enum RedoPoint {
     /// Every path resolved, before the first live write.
     BeforeApply,
+    /// Before make-directory `index` creates its path.
+    BeforeMakeDirectory { index: usize },
     /// Before put `index` replaces its path.
     BeforePut { index: usize },
     /// Before delete `index` removes its path.
@@ -74,6 +77,8 @@ pub enum RedoApplyError {
     },
     #[error("a redo record no application consumed is already committed")]
     OccupiedRecord,
+    #[error("redo record makes directory {path}, which something other than a directory occupies")]
+    OccupiedDirectory { path: String },
     #[error(transparent)]
     Roots(#[from] RepositoryStateStoreError),
     #[error(transparent)]
@@ -118,13 +123,21 @@ impl RedoApplier {
         let injector = &*self.injector;
         let event_log = VirtualPath::EVENTS;
         record
-            .puts()
+            .make_directories()
             .iter()
-            .map(|put| &put.path)
+            .chain(record.puts().iter().map(|put| &put.path))
             .chain(record.deletes().iter())
             .chain(record.event_append().iter().map(|_| &event_log))
             .try_for_each(|path| resolve(roots, path).map(|_| ()))?;
         check_interruption(injector, RedoPoint::BeforeApply)?;
+        record
+            .make_directories()
+            .iter()
+            .enumerate()
+            .try_for_each(|(index, path)| {
+                check_interruption(injector, RedoPoint::BeforeMakeDirectory { index })?;
+                make_directory(roots, path)
+            })?;
         record
             .puts()
             .iter()
@@ -177,6 +190,27 @@ fn resolve<'a>(
         .ok_or_else(|| unaddressable(path))?;
     open_capability_parent(root, path.relative().as_path())?;
     Ok((root, path.relative().as_path()))
+}
+
+/// Make one directory, creating the directories it needs.
+///
+/// A directory already there is the re-application case and succeeds; any other
+/// occupant is refused, because a record whose directory a regular file or a
+/// symlink occupies can never apply (OD-7). The occupant is read no-follow, so a
+/// link to a directory is that other occupant rather than the directory it names.
+fn make_directory(roots: &CapabilityRoots, path: &VirtualPath) -> Result<(), RedoApplyError> {
+    let (root, relative) = resolve(roots, path)?;
+    let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
+    match parent.create_dir(&leaf) {
+        Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            match parent.symlink_metadata(&leaf)?.is_dir() {
+                true => Ok(()),
+                false => Err(occupied_directory(path)),
+            }
+        }
+        Err(error) => Err(error.into()),
+    }
 }
 
 /// Replace a put's path with its bytes, creating the directories it needs.
@@ -288,6 +322,14 @@ fn unaddressable(path: &VirtualPath) -> RedoApplyError {
     }
 }
 
+/// The refusal a non-directory occupant of a made directory raises, shared by
+/// both backends so a caller driving either reads one outcome.
+pub(in crate::storage) fn occupied_directory(path: &VirtualPath) -> RedoApplyError {
+    RedoApplyError::OccupiedDirectory {
+        path: format!("{path:?}"),
+    }
+}
+
 /// The record vocabulary every backend's application is tested against, and the
 /// filesystem backend's own repository fixtures.
 ///
@@ -330,9 +372,14 @@ pub(crate) mod test_fixtures {
     /// The committed record's path below the worktree, so a reading of what a
     /// record published can leave the record itself out.
     pub(crate) fn record_relative_path() -> PathBuf {
-        Path::new(DATA_ROOT_NAME)
-            .join(RECORD_SCRATCH_DIR)
-            .join(RECORD_FILE_NAME)
+        record_scratch_relative_path().join(RECORD_FILE_NAME)
+    }
+
+    /// The scratch directory the record lives in. It outlives the record it
+    /// held, so a reading of what a record published leaves it out alongside the
+    /// record itself.
+    pub(crate) fn record_scratch_relative_path() -> PathBuf {
+        Path::new(DATA_ROOT_NAME).join(RECORD_SCRATCH_DIR)
     }
 
     /// Hold every path in `occupied` as a captured file and an event log the
@@ -355,24 +402,38 @@ pub(crate) mod test_fixtures {
         });
     }
 
-    /// Every file under `root`, keyed by its root-relative path, with the bytes
-    /// and the executable bit that decide whether two repositories converged.
-    pub(crate) fn snapshot(root: &Path) -> BTreeMap<PathBuf, (Vec<u8>, bool)> {
+    /// What one path holds: a file's bytes with its executable bit, or a
+    /// directory. A directory is an entry of its own, so an empty one a record
+    /// made is observable in a convergence comparison.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(crate) enum SnapshotEntry {
+        File { bytes: Vec<u8>, executable: bool },
+        Directory,
+    }
+
+    /// Every entry under `root`, keyed by its root-relative path, in the detail
+    /// that decides whether two repositories converged.
+    pub(crate) fn snapshot(root: &Path) -> BTreeMap<PathBuf, SnapshotEntry> {
         std::fs::read_dir(root)
             .unwrap()
             .flat_map(|entry| {
                 let entry = entry.unwrap();
                 let path = entry.path();
+                let name = PathBuf::from(entry.file_name());
                 match entry.file_type().unwrap().is_dir() {
-                    true => snapshot(&path)
-                        .into_iter()
-                        .map(|(nested, content)| {
-                            (PathBuf::from(entry.file_name()).join(nested), content)
-                        })
+                    true => std::iter::once((name.clone(), SnapshotEntry::Directory))
+                        .chain(
+                            snapshot(&path)
+                                .into_iter()
+                                .map(move |(nested, held)| (name.join(nested), held)),
+                        )
                         .collect::<BTreeMap<_, _>>(),
                     false => BTreeMap::from([(
-                        PathBuf::from(entry.file_name()),
-                        (std::fs::read(&path).unwrap(), is_executable(&path)),
+                        name,
+                        SnapshotEntry::File {
+                            bytes: std::fs::read(&path).unwrap(),
+                            executable: is_executable(&path),
+                        },
                     )]),
                 }
             })
@@ -452,6 +513,17 @@ pub(crate) mod test_fixtures {
         prop_oneof![Just(a), Just(b), Just(c), Just(d)]
     }
 
+    /// Paths a generated record's make-directory operations draw from, disjoint
+    /// from each other and from [`path_vocabulary_paths`]. They sit outside that
+    /// vocabulary because it seeds regular-file occupants, and a non-directory
+    /// occupant of a made directory is a refusal rather than a convergence case.
+    pub(crate) fn directory_vocabulary_paths() -> [VirtualPath; 2] {
+        [
+            VirtualPath::data("templates").unwrap(),
+            VirtualPath::worktree("dev/archive").unwrap(),
+        ]
+    }
+
     /// What a generated record does with one vocabulary path.
     ///
     /// Every path draws its role independently of every other path's, so a
@@ -483,9 +555,15 @@ pub(crate) mod test_fixtures {
                 ),
                 path_vocabulary_paths().len(),
             ),
+            prop::collection::vec(any::<bool>(), directory_vocabulary_paths().len()),
             prop::option::of(prop::collection::vec(any::<u8>(), 0..8)),
         )
-            .prop_map(|(roles, appended)| {
+            .prop_map(|(roles, made, appended)| {
+                let make_directories = directory_vocabulary_paths()
+                    .into_iter()
+                    .zip(made)
+                    .filter_map(|(path, made)| made.then_some(path))
+                    .collect();
                 let (puts, deletes) = path_vocabulary_paths().into_iter().zip(roles).fold(
                     (Vec::new(), Vec::new()),
                     |(mut puts, mut deletes), (path, (role, bytes, mode))| {
@@ -498,6 +576,7 @@ pub(crate) mod test_fixtures {
                     },
                 );
                 RedoRecord::new(
+                    make_directories,
                     puts,
                     deletes,
                     appended.map(|bytes| EventAppend {
@@ -548,6 +627,7 @@ mod tests {
         std::fs::write(worktree.path().join("stale.md"), b"stale").unwrap();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
         let record = RedoRecord::new(
+            vec![VirtualPath::data("templates").unwrap()],
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             vec![VirtualPath::worktree("stale.md").unwrap()],
             Some(EventAppend {
@@ -559,6 +639,10 @@ mod tests {
 
         uninterrupted().apply(&roots, &record).unwrap();
 
+        assert!(
+            data_root(&worktree).join("templates").is_dir(),
+            "the directory the record makes is not there"
+        );
         assert_eq!(
             std::fs::read(data_root(&worktree).join("index.json")).unwrap(),
             b"published"
@@ -577,6 +661,7 @@ mod tests {
     fn test_redo_applier_apply_removes_the_record_it_applied() {
         let (worktree, roots) = repository();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
             None,
@@ -596,6 +681,7 @@ mod tests {
     fn test_redo_applier_apply_creates_the_directories_a_put_needs() {
         let (worktree, roots) = repository();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![put(
                 VirtualPath::data("issues/2026/a.json").unwrap(),
                 b"published",
@@ -620,7 +706,13 @@ mod tests {
     fn test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published() {
         let (worktree, roots) = repository();
         let nested = VirtualPath::data("issues/2026/09/a.json").unwrap();
-        let record = RedoRecord::new(vec![put(nested, b"published")], Vec::new(), None).unwrap();
+        let record = RedoRecord::new(
+            Vec::new(),
+            vec![put(nested, b"published")],
+            Vec::new(),
+            None,
+        )
+        .unwrap();
         let committed = record.commit(&data_root(&worktree)).unwrap();
         let published = data_root(&worktree).join("issues/2026/09/a.json");
 
@@ -654,6 +746,7 @@ mod tests {
     fn test_redo_applier_apply_gives_each_put_the_mode_it_carries() {
         let (worktree, roots) = repository();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![PutFile {
                 path: VirtualPath::worktree("scripts/publish.sh").unwrap(),
                 bytes: b"#!/bin/sh\n".to_vec(),
@@ -669,6 +762,25 @@ mod tests {
         assert!(
             is_executable(&worktree.path().join("scripts/publish.sh")),
             "the published file does not carry the mode the record named"
+        );
+    }
+
+    /// A link to a directory is the one occupant whose target lies outside the
+    /// roots the record resolved. It is not the directory the record makes, so
+    /// it is refused rather than adopted.
+    #[cfg(unix)]
+    #[test]
+    fn test_make_directory_refuses_a_symlink_to_a_directory_at_its_target() {
+        let (worktree, roots) = repository();
+        let outside = TempDir::new().unwrap();
+        let target = VirtualPath::data("templates").unwrap();
+        std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("templates")).unwrap();
+
+        let outcome = make_directory(&roots, &target);
+
+        assert!(
+            matches!(outcome, Err(RedoApplyError::OccupiedDirectory { .. })),
+            "the link was taken for the directory the record makes: {outcome:?}"
         );
     }
 
@@ -696,6 +808,7 @@ mod tests {
         std::os::unix::fs::symlink(&outside_target, data_root(&worktree).join("index.json"))
             .unwrap();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![PutFile {
                 path: target.clone(),
                 bytes: b"published".to_vec(),
@@ -813,6 +926,7 @@ mod tests {
         let record = RedoRecord::new(
             Vec::new(),
             Vec::new(),
+            Vec::new(),
             Some(EventAppend {
                 offset: CAPTURED_LOG.len() as u64,
                 bytes: appended.to_vec(),
@@ -835,12 +949,14 @@ mod tests {
         let (_worktree, roots) = repository();
         let (recorded, applier) = recording_applier();
         let published = RedoRecord::new(
+            Vec::new(),
             vec![put(VirtualPath::data("index.json").unwrap(), b"published")],
             Vec::new(),
             None,
         )
         .unwrap();
         let removed = RedoRecord::new(
+            Vec::new(),
             Vec::new(),
             vec![VirtualPath::data("index.json").unwrap()],
             None,
@@ -871,6 +987,7 @@ mod tests {
         let (worktree, roots) = repository();
         std::fs::write(data_root(&worktree).join("events.jsonl"), CAPTURED_LOG).unwrap();
         let record = RedoRecord::new(
+            vec![VirtualPath::data("templates").unwrap()],
             vec![
                 put(VirtualPath::data("index.json").unwrap(), b"published"),
                 put(VirtualPath::worktree("notes.md").unwrap(), b"published"),
@@ -890,6 +1007,7 @@ mod tests {
             recorded.points(),
             vec![
                 RedoPoint::BeforeApply,
+                RedoPoint::BeforeMakeDirectory { index: 0 },
                 RedoPoint::BeforePut { index: 0 },
                 RedoPoint::BeforePut { index: 1 },
                 RedoPoint::BeforeDelete { index: 0 },
@@ -907,6 +1025,7 @@ mod tests {
         let outside = TempDir::new().unwrap();
         std::os::unix::fs::symlink(outside.path(), data_root(&worktree).join("escape")).unwrap();
         let record = RedoRecord::new(
+            Vec::new(),
             vec![
                 put(VirtualPath::data("inside.json").unwrap(), b"published"),
                 put(

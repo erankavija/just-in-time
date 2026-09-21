@@ -111,6 +111,7 @@ mod recovery_startup_tests {
         let temp = TempDir::new().unwrap();
         repository_missing_its_index(&temp, |bytes| {
             RedoRecord::new(
+                Vec::new(),
                 vec![PutFile {
                     path: VirtualPath::data("index.json").unwrap(),
                     bytes: bytes.to_vec(),
@@ -141,6 +142,7 @@ mod recovery_startup_tests {
             .initialize_fresh_repository(temp.path(), None)
             .expect("a repository the server can serve");
         RedoRecord::new(
+            Vec::new(),
             vec![PutFile {
                 path: VirtualPath::worktree("applied-at-startup.md").unwrap(),
                 bytes: b"published by the leftover record\n".to_vec(),

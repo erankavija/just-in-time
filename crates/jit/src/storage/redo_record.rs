@@ -1,10 +1,12 @@
 //! The redo record: one mutation's file changes, described once and applied forward.
 //!
-//! A record carries the complete new bytes of every file the mutation publishes,
-//! the paths it removes, and the bytes it appends to the event log at a captured
-//! offset. Re-applying a record converges on the same repository state, so a
-//! record that survives a crash is the mutation. Parent directories are implied:
-//! a put creates the directories its path needs.
+//! A record carries the directories the mutation makes, the complete new bytes
+//! of every file it publishes, the paths it removes, and the bytes it appends to
+//! the event log at a captured offset. Re-applying a record converges on the
+//! same repository state, so a record that survives a crash is the mutation.
+//! Parent directories are implied: an operation creates the directories its path
+//! needs, so a make-directory operation carries only a directory no other
+//! operation's path lies beneath (OD-7).
 
 use crate::repository_state::{
     FileMode, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
@@ -41,7 +43,8 @@ pub struct EventAppend {
     pub bytes: Vec<u8>,
 }
 
-/// One mutation's file changes: ordered puts, ordered deletes, one event append.
+/// One mutation's file changes, in application order: ordered directories to
+/// make, ordered puts, ordered deletes, one event append.
 ///
 /// A move is a put and a delete in the same record. Paths are canonical
 /// identities, so one record addresses data-root and worktree targets alike and
@@ -49,11 +52,12 @@ pub struct EventAppend {
 /// pairwise disjoint — no path is an ancestor of another, and no two
 /// operations name the same path — checked identically at construction and at
 /// parse, with the event append's implicit target participating alongside
-/// every put and delete. Fields are private so [`Self::new`] and [`Self::parse`]
-/// are the only ways to reach an instance; a caller who can hold one has had it
-/// checked.
+/// every make-directory, put and delete. Fields are private so [`Self::new`] and
+/// [`Self::parse`] are the only ways to reach an instance; a caller who can hold
+/// one has had it checked.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RedoRecord {
+    make_directories: Vec<VirtualPath>,
     puts: Vec<PutFile>,
     deletes: Vec<VirtualPath>,
     event_append: Option<EventAppend>,
@@ -63,8 +67,8 @@ impl RedoRecord {
     /// Construct a record from its operation set, rejecting one whose paths
     /// overlap: no operation's path may be an ancestor of another's, and no
     /// two operations may name the same path. The event append's implicit
-    /// target, [`VirtualPath::EVENTS`], participates alongside every put and
-    /// delete.
+    /// target, [`VirtualPath::EVENTS`], participates alongside every
+    /// make-directory, put and delete.
     ///
     /// # Errors
     ///
@@ -72,17 +76,24 @@ impl RedoRecord {
     /// [`RedoRecordError::DuplicatePath`] when the operation set contradicts
     /// itself.
     pub fn new(
+        make_directories: Vec<VirtualPath>,
         puts: Vec<PutFile>,
         deletes: Vec<VirtualPath>,
         event_append: Option<EventAppend>,
     ) -> Result<Self, RedoRecordError> {
         let record = Self {
+            make_directories,
             puts,
             deletes,
             event_append,
         };
         record.ensure_disjoint_paths()?;
         Ok(record)
+    }
+
+    /// Every directory the record makes, in application order.
+    pub fn make_directories(&self) -> &[VirtualPath] {
+        &self.make_directories
     }
 
     /// Every put, in application order.
@@ -105,9 +116,9 @@ impl RedoRecord {
     fn ensure_disjoint_paths(&self) -> Result<(), RedoRecordError> {
         let event_log = VirtualPath::EVENTS;
         let paths: Vec<&VirtualPath> = self
-            .puts
+            .make_directories
             .iter()
-            .map(|put| &put.path)
+            .chain(self.puts.iter().map(|put| &put.path))
             .chain(self.deletes.iter())
             .chain(self.event_append.iter().map(|_| &event_log))
             .collect();
@@ -134,6 +145,14 @@ impl RedoRecord {
     pub fn serialize(&self) -> Result<Vec<u8>, RedoRecordError> {
         let header = RecordHeader {
             version: FORMAT_VERSION,
+            make_directories: self
+                .make_directories
+                .iter()
+                .map(|path| PathHeader {
+                    root: path.root_class(),
+                    relative: relative_spelling(path),
+                })
+                .collect(),
             puts: self
                 .puts
                 .iter()
@@ -216,6 +235,11 @@ impl RedoRecord {
         }
         let content = rest.get(1..).unwrap_or_default();
         let mut read = 0;
+        let make_directories = header
+            .make_directories
+            .into_iter()
+            .map(|path| canonical_path(path.root, path.relative))
+            .collect::<Result<Vec<_>, RedoRecordError>>()?;
         let puts = header
             .puts
             .into_iter()
@@ -244,6 +268,7 @@ impl RedoRecord {
         match content.len() - read {
             0 => {
                 let record = Self {
+                    make_directories,
                     puts,
                     deletes,
                     event_append,
@@ -284,6 +309,7 @@ pub enum RedoRecordError {
 #[serde(deny_unknown_fields)]
 struct RecordHeader {
     version: u64,
+    make_directories: Vec<PathHeader>,
     puts: Vec<PutHeader>,
     deletes: Vec<PathHeader>,
     event_append: Option<AppendHeader>,
@@ -411,10 +437,12 @@ mod tests {
     const CROSS_PROCESS_TEST: &str =
         "storage::redo_record::tests::test_parse_reads_a_record_another_process_serialized";
 
-    /// A record covering both roots, both modes, non-UTF-8 content, a delete and
-    /// an append — every operation the vocabulary carries.
+    /// A record covering both roots, both modes, non-UTF-8 content, a made
+    /// directory, a delete and an append — every operation the vocabulary
+    /// carries.
     fn sample_record() -> RedoRecord {
         RedoRecord {
+            make_directories: vec![VirtualPath::data("templates").unwrap()],
             puts: vec![
                 PutFile {
                     path: VirtualPath::data("issues/a.json").unwrap(),
@@ -523,12 +551,14 @@ mod tests {
         let descendant = VirtualPath::data("issues/a.json").unwrap();
 
         let forward = RedoRecord::new(
+            Vec::new(),
             vec![put(ancestor.clone()), put(descendant.clone())],
             Vec::new(),
             None,
         )
         .unwrap_err();
         let reversed = RedoRecord::new(
+            Vec::new(),
             vec![put(descendant.clone()), put(ancestor.clone())],
             Vec::new(),
             None,
@@ -546,14 +576,43 @@ mod tests {
     fn test_new_rejects_a_put_and_delete_naming_the_same_path() {
         let path = VirtualPath::worktree("dev/active/note.md").unwrap();
 
-        let error = RedoRecord::new(vec![put(path.clone())], vec![path.clone()], None).unwrap_err();
+        let error = RedoRecord::new(
+            Vec::new(),
+            vec![put(path.clone())],
+            vec![path.clone()],
+            None,
+        )
+        .unwrap_err();
 
         assert_eq!(error, RedoRecordError::DuplicatePath(path));
+    }
+
+    /// A made directory is an operation path like any other, so a put landing
+    /// beneath one is the overlap the record refuses: the put creates that
+    /// directory itself (OD-7).
+    #[test]
+    fn test_new_rejects_a_made_directory_an_operations_path_lies_beneath() {
+        let directory = VirtualPath::data("issues").unwrap();
+        let nested = VirtualPath::data("issues/a.json").unwrap();
+
+        let error = RedoRecord::new(
+            vec![directory.clone()],
+            vec![put(nested.clone())],
+            Vec::new(),
+            None,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            error,
+            RedoRecordError::OverlappingAncestor(directory, nested)
+        );
     }
 
     #[test]
     fn test_new_rejects_a_delete_naming_the_event_log_while_appending_to_it() {
         let error = RedoRecord::new(
+            Vec::new(),
             Vec::new(),
             vec![VirtualPath::EVENTS],
             Some(EventAppend {
@@ -574,6 +633,7 @@ mod tests {
         // validation of its own, so this is the same bytes a corrupted or
         // adversarial process could hand `parse`.
         let bytes = RedoRecord {
+            make_directories: Vec::new(),
             puts: puts.clone(),
             deletes: Vec::new(),
             event_append: None,
@@ -583,13 +643,14 @@ mod tests {
 
         assert_eq!(
             RedoRecord::parse(&bytes).unwrap_err(),
-            RedoRecord::new(puts, Vec::new(), None).unwrap_err(),
+            RedoRecord::new(Vec::new(), puts, Vec::new(), None).unwrap_err(),
         );
     }
 
     #[test]
     fn test_new_accepts_paths_that_share_a_spelling_prefix_without_containment() {
         let record = RedoRecord::new(
+            Vec::new(),
             vec![
                 put(VirtualPath::data("issues/ab.json").unwrap()),
                 put(VirtualPath::data("issues/a.json").unwrap()),
