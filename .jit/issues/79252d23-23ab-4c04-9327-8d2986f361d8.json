@@ -219,7 +219,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:39:24.586767425Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:23:21.770591049Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
   "labels": [
     "type:task",
@@ -236,5 +247,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T16:38:25.330781011Z"
+  "updated_at": "2026-09-21T17:39:24.586767425Z"
 }

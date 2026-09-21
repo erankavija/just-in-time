@@ -55,7 +55,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:34:24.732751642Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b7c99dcb-073f-46c7-938a-0a465c8131ee",
   "labels": [
     "epic:redo-mutations",
@@ -70,5 +76,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Bootstrap namespace reservation retires with the kernel",
-  "updated_at": "2026-09-21T17:17:45.892900605Z"
+  "updated_at": "2026-09-21T17:34:24.732751642Z"
 }

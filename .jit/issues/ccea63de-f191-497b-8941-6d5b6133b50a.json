@@ -55,7 +55,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:36:15.470838696Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ccea63de-f191-497b-8941-6d5b6133b50a",
   "labels": [
     "type:task",
@@ -70,5 +76,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-09-21T16:14:29.632799988Z"
+  "updated_at": "2026-09-21T17:36:15.470838696Z"
 }

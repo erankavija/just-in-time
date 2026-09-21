@@ -243,7 +243,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:37:47.408077069Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
   "labels": [
     "type:task",
@@ -258,5 +264,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Concept documents state the redo record",
-  "updated_at": "2026-09-21T16:22:30.323804676Z"
+  "updated_at": "2026-09-21T17:37:47.408077069Z"
 }
