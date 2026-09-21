@@ -945,10 +945,15 @@ fn test_conformance_existing_root_all_action_kinds_match_across_backends() {
     }
 }
 
+/// A record's home is inside the data root, so a mutation writing worktree
+/// targets while creating no root has no commit point. Both backends refuse it
+/// with the same typed error rather than publishing it unrecoverably, and
+/// neither writes anything.
 #[test]
-fn test_conformance_worktree_only_absent_root_materializes_no_data_root() {
+fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit"); // absent
+    let note = worktree.path().join("note.txt");
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let make_spec = || {
         let mut spec = CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
@@ -971,38 +976,43 @@ fn test_conformance_worktree_only_absent_root_materializes_no_data_root() {
     let memory = InMemoryStorage::new();
     let mut memory_session = memory.open_mutation_session(layout.clone()).unwrap();
     let memory_image = memory_session.capture(make_spec()).unwrap();
-    let memory_outcome = memory_session
-        .apply(&test_plan(&memory_image, &delta))
-        .unwrap();
+    let memory_outcome = memory_session.apply(&test_plan(&memory_image, &delta));
     drop(memory_session);
 
     let json = JsonFileStorage::new(&data);
     let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
     let json_image = json_session.capture(make_spec()).unwrap();
-    let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
+    let json_outcome = json_session.apply(&test_plan(&json_image, &delta));
     drop(json_session);
 
-    // Identical complete plan hash/action count for identical absent capture,
-    // and neither backend materialized a data root.
-    assert_eq!(memory_outcome, json_outcome);
-    assert!(!data.exists(), "json must not publish an empty data root");
+    for (backend, outcome) in [("memory", memory_outcome), ("json", json_outcome)] {
+        assert!(
+            matches!(
+                outcome,
+                Err(RepositoryStateStoreError::UncommittableWorktreeMutation { ref path })
+                    if path == &data
+            ),
+            "{backend} must refuse the uncommittable mutation, got {outcome:?}"
+        );
+    }
+    assert!(!note.exists(), "the refusal must write no worktree target");
+    assert!(!data.exists(), "the refusal must publish no data root");
     assert!(!worktree.path().join(".jit-bootstrap").exists());
-    assert_eq!(
-        std::fs::read(worktree.path().join("note.txt")).unwrap(),
-        b"note"
-    );
 
-    // Post-apply capture agrees on both backends: data root absent, note present.
-    let mut memory_after = memory.open_mutation_session(layout).unwrap();
+    // The refusal changed nothing either backend can see: both still capture an
+    // absent data root and an absent worktree target.
+    let mut memory_after = memory.open_mutation_session(layout.clone()).unwrap();
     let memory_view = semantic_view(&memory_after.capture(make_spec()).unwrap());
     let json_after = JsonFileStorage::new(&data);
-    let mut json_after_session = json_after
-        .open_mutation_session(discover_repository_layout(worktree.path(), &data).unwrap())
-        .unwrap();
+    let mut json_after_session = json_after.open_mutation_session(layout).unwrap();
     let json_view = semantic_view(&json_after_session.capture(make_spec()).unwrap());
     assert_eq!(memory_view, json_view);
     assert_eq!(
         memory_view[&VirtualPath::data("").unwrap()],
+        SemanticEntry::Absent
+    );
+    assert_eq!(
+        memory_view[&VirtualPath::worktree("note.txt").unwrap()],
         SemanticEntry::Absent
     );
 }

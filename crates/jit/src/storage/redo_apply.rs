@@ -127,24 +127,7 @@ impl RedoApplier {
         check_interruption(injector, RedoPoint::AfterApply)
     }
 
-    /// Apply `record` without consuming a committed one.
-    ///
-    /// The caller has no data root, so it committed no record for this pass to
-    /// remove: publication over roots that hold no commit point is the one
-    /// mutation a record cannot be made durable for.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::apply`], less the removal steps.
-    pub(in crate::storage) fn apply_uncommitted(
-        &self,
-        roots: &CapabilityRoots,
-        record: &RedoRecord,
-    ) -> Result<(), RedoApplyError> {
-        self.apply_operations(roots, record)
-    }
-
-    /// The forward pass over every operation, shared by both entry points.
+    /// The forward pass over every operation, before the record is consumed.
     fn apply_operations(
         &self,
         roots: &CapabilityRoots,
