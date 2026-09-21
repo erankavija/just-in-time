@@ -383,6 +383,9 @@ pub struct JsonFileStorage {
     /// access instead of silently running outside the retained boundary.
     retained_state: Arc<Mutex<RetainedSessionState>>,
     repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    /// Interruption seam for the session's own moments: its open, its
+    /// pre-commit check, and the steps of its redo-record application.
+    mutation_interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     /// Canonical layout of the live mutation session, shared by every clone so
     /// reentry is admitted only for the same selected roots.
     active_mutation_layout: Arc<crate::storage::repository_state_store::ActiveLayoutTracker>,
@@ -434,6 +437,7 @@ impl JsonFileStorage {
             retention_id: NEXT_RETENTION_ID.fetch_add(1, Ordering::Relaxed),
             retained_state: Arc::new(Mutex::new(RetainedSessionState::Idle)),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
             worktree_paths: Arc::new(Mutex::new(None)),
@@ -454,10 +458,9 @@ impl JsonFileStorage {
         root: P,
         interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     ) -> Self {
-        Self::with_repository_state_failures(
-            root,
-            crate::storage::KernelInterruptions::new(interruptions),
-        )
+        let mut storage = Self::new(root);
+        storage.mutation_interruptions = interruptions;
+        storage
     }
 
     /// Construct storage whose mutation sessions are interrupted at the moments
@@ -475,10 +478,9 @@ impl JsonFileStorage {
         root: P,
         interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     ) -> Self {
-        Self::with_repository_state_failures(
-            root,
-            crate::storage::KernelInterruptions::new(interruptions),
-        )
+        let mut storage = Self::new(root);
+        storage.mutation_interruptions = interruptions;
+        storage
     }
 
     /// Construct storage with deterministic kernel-boundary failure injection.
@@ -486,6 +488,7 @@ impl JsonFileStorage {
     /// Kernel vocabulary, so the storage layer's own suite reaches boundaries
     /// no session moment stands for; every other consumer injects through
     /// [`with_mutation_interruptions`](Self::with_mutation_interruptions).
+    #[cfg(test)]
     pub(in crate::storage) fn with_repository_state_failures<P: AsRef<Path>>(
         root: P,
         failures: Arc<dyn crate::storage::TransactionFailureInjector>,
@@ -542,6 +545,12 @@ impl JsonFileStorage {
         &self,
     ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
         Arc::clone(&self.repository_state_failures)
+    }
+
+    pub(crate) fn mutation_interruptions(
+        &self,
+    ) -> Arc<dyn crate::storage::MutationInterruptionInjector> {
+        Arc::clone(&self.mutation_interruptions)
     }
 
     pub(crate) fn active_mutation_layout(

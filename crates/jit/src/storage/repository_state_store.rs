@@ -13,12 +13,12 @@ use crate::repository_state::{
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::file_transaction::RepositoryRecoveryDisposition;
-use crate::storage::memory::{MemoryRecoveryResidue, MemoryRepositoryState};
+use crate::storage::memory::MemoryRepositoryState;
 use crate::storage::{
     FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage,
-    MemoryRedoApplier, NoRedoInterruptions, RedoApplier, RedoApplyError, RedoRecord,
-    RepoWriteGuard, TransactionControlLocation, TransactionFailurePoint, RECORD_FILE_NAME,
-    RECORD_SCRATCH_DIR,
+    MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
+    RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions,
+    TransactionControlLocation, TransactionFailurePoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
@@ -229,11 +229,12 @@ pub trait RepositoryStateStore {
 fn apply_leftover_record(
     roots: &CapabilityRoots,
     record: Option<RedoRecord>,
+    interruptions: Arc<dyn MutationInterruptionInjector>,
 ) -> Result<usize, RepositoryStateStoreError> {
     let Some(record) = record else {
         return Ok(0);
     };
-    RedoApplier::new(Arc::new(NoRedoInterruptions))
+    RedoApplier::new(SessionRedoInterruptions::new(interruptions))
         .apply(roots, &record)
         .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
     Ok(1)
@@ -275,11 +276,12 @@ fn read_leftover_record(
 fn apply_memory_leftover_record(
     storage: &InMemoryStorage,
     record: Option<RedoRecord>,
+    interruptions: Arc<dyn MutationInterruptionInjector>,
 ) -> Result<usize, RepositoryStateStoreError> {
     let Some(record) = record else {
         return Ok(0);
     };
-    MemoryRedoApplier::new(Arc::new(NoRedoInterruptions))
+    MemoryRedoApplier::new(SessionRedoInterruptions::new(interruptions))
         .apply(storage, &record)
         .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
     Ok(1)
@@ -430,6 +432,7 @@ impl RepositoryStateStore for JsonFileStorage {
         // attempt to enter claim coordination (reverse order) is rejected.
         let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
         let injector = self.repository_state_failures();
+        let interruptions = self.mutation_interruptions();
 
         // Serialize the worktree-side `.jit-bootstrap` namespace at the WORKTREE
         // root, outermost, so two sessions sharing this worktree with data roots
@@ -469,6 +472,7 @@ impl RepositoryStateStore for JsonFileStorage {
             pre_leaf,
             Arc::clone(&injector),
         )?;
+        interruptions.check(&MutationPoint::SessionOpen)?;
         injector.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
         let external_transactions = recover_location(
             &recovery_kernel,
@@ -509,7 +513,8 @@ impl RepositoryStateStore for JsonFileStorage {
                 // state, and after journal recovery, whose rollback would undo
                 // what the record published. The record lives inside the data
                 // root, so the absent-root branch has none to apply.
-                let applied_records = apply_leftover_record(&roots, leftover_record)?;
+                let applied_records =
+                    apply_leftover_record(&roots, leftover_record, Arc::clone(&interruptions))?;
                 (
                     Some(repository_guard),
                     internal_transactions,
@@ -557,28 +562,21 @@ impl RepositoryStateStore for InMemoryStorage {
         // recovery and orphan-companion sweep run only when the data root already
         // exists, matching the JSON session-open guard sequence.
         let failures = self.repository_state_failures();
+        let interruptions = self.mutation_interruptions();
+        interruptions.check(&MutationPoint::SessionOpen)?;
         failures.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
-        let mut state = self.repository_state();
-        let data_exists = state.data_root_exists;
-        // Read before recovery and applied after it, as on the JSON backend.
-        // The value cannot be malformed here, so nothing is refused; taking it
-        // at the same moment keeps one reading of when a record is decided.
-        let leftover_record = state.record.clone();
+        let (data_exists, leftover_record) = {
+            let state = self.repository_state();
+            (state.data_root_exists, state.record.clone())
+        };
         if data_exists {
             failures.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
-        }
-        recover_memory_state(&mut state, failures.as_ref())?;
-        // The root recovery left, not the one it found: the JSON open rediscovers
-        // its capabilities after recovery and gates the apply on those.
-        let recovered_data_root = state.data_root_exists;
-        drop(state);
-        if data_exists {
             failures.check(&TransactionFailurePoint::RepositorySweepCompanions)?;
         }
         // Where the JSON open applies it, gated on the data root for the same
         // reason: a record's home is inside it.
-        let applied_records = match recovered_data_root {
-            true => apply_memory_leftover_record(self, leftover_record)?,
+        let applied_records = match data_exists {
+            true => apply_memory_leftover_record(self, leftover_record, interruptions)?,
             false => 0,
         };
         Ok(Box::new(MemoryMutationSession {
@@ -627,27 +625,13 @@ impl RepositoryMutationSession for JsonMutationSession {
         let delta = plan.delta();
         ensure_session_image(&self.layout, self.captured.as_ref(), image)?;
         ensure_delta_is_captured(image, delta)?;
-        self.storage
-            .repository_state_failures()
-            .check(&TransactionFailurePoint::RepositoryBeforeReadSetRevalidation)?;
-        // Immediately before journal preparation, revalidate the entire read set
-        // and the selected-root identities while the session is held. Any content,
-        // listing, root, or alias change yields a typed retryable conflict before
-        // anything durable is written.
+        let interruptions = self.storage.mutation_interruptions();
+        interruptions.check(&MutationPoint::BeforeCommitCheck)?;
+        // Not part of the write set, and not covered by comparing it: a whole
+        // root atomically replaced since capture leaves this session's handles
+        // on the unlinked inode, which every comparison read through them still
+        // agrees with.
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        let worktree_paths = self.storage.configured_worktree_paths()?;
-        let current = capture_capability_image(
-            &self.layout,
-            &self.roots,
-            &worktree_paths,
-            &self.storage,
-            image.capture_spec().clone(),
-        )?;
-        if &current != image {
-            return Err(RepositoryStateStoreError::RetryableConflict {
-                path: first_image_difference(image, &current),
-            });
-        }
         // Recovery takes this finer lock only while it edits the event log.
         // Acquire it again for publication, rather than retaining it for the
         // whole session: ordinary command dispatch legitimately reenters the
@@ -658,40 +642,79 @@ impl RepositoryMutationSession for JsonMutationSession {
             .as_ref()
             .map(|(locker, path)| locker.lock_exclusive(path))
             .transpose()?;
+        let outcome = RepositoryApplyOutcome {
+            transaction_hash: plan.hash().to_string(),
+            actions_applied: delta.actions().len(),
+        };
+        match (self.roots.data.is_some(), delta.actions().is_empty()) {
+            // A record's home is inside the data root, so a delta over an absent
+            // one still publishes through the transaction kernel; the case leaves
+            // it when initialization takes over (jit:b0ee2dd6).
+            (false, _) => self.publish_through_kernel(plan)?,
+            (true, false) => self.publish_through_record(image, delta, interruptions)?,
+            (true, true) => {}
+        }
+        self.captured = None;
+        Ok(outcome)
+    }
+}
+
+impl JsonMutationSession {
+    /// Publish `delta` as one redo record: derived from the delta, refused if
+    /// its write set moved, made durable, applied, and removed.
+    fn publish_through_record(
+        &self,
+        image: &RepositoryImage,
+        delta: &RepositoryDelta,
+        interruptions: Arc<dyn MutationInterruptionInjector>,
+    ) -> Result<(), RepositoryStateStoreError> {
+        let record = redo_record_for(image, delta)?;
+        ensure_write_set_unchanged(&self.roots, image, &record)?;
+        create_delta_directories(&self.roots, delta)?;
+        record
+            .commit(self.layout.data_root())
+            .map_err(RepositoryStateStoreError::Transaction)?;
+        RedoApplier::new(SessionRedoInterruptions::new(interruptions))
+            .apply(&self.roots, &record)
+            .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+    }
+
+    /// Publish a delta whose data root does not exist yet, rebinding the layout
+    /// when the publication created it.
+    fn publish_through_kernel(
+        &self,
+        plan: &MaterializationPlan,
+    ) -> Result<(), RepositoryStateStoreError> {
+        let delta = plan.delta();
         let guard = self
             ._repository_guard
             .as_ref()
             .unwrap_or(&self._bootstrap_guard);
         let transaction_id = uuid::Uuid::new_v4().simple().to_string();
-        let published_absent_data_root = self.roots.data.is_none()
-            && delta
-                .actions()
-                .iter()
-                .any(|action| action.path().root_class() == RepositoryRootClass::Data);
-        let outcome = self
-            .kernel
+        self.kernel
             .execute_repository_delta(guard, &transaction_id, delta, plan.hash())
             .map_err(|error| map_transaction_error(error, &self.layout))?;
-        if published_absent_data_root {
-            let refreshed =
-                discover_repository_layout(self.layout.worktree_root(), self.layout.data_root())?;
-            // The published root is the layout for these roots from here on, for
-            // every holder of the one this session opened with: the storage every
-            // later session reads its layout from, and the reentry guard a
-            // retained startup session left the pre-publication layout in. A
-            // session opened after this one — the second package of a profile
-            // closure applied to the repository initialization just created — is
-            // otherwise refused for roots nothing changed.
-            self.storage
-                .active_mutation_layout()
-                .rebind_published_root(&refreshed);
-            self.storage.configure_repository_layout(&refreshed);
+        if !delta
+            .actions()
+            .iter()
+            .any(|action| action.path().root_class() == RepositoryRootClass::Data)
+        {
+            return Ok(());
         }
-        self.captured = None;
-        Ok(RepositoryApplyOutcome {
-            transaction_hash: outcome.plan_hash,
-            actions_applied: delta.actions().len(),
-        })
+        let refreshed =
+            discover_repository_layout(self.layout.worktree_root(), self.layout.data_root())?;
+        // The published root is the layout for these roots from here on, for
+        // every holder of the one this session opened with: the storage every
+        // later session reads its layout from, and the reentry guard a
+        // retained startup session left the pre-publication layout in. A
+        // session opened after this one — the second package of a profile
+        // closure applied to the repository initialization just created — is
+        // otherwise refused for roots nothing changed.
+        self.storage
+            .active_mutation_layout()
+            .rebind_published_root(&refreshed);
+        self.storage.configure_repository_layout(&refreshed);
+        Ok(())
     }
 }
 
@@ -725,176 +748,75 @@ impl RepositoryMutationSession for MemoryMutationSession {
                 path: "injected memory read-set conflict".into(),
             });
         }
-        self.storage
-            .repository_state_failures()
-            .check(&TransactionFailurePoint::RepositoryBeforeReadSetRevalidation)?;
-        let mut state = self.storage.repository_state();
-        let current = capture_memory_image(&self.layout, &state, image.capture_spec().clone())?;
-        if &current != image {
-            return Err(RepositoryStateStoreError::RetryableConflict {
-                path: "memory read set".into(),
-            });
+        let interruptions = self.storage.mutation_interruptions();
+        interruptions.check(&MutationPoint::BeforeCommitCheck)?;
+        let outcome = RepositoryApplyOutcome {
+            transaction_hash: plan.hash().to_string(),
+            actions_applied: delta.actions().len(),
+        };
+        let data_root_exists = self.storage.repository_state().data_root_exists;
+        match (data_root_exists, delta.actions().is_empty()) {
+            (false, _) => publish_absent_memory_root(&self.layout, &self.storage, delta)?,
+            (true, false) => self.publish_through_record(image, delta, interruptions)?,
+            (true, true) => {}
         }
-        let original = state.clone_without_recovery();
-        let mut candidate = original.clone();
-        let plan_hash = plan.hash().to_string();
-        // Mirror the kernel short-circuit: an empty delta is a no-op that creates
-        // no control, residue, or injector boundary; return the clean zero-action
-        // outcome before any failure check or residue write.
-        if delta.actions().is_empty() {
-            self.captured = None;
-            return Ok(RepositoryApplyOutcome {
-                transaction_hash: plan_hash,
-                actions_applied: 0,
-            });
-        }
-        let rollback_actions = delta
-            .actions()
-            .iter()
-            .enumerate()
-            .filter_map(|(index, action)| {
-                (original.data_root_exists
-                    || action.path().root_class() != RepositoryRootClass::Data)
-                    .then_some(index)
-            })
-            .collect();
-        state.recovery = Some(MemoryRecoveryResidue::Prepared {
-            original: Box::new(original.clone()),
-            final_state: Box::new(candidate.clone()),
-            rollback_actions,
-            _plan_hash: plan_hash.clone(),
-        });
-        let failures = self.storage.repository_state_failures();
-        failures.check(&TransactionFailurePoint::RepositoryBeforeControlCreation)?;
-        failures.check(&TransactionFailurePoint::RepositoryCreateControl)?;
-        failures.check(&TransactionFailurePoint::RepositoryBeforeInitialJournal)?;
-        failures.check(&TransactionFailurePoint::RepositorySyncInitialJournal)?;
-        failures.check(&TransactionFailurePoint::RepositoryPrepareIntent)?;
-        // Model the kernel's create-companion boundary: an internal transaction
-        // (data root already present) publishing a Worktree action creates a
-        // worktree-side companion. Failure there converges to the old state.
-        let has_worktree_action = delta
-            .actions()
-            .iter()
-            .any(|action| action.path().root_class() == RepositoryRootClass::Worktree);
-        if original.data_root_exists && has_worktree_action {
-            failures.check(&TransactionFailurePoint::RepositoryCreateCompanion)?;
-        }
-        if !original.data_root_exists
-            && delta
-                .actions()
-                .iter()
-                .any(|action| action.path().root_class() == RepositoryRootClass::Data)
+        self.captured = None;
+        Ok(outcome)
+    }
+}
+
+impl MemoryMutationSession {
+    /// The in-memory counterpart of [`JsonMutationSession::publish_through_record`],
+    /// over the entry map.
+    fn publish_through_record(
+        &self,
+        image: &RepositoryImage,
+        delta: &RepositoryDelta,
+        interruptions: Arc<dyn MutationInterruptionInjector>,
+    ) -> Result<(), RepositoryStateStoreError> {
+        let record = redo_record_for(image, delta)?;
         {
-            failures.check(&TransactionFailurePoint::RepositoryBeforeDataStageJournal)?;
+            let mut state = self.storage.repository_state();
+            ensure_memory_write_set_unchanged(&state, image, &record)?;
+            create_memory_delta_directories(&mut state, delta);
         }
-        // Model the kernel's per-action prepare boundaries. The memory backend
-        // stages nothing, but a failure here must still converge to the old state
-        // exactly as the JSON kernel's prepared-journal rollback does.
-        for index in 0..delta.actions().len() {
-            failures.check(&TransactionFailurePoint::RepositoryPrepareAction { action: index })?;
-            failures.check(&TransactionFailurePoint::RepositoryStageAction { action: index })?;
-            if matches!(
-                delta.actions()[index].expected(),
-                ExpectedPreimage::File { .. }
-            ) {
-                failures.check(&TransactionFailurePoint::RepositorySyncBackup { action: index })?;
-            }
-            failures.check(&TransactionFailurePoint::RepositorySyncStage { action: index })?;
-        }
-        // Model the kernel's single preparation barrier: one complete prepared
-        // record after the whole staging phase, and no per-action rewrite.
-        failures.check(&TransactionFailurePoint::RepositoryBeforePreparedJournal)?;
-        failures.check(&TransactionFailurePoint::RepositorySyncPreparedJournal)?;
-        for (index, action) in delta.actions().iter().enumerate() {
-            // Staged Data actions of an absent-root delta have no per-action
-            // publication boundary in the kernel (they land inside the stage and
-            // are committed by the single root rename), so skip their Before/After
-            // checks to keep the failure-point set identical across backends.
-            let staged_absent_data = !original.data_root_exists
-                && action.path().root_class() == RepositoryRootClass::Data;
-            if !staged_absent_data {
-                failures
-                    .check(&TransactionFailurePoint::RepositoryBeforeAction { action: index })?;
-                failures.check(&TransactionFailurePoint::RepositoryBeforeTargetMutation {
-                    action: index,
-                })?;
-                failures.check(&TransactionFailurePoint::RepositoryAfterRootBindingCheck {
-                    action: index,
-                })?;
-                if matches!(action, RepositoryAction::DeleteFile { .. }) {
-                    failures.check(&TransactionFailurePoint::RepositoryBeforeDeleteRename {
-                        action: index,
-                    })?;
-                }
-            }
-            apply_memory_action(&self.layout, &mut candidate, action)?;
-            if let Some(MemoryRecoveryResidue::Prepared { final_state, .. }) = &mut state.recovery {
-                **final_state = candidate.clone();
-            }
-            if !staged_absent_data {
-                failures.check(&TransactionFailurePoint::RepositoryAfterTargetMutation {
-                    action: index,
-                })?;
-                failures.check(&TransactionFailurePoint::RepositoryVerifyFinalIdentity {
-                    action: index,
-                })?;
-                failures
-                    .check(&TransactionFailurePoint::RepositoryAfterAction { action: index })?;
-            }
-        }
-        let absent_root = !original.data_root_exists && candidate.data_root_exists;
-        if absent_root {
-            failures.check(&TransactionFailurePoint::RepositoryBeforeDataRootPublication)?;
-            failures.check(&TransactionFailurePoint::RepositoryAfterDataParentBindingCheck)?;
-            // Publish the staged root: it becomes a real Directory entry, so a
-            // later capture of Data("") is a Directory on both backends. Idempotent
-            // with an explicit CreateDirectory Data("") (which the kernel does not
-            // require — the stage dir is the root). A worktree-only absent-root
-            // delta materializes nothing (candidate.data_root_exists stays false).
-            let published_root = RepositoryEntry::Directory {
+        self.storage
+            .commit_record(&record)
+            .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?;
+        MemoryRedoApplier::new(SessionRedoInterruptions::new(interruptions))
+            .apply(&self.storage, &record)
+            .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+    }
+}
+
+/// Publish a delta whose data root does not exist yet, as the transaction
+/// kernel publishes one on the filesystem: the record's home is inside the root
+/// the delta creates, so this one delta reaches the entry map directly.
+fn publish_absent_memory_root(
+    layout: &RepositoryLayout,
+    storage: &InMemoryStorage,
+    delta: &RepositoryDelta,
+) -> Result<(), RepositoryStateStoreError> {
+    let mut state = storage.repository_state();
+    let mut candidate = state.clone();
+    delta
+        .actions()
+        .iter()
+        .try_for_each(|action| apply_memory_action(layout, &mut candidate, action))?;
+    if candidate.data_root_exists {
+        // The published root is a real entry, so a later capture of Data("")
+        // reads a directory as it does through the filesystem's published root.
+        candidate
+            .entries
+            .entry(VirtualPath::data("")?)
+            .or_insert(RepositoryEntry::Directory {
                 identity: EntryIdentity::for_bytes("memory-directory:data-root", b"directory")?,
                 mode: FileMode::Executable,
-            };
-            candidate
-                .entries
-                .entry(VirtualPath::data("")?)
-                .or_insert(published_root);
-            // Once the root rename is modeled, prepared recovery converges
-            // forward just like the file kernel's published-root detection.
-            state.entries = candidate.entries.clone();
-            state.data_root_exists = candidate.data_root_exists;
-            state.recovery = Some(MemoryRecoveryResidue::Committed {
-                final_state: Box::new(candidate.clone()),
-                _plan_hash: plan_hash.clone(),
             });
-            failures.check(&TransactionFailurePoint::RepositoryAfterDataRootPublication)?;
-        }
-        failures.check(&TransactionFailurePoint::RepositoryBeforeCommitDecision)?;
-        state.entries = candidate.entries.clone();
-        state.data_root_exists = candidate.data_root_exists;
-        state.recovery = Some(MemoryRecoveryResidue::Committed {
-            final_state: Box::new(candidate),
-            _plan_hash: plan_hash.clone(),
-        });
-        failures.check(&TransactionFailurePoint::RepositoryAfterCommit)?;
-        // Model the kernel's post-commit cleanup boundary: past the commit point a
-        // failure leaves committed residue and converges forward to the new state.
-        failures.check(&TransactionFailurePoint::RepositoryCleanup)?;
-        if !absent_root {
-            failures.check(&TransactionFailurePoint::RepositoryBeforeStageCleanup)?;
-        }
-        if original.data_root_exists && has_worktree_action {
-            failures.check(&TransactionFailurePoint::RepositoryBeforeCompanionCleanup)?;
-        }
-        failures.check(&TransactionFailurePoint::RepositoryBeforeControlCleanup)?;
-        state.recovery = None;
-        self.captured = None;
-        Ok(RepositoryApplyOutcome {
-            transaction_hash: plan_hash,
-            actions_applied: delta.actions().len(),
-        })
     }
+    state.entries = candidate.entries;
+    state.data_root_exists = candidate.data_root_exists;
+    Ok(())
 }
 
 fn recover_location(
@@ -990,13 +912,53 @@ pub fn ensure_write_set_unchanged(
     captured: &RepositoryImage,
     record: &RedoRecord,
 ) -> Result<(), RepositoryStateStoreError> {
+    ensure_write_set_unchanged_against(
+        captured,
+        record,
+        &|path| inspect_capability_entry(captured.layout(), roots, path),
+        &|| live_event_log_tail(roots, &VirtualPath::EVENTS),
+    )
+}
+
+/// [`ensure_write_set_unchanged`] over the in-memory backend's entry map.
+fn ensure_memory_write_set_unchanged(
+    state: &MemoryRepositoryState,
+    captured: &RepositoryImage,
+    record: &RedoRecord,
+) -> Result<(), RepositoryStateStoreError> {
+    let entry = |path: &VirtualPath| {
+        Ok(state
+            .entries
+            .get(path)
+            .cloned()
+            .unwrap_or(RepositoryEntry::Absent))
+    };
+    ensure_write_set_unchanged_against(captured, record, &entry, &|| {
+        Ok(match state.entries.get(&VirtualPath::EVENTS) {
+            Some(RepositoryEntry::File { content, .. }) => {
+                Some(EventLogTail::of_bytes(content.bytes()))
+            }
+            _ => None,
+        })
+    })
+}
+
+/// The comparison both backends run, over the live readings each one supplies:
+/// `live` for an ordinary write target and `live_log_tail` for the event log,
+/// whose contents are never read whole.
+fn ensure_write_set_unchanged_against(
+    captured: &RepositoryImage,
+    record: &RedoRecord,
+    live: &dyn Fn(&VirtualPath) -> Result<RepositoryEntry, RepositoryStateStoreError>,
+    live_log_tail: &dyn Fn() -> Result<Option<EventLogTail>, RepositoryStateStoreError>,
+) -> Result<(), RepositoryStateStoreError> {
     record
         .puts()
         .iter()
         .map(|put| &put.path)
         .chain(record.deletes().iter())
         .filter(|path| **path != VirtualPath::EVENTS)
-        .try_for_each(|path| ensure_target_unchanged(roots, captured, path))?;
+        .try_for_each(|path| ensure_target_unchanged(captured, path, live))?;
     let touches_event_log = record.event_append().is_some()
         || record
             .puts()
@@ -1009,25 +971,117 @@ pub fn ensure_write_set_unchanged(
     match captured.entry(&VirtualPath::EVENTS)? {
         // An ordinary captured log is the only state carrying a tail to compare;
         // any other occupant is compared like any other write target.
-        RepositoryEntry::File { content, .. } => {
-            (live_event_log_tail(roots, &VirtualPath::EVENTS)?
-                == Some(EventLogTail::of_bytes(content.bytes())))
-            .then_some(())
-            .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS))
-        }
-        _ => ensure_target_unchanged(roots, captured, &VirtualPath::EVENTS),
+        RepositoryEntry::File { content, .. } => (live_log_tail()?
+            == Some(EventLogTail::of_bytes(content.bytes())))
+        .then_some(())
+        .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS)),
+        _ => ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
     }
 }
 
 /// Compare one write target's live occupant with the captured one, byte for byte.
 fn ensure_target_unchanged(
-    roots: &CapabilityRoots,
     captured: &RepositoryImage,
     path: &VirtualPath,
+    live: &dyn Fn(&VirtualPath) -> Result<RepositoryEntry, RepositoryStateStoreError>,
 ) -> Result<(), RepositoryStateStoreError> {
-    (inspect_capability_entry(captured.layout(), roots, path)? == *captured.entry(path)?)
+    (live(path)? == *captured.entry(path)?)
         .then_some(())
         .ok_or_else(|| retryable_conflict(path))
+}
+
+/// Create the directories `delta` names, ahead of the record's commit.
+///
+/// A directory holds no content, so it is not one of the files a record
+/// publishes (`@/charter/D-17`), and a put creates only the directories its own
+/// path needs. A directory the mutation creates and writes nothing beneath —
+/// initialization's issues directory is the one the engine composes — is made
+/// here. Creation is additive and idempotent, so an interruption before the
+/// commit point leaves an empty directory the next attempt reuses.
+fn create_delta_directories(
+    roots: &CapabilityRoots,
+    delta: &RepositoryDelta,
+) -> Result<(), RepositoryStateStoreError> {
+    created_directories(delta).try_for_each(|path| {
+        let root = roots
+            .root(path.root_class())
+            .ok_or_else(|| RepositoryStateStoreError::UnsafeTarget(format!("{path:?}")))?;
+        let (parent, leaf) = open_or_create_capability_parent(root, path.relative().as_path())?;
+        match parent.create_dir(&leaf) {
+            Ok(()) => sync_capability_directory(&parent).map_err(Into::into),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    })
+}
+
+/// [`create_delta_directories`] over the in-memory backend's entry map.
+fn create_memory_delta_directories(state: &mut MemoryRepositoryState, delta: &RepositoryDelta) {
+    created_directories(delta)
+        .for_each(|path| crate::storage::memory::ensure_directory(state, path));
+}
+
+fn created_directories(delta: &RepositoryDelta) -> impl Iterator<Item = &VirtualPath> {
+    delta.actions().iter().filter_map(|action| match action {
+        RepositoryAction::CreateDirectory { path, .. } => Some(path),
+        _ => None,
+    })
+}
+
+/// The redo record that publishes `delta` over the repository `captured` read.
+///
+/// A directory the delta creates is no operation of its own: a put creates the
+/// directories its path needs (OD-7). A directory no put lands beneath is
+/// therefore not created, and is made by the first mutation that writes into it.
+/// A mode change republishes the captured file's own bytes under the new mode,
+/// which the write-set comparison has just confirmed are still the live ones.
+fn redo_record_for(
+    captured: &RepositoryImage,
+    delta: &RepositoryDelta,
+) -> Result<RedoRecord, RepositoryStateStoreError> {
+    let puts = delta
+        .actions()
+        .iter()
+        .filter_map(|action| match action {
+            RepositoryAction::WriteFile {
+                path, bytes, mode, ..
+            } => Some(Ok(PutFile {
+                path: path.clone(),
+                bytes: bytes.clone(),
+                mode: *mode,
+            })),
+            RepositoryAction::SetMode { path, mode, .. } => {
+                Some(captured_put(captured, path, *mode))
+            }
+            _ => None,
+        })
+        .collect::<Result<Vec<_>, RepositoryStateStoreError>>()?;
+    let deletes = delta
+        .actions()
+        .iter()
+        .filter_map(|action| match action {
+            RepositoryAction::DeleteFile { path, .. } => Some(path.clone()),
+            _ => None,
+        })
+        .collect();
+    RedoRecord::new(puts, deletes, None)
+        .map_err(|source| RepositoryStateStoreError::Other(source.into()))
+}
+
+/// The put that carries `path`'s captured bytes under `mode`.
+fn captured_put(
+    captured: &RepositoryImage,
+    path: &VirtualPath,
+    mode: FileMode,
+) -> Result<PutFile, RepositoryStateStoreError> {
+    match captured.entry(path)? {
+        RepositoryEntry::File { content, .. } => Ok(PutFile {
+            path: path.clone(),
+            bytes: content.bytes().to_vec(),
+            mode,
+        }),
+        _ => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
+    }
 }
 
 fn retryable_conflict(path: &VirtualPath) -> RepositoryStateStoreError {
@@ -1328,41 +1382,6 @@ fn memory_listing(
         }
         Some(_) => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
     }
-}
-
-fn recover_memory_state(
-    state: &mut MemoryRepositoryState,
-    failures: &dyn crate::storage::TransactionFailureInjector,
-) -> std::io::Result<()> {
-    if let Some(MemoryRecoveryResidue::Prepared {
-        rollback_actions, ..
-    }) = &state.recovery
-    {
-        for index in rollback_actions.iter().rev().copied() {
-            failures
-                .check(&TransactionFailurePoint::RepositoryBeforeReverseAction { action: index })?;
-            failures
-                .check(&TransactionFailurePoint::RepositoryAfterReverseAction { action: index })?;
-        }
-        failures.check(&TransactionFailurePoint::RepositoryBeforeStageCleanup)?;
-        failures.check(&TransactionFailurePoint::RepositoryBeforeRollbackDecision)?;
-    }
-
-    // Do not consume the residue until every injected rollback edge has
-    // succeeded. A failure above leaves Prepared intact so the next session
-    // retries the same idempotent sequence before restoring the old image.
-    match state.recovery.take() {
-        Some(MemoryRecoveryResidue::Prepared { original, .. }) => {
-            state.entries = original.entries;
-            state.data_root_exists = original.data_root_exists;
-        }
-        Some(MemoryRecoveryResidue::Committed { final_state, .. }) => {
-            state.entries = final_state.entries;
-            state.data_root_exists = final_state.data_root_exists;
-        }
-        None => {}
-    }
-    Ok(())
 }
 
 /// Require that an action's parent directory already exists, mirroring the JSON
@@ -2235,24 +2254,6 @@ fn lexical_absolute(path: &Path) -> Result<PathBuf, RepositoryStateStoreError> {
         }
     }
     Ok(normalized)
-}
-
-fn first_image_difference(expected: &RepositoryImage, actual: &RepositoryImage) -> String {
-    expected
-        .entries()
-        .iter()
-        .find(|(path, entry)| actual.entries().get(*path) != Some(*entry))
-        .map(|(path, _)| format!("{path:?}"))
-        .or_else(|| {
-            expected
-                .listing_fingerprints()
-                .iter()
-                .find_map(|(path, listing)| {
-                    (actual.listing_fingerprints().get(path) != Some(listing))
-                        .then(|| format!("listing {path:?}"))
-                })
-        })
-        .unwrap_or_else(|| "captured evidence".into())
 }
 
 #[cfg(test)]

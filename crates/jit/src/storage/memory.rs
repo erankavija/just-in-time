@@ -41,6 +41,9 @@ pub struct InMemoryStorage {
     /// Canonical aggregate repository image used by recovered mutation sessions.
     pub(crate) repository_state: Arc<Mutex<MemoryRepositoryState>>,
     pub(crate) repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
+    /// Interruption seam for the session's own moments: its open, its
+    /// pre-commit check, and the steps of its redo-record application.
+    pub(crate) mutation_interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     /// Canonical layout of the live mutation session, shared by every clone so
     /// reentry is admitted only for the same selected roots.
     pub(crate) active_mutation_layout:
@@ -54,41 +57,11 @@ pub(crate) struct MemoryRepositoryState {
     pub(crate) entries:
         BTreeMap<crate::repository_state::VirtualPath, crate::repository_state::RepositoryEntry>,
     pub(crate) data_root_exists: bool,
-    pub(crate) recovery: Option<MemoryRecoveryResidue>,
     /// The redo record a committed mutation left beside the entries, and the
     /// whole of what its application replays: the backend holds no snapshot of
     /// the state the record moves away from, because the record is applied
     /// forward.
     pub(crate) record: Option<RedoRecord>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum MemoryRecoveryResidue {
-    Prepared {
-        original: Box<MemoryRepositoryState>,
-        final_state: Box<MemoryRepositoryState>,
-        /// Action indices whose targets are published live and therefore
-        /// participate in prepared rollback. Absent-root Data actions are
-        /// staged beneath the unpublished root and intentionally excluded,
-        /// matching the file transaction kernel's recovery sequence.
-        rollback_actions: Vec<usize>,
-        _plan_hash: String,
-    },
-    Committed {
-        final_state: Box<MemoryRepositoryState>,
-        _plan_hash: String,
-    },
-}
-
-impl MemoryRepositoryState {
-    pub(crate) fn clone_without_recovery(&self) -> Self {
-        Self {
-            entries: self.entries.clone(),
-            data_root_exists: self.data_root_exists,
-            recovery: None,
-            record: None,
-        }
-    }
 }
 
 impl InMemoryStorage {
@@ -116,6 +89,7 @@ impl InMemoryStorage {
             repo_lock: RepoWriteLock::in_process(),
             repository_state: Arc::new(Mutex::new(MemoryRepositoryState::default())),
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             #[cfg(feature = "test-support")]
             repository_state_apply_conflicts: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -160,7 +134,7 @@ impl InMemoryStorage {
         interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     ) -> Self {
         let mut storage = Self::new();
-        storage.repository_state_failures = crate::storage::KernelInterruptions::new(interruptions);
+        storage.mutation_interruptions = interruptions;
         storage
     }
 
@@ -170,7 +144,7 @@ impl InMemoryStorage {
     #[cfg(test)]
     pub(crate) fn without_mutation_interruptions(&self) -> Self {
         Self {
-            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
+            mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             ..self.clone()
         }
     }
@@ -195,7 +169,7 @@ impl InMemoryStorage {
         interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
     ) -> Self {
         Self {
-            repository_state_failures: crate::storage::KernelInterruptions::new(interruptions),
+            mutation_interruptions: interruptions,
             ..self.clone()
         }
     }
@@ -232,6 +206,12 @@ impl InMemoryStorage {
         &self,
     ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
         Arc::clone(&self.repository_state_failures)
+    }
+
+    pub(crate) fn mutation_interruptions(
+        &self,
+    ) -> Arc<dyn crate::storage::MutationInterruptionInjector> {
+        Arc::clone(&self.mutation_interruptions)
     }
 
     pub(crate) fn active_mutation_layout(
@@ -453,14 +433,7 @@ impl InMemoryStorage {
                 state
                     .entries
                     .entry(dir_path)
-                    .or_insert_with(|| RepositoryEntry::Directory {
-                        identity: EntryIdentity::for_bytes(
-                            format!("memory-directory:{}", dir.display()),
-                            b"directory",
-                        )
-                        .expect("directory identity is hashable"),
-                        mode: FileMode::Executable,
-                    });
+                    .or_insert_with(|| memory_directory_entry(dir));
             }
             ancestor = dir.parent();
         }
@@ -623,6 +596,29 @@ impl MemoryRedoApplier {
         check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
         state.record = None;
         check_interruption(injector, RedoPoint::AfterApply)
+    }
+}
+
+/// Hold `path` as a directory entry, with every ancestor it needs.
+///
+/// The counterpart of the file backend's directory creation, whose parent walk
+/// creates the ancestors a target needs.
+pub(in crate::storage) fn ensure_directory(state: &mut MemoryRepositoryState, path: &VirtualPath) {
+    InMemoryStorage::ensure_ancestor_dirs(state, path);
+    state
+        .entries
+        .entry(path.clone())
+        .or_insert_with(|| memory_directory_entry(path.relative().as_path()));
+}
+
+fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
+    RepositoryEntry::Directory {
+        identity: EntryIdentity::for_bytes(
+            format!("memory-directory:{}", relative.display()),
+            b"directory",
+        )
+        .expect("directory identity is hashable"),
+        mode: FileMode::Executable,
     }
 }
 

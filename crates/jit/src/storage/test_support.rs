@@ -155,7 +155,6 @@ impl InMemoryStorage {
         *self.repository_state() = super::memory::MemoryRepositoryState {
             entries,
             data_root_exists,
-            recovery: None,
             record: None,
         };
         Ok(())

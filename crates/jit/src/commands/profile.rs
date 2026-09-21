@@ -4192,7 +4192,7 @@ placement = "append"
         let events_before = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
-            FailOnce::at(MutationPoint::Redo(RedoPoint::BeforeApply)),
+            FailOnce::at(MutationPoint::BeforeCommitCheck),
         );
         let executor = CommandExecutor::new(storage.clone())
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
@@ -5594,7 +5594,7 @@ template = true
         let original_events = fs::read(temp.path().join(".jit/events.jsonl")).unwrap();
         let storage = JsonFileStorage::with_mutation_interruptions(
             temp.path().join(".jit"),
-            FailOnce::at(MutationPoint::Redo(RedoPoint::BeforeApply)),
+            FailOnce::at(MutationPoint::BeforeCommitCheck),
         );
         let selectors = [package_selector(&left), package_selector(&right)];
         let executor = CommandExecutor::new(storage.clone())

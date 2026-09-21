@@ -1027,9 +1027,7 @@ fn derive_reduced_graph_intents(
 #[cfg(test)]
 mod captured_tests {
     use super::*;
-    use crate::storage::{
-        InMemoryStorage, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
-    };
+    use crate::storage::{InMemoryStorage, IssueStore, MutationPoint, RepositoryStateStore};
 
     #[derive(Default)]
     struct OneFailure(std::sync::Mutex<Option<MutationPoint>>);
@@ -1081,7 +1079,7 @@ mod captured_tests {
     #[test]
     fn test_dependency_removal_and_auto_ready_recover_together() {
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            MutationPoint::Redo(RedoPoint::BeforeApply),
+            MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
         storage.add_data_file("config.toml", "");
@@ -1197,8 +1195,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert_eq!(result.not_found, vec![prefix]);
     }
 
+    /// The removal resolves its prefix against the issues the session captured,
+    /// so a second issue sharing the prefix makes it ambiguous.
     #[test]
-    fn test_single_removal_rejects_dependency_prefix_that_becomes_ambiguous() {
+    fn test_single_removal_rejects_a_dependency_prefix_matching_several_issues() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
@@ -1210,16 +1210,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&storage, dependency);
         let mut collision = crate::domain::types::fixture_issue("collision".into(), String::new());
         collision.id = "22222222222222222222222222222222".to_string();
-        let storage = crate::commands::test_helpers::with_apply_race(
-            storage,
-            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(collision)),
-        );
+        crate::commands::test_helpers::seed_issue(&storage, collision);
         let executor = crate::commands::test_helpers::memory_executor(storage);
         let events_before = executor.storage.read_events().unwrap();
 
         let error = executor
             .remove_dependency(&source.id, "2222")
-            .expect_err("recaptured dependency prefix must become ambiguous");
+            .expect_err("a prefix matching several issues must be ambiguous");
 
         assert!(error
             .downcast_ref::<crate::storage::AmbiguousIdError>()
@@ -1235,8 +1232,26 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         assert_eq!(executor.storage.read_events().unwrap(), events_before);
     }
 
+    /// Mark `id` deleted in the fixture's index, as a concurrent deletion leaves
+    /// it.
+    fn mark_index_deleted(storage: &InMemoryStorage, id: &str) {
+        let bytes = storage
+            .read_repo_file(".jit/index.json")
+            .unwrap()
+            .expect("fixture index exists");
+        let mut index = crate::repository_state::RepositoryIndex::parse(bytes.as_bytes()).unwrap();
+        index.mark_deleted(id.to_string());
+        crate::commands::test_helpers::seed_repo_file(
+            storage,
+            ".jit/index.json",
+            std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
+        );
+    }
+
+    /// The removal resolves its prefix over live index membership, so a
+    /// dependency the index marks deleted is no longer found.
     #[test]
-    fn test_single_removal_rejects_dependency_deleted_before_publication() {
+    fn test_single_removal_rejects_a_dependency_the_index_marks_deleted() {
         let storage = InMemoryStorage::new();
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
         let mut dependency = crate::domain::types::fixture_issue("dep".into(), String::new());
@@ -1246,16 +1261,13 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         source.dependencies = vec![dependency.id.clone()];
         crate::commands::test_helpers::seed_issue(&storage, source.clone());
         crate::commands::test_helpers::seed_issue(&storage, dependency.clone());
-        let storage = crate::commands::test_helpers::with_apply_race(
-            storage,
-            crate::commands::test_helpers::SessionRaceAction::Delete(dependency.id),
-        );
+        mark_index_deleted(&storage, &dependency.id);
         let executor = crate::commands::test_helpers::memory_executor(storage);
         let events_before = executor.storage.read_events().unwrap();
 
         let error = executor
             .remove_dependency(&source.id, "2222")
-            .expect_err("deleted recaptured dependency must be rejected");
+            .expect_err("a dependency the index marks deleted must be rejected");
 
         assert!(error
             .downcast_ref::<crate::storage::IssueNotFoundError>()

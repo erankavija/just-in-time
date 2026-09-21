@@ -826,7 +826,7 @@ mod tests {
     use crate::declarations::GateDefinition;
     use crate::declarations::{GateMode, GateStage};
     use crate::domain::State;
-    use crate::storage::{InMemoryStorage, MutationPoint, RedoPoint};
+    use crate::storage::{InMemoryStorage, MutationPoint};
     use std::collections::HashMap;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -2075,7 +2075,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(DeleteFailure(std::sync::Mutex::new(Some(
-            MutationPoint::Redo(RedoPoint::BeforeApply),
+            MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
         storage.add_data_file("config.toml", "[worktree]\nenforce_leases = \"off\"\n");
