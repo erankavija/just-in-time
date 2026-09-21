@@ -61,6 +61,13 @@
       "format": "markdown",
       "label": "Foundation phase footprint",
       "path": "dev/active/f1dc843a-redo-mutations/footprint.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Session 4 handoff",
+      "path": "dev/active/f1dc843a-redo-mutations/handoff-3.md"
     }
   ],
   "first_ready_at": "2026-09-19T20:28:46.980500035Z",
@@ -84,5 +91,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-09-20T20:27:16.951925672Z"
+  "updated_at": "2026-09-21T08:09:19.053274507Z"
 }

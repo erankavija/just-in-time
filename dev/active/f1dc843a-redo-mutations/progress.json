@@ -818,7 +818,7 @@
       "found_during": "wave 4 (4e818d10 worker, disclosed)",
       "subject": "A symlink at an operation's target diverges between the backends and cannot be closed by either",
       "detail": "The filesystem applier reports ELOOP for a symlink or other unsupported occupant at a target; the in-memory backend has no symlinks and reports Unaddressable. The worker neither closed nor widened it, and disclosed it rather than leaving it to be found.",
-      "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it \u2014 its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
+      "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it — its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
       "criterion_subjects": []
     }
   ],
@@ -852,7 +852,7 @@
     {
       "id": "PF-05",
       "finding": "A gate result recorded as `passed` does not say which tree it judged. `jit issue show --json` and `jit gate status-all` report gates[].status with last_run_at and nothing relating that run to HEAD. 35544121's code-review read `passed` from an 11:14Z run while the module it reviewed had since been rewritten (130 lines in the exact file its only finding pointed at). Accepting that readout would have completed the issue on a review of code that no longer existed.",
-      "suggested_remedy": "Surface staleness where readiness is read. The gate-run record already carries the evidence \u2014 its stdout opens with an `Attribution:` commit list \u2014 so a `stale` flag when HEAD has moved past the attributed commits would turn a judgement call into a fact. NOT actioned: this is a shipped surface, escalation category 8.",
+      "suggested_remedy": "Surface staleness where readiness is read. The gate-run record already carries the evidence — its stdout opens with an `Attribution:` commit list — so a `stale` flag when HEAD has moved past the attributed commits would turn a judgement call into a fact. NOT actioned: this is a shipped surface, escalation category 8.",
       "lead_action": "Adopted for the rest of this epic: after every merge, re-evaluate every AI-review gate on the issue before reading its status, and confirm the run's Attribution line covers the new commits.",
       "status": "adopted by the lead; product change raised to the user, not actioned"
     },
@@ -873,7 +873,7 @@
       "id": "PF-08",
       "finding": "rustc masks a struct-literal privacy error behind a later field-access error. When a test both constructs a type by struct literal AND later reads one of its fields, making the fields private surfaces only the E0616 field-access error; the E0451 construction error is dropped. The 8559f529 worker reproduced this in an isolated ten-line crate rather than asserting it.",
       "why_it_matters": "Fixing only the errors cargo reports, then building clean, does NOT prove that no bypassing construction site remains. The build is not the proof. A textual grep for the struct-literal form is.",
-      "lead_action": "Adopted: when a change's purpose is to make a construction path unreachable, the evidence is a grep over the construction form, not a green build. Applied here \u2014 grep confirmed `RedoRecord {` survives only inside redo_record.rs's own test submodule.",
+      "lead_action": "Adopted: when a change's purpose is to make a construction path unreachable, the evidence is a grep over the construction form, not a green build. Applied here — grep confirmed `RedoRecord {` survives only inside redo_record.rs's own test submodule.",
       "status": "adopted by the lead; credited to the 8559f529 worker"
     },
     {
@@ -893,6 +893,20 @@
       "finding": "A worker's cargo-ci run costs ~8 minutes where a no-change run on main costs 26 s and a docs-change run 100 s. Measured breakdown of the 100 s run: clippy 30 s, suite-build 40 s (17 executables, 2.09 GB linked), test 22.7 s over 4732 tests, doctest 4.5 s. The cause is crate granularity, not gate configuration: crates/jit is one compilation unit of 198,814 src lines (190,515 outside test-named files) with 37 direct dependencies, and the workspace has two members. Rust recompiles per crate, so an edit anywhere under storage/ re-type-checks and re-codegens the whole crate, twice per run (clippy's --all-targets check pass, then the test build), before 17 binaries relink. CARGO_INCREMENTAL=0 is banned in force by the bounded-rust-build-footprint budget, so no incremental reuse offsets it. scripts/cargo-ci.sh additionally takes a host-wide flock by design, so a four-worker wave queues four such runs.",
       "lead_action": "Out of this epic's scope; recorded for v1.0 triage rather than acted on. Within scope, the lead refreshes the cache pool from main's target directory at each wave boundary instead of harvesting one worker's worktree: main is exactly the commit the next wave anchors to and its warm tree is 60 GB against the pool's 23 GB, so the seeded worktrees stop re-paying the unchanged base. The structural fix is splitting crates/jit along the layer boundaries AGENTS.md already mandates (domain+graph pure, storage, commands, cli/output), which would make a storage edit stop rebuilding main.rs and commands/profile.rs; it is a large refactor that would collide with this epic's in-flight work and belongs after it. Re-enabling incremental for worker runs while keeping the CI ban is a cheaper stopgap but changes an enforced invariant's budget, so it needs the invoker (escalation category 8). sccache is running at a 6.45 % hit rate and is contributing nothing; same category.",
       "status": "recorded, not acted on; surfaced to the invoker"
+    },
+    {
+      "id": "PF-12",
+      "finding": "PF-11's headline number was misattributed. The cargo-ci gate costs 78 s warm and 128 s cold on an idle host, measured on isolated target directories. The '~8 minutes per worker run' is the host-wide flock in scripts/cargo-ci.sh serializing a four-worker wave -- queue time, not compile time. PF-11's structural claim (crates/jit is one 197k-line compilation unit) stands; its cost attribution did not.",
+      "lead_action": "Re-measured before acting. Three candidate interventions were measured and rejected: lld (inert -- rust-lld is already the default linker on x86_64-unknown-linux-gnu, confirmed by `readelf -p .comment`); raising the flock to 2 slots (88 s against 110 s serial, and BOTH runs failed the suite-duration budget at 38.3/33.3 s against 30 s, because that budget is defined over an idle host); tmpfs worker targets (storage medium is not the bottleneck -- SATA 79 s against NVMe 78 s -- and MemAvailable never fell below 48.06 GB of 62).",
+      "status": "measured; POL-03 applied, the other three rejected with evidence"
+    },
+    {
+      "id": "PF-13",
+      "finding": "sccache is neither broken nor useless: its Rust cache key is bound to the absolute target-directory path, because Cargo passes absolute --extern and -L paths on the rustc command line. Two cold builds at the SAME CARGO_TARGET_DIR: pass 1 37 s with 244 Rust misses and 0 hits, pass 2 7 s with 244 Rust hits (100 %). Across different paths it is 0.00 % in every configuration tested, including CARGO_INCREMENTAL=0. Every agent worktree has its own target path, so sccache misses 100 % of the time in the only scenario it was installed for, costing ~3 s per cold build (68 s with, 65 s without) and 73 GB of disk.",
+      "why_it_matters": "The cache pool in dispatch-worker-worktree.sh already does this job strictly better -- it hardlinks a warm target/ into each worktree, so the worker skips compilation rather than replaying it at 7 s. sccache is redundant when the pool is healthy and useless when it is not. Making it pay would need one shared target-dir path, which jit:be005f64 already rejected because Cargo's single target-dir lock would serialize every concurrent agent build.",
+      "lead_action": "Recorded, not acted on: removing RUSTC_WRAPPER from scripts/cargo-ci.sh is a shared-infrastructure change (escalation category 8) and saves ~3 s. Raised to the user. Keeping the cache pool healthy -- and moving it off the 84 %-full SATA root onto /data (NVMe, 301 GB free) via LEAD_CACHE_POOL -- is the higher-value follow-up.",
+      "corrections": "Two mechanisms were asserted before this one was measured, and both were wrong: (a) that RUSTC_WRAPPER split Cargo fingerprints between gate and interactive builds -- checked, not supported, all libc fingerprints carried an identical rustc hash; (b) that incremental compilation poisoned the sccache key -- refuted, CARGO_INCREMENTAL=0 still gave 0.00 % Rust hits.",
+      "status": "recorded, not acted on; surfaced to the user"
     }
   ],
   "evidence_requirements": [
@@ -903,17 +917,20 @@
       "why": "The measurement is a blunt tree diff and cannot separate redo-record work from anything else landing in the window. Three in-epic tasks are not redo-record work: ce053478 (net +18, done), the claim-ceiling task, and the prose-checks task (projected ~-390 from deleting code_review_policy_test.rs and the packaged-citation test). If the redo-record work alone were net positive, that -390 would flip the total negative and REQ-06 would read green while the epic's premise -- that the storage layer ends smaller -- stayed unproven.",
       "excluded_from_subtotal": [
         "ce053478",
-        "claim-ceiling task",
-        "prose-checks task"
+        "19e7298a (claim-ceiling task)",
+        "2d4fda72 (prose-checks task)",
+        "48e4f65c",
+        "7226f00b",
+        "1fce64b78 (POL-03 build-time commit, session 4, -139 Rust lines; carries no jit issue by POL-03's terms)"
       ],
-      "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently.",
+      "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently. Session 4 added the POL-03 commit to the exclusion list: it is build-tooling work, carries no jit issue, and removes 139 Rust lines that would otherwise flatter REQ-06's literal total. 8559f529 is NOT excluded.",
       "baseline_at_wave2": "+636 -32 = net +604"
     },
     {
       "id": "ER-02",
       "owner": "d591a1c8 (wave 5), carried to 21e976d1 (wave 6)",
       "requirement": "The conformance suite must SUBSUME the two per-backend crash-matrix proptests (prop_re_application_after_any_interrupted_prefix_converges in redo_apply.rs, prop_memory_re_application_after_any_interrupted_prefix_converges in memory.rs), or state per proptest why it proves something the suite does not.",
-      "why": "Story 21e976d1 REQ-02 requires the crash matrix proven in ONE suite with 'no second suite in the workspace' proving it. Both proptests prove exactly that matrix today. Adding the conformance suite without dispositioning them leaves three things proving one property and fails the checkpoint \u2014 a duplication defect under @/inv/orthogonal-tests. Flagged in the dispatch rather than discovered at the gate, since the checkpoint is the next wave."
+      "why": "Story 21e976d1 REQ-02 requires the crash matrix proven in ONE suite with 'no second suite in the workspace' proving it. Both proptests prove exactly that matrix today. Adding the conformance suite without dispositioning them leaves three things proving one property and fails the checkpoint — a duplication defect under @/inv/orthogonal-tests. Flagged in the dispatch rather than discovered at the gate, since the checkpoint is the next wave."
     }
   ],
   "verifications": [
@@ -949,7 +966,7 @@
       "what": "BLOCKING: code-review round 1's finding is unaddressed at HEAD and round 3 passed without re-checking it.",
       "detail": "R1 (blocking, issue-impact, redo_apply.rs:85): 'REQ-05 requires a backend-held interruption injector, but apply_record receives one per call and no backend owns it. Callers can therefore vary injection across applications rather than the backend owning its interruption boundary.' At HEAD apply_record still takes `injector: &dyn RedoInterruptionInjector` (redo_apply.rs:88) and no backend holds it. R2 flagged the staging vulnerability instead; the lead dispatched rework for R2 only. R3 passed with 'All hard criteria are implemented and the prior staging vulnerability is remediated' - it re-checked the staging finding and not R1.",
       "lead_note": "Caught by the Tier 1.5 prior-findings regression check, which exists precisely because reviewers have no memory across rounds. The issue is NOT completed. The worker's original position was that the session becomes the injector holder at wiring time (4319256e), matching the kernel's `execute_repository_delta(..., &*self.injector)` pattern - arguable, but No-argue discipline forbids the lead softening REQ-05 by argument. Resolve by changing the artifact or by escalating.",
-      "verdict": "FAIL confirmed at HEAD in session 2 (apply_record still took the injector per call at redo_apply.rs:88). RESOLVED by the invoker (ESC-06): change the artifact \u2014 redo_apply.rs gains a type holding Arc<dyn RedoInterruptionInjector> with apply(&self, roots, record), mirroring FileTransactionKernel (file_transaction.rs:69). The free-function form does not survive beside it (@/inv/canonical-cutover). Rework attempt 3 dispatched; the invoker's guidance reset the counter."
+      "verdict": "FAIL confirmed at HEAD in session 2 (apply_record still took the injector per call at redo_apply.rs:88). RESOLVED by the invoker (ESC-06): change the artifact — redo_apply.rs gains a type holding Arc<dyn RedoInterruptionInjector> with apply(&self, roots, record), mirroring FileTransactionKernel (file_transaction.rs:69). The free-function form does not survive beside it (@/inv/canonical-cutover). Rework attempt 3 dispatched; the invoker's guidance reset the counter."
     },
     {
       "id": "V-05",
@@ -963,8 +980,8 @@
       "id": "V-06",
       "issue": "35544121",
       "what": "The fsync ordering the R4 fix establishes has no owning test; only the crash-window ordering does.",
-      "detail": "test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published (redo_apply.rs:475) owns the property that the record outlives a fresh nested put's publication, and it was GREEN BEFORE the fix \u2014 the worker disclosed this rather than letting it pass as evidence. The sync itself has no failure seam at this layer: sync_capability_directory operates on an already-open handle via try_clone + sync_all, so the 0o300 no-read-permission trick that makes redo_record's path-based sync_directory observable does not apply here. Adding a RedoPoint for directory creation would widen the point enum that 4e818d10 REQ-04 and d591a1c8 REQ-01 require both backends to share, and the in-memory backend has no directories, so that seam would be wrong.",
-      "lead_note": "Accepted, not waived. @/inv/orthogonal-tests requires an owning test at the cheapest layer THAT CAN OBSERVE the property; no layer here observes it cheaply. The ordering is structural \u2014 the sync sits inside the create arm before the walk descends \u2014 and was verified by reading, by the code-review gate that raised the finding, and by the gate's explicit recheck. Precedent: open_capability_parent likewise has no owning test and is proven through its consumers. Carried to the 21e976d1 checkpoint (wave 6) so holistic-review sees it rather than discovering it.",
+      "detail": "test_redo_applier_apply_keeps_the_record_until_a_fresh_nested_put_is_published (redo_apply.rs:475) owns the property that the record outlives a fresh nested put's publication, and it was GREEN BEFORE the fix — the worker disclosed this rather than letting it pass as evidence. The sync itself has no failure seam at this layer: sync_capability_directory operates on an already-open handle via try_clone + sync_all, so the 0o300 no-read-permission trick that makes redo_record's path-based sync_directory observable does not apply here. Adding a RedoPoint for directory creation would widen the point enum that 4e818d10 REQ-04 and d591a1c8 REQ-01 require both backends to share, and the in-memory backend has no directories, so that seam would be wrong.",
+      "lead_note": "Accepted, not waived. @/inv/orthogonal-tests requires an owning test at the cheapest layer THAT CAN OBSERVE the property; no layer here observes it cheaply. The ordering is structural — the sync sits inside the create arm before the walk descends — and was verified by reading, by the code-review gate that raised the finding, and by the gate's explicit recheck. Precedent: open_capability_parent likewise has no owning test and is proven through its consumers. Carried to the 21e976d1 checkpoint (wave 6) so holistic-review sees it rather than discovering it.",
       "verdict": "accepted with the gap named"
     },
     {
@@ -972,34 +989,34 @@
       "issue": "4e818d10",
       "what": "Cross-backend divergence on a constructible record; lead-verified claims that did hold.",
       "detail": "code-review F1 (blocking): a record putting issues/a.json then issues makes the memory put_entry overwrite the Directory entry with a File while keeping its child, where the filesystem applier fails on the nonempty-directory replacement and leaves its record. Memory reports success and clears the residue (memory.rs:608-610). 835bae3f REQ-02 rejects paths outside the roots at construction but nothing rejects an ancestor/descendant pair, so the record is constructible. F2 (advisory): MemoryRedoApplier::new rustdoc restates its one-field initializer (@/inv/essential-code-prose).",
-      "lead_evidence": "Verified before dispatching rework: memory_file_object(path) is format!(\"memory-file:{path:?}\"), byte-identical to the inline form it replaced, so the kernel's entries are unchanged; and repository_state_store.rs never names MemoryRepositoryState.record \u2014 its only RedoRecord reference is faa668c9's ensure_write_set_unchanged, still with no production caller. So the worker's reachability audit holds and 21e976d1 REQ-03 is satisfied for this issue's work.",
-      "verdict": "RESOLVED. The worker measured RedoApplier's actual contract with three throwaway probes rather than assuming it, and matched all four rows: EISDIR for a put over a directory an earlier put created, UnsafeTarget(component) for the mirror order and for a non-directory ancestor, EISDIR for a delete of a directory. No rollback in any case \u2014 earlier operations stand and the record stays installed, which redo-only convergence requires. Two self-corrections fell out: memory walks ancestors outermost-first so UnsafeTarget names the same component, and the worker's earlier Unaddressable claim for a non-directory ancestor was the wrong error shape. F2's rustdoc deleted. Both gates green on the merged tree; code-review attribution covers 2c0d5d63b and 667460a66."
+      "lead_evidence": "Verified before dispatching rework: memory_file_object(path) is format!(\"memory-file:{path:?}\"), byte-identical to the inline form it replaced, so the kernel's entries are unchanged; and repository_state_store.rs never names MemoryRepositoryState.record — its only RedoRecord reference is faa668c9's ensure_write_set_unchanged, still with no production caller. So the worker's reachability audit holds and 21e976d1 REQ-03 is satisfied for this issue's work.",
+      "verdict": "RESOLVED. The worker measured RedoApplier's actual contract with three throwaway probes rather than assuming it, and matched all four rows: EISDIR for a put over a directory an earlier put created, UnsafeTarget(component) for the mirror order and for a non-directory ancestor, EISDIR for a delete of a directory. No rollback in any case — earlier operations stand and the record stays installed, which redo-only convergence requires. Two self-corrections fell out: memory walks ancestors outermost-first so UnsafeTarget names the same component, and the worker's earlier Unaddressable claim for a non-directory ancestor was the wrong error shape. F2's rustdoc deleted. Both gates green on the merged tree; code-review attribution covers 2c0d5d63b and 667460a66."
     },
     {
       "id": "V-08",
       "issue": "8559f529",
       "what": "The overlap check was implemented as an optional constructor beside pub fields.",
       "detail": "RedoRecord::new validates and parse calls the same helper, but redo_record.rs:56-58 leaves puts, deletes and event_append pub, so `RedoRecord { puts: vec![put(issues/a.json), put(issues)], ..Default::default() }` still constructs the overlapping record the task exists to prevent. REQ-01 says 'rejected at construction'; a struct literal is construction. Compounding it, the struct rustdoc at :49-53 now states 'Operation paths are pairwise disjoint ... checked identically at construction and at parse' as fact, so the type documents an invariant it permits callers to violate.",
-      "lead_note": "Caught at Tier 2 from the worker's own disclosure \u2014 it reported 'Fields stay pub ... existing struct-literal test fixtures were out of scope'. The asymmetry that makes it wrong: 835bae3f's root-class rejection lives in VirtualPath's constructor and CANNOT be bypassed, because no path reaches RedoRecord without passing it. The worker matched that check's placement without matching its unbypassability. PARTLY THE LEAD'S FAULT: the issue Notes said 'roughly 30 production lines', costing the comparison logic and not the encapsulation that makes it binding, and the worker sized to that number. The estimate is descriptive and does not override a criterion; not amended.",
+      "lead_note": "Caught at Tier 2 from the worker's own disclosure — it reported 'Fields stay pub ... existing struct-literal test fixtures were out of scope'. The asymmetry that makes it wrong: 835bae3f's root-class rejection lives in VirtualPath's constructor and CANNOT be bypassed, because no path reaches RedoRecord without passing it. The worker matched that check's placement without matching its unbypassability. PARTLY THE LEAD'S FAULT: the issue Notes said 'roughly 30 production lines', costing the comparison logic and not the encapsulation that makes it binding, and the worker sized to that number. The estimate is descriptive and does not override a criterion; not amended.",
       "verdict": "FAIL - rework 1 of 2. Fields become private with read accessors; 43 struct-literal sites across four files (all tests) route through new(); the shared arbitrary_record() generator must produce disjoint sets by construction rather than prop_assume filtering, since d591a1c8 builds its conformance suite on that fixture next."
     },
     {
       "id": "V-09",
       "issue": "8559f529",
       "what": "The encapsulation rework silently dropped the no-rollback property owned by a completed issue's test.",
-      "detail": "Making RedoRecord's overlap check unbypassable made two memory.rs records unconstructible, so the worker redesigned their tests \u2014 correct in principle and clearly disclosed. But test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created owned an assertion its replacement does not carry: 'the refusal undid a put that had already landed'. That is the no-rollback property \u2014 a refusal leaves the record's EARLIER operations applied \u2014 which 4e818d10's worker established by measurement and which epic REQ-03 rests on. Both replacements apply single-put records, so no earlier operation exists to preserve; the delete test is single-operation too. A backend that rolled back on refusal would pass every test in the tree.",
+      "detail": "Making RedoRecord's overlap check unbypassable made two memory.rs records unconstructible, so the worker redesigned their tests — correct in principle and clearly disclosed. But test_memory_redo_applier_apply_refuses_a_put_over_a_directory_an_earlier_put_created owned an assertion its replacement does not carry: 'the refusal undid a put that had already landed'. That is the no-rollback property — a refusal leaves the record's EARLIER operations applied — which 4e818d10's worker established by measurement and which epic REQ-03 rests on. Both replacements apply single-put records, so no earlier operation exists to preserve; the delete test is single-operation too. A backend that rolled back on refusal would pass every test in the tree.",
       "lead_evidence": "Found by diffing the test inventory of both backends between main and the branch (two memory.rs names replaced by one, redo_apply.rs unchanged), then reading the deleted bodies assertion by assertion. Grepping both backends for the assertion's substance returns nothing. Not covered on the filesystem side either, and correctly so: 4e818d10's worker established that half with throwaway probes because the behaviour belongs to 35544121 under @/inv/orthogonal-tests.",
-      "lead_note": "The property is still expressible under the new validation \u2014 two puts that do not contain one another, e.g. index.json and issues, against a pre-existing directory at issues. The obligation to restore it falls on the change that removed the owner, not on the closed issue.",
-      "verdict": "RESOLVED. test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused restores it with a disjoint two-put record (index.json then issues, against an independently seeded directory): the first put's bytes stand, the second refuses IsADirectory, the record stays installed. The worker's audit for a SECOND lost property is the notable part and the lead verified it: the deleted mirror test also asserted no-rollback, but at the ancestor-walk guard. The worker wrote that test, watched it fail, and traced the cause rather than adjusting it to pass \u2014 apply resolves every operation's path in one batch before BeforeApply (memory.rs:578-585, mirroring redo_apply.rs), so a pre-existing bad ancestor refuses the whole record before anything lands. The only way that guard ever fired mid-pass required two operations naming one path as the other's ancestor, which this issue makes unconstructible. So the scenario is retired by the fix, not lost by redesign, and the upfront-refusal property it leaves behind is already owned by the untouched test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent."
+      "lead_note": "The property is still expressible under the new validation — two puts that do not contain one another, e.g. index.json and issues, against a pre-existing directory at issues. The obligation to restore it falls on the change that removed the owner, not on the closed issue.",
+      "verdict": "RESOLVED. test_memory_redo_applier_apply_leaves_an_earlier_put_applied_after_a_later_one_is_refused restores it with a disjoint two-put record (index.json then issues, against an independently seeded directory): the first put's bytes stand, the second refuses IsADirectory, the record stays installed. The worker's audit for a SECOND lost property is the notable part and the lead verified it: the deleted mirror test also asserted no-rollback, but at the ancestor-walk guard. The worker wrote that test, watched it fail, and traced the cause rather than adjusting it to pass — apply resolves every operation's path in one batch before BeforeApply (memory.rs:578-585, mirroring redo_apply.rs), so a pre-existing bad ancestor refuses the whole record before anything lands. The only way that guard ever fired mid-pass required two operations naming one path as the other's ancestor, which this issue makes unconstructible. So the scenario is retired by the fix, not lost by redesign, and the upfront-refusal property it leaves behind is already owned by the untouched test_memory_redo_applier_apply_refuses_a_data_path_while_the_data_root_is_absent."
     },
     {
       "id": "V-10",
       "issue": "d591a1c8",
       "what": "REQ-02's pre-durability property is implied by the suite but owned by no test.",
       "detail": "code-review F1 (blocking): committed() writes the record before every tested application (redo_conformance.rs:205), and the first injectable RedoPoint follows that commit, so no test interrupts before the record is durable. REQ-02 reads 'After an interruption before the record is durable, the repository reads back as the complete old state.'",
-      "lead_evidence": "Verified before relaying. nothing_published does assert commit publishes nothing (:251-255), and that plus 'the first live write follows BeforeApply' IMPLIES the property \u2014 but an implication drawn from two other assertions is not the owning test the criterion asks for. The structural cause: RedoInterruptionInjector is consulted only inside apply, while durability happens in RedoRecord::commit / commit_record, which has no seam. No RedoPoint value lies in the pre-durability window, so reclassifying points cannot reach it.",
+      "lead_evidence": "Verified before relaying. nothing_published does assert commit publishes nothing (:251-255), and that plus 'the first live write follows BeforeApply' IMPLIES the property — but an implication drawn from two other assertions is not the owning test the criterion asks for. The structural cause: RedoInterruptionInjector is consulted only inside apply, while durability happens in RedoRecord::commit / commit_record, which has no seam. No RedoPoint value lies in the pre-durability window, so reclassifying points cannot reach it.",
       "lead_note": "Told the worker NOT to widen RedoPoint: it is 35544121's closed enum over the apply pass, and 4e818d10 REQ-04 requires both backends to step the same values while their commits differ. If the worker concludes REQ-02 is unreachable without widening it, that returns to the lead as an escalation. Likely honest shape: a torn or absent record leaves the complete old state, observable without touching any enum. Session-open replay stays with 0938d99e (wave 9) per this issue's own Notes.",
-      "verdict": "RESOLVED. prop_an_interruption_during_the_records_commit_leaves_the_complete_old_state runs the real commit, cuts its output back to every proper prefix of the bytes written, and asserts the repository reads complete-old at each. RedoPoint untouched: the worker confirmed widening it could not have helped, since no injector call exists in the commit path to carry a new variant. Filesystem backend alone, with the reason in the test \u2014 InMemoryStorage::commit_record is a single assignment (memory.rs:536-545, lead-verified) so its pre-durability window has no interior. The completed-commit instant stays covered on both backends by prop_nothing_is_published_before_the_pass_reaches_its_first_live_write; proper prefixes and the complete commit are different instants, so the two do not overlap."
+      "verdict": "RESOLVED. prop_an_interruption_during_the_records_commit_leaves_the_complete_old_state runs the real commit, cuts its output back to every proper prefix of the bytes written, and asserts the repository reads complete-old at each. RedoPoint untouched: the worker confirmed widening it could not have helped, since no injector call exists in the commit path to carry a new variant. Filesystem backend alone, with the reason in the test — InMemoryStorage::commit_record is a single assignment (memory.rs:536-545, lead-verified) so its pre-durability window has no interior. The completed-commit instant stays covered on both backends by prop_nothing_is_published_before_the_pass_reaches_its_first_live_write; proper prefixes and the complete commit are different instants, so the two do not overlap."
     },
     {
       "id": "V-11",
@@ -1076,9 +1093,30 @@
       "policy": "The gate's incremental-compilation ban is reversed in full and directly, with no jit issue tracking the reversal, after wave 7 closes. Remove the CARGO_INCREMENTAL=0 export from scripts/cargo-ci.sh and its three enforcement points (the runtime assertion in that script, the script-text check in scripts/rust-build-budget.sh, and build_profile_policy_tests.rs), and amend the bounded-rust-build-footprint invariant text and dev/benchmarks/rust-build-budgets/README.md's provenance in the SAME change so no document still states a ban that is gone.",
       "evidence": "The ban (jit:57d0eb79) rests on dev/archive/6eb585bc-core-maintenance/active/73482aa1-rust-build-efficiency.md, which measured target/debug/incremental at 19 GiB on a tree of 140 integration targets and 712 executables. dev/archive/c639cfb5-jit-profiles-complete/active/handoff-12.md records the owner's 2026-08-13 finding that every measurement in that study is obsolete and that five sites still cite it; this ban is one of them. Today's tree reports 10 integration targets and 14 executables. Cargo.toml's [profile.dev] and [profile.test] already set incremental = true, so the ban applies to gate runs only.",
       "note": "Timing is deliberate: wave 7's four issues are judged by the same gate their workers ran. The change lands on a clean main after the wave closes, so any new failure mode surfaces against main rather than mid-wave. Wave 8 onward runs on the new gate. Related finding: PF-11."
+    },
+    {
+      "id": "POL-04",
+      "decided_by": "user",
+      "wave": 8,
+      "policy": "Every session actively watches how cargo-ci behaves and watches for throughput bottlenecks in parallel execution. Per wave, record each gate run's per-step timings and suite-clock in the wave's progress entry, and record wall time from first dispatch to last merge. Flag any suite-clock above 25 s and any step that moves more than 30 % from the session-4 reference figures.",
+      "reference_figures_session_4": {
+        "gate_total_warm_one_file_edited_s": 56,
+        "gate_total_no_change_s": 25,
+        "gate_total_cold_s": 128,
+        "clippy_warm_ms": 16691,
+        "suite_build_warm_ms": 8608,
+        "test_ms": 17807,
+        "doctest_ms": 4473,
+        "suite_clock_ms": [
+          22398,
+          22344
+        ],
+        "suite_clock_budget_ms": 30000
+      },
+      "note": "Observation carried alongside the waves, not a second measurement project. Known live risk: a worker's FIRST gate run in a freshly seeded worktree measured suite-clock 43.0/43.3 s and failed the budget; the same targets passed once settled (LD-7 signature, worse than the 31.8 s previously recorded)."
     }
   ],
-  "session": 3,
+  "session": 4,
   "rework_counter_resets": [
     {
       "issue": "35544121",
@@ -1120,7 +1158,7 @@
       {
         "pitfall": "SP-06",
         "subject": "stale #[allow(unused_imports)] on the memory re-export line",
-        "verdict": "NEEDS ACTION BEFORE THE GATE. REQ-04 reads 'builds warning-free with the mechanism uncalled, through the storage layer's declared visibility rather than through a dead-code allowance'. The MECHANISM carries no allowance \u2014 MemoryRedoApplier was split onto its own unguarded line at 0612382b4 precisely for this. So REQ-04 is satisfied on a strict reading. But the allowance sits in storage/mod.rs, the same file, and a reviewer checking REQ-04 will grep that file and find it. The worker proved removing it leaves clippy --workspace --all-targets clean. Cheaper to remove it than to argue the distinction at the gate."
+        "verdict": "NEEDS ACTION BEFORE THE GATE. REQ-04 reads 'builds warning-free with the mechanism uncalled, through the storage layer's declared visibility rather than through a dead-code allowance'. The MECHANISM carries no allowance — MemoryRedoApplier was split onto its own unguarded line at 0612382b4 precisely for this. So REQ-04 is satisfied on a strict reading. But the allowance sits in storage/mod.rs, the same file, and a reviewer checking REQ-04 will grep that file and find it. The worker proved removing it leaves clippy --workspace --all-targets clean. Cheaper to remove it than to argue the distinction at the gate."
       },
       {
         "pitfall": "SP-07",
@@ -1159,7 +1197,12 @@
   },
   "handoffs": [
     "dev/active/f1dc843a-redo-mutations/handoff.md",
-    "dev/active/f1dc843a-redo-mutations/handoff-2.md"
+    "dev/active/f1dc843a-redo-mutations/handoff-2.md",
+    {
+      "session": 4,
+      "path": "dev/active/f1dc843a-redo-mutations/handoff-3.md",
+      "note": "Index is one past the highest existing handoff; session 3 left none. Session 3's record is session_3_summary."
+    }
   ],
   "session_2_summary": {
     "closed": [
@@ -1212,5 +1255,14 @@
       "f05a7965's worker stalled twice waiting on a background-job notification that never arrived; its work was committed, so the lead gated it on the merged tree rather than waiting. Its eventual report matched the lead's independent review on every point.",
       "Reports truncated for 7658bf81 and 581bddcf; both tails were retrieved by SendMessage and both confirmed the lead's independent findings."
     ]
+  },
+  "session_4_summary": {
+    "delivered": "No epic waves. The user-requested build-time work session 3 did not reach.",
+    "landed": "1fce64b78 -- POL-03, the gate's incremental-compilation ban retired in full (four enforcement sites, not the three POL-03 named; scripts/cargo-ci-selftest.sh was the fourth), with gates.toml, Cargo.toml, dev/TESTING.md, the rust-build-budgets README derivation, the rules-and-gates projection and CHANGELOG amended in the same change.",
+    "measured_payoff": "One file under crates/jit/src/storage/ touched: clippy 29,276 -> 16,691 ms, suite-build 25,133 -> 8,608 ms, full gate 79 -> 56 s. Cold build unchanged (99.5 -> 99.1 s). Suite-clock unchanged over two no-change reruns (22,398 / 22,344 ms against a 22,332 ms baseline), so the budget derivation needed no revision. Cost: target directory 3.3 GB -> 7.1 GB.",
+    "wave_throughput_effect": "A four-worker wave's serialized gate cost falls from ~316 s to ~224 s. The flock stays, so the wave remains serialized by design -- see PF-12.",
+    "open_for_user": "Whether crates/jit is split along its layer boundaries, and when. Layer sizes and the recommendation are in handoff-3.md.",
+    "verification": "cargo-ci green on main at 1fce64b78 (4704 tests, 63 doctests, 0 skipped, 0 ignored); docs-mechanical green on all seven checks.",
+    "housekeeping": "All experiment target directories under /data removed. Six stale worktrees from earlier epics still hold disk on / and carry unmerged commits -- not this epic's, untouched."
   }
 }
