@@ -181,3 +181,28 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
         "the startup session must have applied the record it counted"
     );
 }
+
+/// A leftover record the session cannot read fails `jit recover` as a recovery
+/// failure; applying one is the command's own work.
+#[test]
+fn test_recover_json_classifies_an_unreadable_leftover_record_as_recovery_failed() {
+    let temp = setup_test_repo();
+    let scratch = temp
+        .path()
+        .join(".jit")
+        .join(jit::storage::RECORD_SCRATCH_DIR);
+    std::fs::create_dir_all(&scratch).unwrap();
+    std::fs::write(scratch.join(jit::storage::RECORD_FILE_NAME), b"no header").unwrap();
+
+    let output = jit_cmd()
+        .current_dir(temp.path())
+        .args(["recover", "--json"])
+        .assert()
+        .code(jit::output::ErrorCode::RecoveryFailed.exit_code().code())
+        .get_output()
+        .stdout
+        .clone();
+
+    let envelope: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(envelope["error"]["code"], "recovery_failed", "{envelope}");
+}

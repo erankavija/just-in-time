@@ -461,6 +461,31 @@
       "format": "markdown",
       "label": "runtime-defaults",
       "path": "docs/reference/runtime-defaults.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8808feb77e9be61c943224f2cafa0d49ecc4c8ff71f678859572f7035432f100",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "exit-codes.md",
+          "resolved_path": "docs/reference/exit-codes.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6c7271281fe7af9adc684eeaef9b85218bd614471ffa1eb9331507fcaed8d97c",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "profiles.md",
+          "resolved_path": "docs/reference/profiles.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "error-codes",
+      "path": "docs/reference/error-codes.md"
     }
   ],
   "first_ready_at": "2026-09-21T16:03:08.028889250Z",
@@ -487,5 +512,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T19:53:49.990692009Z"
+  "updated_at": "2026-09-21T19:57:14.496923020Z"
 }

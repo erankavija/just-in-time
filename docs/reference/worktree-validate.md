@@ -432,7 +432,7 @@ The pre-commit hook runs similar validation automatically. Use `jit validate` fo
 
 ## jit recover
 
-Apply a leftover redo record and run the repair routines.
+Run recovery: apply a leftover redo record, then the repair routines.
 
 ### Synopsis
 

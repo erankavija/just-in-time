@@ -48,7 +48,7 @@ status taxonomy and command-specific exceptions, see [Exit Codes](exit-codes.md)
 | `WORKTREE_STORE_DIVERGENCE_ERROR` | Cross-checkout store comparison failed. | `1` |
 | `HOOKS_INSTALL_ERROR` | Repository hook installation failed. | `1` |
 | `GENERIC_ERROR` | A command failed without a more specific public classification. | `1` |
-| `recovery_failed` | Repository recovery failed. | `1` |
+| `recovery_failed` | Applying a leftover redo record, or a recovery routine, failed. | `1` |
 | `CLAIM_ACQUIRE_ERROR` | Claim acquisition failed. | `3` |
 | `CLAIM_RELEASE_ERROR` | Claim release failed. | `3` |
 | `CLAIM_RENEW_ERROR` | Claim renewal failed. | `3` |
