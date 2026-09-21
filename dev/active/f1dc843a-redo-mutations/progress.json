@@ -990,6 +990,13 @@
       "suggested_remedy": "Confirm a worker is IDLE (ListAgents, not its report) before merging or gating its branch. Deliver any added constraint before dispatch, not after a report; when one must be sent late, expect the worker to resume and do not start a gate until it goes idle again.",
       "status": "adopted by the lead",
       "session": 5
+    },
+    {
+      "id": "PF-17",
+      "finding": "Every first cargo-ci run on main after a merge fails, and never for a reason about the tree. A merge invalidates the build, so the gate's own suite-build step rebuilds inside the run; the suite then executes against freshly linked executables and the same six tail tests (jit::fast_rules cli_warnings_integration_tests) trip the 20 s per-test bound, or the suite-duration budget trips on its own. Observed three times in session 5: wave 8 cold 44381 ms; wave 9 cold-and-contended 97493 ms; wave 9 cold 60493 ms with six TIMEOUTs. The warm re-run then passes at 22455 / 22703 ms, on baseline. This is LD-7's signature, and it costs a wasted full gate run per merge -- roughly 60-100 s of test execution plus a lead round trip.",
+      "suggested_remedy": "Warm the target before evaluating, not by re-running the gate. After each merge, run the build once (cargo-ci's suite-build step, or `cargo nextest run --no-run --workspace --all-targets`) and only then `jit gate evaluate --force`. That replaces two full gate runs with one build plus one gate run. Adopted by the lead from wave 10 onward.",
+      "status": "adopted by the lead",
+      "session": 5
     }
   ],
   "evidence_requirements": [
