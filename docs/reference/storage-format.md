@@ -90,33 +90,21 @@ Lease records live under `.git/jit/`, not `.jit/`. See
 ## Publication and Recovery
 
 A mutation publishes through one **redo record**: the directories it creates,
-the complete new bytes of every file it writes, and the paths it removes. A
-mutation that records events writes `events.jsonl` like any other file, so the
-record carries the log's complete new bytes. The record names only the files
-that one mutation writes (`@/charter/D-17`).
+the new contents of every file it writes, and the paths it removes
+(`@/charter/D-17`). The mutation fails, before anything durable is written, if
+any path it creates, writes, or removes changed since it read it. The record is
+then written and synced under the scratch directory; that write is the
+mutation's commit point. Application creates the directories, replaces each
+file through the temp-file and rename pattern (`@/inv/atomic-writes`), removes
+the listed paths, and ends by removing the record.
 
-The record is written and synced under the scratch directory before any live
-file changes; that write is the mutation's commit point. Applying it is one
-forward pass: the directories, then each written file replaced with its new
-bytes through the temp-file and rename pattern (`@/inv/atomic-writes`), then
-the removals. The pass ends by removing the record.
-
-Before the commit point, the mutation's write set is compared against what it
-read — the live occupant of every path the record creates, writes, or removes,
-and the event log as its length plus the last bytes of its tail. A write target
-that moved since the mutation read it fails the mutation, before anything
-durable is written.
-
-Recovery is that same forward pass. A session that opens over a leftover record
-applies it, removes it, and only then serves the command. Application is
-idempotent: a directory already present is accepted, a write overwrites, and
-a removal tolerates absence, so an interrupted application converges on the
-same state however often it is replayed. A leftover record that does not
-parse, including one whose own write was interrupted, is refused: the session
-open fails with an error naming the record and does not proceed. Repository
-discovery recognizes a pending record as well as an initialized `index.json`,
-so a repository whose index a crash left unwritten still reaches the session
-open that applies its record.
+A session that opens over a leftover record applies it before serving the
+command. Application is idempotent, so an interrupted application converges on
+the same state when repeated. A leftover record that does not parse, including
+one whose own write was interrupted, is refused: the session open fails with an
+error naming the record. Repository discovery recognizes a pending record as
+well as an initialized `index.json`, so a repository whose index a crash left
+unwritten still reaches that session open.
 
 ## Issue JSON Schema
 
