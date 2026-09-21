@@ -209,9 +209,61 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "ready to dispatch"
+          "status": "done — cargo-ci and code-review both passed on the merged tree; zero worker rework rounds, one lead prose correction (V-17)",
+          "dispatch": {
+            "session": 5,
+            "tier": "opus",
+            "worktree": ".agents/worktrees/agent-8d7f4cec",
+            "anchor": "958c3b7a4",
+            "plan_linked_before_dispatch": true
+          }
         }
-      ]
+      ],
+      "pol_04_observations": {
+        "worker_worktree_final_run": {
+          "fmt": 1615,
+          "clippy": 18969,
+          "suite_build": 13337,
+          "test": 20952,
+          "doctest": 4483,
+          "suite_clock": 25452
+        },
+        "main_merged_tree_runs": [
+          {
+            "run": "cold target after merge",
+            "suite_build": 33760,
+            "test": 39897,
+            "suite_clock": 44381,
+            "verdict": "FAILED budget (30000 ms); LD-7 signature, not a verdict about the change"
+          },
+          {
+            "run": "memoized",
+            "suite_clock": null,
+            "verdict": "no execution; prior FAIL reused over unchanged declared inputs (PF-14)"
+          },
+          {
+            "run": "forced warm",
+            "clippy": 215,
+            "suite_build": 573,
+            "test": 17742,
+            "doctest": 4696,
+            "suite_clock": 22455,
+            "verdict": "PASS"
+          },
+          {
+            "run": "forced, after the manifest correction",
+            "clippy": 18369,
+            "suite_build": 14047,
+            "test": 20775,
+            "doctest": 4449,
+            "suite_clock": 25242,
+            "verdict": "PASS"
+          }
+        ],
+        "reading": "The settled figure on main is 22455 ms, matching session 4's 22332 ms baseline, so the suite did not move. The two 25 s readings both follow a rebuild: the suite runs on freshly linked executables and pays first-touch cost. No step moved more than 30 % from session 4's post-POL-03 figures once warm.",
+        "wave_wall_time": "first dispatch to issue done: about 95 minutes, of which roughly 45 were gate runs (two cargo-ci re-runs and two 7-minute code-review runs).",
+        "flag": "suite-clock exceeded the 25 s watch threshold on the two post-rebuild runs. Not a regression; recorded so a later drift has a baseline."
+      }
     },
     {
       "wave_number": 9,
@@ -820,6 +872,16 @@
       "detail": "The filesystem applier reports ELOOP for a symlink or other unsupported occupant at a target; the in-memory backend has no symlinks and reports Unaddressable. The worker neither closed nor widened it, and disclosed it rather than leaving it to be found.",
       "disposition": "OPEN and correctly placed elsewhere. It is a property of the LIVE target, not of the record, so 8559f529's construction-time validation cannot close it — its Non-goals say so explicitly. Owner is d591a1c8 (wave 5), which must state what its conformance suite covers on each backend rather than claim an identical matrix. Carry this into that dispatch.",
       "criterion_subjects": []
+    },
+    {
+      "id": "SP-08",
+      "found_during": "wave 8 review (8d7f4cec), Tier 2.5 sweep",
+      "subject": "The architecture note still presents the kernel's FailurePoint as the test seam",
+      "detail": "dev/architecture/repository-state-materialization.md:422-423 reads 'Every durability boundary and action edge is a stable FailurePoint ... and a TransactionFailureInjector lets tests interrupt or race the kernel at each one'. Still true after 8d7f4cec -- the kernel keeps both, now pub(in crate::storage) -- but no longer the seam a consumer reaches, which is MutationPoint. Not falsified, so not a wave-8 failure.",
+      "disposition": "OWNER: be13da79 (wave 19, Architecture materialization note rewrite), whose REQ-01 and REQ-03 cover this section. Verify the paragraph names the record's interruption vocabulary there.",
+      "criterion_subjects": [
+        "REQ-07"
+      ]
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
@@ -907,6 +969,20 @@
       "lead_action": "Recorded, not acted on: removing RUSTC_WRAPPER from scripts/cargo-ci.sh is a shared-infrastructure change (escalation category 8) and saves ~3 s. Raised to the user. Keeping the cache pool healthy -- and moving it off the 84 %-full SATA root onto /data (NVMe, 301 GB free) via LEAD_CACHE_POOL -- is the higher-value follow-up.",
       "corrections": "Two mechanisms were asserted before this one was measured, and both were wrong: (a) that RUSTC_WRAPPER split Cargo fingerprints between gate and interactive builds -- checked, not supported, all libc fingerprints carried an identical rustc hash; (b) that incremental compilation poisoned the sccache key -- refuted, CARGO_INCREMENTAL=0 still gave 0.00 % Rust hits.",
       "status": "recorded, not acted on; surfaced to the user"
+    },
+    {
+      "id": "PF-14",
+      "finding": "`jit gate evaluate` memoizes an automated gate's verdict over unchanged declared inputs: a re-run reports `Duration: 0ms` and `Verdict: taken from run <id> over the same declared inputs`, reusing the prior FAIL. The standing remedy for LD-7 -- 're-run once warm' -- therefore does nothing without `--force`.",
+      "suggested_remedy": "Use `jit gate evaluate <id> <gate> --force` for every warm re-run of a timing failure. Adopted by the lead for the rest of this epic.",
+      "status": "adopted by the lead",
+      "session": 5
+    },
+    {
+      "id": "PF-15",
+      "finding": "A gate run's `Tree: dirty` line can report only the tracker's own records. `jit claim acquire` appends to .jit/events.jsonl and rewrites the issue file before the checker starts, so a gate evaluated straight after a clean merge reports dirty with no source change in the tree.",
+      "suggested_remedy": "Commit tracker state after each claim/evaluate pair before reading a `Tree:` line as a statement about the source tree; `git status --porcelain` separates the two.",
+      "status": "recorded",
+      "session": 5
     }
   ],
   "evidence_requirements": [
@@ -1065,6 +1141,15 @@
       "detail": "7658bf81 deleted the session suite's occupied-root refusal coverage, deferring it to file_transaction.rs's own test module. That module retires with the kernel in b0ee2dd6 (wave 12). Its replacement owner must land in 10ba2e35 (wave 11, init publisher, F-28) FIRST. Wave order already places 11 before 12.",
       "lead_note": "Verify at 10ba2e35's review that it actually covers refusal of an occupied destination -- @/inv/atomic-writes' 'an occupied destination is never overwritten' -- rather than assuming the ordering carries the property.",
       "status": "open, owned by wave 11 review"
+    },
+    {
+      "id": "V-17",
+      "issue": "8d7f4cec",
+      "what": "The worker's `test-support` manifest prose against the visibility it describes.",
+      "detail": "Commit 8828f6814 rewrote crates/jit/Cargo.toml's test-support comment to say the feature exposes 'mutation interruption points/injectors ... as part of the crate's public API' and that it 'only widens their visibility from pub(crate) to pub', so 'cargo build and release builds drop the surface'. False for the two items named: storage/mod.rs re-exports MutationPoint and MutationInterruptionInjector with an unconditional `pub use`, so a default build keeps them. crates/server/Cargo.toml carried the same error in its parenthetical example.",
+      "resolution": "Lead corrected the prose rather than gating the exports (22dd9455f). The exports are plan-conformant: plan decision LD-11 states the record's own modules 'join the storage layer's public surface beside json, memory and repository_state_store ... which is their intended end state', and RedoPoint plus its injector trait have been unconditionally public since wave 1. Gating MutationPoint would have made a local parallel variant of that convention (@/inv/convention-convergence).",
+      "why_lead_edited": "The finding was a statement of fact about visibility the lead had already verified, with no design judgement left for a worker; a rework dispatch would have cost a fresh worktree and a cold build for a six-line comment. Both gates were re-run over the corrected tree so no jit:8d7f4cec-attributed commit goes unreviewed (PF-05).",
+      "verdict": "closed"
     }
   ],
   "standing_policies": [
@@ -1116,7 +1201,7 @@
       "note": "Observation carried alongside the waves, not a second measurement project. Known live risk: a worker's FIRST gate run in a freshly seeded worktree measured suite-clock 43.0/43.3 s and failed the budget; the same targets passed once settled (LD-7 signature, worse than the 31.8 s previously recorded)."
     }
   ],
-  "session": 4,
+  "session": 5,
   "rework_counter_resets": [
     {
       "issue": "35544121",

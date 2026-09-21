@@ -51,6 +51,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T09:11:26.943913761Z",
   "first_ready_at": "2026-09-20T22:17:47.353355240Z",
   "gates_required": [
     "cargo-ci",
@@ -64,7 +65,7 @@
     },
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-09-21T09:00:32.299002858Z",
+      "updated_at": "2026-09-21T09:11:09.846175562Z",
       "updated_by": "auto:executor"
     }
   },
@@ -81,7 +82,7 @@
     "enforces:@/invariant/orthogonal-tests"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-09-21T09:03:36.232089704Z"
+  "updated_at": "2026-09-21T09:11:26.943913761Z"
 }

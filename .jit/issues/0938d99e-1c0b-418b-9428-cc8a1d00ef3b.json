@@ -7,6 +7,7 @@
   ],
   "description": "Opening a mutation session applies a leftover redo record idempotently on both backends and reports how many records it applied.\n\n## Background\n\nSession open runs crash recovery today: it lists pending transactions in two control locations, validates each journal, and either rolls a prepared transaction back or completes a committed one forward. Under the redo record that becomes one step: read a leftover record from the data root's scratch directory and apply it, which is idempotent, then remove it.\n\nThis lands while the kernel still commits. With no writer of records yet, the new path is a no-op on a live repository and is exercised by seeding a record directly, which is what makes it safe to separate from the commit swap.\n\nThe dispatch's reported count feeds the recover command's output and the server's startup report, so its meaning changes from recovered transactions to applied records.\n\n## Success Criteria\n\n- [hard] REQ-01: Opening a session on either backend applies a leftover redo record before any capture, and removes it.\n- [hard] REQ-02: Opening a session twice over the same seeded record leaves the repository in the same semantic state as opening it once.\n- [hard] REQ-03: The dispatch report counts applied redo records, and its count reaches the recover command and the server's startup report.\n- [hard] REQ-04: A session opened on a repository with no leftover record performs no extra read beyond checking the scratch directory.\n- [hard] REQ-05: A malformed leftover record yields a typed recovery failure naming the record, leaving the repository unchanged.\n- [hard] REQ-06: Journal recovery still runs at session open while the kernel commits, so a repository left by the kernel converges as it does today.\n\n## Notes\n\nExpected additive footprint is under 200 production lines.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T09:11:27.205018135Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -24,7 +25,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T09:11:27.205018135Z"
 }
