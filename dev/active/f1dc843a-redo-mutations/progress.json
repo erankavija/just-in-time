@@ -1796,7 +1796,8 @@
       "disposition": "OWNER: 4319256e (wave 10, Session commit through the redo record), whose REQ-04 requires a repository left by an interruption to converge. The injector must be plumbed to both backends there.",
       "criterion_subjects": [
         "REQ-03"
-      ]
+      ],
+      "closure": "VERIFIED CLOSED at HEAD in session 6: apply_leftover_record (repository_state_store.rs:238) and apply_memory_leftover_record (:285) both build their applier from SessionRedoInterruptions::new(interruptions); NoRedoInterruptions survives only inside test modules. Delivered by 4319256e (wave 10). Session 6 closed wave 10 without checking this entry because it had not read the session-5 pitfall contents; the check was made here, before the fbd6c859 checkpoint."
     },
     {
       "id": "SP-10",
@@ -1807,7 +1808,8 @@
       "criterion_subjects": [
         "REQ-03",
         "REQ-05"
-      ]
+      ],
+      "closure": "VERIFIED CLOSED at HEAD: discovery.rs keys on RECORD_SCRATCH_DIR/RECORD_FILE_NAME (b0ee2dd6 REQ-05)."
     },
     {
       "id": "SP-17",
@@ -1892,5 +1894,9 @@
       "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do.",
       "renumbered_from": "SP-16 (collided with an earlier session's SP-16)"
     }
-  ]
+  ],
+  "checkpoint_reconciliation_fbd6c859": {
+    "performed": "session 6, before fbd6c859's gates, per lead-review-protocol 'Before a container's final gate'",
+    "result": "No pitfall is an open violation of an fbd6c859 criterion. SP-09 and SP-10 (session 5) verified closed in the code. SP-19 closed by b7c99dcb. SP-25 is owned by 42478e5d, a child of this story, and must be closed before the checkpoint runs. SP-08, SP-17 and SP-21 concern the charter and contributor docs owned by later-story tasks (816df12a, be13da79), outside REQ-05's adopter surface. SP-18, SP-20, SP-22, SP-23 and SP-24 name no criterion and surface in the completion report."
+  }
 }
