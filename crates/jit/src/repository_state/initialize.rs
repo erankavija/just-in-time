@@ -914,7 +914,7 @@ fn push_gitattributes_action(
 /// missing the block gets it appended (with the required separator). A non-UTF-8
 /// file, a jit block present for a DIFFERENT data root (competing claim), or a
 /// symlink/directory/unsupported occupant is a typed error aborting init before
-/// any journaling.
+/// anything is published.
 fn resolve_gitattributes(
     entry: &RepositoryEntry,
     line: &str,

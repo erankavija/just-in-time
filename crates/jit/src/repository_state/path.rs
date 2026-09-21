@@ -313,7 +313,7 @@ impl VirtualPath {
     /// Construct a virtual identity from an explicit selected-root class.
     ///
     /// Every fallible constructor funnels through the same canonicality and
-    /// reserved-namespace guard, so live mutation planning, storage journal
+    /// reserved-namespace guard, so live mutation planning, redo-record
     /// decoding, and layout classification all re-apply it instead of accepting a
     /// string path and inferring its root.
     pub(crate) fn from_root(

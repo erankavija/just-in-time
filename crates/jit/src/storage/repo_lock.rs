@@ -42,7 +42,7 @@ use std::time::Duration;
 /// lock and never nest, so a retained holder cannot reenter through a second
 /// instance. Sharing one reentrant instance per path lets independent storage
 /// backends that name the same lock file — for example sessions with different
-/// data roots under one worktree, all guarding that worktree's `.jit-bootstrap`
+/// data roots under one worktree, all guarding that worktree's bootstrap
 /// namespace — reenter and serialize in-process rather than deadlock.
 fn shared_lock_registry() -> &'static Mutex<HashMap<PathBuf, Weak<RepoWriteLock>>> {
     static REGISTRY: OnceLock<Mutex<HashMap<PathBuf, Weak<RepoWriteLock>>>> = OnceLock::new();
