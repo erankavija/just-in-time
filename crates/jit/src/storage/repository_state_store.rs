@@ -1,7 +1,8 @@
 //! Recovered layout-aware repository capture and mutation sessions.
 //!
-//! Session orchestration lives here; durable publication and recovery belong to
-//! the capability-confined [`FileTransactionKernel`].
+//! Session orchestration lives here. Durable publication belongs to the
+//! capability-confined [`FileTransactionKernel`]; an opening session recovers
+//! its journals and then applies the redo record a crash left.
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
