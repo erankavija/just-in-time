@@ -365,7 +365,14 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending — next"
+          "status": "in_progress — dispatched, round 1",
+          "dispatch": {
+            "session": 6,
+            "tier": "opus",
+            "worktree": ".agents/worktrees/agent-10ba2e35",
+            "anchor": "68045a4d5",
+            "plan_linked_before_dispatch": true
+          }
         }
       ]
     },
