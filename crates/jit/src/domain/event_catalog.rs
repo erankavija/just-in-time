@@ -259,9 +259,9 @@ impl EventTag {
                  lifecycle timestamps; the record carries the number of issues it updated."
             }
             EventTag::ProfileLifecycle => {
-                "A profile lifecycle operation reached one durable transaction commit point; \
-                 the record summarizes per-profile actions and variable source kinds without \
-                 resolved values or rendered content."
+                "A profile lifecycle operation reached its commit point, the redo record \
+                 carrying its writes; the event summarizes per-profile actions and variable \
+                 source kinds without resolved values or rendered content."
             }
             EventTag::LinkedCheckoutWriteOverridden => {
                 "An explicit per-invocation override permitted a state-mutating command inside a \
