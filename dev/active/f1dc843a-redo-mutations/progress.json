@@ -1142,6 +1142,15 @@
       "criterion_subjects": "none directly; the plan's lock-and-record-scope contract (LD-1) states the lock's scope.",
       "verdict": "Lock kept and its prose corrected by the worker; test_session_disjoint_sessions_serialize_on_worktree_bootstrap still owns the property. Recorded in case LD-1's scope statement wants restating when a documentation task reaches it.",
       "owner": "surfaces in the completion report"
+    },
+    {
+      "id": "SP-12",
+      "wave": 12,
+      "subject": "dev/architecture/repository-state-materialization.md still names file_transaction and the transaction kernel (3 matches at wave 12's close), and its closing reading order sends a contributor to files that no longer exist.",
+      "criterion_subjects": "epic REQ-07",
+      "owner": "be13da79 (wave 19, Architecture materialization note rewrite) — verified to own it: its REQ-01 covers the layer map and diagrams, and its REQ-04 is exactly this ('The closing reading order points at files that exist after the change'). Closed by assignment, not deferred.",
+      "raised_by": "worker-b0ee2dd6, flagged rather than edited because the plan assigns the note to its own task.",
+      "verify_at": "wave 19, and again at the epic completion reconciliation."
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
