@@ -90,9 +90,13 @@ pub(crate) enum RepositoryFinalIdentity {
 /// report a journal/delta alignment mismatch without conflating the enums.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ActionTag {
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     CreateDirectory,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     WriteFile,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     SetMode,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     DeleteFile,
 }
 
@@ -132,6 +136,7 @@ pub(crate) enum RepositoryJournalActionKind {
 
 impl RepositoryJournalActionKind {
     /// The four-value action tag of this durable journal action kind.
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     pub(crate) fn tag(&self) -> ActionTag {
         match self {
             Self::CreateDirectory { .. } => ActionTag::CreateDirectory,

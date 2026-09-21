@@ -4,6 +4,7 @@ use super::transaction_journal::ActionTag;
 
 /// Observable recovery state returned after prepare/commit/rollback.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 pub(crate) enum RecoveryState {
     /// A prepared journal remains and must be rolled back before another write.
     Prepared,
@@ -37,34 +38,84 @@ pub(crate) enum RecoveryState {
 pub enum FailurePoint {
     RepositoryRecoveryExternal,
     RepositoryRecoveryInternal,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryBeforeControlCreation,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryCreateControl,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryBeforeInitialJournal,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryBeforeDataStageJournal,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryBeforePreparedJournal,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositorySyncInitialJournal,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryCreateCompanion,
     RepositorySweepCompanions,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryPrepareIntent,
-    RepositoryPrepareAction { action: usize },
-    RepositoryStageAction { action: usize },
-    RepositorySyncStage { action: usize },
-    RepositorySyncBackup { action: usize },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryPrepareAction {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryStageAction {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositorySyncStage {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositorySyncBackup {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositorySyncPreparedJournal,
-    RepositoryBeforeAction { action: usize },
-    RepositoryBeforeTargetMutation { action: usize },
-    RepositoryAfterRootBindingCheck { action: usize },
-    RepositoryBeforeDeleteRename { action: usize },
-    RepositoryAfterTargetMutation { action: usize },
-    RepositoryVerifyFinalIdentity { action: usize },
-    RepositoryAfterAction { action: usize },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryBeforeAction {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryBeforeTargetMutation {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryAfterRootBindingCheck {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryBeforeDeleteRename {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryAfterTargetMutation {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryVerifyFinalIdentity {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
+    RepositoryAfterAction {
+        action: usize,
+    },
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryBeforeDataRootPublication,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryAfterDataParentBindingCheck,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryAfterDataRootPublication,
     RepositoryBeforeCommitDecision,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     RepositoryAfterCommit,
-    RepositoryBeforeReverseAction { action: usize },
-    RepositoryAfterReverseAction { action: usize },
+    RepositoryBeforeReverseAction {
+        action: usize,
+    },
+    RepositoryAfterReverseAction {
+        action: usize,
+    },
     RepositoryBeforeRollbackDecision,
     RepositoryBeforeStageCleanup,
     RepositoryBeforeCompanionCleanup,
@@ -91,6 +142,7 @@ impl TransactionFailureInjector for NoTransactionFailures {
 /// Failure that means a durable journal must be recovered before further writes.
 #[derive(Debug, thiserror::Error)]
 #[error("transaction {transaction_id} requires recovery from {state:?}: {source}")]
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 pub(crate) struct RecoveryRequiredError {
     /// Transaction whose journal remains authoritative.
     pub transaction_id: String,
@@ -136,6 +188,7 @@ pub(crate) enum FileTransactionError {
     /// `unreachable!` so any drift aborts with no partial write instead of a
     /// panic.
     #[error("journal action {index} kind mismatch: expected {expected}, found {found}")]
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     JournalActionMismatch {
         index: usize,
         expected: ActionTag,

@@ -215,6 +215,7 @@ impl FileTransactionKernel {
             .map(|_| RepositoryRecoveryDisposition::Recovered)
     }
 
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     pub(crate) fn execute_repository_delta(
         &self,
         _guard: &RepoWriteGuard,
@@ -268,12 +269,14 @@ struct ControlDirs {
 /// through [`remove_companion_control`] at cleanup so no parent handle is needed.
 struct CompanionDirs {
     transaction_identity: EntryIdentity,
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     stages: Dir,
     backups: Dir,
 }
 
 /// Staging authority for `root`'s actions: the companion (worktree filesystem)
 /// for Worktree actions when one exists, otherwise the primary control.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn stage_authority(control: &ControlDirs, root: RepositoryRootClass) -> &Dir {
     match (root, &control.companion) {
         (RepositoryRootClass::Worktree, Some(companion)) => &companion.stages,
@@ -468,6 +471,7 @@ fn cleanup_empty_repository_control(
     }
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn create_repository_control(
     roots: &RepositoryKernelRoots,
     id: &str,
@@ -509,6 +513,7 @@ fn create_repository_control(
 /// marker, stages, and backups. The marker records the owning data root's stable
 /// owner digest, so the external-recovery scan skips it and the orphan sweep only
 /// reclaims companions belonging to the running session's own data root.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn create_companion_control(worktree: &Dir, id: &str, owner: &str) -> Result<CompanionDirs> {
     let bootstrap = open_or_create_protocol_dir(worktree, BOOTSTRAP_DIR)?;
     ensure_protocol_marker(&bootstrap)?;
@@ -708,6 +713,7 @@ fn open_repository_transaction_dir(
     Ok(Some((base, transactions, transaction)))
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn delta_has_data_action(delta: &RepositoryDelta) -> bool {
     delta
         .actions()
@@ -715,6 +721,7 @@ fn delta_has_data_action(delta: &RepositoryDelta) -> bool {
         .any(|action| action.path().root_class() == RepositoryRootClass::Data)
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn initial_repository_journal(
     roots: &RepositoryKernelRoots,
     id: &str,
@@ -820,6 +827,7 @@ fn initial_repository_journal(
 /// hundreds of distinct directories, and retaining one file descriptor per
 /// directory until the barrier would exhaust the process descriptor table.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 enum BarrierDirectory {
     /// Staging authority colocated with the named root class.
     Stages(RepositoryRootClass),
@@ -844,14 +852,17 @@ enum BarrierDirectory {
 /// weakening — every recorded directory is durable before the phase's record is
 /// published (`@/inv/atomic-writes`).
 #[derive(Debug, Default)]
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 struct DirectoryBarrier(BTreeSet<BarrierDirectory>);
 
 impl DirectoryBarrier {
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     fn record(&mut self, directory: BarrierDirectory) {
         self.0.insert(directory);
     }
 
     /// Record the live directory holding `path`'s parent.
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     fn record_live_parent(&mut self, path: &VirtualPath) {
         self.record(BarrierDirectory::LiveDirectory {
             root: path.root_class(),
@@ -861,6 +872,7 @@ impl DirectoryBarrier {
 
     /// Synchronize every recorded directory exactly once. `data_stage` is the
     /// open absent-root stage when the phase staged into one.
+    #[allow(dead_code, reason = "removed when the transaction kernel retires")]
     fn sync(
         &self,
         roots: &RepositoryKernelRoots,
@@ -886,6 +898,7 @@ impl DirectoryBarrier {
 
 /// The directory component of a canonical path, relative to its own root. Empty
 /// when the path names an entry directly under that root.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn parent_relative(path: &VirtualPath) -> String {
     path.relative()
         .as_path()
@@ -898,6 +911,7 @@ fn parent_relative(path: &VirtualPath) -> String {
 /// a phase barrier holds no capability between recording a directory and
 /// synchronizing it. An empty path names `root` itself; a symlinked component is
 /// rejected exactly as it is on the mutation path.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn open_relative_dir(root: &Dir, relative: &str) -> Result<Dir> {
     Path::new(relative)
         .components()
@@ -918,6 +932,7 @@ fn write_repository_journal(
     Ok(())
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn execute_repository_delta(
     roots: &RepositoryKernelRoots,
     id: &str,
@@ -1027,6 +1042,7 @@ fn execute_repository_delta(
 /// exactly what identity-driven rollback converges from. A crash anywhere in this
 /// phase therefore recovers from either the initial record (nothing live was
 /// touched, so every action's preimage still holds) or the prepared one.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn prepare_repository_actions(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
@@ -1191,6 +1207,7 @@ fn prepare_repository_actions(
 /// extraction fails with a typed [`FileTransactionError::JournalActionMismatch`]
 /// instead of panicking mid-construction. The mismatch propagates into the
 /// created-control teardown, so no partial write is left behind.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn set_mode_final_file_identity(
     expected: &ExpectedPreimage,
     index: usize,
@@ -1211,6 +1228,7 @@ fn set_mode_final_file_identity(
 /// occupant is a `WriteFile` (create) target, and a foreign occupant would have
 /// to be removed. Defensive only — `validate_action` guarantees a `SetMode`
 /// preimage is `File`, so this classifies only drifted journal/delta input.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn action_tag_of_preimage(preimage: &ExpectedPreimage) -> ActionTag {
     match preimage {
         ExpectedPreimage::File { .. } => ActionTag::SetMode,
@@ -1226,6 +1244,7 @@ fn action_tag_of_preimage(preimage: &ExpectedPreimage) -> ActionTag {
 /// Total: a journal action whose kind does not match the semantic action at
 /// `index` aborts with [`FileTransactionError::JournalActionMismatch`] instead
 /// of panicking.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn create_directory_stage_name(
     kind: &RepositoryJournalActionKind,
     index: usize,
@@ -1242,6 +1261,7 @@ fn create_directory_stage_name(
 
 /// Extract the stage and backup control-names a `WriteFile` journal action pins.
 /// Total: see [`create_directory_stage_name`].
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn write_file_control_names(
     kind: &RepositoryJournalActionKind,
     index: usize,
@@ -1260,6 +1280,7 @@ fn write_file_control_names(
 
 /// Extract the stage and backup control-names a `SetMode` journal action pins.
 /// Total: see [`create_directory_stage_name`].
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn set_mode_control_names(
     kind: &RepositoryJournalActionKind,
     index: usize,
@@ -1278,6 +1299,7 @@ fn set_mode_control_names(
 
 /// Extract the backup control-name a `DeleteFile` journal action pins. Total:
 /// see [`create_directory_stage_name`].
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn delete_file_backup_name(
     kind: &RepositoryJournalActionKind,
     index: usize,
@@ -1299,6 +1321,7 @@ fn delete_file_backup_name(
 /// afterward. The copy's own contents are synchronized here; its arrival in the
 /// backup directory is made durable by the caller's preparation barrier, before
 /// the prepared record is published.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn prepare_repository_backup(
     parent: &Dir,
     leaf: &str,
@@ -1342,6 +1365,7 @@ fn prepare_repository_backup(
     Ok(())
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn prepare_staged_data_action(
     stage: &Dir,
     action: &RepositoryAction,
@@ -1393,6 +1417,7 @@ fn prepare_staged_data_action(
 /// endpoints of every action, so a crash mid-publication rolls back from it by
 /// identity. `Committed` makes the final targets authoritative, which is why the
 /// live-parent barrier is crossed before the caller reaches that decision.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn publish_repository_actions(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
@@ -1503,6 +1528,7 @@ fn publish_repository_actions(
     Ok(())
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn publish_repository_action(
     roots: &RepositoryKernelRoots,
     control: &ControlDirs,
@@ -1586,6 +1612,7 @@ fn publish_repository_action(
     ensure_repository_mutation_root_is_live(roots, path.root_class())
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn move_repository_file_aside_if_identity(
     parent: &Dir,
     leaf: &str,
@@ -1613,6 +1640,7 @@ fn move_repository_file_aside_if_identity(
 
 /// Atomically rename `leaf` into transaction control and verify that the removed
 /// name still has the expected identity. A raced-in occupant is renamed back.
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn remove_repository_file_if_identity(
     parent: &Dir,
     leaf: &str,
@@ -2595,6 +2623,7 @@ fn repository_file_content_matches_expected(
     }
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn ensure_repository_expected(
     path: &VirtualPath,
     expected: &ExpectedPreimage,
@@ -2677,6 +2706,7 @@ fn map_noreplace_error(error: std::io::Error) -> anyhow::Error {
     }
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn create_transaction_dirs(base: Dir, transactions: Dir, id: &str) -> Result<ControlDirs> {
     transactions.create_dir(id).map_err(|error| {
         if error.kind() == ErrorKind::AlreadyExists {
@@ -2816,6 +2846,7 @@ fn sync_capable_directory(directory: &Dir) -> std::io::Result<Dir> {
     Ok(Dir::from_std_file(file.into_std()))
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn open_or_create_dir(parent: &Dir, name: &str) -> Result<Dir> {
     match parent.symlink_metadata(name) {
         Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
@@ -2834,6 +2865,7 @@ fn open_or_create_dir(parent: &Dir, name: &str) -> Result<Dir> {
     open_existing_dir(parent, name)
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn open_or_create_protocol_dir(parent: &Dir, name: &str) -> Result<Dir> {
     match parent.symlink_metadata(name) {
         Ok(metadata) if metadata.is_symlink() || !metadata.is_dir() => {
@@ -2849,6 +2881,7 @@ fn open_or_create_protocol_dir(parent: &Dir, name: &str) -> Result<Dir> {
     open_existing_dir(parent, name)
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn ensure_protocol_marker(directory: &Dir) -> Result<()> {
     match directory.read_to_string(PROTOCOL_MARKER) {
         Ok(contents) if contents == "1\n" => validate_protocol_contents(directory),
@@ -2902,6 +2935,7 @@ fn metadata_optional(directory: &Dir, path: &str) -> Result<Option<cap_std::fs::
     }
 }
 
+#[allow(dead_code, reason = "removed when the transaction kernel retires")]
 fn set_mode(parent: &Dir, leaf: &str, mode: Option<u32>) -> Result<()> {
     #[cfg(unix)]
     if let Some(mode) = mode {

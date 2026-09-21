@@ -367,22 +367,6 @@ impl crate::storage::TransactionFailureInjector for SelectedFailures {
     }
 }
 
-struct HookAt {
-    point: TransactionFailurePoint,
-    hook: Mutex<Option<Box<dyn FnOnce() + Send>>>,
-}
-
-impl crate::storage::TransactionFailureInjector for HookAt {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &self.point {
-            if let Some(hook) = self.hook.lock().unwrap().take() {
-                hook();
-            }
-        }
-        Ok(())
-    }
-}
-
 #[test]
 fn test_json_and_memory_share_absent_root_actions_and_hash() {
     let temp = TempDir::new().unwrap();
@@ -3022,7 +3006,7 @@ fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() 
     )
     .unwrap();
 
-    let record = redo_record_for(&image, &delta).unwrap();
+    let record = redo_record_for(&image, delta.actions().iter()).unwrap();
 
     assert_eq!(
         record.make_directories(),
@@ -3676,24 +3660,16 @@ fn test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates
 /// Leave one journal a later open would recover: a mutation interrupted past
 /// its commit point, which the next session completes forward.
 ///
-/// Published over a second, absent data root in the same worktree, because that
-/// is the delta the transaction kernel still carries; the journal it leaves is
-/// the worktree-level external one every session over this worktree recovers.
+/// Written through the transaction kernel directly, over a second, absent data
+/// root in the same worktree: no publisher reaches the kernel any more, and a
+/// journal is what this fixture is for. It retires with the kernel
+/// (jit:b0ee2dd6). The journal it leaves is the worktree-level external one
+/// every session over this worktree recovers.
 fn leave_recoverable_journal(backend: &FileSessionBackend) {
     let data = backend.worktree.path().join(".jit-sibling");
-    let storage = JsonFileStorage::with_repository_state_failures(
-        &data,
-        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit),
-    );
+    let storage = JsonFileStorage::new(&data);
     let layout = discover_repository_layout(backend.worktree.path(), &data).unwrap();
     let path = data_path("interrupted.txt");
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session
-        .capture(
-            CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
-                .unwrap(),
-        )
-        .unwrap();
     let delta = RepositoryDelta::new(
         &layout,
         vec![RepositoryAction::write_file(
@@ -3705,7 +3681,21 @@ fn leave_recoverable_journal(backend: &FileSessionBackend) {
         )],
     )
     .unwrap();
-    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+    let (roots, data_parent, data_leaf) = CapabilityRoots::open(&layout).unwrap();
+    let kernel = FileTransactionKernel::for_repository_layout(
+        layout,
+        roots.worktree.try_clone().unwrap(),
+        None,
+        data_parent,
+        data_leaf,
+        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit),
+    )
+    .unwrap();
+    let guard = storage.acquire_bootstrap_write_lock().unwrap();
+
+    assert!(kernel
+        .execute_repository_delta(&guard, "interrupted", &delta, "plan")
+        .is_err());
 }
 
 /// REQ-04. Every scratch entry but the record is sealed against opening, so a
@@ -3885,8 +3875,14 @@ fn test_interrupted_absent_root_publication_leaves_no_root_and_the_next_reclaims
         .is_err());
     drop(session);
 
-    assert!(!data.exists(), "an interruption before the rename publishes nothing");
-    assert!(stage.exists(), "the interrupted publication's stage outlives it");
+    assert!(
+        !data.exists(),
+        "an interruption before the rename publishes nothing"
+    );
+    assert!(
+        stage.exists(),
+        "the interrupted publication's stage outlives it"
+    );
 
     let next = JsonFileStorage::new(&data);
     let mut session = next.open_mutation_session(layout.clone()).unwrap();
@@ -3896,7 +3892,10 @@ fn test_interrupted_absent_root_publication_leaves_no_root_and_the_next_reclaims
         .unwrap();
 
     assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
-    assert!(!stage.exists(), "the next publication reclaims the orphan stage");
+    assert!(
+        !stage.exists(),
+        "the next publication reclaims the orphan stage"
+    );
 }
 
 /// REQ-04: the worktree targets travel in a redo record the stage carries into
@@ -3922,7 +3921,9 @@ fn test_absent_root_publication_carries_its_worktree_targets_in_the_redo_record(
     assert_eq!(std::fs::read(data.join("index.json")).unwrap(), b"{}");
     assert!(!note.exists(), "no worktree target precedes its record");
     assert!(
-        data.join(RECORD_SCRATCH_DIR).join(RECORD_FILE_NAME).exists(),
+        data.join(RECORD_SCRATCH_DIR)
+            .join(RECORD_FILE_NAME)
+            .exists(),
         "the published root must carry the record its worktree targets wait in"
     );
 
