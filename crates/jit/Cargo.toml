@@ -79,9 +79,9 @@ html = ["dep:tl"]
 # XML content parser (document/parser/xml.rs). Pulls the `quick-xml` reader.
 # OFF by default.
 xml = ["dep:quick-xml"]
-# Exposes the test-only failure-injection and fixture surface (transaction
-# failure points/injectors, `InMemoryStorage::seed_issue_fixture`,
-# `commands::test_helpers`, `JsonFileStorage::with_repository_state_failures`)
+# Exposes the test-only interruption-injection and fixture surface (mutation
+# interruption points/injectors, `InMemoryStorage::seed_issue_fixture`,
+# `commands::test_helpers`, `JsonFileStorage::with_mutation_interruptions`)
 # as part of the crate's public API. The definitions compile unconditionally
 # either way — this feature only widens their visibility from `pub(crate)` to
 # `pub` — so `cargo build` and release builds drop the surface while the self
