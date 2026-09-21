@@ -3646,6 +3646,73 @@ fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     );
 }
 
+/// REQ-05 where the reviewer found it open: a repository holding both a
+/// recoverable journal and a malformed record. External recovery, internal
+/// recovery and the companion sweep all mutate, and all run before the record
+/// is applied, so the record has to be read before the first of them.
+#[test]
+fn test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates() {
+    let backend = FileSessionBackend::seeded();
+    leave_recoverable_journal(&backend);
+    let scratch = backend.scratch_path();
+    std::fs::create_dir_all(&scratch).unwrap();
+    std::fs::write(scratch.join(RECORD_FILE_NAME), b"not a redo record").unwrap();
+    let before = snapshot(backend.worktree.path());
+    assert!(
+        before
+            .keys()
+            .any(|path| path.starts_with(Path::new(".jit/tmp/transactions"))),
+        "the fixture must leave a journal for recovery to act on, got {:?}",
+        before.keys().collect::<Vec<_>>()
+    );
+
+    let error = match backend.open() {
+        Err(error) => error,
+        Ok(_) => panic!("a malformed leftover record must refuse the session open"),
+    };
+
+    assert!(
+        matches!(
+            &error,
+            RepositoryStateStoreError::UnreadableRedoRecord { .. }
+        ),
+        "the refusal must be the record's, not recovery's, got {error:?}"
+    );
+    assert_eq!(
+        snapshot(backend.worktree.path()),
+        before,
+        "the journal must be left unrecovered and every other byte untouched"
+    );
+}
+
+/// Leave one journal a later open would recover: a mutation interrupted past
+/// its commit point, which the next session completes forward.
+fn leave_recoverable_journal(backend: &FileSessionBackend) {
+    let data = redo_root(&backend.worktree);
+    let storage = JsonFileStorage::with_repository_state_failures(
+        &data,
+        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit),
+    );
+    let layout = discover_repository_layout(backend.worktree.path(), &data).unwrap();
+    let path = data_path("interrupted.txt");
+    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
+    let image = session
+        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .unwrap();
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            path,
+            "interrupted",
+            ExpectedPreimage::Absent,
+            b"interrupted".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+    assert!(session.apply(&test_plan(&image, &delta)).is_err());
+}
+
 /// REQ-04. Every scratch entry but the record is sealed against opening, so a
 /// pass that read one fails here; the listing is compared across the open, so
 /// one that wrote there shows up too. A permission trap on the directory
