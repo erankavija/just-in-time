@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-09-21T10:22:35.138107309Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
@@ -7,7 +8,49 @@
     "0938d99e-1c0b-418b-9428-cc8a1d00ef3b"
   ],
   "description": "A mutation's apply commits through one redo record in place of the journaled kernel, with the whole-read-set re-capture gone.\n\n## Background\n\nEvery repository publisher in the workspace converges on one seam: the mutation session's apply. Issue commands, dependency edits, template application, validation repair, profile lifecycle, configuration edits, archive execution, gate runs, project rendering, and document commands all reach the kernel through it. That makes the seam the place to change the commit mechanism with no publisher touched.\n\nApply's shape becomes: derive the record from the delta the plan carries, compare the live bytes of the files it writes and the event log's length and tail, write the record durably, apply it, and remove it. The re-capture of the whole read set and its whole-image comparison, which ran immediately before journal preparation on both backends, is gone.\n\nMachine-local control files stay outside the record and outside the lock: worktree identity, the server pid file, the server log, and claims under the version-control directory.\n\n## Success Criteria\n\n- [hard] REQ-01: The mutation session's apply builds a redo record from the plan's delta, writes it durably, applies it, and removes it, on the filesystem backend and the in-memory backend.\n- [hard] REQ-02: Publishers reach publication through the same session trait they used before, with their call sites unchanged.\n- [hard] REQ-03: Apply's only pre-commit check is over the files it writes and the event log's length and tail; the read-set re-capture and whole-image comparison are gone from both backends.\n- [hard] REQ-04: A repository left by an interruption converges on the complete old state, or on the complete new state once the next session opens.\n- [hard] REQ-05: Worktree identity, the server pid file, the server log, and claim state are carried outside the record and outside the repository write lock.\n- [hard] REQ-06: The session trait's shape is unchanged, so both out-of-crate re-implementations of it compile unmodified.\n- [hard] REQ-07: A delta that creates an absent data root still reaches the transaction kernel, so the kernel keeps a caller and the workspace builds with no warnings.\n- [hard] REQ-08: The interruption point that named the read-set revalidation leaves the failure-point enum with the revalidation itself, so no point survives that nothing constructs.\n- [hard] REQ-09: The suite passes with no test held out of the default run.\n\n## Notes\n\nExpected additive footprint is under 300 production lines, against the in-memory kernel modelling of roughly 340 lines it replaces. The transaction kernel's one remaining caller after this change is the creation of an absent data root, which apply already distinguishes by the delta's root class. Keeping that branch is what leaves the kernel referenced until initialization takes over.\n\nThe read-set revalidation is the only interruption point in the failure-point enum with no site inside the kernel. Its two constructors are the revalidation blocks this task removes, and the test-side constructors are gone by the time it runs, so the variant would be left never constructed in a crate-private enum. It leaves with the code it named.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T10:19:41.310470813Z",
   "gates_required": [
     "cargo-ci",
@@ -29,7 +72,7 @@
     "enforces:@/invariant/derived-state-coherence"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Session commit through the redo record",
-  "updated_at": "2026-09-21T10:19:41.310470813Z"
+  "updated_at": "2026-09-21T10:22:35.138107309Z"
 }
