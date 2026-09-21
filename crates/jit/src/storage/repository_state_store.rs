@@ -380,7 +380,7 @@ struct JsonMutationSession {
     data_parent: Dir,
     data_leaf: String,
     /// Worktree-root bootstrap lock, held outermost so the worktree-side
-    /// `.jit-bootstrap` namespace is serialized across disjoint-data-root sessions.
+    /// bootstrap namespace is serialized across disjoint-data-root sessions.
     _worktree_bootstrap_guard: RepoWriteGuard,
     _bootstrap_guard: RepoWriteGuard,
     _repository_guard: Option<RepoWriteGuard>,

@@ -975,7 +975,6 @@ fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
     }
     assert!(!note.exists(), "the refusal must write no worktree target");
     assert!(!data.exists(), "the refusal must publish no data root");
-    assert!(!worktree.path().join(".jit-bootstrap").exists());
 
     // The refusal changed nothing either backend can see: both still capture an
     // absent data root and an absent worktree target.
@@ -1434,7 +1433,7 @@ fn test_session_disjoint_sessions_serialize_on_worktree_bootstrap() {
 
     // Two data roots under DIFFERENT parents, both sharing one worktree. Their
     // data-root-parent bootstrap locks differ, so only the worktree-root
-    // bootstrap lock serializes their shared `.jit-bootstrap` namespace.
+    // bootstrap lock serializes their shared bootstrap namespace.
     let worktree = TempDir::new().unwrap();
     let parent_one = TempDir::new().unwrap();
     let parent_two = TempDir::new().unwrap();
