@@ -6,7 +6,7 @@ use super::{atomic_write::rename_noreplace_cap, InMemoryStorage, IssueStore};
 use crate::domain::Issue;
 use crate::repository_state::{
     serialize_issue, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry, RepositoryIndex,
-    VirtualPath,
+    VirtualPath, RECORD_SCRATCH_DIR,
 };
 use anyhow::{bail, Context, Result};
 use std::collections::BTreeMap;
@@ -112,6 +112,12 @@ impl InMemoryStorage {
                 let relative = path.strip_prefix(repository_root).with_context(|| {
                     format!("fixture path {} escaped its repository", path.display())
                 })?;
+                // Machine-local transaction control, which no repository path
+                // addresses: a published root carries it from the publication
+                // that created it.
+                if relative == Path::new(".jit").join(RECORD_SCRATCH_DIR) {
+                    return Ok(());
+                }
                 let virtual_path = if relative == Path::new(".jit") {
                     VirtualPath::data("")?
                 } else if let Ok(data_relative) = relative.strip_prefix(".jit") {

@@ -1,9 +1,9 @@
 //! Recovered layout-aware repository capture and mutation sessions.
 //!
 //! Session orchestration lives here; an apply publishes through one redo record
-//! and an opening session applies the record a crash left. A delta over an
-//! absent data root is the exception, published by the capability-confined
-//! [`FileTransactionKernel`] until initialization takes it over (jit:b0ee2dd6).
+//! and an opening session applies the record a crash left. A delta creating an
+//! absent data root is the exception, published by [`init_publish`] because the
+//! record's home is inside the root that does not exist yet.
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
@@ -14,6 +14,7 @@ use crate::repository_state::{
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::file_transaction::RepositoryRecoveryDisposition;
+use crate::storage::init_publish;
 use crate::storage::memory::MemoryRepositoryState;
 use crate::storage::{
     FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage,
@@ -375,7 +376,10 @@ struct JsonMutationSession {
     storage: JsonFileStorage,
     recovery_report: RecoveryDispatchReport,
     roots: CapabilityRoots,
-    kernel: FileTransactionKernel,
+    /// The data root's parent, with the leaf it is to be published at: the
+    /// publisher of an absent root stages beside that leaf and renames onto it.
+    data_parent: Dir,
+    data_leaf: String,
     /// Worktree-root bootstrap lock, held outermost so the worktree-side
     /// `.jit-bootstrap` namespace is serialized across disjoint-data-root sessions.
     _worktree_bootstrap_guard: RepoWriteGuard,
@@ -491,8 +495,8 @@ impl RepositoryStateStore for JsonFileStorage {
             layout.clone(),
             roots.worktree.try_clone()?,
             roots.data.as_ref().map(Dir::try_clone).transpose()?,
-            data_parent,
-            data_leaf,
+            data_parent.try_clone()?,
+            data_leaf.clone(),
             Arc::clone(&injector),
         )?;
 
@@ -526,6 +530,8 @@ impl RepositoryStateStore for JsonFileStorage {
                 (None, Vec::new(), external_transactions, 0)
             };
         let events_lock = roots.data.as_ref().map(|_| self.events_lock_spec());
+        // Recovery is the whole of the kernel's remaining work, and it is done.
+        drop(kernel);
 
         self.configure_repository_layout(&layout);
         Ok(Box::new(JsonMutationSession {
@@ -537,7 +543,8 @@ impl RepositoryStateStore for JsonFileStorage {
                 applied_records,
             },
             roots,
-            kernel,
+            data_parent,
+            data_leaf,
             _worktree_bootstrap_guard: worktree_bootstrap_guard,
             _bootstrap_guard: bootstrap_guard,
             _repository_guard: repository_guard,
@@ -638,10 +645,7 @@ impl RepositoryMutationSession for JsonMutationSession {
             actions_applied: delta.actions().len(),
         };
         match (self.roots.data.is_some(), delta.actions().is_empty()) {
-            // A record's home is inside the data root, so a delta over an absent
-            // one still publishes through the transaction kernel; the case leaves
-            // it when initialization takes over (jit:b0ee2dd6).
-            (false, _) => self.publish_through_kernel(plan)?,
+            (false, _) => self.publish_absent_data_root(image, delta, interruptions)?,
             (true, false) => self.publish_through_record(image, delta, interruptions)?,
             (true, true) => {}
         }
@@ -659,7 +663,7 @@ impl JsonMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta)?;
+        let record = redo_record_for(image, delta.actions().iter())?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
         record
             .commit(self.layout.data_root())
@@ -669,28 +673,55 @@ impl JsonMutationSession {
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
     }
 
-    /// Publish a delta whose data root does not exist yet, rebinding the layout
-    /// when the publication created it.
-    fn publish_through_kernel(
+    /// Publish a delta whose data root does not exist yet: the new root through
+    /// the init publisher, and its worktree targets through a redo record the
+    /// stage carries into the published root, so an interruption after the
+    /// rename is replayed by the next session that opens.
+    ///
+    /// A delta publishing no root has nowhere to put a record — its home is
+    /// inside the root — and applies its worktree operations directly, there
+    /// being no repository yet for a commit point to make whole.
+    fn publish_absent_data_root(
         &self,
-        plan: &MaterializationPlan,
+        image: &RepositoryImage,
+        delta: &RepositoryDelta,
+        interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let delta = plan.delta();
-        let guard = self
-            ._repository_guard
-            .as_ref()
-            .unwrap_or(&self._bootstrap_guard);
-        let transaction_id = uuid::Uuid::new_v4().simple().to_string();
-        self.kernel
-            .execute_repository_delta(guard, &transaction_id, delta, plan.hash())
-            .map_err(|error| map_transaction_error(error, &self.layout))?;
-        if !delta
-            .actions()
-            .iter()
-            .any(|action| action.path().root_class() == RepositoryRootClass::Data)
-        {
-            return Ok(());
+        let of_class = |class| {
+            delta
+                .actions()
+                .iter()
+                .filter(move |action| action.path().root_class() == class)
+        };
+        let record = redo_record_for(image, of_class(RepositoryRootClass::Worktree))?;
+        ensure_write_set_unchanged(&self.roots, image, &record)?;
+        let applier = RedoApplier::new(SessionRedoInterruptions::new(Arc::clone(&interruptions)));
+        let redo = |outcome: Result<(), RedoApplyError>| {
+            outcome.map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+        };
+        if of_class(RepositoryRootClass::Data).next().is_none() {
+            return redo(applier.apply_uncommitted(&self.roots, &record));
         }
+        init_publish::stage_new_data_root(
+            &self.data_parent,
+            &self.data_leaf,
+            of_class(RepositoryRootClass::Data),
+        )?;
+        let carries_worktree = of_class(RepositoryRootClass::Worktree).next().is_some();
+        if carries_worktree {
+            // Durable inside the stage, so publishing the root and committing
+            // its worktree targets are one act: the rename carries the record
+            // into the root, and an interruption between them leaves it there.
+            record
+                .commit(&init_publish::stage_path(self.layout.data_root()))
+                .map_err(RepositoryStateStoreError::Transaction)?;
+        }
+        interruptions.check(&MutationPoint::BeforeRootPublication)?;
+        init_publish::publish_staged_data_root(
+            &self.data_parent,
+            &self.data_leaf,
+            self.layout.data_root(),
+        )?;
         let refreshed =
             discover_repository_layout(self.layout.worktree_root(), self.layout.data_root())?;
         // The published root is the layout for these roots from here on, for
@@ -704,7 +735,12 @@ impl JsonMutationSession {
             .active_mutation_layout()
             .rebind_published_root(&refreshed);
         self.storage.configure_repository_layout(&refreshed);
-        Ok(())
+        match carries_worktree {
+            // Through the published root's capabilities: the record the rename
+            // carried in is removed from the scratch directory it now has.
+            true => redo(applier.apply(&CapabilityRoots::open(&refreshed)?.0, &record)),
+            false => Ok(()),
+        }
     }
 }
 
@@ -764,7 +800,7 @@ impl MemoryMutationSession {
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
-        let record = redo_record_for(image, delta)?;
+        let record = redo_record_for(image, delta.actions().iter())?;
         ensure_memory_write_set_unchanged(&self.storage.repository_state(), image, &record)?;
         self.storage
             .commit_record(&record)
@@ -775,9 +811,9 @@ impl MemoryMutationSession {
     }
 }
 
-/// Publish a delta whose data root does not exist yet, as the transaction
-/// kernel publishes one on the filesystem: the record's home is inside the root
-/// the delta creates, so this one delta reaches the entry map directly.
+/// Publish a delta whose data root does not exist yet, as the init publisher
+/// publishes one on the filesystem: the record's home is inside the root the
+/// delta creates, so this one delta reaches the entry map directly.
 fn publish_absent_memory_root(
     layout: &RepositoryLayout,
     storage: &InMemoryStorage,
@@ -825,22 +861,6 @@ fn recover_location(
         .collect::<Result<Vec<_>, _>>()?;
     kernel.cleanup_empty_repository_control(location)?;
     Ok(recovered)
-}
-
-fn map_transaction_error(
-    error: anyhow::Error,
-    layout: &RepositoryLayout,
-) -> RepositoryStateStoreError {
-    if matches!(
-        error.downcast_ref::<crate::storage::FileTransactionError>(),
-        Some(crate::storage::FileTransactionError::OccupiedDataRoot { .. })
-    ) {
-        RepositoryStateStoreError::OccupiedDataRoot {
-            path: layout.data_root().to_path_buf(),
-        }
-    } else {
-        RepositoryStateStoreError::Transaction(error)
-    }
 }
 
 fn ensure_session_image(
@@ -982,18 +1002,18 @@ fn ensure_target_unchanged(
 /// The rest are created by the operation that lands under them, so carrying them
 /// too would put an ancestor and its descendant in one record — the overlap
 /// [`RedoRecord::new`] refuses (OD-7).
-fn made_directories(delta: &RepositoryDelta) -> impl Iterator<Item = &VirtualPath> {
-    delta
-        .actions()
-        .iter()
+fn made_directories<'a>(
+    actions: impl Iterator<Item = &'a RepositoryAction> + Clone,
+) -> impl Iterator<Item = &'a VirtualPath> {
+    let covering = actions.clone();
+    actions
         .filter_map(|action| match action {
             RepositoryAction::CreateDirectory { path, .. } => Some(path),
             _ => None,
         })
-        .filter(|directory| {
-            !delta
-                .actions()
-                .iter()
+        .filter(move |directory| {
+            !covering
+                .clone()
                 .any(|action| lies_beneath(action.path(), directory))
         })
 }
@@ -1016,14 +1036,13 @@ fn lies_beneath(path: &VirtualPath, directory: &VirtualPath) -> bool {
 /// ancestors are created on apply. A mode change republishes the captured file's
 /// own bytes under the new mode, which the write-set comparison has just
 /// confirmed are still the live ones.
-fn redo_record_for(
+fn redo_record_for<'a>(
     captured: &RepositoryImage,
-    delta: &RepositoryDelta,
+    actions: impl Iterator<Item = &'a RepositoryAction> + Clone,
 ) -> Result<RedoRecord, RepositoryStateStoreError> {
-    let make_directories = made_directories(delta).cloned().collect();
-    let puts = delta
-        .actions()
-        .iter()
+    let make_directories = made_directories(actions.clone()).cloned().collect();
+    let puts = actions
+        .clone()
         .filter_map(|action| match action {
             RepositoryAction::WriteFile {
                 path, bytes, mode, ..
@@ -1038,9 +1057,7 @@ fn redo_record_for(
             _ => None,
         })
         .collect::<Result<Vec<_>, RepositoryStateStoreError>>()?;
-    let deletes = delta
-        .actions()
-        .iter()
+    let deletes = actions
         .filter_map(|action| match action {
             RepositoryAction::DeleteFile { path, .. } => Some(path.clone()),
             _ => None,
@@ -1367,8 +1384,8 @@ fn memory_listing(
 }
 
 /// Require that an action's parent directory already exists, mirroring the JSON
-/// kernel's `open_parent` (which walks every intermediate component under the root
-/// capability and fails with `MissingParent` when one is absent). Only intermediate
+/// backend's parent walk (every intermediate component under the root
+/// capability, failing when one is absent). Only intermediate
 /// directories are checked; the root capability itself (empty relative) always
 /// exists and is never a parent to verify. Because every `CreateDirectory` goes
 /// through this same check, a present `Directory` entry implies all its ancestors

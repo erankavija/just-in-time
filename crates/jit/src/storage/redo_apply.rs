@@ -120,6 +120,36 @@ impl RedoApplier {
         roots: &CapabilityRoots,
         record: &RedoRecord,
     ) -> Result<(), RedoApplyError> {
+        self.apply_operations(roots, record)?;
+        let injector = &*self.injector;
+        check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
+        remove_record(roots)?;
+        check_interruption(injector, RedoPoint::AfterApply)
+    }
+
+    /// Apply `record` without consuming a committed one.
+    ///
+    /// The caller has no data root, so it committed no record for this pass to
+    /// remove: publication over roots that hold no commit point is the one
+    /// mutation a record cannot be made durable for.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply`], less the removal steps.
+    pub(in crate::storage) fn apply_uncommitted(
+        &self,
+        roots: &CapabilityRoots,
+        record: &RedoRecord,
+    ) -> Result<(), RedoApplyError> {
+        self.apply_operations(roots, record)
+    }
+
+    /// The forward pass over every operation, shared by both entry points.
+    fn apply_operations(
+        &self,
+        roots: &CapabilityRoots,
+        record: &RedoRecord,
+    ) -> Result<(), RedoApplyError> {
         let injector = &*self.injector;
         let event_log = VirtualPath::EVENTS;
         record
@@ -154,13 +184,13 @@ impl RedoApplier {
                 check_interruption(injector, RedoPoint::BeforeDelete { index })?;
                 delete_file(roots, path)
             })?;
-        if let Some(append) = record.event_append() {
-            check_interruption(injector, RedoPoint::BeforeEventAppend)?;
-            append_events(roots, append)?;
+        match record.event_append() {
+            Some(append) => {
+                check_interruption(injector, RedoPoint::BeforeEventAppend)?;
+                append_events(roots, append)
+            }
+            None => Ok(()),
         }
-        check_interruption(injector, RedoPoint::BeforeRecordRemoval)?;
-        remove_record(roots)?;
-        check_interruption(injector, RedoPoint::AfterApply)
     }
 }
 
@@ -222,7 +252,7 @@ fn put_file(roots: &CapabilityRoots, put: &PutFile) -> Result<(), RedoApplyError
     let (root, relative) = resolve(roots, &put.path)?;
     let (parent, leaf) = open_or_create_capability_parent(root, relative)?;
     let staged = staged_name();
-    write_staged(&parent, &staged, put)?;
+    write_staged_file(&parent, &staged, &put.bytes, put.mode)?;
     parent.rename(&staged, &parent, &leaf)?;
     sync_capability_directory(&parent).map_err(Into::into)
 }
@@ -234,18 +264,25 @@ fn staged_name() -> String {
     format!(".redo.{}.tmp", uuid::Uuid::new_v4().simple())
 }
 
-/// Write the staged bytes with the put's mode and return once they are durable.
+/// Write `bytes` under `mode` as a new file named `leaf` and return once they
+/// are durable. Shared with the init publisher's staging, so a new file is
+/// written one way whichever publication writes it.
 ///
-/// The open creates the file or fails: an occupied stage name is never opened
+/// The open creates the file or fails: an occupied name is never opened
 /// through, so no symlink carries the bytes elsewhere and no occupant is
 /// truncated (`@/inv/atomic-writes`).
-fn write_staged(parent: &Dir, staged: &str, put: &PutFile) -> Result<(), RedoApplyError> {
+pub(in crate::storage) fn write_staged_file(
+    parent: &Dir,
+    leaf: &str,
+    bytes: &[u8],
+    mode: FileMode,
+) -> Result<(), RedoApplyError> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
     options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(staged, &options)?;
-    file.write_all(&put.bytes)?;
-    set_mode(&file, put.mode)?;
+    let mut file = parent.open_with(leaf, &options)?;
+    file.write_all(bytes)?;
+    set_mode(&file, mode)?;
     file.sync_all().map_err(Into::into)
 }
 
@@ -841,7 +878,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_write_staged_refuses_a_symlink_occupying_the_staged_name() {
+    fn test_write_staged_file_refuses_a_symlink_occupying_the_staged_name() {
         let directory = TempDir::new().unwrap();
         let unrelated = directory.path().join("unrelated.json");
         std::fs::write(&unrelated, b"a file the record never named").unwrap();
@@ -851,11 +888,7 @@ mod tests {
             .unwrap();
         let parent = ambient_directory(directory.path());
 
-        let outcome = write_staged(
-            &parent,
-            OCCUPIED_STAGE,
-            &put(VirtualPath::data("index.json").unwrap(), b"published"),
-        );
+        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
 
         assert!(
             outcome.is_err(),
@@ -869,17 +902,13 @@ mod tests {
     }
 
     #[test]
-    fn test_write_staged_refuses_a_file_occupying_the_staged_name() {
+    fn test_write_staged_file_refuses_a_file_occupying_the_staged_name() {
         let directory = TempDir::new().unwrap();
         let occupant = directory.path().join(OCCUPIED_STAGE);
         std::fs::write(&occupant, b"a staging another application holds").unwrap();
         let parent = ambient_directory(directory.path());
 
-        let outcome = write_staged(
-            &parent,
-            OCCUPIED_STAGE,
-            &put(VirtualPath::data("index.json").unwrap(), b"published"),
-        );
+        let outcome = write_staged_file(&parent, OCCUPIED_STAGE, b"published", FileMode::Regular);
 
         assert!(outcome.is_err(), "the staging truncated an occupied name");
         assert_eq!(
