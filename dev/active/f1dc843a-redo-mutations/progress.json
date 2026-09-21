@@ -1111,6 +1111,15 @@
       "resolved_by": "user",
       "status": "closed",
       "follow_on": "42478e5d's dispatch will direct it to describe the recovery contract without event-log write mechanics. guarantees.md (ead8f86d, closed) keeps its correct mechanism statement; b4483ad6 REQ-06 owns flipping it."
+    },
+    {
+      "id": "ESC-13",
+      "wave": 14,
+      "category": "shipped-surface change inside a documentation task (POL-01)",
+      "question": "42478e5d REQ-05 presumes recovery_failed covers a failed record application; it does not — a leftover record that fails to read or apply fails at session open (main.rs:2474) and surfaces as GENERIC_ERROR, verified by the worker with the built binary three ways.",
+      "resolution": "Owner chose B: jit recover classifies its own session-open failure to read or apply the leftover record as recovery_failed, at the CLI layer, with one owning test; the error-code entry states it. Other commands keep their codes.",
+      "resolved_by": "user",
+      "status": "closed"
     }
   ],
   "rework_counts": {
