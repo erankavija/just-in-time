@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6f35eb3d7c38223dc525809f7cfffb0d0c340e6",
+  "completed_at": "2026-09-21T19:29:53.369795368Z",
+  "duration_ms": 88731,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 92,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The redo-record contract omits the captured-offset event-log append and incorrectly says every written file is replaced."
+      }
+    ],
+    "summary": "The issue-authored redo-record reference inaccurately describes event-log publication as a whole-file replacement.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ccea63de-f191-497b-8941-6d5b6133b50a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e2711c3b-b52c-49b7-8850-92a190449599",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T19:28:24.638223785Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.2aKJsWR3RW: binary file matches\n--- agent stderr (first 12 of 25148 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c570-e2d7-7ae2-9b8e-65ee9b444a6a\n--------\n--- 25136 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `ccea63de` is a leaf task (level 4; no DAG children). I individually inspected its eight reachable `jit:ccea63de` commits; the relevant footprint is `docs/reference/storage-format.md`. The prior review had no unresolved findings.\n\nThe storage reference is correctly placed and discoverable, but its redo-record description omits the event-log append operation that current code preserves and replays.\n\n1. **F1 — blocking, issue-impact, high:** [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:92) says a record holds complete replacement contents for every written file and that application replaces each file. Current `RedoRecord` instead carries event-log bytes plus their captured offset, and application writes them at that offset. Amend the paragraph to distinguish replacement files from the event-log append, and state that recovery replays that append idempotently.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue-authored redo-record reference inaccurately describes event-log publication as a whole-file replacement.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The redo-record contract omits the captured-offset event-log append and incorrectly says every written file is replaced.\",\"file\":\"docs/reference/storage-format.md\",\"line\":92}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

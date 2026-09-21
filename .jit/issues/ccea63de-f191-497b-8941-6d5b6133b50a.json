@@ -6,7 +6,7 @@
   "dependencies": [
     "b0ee2dd6-5393-4193-a88d-f3301601234e"
   ],
-  "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement and removal.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page carries no description of rollback, a journal, a backup, a staging directory, a companion, or an external bootstrap control directory.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n",
+  "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement and removal.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page carries no description of rollback, a journal, a backup, a staging directory, a companion, or an external bootstrap control directory.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n\n\n## Decisions\n\n- D-1: The page states the write contract without the event log's write mechanics. Production publishes `events.jsonl` as one of the record's file replacements: the record constructor, `redo_record_for` in `crates/jit/src/storage/repository_state_store.rs`, passes no event append. The positioned append is `jit:b4483ad6`'s change, and its REQ-06 updates the adopter pages when it lands.\n",
   "documents": [
     {
       "assets": [
@@ -57,8 +57,8 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "passed",
-      "updated_at": "2026-09-21T19:27:01.352083024Z",
+      "status": "failed",
+      "updated_at": "2026-09-21T19:29:53.678851549Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -81,5 +81,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-09-21T19:27:01.352083024Z"
+  "updated_at": "2026-09-21T19:42:25.418152725Z"
 }
