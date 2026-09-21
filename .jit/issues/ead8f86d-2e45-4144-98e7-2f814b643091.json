@@ -245,13 +245,13 @@
   ],
   "gates_status": {
     "doc-review": {
-      "status": "passed",
-      "updated_at": "2026-09-21T17:43:32.771834905Z",
+      "status": "failed",
+      "updated_at": "2026-09-21T18:06:21.231396682Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-09-21T17:37:47.408077069Z",
+      "updated_at": "2026-09-21T18:04:09.733650147Z",
       "updated_by": "auto:executor"
     }
   },
@@ -269,5 +269,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Concept documents state the redo record",
-  "updated_at": "2026-09-21T17:43:32.771834905Z"
+  "updated_at": "2026-09-21T18:06:21.231396682Z"
 }

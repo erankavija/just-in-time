@@ -564,6 +564,16 @@
         "merge": "All four branches merged cleanly into main with no .jit conflict.",
         "links": "docs-check-links.sh over docs/, README.md, AGENTS.md and mcp-server/README.md passed on the merged tree — the check no individual worker could run, since each verified only its own branch.",
         "gate_contention": "Running gate evaluations concurrently timed out one docs-mechanical run on the bootstrap lock (cargo-ci held it). Gates re-run strictly sequentially."
+      },
+      "rework_round_1": {
+        "ccea63de": "Event log now a whole-file replacement (storage-format.md:92-114); the positioned-append and offset language is gone. The worker also cut a second false cost claim unprompted ('publication costs what the mutation touches rather than what the repository holds'). Its retained claim that the event log is compared by length plus tail was verified by the lead: touches_event_log is true whenever a put names EVENTS (repository_state_store.rs:904-909), so the tail comparison runs for a whole-file put.",
+        "ead8f86d": "guarantees.md:69-104 describe the whole-file replacement; the :102 cost claim removed with no hedge, and the worker also deleted a Benefits bullet of its own carrying the same false claim. The other three concepts pages needed no change. Lead decision on the worker's question: keep the @/charter/D-17 citation on the Guarantee line — a citation points to the decision behind the record and does not assert that its cost outcome has been reached.",
+        "merged_tree": "Both merged cleanly. The combined offset/positioned/cost sweep over storage-format.md and docs/concepts/ is empty, and every link and anchor still resolves."
+      },
+      "rework_round_2": {
+        "ccea63de": "Both gates PASSED after round 1, but the lead did not close it: two independent doc-review runs (on ead8f86d, rounds 1 and 2) flagged storage-format.md:114-117 as advisory — 'A record whose own write was interrupted... so the residue is skipped rather than applied.' Verified false at HEAD: commit writes straight to scratch/redo.record with create_file_synced (redo_record.rs:207-216), so a torn file does sit at the real path, but read_leftover_record (repository_state_store.rs:249-274) turns any parse failure into UnreadableRedoRecord and session open refuses. The refusal is jit:0938d99e's reviewed design: a torn write and a committed record later corrupted both fail to parse, and discarding the latter would lose a partly-applied mutation. The page is wrong; the code is right. Rework directs the sentence to state the refusal and NOT to improvise an operator procedure.",
+        "ead8f86d": "doc-review round 2 F1, blocking: `find .jit -name '*.tmp' -mmin +60 -delete` at guarantees.md:519 also matches and deletes empty directories named *.tmp, contradicting the page's own 'files whose name ends in .tmp'. Fix: -type f. Not a regression — the recipe was present in round 1 and that run's reviewer did not raise it; reviewers carry no memory across rounds, which is why Tier 1.5's cumulative table exists.",
+        "at_limit": "Both issues now stand at MAX_REWORK_ATTEMPTS (2). A further failure on either escalates to the owner."
       }
     },
     {
@@ -1030,8 +1040,8 @@
     "0938d99e": 1,
     "4319256e": 1,
     "10ba2e35": 1,
-    "ccea63de": 1,
-    "ead8f86d": 1,
+    "ccea63de": 2,
+    "ead8f86d": 2,
     "79252d23": 1
   },
   "surfaced_pitfalls": [
@@ -1193,6 +1203,22 @@
       "criterion_subjects": "none in this epic",
       "raised_by": "worker-ccea63de, reported rather than touched — correct, since verifying it is outside the issue's five criteria.",
       "status": "open — no owner; surfaces in the completion report"
+    },
+    {
+      "id": "SP-15",
+      "wave": 13,
+      "subject": "docs/concepts/guarantees.md:634 (Graceful Degradation) says that with a malformed events.jsonl line, 'issue operations, which append rather than re-read the log, keep working'. Some mutations do parse the captured log: captured_events at repository_state/mutation.rs:694 runs parse_known_events and returns MalformedRecord on failure, and the claim path uses it.",
+      "criterion_subjects": "none in this epic — it concerns read tolerance, not publication or cost.",
+      "raised_by": "worker-ead8f86d during rework, reported rather than fixed, correctly: it predates the issue.",
+      "status": "open — no owner; surfaces in the completion report"
+    },
+    {
+      "id": "SP-16",
+      "wave": 13,
+      "subject": "An interruption during the record's own write (inside RedoRecord::commit, before its fsync completes) leaves a truncated redo.record, and the next session open refuses it with UnreadableRedoRecord. The repository's files are the complete old state, so epic REQ-03 holds by its letter, but every mutating command fails until an operator removes the record by hand — and whether a given unreadable record is safe to remove is the torn-versus-corrupted question the refusal exists to avoid answering automatically.",
+      "criterion_subjects": "42478e5d REQ-04 (the troubleshooting guide's recovery procedure) and REQ-05 (the error-code entry for a recovery failure describes a failed application).",
+      "owner": "42478e5d (wave 14). The lead will brief it explicitly at dispatch: the operator procedure for UnreadableRedoRecord, including how to tell a torn write (the parse error names 'fewer content bytes than the header declares') from other corruption, must be written with care rather than as 'delete the file'.",
+      "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do."
     }
   ],
   "started_at": "2026-09-20T06:25:44.651403+00:00",
