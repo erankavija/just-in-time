@@ -3,7 +3,8 @@
 //! One forward pass over the record's operations, then the record is removed.
 //! Re-application is the same pass: a put overwrites, a delete tolerates
 //! absence, the append rewrites its bytes at its offset, so a record applied
-//! twice converges. Nothing publishes through this module yet.
+//! twice converges. A session open applies the record a crash left; no
+//! mutation writes one yet.
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,

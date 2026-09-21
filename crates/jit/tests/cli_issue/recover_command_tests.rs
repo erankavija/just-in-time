@@ -139,3 +139,46 @@ fn test_recover_help_describes_purpose() {
         .stdout(predicate::str::contains("recovery"))
         .stdout(predicate::str::contains("stale"));
 }
+
+/// The recover command reports the record its startup session applied. The
+/// count it prints comes from the session's recovery dispatch, so a leftover
+/// record reaches the adopter through the same field a recovered transaction
+/// does — the field's spelling is renamed by jit:51eb1aa6, not here.
+#[test]
+fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
+    use jit::storage::{PutFile, RedoRecord};
+
+    let temp = setup_test_repo();
+    let published = temp.path().join("applied-by-recovery.md");
+    RedoRecord::new(
+        vec![PutFile {
+            path: jit::repository_state::VirtualPath::worktree("applied-by-recovery.md").unwrap(),
+            bytes: b"published by the leftover record\n".to_vec(),
+            mode: jit::repository_state::FileMode::Regular,
+        }],
+        Vec::new(),
+        None,
+    )
+    .unwrap()
+    .commit(&temp.path().join(".jit"))
+    .unwrap();
+
+    let output = jit_cmd()
+        .current_dir(temp.path())
+        .args(["recover", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let value: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(
+        value["transactions_recovered"], 1,
+        "the applied record must reach the recover command's count, got {value}"
+    );
+    assert!(
+        published.exists(),
+        "the startup session must have applied the record it counted"
+    );
+}

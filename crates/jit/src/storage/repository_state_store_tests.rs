@@ -3,8 +3,13 @@ use crate::repository_state::{
     plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
     RepositorySeedKind,
 };
-use crate::storage::{EventAppend, PutFile};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use crate::storage::memory::test_fixtures as memory_fixtures;
+use crate::storage::redo_apply::test_fixtures::{
+    data_root as redo_root, record_relative_path, repository as redo_repository, seed_repository,
+    snapshot, CAPTURED_LOG,
+};
+use crate::storage::{EventAppend, PutFile, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::process::Command;
 use std::sync::Mutex;
 use tempfile::TempDir;
@@ -3384,5 +3389,316 @@ fn long_log() -> Vec<u8> {
         .copied()
         .cycle()
         .take((EVENT_LOG_TAIL_WINDOW as usize) + line.len() * 2)
+        .collect()
+}
+
+/// What the session-open contract needs of a backend: a seeded repository, the
+/// commit point a leftover record occupies, one session open, and readings of
+/// what the record published.
+///
+/// One contract, run on both backends, because applying a leftover record is
+/// the session's behaviour rather than either backend's
+/// (`@/inv/shared-test-contracts`).
+trait SessionRecordBackend: Sized {
+    /// What a record publishes, compared between two opens.
+    type Published: std::fmt::Debug + PartialEq;
+
+    /// A repository whose data root exists and whose event log holds
+    /// [`CAPTURED_LOG`], the offset [`leftover_record`] appends at.
+    fn seeded() -> Self;
+    /// Leave `record` at the commit point a session open finds it at.
+    fn commit(&self, record: &RedoRecord);
+    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
+    fn published(&self) -> Self::Published;
+    /// Whether a record is still waiting for an open to carry it forward.
+    fn holds_record(&self) -> bool;
+    /// The live bytes at `path`, or `None` when nothing is there.
+    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>>;
+}
+
+struct FileSessionBackend {
+    worktree: TempDir,
+    storage: JsonFileStorage,
+    layout: RepositoryLayout,
+}
+
+impl FileSessionBackend {
+    fn record_path(&self) -> PathBuf {
+        self.worktree.path().join(record_relative_path())
+    }
+
+    fn scratch_path(&self) -> PathBuf {
+        redo_root(&self.worktree).join(RECORD_SCRATCH_DIR)
+    }
+}
+
+impl SessionRecordBackend for FileSessionBackend {
+    type Published = BTreeMap<PathBuf, (Vec<u8>, bool)>;
+
+    fn seeded() -> Self {
+        let (worktree, _roots) = redo_repository();
+        seed_repository(&worktree, &[], false);
+        let data = redo_root(&worktree);
+        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+        let storage = JsonFileStorage::new(&data);
+        Self {
+            worktree,
+            storage,
+            layout,
+        }
+    }
+
+    fn commit(&self, record: &RedoRecord) {
+        record.commit(&redo_root(&self.worktree)).unwrap();
+    }
+
+    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        self.storage.open_mutation_session(self.layout.clone())
+    }
+
+    fn published(&self) -> Self::Published {
+        let mut files = snapshot(self.worktree.path());
+        files.remove(&record_relative_path());
+        files
+    }
+
+    fn holds_record(&self) -> bool {
+        self.record_path().exists()
+    }
+
+    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>> {
+        let root = match path.root_class() {
+            RepositoryRootClass::Data => redo_root(&self.worktree),
+            RepositoryRootClass::Worktree => self.worktree.path().to_path_buf(),
+        };
+        std::fs::read(root.join(path.relative().as_path())).ok()
+    }
+}
+
+struct MemorySessionBackend(InMemoryStorage);
+
+impl SessionRecordBackend for MemorySessionBackend {
+    type Published = BTreeMap<VirtualPath, RepositoryEntry>;
+
+    fn seeded() -> Self {
+        Self(memory_fixtures::seeded(&[], false))
+    }
+
+    fn commit(&self, record: &RedoRecord) {
+        self.0.commit_record(record).unwrap();
+    }
+
+    fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        self.0.open_mutation_session(self.0.repository_layout())
+    }
+
+    fn published(&self) -> Self::Published {
+        memory_fixtures::semantic_state(&self.0).0
+    }
+
+    fn holds_record(&self) -> bool {
+        memory_fixtures::semantic_state(&self.0).2.is_some()
+    }
+
+    fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>> {
+        match memory_fixtures::semantic_state(&self.0).0.get(path) {
+            Some(RepositoryEntry::File { content, .. }) => Some(content.bytes().to_vec()),
+            _ => None,
+        }
+    }
+}
+
+/// The leftover a session must apply: one data file published and one event
+/// appended at the log length the interrupted mutation captured.
+fn leftover_record() -> RedoRecord {
+    RedoRecord::new(
+        vec![put_file(leftover_target(), LEFTOVER_BYTES)],
+        Vec::new(),
+        event_append(CAPTURED_LOG.len() as u64),
+    )
+    .unwrap()
+}
+
+fn leftover_target() -> VirtualPath {
+    data_path("issues/left.json")
+}
+
+const LEFTOVER_BYTES: &[u8] = b"{\"id\":\"left\"}";
+
+/// The event log a leftover record's application leaves.
+fn appended_log() -> Vec<u8> {
+    [CAPTURED_LOG, &event_append(0).unwrap().bytes].concat()
+}
+
+/// REQ-01: the record is applied before the session can capture anything, and
+/// the commit point is cleared once it is.
+fn assert_open_applies_the_leftover<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    backend.commit(&leftover_record());
+
+    let mut session = backend.open().unwrap();
+    let image = session
+        .capture(CaptureSpec::phase_one([leftover_target()], budget()).unwrap())
+        .unwrap();
+
+    assert!(
+        matches!(
+            image.entry(&leftover_target()),
+            Ok(RepositoryEntry::File { content, .. }) if content.bytes() == LEFTOVER_BYTES
+        ),
+        "the session's first capture must read the applied record, got {:?}",
+        image.entry(&leftover_target())
+    );
+    drop(session);
+    assert_eq!(
+        backend.bytes_at(&VirtualPath::EVENTS).as_deref(),
+        Some(appended_log().as_slice()),
+        "the record's appended events must reach the log"
+    );
+    assert!(
+        !backend.holds_record(),
+        "an applied record must leave the commit point"
+    );
+}
+
+#[test]
+fn test_open_mutation_session_applies_a_leftover_record_before_capture_on_both_backends() {
+    assert_open_applies_the_leftover::<FileSessionBackend>();
+    assert_open_applies_the_leftover::<MemorySessionBackend>();
+}
+
+/// REQ-02: a second open over the same seeded record publishes nothing further.
+fn assert_two_opens_converge_as_one<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    backend.commit(&leftover_record());
+
+    drop(backend.open().unwrap());
+    let after_one = backend.published();
+    drop(backend.open().unwrap());
+
+    assert_eq!(
+        backend.published(),
+        after_one,
+        "opening twice over one seeded record must leave what opening once left"
+    );
+}
+
+#[test]
+fn test_open_mutation_session_twice_over_one_record_converges_as_once_on_both_backends() {
+    assert_two_opens_converge_as_one::<FileSessionBackend>();
+    assert_two_opens_converge_as_one::<MemorySessionBackend>();
+}
+
+/// REQ-03: the dispatch report counts what the open applied, and that count is
+/// the one `recovered_count` reports to its consumers.
+fn assert_report_counts_applied_records<B: SessionRecordBackend>() {
+    let backend = B::seeded();
+    let quiet = {
+        let session = backend.open().unwrap();
+        session.recovery_report().clone()
+    };
+    backend.commit(&leftover_record());
+    let applied = {
+        let session = backend.open().unwrap();
+        session.recovery_report().clone()
+    };
+
+    assert_eq!(
+        quiet.applied_records, 0,
+        "a repository with no leftover record applies none"
+    );
+    assert_eq!(
+        applied.applied_records, 1,
+        "one leftover record is one applied record"
+    );
+    assert_eq!(
+        applied.recovered_count(),
+        quiet.recovered_count() + 1,
+        "the applied record must reach the count both consumers read"
+    );
+}
+
+#[test]
+fn test_recovery_dispatch_report_counts_applied_records_on_both_backends() {
+    assert_report_counts_applied_records::<FileSessionBackend>();
+    assert_report_counts_applied_records::<MemorySessionBackend>();
+}
+
+/// REQ-05: a leftover the session cannot read is a typed failure naming the
+/// record, and the repository it refused is byte-for-byte what it found.
+///
+/// The first open creates the session's own advisory lock files, so the
+/// snapshot the refusal is compared against covers every byte below the
+/// worktree, the malformed record included.
+#[test]
+fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
+    let backend = FileSessionBackend::seeded();
+    drop(backend.open().unwrap());
+    backend.commit(&leftover_record());
+    std::fs::write(backend.record_path(), b"not a redo record").unwrap();
+    let before = snapshot(backend.worktree.path());
+
+    let error = match backend.open() {
+        Err(error) => error,
+        Ok(_) => panic!("a malformed leftover record must refuse the session open"),
+    };
+
+    assert!(
+        matches!(
+            &error,
+            RepositoryStateStoreError::UnreadableRedoRecord { path, .. }
+                if path.contains(RECORD_FILE_NAME)
+        ),
+        "a malformed leftover must name the record it refused, got {error:?}"
+    );
+    assert_eq!(
+        snapshot(backend.worktree.path()),
+        before,
+        "a refused open must leave every byte it found, the record included"
+    );
+}
+
+/// REQ-04: with no leftover record the open reads the record's own path and
+/// nothing else in the scratch directory. Every other entry there is poisoned —
+/// a file and a directory neither of which can be opened — so a pass that read
+/// one fails, and the directory's listing is compared across the open, so a
+/// pass that wrote one shows up too.
+#[cfg(unix)]
+#[test]
+fn test_open_mutation_session_reads_nothing_in_the_scratch_directory_but_the_record() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let backend = FileSessionBackend::seeded();
+    let scratch = backend.scratch_path();
+    std::fs::create_dir(&scratch).unwrap();
+    std::fs::write(scratch.join("decoy"), b"not a redo record").unwrap();
+    std::fs::create_dir(scratch.join("nested")).unwrap();
+    let sealed = std::fs::Permissions::from_mode(0o000);
+    std::fs::set_permissions(scratch.join("decoy"), sealed.clone()).unwrap();
+    std::fs::set_permissions(scratch.join("nested"), sealed).unwrap();
+    let before = scratch_entries(&scratch);
+
+    let opened = backend.open();
+
+    let readable = std::fs::Permissions::from_mode(0o755);
+    std::fs::set_permissions(scratch.join("nested"), readable).unwrap();
+    let session = opened.expect("a poisoned scratch entry is never read, so the open succeeds");
+    assert_eq!(
+        session.recovery_report().applied_records,
+        0,
+        "no record is waiting, so none is applied"
+    );
+    assert_eq!(
+        scratch_entries(&scratch),
+        before,
+        "checking for the record neither creates nor removes a scratch entry"
+    );
+}
+
+#[cfg(unix)]
+fn scratch_entries(scratch: &Path) -> BTreeSet<std::ffi::OsString> {
+    std::fs::read_dir(scratch)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
         .collect()
 }

@@ -123,6 +123,45 @@ mod recovery_startup_tests {
         assert_eq!(session.recovery_report().recovered_count(), 1);
         assert!(!temp.path().join(".jit-bootstrap").exists());
     }
+
+    /// The startup count the server logs covers a leftover redo record, which
+    /// the startup session applies like any other residue it carries forward.
+    #[test]
+    fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
+        use jit::repository_state::{FileMode, VirtualPath};
+        use jit::storage::{PutFile, RedoRecord};
+
+        let temp = TempDir::new().unwrap();
+        let data = temp.path().join(".jit");
+        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        CommandExecutor::new(JsonFileStorage::new(&data))
+            .with_layout(layout)
+            .initialize_fresh_repository(temp.path(), None)
+            .expect("a repository the server can serve");
+        RedoRecord::new(
+            vec![PutFile {
+                path: VirtualPath::worktree("applied-at-startup.md").unwrap(),
+                bytes: b"published by the leftover record\n".to_vec(),
+                mode: FileMode::Regular,
+            }],
+            Vec::new(),
+            None,
+        )
+        .unwrap()
+        .commit(&data)
+        .unwrap();
+
+        let served_layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        let (_storage, session) =
+            prepare_server_storage(&data, served_layout).expect("startup recovery");
+
+        assert_eq!(
+            session.recovery_report().recovered_count(),
+            1,
+            "the applied record must reach the count the server reports at startup"
+        );
+        assert!(temp.path().join("applied-at-startup.md").exists());
+    }
 }
 
 #[cfg(test)]
