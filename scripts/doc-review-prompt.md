@@ -63,11 +63,11 @@ Every finding must declare both classifications in its structured record:
 - `disposition`: `"blocking"` or `"advisory"`;
 - `origin`: `"issue-impact"` or `"pre-existing"`.
 
-An **issue-impact blocking** finding has a direct causal relationship to the issue work. This includes a missing required documentation update; an inaccurate or incomplete issue-authored update; or an issue-introduced defect in a link, citation, example, placement, discoverability, or material concision.
+An **issue-impact blocking** finding has a direct causal relationship to the issue work. This includes a missing required documentation update; an inaccurate or incomplete issue-authored update; or an issue-introduced defect in a link, citation, example, placement, discoverability, or concision (rubric item 4).
 
 Existing unrelated drift encountered while following the impact cone should be surfaced as **pre-existing advisory** feedback when useful. Surfacing it is recommended, but an exhaustive drift search is not required. Existing drift never changes a passing verdict to failure and normally belongs in separate follow-up work. Do not relabel issue-impact defects as pre-existing merely because similar drift existed elsewhere.
 
-The verdict is `fail` **if and only if** at least one unresolved issue-impact blocking finding exists. The verdict is `pass` when none exists, including when the findings array contains pre-existing advisory feedback. Sentence-level style preferences are advisory and do not fail the gate.
+The verdict is `fail` **if and only if** at least one unresolved issue-impact blocking finding exists. The verdict is `pass` when none exists, including when the findings array contains pre-existing advisory feedback. Style preferences outside rubric item 4's blocking cases are advisory and do not fail the gate.
 
 ## Review rubric
 
@@ -76,7 +76,7 @@ For the documentation impact cone, check:
 1. **Necessity and completeness.** Every user-visible effect that requires documentation has the smallest sufficient update, including effects in untouched docs.
 2. **Accuracy.** Commands, flags, output, configuration, storage, workflows, links, citations, and examples agree with the current source tree.
 3. **Placement and discoverability.** Information appears in the canonical Diátaxis location and is linked where an adopter would look. Repo-local dogfood configuration is clearly signalled rather than presented as a shipped default.
-4. **Concise style.** Prefer direct present-tense statements, focused examples, and links to canonical reference material instead of duplication. Omit implementation history, transition narration, internal mechanics, and setup or output that users do not need. Material duplication, buried or obscured instructions, and unnecessary internal detail in issue-authored prose are blocking when they impair usability; sentence-level preferences are advisory.
+4. **Concise style.** Issue-authored prose is terse, plain, and on point. Prefer direct present-tense statements, focused examples, and links to canonical reference material instead of duplication. Omit implementation history, transition narration, internal mechanics, and setup or output that users do not need. Each of the following in issue-authored prose is blocking: a sentence or passage that restates another; jargon or an internal term where a plain word serves the reader; internal mechanics the reader does not act on; content that does not serve the page's purpose; and buried or obscured instructions. For each, name the passage and give the cut or the plain replacement. A choice between two wordings that are both terse and plain is advisory.
 5. **Affected regressions.** Check links, item citations, paths, examples, neighboring claims, Mermaid diagrams, and LaTeX mathematics only where the issue directly changed or affected them. Use `docs/reference/jit-content-standards.md` as the style source of truth.
 
 ## Prior review feedback
