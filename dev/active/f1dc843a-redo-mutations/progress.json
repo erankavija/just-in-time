@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 12,
+  "current_wave": 13,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -445,7 +445,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — dispatched, round 1",
+          "status": "done — cargo-ci and code-review both passed on the merged tree, zero rework rounds, reviewer verdict pass with 0 findings",
           "dispatch": {
             "session": 6,
             "tier": "opus",
@@ -458,7 +458,24 @@
             "lead_note": "Dispatch names wave 11's 66 dead-code allowances as this task's REQ-06 obligation and gives the worker `grep -rn 'removed when the transaction kernel retires' crates/ | wc -l` as its progress signal, which must reach 0. Also carries forward the item-inventory-diff rule, since this task is mostly deletion and a prior session lost a gate run to a sed range deletion."
           }
         }
-      ]
+      ],
+      "review_round_1": {
+        "cargo_ci_merged_tree": "cold run FAILED the suite-duration budget alone at 81927 ms with all 4705 tests passing (the whole workspace rebuilt after four module deletions); forced warm re-run PASSED, suite-clock 21990 ms",
+        "pol_04_timings_warm": {
+          "fmt_ms": 1614,
+          "clippy_ms": 245,
+          "suite_build_ms": 583,
+          "test_ms": 17296,
+          "doctest_ms": 4675,
+          "suite_clock_ms": 21990,
+          "flags": "none"
+        },
+        "code_review": "PASSED, 0 findings",
+        "lead_verification": "Independently at HEAD: all 17 named constructs grep to 0 across crates/ (FileTransactionKernel, rollback_repository_action, prepare_repository_backup, backup_authority, stage_authority, create_directory_stage_name, CompanionDirs, COMPANION_MARKER, needs_worktree_companion, FailurePoint, TransactionFailureInjector, transaction_journal, transaction_recovery, transaction_staging, TransactionControlLocation, TRANSACTION_PROTOCOL_MARKER, RecoveryRequiredError). REQ-06: the allowance grep returns 0. REQ-07: no #[ignore] in crates/. REQ-08: git diff --numstat against f0aa1d508 sums to added 100, deleted 4467, net -4367 over *.rs (-4356 all files). REQ-05 read at discovery.rs:82-93: discovery keys on RECORD_SCRATCH_DIR/RECORD_FILE_NAME from storage::redo_record, so discovery and session-open application agree by construction rather than by a second spelling.",
+        "lead_tier_2_5": "Zero matches for kernel or journal prose anywhere in crates/**/*.rs — the worker's sweep was complete.",
+        "lead_tier_3": "RecoveryDispatchReport lost two fields but keeps recovered_count(), so crates/server's three call sites compile unmodified. Test count 4722 -> 4705 with every deleted test's property accounted for: died with its mechanism, or moved to the test that already owned it."
+      },
+      "deleted_test_properties": "Verified against the worker's accounting rather than accepted: test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates retired into test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it, which already asserted both halves (typed refusal naming the record, and a worktree snapshot equal across the refused open); the two recovery-discovery journal tests became one record test keeping the same property; the empty-delta conformance test's residue assertion moved to the record's scratch path. test_absent_root_publication_reaches_no_transaction_kernel_boundary was vacuous once no boundary exists and its enforcement is now structural plus the source guard."
     },
     {
       "wave_number": 13,
@@ -472,7 +489,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next, four-way fan-out"
         },
         {
           "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
@@ -483,7 +500,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next, four-way fan-out"
         },
         {
           "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
@@ -496,7 +513,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next, four-way fan-out"
         },
         {
           "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
@@ -507,7 +524,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "ready — next, four-way fan-out"
         }
       ]
     },
@@ -1071,6 +1088,23 @@
       "subject": "The init publisher's stage name is deterministic (`<leaf>.stage`), so a repository configured with a data root named X.stage beside one named X would have the second one's stage reclaim the first one's root. The bootstrap lock serializes the sessions but cannot prevent it.",
       "criterion_subjects": "none — no epic or issue criterion names it",
       "verdict": "accepted, not guarded. Self-inflicted configuration; OD-6 asks for the deterministic name, and a marker protocol would be new mechanism for a case nobody hits.",
+      "owner": "surfaces in the completion report"
+    },
+    {
+      "id": "SP-10",
+      "wave": 12,
+      "subject": "The `.jit-bootstrap` reserved namespace outlives the mechanism that used it. repository_state/path.rs:208 and :452 still refuse `.jit-bootstrap` and `.jit-bootstrap/*` as mutation targets, but nothing writes there since the kernel's external control location went. The live `.jit-bootstrap.lock` is a sibling path the guard does not match, so the dead directory is guarded while the live lock file is not.",
+      "criterion_subjects": "No issue criterion names it. b0ee2dd6 REQ-01/REQ-02 enumerate five constructs and four modules, none of which is this; epic REQ-05's enumeration does not name it either. @/inv/canonical-cutover names it generically as a superseded representation.",
+      "raised_by": "worker-b0ee2dd6, flagged rather than deleted unasked — the correct call, since removing a reserved-path guard changes which worktree paths a mutation may target.",
+      "bearing_on_wave_13": "ccea63de REQ-04 requires the storage-format page to carry no description of an external bootstrap control directory. The page and the code will then disagree about whether the name is reserved.",
+      "status": "open — lead to put it to the owner before wave 13's documentation work lands"
+    },
+    {
+      "id": "SP-11",
+      "wave": 12,
+      "subject": "The worktree-root bootstrap lock's second job is gone. It no longer serializes companions and external journals across disjoint-data-root sessions; it now serializes only absent-root publication, where two sessions sharing a worktree can still race the init publisher's sibling stage.",
+      "criterion_subjects": "none directly; the plan's lock-and-record-scope contract (LD-1) states the lock's scope.",
+      "verdict": "Lock kept and its prose corrected by the worker; test_session_disjoint_sessions_serialize_on_worktree_bootstrap still owns the property. Recorded in case LD-1's scope statement wants restating when a documentation task reaches it.",
       "owner": "surfaces in the completion report"
     }
   ],

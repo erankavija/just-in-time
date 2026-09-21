@@ -7,6 +7,7 @@
   ],
   "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement and removal.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page carries no description of rollback, a journal, a backup, a staging directory, a companion, or an external bootstrap control directory.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T16:03:08.980275069Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T16:03:08.980275069Z"
 }

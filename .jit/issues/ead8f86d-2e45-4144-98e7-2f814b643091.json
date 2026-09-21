@@ -7,6 +7,7 @@
   ],
   "description": "The concepts family describes record-based publication and states which files under the data root are safe to remove by hand.\n\n## Background\n\nThe guarantees page is the epicentre in the adopter-facing concepts family. It describes atomic operations, states that the event log is a locked append rather than a replacement-file rename, explains that locks complement rather than extend an atomic rename, carries a recoverable profile publication section built on a durable journal with prepared and committed arms, shows a data-root layout without the scratch directory, explains partial-write recovery in terms of temp-file residue, and tells the reader to delete files matching a temp extension older than an hour.\n\nThat recipe now runs beside the directory holding the commit point, so the page must say which files under the data root are safe to remove. The design-philosophy, overview, and core-model pages each carry a lighter statement of the same mechanism.\n\n## Success Criteria\n\n- [hard] REQ-01: The guarantees page describes publication as one synced redo record over the files a mutation writes, converging forward at session open.\n- [hard] REQ-02: The recoverable-publication section describes application of a leftover record.\n- [hard] REQ-03: The stale-temporary-file guidance names the files safe to remove by hand and states that the data root's scratch directory holds the commit point.\n- [hard] REQ-04: The data-root layout in the concepts family lists the scratch directory.\n- [hard] REQ-05: The design-philosophy, overview, and core-model pages describe the same mechanism.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T16:03:09.606058262Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -24,7 +25,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Concept documents state the redo record",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T16:03:09.606058262Z"
 }

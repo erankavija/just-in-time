@@ -57,6 +57,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/investigation.md"
     }
   ],
+  "done_at": "2026-09-21T16:03:07.670347015Z",
   "first_ready_at": "2026-09-21T15:27:55.418424066Z",
   "gates_required": [
     "cargo-ci",
@@ -66,6 +67,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-09-21T15:55:41.143430907Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T16:02:53.199413675Z",
       "updated_by": "auto:executor"
     }
   },
@@ -82,7 +88,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Transaction kernel retirement",
-  "updated_at": "2026-09-21T15:55:41.143430907Z"
+  "updated_at": "2026-09-21T16:03:07.670347015Z"
 }

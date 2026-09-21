@@ -7,6 +7,7 @@
   ],
   "description": "The profiles reference describes profile publication and recovery as a redo record applied forward, and the bridge README points at the same contract.\n\n## Background\n\nThe reference carries the canonical adopter contract for profile publication: a typed durable journal, an external bootstrap control directory under a named protocol version, a transactions subdirectory under the data root, a verified sibling staging directory, mandatory recovery at every profile command, and rollback of a prepared transaction. Several other passages describe a profile application as one recoverable transaction.\n\nProfile application publishes through the same record as every other mutation, over data-root and worktree paths, so the section states the shared mechanism. The bridge README points readers at this page for the recoverable-publication contract and asserts that the bridge maintains no second transaction model, so it moves with the page it cites.\n\n## Success Criteria\n\n- [hard] REQ-01: The publication section describes one synced redo record carrying the profile's written files, its removed files, and its event append, applied at session open.\n- [hard] REQ-02: The page carries no description of a typed durable journal, an external bootstrap control directory, a protocol version, a verified sibling staging directory, or prepared-transaction rollback.\n- [hard] REQ-03: Passages calling a profile application one recoverable transaction state the record.\n- [hard] REQ-04: The page states that a profile's worktree targets publish in the same record as its data-root targets.\n- [hard] REQ-05: The bridge README describes the publication contract it points at in the same terms as this page.\n- [hard] REQ-06: The event catalogue's profile-lifecycle entry names the redo record as the commit point the operation reaches, and the generated events reference is regenerated from it.\n- [hard] REQ-07: The page's cross-references resolve, and it restates no fact the storage reference owns.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T16:03:08.670862831Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -28,7 +29,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T16:03:08.670862831Z"
 }

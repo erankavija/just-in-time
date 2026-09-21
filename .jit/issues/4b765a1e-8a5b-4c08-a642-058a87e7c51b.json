@@ -7,6 +7,7 @@
   ],
   "description": "The security-review gate's declared scope names the mechanisms the repository has.\n\n## Background\n\nThe gate registry declares each gate's review scope, and the security-review entry lists the areas a reviewer is expected to cover: path containment, symlink and junction races, recovery journals, untrusted manifest content, and the rest. Recovery journals stop existing when the transaction kernel retires, so the scope names an area with no code behind it and a reviewer is directed at nothing.\n\nThe registry is the authority and the rules-and-gates reference is its projection, so the line is corrected at source and the projection is re-rendered.\n\n## Success Criteria\n\n- [hard] REQ-01: The security-review gate's declared scope names no recovery journal, and it names the redo record's publication and replay in its place.\n- [hard] REQ-02: The remaining scope areas are unchanged.\n- [hard] REQ-03: The rules-and-gates reference matches the registry, produced by rendering rather than by hand.\n- [hard] REQ-04: Repository validation passes against the edited registry.\n",
   "documents": [],
+  "first_ready_at": "2026-09-21T16:03:08.341274244Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical",
@@ -26,7 +27,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Security review scope names live mechanisms",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T16:03:08.341274244Z"
 }
