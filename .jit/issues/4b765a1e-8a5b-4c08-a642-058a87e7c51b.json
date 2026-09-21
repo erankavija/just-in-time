@@ -50,13 +50,30 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T19:52:12.005636852Z",
   "first_ready_at": "2026-09-21T16:03:08.341274244Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T19:51:24.263999948Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-09-21T19:49:58.660021066Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-09-21T19:47:34.912841453Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
   "labels": [
     "type:task",
@@ -70,7 +87,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Security review scope names live mechanisms",
-  "updated_at": "2026-09-21T19:45:08.942370032Z"
+  "updated_at": "2026-09-21T19:52:12.005636852Z"
 }

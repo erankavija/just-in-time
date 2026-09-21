@@ -15207,3 +15207,14 @@
 {"fields":["documents"],"id":"6421d5c1-05c5-4480-960b-959577c80182","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:45:08.942370032Z","type":"issue_updated","updated_by":"doc-add"}
 {"assignee":"agent:jit-execution-lead","id":"cb7fb6b4-823f-47b8-92b8-2e6fbfac47d7","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","timestamp":"2026-09-21T19:45:09.225460238Z","type":"issue_claimed"}
 {"fields":["documents"],"id":"ae463cf6-32c6-47a1-8e8f-3bbe59e098de","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","timestamp":"2026-09-21T19:45:09.472507407Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"repo-validate","id":"fef8e4f5-57ac-499a-9ebe-315b08422376","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:47:34.912841453Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"cc6897f0-08e7-46d1-8065-086ef1d3385c","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:49:58.660021066Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"0f6a14e4-899b-4a8f-9c71-4f0622bec076","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:51:24.263999948Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"0b95c031-03fb-41af-a396-1b940c605900","issue_id":"42478e5d-90aa-472e-bca2-f628a1d883c2","timestamp":"2026-09-21T19:52:01.175528915Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"b8a70cb1-c30d-42f7-8fa6-881c7ba2340c","issue_id":"42478e5d-90aa-472e-bca2-f628a1d883c2","timestamp":"2026-09-21T19:52:01.175528915Z","type":"issue_claimed"}
+{"from":"ready","id":"b638a4d1-5dc9-4fb3-a580-e564a08b63c9","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","timestamp":"2026-09-21T19:52:01.574974949Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"c3c92ee8-08bc-4533-a97e-bece7710c896","issue_id":"434a60b7-a837-432d-b6ef-8711026e2210","timestamp":"2026-09-21T19:52:01.574974949Z","type":"issue_claimed"}
+{"from":"ready","id":"6c62db06-60e8-4477-a42a-e9b0a571f03d","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:52:01.981692554Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"395335fe-de91-4493-ab5f-c8db49615d11","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:52:01.981692554Z","type":"issue_claimed"}
+{"from":"in_progress","id":"1f038851-16fa-457d-bfa0-cfc5971f658c","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:52:12.005636852Z","to":"done","type":"issue_state_changed"}
+{"id":"2d08b4dd-22f5-4e67-9786-fc6477644c47","issue_id":"4b765a1e-8a5b-4c08-a642-058a87e7c51b","timestamp":"2026-09-21T19:52:12.005636852Z","type":"issue_completed"}

@@ -67,7 +67,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Record documentation states that an unreadable leftover record is refused",
-  "updated_at": "2026-09-21T19:45:09.472507407Z"
+  "updated_at": "2026-09-21T19:52:01.574974949Z"
 }

@@ -630,7 +630,7 @@
             "docs-mechanical",
             "repo-validate"
           ],
-          "status": "in_progress — dispatched, round 1"
+          "status": "done — repo-validate, docs-mechanical and doc-review passed on the merged tree, zero rework rounds"
         },
         {
           "id": "434a60b7-a837-432d-b6ef-8711026e2210",
@@ -1460,6 +1460,13 @@
       "wave": 13,
       "finding": "Parallel documentation dispatch produced a cross-page duplication that only exists after merge: ccea63de created the canonical `## Publication and Recovery` section in storage-format.md while 79252d23 independently wrote the same generic contract into profiles.md. Neither could see the other. code-review caught it on 79252d23 as F3 (REQ-07: restates no fact the storage reference owns).",
       "lesson": "When parallel doc tasks share a canonical home, name which page owns the shared content in every prompt, so the non-owning pages write a citation from the start rather than a copy."
+    },
+    {
+      "id": "PF-22",
+      "session": 6,
+      "finding": "Session 6 dispatched waves 10-14 without moving any issue to in_progress. The lead acquired leases (`jit claim acquire`) and relied on the assignee field, but never ran `jit issue claim`, which is what promotes an issue to in_progress. Issues went ready -> done directly, and the tracker showed no work in flight while workers were running. The owner noticed.",
+      "cause": "Wave 10's first `jit issue claim <id> agent:worker` was refused because the issue was already assigned to agent:jit-execution-lead; the lead switched to lease acquisition and never returned to issue claim.",
+      "fix": "Claim every dispatched issue with `jit issue claim <id> agent:jit-execution-lead` (the refusal message itself says re-claiming as the assignee succeeds and promotes to in_progress), and confirm the state reads in_progress before sending the worker. Leases are separate: they are still needed for gate evaluation and state updates."
     }
   ],
   "evidence_requirements": [

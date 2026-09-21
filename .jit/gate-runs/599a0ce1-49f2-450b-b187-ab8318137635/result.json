@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "972e1062d7900f742801f15ee9be3e6339ed6210",
+  "completed_at": "2026-09-21T19:51:23.958979822Z",
+  "duration_ms": 84664,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The security-review scope and its canonical rendered reference accurately and concisely name redo-record publication and replay.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "599a0ce1-49f2-450b-b187-ab8318137635",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T19:49:59.294477612Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children. Reviewed tagged commits `9dfc313a` and `972e1062` separately; their adopter-facing footprint is the registry update and its rendered rules-and-gates projection.\n\nThe updated scope accurately names the live redo-record publication/replay mechanism, preserves the remaining scope, and is concise and discoverable in the canonical generated reference.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The security-review scope and its canonical rendered reference accurately and concisely name redo-record publication and replay.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
