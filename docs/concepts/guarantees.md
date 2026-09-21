@@ -514,9 +514,9 @@ mutating command applies it.
 # cleanup).
 jit recover
 
-# Manual sweep at any time. Match the .tmp suffix, which the scratch directory
-# and its record do not carry.
-find .jit -name '*.tmp' -mmin +60 -delete
+# Manual sweep at any time. Match regular files with the .tmp suffix, which
+# the scratch directory and its record do not carry.
+find .jit -type f -name '*.tmp' -mmin +60 -delete
 ```
 
 The one-hour age is the default temp-file cleanup threshold — see
