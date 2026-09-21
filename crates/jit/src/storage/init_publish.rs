@@ -16,14 +16,21 @@ use crate::storage::repository_state_store::{
 };
 use cap_std::fs::Dir;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-/// The stage directory's name beside the data root named `data_leaf`.
+/// The stage directory a publication of the root at `data_root` writes into.
 ///
-/// One deterministic name, so the next publication reclaims the orphan an
+/// One deterministic sibling, so the next publication reclaims the orphan an
 /// interrupted one left; the session's bootstrap lock is what keeps two
 /// publications from sharing it.
-pub(in crate::storage) fn stage_name(data_leaf: &str) -> String {
+pub(in crate::storage) fn stage_path(data_root: &Path) -> PathBuf {
+    let leaf = data_root.file_name().unwrap_or_default().to_string_lossy();
+    data_root.with_file_name(stage_name(&leaf))
+}
+
+/// [`stage_path`] for a caller holding the data root as a parent capability
+/// and the leaf it publishes at.
+fn stage_name(data_leaf: &str) -> String {
     format!("{data_leaf}.stage")
 }
 

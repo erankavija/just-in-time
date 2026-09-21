@@ -3786,19 +3786,13 @@ impl crate::storage::TransactionFailureInjector for RecordedKernelBoundaries {
     }
 }
 
-/// The sibling stage a publication of `data` writes its new root into.
-fn sibling_stage(data: &Path) -> PathBuf {
-    let leaf = data.file_name().and_then(|leaf| leaf.to_str()).unwrap();
-    data.with_file_name(crate::storage::init_publish::stage_name(leaf))
-}
-
 /// REQ-01: the complete scaffold stands in the sibling stage while nothing
 /// occupies the destination, so the rename alone is what makes it the root.
 #[test]
 fn test_absent_data_root_publishes_a_complete_sibling_stage_by_rename() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
-    let stage = sibling_stage(&data);
+    let stage = crate::storage::init_publish::stage_path(&data);
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
 
     let observed = Arc::new(Mutex::new(None));
@@ -3861,7 +3855,7 @@ fn test_occupied_destination_refuses_absent_root_publication_and_leaves_it_untou
 fn test_interrupted_absent_root_publication_leaves_no_root_and_the_next_reclaims_its_stage() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
-    let stage = sibling_stage(&data);
+    let stage = crate::storage::init_publish::stage_path(&data);
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
 
     let interrupted = JsonFileStorage::with_mutation_interruptions(

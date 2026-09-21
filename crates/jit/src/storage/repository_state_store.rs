@@ -696,15 +696,11 @@ impl JsonMutationSession {
         let record = redo_record_for(image, of_class(RepositoryRootClass::Worktree))?;
         ensure_write_set_unchanged(&self.roots, image, &record)?;
         let applier = RedoApplier::new(SessionRedoInterruptions::new(Arc::clone(&interruptions)));
-        let apply = |roots: &CapabilityRoots| {
-            applier
-                .apply(roots, &record)
-                .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+        let redo = |outcome: Result<(), RedoApplyError>| {
+            outcome.map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
         };
         if of_class(RepositoryRootClass::Data).next().is_none() {
-            return applier
-                .apply_uncommitted(&self.roots, &record)
-                .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)));
+            return redo(applier.apply_uncommitted(&self.roots, &record));
         }
         init_publish::stage_new_data_root(
             &self.data_parent,
@@ -717,12 +713,7 @@ impl JsonMutationSession {
             // its worktree targets are one act: the rename carries the record
             // into the root, and an interruption between them leaves it there.
             record
-                .commit(
-                    &self
-                        .layout
-                        .data_root()
-                        .with_file_name(init_publish::stage_name(&self.data_leaf)),
-                )
+                .commit(&init_publish::stage_path(self.layout.data_root()))
                 .map_err(RepositoryStateStoreError::Transaction)?;
         }
         interruptions.check(&MutationPoint::BeforeRootPublication)?;
@@ -747,7 +738,7 @@ impl JsonMutationSession {
         match carries_worktree {
             // Through the published root's capabilities: the record the rename
             // carried in is removed from the scratch directory it now has.
-            true => apply(&CapabilityRoots::open(&refreshed)?.0),
+            true => redo(applier.apply(&CapabilityRoots::open(&refreshed)?.0, &record)),
             false => Ok(()),
         }
     }
