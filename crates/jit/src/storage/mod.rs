@@ -15,11 +15,9 @@ pub mod claim_coordinator;
 pub mod clock;
 #[cfg(test)]
 pub(crate) mod contention_probe;
-pub mod control_plane;
 pub mod discovery;
 pub mod errors;
 pub(crate) mod external_publish;
-pub(crate) mod file_transaction;
 pub mod gate_runs;
 pub mod gate_store;
 pub mod git_revision;
@@ -42,9 +40,6 @@ pub mod ruleset_store;
 pub mod temp_cleanup;
 #[cfg(feature = "test-support")]
 mod test_support;
-mod transaction_journal;
-mod transaction_recovery;
-mod transaction_staging;
 pub mod user_config_store;
 pub mod warnings;
 pub mod worktree_identity;
@@ -61,10 +56,6 @@ pub use errors::{
     InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
     RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
 };
-// Storage-only: the transaction kernel recovers journals inside repository
-// roots, so no command may name it. Commands publish through
-// `RepositoryStateStore` sessions.
-pub(in crate::storage) use file_transaction::{FileTransactionKernel, TransactionControlLocation};
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
 };
@@ -93,13 +84,6 @@ pub use repository_state_store::{
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub use test_support::{publish_fixture_directory_noreplace, publish_fixture_file_noreplace};
-pub(crate) use transaction_recovery::FileTransactionError;
-// Kernel-only failure-injection seam: the kernel's own boundaries are named by
-// the modules that host it, and a consumer injects a session through
-// `MutationPoint` instead.
-pub(in crate::storage) use transaction_recovery::{
-    FailurePoint as TransactionFailurePoint, NoTransactionFailures, TransactionFailureInjector,
-};
 pub use warnings::StorageWarning;
 pub use worktree_paths::WorktreePaths;
 
@@ -151,9 +135,9 @@ pub trait IssueStore: Clone {
     ///
     /// File-backed CLI storage overrides this to release the bootstrap and
     /// repository locks while a checker subprocess runs. The locks are
-    /// reacquired and pending journals are recovered before the caller can
-    /// publish the subprocess result through its session. Backends without a retained startup
-    /// session execute `operation` directly.
+    /// reacquired and a record the subprocess left is applied before the caller
+    /// can publish its result through its session. Backends without a retained
+    /// startup session execute `operation` directly.
     ///
     /// # Errors
     ///

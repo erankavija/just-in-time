@@ -11,7 +11,6 @@ use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
-use crate::storage::file_transaction::repository_unix_mode;
 use crate::storage::redo_record::{
     EventAppend, PutFile, RedoRecord, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
@@ -273,9 +272,11 @@ pub(in crate::storage) fn write_staged_file(
 fn set_mode(file: &File, mode: FileMode) -> Result<(), RedoApplyError> {
     use cap_std::fs::PermissionsExt;
 
-    repository_unix_mode(mode)
-        .map(|mode| file.set_permissions(cap_std::fs::Permissions::from_mode(mode)))
-        .transpose()?;
+    let bits = match mode {
+        FileMode::Regular => 0o644,
+        FileMode::Executable => 0o755,
+    };
+    file.set_permissions(cap_std::fs::Permissions::from_mode(bits))?;
     Ok(())
 }
 

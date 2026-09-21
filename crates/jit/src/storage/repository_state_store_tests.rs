@@ -9,7 +9,7 @@ use crate::storage::redo_apply::test_fixtures::{
     repository as redo_repository, seed_repository, snapshot, SnapshotEntry, CAPTURED_LOG,
 };
 use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::process::Command;
 use std::sync::Mutex;
 use tempfile::TempDir;
@@ -343,28 +343,6 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
         .unwrap();
     assert_eq!(json.load_issue(&issue.id).unwrap(), issue);
     assert_eq!(json.list_issues().unwrap(), vec![issue]);
-}
-
-#[derive(Default)]
-struct SelectedFailures(Mutex<HashSet<TransactionFailurePoint>>);
-
-impl SelectedFailures {
-    fn one(point: TransactionFailurePoint) -> Arc<Self> {
-        Arc::new(Self(Mutex::new(HashSet::from([point]))))
-    }
-}
-
-impl crate::storage::TransactionFailureInjector for SelectedFailures {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        // Fire once, then clear, so a later recovery on the same in-memory
-        // instance (whose state lives with the storage, not on disk) proceeds
-        // with a clean boundary instead of re-tripping the injected point.
-        if self.0.lock().unwrap().remove(point) {
-            Err(std::io::Error::other(format!("injected {point:?}")))
-        } else {
-            Ok(())
-        }
-    }
 }
 
 #[test]
@@ -1043,8 +1021,10 @@ fn test_conformance_empty_delta_is_a_noop_on_both_backends() {
     // its complete captured-image plan hash. No residue is created.
     assert_eq!(memory_outcome.actions_applied, json_outcome.actions_applied);
     assert_eq!(json_outcome.actions_applied, 0);
-    assert!(!worktree.path().join(".jit-bootstrap").exists());
-    assert!(!data.join("tmp/transactions").exists());
+    assert!(!data
+        .join(RECORD_SCRATCH_DIR)
+        .join(RECORD_FILE_NAME)
+        .exists());
 }
 
 fn apply_once<S: RepositoryStateStore>(
@@ -3628,86 +3608,6 @@ fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     );
 }
 
-/// REQ-05 where the reviewer found it open: a repository holding both a
-/// recoverable journal and a malformed record. External recovery, internal
-/// recovery and the companion sweep all mutate, and all run before the record
-/// is applied, so the record has to be read before the first of them.
-#[test]
-fn test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates() {
-    let backend = FileSessionBackend::seeded();
-    leave_recoverable_journal(&backend);
-    let scratch = backend.scratch_path();
-    std::fs::create_dir_all(&scratch).unwrap();
-    std::fs::write(scratch.join(RECORD_FILE_NAME), b"not a redo record").unwrap();
-    let before = snapshot(backend.worktree.path());
-    assert!(
-        before
-            .keys()
-            .any(|path| path.starts_with(Path::new(".jit-bootstrap"))),
-        "the fixture must leave a journal for recovery to act on, got {:?}",
-        before.keys().collect::<Vec<_>>()
-    );
-
-    let error = match backend.open() {
-        Err(error) => error,
-        Ok(_) => panic!("a malformed leftover record must refuse the session open"),
-    };
-
-    assert!(
-        matches!(
-            &error,
-            RepositoryStateStoreError::UnreadableRedoRecord { .. }
-        ),
-        "the refusal must be the record's, not recovery's, got {error:?}"
-    );
-    assert_eq!(
-        snapshot(backend.worktree.path()),
-        before,
-        "the journal must be left unrecovered and every other byte untouched"
-    );
-}
-
-/// Leave one journal a later open would recover: a mutation interrupted past
-/// its commit point, which the next session completes forward.
-///
-/// Written through the transaction kernel directly, over a second, absent data
-/// root in the same worktree: no publisher reaches the kernel any more, and a
-/// journal is what this fixture is for. It retires with the kernel
-/// (jit:b0ee2dd6). The journal it leaves is the worktree-level external one
-/// every session over this worktree recovers.
-fn leave_recoverable_journal(backend: &FileSessionBackend) {
-    let data = backend.worktree.path().join(".jit-sibling");
-    let storage = JsonFileStorage::new(&data);
-    let layout = discover_repository_layout(backend.worktree.path(), &data).unwrap();
-    let path = data_path("interrupted.txt");
-    let delta = RepositoryDelta::new(
-        &layout,
-        vec![RepositoryAction::write_file(
-            path,
-            "interrupted",
-            ExpectedPreimage::Absent,
-            b"interrupted".to_vec(),
-            FileMode::Regular,
-        )],
-    )
-    .unwrap();
-    let (roots, data_parent, data_leaf) = CapabilityRoots::open(&layout).unwrap();
-    let kernel = FileTransactionKernel::for_repository_layout(
-        layout,
-        roots.worktree.try_clone().unwrap(),
-        None,
-        data_parent,
-        data_leaf,
-        SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit),
-    )
-    .unwrap();
-    let guard = storage.acquire_bootstrap_write_lock().unwrap();
-
-    assert!(kernel
-        .execute_repository_delta(&guard, "interrupted", &delta, "plan")
-        .is_err());
-}
-
 /// REQ-04. Every scratch entry but the record is sealed against opening, so a
 /// pass that read one fails here; the listing is compared across the open, so
 /// one that wrote there shows up too. A permission trap on the directory
@@ -3775,23 +3675,6 @@ impl crate::storage::MutationInterruptionInjector for HookAtMoment {
                 hook();
             }
         }
-        Ok(())
-    }
-}
-
-/// Every transaction-kernel boundary one session reached, in order.
-#[derive(Default)]
-struct RecordedKernelBoundaries(Mutex<Vec<TransactionFailurePoint>>);
-
-impl RecordedKernelBoundaries {
-    fn reached(&self) -> Vec<TransactionFailurePoint> {
-        self.0.lock().unwrap().clone()
-    }
-}
-
-impl crate::storage::TransactionFailureInjector for RecordedKernelBoundaries {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        self.0.lock().unwrap().push(point.clone());
         Ok(())
     }
 }
@@ -3938,37 +3821,4 @@ fn test_absent_root_publication_carries_its_worktree_targets_in_the_redo_record(
 
     assert_eq!(session.recovery_report().applied_records, 1);
     assert_eq!(std::fs::read(&note).unwrap(), b"note");
-}
-
-/// REQ-05, REQ-06: the publisher carries the creation protocol alone. The
-/// kernel's failure points name its every boundary, so an apply reaching none
-/// of them wrote no journal, opened no bootstrap control, and re-verified no
-/// published identity.
-#[test]
-fn test_absent_root_publication_reaches_no_transaction_kernel_boundary() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let boundaries = Arc::new(RecordedKernelBoundaries::default());
-    let storage = JsonFileStorage::with_repository_state_failures(
-        &data,
-        Arc::clone(&boundaries) as Arc<dyn crate::storage::TransactionFailureInjector>,
-    );
-
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let image = session.capture(initial_spec()).unwrap();
-    let before_apply = boundaries.reached();
-    session
-        .apply(&test_plan(&image, &initialization_delta(&layout)))
-        .unwrap();
-
-    assert_eq!(
-        boundaries.reached(),
-        before_apply,
-        "publishing an absent data root reached a transaction-kernel boundary"
-    );
-    assert!(
-        !worktree.path().join(".jit-bootstrap").exists(),
-        "the publisher opened an external bootstrap control directory"
-    );
 }

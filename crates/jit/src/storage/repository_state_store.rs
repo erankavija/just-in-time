@@ -13,14 +13,12 @@ use crate::repository_state::{
     RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
-use crate::storage::file_transaction::RepositoryRecoveryDisposition;
 use crate::storage::init_publish;
 use crate::storage::memory::MemoryRepositoryState;
 use crate::storage::{
-    FileLocker, FileTransactionKernel, InMemoryStorage, IssueStore, JsonFileStorage,
-    MemoryRedoApplier, MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier,
-    RedoApplyError, RedoRecord, RepoWriteGuard, SessionRedoInterruptions,
-    TransactionControlLocation, TransactionFailurePoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
+    FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, MemoryRedoApplier,
+    MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier, RedoApplyError, RedoRecord,
+    RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
 use cap_primitives::fs::FollowSymlinks;
 use cap_std::fs::{Dir, OpenOptions};
@@ -42,19 +40,15 @@ pub struct RepositoryApplyOutcome {
 /// Residue one session open carried forward.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RecoveryDispatchReport {
-    /// External journals or orphan controls recovered in deterministic id order.
-    pub external_transactions: Vec<String>,
-    /// Internal data-root journals recovered in deterministic id order.
-    pub internal_transactions: Vec<String>,
     /// Leftover redo records applied: one, or none, because a record is the
     /// whole of one mutation.
     pub applied_records: usize,
 }
 
 impl RecoveryDispatchReport {
-    /// Journals recovered plus records applied.
+    /// Records applied.
     pub fn recovered_count(&self) -> usize {
-        self.external_transactions.len() + self.internal_transactions.len() + self.applied_records
+        self.applied_records
     }
 }
 
@@ -247,8 +241,8 @@ fn apply_leftover_record(
     Ok(1)
 }
 
-/// Runs before any recovery pass, so a record it refuses is refused over an
-/// untouched repository. A repository holding no record pays one look at the
+/// Runs before the record is applied, so a record this open refuses is refused
+/// over an untouched repository. A repository holding none pays one look at the
 /// record's own name: the parent walk stops at an absent scratch directory and
 /// the open at an absent record, and nothing there is enumerated or otherwise
 /// read.
@@ -441,15 +435,14 @@ impl RepositoryStateStore for JsonFileStorage {
         // Mark a repository mutation session as held on this thread so a later
         // attempt to enter claim coordination (reverse order) is rejected.
         let order_guard = crate::storage::guard_order::RepositoryOrderGuard::enter();
-        let injector = self.repository_state_failures();
         let interruptions = self.mutation_interruptions();
 
-        // Serialize the worktree-side `.jit-bootstrap` namespace at the WORKTREE
-        // root, outermost, so two sessions sharing this worktree with data roots
-        // under different parents cannot concurrently mutate its companions and
-        // external journals. For a nested repo this is the same reentrant lock as
-        // the bootstrap lock below; for a disjoint root it is a distinct outer
-        // lock. Acquired before any capability discovery.
+        // Serialize the worktree-side bootstrap namespace at the WORKTREE root,
+        // outermost, so two sessions sharing this worktree with data roots under
+        // different parents cannot concurrently publish into it. For a nested
+        // repo this is the same reentrant lock as the bootstrap lock below; for
+        // a disjoint root it is a distinct outer lock. Acquired before any
+        // capability discovery.
         let worktree_bootstrap_guard =
             self.acquire_worktree_bootstrap_lock(layout.worktree_root())?;
         // Fixed order: bootstrap serialization is acquired BEFORE any capability
@@ -459,94 +452,29 @@ impl RepositoryStateStore for JsonFileStorage {
         let bootstrap_guard = self.acquire_bootstrap_write_lock()?;
         revalidate_layout(&layout)?;
 
-        // External recovery needs the data capability exactly as it exists now:
-        // a still-unpublished prepared root has none and rolls back, while an
-        // already-published absent root exists and completes forward, verifying
-        // its final data actions. Recovery never itself newly publishes a root,
-        // so this pre-recovery view is authoritative for the external pass; the
-        // main kernel is rebuilt from a fresh view afterward.
-        let (pre_roots, pre_parent, pre_leaf) = CapabilityRoots::open(&layout)?;
-        // Read before the first recovery pass, apply after the last: a record
-        // this session cannot read is refused while the repository is still
-        // exactly as it was found, and a readable one is carried to the apply
-        // below rather than read a second time, so a repository holding none
-        // still pays one by-name look. The bytes are safe to carry because the
-        // bootstrap lock above is held until this session ends, and no other
-        // session can open — and so write a record — while it is.
-        let leftover_record = read_leftover_record(&pre_roots)?;
-        let recovery_kernel = FileTransactionKernel::for_repository_layout(
-            layout.clone(),
-            pre_roots.worktree.try_clone()?,
-            pre_roots.data.as_ref().map(Dir::try_clone).transpose()?,
-            pre_parent,
-            pre_leaf,
-            Arc::clone(&injector),
-        )?;
-        interruptions.check(&MutationPoint::SessionOpen)?;
-        injector.check(&TransactionFailurePoint::RepositoryRecoveryExternal)?;
-        let external_transactions = recover_location(
-            &recovery_kernel,
-            TransactionControlLocation::ExternalBootstrap,
-        )?;
-        drop(recovery_kernel);
-        drop(pre_roots);
-
-        // Rediscover capabilities AFTER external recovery: absent-root recovery
-        // may have published the selected data root, and prepared-root recovery
-        // may have removed it. The kernel is pinned to these fresh, identity-
-        // bound handles for the remainder of the session.
         let (roots, data_parent, data_leaf) = CapabilityRoots::open(&layout)?;
-        let kernel = FileTransactionKernel::for_repository_layout(
-            layout.clone(),
-            roots.worktree.try_clone()?,
-            roots.data.as_ref().map(Dir::try_clone).transpose()?,
-            data_parent.try_clone()?,
-            data_leaf.clone(),
-            Arc::clone(&injector),
-        )?;
+        let leftover_record = read_leftover_record(&roots)?;
+        interruptions.check(&MutationPoint::SessionOpen)?;
 
-        let (repository_guard, internal_transactions, external_transactions, applied_records) =
-            if roots.data.is_some() {
-                let repository_guard = self.acquire_repo_write_lock_raw()?;
-                let _events_guard = self.acquire_events_write_lock()?;
-                injector.check(&TransactionFailurePoint::RepositoryRecoveryInternal)?;
-                let internal_transactions =
-                    recover_location(&kernel, TransactionControlLocation::InternalRepository)?;
-                // After internal-journal recovery, reclaim worktree-side companions
-                // left orphaned by a crash whose internal transaction is already gone.
-                let swept_companions = kernel.sweep_orphan_companions(&repository_guard)?;
-                let mut external_transactions = external_transactions;
-                external_transactions.extend(swept_companions);
-                external_transactions.sort();
-                external_transactions.dedup();
-                // Inside both locks, because the record writes repository
-                // state, and after journal recovery, whose rollback would undo
-                // what the record published. The record lives inside the data
-                // root, so the absent-root branch has none to apply.
-                let applied_records =
-                    apply_leftover_record(&roots, leftover_record, Arc::clone(&interruptions))?;
-                (
-                    Some(repository_guard),
-                    internal_transactions,
-                    external_transactions,
-                    applied_records,
-                )
-            } else {
-                (None, Vec::new(), external_transactions, 0)
-            };
+        let (repository_guard, applied_records) = if roots.data.is_some() {
+            let repository_guard = self.acquire_repo_write_lock_raw()?;
+            let _events_guard = self.acquire_events_write_lock()?;
+            // Inside both locks, because the record writes repository state.
+            // The record lives inside the data root, so the absent-root branch
+            // has none to apply.
+            let applied_records =
+                apply_leftover_record(&roots, leftover_record, Arc::clone(&interruptions))?;
+            (Some(repository_guard), applied_records)
+        } else {
+            (None, 0)
+        };
         let events_lock = roots.data.as_ref().map(|_| self.events_lock_spec());
-        // Recovery is the whole of the kernel's remaining work, and it is done.
-        drop(kernel);
 
         self.configure_repository_layout(&layout);
         Ok(Box::new(JsonMutationSession {
             layout,
             storage: self.clone(),
-            recovery_report: RecoveryDispatchReport {
-                external_transactions,
-                internal_transactions,
-                applied_records,
-            },
+            recovery_report: RecoveryDispatchReport { applied_records },
             roots,
             data_parent,
             data_leaf,
@@ -585,10 +513,7 @@ impl RepositoryStateStore for InMemoryStorage {
         Ok(Box::new(MemoryMutationSession {
             layout,
             storage: self.clone(),
-            recovery_report: RecoveryDispatchReport {
-                applied_records,
-                ..Default::default()
-            },
+            recovery_report: RecoveryDispatchReport { applied_records },
             _guard: guard,
             _reentry: reentry,
             _order_guard: order_guard,
@@ -871,28 +796,6 @@ fn publish_absent_memory_root(
     state.entries = candidate.entries;
     state.data_root_exists = candidate.data_root_exists;
     Ok(())
-}
-
-fn recover_location(
-    kernel: &FileTransactionKernel,
-    location: TransactionControlLocation,
-) -> Result<Vec<String>, RepositoryStateStoreError> {
-    let transactions = kernel.pending_repository_transactions(location)?;
-    let recovered = transactions
-        .into_iter()
-        .filter_map(
-            |id| match kernel.recover_repository_transaction(location, &id) {
-                Ok(RepositoryRecoveryDisposition::Recovered) => Some(Ok(id)),
-                Ok(
-                    RepositoryRecoveryDisposition::SkippedCompanion
-                    | RepositoryRecoveryDisposition::SkippedForeignOwner,
-                ) => None,
-                Err(error) => Some(Err(RepositoryStateStoreError::Transaction(error))),
-            },
-        )
-        .collect::<Result<Vec<_>, _>>()?;
-    kernel.cleanup_empty_repository_control(location)?;
-    Ok(recovered)
 }
 
 fn ensure_session_image(

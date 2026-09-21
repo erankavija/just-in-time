@@ -348,28 +348,28 @@ pub(crate) fn parse_repository_index(bytes: &[u8]) -> Result<Index> {
     }
 }
 
-/// File-backed repository reader and transaction-session provider.
+/// File-backed repository reader and mutation-session provider.
 ///
 /// This implementation stores each issue as a separate JSON file in `.jit/issues/`,
 /// events in `.jit/events.jsonl`, and gate definitions in `.jit/gates.toml` — a
 /// `[[gates]]` array-of-tables parsed through [`crate::storage::gate_store`].
 /// Publication is owned by its [`RepositoryStateStore`] implementation, which
-/// applies complete repository deltas through the file transaction kernel.
+/// applies complete repository deltas through one redo record.
 ///
 /// A mutation session retains the repository-sibling bootstrap lock followed by
 /// the repository write lock ([`RepoWriteLock`], `.repo-write.lock`) across
 /// recovery, capture, and apply. Typed readers retain their narrower shared
 /// locks; event-log publication takes the matching exclusive event lock only
-/// around recovery or transactional apply.
+/// around recovery or apply.
 #[derive(Clone)]
 pub struct JsonFileStorage {
     root: PathBuf,
     locker: FileLocker,
     /// Repository-sibling lock acquired before `.jit/.repo-write.lock`.
     ///
-    /// It deliberately lives outside `.jit-bootstrap/`: fresh-root recovery
-    /// removes that control directory while retaining this guard, and deleting
-    /// the backing lock inode would let another process lock a replacement.
+    /// It deliberately lives outside `.jit/`: a session over an absent data
+    /// root retains this guard while that root does not exist yet, and a lock
+    /// inode inside the root would be a different inode once it is published.
     bootstrap_lock: Arc<RepoWriteLock>,
     /// Shared by every clone of this instance, so a nested write inside a
     /// sequence that already holds the lock reenters it instead of deadlocking.
@@ -382,7 +382,6 @@ pub struct JsonFileStorage {
     /// guard is thread-scoped. Clones use this metadata to fail cross-thread
     /// access instead of silently running outside the retained boundary.
     retained_state: Arc<Mutex<RetainedSessionState>>,
-    repository_state_failures: Arc<dyn crate::storage::TransactionFailureInjector>,
     /// Interruption seam for the session's own moments: its open, its
     /// pre-commit check, and the steps of its redo-record application.
     mutation_interruptions: Arc<dyn crate::storage::MutationInterruptionInjector>,
@@ -436,7 +435,6 @@ impl JsonFileStorage {
             bootstrap_lock,
             retention_id: NEXT_RETENTION_ID.fetch_add(1, Ordering::Relaxed),
             retained_state: Arc::new(Mutex::new(RetainedSessionState::Idle)),
-            repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             mutation_interruptions: Arc::new(crate::storage::NoMutationInterruptions),
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
@@ -483,21 +481,6 @@ impl JsonFileStorage {
         storage
     }
 
-    /// Construct storage with deterministic kernel-boundary failure injection.
-    ///
-    /// Kernel vocabulary, so the storage layer's own suite reaches boundaries
-    /// no session moment stands for; every other consumer injects through
-    /// [`with_mutation_interruptions`](Self::with_mutation_interruptions).
-    #[cfg(test)]
-    pub(in crate::storage) fn with_repository_state_failures<P: AsRef<Path>>(
-        root: P,
-        failures: Arc<dyn crate::storage::TransactionFailureInjector>,
-    ) -> Self {
-        let mut storage = Self::new(root);
-        storage.repository_state_failures = failures;
-        storage
-    }
-
     #[cfg(test)]
     pub(crate) fn with_git_program<P: AsRef<Path>, G: Into<PathBuf>>(
         root: P,
@@ -539,12 +522,6 @@ impl JsonFileStorage {
             .keys()
             .cloned()
             .collect()
-    }
-
-    pub(crate) fn repository_state_failures(
-        &self,
-    ) -> Arc<dyn crate::storage::TransactionFailureInjector> {
-        Arc::clone(&self.repository_state_failures)
     }
 
     pub(crate) fn mutation_interruptions(
@@ -645,19 +622,18 @@ impl JsonFileStorage {
 
     /// Acquire only the repository-sibling bootstrap lock.
     ///
-    /// Startup recovery uses this before touching `.jit/`, because a prepared
-    /// fresh-root transaction may need to restore the complete absence of that
-    /// directory.
+    /// A session uses this before touching `.jit/`, because the root itself may
+    /// be what the session publishes.
     pub(crate) fn acquire_bootstrap_write_lock(&self) -> Result<RepoWriteGuard> {
         self.bootstrap_lock.acquire()
     }
 
     /// Acquire the bootstrap lock keyed at the WORKTREE root, serializing the
-    /// worktree-side `.jit-bootstrap` transactions namespace across every session
-    /// sharing the worktree regardless of its data root. For a nested repo this is
-    /// the same reentrant instance as [`acquire_bootstrap_write_lock`]; for a
-    /// disjoint data root it is a distinct, outer lock that prevents two such
-    /// sessions from concurrently mutating one worktree's companions and journals.
+    /// worktree-side namespace across every session sharing the worktree
+    /// regardless of its data root. For a nested repo this is the same reentrant
+    /// instance as [`acquire_bootstrap_write_lock`]; for a disjoint data root it
+    /// is a distinct, outer lock that prevents two such sessions from
+    /// concurrently publishing into one worktree.
     pub(crate) fn acquire_worktree_bootstrap_lock(
         &self,
         worktree_root: &Path,
@@ -679,9 +655,9 @@ impl JsonFileStorage {
 
     /// Acquire the event-log lock after the repository write lock.
     ///
-    /// Repository-state publication replaces the complete next event-log image
-    /// inside a file-set transaction, so typed event readers are excluded while
-    /// those bytes are recovered or applied.
+    /// Repository-state publication appends to the event log through its redo
+    /// record, so typed event readers are excluded while those bytes are
+    /// applied.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
         self.locker.lock_exclusive(&self.root.join(".events.lock"))
     }
@@ -1147,8 +1123,8 @@ impl IssueStore for JsonFileStorage {
         let operation_result = operation();
 
         // Re-establish the boundary before the caller can persist a verdict.
-        // This also repairs a journal left by a checker-side mutation that
-        // crashed after preparing or committing its transaction. The external
+        // This also applies a record left by a checker-side mutation that
+        // crashed after committing it. The external
         // process has already finished, so a lock wait that expires is retried
         // rather than discarding its outcome: another jit process holds the
         // chain, and that holder is itself a bounded operation.

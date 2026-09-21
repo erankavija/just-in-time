@@ -30,6 +30,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 
+/// The filesystem refused an operation this publication's durability needs.
+#[derive(Debug, thiserror::Error)]
+#[error("filesystem operation required for durable publication is unsupported: {operation}")]
+pub(crate) struct UnsupportedFilesystem {
+    pub(crate) operation: String,
+}
+
 /// Successful external publication plus non-fatal durability/cleanup warnings
 /// observed after the no-return commit point.
 #[derive(Debug, Default)]
@@ -215,12 +222,10 @@ pub(crate) fn publish_external_directory_noreplace(
                 target.display()
             ))
             .into(),
-            std::io::ErrorKind::Unsupported => {
-                crate::storage::FileTransactionError::UnsupportedFilesystem {
-                    operation: "atomic no-replace external directory publication".into(),
-                }
-                .into()
+            std::io::ErrorKind::Unsupported => UnsupportedFilesystem {
+                operation: "atomic no-replace external directory publication".into(),
             }
+            .into(),
             _ => anyhow::Error::new(error),
         });
     }
