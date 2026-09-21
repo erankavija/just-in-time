@@ -59,7 +59,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-21T08:53:24.570982485Z",
+      "updated_at": "2026-09-21T09:03:36.232089704Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -83,5 +83,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-09-21T09:00:32.299002858Z"
+  "updated_at": "2026-09-21T09:03:36.232089704Z"
 }
