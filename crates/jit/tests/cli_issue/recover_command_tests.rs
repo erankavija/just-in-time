@@ -140,10 +140,8 @@ fn test_recover_help_describes_purpose() {
         .stdout(predicate::str::contains("stale"));
 }
 
-/// The recover command reports the record its startup session applied. The
-/// count it prints comes from the session's recovery dispatch, so a leftover
-/// record reaches the adopter through the same field a recovered transaction
-/// does — the field's spelling is renamed by jit:51eb1aa6, not here.
+/// REQ-03 at the recover command. The field keeps its transaction spelling;
+/// jit:51eb1aa6 renames it.
 #[test]
 fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     use jit::storage::{PutFile, RedoRecord};

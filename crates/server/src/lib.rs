@@ -124,8 +124,7 @@ mod recovery_startup_tests {
         assert!(!temp.path().join(".jit-bootstrap").exists());
     }
 
-    /// The startup count the server logs covers a leftover redo record, which
-    /// the startup session applies like any other residue it carries forward.
+    /// REQ-03 at the count `main` logs on startup.
     #[test]
     fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
         use jit::repository_state::{FileMode, VirtualPath};

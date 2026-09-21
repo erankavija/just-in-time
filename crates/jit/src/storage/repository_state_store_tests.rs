@@ -3392,10 +3392,6 @@ fn long_log() -> Vec<u8> {
         .collect()
 }
 
-/// What the session-open contract needs of a backend: a seeded repository, the
-/// commit point a leftover record occupies, one session open, and readings of
-/// what the record published.
-///
 /// One contract, run on both backends, because applying a leftover record is
 /// the session's behaviour rather than either backend's
 /// (`@/inv/shared-test-contracts`).
@@ -3403,16 +3399,14 @@ trait SessionRecordBackend: Sized {
     /// What a record publishes, compared between two opens.
     type Published: std::fmt::Debug + PartialEq;
 
-    /// A repository whose data root exists and whose event log holds
-    /// [`CAPTURED_LOG`], the offset [`leftover_record`] appends at.
+    /// Its event log holds [`CAPTURED_LOG`], the offset [`leftover_record`]
+    /// appends at.
     fn seeded() -> Self;
-    /// Leave `record` at the commit point a session open finds it at.
     fn commit(&self, record: &RedoRecord);
     fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
     fn published(&self) -> Self::Published;
     /// Whether a record is still waiting for an open to carry it forward.
     fn holds_record(&self) -> bool;
-    /// The live bytes at `path`, or `None` when nothing is there.
     fn bytes_at(&self, path: &VirtualPath) -> Option<Vec<u8>>;
 }
 
@@ -3508,8 +3502,8 @@ impl SessionRecordBackend for MemorySessionBackend {
     }
 }
 
-/// The leftover a session must apply: one data file published and one event
-/// appended at the log length the interrupted mutation captured.
+/// One data file published and one event appended at the log length the
+/// interrupted mutation captured.
 fn leftover_record() -> RedoRecord {
     RedoRecord::new(
         vec![put_file(leftover_target(), LEFTOVER_BYTES)],
@@ -3525,13 +3519,12 @@ fn leftover_target() -> VirtualPath {
 
 const LEFTOVER_BYTES: &[u8] = b"{\"id\":\"left\"}";
 
-/// The event log a leftover record's application leaves.
 fn appended_log() -> Vec<u8> {
     [CAPTURED_LOG, &event_append(0).unwrap().bytes].concat()
 }
 
-/// REQ-01: the record is applied before the session can capture anything, and
-/// the commit point is cleared once it is.
+/// REQ-01, observed through the session's own first capture: nothing else can
+/// tell an application that preceded it from one the capture triggered.
 fn assert_open_applies_the_leftover<B: SessionRecordBackend>() {
     let backend = B::seeded();
     backend.commit(&leftover_record());
@@ -3567,7 +3560,7 @@ fn test_open_mutation_session_applies_a_leftover_record_before_capture_on_both_b
     assert_open_applies_the_leftover::<MemorySessionBackend>();
 }
 
-/// REQ-02: a second open over the same seeded record publishes nothing further.
+/// REQ-02.
 fn assert_two_opens_converge_as_one<B: SessionRecordBackend>() {
     let backend = B::seeded();
     backend.commit(&leftover_record());
@@ -3589,8 +3582,7 @@ fn test_open_mutation_session_twice_over_one_record_converges_as_once_on_both_ba
     assert_two_opens_converge_as_one::<MemorySessionBackend>();
 }
 
-/// REQ-03: the dispatch report counts what the open applied, and that count is
-/// the one `recovered_count` reports to its consumers.
+/// REQ-03, at the report. Its two consumers are covered where they read it.
 fn assert_report_counts_applied_records<B: SessionRecordBackend>() {
     let backend = B::seeded();
     let quiet = {
@@ -3624,12 +3616,8 @@ fn test_recovery_dispatch_report_counts_applied_records_on_both_backends() {
     assert_report_counts_applied_records::<MemorySessionBackend>();
 }
 
-/// REQ-05: a leftover the session cannot read is a typed failure naming the
-/// record, and the repository it refused is byte-for-byte what it found.
-///
-/// The first open creates the session's own advisory lock files, so the
-/// snapshot the refusal is compared against covers every byte below the
-/// worktree, the malformed record included.
+/// REQ-05. The first open creates the session's own advisory lock files, so
+/// the snapshot the refusal is measured against excludes nothing.
 #[test]
 fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     let backend = FileSessionBackend::seeded();
@@ -3658,11 +3646,11 @@ fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     );
 }
 
-/// REQ-04: with no leftover record the open reads the record's own path and
-/// nothing else in the scratch directory. Every other entry there is poisoned —
-/// a file and a directory neither of which can be opened — so a pass that read
-/// one fails, and the directory's listing is compared across the open, so a
-/// pass that wrote one shows up too.
+/// REQ-04. Every scratch entry but the record is sealed against opening, so a
+/// pass that read one fails here; the listing is compared across the open, so
+/// one that wrote there shows up too. A permission trap on the directory
+/// itself cannot serve: cap-std needs a read handle on it even to open the
+/// record by name.
 #[cfg(unix)]
 #[test]
 fn test_open_mutation_session_reads_nothing_in_the_scratch_directory_but_the_record() {

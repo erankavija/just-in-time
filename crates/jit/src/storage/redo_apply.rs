@@ -4,7 +4,7 @@
 //! Re-application is the same pass: a put overwrites, a delete tolerates
 //! absence, the append rewrites its bytes at its offset, so a record applied
 //! twice converges. A session open applies the record a crash left; no
-//! mutation writes one yet.
+//! mutation writes one until apply commits through it (jit:4319256e).
 
 use crate::repository_state::{
     CaptureError, FileMode, RepositoryLayoutError, RepositoryRootClass, VirtualPath,
