@@ -631,7 +631,8 @@ fn memory_directory_entry(relative: &std::path::Path) -> RepositoryEntry {
 /// operation: a data path while the data root is absent has no root to land in,
 /// and an ancestor that is not a directory is the no-follow parent walk's
 /// refusal, reported by the same component the walk stopped at. An absent
-/// ancestor is admitted, because a put creates the directories its path needs.
+/// ancestor is admitted, because an operation creates the directories its path
+/// needs.
 fn resolve(state: &MemoryRepositoryState, path: &VirtualPath) -> Result<(), RedoApplyError> {
     if path.root_class() == RepositoryRootClass::Data && !state.data_root_exists {
         return Err(unaddressable(path));

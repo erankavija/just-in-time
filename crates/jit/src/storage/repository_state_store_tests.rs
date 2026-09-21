@@ -2976,6 +2976,69 @@ fn test_ensure_write_set_unchanged_admits_a_write_set_nothing_moved() {
     assert!(fixture.check(&image, &record).is_ok());
 }
 
+/// A directory the record makes is a write target like any other, so a target
+/// something occupied since the capture is the retryable conflict rather than a
+/// committed record that can never apply.
+#[test]
+fn test_ensure_write_set_unchanged_refuses_a_made_directory_target_something_occupies() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let made = data_path("templates");
+    let image = fixture.capture([made.clone(), VirtualPath::EVENTS]);
+    let record = RedoRecord::new(
+        vec![made.clone()],
+        Vec::new(),
+        Vec::new(),
+        event_append(seeded_log().len() as u64),
+    )
+    .unwrap();
+
+    fixture.write(
+        "templates",
+        b"a file another writer left at the directory's path",
+    );
+
+    let error = fixture.check(&image, &record).unwrap_err();
+    assert!(
+        names_moved_path(&error, &made),
+        "the conflict must name the directory target that moved, got {error:?}"
+    );
+}
+
+/// A directory another action's path lies beneath is created by that action, so
+/// only the rest reach the record — where an interruption leaves them for the
+/// next session to replay (OD-7).
+#[test]
+fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let empty = data_path("templates");
+    let ancestor = data_path("gates");
+    let written = data_path("gates/review.json");
+    let image = fixture.capture([empty.clone(), ancestor.clone(), written.clone()]);
+    let delta = RepositoryDelta::new(
+        &fixture.layout,
+        vec![
+            RepositoryAction::create_directory(empty.clone(), "p0", ExpectedPreimage::Absent),
+            RepositoryAction::create_directory(ancestor, "p0", ExpectedPreimage::Absent),
+            RepositoryAction::write_file(
+                written,
+                "p0",
+                ExpectedPreimage::Absent,
+                b"{}".to_vec(),
+                FileMode::Regular,
+            ),
+        ],
+    )
+    .unwrap();
+
+    let record = redo_record_for(&image, &delta).unwrap();
+
+    assert_eq!(
+        record.make_directories(),
+        [empty],
+        "the record carries a directory its own put already creates"
+    );
+}
+
 #[test]
 fn test_ensure_write_set_unchanged_refuses_a_put_target_whose_bytes_changed() {
     let fixture = WriteSetFixture::new(&[
