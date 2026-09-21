@@ -1,0 +1,74 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-09-21T16:14:30.269189711Z",
+  "context": {},
+  "created_at": "2026-09-21T16:13:24.526824783Z",
+  "dependencies": [
+    "b0ee2dd6-5393-4193-a88d-f3301601234e"
+  ],
+  "description": "The reserved `.jit-bootstrap` namespace retires with the mechanism that used it, and the worktree bootstrap lock's own path is guarded on its merits.\n\n## Background\n\n`.jit-bootstrap` was the transaction kernel's external control location: the directory holding a journal for a publication over an absent data root. `jit:b0ee2dd6` retired the kernel, so nothing writes there and recovery discovery no longer looks for it. Two mutation-target guards outlive it, refusing `.jit-bootstrap` and `.jit-bootstrap/*` as worktree paths (`crates/jit/src/repository_state/path.rs:208`, `:452`).\n\nA superseded representation with no mechanism behind it is a defect under `@/inv/canonical-cutover`, and the storage-format reference is about to state that the engine has no external bootstrap control directory (`jit:ccea63de` REQ-04), so the page and the code would disagree about whether the name is reserved.\n\nRetiring the reservation exposes a question the kernel's presence masked. The worktree bootstrap lock is live and is still needed: two sessions sharing a worktree race the init publisher's sibling stage. Its file is `.jit-bootstrap.lock`, a sibling path the current guard does not match, because the guard was written for the directory rather than for the lock. So the dead namespace is guarded and the live lock file is not. Whether a mutation may target `.jit-bootstrap.lock` is the question this task settles on the lock's own merits rather than by inheritance.\n\n## Success Criteria\n\n- [hard] REQ-01: No guard, constant, test, or prose reserves the `.jit-bootstrap` directory namespace, and no document describes an external bootstrap control directory as a live location.\n- [hard] REQ-02: Whether the worktree bootstrap lock's own path is refused as a mutation target is decided on the lock's merits and stated where the decision lives, with the behaviour the decision implies covered by a test that owns it.\n- [hard] REQ-03: The two path guards' existing tests either move to the surviving property or retire with the reservation, and no property loses its owner.\n- [hard] REQ-04: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n\n## Notes\n\nCreated by the execution lead under POL-01 during wave 12's review, from a finding the wave's worker flagged rather than acted on. Excluded from the epic's REQ-06 redo-record subtotal per ER-01.\n\nThe decision REQ-02 asks for is a real one rather than a formality: refusing the lock's path protects a live control file from an ordinary worktree mutation, and admitting it keeps the engine out of a name it does not own. Either is defensible; the criterion requires the choice and its statement, not a particular answer.\n\nThis is a small change by line count. Its cost is in deciding rather than typing.\n",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-09-21T16:13:24.526824783Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b7c99dcb-073f-46c7-938a-0a465c8131ee",
+  "labels": [
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "story:record-publication-cutover",
+    "component:core",
+    "satisfies:REQ-05",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/canonical-cutover",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Bootstrap namespace reservation retires with the kernel",
+  "updated_at": "2026-09-21T16:14:30.373394919Z"
+}

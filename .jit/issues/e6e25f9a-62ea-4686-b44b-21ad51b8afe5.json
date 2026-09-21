@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-09-21T16:14:30.024674911Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "b0ee2dd6-5393-4193-a88d-f3301601234e"
   ],
   "description": "The deployment guide's backup procedure accounts for the data root's scratch directory, so a backup carries no pending redo record.\n\n## Background\n\nThe guide tells the reader to archive the whole data root and restore it elsewhere. Under the redo record that captures a pending commit point: restoring it into a repository that never performed the mutation would apply the record at the next session open.\n\n## Success Criteria\n\n- [hard] REQ-01: The backup procedure excludes the data root's scratch directory.\n- [hard] REQ-02: The restore procedure states that a restored data root carries no pending record.\n- [hard] REQ-03: The guide states why the scratch directory is excluded, in one sentence.\n- [hard] REQ-04: The guide carries no description of journaled publication.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T16:03:09.297349208Z",
   "gates_required": [
     "doc-review",
@@ -26,5 +69,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Deployment guide backup procedure",
-  "updated_at": "2026-09-21T16:03:09.297349208Z"
+  "updated_at": "2026-09-21T16:14:30.128027033Z"
 }

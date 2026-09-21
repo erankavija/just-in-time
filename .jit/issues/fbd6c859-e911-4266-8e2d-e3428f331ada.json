@@ -1,11 +1,13 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-09-21T16:13:47.198294824Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "42478e5d-90aa-472e-bca2-f628a1d883c2",
     "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
     "79252d23-23ab-4c04-9327-8d2986f361d8",
+    "b7c99dcb-073f-46c7-938a-0a465c8131ee",
     "ccea63de-f191-497b-8941-6d5b6133b50a",
     "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
     "ead8f86d-2e45-4144-98e7-2f814b643091"
@@ -34,5 +36,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Record publication cutover",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-09-21T16:13:47.416648821Z"
 }

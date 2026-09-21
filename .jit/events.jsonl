@@ -15134,3 +15134,15 @@
 {"from":"backlog","id":"5f8c2a2f-46ba-4f7c-8070-b8b537fa3818","issue_id":"ccea63de-f191-497b-8941-6d5b6133b50a","timestamp":"2026-09-21T16:03:08.980275069Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"0e7014cd-2d99-45f2-a8ee-e087da9aaeef","issue_id":"e6e25f9a-62ea-4686-b44b-21ad51b8afe5","timestamp":"2026-09-21T16:03:09.297349208Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"16f0a497-7255-4b8d-a5b7-8decb178ed85","issue_id":"ead8f86d-2e45-4144-98e7-2f814b643091","timestamp":"2026-09-21T16:03:09.606058262Z","to":"ready","type":"issue_state_changed"}
+{"id":"5d86487d-64f0-4b35-a59e-3f62e3aa136b","issue_id":"b7c99dcb-073f-46c7-938a-0a465c8131ee","priority":"high","timestamp":"2026-09-21T16:13:24.526824783Z","title":"Bootstrap namespace reservation retires with the kernel","type":"issue_created"}
+{"fields":["dependencies"],"id":"0b72c35d-6e1e-4878-8d5e-af1872f5810c","issue_id":"b7c99dcb-073f-46c7-938a-0a465c8131ee","timestamp":"2026-09-21T16:13:29.121009075Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:jit-execution-lead","id":"84be7273-a8ea-4e00-a4fb-0691c0654961","issue_id":"fbd6c859-e911-4266-8e2d-e3428f331ada","timestamp":"2026-09-21T16:13:47.198294824Z","type":"issue_claimed"}
+{"fields":["dependencies"],"id":"c1e91f23-4813-4cf2-9ba8-037027fef971","issue_id":"fbd6c859-e911-4266-8e2d-e3428f331ada","timestamp":"2026-09-21T16:13:47.416648821Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:jit-execution-lead","id":"4b1be6e9-db1f-47fb-bb33-157e0efa59e8","issue_id":"ccea63de-f191-497b-8941-6d5b6133b50a","timestamp":"2026-09-21T16:14:29.528649912Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"d42cbedb-2fdb-475b-a70d-8605d19aed5c","issue_id":"ccea63de-f191-497b-8941-6d5b6133b50a","timestamp":"2026-09-21T16:14:29.632799988Z","type":"issue_updated","updated_by":"doc-add"}
+{"assignee":"agent:jit-execution-lead","id":"0046013c-4e3b-4571-b3a1-756dcfb3f90d","issue_id":"ead8f86d-2e45-4144-98e7-2f814b643091","timestamp":"2026-09-21T16:14:29.775907477Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"35eee462-0bc7-4334-8c7d-c2b3c37f0850","issue_id":"ead8f86d-2e45-4144-98e7-2f814b643091","timestamp":"2026-09-21T16:14:29.880686627Z","type":"issue_updated","updated_by":"doc-add"}
+{"assignee":"agent:jit-execution-lead","id":"cb4f033d-d592-4a20-98f4-031cd8684779","issue_id":"e6e25f9a-62ea-4686-b44b-21ad51b8afe5","timestamp":"2026-09-21T16:14:30.024674911Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"c4c067bc-589e-40bc-a554-da7e54f81f0e","issue_id":"e6e25f9a-62ea-4686-b44b-21ad51b8afe5","timestamp":"2026-09-21T16:14:30.128027033Z","type":"issue_updated","updated_by":"doc-add"}
+{"assignee":"agent:jit-execution-lead","id":"e5184313-51b4-4b55-9069-311c8ca18690","issue_id":"b7c99dcb-073f-46c7-938a-0a465c8131ee","timestamp":"2026-09-21T16:14:30.269189711Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"87b6e287-ac2f-4366-9118-86ceac1e641b","issue_id":"b7c99dcb-073f-46c7-938a-0a465c8131ee","timestamp":"2026-09-21T16:14:30.373394919Z","type":"issue_updated","updated_by":"doc-add"}
