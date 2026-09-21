@@ -1011,9 +1011,17 @@
     {
       "id": "PF-17",
       "finding": "Every first cargo-ci run on main after a merge fails, and never for a reason about the tree. A merge invalidates the build, so the gate's own suite-build step rebuilds inside the run; the suite then executes against freshly linked executables and the same six tail tests (jit::fast_rules cli_warnings_integration_tests) trip the 20 s per-test bound, or the suite-duration budget trips on its own. Observed three times in session 5: wave 8 cold 44381 ms; wave 9 cold-and-contended 97493 ms; wave 9 cold 60493 ms with six TIMEOUTs. The warm re-run then passes at 22455 / 22703 ms, on baseline. This is LD-7's signature, and it costs a wasted full gate run per merge -- roughly 60-100 s of test execution plus a lead round trip.",
-      "suggested_remedy": "Warm the target before evaluating, not by re-running the gate. After each merge, run the build once (cargo-ci's suite-build step, or `cargo nextest run --no-run --workspace --all-targets`) and only then `jit gate evaluate --force`. That replaces two full gate runs with one build plus one gate run. Adopted by the lead from wave 10 onward.",
+      "suggested_remedy": "Expect the 30 s suite-duration budget to be unsatisfiable on the first execution of newly linked test executables, which is what every merge produces. Pre-run the suite itself (`cargo nextest run --workspace --all-targets`) after a merge and before `jit gate evaluate --force`: same wall time as gating twice, but it leaves one clean gate record instead of a failed run needing explanation. Adopted by the lead.",
       "status": "adopted by the lead",
-      "session": 5
+      "session": 5,
+      "correction": "The first remedy was wrong about the mechanism. After the wave-9 rework merge the lead pre-built with `cargo nextest run --no-run --workspace --all-targets` (15.97 s) and gated a genuinely warm target: suite-build 824 ms, every executable already linked, host idle with no process above 2 % CPU. The test step still took 39879 ms against a 17746 ms baseline and the suite-duration budget still failed, with all 4715 tests passing. An immediate second run over the identical tree and identical binaries gave 17746 ms and passed. The cost is therefore the first EXECUTION of freshly linked test executables, not compilation and not contention -- so warming the build does not avoid it.",
+      "measurements": [
+        "wave 8 post-merge, cold build: suite-build 33760 ms, suite-clock 44381 ms, FAIL",
+        "wave 9 post-merge, cold build + worker contention: suite-build 54185 ms, suite-clock 97493 ms, FAIL",
+        "wave 9 post-merge, cold build: suite-build 17626 ms, suite-clock 60493 ms, six 20 s TIMEOUTs",
+        "wave 9 post-rework, PRE-BUILT and host idle: suite-build 897 ms, test 39879 ms, suite-clock 44377 ms, FAIL, 4715 passed",
+        "wave 9 post-rework, second run, identical tree and binaries: test 17746 ms, suite-clock 22495 ms, PASS"
+      ]
     }
   ],
   "evidence_requirements": [
