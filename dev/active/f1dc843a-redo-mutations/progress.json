@@ -618,7 +618,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — dispatched, round 1"
+          "status": "in_progress — rework round 1: doc-review F1 (recover output example at worktree-validate.md:478 omits two printed lines) and code-review F1 (troubleshooting.md:259 contradicts option B). cargo-ci and docs-mechanical passed."
         },
         {
           "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
@@ -1135,7 +1135,8 @@
     "10ba2e35": 1,
     "ccea63de": 1,
     "ead8f86d": 2,
-    "79252d23": 1
+    "79252d23": 1,
+    "42478e5d": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -1899,6 +1900,14 @@
       "owner": "42478e5d (wave 14). The lead will brief it explicitly at dispatch: the operator procedure for UnreadableRedoRecord, including how to tell a torn write (the parse error names 'fewer content bytes than the header declares') from other corruption, must be written with care rather than as 'delete the file'.",
       "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do.",
       "renumbered_from": "SP-16 (collided with an earlier session's SP-16)"
+    },
+    {
+      "id": "SP-26",
+      "wave": 14,
+      "subject": "The 'Recovery complete ... repository absence restored' branch in main.rs (`!storage.root().exists() && transactions_recovered > 0`) and its twin arm at main.rs:~2589 look unreachable: a redo record lives inside the data root, so an absent root carries no record to apply.",
+      "criterion_subjects": "51eb1aa6 REQ-05 (recover's machine-readable output and rendered line)",
+      "owner": "51eb1aa6 (wave 16), which rewrites both of recover's output branches; brief it to delete the unreachable one rather than rename it.",
+      "raised_by": "worker-42478e5d, reported rather than changed"
     }
   ],
   "checkpoint_reconciliation_fbd6c859": {
