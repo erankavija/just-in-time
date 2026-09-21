@@ -502,8 +502,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T20:36:25.948345230Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T20:46:32.258259838Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
@@ -533,5 +533,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T20:42:25.795489100Z"
+  "updated_at": "2026-09-21T20:46:32.258259838Z"
 }
