@@ -488,6 +488,7 @@
       "path": "docs/reference/error-codes.md"
     }
   ],
+  "done_at": "2026-09-21T20:46:48.288326977Z",
   "first_ready_at": "2026-09-21T16:03:08.028889250Z",
   "gates_required": [
     "cargo-ci",
@@ -531,7 +532,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T20:46:32.258259838Z"
+  "updated_at": "2026-09-21T20:46:48.288326977Z"
 }

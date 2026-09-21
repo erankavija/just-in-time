@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 14,
+  "current_wave": 15,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -618,7 +618,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — rework round 1: doc-review F1 (recover output example at worktree-validate.md:478 omits two printed lines) and code-review F1 (troubleshooting.md:259 contradicts option B). cargo-ci and docs-mechanical passed."
+          "status": "done — cargo-ci, docs-mechanical, doc-review and code-review passed on the merged tree after one rework round; both reviews 0 findings on clean trees"
         },
         {
           "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
@@ -655,7 +655,8 @@
           "434a60b7": "sonnet"
         },
         "briefing": "42478e5d carries SP-25 (a careful operator procedure for UnreadableRedoRecord, grounded in the parse error that distinguishes a torn write), cites storage-format.md#publication-and-recovery rather than restating it (PF-21), describes no event-log write mechanics (ESC-12), and leaves the transactions_recovered rename to 51eb1aa6. All three prompts state the writing standard: terse, plain, on point."
-      }
+      },
+      "closed": "All three done: 4b765a1e, 434a60b7, 42478e5d."
     },
     {
       "wave_number": 15,
@@ -671,7 +672,7 @@
             "docs-mechanical",
             "holistic-review"
           ],
-          "status": "pending"
+          "status": "in_progress — story checkpoint gates"
         }
       ]
     },
@@ -1899,7 +1900,8 @@
       "criterion_subjects": "42478e5d REQ-04 (the troubleshooting guide's recovery procedure) and REQ-05 (the error-code entry for a recovery failure describes a failed application).",
       "owner": "42478e5d (wave 14). The lead will brief it explicitly at dispatch: the operator procedure for UnreadableRedoRecord, including how to tell a torn write (the parse error names 'fewer content bytes than the header declares') from other corruption, must be written with care rather than as 'delete the file'.",
       "note": "Not a code defect: refusing when a torn write cannot be told from a corrupted committed record is the conservative, reviewed choice (jit:0938d99e). Recorded because it is the one crash case whose recovery is manual, and nothing in the epic's documentation yet tells an operator what to do.",
-      "renumbered_from": "SP-16 (collided with an earlier session's SP-16)"
+      "renumbered_from": "SP-16 (collided with an earlier session's SP-16)",
+      "closure": "CLOSED by 42478e5d: troubleshooting.md carries the unreadable-record procedure, grounded in the parse error that distinguishes a torn write, and jit recover reports the failure as recovery_failed (ESC-13)."
     },
     {
       "id": "SP-26",
