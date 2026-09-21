@@ -69,6 +69,11 @@ pub enum RepositoryStateStoreError {
     RetryableConflict { path: String },
     #[error("selected data-root destination became occupied: {path}")]
     OccupiedDataRoot { path: PathBuf },
+    /// A redo record lives inside the data root, so a mutation writing worktree
+    /// targets while creating no root has no commit point; publishing it would
+    /// leave partly written files nothing can replay.
+    #[error("mutation writes worktree targets and creates no data root at {path}, so no redo record can commit it")]
+    UncommittableWorktreeMutation { path: PathBuf },
     #[error("repository recovery or publication failed: {0}")]
     Transaction(#[source] anyhow::Error),
     #[error("leftover redo record {path} is not readable: {source}")]
@@ -645,9 +650,9 @@ impl RepositoryMutationSession for JsonMutationSession {
             actions_applied: delta.actions().len(),
         };
         match (self.roots.data.is_some(), delta.actions().is_empty()) {
-            (false, _) => self.publish_absent_data_root(image, delta, interruptions)?,
+            (false, false) => self.publish_absent_data_root(image, delta, interruptions)?,
             (true, false) => self.publish_through_record(image, delta, interruptions)?,
-            (true, true) => {}
+            (_, true) => {}
         }
         self.captured = None;
         Ok(outcome)
@@ -678,15 +683,16 @@ impl JsonMutationSession {
     /// stage carries into the published root, so an interruption after the
     /// rename is replayed by the next session that opens.
     ///
-    /// A delta publishing no root has nowhere to put a record — its home is
-    /// inside the root — and applies its worktree operations directly, there
-    /// being no repository yet for a commit point to make whole.
+    /// A delta publishing no root is refused by
+    /// [`ensure_committable_absent_root_delta`], so every delta that reaches the
+    /// stage creates the root its record is committed into.
     fn publish_absent_data_root(
         &self,
         image: &RepositoryImage,
         delta: &RepositoryDelta,
         interruptions: Arc<dyn MutationInterruptionInjector>,
     ) -> Result<(), RepositoryStateStoreError> {
+        ensure_committable_absent_root_delta(&self.layout, delta)?;
         let of_class = |class| {
             delta
                 .actions()
@@ -699,9 +705,6 @@ impl JsonMutationSession {
         let redo = |outcome: Result<(), RedoApplyError>| {
             outcome.map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
         };
-        if of_class(RepositoryRootClass::Data).next().is_none() {
-            return redo(applier.apply_uncommitted(&self.roots, &record));
-        }
         init_publish::stage_new_data_root(
             &self.data_parent,
             &self.data_leaf,
@@ -782,9 +785,9 @@ impl RepositoryMutationSession for MemoryMutationSession {
         };
         let data_root_exists = self.storage.repository_state().data_root_exists;
         match (data_root_exists, delta.actions().is_empty()) {
-            (false, _) => publish_absent_memory_root(&self.layout, &self.storage, delta)?,
+            (false, false) => publish_absent_memory_root(&self.layout, &self.storage, delta)?,
             (true, false) => self.publish_through_record(image, delta, interruptions)?,
-            (true, true) => {}
+            (_, true) => {}
         }
         self.captured = None;
         Ok(outcome)
@@ -811,6 +814,34 @@ impl MemoryMutationSession {
     }
 }
 
+/// Refuse a mutation over an absent data root that writes worktree targets and
+/// creates no root.
+///
+/// The redo record's home is inside the root such a delta does not create, so
+/// the mutation has no commit point: publishing it would leave partly written
+/// worktree files with nothing to replay them. Both backends raise this, so a
+/// caller driving either reads one refusal.
+fn ensure_committable_absent_root_delta(
+    layout: &RepositoryLayout,
+    delta: &RepositoryDelta,
+) -> Result<(), RepositoryStateStoreError> {
+    let writes = |class| {
+        delta
+            .actions()
+            .iter()
+            .any(|action| action.path().root_class() == class)
+    };
+    match (
+        writes(RepositoryRootClass::Data),
+        writes(RepositoryRootClass::Worktree),
+    ) {
+        (false, true) => Err(RepositoryStateStoreError::UncommittableWorktreeMutation {
+            path: layout.data_root().to_path_buf(),
+        }),
+        _ => Ok(()),
+    }
+}
+
 /// Publish a delta whose data root does not exist yet, as the init publisher
 /// publishes one on the filesystem: the record's home is inside the root the
 /// delta creates, so this one delta reaches the entry map directly.
@@ -819,6 +850,7 @@ fn publish_absent_memory_root(
     storage: &InMemoryStorage,
     delta: &RepositoryDelta,
 ) -> Result<(), RepositoryStateStoreError> {
+    ensure_committable_absent_root_delta(layout, delta)?;
     let mut state = storage.repository_state();
     let mut candidate = state.clone();
     delta
