@@ -87,16 +87,18 @@ pub fn prepare_server_storage(
 mod recovery_startup_tests {
     use super::*;
     use jit::commands::CommandExecutor;
-    use jit::storage::{TransactionFailureInjector, TransactionFailurePoint};
+    use jit::storage::{MutationInterruptionInjector, MutationPoint, RedoPoint};
     use std::sync::Arc;
     use tempfile::TempDir;
 
-    struct FailAfterCommit;
+    struct FailAfterApply;
 
-    impl TransactionFailureInjector for FailAfterCommit {
-        fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-            if point == &TransactionFailurePoint::RepositoryAfterCommit {
-                return Err(std::io::Error::other("interrupt after commit"));
+    impl MutationInterruptionInjector for FailAfterApply {
+        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+            if point == &MutationPoint::Redo(RedoPoint::AfterApply) {
+                return Err(std::io::Error::other(
+                    "interrupt after the mutation is published",
+                ));
             }
             Ok(())
         }
@@ -108,7 +110,7 @@ mod recovery_startup_tests {
         let data = temp.path().join(".jit");
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let interrupted =
-            JsonFileStorage::with_repository_state_failures(&data, Arc::new(FailAfterCommit));
+            JsonFileStorage::with_mutation_interruptions(&data, Arc::new(FailAfterApply));
         let executor = CommandExecutor::new(interrupted).with_layout(layout);
         assert!(executor
             .initialize_fresh_repository(temp.path(), None)

@@ -9,8 +9,8 @@
 use jit::commands::{CommandExecutor, ProfileSelector};
 use jit::profile::ProfileApplicationStatus;
 use jit::storage::{
-    discover_repository_layout, JsonFileStorage, TransactionFailureInjector,
-    TransactionFailurePoint,
+    discover_repository_layout, JsonFileStorage, MutationInterruptionInjector, MutationPoint,
+    RedoPoint,
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -92,9 +92,9 @@ impl PublicationCounter {
     }
 }
 
-impl TransactionFailureInjector for PublicationCounter {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if point == &TransactionFailurePoint::RepositoryBeforeControlCreation {
+impl MutationInterruptionInjector for PublicationCounter {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        if point == &MutationPoint::Redo(RedoPoint::BeforeApply) {
             self.0.fetch_add(1, Ordering::SeqCst);
         }
         Ok(())
@@ -105,12 +105,12 @@ pub(super) fn selector() -> ProfileSelector {
     ProfileSelector::path(PathBuf::from(PACKAGE_LOCATION))
 }
 
-pub(super) fn executor_with_failures(
+pub(super) fn executor_with_interruptions(
     repository: &Path,
-    failures: Arc<dyn TransactionFailureInjector>,
+    interruptions: Arc<dyn MutationInterruptionInjector>,
 ) -> CommandExecutor<JsonFileStorage> {
     let data = repository.join(".jit");
-    let storage = JsonFileStorage::with_repository_state_failures(&data, failures);
+    let storage = JsonFileStorage::with_mutation_interruptions(&data, interruptions);
     let layout = discover_repository_layout(repository, &data).unwrap();
     CommandExecutor::new(storage).with_layout(layout)
 }
@@ -187,7 +187,7 @@ pub(super) fn changed_profile_fixture() -> (TempDir, LifecycleState) {
 fn test_profile_apply_publishes_its_change_through_the_shared_mutation_session() {
     let (repository, prior) = changed_profile_fixture();
     let publications = Arc::new(PublicationCounter::default());
-    let executor = executor_with_failures(repository.path(), publications.clone());
+    let executor = executor_with_interruptions(repository.path(), publications.clone());
 
     let applied = executor.apply_profile(&[selector()]).unwrap();
 

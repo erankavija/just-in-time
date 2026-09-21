@@ -632,10 +632,9 @@ mod tests {
     use super::*;
     use crate::domain::{Issue, Priority, State};
 
-    /// Fails the FIRST session open at the once-per-session-open failure
-    /// point `SessionOpenCounter` also observes
-    /// (`TransactionFailurePoint::RepositoryRecoveryExternal`), then lets
-    /// every later open through. `apply_bulk_update` always attempts the
+    /// Fails the FIRST session open at the moment `SessionOpenCounter` also
+    /// observes ([`MutationPoint::SessionOpen`]), then lets every later open
+    /// through. `apply_bulk_update` always attempts the
     /// shared verification session before any per-issue session, so this
     /// injects exactly one failure into that shared session, isolating its
     /// effect from the per-issue sessions that must still succeed.
@@ -644,10 +643,10 @@ mod tests {
         failed_once: std::sync::atomic::AtomicBool,
     }
 
-    impl crate::storage::TransactionFailureInjector for FailFirstSessionOpen {
-        fn check(&self, point: &crate::storage::TransactionFailurePoint) -> std::io::Result<()> {
+    impl crate::storage::MutationInterruptionInjector for FailFirstSessionOpen {
+        fn check(&self, point: &crate::storage::MutationPoint) -> std::io::Result<()> {
             use std::sync::atomic::Ordering;
-            if point == &crate::storage::TransactionFailurePoint::RepositoryRecoveryExternal {
+            if point == &crate::storage::MutationPoint::SessionOpen {
                 self.opens.fetch_add(1, Ordering::SeqCst);
                 if !self.failed_once.swap(true, Ordering::SeqCst) {
                     return Err(std::io::Error::other(
@@ -1539,7 +1538,7 @@ mod tests {
         // session is funded and the baseline measures C alone.
         let baseline_counter = SessionOpenCounter::new();
         let baseline_storage =
-            InMemoryStorage::new().with_repository_state_failure_view(baseline_counter.clone());
+            InMemoryStorage::new().with_mutation_interruption_view(baseline_counter.clone());
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
             create_test_issue("baseline", State::Ready, vec![]),
@@ -1562,7 +1561,7 @@ mod tests {
         let k = 5;
         let j = 2;
         let counter = SessionOpenCounter::new();
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..k {
             let mut issue = create_test_issue(&format!("issue-{index}"), State::Ready, vec![]);
             if index >= j {
@@ -1600,7 +1599,7 @@ mod tests {
 
         let baseline_counter = SessionOpenCounter::new();
         let baseline_storage =
-            InMemoryStorage::new().with_repository_state_failure_view(baseline_counter.clone());
+            InMemoryStorage::new().with_mutation_interruption_view(baseline_counter.clone());
         crate::commands::test_helpers::seed_issue(
             &baseline_storage,
             create_test_issue("baseline", State::Ready, vec![]),
@@ -1617,7 +1616,7 @@ mod tests {
         // skip candidates.
         let k = 3;
         let counter = SessionOpenCounter::new();
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..k {
             crate::commands::test_helpers::seed_issue(
                 &storage,
@@ -1648,7 +1647,7 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let counter = SessionOpenCounter::new();
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         for index in 0..3 {
             let mut issue = create_test_issue(&format!("noop-{index}"), State::Ready, vec![]);
             issue.priority = Priority::High;
@@ -1685,7 +1684,7 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let counter = SessionOpenCounter::new();
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
 
         let mut issue = create_test_issue("blocked", State::Gated, vec![]);
         issue.gates_required = vec!["tests".to_string()];
@@ -1729,7 +1728,7 @@ mod tests {
         use crate::storage::InMemoryStorage;
 
         let counter = SessionOpenCounter::new();
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(counter.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(counter.clone());
         // Seeded directly, bypassing create-time validation, so the issue
         // already violates the always-enforced default label-format rule.
         crate::commands::test_helpers::seed_issue(
@@ -1863,7 +1862,7 @@ mod tests {
             opens: AtomicUsize::new(0),
             failed_once: AtomicBool::new(false),
         });
-        let storage = InMemoryStorage::new().with_repository_state_failure_view(injector.clone());
+        let storage = InMemoryStorage::new().with_mutation_interruption_view(injector.clone());
 
         let mut noop_issue = create_test_issue("noop", State::Ready, vec![]);
         noop_issue.priority = Priority::High;

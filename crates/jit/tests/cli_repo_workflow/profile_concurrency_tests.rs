@@ -2,11 +2,11 @@
 //! session and transaction boundary.
 
 use super::profile_publication_tests::{
-    changed_profile_fixture, executor_with_failures, ordinary_executor, selector, LifecycleState,
-    PACKAGE_LOCATION,
+    changed_profile_fixture, executor_with_interruptions, ordinary_executor, selector,
+    LifecycleState, PACKAGE_LOCATION,
 };
 use jit::profile::ProfileApplicationStatus;
-use jit::storage::{TransactionFailureInjector, TransactionFailurePoint};
+use jit::storage::{MutationInterruptionInjector, MutationPoint, RedoPoint};
 use serde_json::Value;
 use std::process::Command;
 use std::sync::{Arc, Condvar, Mutex};
@@ -17,7 +17,7 @@ struct PauseState {
     released: bool,
 }
 
-/// Pause one real publication immediately before transaction-control creation.
+/// Pause one real publication at the moment its record application begins.
 ///
 /// The repository mutation session already holds the repository-wide lock at
 /// this point, while none of the planned target, ownership, or audit bytes have
@@ -44,9 +44,9 @@ impl PublicationPause {
     }
 }
 
-impl TransactionFailureInjector for PublicationPause {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        if point != &TransactionFailurePoint::RepositoryBeforeControlCreation {
+impl MutationInterruptionInjector for PublicationPause {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        if point != &MutationPoint::Redo(RedoPoint::BeforeApply) {
             return Ok(());
         }
 
@@ -76,7 +76,7 @@ fn test_concurrent_profile_apply_contender_never_publishes_a_stale_capture() {
     let winner_path = repository.path().to_path_buf();
     let winner_pause = Arc::clone(&pause);
     let winner = std::thread::spawn(move || {
-        executor_with_failures(&winner_path, winner_pause).apply_profile(&[selector()])
+        executor_with_interruptions(&winner_path, winner_pause).apply_profile(&[selector()])
     });
 
     pause.wait_until_reached();

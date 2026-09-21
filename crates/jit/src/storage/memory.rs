@@ -165,10 +165,10 @@ impl InMemoryStorage {
     }
 
     /// A view sharing this backend's aggregate state, lock, and layout tracker but
-    /// with a clean failure injector. Mirrors opening a fresh `JsonFileStorage`
+    /// with a clean injector. Mirrors opening a fresh `JsonFileStorage`
     /// over the same on-disk root for recovery: same state, no injected faults.
     #[cfg(test)]
-    pub(crate) fn without_repository_state_failures(&self) -> Self {
+    pub(crate) fn without_mutation_interruptions(&self) -> Self {
         Self {
             repository_state_failures: Arc::new(crate::storage::NoTransactionFailures),
             ..self.clone()
