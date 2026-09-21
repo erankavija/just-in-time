@@ -1,0 +1,72 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "58b99fb4be0854da5dcd73a4ba728144211a27ad",
+  "completed_at": "2026-09-21T17:49:55.988567102Z",
+  "duration_ms": 254399,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/profiles.md",
+        "id": "F1",
+        "line": 530,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "high",
+        "summary": "Profiles documentation says the redo record appends event bytes at a captured offset, but production materializes events.jsonl as a full-file write and constructs records with event_append set to None."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/profiles.md",
+        "id": "F2",
+        "line": 555,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The profiled-init documentation says initialization always carries a redo record, but the publisher commits one only when worktree targets exist."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/profiles.md",
+        "id": "F3",
+        "line": 520,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "high",
+        "summary": "The profiles reference duplicates the generic publication and recovery contract owned by the Storage Format reference instead of citing it."
+      },
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/storage-format.md",
+        "id": "F4",
+        "line": 92,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The Storage Format reference independently retains the unsupported offset-based event-append claim."
+      }
+    ],
+    "summary": "The issue introduces inaccurate and duplicate redo-record documentation; the canonical storage reference also has a pre-existing offset-append mismatch.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "79252d23-23ab-4c04-9327-8d2986f361d8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9bcaa52d-bf4f-4729-9bc5-0b41d85bbcb4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T17:45:41.589465417Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10199 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c512-d86a-78a0-8fc3-76b8094852c2\n--------\nuser\n--- 10186 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 766d6a4a, 8a789b28, 19c7ce6a, 777a1db7, f59e40d0, 8ecf1e70 (`jit:79252d23`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose, @/invariant/atomic-writes (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit none); doc-review failed (exit 1); docs-mechanical passed (exit 0); code-review pending\nTruncation recovery: per-path commit patches and line-scoped source/prose reads\n\n1. F1 — blocking, issue-impact, high: The new profile-publication contract says the redo record stores event bytes for an offset append, but production turns the composed event log into a `WriteFile` and constructs every record with `event_append: None`. This leaves REQ-01’s event-append claim inaccurate. [docs/reference/profiles.md:530] [@/charter/D-17]\n\n2. F2 — blocking, issue-impact, high: The profiled-init passage says every new-root initialization carries a durable redo record, but the publisher creates and commits that record only when the delta has worktree targets; a data-root-only profile initialization is published without one. [docs/reference/profiles.md:555]\n\n3. F3 — blocking, issue-impact, high: The newly added profiles section repeats the generic redo-record, commit, replay, and recovery contract already owned by the Storage Format reference, despite REQ-07 requiring citation rather than restatement. [docs/reference/profiles.md:520] [@/invariant/single-source-prose]\n\n4. F4 — advisory, pre-existing, medium: The Storage Format reference independently retains the same unsupported offset-based event-append description. [docs/reference/storage-format.md:92]\n\nTotal findings: 4\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue introduces inaccurate and duplicate redo-record documentation; the canonical storage reference also has a pre-existing offset-append mismatch.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profiles documentation says the redo record appends event bytes at a captured offset, but production materializes events.jsonl as a full-file write and constructs records with event_append set to None.\",\"file\":\"docs/reference/profiles.md\",\"line\":530,\"references\":[\"@/charter/D-17\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The profiled-init documentation says initialization always carries a redo record, but the publisher commits one only when worktree targets exist.\",\"file\":\"docs/reference/profiles.md\",\"line\":555,\"references\":[]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The profiles reference duplicates the generic publication and recovery contract owned by the Storage Format reference instead of citing it.\",\"file\":\"docs/reference/profiles.md\",\"line\":520,\"references\":[\"@/invariant/single-source-prose\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The Storage Format reference independently retains the unsupported offset-based event-append claim.\",\"file\":\"docs/reference/storage-format.md\",\"line\":92,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

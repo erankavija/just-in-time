@@ -225,6 +225,16 @@
       "updated_at": "2026-09-21T17:39:24.586767425Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-09-21T17:49:56.301915080Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-09-21T17:45:40.931125714Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-09-21T17:23:21.770591049Z",
@@ -247,5 +257,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T17:39:24.586767425Z"
+  "updated_at": "2026-09-21T17:49:56.301915080Z"
 }

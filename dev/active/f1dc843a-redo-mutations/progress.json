@@ -489,7 +489,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — dispatched, round 1"
+          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
         },
         {
           "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
@@ -500,7 +500,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — dispatched, round 1"
+          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
         },
         {
           "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
@@ -513,7 +513,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — held for the next slot (four gates including cargo-ci; avoids a second cargo-ci worker contending on the host flock)"
+          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
         },
         {
           "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
@@ -541,8 +541,9 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — dispatched, round 1",
-          "created_during_execution": true
+          "status": "done — cargo-ci and code-review both passed on the merged tree, zero rework rounds",
+          "created_during_execution": true,
+          "review": "REQ-02 decided on traced evidence: refuse .jit-bootstrap.lock as a mutation target, because publication stage-and-renames and so replaces the inode the mutating session holds its own flock on, letting the next acquirer lock the replacement mid-mutation. The identity-level reservation was tried first and refuted by 8 failing lib tests (the lock sits among worktree content, so capture must name it), so the guard sits at validate_action / RepositoryDelta::new, matching the criterion's own wording 'refused as a mutation target'. Stated at path.rs:18-31; owning test image.rs:2320. REQ-01 re-verified: zero non-lock .jit-bootstrap occurrences in Rust."
         }
       ],
       "dispatch": {
@@ -558,6 +559,11 @@
         },
         "split_reason": "Five issues are ready against a cap of four. 79252d23 was held rather than one of the others because it is the only other issue carrying cargo-ci, and two cargo-ci workers serialize on the host-wide flock (PF-11). b7c99dcb was dispatched with ccea63de deliberately, so the code guard and the page that denies the mechanism cut over together, per the owner's decision.",
         "conflict_analysis": "Disjoint file sets: ccea63de owns docs/reference/storage-format.md, ead8f86d owns docs/concepts/*, e6e25f9a owns docs/how-to/deployment.md, b7c99dcb owns crates/jit/src/repository_state/path.rs. Each prompt names the other workers' files as off-limits. b7c99dcb was told to report rather than edit any adopter document still describing the external bootstrap control directory, since ccea63de owns the one that does."
+      },
+      "integration": {
+        "merge": "All four branches merged cleanly into main with no .jit conflict.",
+        "links": "docs-check-links.sh over docs/, README.md, AGENTS.md and mcp-server/README.md passed on the merged tree — the check no individual worker could run, since each verified only its own branch.",
+        "gate_contention": "Running gate evaluations concurrently timed out one docs-mechanical run on the bootstrap lock (cargo-ci held it). Gates re-run strictly sequentially."
       }
     },
     {
@@ -1023,7 +1029,10 @@
     "21e976d1": 1,
     "0938d99e": 1,
     "4319256e": 1,
-    "10ba2e35": 1
+    "10ba2e35": 1,
+    "ccea63de": 1,
+    "ead8f86d": 1,
+    "79252d23": 1
   },
   "surfaced_pitfalls": [
     {
@@ -1324,6 +1333,23 @@
       "finding": "`jit gate evaluate` takes a prior run's verdict over the same declared inputs instead of executing, so a cold-target cargo-ci FAILURE is memoized and a plain re-run on the unchanged tree returns the cached fail with duration 0 ms and exit code n/a ('Verdict: taken from run <id> over the same declared inputs'). `--force` executes the checker unconditionally and is required for every warm re-run after a cold failure.",
       "why_it_matters": "POL-04's known cold-target trap and this memoization compose badly: the cold run fails on fixture timeouts and the suite-duration budget, and without --force the wave cannot clear the gate on an unchanged tree. Observed twice this session on 10ba2e35.",
       "action": "Every warm re-run after a cold cargo-ci failure uses `jit gate evaluate <id> cargo-ci --force`."
+    },
+    {
+      "id": "PF-20",
+      "session": 6,
+      "wave": 13,
+      "finding": "The lead's dispatch prompts for ccea63de and ead8f86d described redo_apply.rs's application order as including 'the positioned event append'. That is what the APPLIER does when a record carries an event_append — but production never constructs one: redo_record_for passes None (repository_state_store.rs:1001) and the event log is published as a whole-file put. The positioned append is b4483ad6 (wave 16). Three workers followed the prompt and documented a mechanism that does not run yet, and guarantees.md went further, telling adopters 'publishing a mutation costs what it changes' — the epic's goal, currently false.",
+      "detection": "code-review and doc-review on 79252d23 caught it as F1; both gates on ccea63de and ead8f86d had already PASSED with the same inaccuracy. The lead verified F1 at HEAD and swept the other two pages before closing them.",
+      "why_gates_missed_it": "A passed gate is a floor, not a ceiling. doc-review judged ccea63de and ead8f86d against their own criteria and did not trace the event-log claim to the record's constructor.",
+      "lesson": "Point a documentation worker at the code that CONSTRUCTS the thing it documents (redo_record_for), not at the code that CONSUMES it (the applier). A consumer's capability is not the producer's behaviour. And a lead's own paraphrase in a dispatch prompt is a claim that needs the same verification as a worker's.",
+      "sequencing_confirmed": "b4483ad6 REQ-06 owns the flip: 'The adopter pages stating how the event log grows describe a positioned append at the captured length.' So this wave's pages must describe the whole-file write, per OD-10 ('adopter documentation lands inside the phase that changes the behaviour it describes')."
+    },
+    {
+      "id": "PF-21",
+      "session": 6,
+      "wave": 13,
+      "finding": "Parallel documentation dispatch produced a cross-page duplication that only exists after merge: ccea63de created the canonical `## Publication and Recovery` section in storage-format.md while 79252d23 independently wrote the same generic contract into profiles.md. Neither could see the other. code-review caught it on 79252d23 as F3 (REQ-07: restates no fact the storage reference owns).",
+      "lesson": "When parallel doc tasks share a canonical home, name which page owns the shared content in every prompt, so the non-owning pages write a citation from the start rather than a copy."
     }
   ],
   "evidence_requirements": [

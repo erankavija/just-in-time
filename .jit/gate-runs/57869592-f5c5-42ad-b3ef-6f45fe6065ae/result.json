@@ -1,0 +1,48 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "58b99fb4be0854da5dcd73a4ba728144211a27ad",
+  "completed_at": "2026-09-21T17:45:40.621335023Z",
+  "duration_ms": 127201,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/profiles.md",
+        "id": "F1",
+        "line": 530,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Profiles documentation says the redo record appends event bytes at a captured offset, but production record construction writes events.jsonl as a full file and sets event_append to None."
+      },
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/storage-format.md",
+        "id": "F2",
+        "line": 92,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The storage reference independently retains the same offset-based event-append claim, which does not match current production record construction."
+      }
+    ],
+    "summary": "The issue introduces an inaccurate offset-based event-append claim in the profiles publication contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "79252d23-23ab-4c04-9327-8d2986f361d8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "57869592-f5c5-42ad-b3ef-6f45fe6065ae",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T17:43:33.419876631Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.0f7pifBTzW: binary file matches\n--- agent stderr (first 12 of 31733 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.155.1\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0c510-e3ce-7c81-bb7d-23b8d0711cf6\n--------\n--- 31721 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: this is a leaf `task` with no resolved children. I inspected each of its six reachable `jit:79252d23` commits individually; no uncommitted changes were attributed. The issue updated the profiles/events references and MCP README. Current storage code instead records `events.jsonl` as a full file write, not an offset-based event append.\n\n1. **F1 — blocking, issue-impact, high:** The new profiles publication contract says the redo record carries event bytes appended at a captured offset and that it appends the lifecycle event ([docs/reference/profiles.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/profiles.md:530)). Current production record construction always uses `event_append: None` and represents `events.jsonl` as a full file write. Amend this passage, including the lifecycle-event wording at line 568, to describe the current full-file event-log write—or implement offset append support before retaining this contract.\n\n2. **F2 — advisory, pre-existing, medium:** The canonical storage reference makes the same offset-append claim ([docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:92)). This predates the issue and does not affect the verdict, but should be corrected with the canonical storage contract.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The issue introduces an inaccurate offset-based event-append claim in the profiles publication contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Profiles documentation says the redo record appends event bytes at a captured offset, but production record construction writes events.jsonl as a full file and sets event_append to None.\",\"file\":\"docs/reference/profiles.md\",\"line\":530},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The storage reference independently retains the same offset-based event-append claim, which does not match current production record construction.\",\"file\":\"docs/reference/storage-format.md\",\"line\":92}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

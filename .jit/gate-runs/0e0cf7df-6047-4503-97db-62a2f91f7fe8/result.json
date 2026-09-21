@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "58b99fb4be0854da5dcd73a4ba728144211a27ad",
+  "completed_at": "2026-09-21T17:43:32.464581939Z",
+  "duration_ms": 163278,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 117,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The storage reference says an interrupted redo-record write is skipped, but session opening refuses unreadable leftover records."
+      }
+    ],
+    "summary": "The issue's concept-document updates accurately cover redo-record publication, recovery, scratch layout, and safe temporary-file cleanup; one pre-existing reference inconsistency remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ead8f86d-2e45-4144-98e7-2f814b643091",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0e0cf7df-6047-4503-97db-62a2f91f7fe8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T17:40:49.185673562Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` with no resolved children; inspected four reachable `jit:ead8f86d` commits individually. Their union updates the four concept pages. The new redo-record documentation meets the issue’s stated scope and matches current behavior.\n\n1. [Advisory, pre-existing] `docs/reference/storage-format.md:117` says an interrupted record write is “skipped,” but session opening actually refuses an unreadable leftover record. Clarify that recovery stops with an error for malformed `redo.record` files.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue's concept-document updates accurately cover redo-record publication, recovery, scratch layout, and safe temporary-file cleanup; one pre-existing reference inconsistency remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The storage reference says an interrupted redo-record write is skipped, but session opening refuses unreadable leftover records.\",\"file\":\"docs/reference/storage-format.md\",\"line\":117}]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

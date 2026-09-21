@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "58b99fb4be0854da5dcd73a4ba728144211a27ad",
+  "completed_at": "2026-09-21T17:40:48.224200454Z",
+  "duration_ms": 53049,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The issue-scoped storage-format documentation accurately states the redo-record contract with no blocking documentation impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ccea63de-f191-497b-8941-6d5b6133b50a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20805d1a-8f34-4e75-8315-0304db750ef3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T17:39:55.174501545Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `ccea63de` is a leaf task. I inspected its two reachable tagged commits individually; the merge repeats the documentation patch, so the union is the current `docs/reference/storage-format.md` update. No uncommitted changes were attributed.\n\nThe reference accurately documents the scratch directory, synced redo-record publication, idempotent session-open recovery, and engine-composed ignore entry. It removes the retired transaction/bootstrap vocabulary required by the issue.\n\nFindings: none.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The issue-scoped storage-format documentation accurately states the redo-record contract with no blocking documentation impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

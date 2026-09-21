@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "58b99fb4be0854da5dcd73a4ba728144211a27ad",
+  "completed_at": "2026-09-21T17:53:04.903353965Z",
+  "duration_ms": 187939,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/architecture/repository-state-materialization.md",
+        "id": "F1",
+        "line": 400,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/canonical-cutover"
+        ],
+        "severity": "low",
+        "summary": "Architecture note still describes the retired ExternalBootstrap bootstrap-directory control location; its separate owner is jit:be13da79."
+      }
+    ],
+    "summary": "The attributable implementation meets the issue criteria; one external stale architecture document is advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b7c99dcb-073f-46c7-938a-0a465c8131ee",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "016b2bff-f5cd-4864-a0bd-ca0afd266339",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T17:49:56.963730840Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 72afc1f23aec1f95fa3cdd731cb7e5ccca3cbe15, 117c78f702a48886946748c9fcee41e79074ced5, 5bd0b8922c1048a801bd727f51c4bcfe4d36d151\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md), @/invariant/canonical-cutover (.jit/invariants.toml), @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-09-21T17:33:59Z); code-review pending\nTruncation recovery: none\n\n1. F1 — advisory, pre-existing: [dev/architecture/repository-state-materialization.md:400](/home/vkaskivuo/Projects/just-in-time/dev/architecture/repository-state-materialization.md:400) still describes the retired `ExternalBootstrap` `.jit-bootstrap/transactions` control location. It was not changed by this issue and is explicitly owned by `jit:be13da79`; reporting it satisfies this issue’s report-not-edit boundary. References: @/invariant/canonical-cutover.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation meets the issue criteria; one external stale architecture document is advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Architecture note still describes the retired ExternalBootstrap bootstrap-directory control location; its separate owner is jit:be13da79.\",\"file\":\"dev/architecture/repository-state-materialization.md\",\"line\":400,\"references\":[\"@/invariant/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

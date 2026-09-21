@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-09-21T17:53:33.296000762Z",
   "first_ready_at": "2026-09-21T16:13:24.526824783Z",
   "gates_required": [
     "cargo-ci",
@@ -59,6 +60,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-09-21T17:34:24.732751642Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-09-21T17:53:05.210875690Z",
       "updated_by": "auto:executor"
     }
   },
@@ -74,7 +80,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Bootstrap namespace reservation retires with the kernel",
-  "updated_at": "2026-09-21T17:34:24.732751642Z"
+  "updated_at": "2026-09-21T17:53:33.296000762Z"
 }
