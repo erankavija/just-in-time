@@ -259,6 +259,9 @@ application are defined in
 Error: applying the leftover redo record failed: <cause>
 ```
 
+`jit recover` prints `Recovery failed:` in place of `Error:`, and under `--json`
+reports `recovery_failed` where other mutating commands report `GENERIC_ERROR`.
+
 **Cause:** Session open could not apply the record, for example because a path
 it writes is not writable or a file occupies a directory it creates. The record
 stays in place.
@@ -273,9 +276,9 @@ repeated, so the part already applied does no harm.
 Error: leftover redo record tmp/redo.record is not readable: <reason>
 ```
 
-Every mutating command, `jit recover` included, fails this way until the record
-is dealt with. Read-only commands still run and show the repository without the
-pending mutation. JIT refuses the record rather than skipping it, because a
+Every mutating command fails this way until the record is dealt with;
+`jit recover` reports it in the recovery-failure form described above. Read-only
+commands still run and show the repository without the pending mutation. JIT refuses the record rather than skipping it, because a
 record damaged after it was committed may belong to a partly applied mutation.
 
 **Solution:** Copy the record (`redo.record` in `.jit/tmp/`) outside `.jit/`,

@@ -477,16 +477,19 @@ jit recover --json
 
 ```
 Recovery complete:
+  • Transactions recovered: 0
   • Stale locks cleaned: 1
   • Index rebuilt: true
   • Expired leases evicted: 2
   • Temp files removed: 0
+  • Derived-state targets repaired: 0
 ```
 
 ### Failure modes
 
-The command fails when recovery itself fails. For the code that failure exits
-with, see the [Exit Codes reference](exit-codes.md).
+The command fails with `recovery_failed` when applying a leftover redo record,
+or a recovery routine, fails. For the status that code exits with, see the
+[Error Codes reference](error-codes.md).
 
 ---
 
