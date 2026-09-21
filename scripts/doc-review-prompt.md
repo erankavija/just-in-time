@@ -28,6 +28,10 @@ When no tagged commit is available for an included issue, fall back to that issu
 
 Useful commands include `git log --format='%H%x00%B%x00'`, `git show --find-renames --find-copies <commit>`, `jit issue status <id>... --json`, `rg`, `jit --schema`, and `jit item show <address>`. Always inspect tagged commits individually, never as a broad range.
 
+## User decisions
+
+The issue description may record user decisions as `decision` items (`D-NN`) under a `## Decisions` heading. Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses. If evidence contradicts a decision's factual premise, surface that as an advisory finding citing the decision's address, `@/issue/<short-id>/decision/D-NN`.
+
 ## Derive the smallest documentation impact cone
 
 From the attributable footprint and issue intent, identify the user-visible changes: commands, flags, output, configuration, storage, workflows, prerequisites, guarantees, or other adopter-observable behavior. Decide whether each effect needs a tutorial, how-to, reference, concept explanation, README update, or no documentation change.

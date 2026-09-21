@@ -37,6 +37,10 @@ An event log, gate-run result, benchmark artifact, session handoff, or progress
 file records what was true when written; review none of them against current
 behavior and raise no finding whose remedy is editing one.
 
+## User decisions
+
+The issue description may record user decisions as `decision` items (`D-NN`) under a `## Decisions` heading. Decisions bind this review: treat the state a decision accepts as authoritative, and do not raise a blocking finding whose only remedy the decision forecloses. If evidence contradicts a decision's factual premise, surface that as an advisory finding citing the decision's address, `@/issue/<short-id>/decision/D-NN`.
+
 ## Bounded inspection and truncation recovery
 
 Read patches and current files in bounded calls, partitioned by commit, path, or line range. Search only relevant directories and patterns. Do not combine a full patch, the full gate registry, and repository-wide searches in one command.
