@@ -71,8 +71,10 @@ pub use json::{
     RetainedSessionSuspendedError,
 };
 pub use lock::{configured_lock_timeout, is_lock_timeout, FileLocker, LockMode, LockTimeout};
-pub(in crate::storage) use mutation_interruption::KernelInterruptions;
-pub use mutation_interruption::{MutationInterruptionInjector, MutationPoint};
+pub(in crate::storage) use mutation_interruption::SessionRedoInterruptions;
+pub use mutation_interruption::{
+    MutationInterruptionInjector, MutationPoint, NoMutationInterruptions,
+};
 pub use path_errors::{validate_repo_relative_path, PathReadError};
 pub use redo_apply::{
     NoRedoInterruptions, RedoApplier, RedoApplyError, RedoInterruptionInjector, RedoPoint,
@@ -127,8 +129,8 @@ pub trait IssueStore: Clone {
     /// guard drops.
     ///
     /// [`RepositoryStateStore`] sessions retain this as their outer
-    /// serialization guard across recovery, capture, read-set revalidation, and
-    /// transactional apply. The lock is
+    /// serialization guard across recovery, capture, the pre-commit check, and
+    /// the application of the redo record. The lock is
     /// [reentrant](repo_lock::RepoWriteLock#reentrancy) so a retained startup
     /// session can reenter the same backend boundary.
     ///

@@ -595,7 +595,9 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
 
-    /// Count only the recoverable publication boundary, not read-only captures.
+    /// Count each apply's own pre-commit check, the one boundary every
+    /// publication crosses on both the record and the absent-root path, and no
+    /// read-only capture.
     struct PublicationCounter(AtomicUsize);
 
     impl PublicationCounter {
@@ -610,8 +612,7 @@ mod tests {
 
     impl crate::storage::MutationInterruptionInjector for PublicationCounter {
         fn check(&self, point: &crate::storage::MutationPoint) -> std::io::Result<()> {
-            if point == &crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply)
-            {
+            if point == &crate::storage::MutationPoint::BeforeCommitCheck {
                 self.0.fetch_add(1, Ordering::SeqCst);
             }
             Ok(())

@@ -457,12 +457,12 @@ fn cleanup_empty_repository_control(
                 }
                 drop(transactions);
                 tmp.remove_dir("transactions")?;
+                sync_directory(&tmp)?;
             }
-            if tmp.entries()?.next().is_none() {
-                drop(tmp);
-                data.remove_dir("tmp")?;
-                sync_directory(data)?;
-            }
+            // The scratch directory itself stays: it is the redo record's home
+            // and the entry the data root's ignore file names, so removing it
+            // would have the next mutation recreate it and fsync the data root
+            // again.
             Ok(())
         }
     }

@@ -87,49 +87,52 @@ pub fn prepare_server_storage(
 mod recovery_startup_tests {
     use super::*;
     use jit::commands::CommandExecutor;
-    use jit::storage::{MutationInterruptionInjector, MutationPoint, RedoPoint};
-    use std::sync::Arc;
+    use jit::repository_state::{FileMode, VirtualPath};
+    use jit::storage::{PutFile, RedoRecord};
     use tempfile::TempDir;
 
-    struct FailAfterApply;
-
-    impl MutationInterruptionInjector for FailAfterApply {
-        fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-            if point == &MutationPoint::Redo(RedoPoint::AfterApply) {
-                return Err(std::io::Error::other(
-                    "interrupt after the mutation is published",
-                ));
-            }
-            Ok(())
-        }
+    /// A repository whose index the leftover `record` restores, so startup
+    /// validation passes only if the record was applied before it ran.
+    fn repository_missing_its_index(temp: &TempDir, record: impl FnOnce(&[u8]) -> RedoRecord) {
+        let data = temp.path().join(".jit");
+        let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
+        CommandExecutor::new(JsonFileStorage::new(&data))
+            .with_layout(layout)
+            .initialize_fresh_repository(temp.path(), None)
+            .expect("a repository the server can serve");
+        let index = data.join("index.json");
+        let bytes = std::fs::read(&index).unwrap();
+        std::fs::remove_file(&index).unwrap();
+        record(&bytes).commit(&data).unwrap();
     }
 
     #[test]
-    fn test_server_startup_recovers_committed_fresh_root_before_validation() {
+    fn test_server_startup_applies_the_leftover_record_before_validation() {
         let temp = TempDir::new().unwrap();
+        repository_missing_its_index(&temp, |bytes| {
+            RedoRecord::new(
+                vec![PutFile {
+                    path: VirtualPath::data("index.json").unwrap(),
+                    bytes: bytes.to_vec(),
+                    mode: FileMode::Regular,
+                }],
+                Vec::new(),
+                None,
+            )
+            .unwrap()
+        });
+
         let data = temp.path().join(".jit");
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        let interrupted =
-            JsonFileStorage::with_mutation_interruptions(&data, Arc::new(FailAfterApply));
-        let executor = CommandExecutor::new(interrupted).with_layout(layout);
-        assert!(executor
-            .initialize_fresh_repository(temp.path(), None)
-            .is_err());
-
-        let recovered_layout =
-            jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let (_storage, session) =
-            prepare_server_storage(&data, recovered_layout).expect("startup recovery");
+            prepare_server_storage(&data, layout).expect("startup applies the record first");
+
         assert_eq!(session.recovery_report().recovered_count(), 1);
-        assert!(!temp.path().join(".jit-bootstrap").exists());
     }
 
     /// REQ-03 at the count `main` logs on startup.
     #[test]
     fn test_server_startup_counts_the_leftover_redo_record_it_applied() {
-        use jit::repository_state::{FileMode, VirtualPath};
-        use jit::storage::{PutFile, RedoRecord};
-
         let temp = TempDir::new().unwrap();
         let data = temp.path().join(".jit");
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();

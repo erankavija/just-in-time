@@ -5,8 +5,7 @@
 //! steps stay named by [`RedoPoint`], so a publication interruption means here
 //! what it means in the applier.
 
-use crate::storage::redo_apply::RedoPoint;
-use crate::storage::{TransactionFailureInjector, TransactionFailurePoint};
+use crate::storage::redo_apply::{RedoInterruptionInjector, RedoPoint};
 use std::sync::Arc;
 
 /// One interruptible moment of a mutation session.
@@ -27,52 +26,32 @@ pub trait MutationInterruptionInjector: Send + Sync {
     fn check(&self, point: &MutationPoint) -> std::io::Result<()>;
 }
 
-/// Puts the transaction kernel's boundaries to a session injector as the
-/// record-era moments they stand for, so a repointed injection fires while the
-/// kernel is still the publisher.
-///
-/// Removed when the session commits through the redo record (jit:4319256e):
-/// the session checks [`MutationPoint::SessionOpen`] and
-/// [`MutationPoint::BeforeCommitCheck`] itself from there and the applier checks
-/// its own [`RedoPoint`]s, leaving nothing to translate.
-pub(in crate::storage) struct KernelInterruptions(Arc<dyn MutationInterruptionInjector>);
+/// Production injector: every moment proceeds.
+#[derive(Debug, Default)]
+pub struct NoMutationInterruptions;
 
-impl KernelInterruptions {
-    /// Wrap `injector` as the kernel-vocabulary injector the session threads.
+impl MutationInterruptionInjector for NoMutationInterruptions {
+    fn check(&self, _point: &MutationPoint) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Puts a record application's own points to the session injector that owns
+/// them, so a session's applications and the moments around them are injected
+/// through one vocabulary.
+pub(in crate::storage) struct SessionRedoInterruptions(Arc<dyn MutationInterruptionInjector>);
+
+impl SessionRedoInterruptions {
+    /// Hold `injector` as the owner of every point an application reaches
+    /// through this adapter.
     pub(in crate::storage) fn new(injector: Arc<dyn MutationInterruptionInjector>) -> Arc<Self> {
         Arc::new(Self(injector))
     }
 }
 
-impl TransactionFailureInjector for KernelInterruptions {
-    fn check(&self, point: &TransactionFailurePoint) -> std::io::Result<()> {
-        record_era_moment(point).map_or(Ok(()), |moment| self.0.check(&moment))
-    }
-}
-
-/// The session moment a kernel boundary stands for, or `None` for a kernel step
-/// the record protocol has no moment of its own for.
-///
-/// Each pairing is the one boundary a session crosses exactly once per moment:
-/// external recovery precedes everything else a session open does;
-/// read-set revalidation is the apply's comparison against the live repository;
-/// control creation opens one publication with nothing durable yet written,
-/// which is what [`RedoPoint::BeforeApply`] names once the record is the commit
-/// point; and the post-commit boundary leaves the mutation published with only
-/// cleanup outstanding, which is [`RedoPoint::AfterApply`].
-fn record_era_moment(point: &TransactionFailurePoint) -> Option<MutationPoint> {
-    match point {
-        TransactionFailurePoint::RepositoryRecoveryExternal => Some(MutationPoint::SessionOpen),
-        TransactionFailurePoint::RepositoryBeforeReadSetRevalidation => {
-            Some(MutationPoint::BeforeCommitCheck)
-        }
-        TransactionFailurePoint::RepositoryBeforeControlCreation => {
-            Some(MutationPoint::Redo(RedoPoint::BeforeApply))
-        }
-        TransactionFailurePoint::RepositoryAfterCommit => {
-            Some(MutationPoint::Redo(RedoPoint::AfterApply))
-        }
-        _ => None,
+impl RedoInterruptionInjector for SessionRedoInterruptions {
+    fn check(&self, point: &RedoPoint) -> std::io::Result<()> {
+        self.0.check(&MutationPoint::Redo(point.clone()))
     }
 }
 
@@ -81,111 +60,27 @@ mod tests {
     use super::*;
     use std::sync::Mutex;
 
-    /// Records every moment put to it, failing at one selected moment.
     #[derive(Default)]
-    struct Recorded {
-        seen: Mutex<Vec<MutationPoint>>,
-        fail_at: Option<MutationPoint>,
-    }
-
-    impl Recorded {
-        fn failing_at(point: MutationPoint) -> Arc<Self> {
-            Arc::new(Self {
-                seen: Mutex::new(Vec::new()),
-                fail_at: Some(point),
-            })
-        }
-
-        fn seen(&self) -> Vec<MutationPoint> {
-            self.seen.lock().unwrap().clone()
-        }
-    }
+    struct Recorded(Mutex<Vec<MutationPoint>>);
 
     impl MutationInterruptionInjector for Recorded {
         fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
-            self.seen.lock().unwrap().push(point.clone());
-            if self.fail_at.as_ref() == Some(point) {
-                return Err(std::io::Error::other("injected"));
-            }
-            Ok(())
+            self.0.lock().unwrap().push(point.clone());
+            Err(std::io::Error::other("injected"))
         }
     }
 
-    /// The kernel boundaries a session crosses, one sample per phase of a
-    /// publication, including every boundary that stands for a session moment.
-    fn kernel_boundaries() -> Vec<TransactionFailurePoint> {
-        vec![
-            TransactionFailurePoint::RepositoryRecoveryExternal,
-            TransactionFailurePoint::RepositoryRecoveryInternal,
-            TransactionFailurePoint::RepositoryBeforeReadSetRevalidation,
-            TransactionFailurePoint::RepositoryBeforeControlCreation,
-            TransactionFailurePoint::RepositoryCreateControl,
-            TransactionFailurePoint::RepositoryPrepareAction { action: 0 },
-            TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
-            TransactionFailurePoint::RepositoryAfterTargetMutation { action: 0 },
-            TransactionFailurePoint::RepositoryBeforeCommitDecision,
-            TransactionFailurePoint::RepositoryAfterCommit,
-            TransactionFailurePoint::RepositoryBeforeControlCleanup,
-            TransactionFailurePoint::RepositoryCleanup,
-        ]
-    }
-
     #[test]
-    fn test_record_era_moment_gives_each_session_moment_exactly_one_kernel_boundary() {
-        let moments: Vec<MutationPoint> = kernel_boundaries()
-            .iter()
-            .filter_map(record_era_moment)
-            .collect();
-
-        assert_eq!(
-            moments
-                .iter()
-                .collect::<std::collections::HashSet<_>>()
-                .len(),
-            moments.len(),
-            "two kernel boundaries standing for one moment would fire a repointed injection twice"
-        );
-        assert_eq!(
-            moments,
-            vec![
-                MutationPoint::SessionOpen,
-                MutationPoint::BeforeCommitCheck,
-                MutationPoint::Redo(RedoPoint::BeforeApply),
-                MutationPoint::Redo(RedoPoint::AfterApply),
-            ],
-            "the moments must arrive in the order a publishing session crosses them"
-        );
-    }
-
-    #[test]
-    fn test_kernel_interruptions_puts_only_the_boundaries_that_stand_for_a_moment() {
+    fn test_session_redo_interruptions_names_the_point_the_application_reached() {
         let injector = Arc::new(Recorded::default());
-        let bridge = KernelInterruptions::new(injector.clone());
+        let adapter = SessionRedoInterruptions::new(injector.clone());
 
-        for point in kernel_boundaries() {
-            bridge.check(&point).expect("no moment is injected");
-        }
+        assert!(adapter.check(&RedoPoint::BeforePut { index: 2 }).is_err());
 
         assert_eq!(
-            injector.seen(),
-            kernel_boundaries()
-                .iter()
-                .filter_map(record_era_moment)
-                .collect::<Vec<_>>(),
-            "a kernel step the record protocol has no moment for must reach no injector"
+            injector.0.lock().unwrap().clone(),
+            vec![MutationPoint::Redo(RedoPoint::BeforePut { index: 2 })],
+            "the adapter must put the application's own point to the session injector"
         );
-    }
-
-    #[test]
-    fn test_kernel_interruptions_raises_the_injected_failure_at_its_moment() {
-        let injector = Recorded::failing_at(MutationPoint::Redo(RedoPoint::BeforeApply));
-        let bridge = KernelInterruptions::new(injector);
-
-        assert!(bridge
-            .check(&TransactionFailurePoint::RepositoryCreateControl)
-            .is_ok());
-        assert!(bridge
-            .check(&TransactionFailurePoint::RepositoryBeforeControlCreation)
-            .is_err());
     }
 }

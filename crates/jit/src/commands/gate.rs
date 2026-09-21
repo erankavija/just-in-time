@@ -1890,7 +1890,7 @@ enforce_leases = "off"
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
+            crate::storage::MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
         seed_repo_file(&storage, ".jit/config.toml", "");
@@ -1927,7 +1927,7 @@ enforce_leases = "off"
         use crate::storage::RepositoryStateStore;
 
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
+            crate::storage::MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
         seed_repo_file(
@@ -1979,7 +1979,7 @@ enforce_leases = "off"
         // The attestation's own publication is the first this view sees: the
         // fixture above was seeded through the clean storage.
         let failures = std::sync::Arc::new(OneFailure(std::sync::Mutex::new(Some(
-            crate::storage::MutationPoint::Redo(crate::storage::RedoPoint::BeforeApply),
+            crate::storage::MutationPoint::BeforeCommitCheck,
         ))));
         let injected = executor.storage().with_mutation_interruption_view(failures);
         let recovered = injected.without_mutation_interruptions();

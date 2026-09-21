@@ -8,7 +8,7 @@ use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, repository as redo_repository, seed_repository,
     snapshot, CAPTURED_LOG,
 };
-use crate::storage::{EventAppend, PutFile, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
+use crate::storage::{EventAppend, PutFile, RedoPoint, RECORD_FILE_NAME, RECORD_SCRATCH_DIR};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::process::Command;
 use std::sync::Mutex;
@@ -37,8 +37,11 @@ fn test_advisory_error_classification_only_accepts_permission_denied_io() {
 }
 
 #[cfg(unix)]
+/// A listing is captured evidence the mutation reads and never writes, so its
+/// movement leaves the mutation admissible — the cost `@/charter/D-17` names,
+/// stated here for the one kind of evidence the record cannot carry at all.
 #[test]
-fn test_json_apply_retries_when_advisory_unreadable_listing_becomes_readable() {
+fn test_json_apply_admits_an_advisory_listing_that_became_readable() {
     use std::os::unix::fs::PermissionsExt as _;
 
     let worktree = TempDir::new().unwrap();
@@ -77,15 +80,8 @@ fn test_json_apply_retries_when_advisory_unreadable_listing_becomes_readable() {
     assert!(unreadable.listing_fingerprints()[&secret_path].is_advisory_unreadable());
     std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o700)).unwrap();
 
-    assert!(matches!(
-        session.apply(&test_plan(&unreadable, &delta)),
-        Err(RepositoryStateStoreError::RetryableConflict { .. })
-    ));
-    assert!(!worktree.path().join("published.txt").exists());
+    session.apply(&test_plan(&unreadable, &delta)).unwrap();
 
-    let readable = session.capture(spec()).unwrap();
-    assert!(!readable.listing_fingerprints()[&secret_path].is_advisory_unreadable());
-    session.apply(&test_plan(&readable, &delta)).unwrap();
     assert_eq!(
         std::fs::read(worktree.path().join("published.txt")).unwrap(),
         b"published"
@@ -729,121 +725,6 @@ fn test_memory_set_mode_uses_exact_file_preimage() {
     ));
 }
 
-#[cfg(unix)]
-#[test]
-fn test_canonical_set_mode_leaf_symlink_swap_cannot_mutate_external_target() {
-    use std::os::unix::fs::{symlink, PermissionsExt as _};
-
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let target = data.join("mode.txt");
-    let moved = data.join("mode-original.txt");
-    std::fs::write(&target, b"inside").unwrap();
-    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
-    let outside = TempDir::new().unwrap();
-    let outside_target = outside.path().join("outside.txt");
-    std::fs::write(&outside_target, b"outside").unwrap();
-    std::fs::set_permissions(&outside_target, std::fs::Permissions::from_mode(0o640)).unwrap();
-
-    let hook_target = target.clone();
-    let hook_moved = moved.clone();
-    let hook_outside = outside_target.clone();
-    let injector = Arc::new(HookAt {
-        point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
-        hook: Mutex::new(Some(Box::new(move || {
-            std::fs::rename(&hook_target, &hook_moved).unwrap();
-            symlink(&hook_outside, &hook_target).unwrap();
-        }))),
-    });
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::phase_one([VirtualPath::data("mode.txt").unwrap()], budget()).unwrap();
-    let image = session.capture(spec).unwrap();
-    let expected = ExpectedPreimage::of(
-        image
-            .entry(&VirtualPath::data("mode.txt").unwrap())
-            .unwrap(),
-    );
-    let delta = RepositoryDelta::new(
-        &layout,
-        vec![RepositoryAction::set_mode(
-            VirtualPath::data("mode.txt").unwrap(),
-            "mode",
-            expected,
-            FileMode::Executable,
-        )],
-    )
-    .unwrap();
-    assert!(session.apply(&test_plan(&image, &delta)).is_err());
-    assert_eq!(
-        std::fs::metadata(&outside_target)
-            .unwrap()
-            .permissions()
-            .mode()
-            & 0o777,
-        0o640
-    );
-    assert_eq!(
-        std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
-        0o600
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn test_canonical_set_mode_revalidates_identity_on_mutated_handle() {
-    use std::os::unix::fs::PermissionsExt as _;
-
-    let temp = TempDir::new().unwrap();
-    let data = temp.path().join(".jit");
-    std::fs::create_dir(&data).unwrap();
-    let target = data.join("mode.txt");
-    let moved = data.join("mode-original.txt");
-    std::fs::write(&target, b"inside").unwrap();
-    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
-    let hook_target = target.clone();
-    let hook_moved = moved.clone();
-    let injector = Arc::new(HookAt {
-        point: TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
-        hook: Mutex::new(Some(Box::new(move || {
-            std::fs::rename(&hook_target, &hook_moved).unwrap();
-            std::fs::write(&hook_target, b"unexpected").unwrap();
-            std::fs::set_permissions(&hook_target, std::fs::Permissions::from_mode(0o640)).unwrap();
-        }))),
-    });
-    let layout = discover_repository_layout(temp.path(), &data).unwrap();
-    let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
-    let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::phase_one([VirtualPath::data("mode.txt").unwrap()], budget()).unwrap();
-    let image = session.capture(spec).unwrap();
-    let expected = ExpectedPreimage::of(
-        image
-            .entry(&VirtualPath::data("mode.txt").unwrap())
-            .unwrap(),
-    );
-    let delta = RepositoryDelta::new(
-        &layout,
-        vec![RepositoryAction::set_mode(
-            VirtualPath::data("mode.txt").unwrap(),
-            "mode",
-            expected,
-            FileMode::Executable,
-        )],
-    )
-    .unwrap();
-    assert!(session.apply(&test_plan(&image, &delta)).is_err());
-    assert_eq!(
-        std::fs::metadata(&target).unwrap().permissions().mode() & 0o777,
-        0o640
-    );
-    assert_eq!(
-        std::fs::metadata(&moved).unwrap().permissions().mode() & 0o777,
-        0o600
-    );
-}
-
 // --- Cross-backend conformance matrix ------------------------------------
 //
 // One suite exercises identical canonical semantics on the JSON and memory
@@ -1183,92 +1064,54 @@ fn apply_once<S: RepositoryStateStore>(
     session.apply(&test_plan(&image, delta))
 }
 
+/// A put creates the directories its path needs (OD-7), so a nested write
+/// publishes without an explicit parent action — identically on both backends,
+/// because each one's record application creates the ancestors.
 #[test]
-fn test_conformance_parent_existence_enforced_on_both_backends() {
-    for existing_root in [false, true] {
-        let worktree = TempDir::new().unwrap();
-        let data = worktree.path().join(".jit");
-        if existing_root {
-            std::fs::create_dir(&data).unwrap();
-        }
-        let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-        let spec = || {
-            CaptureSpec::phase_one(
-                [
-                    VirtualPath::data("").unwrap(),
-                    VirtualPath::data("nested").unwrap(),
-                    VirtualPath::data("nested/file.txt").unwrap(),
-                ],
-                budget(),
-            )
-            .unwrap()
-        };
-
-        // A nested WriteFile whose parent directory is not created fails on both
-        // backends (JSON: open_parent MissingParent; memory: parent-existence
-        // rule), leaving the old state untouched.
-        let missing_parent = RepositoryDelta::new(
-            &layout,
-            vec![RepositoryAction::write_file(
-                VirtualPath::data("nested/file.txt").unwrap(),
-                "p0",
-                ExpectedPreimage::Absent,
-                b"x".to_vec(),
-                FileMode::Regular,
-            )],
-        )
-        .unwrap();
-        let json = JsonFileStorage::new(&data);
-        assert!(apply_once(&json, &layout, spec(), &missing_parent).is_err());
-        assert!(
-            !data.join("nested").exists(),
-            "existing_root={existing_root}"
-        );
-        let memory = InMemoryStorage::new();
-        if existing_root {
-            seed_memory_existing(&memory, &[]);
-        }
-        assert!(apply_once(&memory, &layout, spec(), &missing_parent).is_err());
-
-        // The same delta with the explicit CreateDirectory parent succeeds
-        // identically on both backends (fresh trees to avoid carrying residue).
-        let worktree2 = TempDir::new().unwrap();
-        let data2 = worktree2.path().join(".jit");
-        if existing_root {
-            std::fs::create_dir(&data2).unwrap();
-        }
-        let layout2 = discover_repository_layout(worktree2.path(), &data2).unwrap();
-        let with_parent = RepositoryDelta::new(
-            &layout2,
-            vec![
-                RepositoryAction::create_directory(
-                    VirtualPath::data("nested").unwrap(),
-                    "p0",
-                    ExpectedPreimage::Absent,
-                ),
-                RepositoryAction::write_file(
-                    VirtualPath::data("nested/file.txt").unwrap(),
-                    "p0",
-                    ExpectedPreimage::Absent,
-                    b"x".to_vec(),
-                    FileMode::Regular,
-                ),
+fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let nested = VirtualPath::data("nested/file.txt").unwrap();
+    let spec = || {
+        CaptureSpec::phase_one(
+            [
+                VirtualPath::data("").unwrap(),
+                VirtualPath::data("nested").unwrap(),
+                nested.clone(),
             ],
+            budget(),
         )
-        .unwrap();
-        let json2 = JsonFileStorage::new(&data2);
-        let json_outcome = apply_once(&json2, &layout2, spec(), &with_parent).unwrap();
-        let memory2 = InMemoryStorage::new();
-        if existing_root {
-            seed_memory_existing(&memory2, &[]);
-        }
-        let memory_outcome = apply_once(&memory2, &layout2, spec(), &with_parent).unwrap();
-        assert_eq!(
-            json_outcome.actions_applied, memory_outcome.actions_applied,
-            "complete hashes may differ with backend-specific captured identities; \
-                 action counts must agree for existing_root={existing_root}"
-        );
-    }
+        .unwrap()
+    };
+    let delta = RepositoryDelta::new(
+        &layout,
+        vec![RepositoryAction::write_file(
+            nested.clone(),
+            "p0",
+            ExpectedPreimage::Absent,
+            b"x".to_vec(),
+            FileMode::Regular,
+        )],
+    )
+    .unwrap();
+
+    let json = JsonFileStorage::new(&data);
+    let json_outcome = apply_once(&json, &layout, spec(), &delta).unwrap();
+    let memory = InMemoryStorage::new();
+    seed_memory_existing(&memory, &[]);
+    let memory_outcome = apply_once(&memory, &layout, spec(), &delta).unwrap();
+
+    assert_eq!(
+        std::fs::read(data.join("nested/file.txt")).unwrap(),
+        b"x",
+        "the filesystem backend did not create the directory its put needed"
+    );
+    assert_eq!(
+        json_outcome.actions_applied, memory_outcome.actions_applied,
+        "the backends disagree on what the nested write published"
+    );
 }
 
 #[test]
@@ -1489,9 +1332,9 @@ fn test_conformance_listing_rogue_name_bytes_exceed_budget_on_both_backends() {
 #[test]
 fn test_conformance_empty_delta_ignores_armed_injectors() {
     for point in [
-        TransactionFailurePoint::RepositoryPrepareIntent,
-        TransactionFailurePoint::RepositoryAfterCommit,
-        TransactionFailurePoint::RepositoryCleanup,
+        MutationPoint::Redo(RedoPoint::BeforeApply),
+        MutationPoint::Redo(RedoPoint::BeforeRecordRemoval),
+        MutationPoint::Redo(RedoPoint::AfterApply),
     ] {
         let worktree = TempDir::new().unwrap();
         let data = worktree.path().join(".jit");
@@ -1500,16 +1343,16 @@ fn test_conformance_empty_delta_ignores_armed_injectors() {
         let spec = || CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
         let delta = RepositoryDelta::new(&layout, vec![]).unwrap();
 
-        // An empty delta short-circuits before any apply-phase injector on both
-        // backends, so an armed apply-phase failure never fires.
-        let json = JsonFileStorage::with_repository_state_failures(
+        // An empty delta writes no record on either backend, so no step of a
+        // record's application is reached and an armed interruption never fires.
+        let json = JsonFileStorage::with_mutation_interruptions(
             &data,
-            SelectedFailures::one(point.clone()),
+            InterruptAtMoment::new(point.clone()),
         );
         let json_outcome = apply_once(&json, &layout, spec(), &delta).unwrap();
 
         let memory =
-            InMemoryStorage::with_repository_state_failures(SelectedFailures::one(point.clone()));
+            InMemoryStorage::with_mutation_interruptions(InterruptAtMoment::new(point.clone()));
         seed_memory_existing(&memory, &[]);
         let memory_outcome = apply_once(&memory, &layout, spec(), &delta).unwrap();
 
@@ -1518,6 +1361,13 @@ fn test_conformance_empty_delta_ignores_armed_injectors() {
             "{point:?}"
         );
         assert_eq!(json_outcome.actions_applied, 0);
+        assert!(
+            !data
+                .join(RECORD_SCRATCH_DIR)
+                .join(RECORD_FILE_NAME)
+                .exists(),
+            "an empty delta committed a record, at {point:?}"
+        );
     }
 }
 
@@ -1716,62 +1566,6 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
 
 #[cfg(unix)]
 #[test]
-fn test_existing_data_root_replacement_during_publication_never_succeeds() {
-    for point in [
-        TransactionFailurePoint::RepositoryBeforeTargetMutation { action: 0 },
-        TransactionFailurePoint::RepositoryAfterRootBindingCheck { action: 0 },
-        TransactionFailurePoint::RepositoryBeforeCommitDecision,
-    ] {
-        let outer = TempDir::new().unwrap();
-        let worktree = outer.path().join("project");
-        let data = worktree.join(".jit");
-        let replacement = worktree.join(".jit-replacement");
-        let detached = worktree.join(".jit-detached");
-        std::fs::create_dir_all(&data).unwrap();
-        std::fs::create_dir(&replacement).unwrap();
-        std::fs::write(replacement.join("replacement-marker"), b"live").unwrap();
-
-        let hook_data = data.clone();
-        let hook_replacement = replacement.clone();
-        let hook_detached = detached.clone();
-        let injector = Arc::new(HookAt {
-            point,
-            hook: Mutex::new(Some(Box::new(move || {
-                std::fs::rename(&hook_data, &hook_detached).unwrap();
-                std::fs::rename(&hook_replacement, &hook_data).unwrap();
-            }))),
-        });
-        let layout = discover_repository_layout(&worktree, &data).unwrap();
-        let storage = JsonFileStorage::with_repository_state_failures(&data, injector);
-        let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-        let path = VirtualPath::data("new.txt").unwrap();
-        let spec = CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
-            .unwrap();
-        let image = session.capture(spec).unwrap();
-        let delta = RepositoryDelta::new(
-            &layout,
-            vec![RepositoryAction::write_file(
-                path,
-                "root-swap",
-                ExpectedPreimage::Absent,
-                b"planned".to_vec(),
-                FileMode::Regular,
-            )],
-        )
-        .unwrap();
-
-        assert!(session.apply(&test_plan(&image, &delta)).is_err());
-        assert_eq!(
-            std::fs::read(data.join("replacement-marker")).unwrap(),
-            b"live"
-        );
-        assert!(!data.join("new.txt").exists());
-        assert!(!detached.join("new.txt").exists());
-    }
-}
-
-#[cfg(unix)]
-#[test]
 fn test_absent_data_parent_replacement_during_publication_never_succeeds() {
     for point in [
         TransactionFailurePoint::RepositoryBeforeDataRootPublication,
@@ -1905,9 +1699,8 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
     )
     .unwrap();
 
-    // A concurrent mutation changes the read set between capture and apply, so
-    // apply must reject with the same typed retryable conflict the JSON kernel
-    // returns from its pre-journal revalidation.
+    // A write target moves between capture and apply, so the pre-commit check
+    // refuses the mutation before its record is written.
     {
         let mut state = memory.repository_state();
         state.entries.insert(
@@ -3404,6 +3197,12 @@ trait SessionRecordBackend: Sized {
     fn seeded() -> Self;
     fn commit(&self, record: &RedoRecord);
     fn open(&self) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
+    /// Open a session whose publication is interrupted at `point`, over the
+    /// same repository every other method reads.
+    fn open_interrupted(
+        &self,
+        point: MutationPoint,
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError>;
     fn published(&self) -> Self::Published;
     /// Whether a record is still waiting for an open to carry it forward.
     fn holds_record(&self) -> bool;
@@ -3450,6 +3249,17 @@ impl SessionRecordBackend for FileSessionBackend {
         self.storage.open_mutation_session(self.layout.clone())
     }
 
+    fn open_interrupted(
+        &self,
+        point: MutationPoint,
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        JsonFileStorage::with_mutation_interruptions(
+            redo_root(&self.worktree),
+            InterruptAtMoment::new(point),
+        )
+        .open_mutation_session(self.layout.clone())
+    }
+
     fn published(&self) -> Self::Published {
         let mut files = snapshot(self.worktree.path());
         files.remove(&record_relative_path());
@@ -3486,6 +3296,15 @@ impl SessionRecordBackend for MemorySessionBackend {
         self.0.open_mutation_session(self.0.repository_layout())
     }
 
+    fn open_interrupted(
+        &self,
+        point: MutationPoint,
+    ) -> Result<Box<dyn RepositoryMutationSession>, RepositoryStateStoreError> {
+        self.0
+            .with_mutation_interruption_view(InterruptAtMoment::new(point))
+            .open_mutation_session(self.0.repository_layout())
+    }
+
     fn published(&self) -> Self::Published {
         memory_fixtures::semantic_state(&self.0).0
     }
@@ -3498,6 +3317,25 @@ impl SessionRecordBackend for MemorySessionBackend {
         match memory_fixtures::semantic_state(&self.0).0.get(path) {
             Some(RepositoryEntry::File { content, .. }) => Some(content.bytes().to_vec()),
             _ => None,
+        }
+    }
+}
+
+/// Interrupts a session at one named moment, so exactly the steps before it
+/// ran.
+struct InterruptAtMoment(MutationPoint);
+
+impl InterruptAtMoment {
+    fn new(point: MutationPoint) -> Arc<Self> {
+        Arc::new(Self(point))
+    }
+}
+
+impl crate::storage::MutationInterruptionInjector for InterruptAtMoment {
+    fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
+        match *point == self.0 {
+            true => Err(std::io::Error::other(format!("interrupted at {point:?}"))),
+            false => Ok(()),
         }
     }
 }
@@ -3552,6 +3390,74 @@ fn assert_open_applies_the_leftover<B: SessionRecordBackend>() {
         !backend.holds_record(),
         "an applied record must leave the commit point"
     );
+}
+
+/// REQ-01 and REQ-04, at the seam every publisher reaches: an apply interrupted
+/// inside its own record application has already passed the commit point, so
+/// the repository holds the record and the complete old state, and the next
+/// session open carries it to the complete new state.
+///
+/// The record's own crash matrix is proven against the record in
+/// `redo_conformance`; what this states is that a session's publication goes
+/// through it (`@/inv/orthogonal-tests`).
+fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
+    let target = leftover_target();
+    let old = B::seeded();
+    let published = {
+        let mut session = old
+            .open_interrupted(MutationPoint::Redo(RedoPoint::BeforePut { index: 0 }))
+            .unwrap();
+        let image = session
+            .capture(CaptureSpec::phase_one([target.clone()], budget()).unwrap())
+            .unwrap();
+        let delta = RepositoryDelta::new(
+            session.layout(),
+            vec![RepositoryAction::write_file(
+                target.clone(),
+                "interrupted-publication",
+                ExpectedPreimage::Absent,
+                LEFTOVER_BYTES.to_vec(),
+                FileMode::Regular,
+            )],
+        )
+        .unwrap();
+        let before = old.published();
+
+        assert!(
+            session.apply(&test_plan(&image, &delta)).is_err(),
+            "the injected interruption must stop the publication"
+        );
+
+        assert_eq!(
+            old.published(),
+            before,
+            "the interruption preceded the first live write, so nothing may be published"
+        );
+        before
+    };
+    assert!(
+        old.holds_record(),
+        "an interrupted publication must leave the record that carries it forward"
+    );
+
+    drop(old.open().unwrap());
+
+    assert_eq!(
+        old.bytes_at(&target).as_deref(),
+        Some(LEFTOVER_BYTES),
+        "the next open must carry the interrupted mutation to its complete new state"
+    );
+    assert_ne!(old.published(), published);
+    assert!(
+        !old.holds_record(),
+        "a converged repository must leave the commit point"
+    );
+}
+
+#[test]
+fn test_apply_interrupted_inside_its_record_converges_at_the_next_open_on_both_backends() {
+    assert_an_interrupted_publication_converges::<FileSessionBackend>();
+    assert_an_interrupted_publication_converges::<MemorySessionBackend>();
 }
 
 #[test]
@@ -3661,7 +3567,7 @@ fn test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates
     assert!(
         before
             .keys()
-            .any(|path| path.starts_with(Path::new(".jit/tmp/transactions"))),
+            .any(|path| path.starts_with(Path::new(".jit-bootstrap"))),
         "the fixture must leave a journal for recovery to act on, got {:?}",
         before.keys().collect::<Vec<_>>()
     );
@@ -3687,8 +3593,12 @@ fn test_open_mutation_session_refuses_a_malformed_record_before_recovery_mutates
 
 /// Leave one journal a later open would recover: a mutation interrupted past
 /// its commit point, which the next session completes forward.
+///
+/// Published over a second, absent data root in the same worktree, because that
+/// is the delta the transaction kernel still carries; the journal it leaves is
+/// the worktree-level external one every session over this worktree recovers.
 fn leave_recoverable_journal(backend: &FileSessionBackend) {
-    let data = redo_root(&backend.worktree);
+    let data = backend.worktree.path().join(".jit-sibling");
     let storage = JsonFileStorage::with_repository_state_failures(
         &data,
         SelectedFailures::one(TransactionFailurePoint::RepositoryAfterCommit),
@@ -3697,7 +3607,10 @@ fn leave_recoverable_journal(backend: &FileSessionBackend) {
     let path = data_path("interrupted.txt");
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
     let image = session
-        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .capture(
+            CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget())
+                .unwrap(),
+        )
         .unwrap();
     let delta = RepositoryDelta::new(
         &layout,

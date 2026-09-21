@@ -3931,12 +3931,14 @@ mod tests {
         );
     }
 
+    /// The gate registry is evidence a gate addition reads and never writes, so
+    /// a declaration removed after capture is caught by the next session's own
+    /// derivation rather than by the first session's publication — the cost
+    /// `@/charter/D-17` names.
     #[test]
     fn test_gate_add_retry_rejects_removed_registry_declaration() {
         use crate::repository_state::{finalize, MutationContext};
-        use crate::storage::{
-            GateNotFoundError, InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError,
-        };
+        use crate::storage::{GateNotFoundError, InMemoryStorage, RepositoryStateStore};
 
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_gate_registry(
@@ -3971,17 +3973,13 @@ mod tests {
             &request,
         )
         .unwrap();
-        let stale_plan = finalize(&layout, &first_image, &context, &first.intents).unwrap();
+        drop(finalize(&layout, &first_image, &context, &first.intents).unwrap());
+        drop(first_session);
 
         crate::commands::test_helpers::seed_gate_registry(
             &storage,
             &crate::declarations::GateRegistry::default(),
         );
-        assert!(matches!(
-            first_session.apply(&stale_plan),
-            Err(RepositoryStateStoreError::RetryableConflict { .. })
-        ));
-        drop(first_session);
 
         let mut retry_session = storage.open_mutation_session(layout).unwrap();
         let retry_image = retry_session
