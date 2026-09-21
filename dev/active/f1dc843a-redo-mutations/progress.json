@@ -445,7 +445,18 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending — next"
+          "status": "in_progress — dispatched, round 1",
+          "dispatch": {
+            "session": 6,
+            "tier": "opus",
+            "worktree": ".agents/worktrees/agent-b0ee2dd6",
+            "anchor": "f0aa1d508",
+            "docs_linked_before_dispatch": [
+              "plan.md (design)",
+              "investigation.md (research, REQ-05 construct map)"
+            ],
+            "lead_note": "Dispatch names wave 11's 66 dead-code allowances as this task's REQ-06 obligation and gives the worker `grep -rn 'removed when the transaction kernel retires' crates/ | wc -l` as its progress signal, which must reach 0. Also carries forward the item-inventory-diff rule, since this task is mostly deletion and a prior session lost a gate run to a sed range deletion."
+          }
         }
       ]
     },
