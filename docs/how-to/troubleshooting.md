@@ -232,9 +232,9 @@ The claims index can always be rebuilt from the append-only `claims.jsonl` log.
 
 `jit validate` reports repository validation findings. Stale locks, expired
 leases, and a corrupted claims index are coordination state for `jit recover` to
-repair; it also removes orphaned `*.tmp` files. It never removes
-`.jit/tmp/redo.record`: the scratch directory `.jit/tmp/` holds a pending
-mutation's commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
+repair; it also removes orphaned `*.tmp` files. It never removes `redo.record`
+from the scratch directory `.jit/tmp/`: that record is a pending mutation's
+commit point. [Stale Temporary Files](../concepts/guarantees.md#stale-temporary-files)
 names what is safe to remove by hand.
 
 ```bash
@@ -278,8 +278,8 @@ is dealt with. Read-only commands still run and show the repository without the
 pending mutation. JIT refuses the record rather than skipping it, because a
 record damaged after it was committed may belong to a partly applied mutation.
 
-**Solution:** Copy `.jit/tmp/redo.record` outside `.jit/`, then act on the
-reason:
+**Solution:** Copy the record (`redo.record` in `.jit/tmp/`) outside `.jit/`,
+then act on the reason:
 
 - `redo record carries no header line` or `redo record holds fewer content
   bytes than its header declares`: what an interrupted write of the record
