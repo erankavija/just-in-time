@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 11,
+  "current_wave": 12,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -365,7 +365,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — dispatched, round 1",
+          "status": "done — cargo-ci and code-review both passed on the merged tree after one rework round (OC-01, lead-found); reviewer verdict pass, 0 findings",
           "dispatch": {
             "session": 6,
             "tier": "opus",
@@ -415,7 +415,23 @@
           "verdict": "accepted; cfg(test) only, so the lib-build dead-code allowances REQ-07 covers are unaffected. It retires with the kernel at b0ee2dd6."
         }
       ],
-      "footprint_against_note": "292 net production lines against the issue's under-250 Notes estimate. Reason recorded rather than the estimate retrofitted (ESC-08 precedent): 97 lines are REQ-07's dead-code allowances, whose volume the note did not anticipate (rustfmt expands a struct-variant body once it carries an attribute); the publisher module itself is 137 lines, under the note, and publisher-attributable production outside it is 58. No criterion binds the figure."
+      "footprint_against_note": "307 net production lines against the issue's under-250 Notes estimate (292 before the rework round, which netted +15). Reason recorded rather than the estimate retrofitted (ESC-08 precedent): 97 lines are REQ-07's dead-code allowances, whose volume the note did not anticipate; the publisher module itself is 137, under the note. No criterion binds the figure.",
+      "review_round_2": {
+        "cargo_ci_merged_tree": "cold run FAILED on the same six dogfood-fixture timeouts (suite-clock 60762 ms); forced warm re-run PASSED, 4722 passed, suite-clock 22328 ms, duration 24968 ms",
+        "pol_04_timings_warm": {
+          "fmt_ms": 1642,
+          "clippy_ms": 201,
+          "suite_build_ms": 605,
+          "test_ms": 17571,
+          "doctest_ms": 4739,
+          "suite_clock_ms": 22328,
+          "flags": "none"
+        },
+        "code_review": "PASSED, 0 findings",
+        "lead_tier_1_5": "OC-01 confirmed closed at HEAD independently: both seams read (false,false)->absent-root publisher, (true,false)->record, (_,true)->no-op, so an empty delta cannot reach a publisher on either backend; ensure_committable_absent_root_delta (repository_state_store.rs:827) refuses exactly (no data action, at least one worktree action) and is called first by publish_absent_data_root (:695) and publish_absent_memory_root (:851); apply_uncommitted has zero occurrences workspace-wide and RedoApplier holds new/apply/apply_operations only; the new error variant is not classified retryable (commands/mod.rs:270 retries RetryableConflict alone), which is right because retrying cannot make the delta committable.",
+        "widening_accepted": "The worker widened the empty-delta handling from the directive: both seams now match (_, true) => {} rather than relying on the publisher body to fold zero actions. Accepted — with apply_uncommitted gone, an empty delta over an absent root would otherwise have staged and published an empty data root. It is covered by the existing test_conformance_empty_delta_is_a_noop_on_both_backends and test_conformance_empty_delta_ignores_armed_injectors, both still passing. Surfaced by the worker rather than buried.",
+        "worker_self_correction": "The worker retracted its own earlier 'nothing enforces that' finding: the seam refusal is now the enforcement point, so the guarantee no longer rests on derive_initialization alone."
+      }
     },
     {
       "wave_number": 12,
@@ -429,7 +445,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "pending — next"
         }
       ]
     },
