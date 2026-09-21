@@ -618,7 +618,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next"
+          "status": "in_progress — dispatched, round 1"
         },
         {
           "id": "4b765a1e-8a5b-4c08-a642-058a87e7c51b",
@@ -630,9 +630,32 @@
             "docs-mechanical",
             "repo-validate"
           ],
-          "status": "ready — next"
+          "status": "in_progress — dispatched, round 1"
+        },
+        {
+          "id": "434a60b7-a837-432d-b6ef-8711026e2210",
+          "short_id": "434a60b7",
+          "title": "Record documentation states that an unreadable leftover record is refused",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "created_during_execution": true,
+          "status": "in_progress — dispatched, round 1"
         }
-      ]
+      ],
+      "dispatch": {
+        "session": 6,
+        "anchor": "6628169ba",
+        "concurrent": 3,
+        "tiers": {
+          "42478e5d": "opus",
+          "4b765a1e": "sonnet",
+          "434a60b7": "sonnet"
+        },
+        "briefing": "42478e5d carries SP-16 (a careful operator procedure for UnreadableRedoRecord, grounded in the parse error that distinguishes a torn write), cites storage-format.md#publication-and-recovery rather than restating it (PF-21), describes no event-log write mechanics (ESC-12), and leaves the transactions_recovered rename to 51eb1aa6. All three prompts state the writing standard: terse, plain, on point."
+      }
     },
     {
       "wave_number": 15,
@@ -948,6 +971,14 @@
       "owner_decision": "Owner chose a new task in wave 13 over leaving it recorded or folding it into ccea63de, so code and page cut over together without stretching a documentation task into Rust changes.",
       "er_01": "Excluded from the epic's REQ-06 redo-record subtotal per ER-01.",
       "dag": "depends on b0ee2dd6; fbd6c859 (its story) depends on it, which is what backs its membership labels — jit validate reported 3 unbacked labels until that edge was added."
+    },
+    {
+      "short_id": "434a60b7",
+      "wave": 14,
+      "policy": "POL-01",
+      "origin": "worker-ccea63de flagged redo_record.rs:197-199 as the source of the false 'skips the residue' claim; no criterion covered it (e346d387's REQ-01 names five retired mechanisms, not this).",
+      "er_01": "Excluded from the REQ-06 redo-record subtotal.",
+      "dag": "depends on 0938d99e; fbd6c859 depends on it."
     }
   ],
   "escalations": [
