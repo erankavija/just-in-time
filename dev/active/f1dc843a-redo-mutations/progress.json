@@ -1049,7 +1049,8 @@
         "wave 9 post-merge, cold build: suite-build 17626 ms, suite-clock 60493 ms, six 20 s TIMEOUTs",
         "wave 9 post-rework, PRE-BUILT and host idle: suite-build 897 ms, test 39879 ms, suite-clock 44377 ms, FAIL, 4715 passed",
         "wave 9 post-rework, second run, identical tree and binaries: test 17746 ms, suite-clock 22495 ms, PASS"
-      ]
+      ],
+      "invocation_correction": "The pre-run must use the gate's own invocation, `cargo nextest run --workspace`. The lead first tried `--all-targets`, which changed the target set the nextest setup-script filters name by binary, so every setup script failed and 0/4712 tests ran ('Cancelling due to setup script failure'). Nothing was wrong with the tree. With the correct invocation the pre-run passed 4712/4712 in 35 s and the gate then passed FIRST TIME at suite-clock 21955 ms -- the first post-merge gate run this session not to fail."
     },
     {
       "id": "PF-18",
