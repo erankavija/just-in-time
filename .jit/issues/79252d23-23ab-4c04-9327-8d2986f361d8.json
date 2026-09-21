@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-09-21T16:22:25.145767359Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "b0ee2dd6-5393-4193-a88d-f3301601234e"
   ],
   "description": "The profiles reference describes profile publication and recovery as a redo record applied forward, and the bridge README points at the same contract.\n\n## Background\n\nThe reference carries the canonical adopter contract for profile publication: a typed durable journal, an external bootstrap control directory under a named protocol version, a transactions subdirectory under the data root, a verified sibling staging directory, mandatory recovery at every profile command, and rollback of a prepared transaction. Several other passages describe a profile application as one recoverable transaction.\n\nProfile application publishes through the same record as every other mutation, over data-root and worktree paths, so the section states the shared mechanism. The bridge README points readers at this page for the recoverable-publication contract and asserts that the bridge maintains no second transaction model, so it moves with the page it cites.\n\n## Success Criteria\n\n- [hard] REQ-01: The publication section describes one synced redo record carrying the profile's written files, its removed files, and its event append, applied at session open.\n- [hard] REQ-02: The page carries no description of a typed durable journal, an external bootstrap control directory, a protocol version, a verified sibling staging directory, or prepared-transaction rollback.\n- [hard] REQ-03: Passages calling a profile application one recoverable transaction state the record.\n- [hard] REQ-04: The page states that a profile's worktree targets publish in the same record as its data-root targets.\n- [hard] REQ-05: The bridge README describes the publication contract it points at in the same terms as this page.\n- [hard] REQ-06: The event catalogue's profile-lifecycle entry names the redo record as the commit point the operation reaches, and the generated events reference is regenerated from it.\n- [hard] REQ-07: The page's cross-references resolve, and it restates no fact the storage reference owns.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Epic plan",
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T16:03:08.670862831Z",
   "gates_required": [
     "cargo-ci",
@@ -31,5 +74,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T16:03:08.670862831Z"
+  "updated_at": "2026-09-21T16:22:25.254005975Z"
 }
