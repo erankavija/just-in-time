@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "33c5f7168899d9c767394ccb4ecc88076360ec5b",
+  "completed_at": "2026-09-21T20:42:25.475568002Z",
+  "duration_ms": 105028,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's redo-record and recovery documentation is accurate, complete, and the prior output example finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "42478e5d-90aa-472e-bca2-f628a1d883c2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "834781c6-ada1-48af-b38c-d097dedbd515",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T20:40:40.447320063Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf `task` 42478e5d has no resolved children. Reviewed the union of its 16 individually inspected `jit:42478e5d` commit patches and verified current recovery behavior in code. The prior output-field finding is resolved at [worktree-validate.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/worktree-validate.md:480).\n\nDocumentation accurately covers redo-record application, safe temp cleanup, recovery failures, and affected command publications.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's redo-record and recovery documentation is accurate, complete, and the prior output example finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
