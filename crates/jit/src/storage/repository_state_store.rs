@@ -229,8 +229,7 @@ pub trait RepositoryStateStore {
 /// A record is applied forward and re-applied idempotently, so an open that
 /// meets one carries its mutation to completion whether or not an earlier open
 /// got part of the way. The pass runs under the repository write lock, because
-/// the record's operations are writes of repository state
-/// (`plan lock-and-record-scope`).
+/// the record's operations are writes of repository state.
 ///
 /// # Errors
 ///

@@ -3626,12 +3626,17 @@ fn test_recovery_dispatch_report_counts_applied_records_on_both_backends() {
 
 /// REQ-05: a leftover the session cannot read is a typed failure naming the
 /// record, and the repository it refused is byte-for-byte what it found.
+///
+/// The first open creates the session's own advisory lock files, so the
+/// snapshot the refusal is compared against covers every byte below the
+/// worktree, the malformed record included.
 #[test]
 fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
     let backend = FileSessionBackend::seeded();
+    drop(backend.open().unwrap());
     backend.commit(&leftover_record());
     std::fs::write(backend.record_path(), b"not a redo record").unwrap();
-    let before = repository_bytes(backend.worktree.path());
+    let before = snapshot(backend.worktree.path());
 
     let error = match backend.open() {
         Err(error) => error,
@@ -3647,20 +3652,10 @@ fn test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it() {
         "a malformed leftover must name the record it refused, got {error:?}"
     );
     assert_eq!(
-        repository_bytes(backend.worktree.path()),
+        snapshot(backend.worktree.path()),
         before,
         "a refused open must leave every byte it found, the record included"
     );
-}
-
-/// Every repository byte below `worktree`, leaving out the advisory lock files
-/// a session open creates: those are machine-local control files outside the
-/// record's scope (`plan lock-and-record-scope`).
-fn repository_bytes(worktree: &Path) -> BTreeMap<PathBuf, (Vec<u8>, bool)> {
-    snapshot(worktree)
-        .into_iter()
-        .filter(|(path, _)| path.extension() != Some(std::ffi::OsStr::new("lock")))
-        .collect()
 }
 
 /// REQ-04: with no leftover record the open reads the record's own path and
