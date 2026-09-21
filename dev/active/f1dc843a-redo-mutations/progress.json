@@ -489,7 +489,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next, four-way fan-out"
+          "status": "in_progress — dispatched, round 1"
         },
         {
           "id": "ead8f86d-2e45-4144-98e7-2f814b643091",
@@ -500,7 +500,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next, four-way fan-out"
+          "status": "in_progress — dispatched, round 1"
         },
         {
           "id": "79252d23-23ab-4c04-9327-8d2986f361d8",
@@ -513,7 +513,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next, four-way fan-out"
+          "status": "ready — held for the next slot (four gates including cargo-ci; avoids a second cargo-ci worker contending on the host flock)"
         },
         {
           "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",
@@ -524,9 +524,35 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next, four-way fan-out"
+          "status": "in_progress — dispatched, round 1"
+        },
+        {
+          "id": "b7c99dcb",
+          "short_id": "b7c99dcb",
+          "title": "Bootstrap namespace reservation retires with the kernel",
+          "classification": "implementation",
+          "gates": [
+            "cargo-ci",
+            "code-review"
+          ],
+          "status": "in_progress — dispatched, round 1",
+          "created_during_execution": true
         }
-      ]
+      ],
+      "dispatch": {
+        "session": 6,
+        "anchor": "0b1cdb865",
+        "concurrent": 4,
+        "cap": 4,
+        "tiers": {
+          "ccea63de": "opus",
+          "ead8f86d": "opus",
+          "e6e25f9a": "sonnet",
+          "b7c99dcb": "opus"
+        },
+        "split_reason": "Five issues are ready against a cap of four. 79252d23 was held rather than one of the others because it is the only other issue carrying cargo-ci, and two cargo-ci workers serialize on the host-wide flock (PF-11). b7c99dcb was dispatched with ccea63de deliberately, so the code guard and the page that denies the mechanism cut over together, per the owner's decision.",
+        "conflict_analysis": "Disjoint file sets: ccea63de owns docs/reference/storage-format.md, ead8f86d owns docs/concepts/*, e6e25f9a owns docs/how-to/deployment.md, b7c99dcb owns crates/jit/src/repository_state/path.rs. Each prompt names the other workers' files as off-limits. b7c99dcb was told to report rather than edit any adopter document still describing the external bootstrap control directory, since ccea63de owns the one that does."
+      }
     },
     {
       "wave_number": 14,
@@ -862,6 +888,16 @@
       ],
       "excluded_from_req06_subtotal": false,
       "subtotal_note": "This IS redo-record work, so it counts in the ER-01 subtotal normally, unlike the adjacent-defect tasks."
+    },
+    {
+      "short_id": "b7c99dcb",
+      "wave": 13,
+      "policy": "POL-01",
+      "title": "Bootstrap namespace reservation retires with the kernel",
+      "origin": "SP-10, flagged by worker-b0ee2dd6 during wave 12 and escalated by the lead because retiring a reserved-path guard changes which worktree paths a mutation may target.",
+      "owner_decision": "Owner chose a new task in wave 13 over leaving it recorded or folding it into ccea63de, so code and page cut over together without stretching a documentation task into Rust changes.",
+      "er_01": "Excluded from the epic's REQ-06 redo-record subtotal per ER-01.",
+      "dag": "depends on b0ee2dd6; fbd6c859 (its story) depends on it, which is what backs its membership labels — jit validate reported 3 unbacked labels until that edge was added."
     }
   ],
   "escalations": [
