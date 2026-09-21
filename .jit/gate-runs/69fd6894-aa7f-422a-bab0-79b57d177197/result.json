@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f490e82f8aa643727857cc7a25b6c4d16dc826e",
+  "completed_at": "2026-09-21T18:19:02.910926489Z",
+  "duration_ms": 227854,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 114,
+        "origin": "pre-existing",
+        "severity": "medium",
+        "summary": "The storage reference says an unparsable interrupted redo record is skipped, but session open refuses it with UnreadableRedoRecord."
+      }
+    ],
+    "summary": "The tagged documentation changes satisfy the issue criteria; one pre-existing storage-reference recovery statement remains inaccurate.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "79252d23-23ab-4c04-9327-8d2986f361d8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "69fd6894-aa7f-422a-bab0-79b57d177197",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T18:15:15.056655066Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 766d6a4a0, 19c7ce6ac, 777a1db7e, 8a789b288, f59e40d0c, 8ecf1e704, b22a84312, 6f490e82f; uncommitted changes excluded  \nPolicy sources: AGENTS.md  \nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml)  \nGate evidence: cargo-ci passed (0); doc-review passed (0); docs-mechanical passed (0); prior code-review failed (1), with its blocking findings rechecked  \nTruncation recovery: narrowed merge patches and source reads by affected path after truncated combined outputs  \n\n1. [advisory][pre-existing] `docs/reference/storage-format.md:114` says an unparsable interrupted redo record is skipped, but session open turns parse failures into `UnreadableRedoRecord` and refuses to proceed. The new profiles citation correctly defers to this canonical page; the inaccurate recovery sentence predates this issue.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged documentation changes satisfy the issue criteria; one pre-existing storage-reference recovery statement remains inaccurate.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The storage reference says an unparsable interrupted redo record is skipped, but session open refuses it with UnreadableRedoRecord.\",\"file\":\"docs/reference/storage-format.md\",\"line\":114,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

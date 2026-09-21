@@ -513,7 +513,34 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — rework round 1 (lead-found positioned-append inaccuracy; 79252d23 also failed both reviews)"
+          "status": "done — cargo-ci, code-review, doc-review and docs-mechanical all passed on the merged tree after one rework round",
+          "tier_1_5": [
+            {
+              "round": "R1",
+              "finding": "doc-review F1 + code-review F1: positioned append at profiles.md:530",
+              "status_at_head": "closed",
+              "evidence": "zero offset/positioned matches in profiles.md; removed with the generic contract"
+            },
+            {
+              "round": "R1",
+              "finding": "code-review F2: profiled init always carries a record",
+              "status_at_head": "closed",
+              "evidence": "profiles.md:534-539 — conditional on worktree targets, matching `if carries_worktree` at repository_state_store.rs:638-639; an application with none publishes the new root alone"
+            },
+            {
+              "round": "R1",
+              "finding": "code-review F3: duplicates the storage contract (REQ-07)",
+              "status_at_head": "closed",
+              "evidence": "zero matches for the generic-contract phrases; one citation of storage-format.md#publication-and-recovery"
+            },
+            {
+              "round": "R1",
+              "finding": "lead Tier 3: heading names rollback over a body that denies it",
+              "status_at_head": "closed",
+              "evidence": "profiles.md:517 is `## Publication and recovery`; all three inbound links repointed and the old anchor greps to zero across docs/"
+            }
+          ],
+          "advisory_carried": "The passing code-review raised one advisory: storage-format.md:114 calls an unparsable interrupted record 'skipped' when session open refuses it. That is ccea63de's page and the third independent reviewer to flag it, confirming the lead's round-2 directive to ccea63de."
         },
         {
           "id": "e6e25f9a-62ea-4686-b44b-21ad51b8afe5",

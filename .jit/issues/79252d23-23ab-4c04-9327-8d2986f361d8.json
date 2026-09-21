@@ -212,6 +212,7 @@
       "path": "mcp-server/README.md"
     }
   ],
+  "done_at": "2026-09-21T18:19:35.677222393Z",
   "first_ready_at": "2026-09-21T16:03:08.670862831Z",
   "gates_required": [
     "cargo-ci",
@@ -222,22 +223,22 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-09-21T17:39:24.586767425Z",
+      "updated_at": "2026-09-21T18:13:29.333051293Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T17:49:56.301915080Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T18:19:03.217186038Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-09-21T17:45:40.931125714Z",
+      "status": "passed",
+      "updated_at": "2026-09-21T18:15:14.262610004Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-09-21T17:23:21.770591049Z",
+      "updated_at": "2026-09-21T18:11:02.783895884Z",
       "updated_by": "auto:executor"
     }
   },
@@ -255,7 +256,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T17:49:56.301915080Z"
+  "updated_at": "2026-09-21T18:19:35.677222393Z"
 }

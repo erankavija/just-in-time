@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6f490e82f8aa643727857cc7a25b6c4d16dc826e",
+  "completed_at": "2026-09-21T18:15:13.953347480Z",
+  "duration_ms": 103976,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's current documentation accurately and concisely describes profile publication through the canonical redo-record contract.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "79252d23-23ab-4c04-9327-8d2986f361d8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "342bde07-8da8-46e1-800d-3249be884a71",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-09-21T18:13:29.976757471Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: this level-4 `task` is a DAG leaf with no children. I inspected all eight reachable `jit:79252d23` commits individually; uncommitted `.jit` changes were excluded. The prior blocking claim was corrected: the profiles page now cites the canonical, accurate whole-file record contract, while retaining profile-specific atomicity and MCP/event coverage.\n\nFindings:\n\nNone.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's current documentation accurately and concisely describes profile publication through the canonical redo-record contract.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
