@@ -31,7 +31,9 @@ where each comes up.
 ├── gate-runs/        # Recorded gate runs, one directory per run
 │   └── <run-id>/
 │       └── result.json  # Run record (see Storage Record Layout)
-└── schemas/          # JSON Schema files referenced by rules.toml
+├── schemas/          # JSON Schema files referenced by rules.toml
+└── tmp/              # Machine-local scratch directory
+    └── redo.record   # The pending redo record, while a mutation leaves one
 ```
 
 `templates.toml` is authored per project; `jit init` does not scaffold it.
@@ -45,10 +47,12 @@ reaches the repository.
 A live repository also carries gitignored, machine-local files directly under
 `.jit/`: `worktree.json`, `server.log`, `server.pid.json`, a fixed set of lock
 files, and `tmp/`. The data root's own `.gitignore` is derived state, not
-authored: its delimited engine-owned region names `tmp/`, so a repository never
-commits what publication stages there. Initialization writes it and
-`jit validate --fix` restores it, each preserving every line outside that
-region, and the repository's root ignore file is neither read nor written. The store's fixed lock set under `.jit/` is
+authored: the engine composes its delimited engine-owned region, whose single
+entry is the scratch directory `tmp/`, so a repository never commits a pending
+redo record. Initialization writes it and `jit validate --fix` restores it,
+each preserving every line outside that region, and the repository's root
+ignore file is neither read nor written. The store's fixed lock set under
+`.jit/` is
 `.repo-write.lock`, `.index.lock`, `.gates.lock`, and `.events.lock`; it is
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
@@ -71,18 +75,50 @@ storage instance, JIT removes empty UUID-shaped `.lock` sidecars left in
 `issues/` by versions that predate this format. That sweep is legacy cleanup,
 not part of read correctness or the current storage layout, so a command that
 reports without changing the repository enumerates issues through a read path
-that skips it and leaves any remaining sidecars in place. Pending recoverable
-multi-file transactions use `.jit/tmp/transactions/`. All of these are runtime
-state, not part of the versioned data format.
+that skips it and leaves any remaining sidecars in place. A pending redo
+record lives in the scratch directory `.jit/tmp/` as `redo.record` (see
+[Publication and Recovery](#publication-and-recovery)). All of these are
+runtime state, not part of the versioned data format.
 
-When a repository profile is applied, its canonical provenance record
-lives under `.jit/profiles/`. Fresh profiled initialization may temporarily use
-the repository-sibling `.jit-bootstrap/` control directory before `.jit/`
-exists. The [Repository Profiles reference](profiles.md) defines the record,
-transaction, rollback, and mandatory-recovery contract.
+When a repository profile is applied, its canonical provenance record lives
+under `.jit/profiles/`. The [Repository Profiles reference](profiles.md)
+defines that record.
 
 Lease records live under `.git/jit/`, not `.jit/`. See
 [The `.git/jit/` control plane](#the-gitjit-control-plane) below.
+
+## Publication and Recovery
+
+A mutation publishes through one **redo record**: the directories it creates,
+the complete new bytes of every file it writes, the paths it removes, and the
+bytes it appends to the event log at the offset it captured as the log's
+length. The record names what that one mutation writes, so publication costs
+what the mutation touches rather than what the repository holds
+(`@/charter/D-17`).
+
+The record is written and synced under the scratch directory before any live
+file changes; that write is the mutation's commit point. Applying it is one
+forward pass: the directories, then each written file replaced with its new
+bytes through the temp-file and rename pattern (`@/inv/atomic-writes`), then
+the removals, then the event-log append at its captured offset. The pass ends
+by removing the record.
+
+Before the commit point, the mutation's write set is compared against what it
+read — the live occupant of every path the record creates, writes, or removes,
+and the event log as its length plus the last bytes of its tail. A write target
+that moved since the mutation read it fails the mutation, before anything
+durable is written.
+
+Recovery is that same forward pass. A session that opens over a leftover record
+applies it, removes it, and only then serves the command. Application is
+idempotent: a directory already present is accepted, a write overwrites, a
+removal tolerates absence, and the append rewrites its bytes at its offset, so
+an interrupted application converges on the same state however often it is
+replayed. A record whose own write was interrupted is a proper prefix of the
+serialized form, which no session parses, so the residue is skipped rather than
+applied. Repository discovery recognizes a pending record as well as an
+initialized `index.json`, so a repository whose index a crash left unwritten
+still reaches the session open that applies its record.
 
 ## Issue JSON Schema
 
