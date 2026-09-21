@@ -987,9 +987,10 @@
     {
       "id": "PF-16",
       "finding": "A worker's completion report does not mean its processes have exited, and a lead message sent to a reported-done worker puts it back to work. The lead sent w-0938d99e an added @/inv/essential-code-prose constraint just as it reported; the worker resumed and started rebuilding in its worktree while the lead merged the branch and evaluated cargo-ci on main. The two builds collided: suite-clock 97493 ms and suite-build 54114 ms against a 22.4 s / 0.6 s warm baseline, load average 10.3, with the worker's own rust-lld and rustc processes visible in its worktree target. The gate's FAIL said nothing about the tree.",
-      "suggested_remedy": "Confirm a worker is IDLE (ListAgents, not its report) before merging or gating its branch. Deliver any added constraint before dispatch, not after a report; when one must be sent late, expect the worker to resume and do not start a gate until it goes idle again.",
+      "suggested_remedy": "Confirm a worker is IDLE (ListAgents, not its report) before merging or gating its branch. Deliver any added constraint before dispatch, not after a report; when one must be sent late, expect the worker to resume and do not start a gate until it goes idle again. Never write to, commit in, or clean a worktree while its worker is running: a lead-preserve commit is for a worker that has terminated, not one that is merely quiet. Ask the worker to commit its own work and report the sha.",
       "status": "adopted by the lead",
-      "session": 5
+      "session": 5,
+      "second_half": "The same mistake then cost a second time in the other direction: the lead ran `git add -A && git commit` inside the live worker's worktree to preserve its edits, while the worker had a cargo-ci run in flight and was about to commit them itself. The worker's own commit found a clean tree. Nothing was lost -- the content is the lead's commit, later amended to cdfb91dc0 and merged -- but authorship and the commit message were the lead's for work the worker did, and the lead had to correct both."
     },
     {
       "id": "PF-17",
