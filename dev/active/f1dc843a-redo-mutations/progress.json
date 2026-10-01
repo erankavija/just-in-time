@@ -1219,7 +1219,8 @@
     "3d9150d7": 2,
     "b4483ad6": 1,
     "c88822a5": 1,
-    "ec72359b": 1
+    "ec72359b": 1,
+    "dd1b984c": 2
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -2036,7 +2037,7 @@
       "source": "3d9150d7 rework-2 worker report",
       "subject": "repo_lock::acquire (lock parent) and worktree_identity (create_dir_all(.jit)) can create the data root .jit/ when absent — a second absent-root creation path beside the init root publisher named by 3d9150d7 REQ-02. The guard classifies them as lock/identity writes.",
       "owner": "lead to assess at 3d9150d7 review against REQ-01/REQ-02; candidate POL-01 task",
-      "status": "assigned — dd1b984c (epic REQ-05 names it)"
+      "status": "closed — dd1b984c (lock/identity writes refuse an absent root; guard exempts only stage_new_data_root)"
     },
     {
       "id": "SP-29",
