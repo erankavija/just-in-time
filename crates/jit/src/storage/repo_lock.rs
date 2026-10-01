@@ -28,8 +28,9 @@
 //! take shared index, issue, gate, or event locks; no reader acquires the outer
 //! mutation chain, so no cycle exists.
 
+use super::errors::RepositoryNotFoundError;
 use super::lock::{FileLocker, LockGuard, LockMode, LockTimeout};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, Weak};
@@ -123,7 +124,7 @@ impl RepoWriteLock {
     /// writers across processes as well as threads.
     ///
     /// `timeout` bounds how long an acquisition waits for the file lock. The lock
-    /// file (and the storage root) are created on first acquisition, not here.
+    /// file is created on first acquisition, not here; the storage root never is.
     pub fn for_storage_root<P: AsRef<Path>>(storage_root: P, timeout: Duration) -> Arc<Self> {
         Self::for_storage_root_after(storage_root, timeout, None)
     }
@@ -212,8 +213,8 @@ impl RepoWriteLock {
     ///
     /// # Errors
     ///
-    /// Returns an error when the storage root cannot be created, and a
-    /// [`LockTimeout`] when the configured wait expires with the lock still
+    /// Returns a [`RepositoryNotFoundError`] when the lock file's directory is
+    /// absent, and a [`LockTimeout`] when the configured wait expires with the lock still
     /// held — by another thread of this process or by another process alike.
     /// That is the caller reporting itself still queued rather than the lock
     /// refusing it, so callers that must tell the two apart match it with
@@ -279,10 +280,10 @@ impl RepoWriteLock {
         // Nobody owns the lock, so nobody will call `release` while we hold the
         // state mutex across the (possibly blocking) file-lock acquisition.
         if let Some((path, locker)) = &self.backing {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).with_context(|| {
-                    format!("Failed to create storage root {}", parent.display())
-                })?;
+            // The lock never creates its directory: an absent data root is
+            // created only by initialization's publisher.
+            if let Some(parent) = path.parent().filter(|parent| !parent.is_dir()) {
+                return Err(RepositoryNotFoundError::new(parent.display().to_string()).into());
             }
             state.file_guard = Some(locker.lock_exclusive(path)?);
         }
@@ -352,6 +353,7 @@ mod tests {
     use super::*;
     use crate::storage::contention_probe::{admitted_when_reached, Contenders};
     use crate::storage::lock::is_lock_timeout;
+    use crate::storage::RepositoryNotFoundError;
     use std::sync::atomic::{AtomicBool, Ordering};
     use tempfile::TempDir;
 
@@ -446,8 +448,31 @@ mod tests {
     }
 
     #[test]
+    fn test_acquire_over_absent_lock_directory_refuses_without_creating_it() {
+        let temp = TempDir::new().unwrap();
+        let data_root = temp.path().join(".jit");
+        let locks = [
+            RepoWriteLock::for_storage_root(&data_root, Duration::from_millis(100)),
+            RepoWriteLock::for_lock_path(
+                data_root.join("bootstrap.lock"),
+                Duration::from_millis(100),
+            ),
+        ];
+
+        for lock in locks {
+            let error = lock.acquire().unwrap_err();
+            assert!(
+                error.downcast_ref::<RepositoryNotFoundError>().is_some(),
+                "{error:#}"
+            );
+            assert!(!data_root.exists(), "acquisition created the data root");
+        }
+    }
+
+    #[test]
     fn test_predecessor_is_held_until_dependent_guard_drops() {
         let temp = TempDir::new().unwrap();
+        std::fs::create_dir(temp.path().join(".jit")).unwrap();
         let predecessor = RepoWriteLock::for_lock_path(
             temp.path().join("bootstrap.lock"),
             Duration::from_millis(100),

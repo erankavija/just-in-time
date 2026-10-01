@@ -1628,6 +1628,20 @@ mod tests {
     }
 
     #[test]
+    fn test_acquire_bootstrap_locks_over_absent_data_root_create_no_data_root() {
+        let temp = TempDir::new().unwrap();
+        let data_root = temp.path().join(".jit");
+        let storage = JsonFileStorage::new(&data_root);
+
+        let _worktree = storage
+            .acquire_worktree_bootstrap_lock(temp.path())
+            .unwrap();
+        let _bootstrap = storage.acquire_bootstrap_write_lock().unwrap();
+
+        assert!(!data_root.exists());
+    }
+
+    #[test]
     fn test_layout_binding_rejects_different_roots_but_accepts_same_root_refresh() {
         let worktree = TempDir::new().unwrap();
         let other_worktree = TempDir::new().unwrap();
