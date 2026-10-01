@@ -539,25 +539,20 @@ struct PrecheckValidationView {
         crate::repository_state::VirtualPath,
         crate::repository_state::DirectoryListing,
     >,
-    pinned: std::collections::BTreeMap<
-        (String, String),
-        crate::repository_state::PinnedDocumentEvidence,
-    >,
-    linked: std::collections::BTreeMap<
-        crate::repository_state::VirtualPath,
-        crate::repository_state::LinkedWorktreeEvidence,
-    >,
 }
 
 impl PrecheckEvidence {
+    /// Whether `image` holds these inputs unchanged, compared over the inputs
+    /// it reads: a mutation base reads no issue document reference.
     fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
-        let inputs = self
+        let inputs_unchanged = self
             .inputs
             .iter()
-            .map(|(path, _)| {
+            .filter(|(path, _)| image.capture_spec().contains_path(path))
+            .map(|(path, identity)| {
                 image
                     .entry(path)
-                    .map(|entry| (path.clone(), entry.identity().cloned()))
+                    .map(|entry| entry.identity() == identity.as_ref())
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let validation_view = self
@@ -565,10 +560,9 @@ impl PrecheckEvidence {
             .as_ref()
             .map(|_| PrecheckValidationView {
                 listings: image.directory_listings().clone(),
-                pinned: image.pinned_evidence().clone(),
-                linked: image.linked_worktree_evidence().clone(),
             });
-        Ok(inputs == self.inputs && validation_view == self.validation_view)
+        Ok(inputs_unchanged.into_iter().all(|unchanged| unchanged)
+            && validation_view == self.validation_view)
     }
 }
 
@@ -610,6 +604,18 @@ pub(crate) fn is_broad_builtin_precheck(gate: &crate::declarations::GateDefiniti
         )
 }
 
+/// Whether one of `issue`'s precheck gates validates the whole repository.
+fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistry) -> bool {
+    issue
+        .gates_required
+        .iter()
+        .filter_map(|key| registry.gates.get(key))
+        .any(|gate| {
+            gate.stage == crate::declarations::GateStage::Precheck
+                && is_broad_builtin_precheck(gate)
+        })
+}
+
 fn captured_precheck_plan(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
@@ -625,9 +631,7 @@ fn captured_precheck_plan(
         .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
-    let broad_builtin = gates
-        .iter()
-        .any(|(_, gate)| is_broad_builtin_precheck(gate));
+    let broad_builtin = has_broad_precheck(issue, registry);
     let consumes_history = gates.iter().any(|(_, gate)| {
         gate.mode == GateMode::Auto
             && gate
@@ -700,8 +704,6 @@ fn captured_precheck_plan(
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let validation_view = broad_builtin.then(|| PrecheckValidationView {
         listings: image.directory_listings().clone(),
-        pinned: image.pinned_evidence().clone(),
-        linked: image.linked_worktree_evidence().clone(),
     });
     Ok(CapturedPrecheckPlan {
         evidence: PrecheckEvidence {
@@ -2705,6 +2707,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .config_manager
                         .enforcement_mode_from_config(declarations.config())?;
                     let registry = declarations.gates;
+                    // A precheck validating the whole repository runs over
+                    // the validation base.
+                    let image = match has_broad_precheck(&issue, &registry) {
+                        false => image,
+                        true => match self.capture_proposed_base(
+                            preflight.as_mut(),
+                            &std::collections::BTreeMap::new(),
+                            &[],
+                            Some(image),
+                        )? {
+                            Some(image) => image,
+                            None => return Ok(AttemptOutcome::Retry),
+                        },
+                    };
                     let plan = captured_precheck_plan(&image, &issue, &registry)?;
                     Some(PrecheckPreflight {
                         plan,

@@ -406,19 +406,17 @@ fn captured_gate_evaluation(
     let pinned = image
         .pinned_evidence()
         .iter()
-        .filter(|(key, _)| wanted_pinned.contains(*key))
+        .filter(|(key, _)| broad_validation || wanted_pinned.contains(*key))
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
     let linked = image
         .linked_worktree_evidence()
         .iter()
-        .filter(|(path, _)| inputs.iter().any(|(input, _)| input == *path))
+        .filter(|(path, _)| broad_validation || inputs.iter().any(|(input, _)| input == *path))
         .map(|(path, value)| (path.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
     let validation_view = broad_validation.then(|| super::PrecheckValidationView {
         listings: image.directory_listings().clone(),
-        pinned: image.pinned_evidence().clone(),
-        linked: image.linked_worktree_evidence().clone(),
     });
     Ok(CapturedGateEvaluation {
         evidence: GateEvaluationEvidence {
@@ -3734,6 +3732,48 @@ source-of-truth = "markdown-first"
         assert_eq!(
             executor.storage.load_issue(&issue_id).unwrap().state,
             State::InProgress
+        );
+    }
+
+    /// A precheck validating the whole repository runs over the issue's
+    /// documents, which the transition's own base does not read.
+    #[test]
+    fn test_update_issue_state_broad_precheck_over_issue_documents_records_a_stable_run() {
+        let (repo, executor, issue_id) = setup_file_repository();
+        let gate_key = "not-a-reserved-repository-key";
+        executor
+            .update_gate(
+                gate_key,
+                GateUpdate {
+                    stage: Some(GateStage::Precheck),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        std::fs::create_dir_all(repo.path().join("dev")).unwrap();
+        std::fs::write(repo.path().join("dev/notes.md"), "# Notes\n").unwrap();
+        executor
+            .add_document_reference(&issue_id, "dev/notes.md", None, None, None, true)
+            .unwrap();
+        executor
+            .update_issue_state(&issue_id, State::Ready)
+            .unwrap();
+
+        executor
+            .update_issue_state(&issue_id, State::InProgress)
+            .unwrap();
+
+        let runs = executor
+            .storage
+            .list_gate_runs_for_issue(&issue_id)
+            .unwrap()
+            .into_iter()
+            .filter(|run| run.gate_key == gate_key)
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(
+            runs[0].evaluation_stability,
+            crate::domain::GateEvaluationStability::Stable
         );
     }
 
