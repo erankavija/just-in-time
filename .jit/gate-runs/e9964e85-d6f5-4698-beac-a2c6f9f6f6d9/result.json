@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "7d06ab02a0a8439795d33aad2b149c18c7613467",
+  "completed_at": "2026-10-01T13:31:53.943543556Z",
+  "duration_ms": 394436,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "4aecb85a8c22130607342cfb99a38696a6960acd4694dd2fd80d23f3aa7b759e",
+  "issue_id": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e9964e85-d6f5-4698-beac-a2c6f9f6f6d9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T13:25:19.507083026Z",
+  "status": "failed",
+  "stderr": "cargo-ci: another build holds /tmp/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nflock           2685598 WRITE  /tmp/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 47267 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 47267 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 81899 ms, warmed 17 executables (2070574480 bytes) in 1699 ms.\n  ✓ fmt: ok (1647 ms)\n  ✓ clippy: ok (38483 ms)\n  ✓ suite-build: built in 81899 ms, warmed 17 executables (2070574480 bytes) in 1699 ms (83602 ms)\n  ✓ test: 4708 passed, 0 failed, 0 skipped (42504 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4744 ms)\n  ✓ suite-clock: 47267 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (7 ms)\n  ✗ budget: FAILED (exit 1) (81 ms)\n\n",
+  "tree_dirty": false
+}

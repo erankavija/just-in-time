@@ -55,7 +55,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T13:31:53.951762812Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
   "labels": [
     "type:task",
@@ -71,5 +77,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan hash retirement",
-  "updated_at": "2026-10-01T11:43:02.868543340Z"
+  "updated_at": "2026-10-01T13:31:53.951762812Z"
 }

@@ -6,7 +6,7 @@
   "dependencies": [
     "b4483ad6-5ce9-4209-933b-aa386cb74b3a"
   ],
-  "description": "Module docs, function contracts, error strings, and the recover command's help name the redo record.\n\n## Background\n\nRoughly forty Rust doc comments across the command, storage, repository-state, and server layers describe publication as one recoverable transaction, a recovered session, or a preimage check. Error strings in the storage layer name journal, control-directory, and event-log writes. The recover command's help exists verbatim twice, once on the command enumeration and once on its implementation, and both feed adopter-facing surfaces.\n\nThe project keeps comments to what the code leaves non-obvious, so what replaces the retired prose is a short module orientation plus contract and invariant notes.\n\nThe sweep terms are: `one recoverable transaction`, `recovered session`, `preimage`, `journal`, `stage`, `staging`, `backup`, `reverse action`, and `roll back`.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust doc comment, error string, or help text in the workspace describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion.\n- [hard] REQ-02: The recover command's two copies of its help state the same behaviour and describe application of a leftover record at session open.\n- [hard] REQ-03: Error strings name the redo record where they named the journal.\n- [hard] REQ-04: A sweep over the nine terms listed in this issue returns, in the workspace sources outside pinned archives, only occurrences whose sense is unrelated to publication, each named in the completion evidence.\n",
+  "description": "Module docs, function contracts, error strings, and the recover command's help name the redo record.\n\n## Background\n\nRoughly forty Rust doc comments across the command, storage, repository-state, and server layers describe publication as one recoverable transaction, a recovered session, or a preimage check. Error strings in the storage layer name journal, control-directory, and event-log writes. The recover command's help exists verbatim twice, once on the command enumeration and once on its implementation, and both feed adopter-facing surfaces.\n\nThe project keeps comments to what the code leaves non-obvious, so what replaces the retired prose is a short module orientation plus contract and invariant notes.\n\nThe sweep terms are: `one recoverable transaction`, `recovered session`, `preimage`, `journal`, `stage`, `staging`, `backup`, `reverse action`, and `roll back`.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust doc comment, error string, or help text in the workspace describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion.\n- [hard] REQ-02: The recover command's two copies of its help state the same behaviour and describe application of a leftover record at session open.\n- [hard] REQ-03: Error strings name the redo record where they named the journal.\n- [hard] REQ-04: A sweep over the nine terms listed in this issue returns, in the workspace sources outside pinned archives, only occurrences whose sense is unrelated to publication or that name a live mechanism of the current publication design (the apply-time conflict check's expected preimage, initialization's stage directory, temp-file staging before rename), each named in the completion evidence.\n\n## Decisions\n\n- D-1: REQ-04 admits occurrences naming a live mechanism of the current publication design. The literal reading would rename the conflict check's `ExpectedPreimage`, initialization's stage directory and temp-file staging, which the rewritten atomic-writes invariant (816df12a REQ-01) itself names. Decided by the epic owner in session 8.",
   "documents": [
     {
       "assets": [
@@ -48,6 +48,12 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "label": null,
+      "path": "dev/active/e346d387/sweep-evidence.md"
     }
   ],
   "first_ready_at": "2026-10-01T11:42:30.442072007Z",
@@ -74,5 +80,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Rust prose and command help state the redo record",
-  "updated_at": "2026-10-01T11:43:03.796092320Z"
+  "updated_at": "2026-10-01T13:35:21.205729830Z"
 }
