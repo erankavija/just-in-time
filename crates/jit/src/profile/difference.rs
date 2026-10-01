@@ -129,7 +129,6 @@ pub(crate) fn profile_plan_entry(
         version: version.to_string(),
         origin,
         status,
-        plan_hash: plan.hash().to_string(),
         targets,
         contributions,
     }

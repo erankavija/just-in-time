@@ -803,7 +803,7 @@ the count-wrapped `ProfilePlanResult` collection
 `{"count": N, "profiles": [...]}`. It reports dependency-only packages once
 before every selected root occurrence in selector order, exactly like the run
 it rehearses. Each entry includes `id`, `version`, `origin`, `status`
-(`would_apply` or `unchanged`), `plan_hash`, and the sorted target and
+(`would_apply` or `unchanged`), and the sorted target and
 declaration lists in the vocabulary [`jit profile diff`](#jit-profile-diff)
 documents. A repeated root's later observations are `unchanged` and carry no
 decisions. A rehearsal fails where its publication would, so it never reports a
@@ -812,9 +812,8 @@ decisions. A rehearsal fails where its publication would, so it never reports a
 Without `--dry-run`, JSON returns `ProfileComposedApplyResult`, the standard
 count-wrapped envelope `{"count": N, "profiles": [...]}` holding one
 `ProfileApplyResult` per corresponding rehearsal observation. Each entry carries
-`id`, `version`, `origin`, `status` (`applied` or `unchanged`), `plan_hash`, an
-optional `transaction_id`, non-fatal cleanup warnings, and the target and
-declaration decisions in the shared vocabulary. Exact reapplication of a whole
+`id`, `version`, `origin`, `status` (`applied` or `unchanged`), and the target
+and declaration decisions in the shared vocabulary. Exact reapplication of a whole
 set is a successful no-op. Human output uses the same identity, origin, status,
 and per-target decisions. Application
 and all coupled derived targets publish through that one redo record, with
@@ -3520,6 +3519,8 @@ under `.jit/` older than the [cleanup threshold](runtime-defaults.md).
 jit recover [--json]
 ```
 
+The report counts the leftover redo records the session open applied
+(`redo_records_applied` in JSON, "Redo records applied" in text), at most one.
 It removes only provably stale data and never the pending redo record, so it is
 safe to run at any time.
 

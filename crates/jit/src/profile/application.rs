@@ -36,19 +36,6 @@ impl<T> ProfileCollection<T> {
     }
 }
 
-/// Non-fatal application diagnostics.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ProfileApplicationWarning {
-    /// Final targets are committed, but machine-local transaction cleanup remains.
-    TransactionCleanupPending {
-        /// Machine-local transaction identifier recoverable on the next mutation.
-        transaction_id: String,
-        /// Cleanup failure retained for diagnostics.
-        reason: String,
-    },
-}
-
 /// Internal command-layer profile application result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileApplyResult {
@@ -60,13 +47,6 @@ pub struct ProfileApplyResult {
     pub origin: ProfileOrigin,
     /// Whether anything was published.
     pub status: ProfileApplicationStatus,
-    /// Deterministic plan identity rebuilt under the write lock.
-    pub plan_hash: String,
-    /// Transaction identifier for an applied result.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub transaction_id: Option<String>,
-    /// Non-fatal cleanup diagnostics.
-    pub warnings: Vec<ProfileApplicationWarning>,
     /// Every file target this profile decided about.
     pub targets: Vec<ProfileTargetChange>,
     /// Every semantic declaration this profile decided about.
@@ -102,10 +82,10 @@ pub(crate) trait SelectionObservation {
     fn profile_id(&self) -> &str;
 
     /// Reduce this answer to what an observation that publishes nothing may
-    /// say: it still names its profile, its version, and the plan it was
-    /// derived from, and it claims no change and nothing a publication carried.
+    /// say: it still names its profile and its version, and it claims no change
+    /// and nothing a publication carried.
     ///
-    /// A repeated selector observes a transaction its first occurrence already
+    /// A repeated selector observes a publication its first occurrence already
     /// accounts for, so this is what its second and later observations report.
     fn observe_without_publishing(&mut self);
 }
@@ -117,8 +97,6 @@ impl SelectionObservation for ProfileApplyResult {
 
     fn observe_without_publishing(&mut self) {
         self.status = ProfileApplicationStatus::Unchanged;
-        self.transaction_id = None;
-        self.warnings.clear();
         self.targets.clear();
         self.contributions.clear();
     }
@@ -300,9 +278,6 @@ pub struct ProfilePlanEntry {
     pub origin: ProfileOrigin,
     /// Whether execution would publish this profile.
     pub status: ProfilePlanStatus,
-    /// Identity of the complete canonical repository materialization plan this
-    /// entry was derived from.
-    pub plan_hash: String,
     /// The targets this profile decides, sorted by path.
     ///
     /// An observation that would publish nothing decides no target, so a

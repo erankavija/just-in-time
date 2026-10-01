@@ -48,8 +48,6 @@ fn init_profile_results(
         let mut result = (*source).clone();
         if !first {
             result.status = ProfileApplicationStatus::Unchanged;
-            result.transaction_id = None;
-            result.warnings.clear();
             result.targets.clear();
             result.contributions.clear();
         }

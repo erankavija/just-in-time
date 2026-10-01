@@ -1171,9 +1171,6 @@ fn print_profile_applications(
         };
         print_profile_heading(&profile.id, &profile.version, &profile.origin, status);
         print_profile_decisions(&profile.targets, &profile.contributions);
-        for warning in profile.warnings {
-            eprintln!("Warning: {warning:?}");
-        }
     }
 }
 
@@ -2500,7 +2497,7 @@ fn run() -> Result<()> {
     // exception: their operation session opens only after coordination.
     let coordinates_claims_first = command.coordinates_claims_first();
     let mut retained_mutation_session = None;
-    let transactions_recovered = if requires_recovery_dispatch {
+    let redo_records_applied = if requires_recovery_dispatch {
         if coordinates_claims_first {
             // Claim-aware mutation enters coordination first, then opens its own
             // recovered repository session. This unretained startup open repairs
@@ -2623,11 +2620,6 @@ fn run() -> Result<()> {
                 let output = JsonOutput::success(payload).with_message(message);
                 println!("{}", output.to_json_string()?);
             }
-        }
-        Commands::Recover { .. } if !storage.root().exists() && transactions_recovered > 0 => {
-            // A prepared fresh-root transaction may legitimately recover to
-            // "no repository". The explicit recovery command still succeeds:
-            // its requested work completed before validation became relevant.
         }
         Commands::Profile(ProfileCommands::List { .. } | ProfileCommands::Show { .. }) => {}
         _ => {
@@ -7836,31 +7828,6 @@ fn run() -> Result<()> {
             use jit::output::{JsonOutput, OutputContext};
             use serde_json::json;
 
-            if !storage.root().exists() && transactions_recovered > 0 {
-                if json {
-                    let output = JsonOutput::success(
-                        json!({
-                            "success": true,
-                            "transactions_recovered": transactions_recovered,
-                            "stale_locks_cleaned": 0,
-                            "index_rebuilt": false,
-                            "expired_leases_evicted": 0,
-                            "temp_files_removed": 0,
-                            "derived_state_repaired": 0,
-                            "warnings": [],
-                        }))
-                    .with_message(format!(
-                        "Recovery: {transactions_recovered} transaction(s) recovered; repository absence restored"
-                    ));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    println!("Recovery complete:");
-                    println!("  • Transactions recovered: {transactions_recovered}");
-                    println!("  • Repository state: not initialized (restored)");
-                }
-                return Ok(());
-            }
-
             match execute_recover(&storage, &worktree_paths) {
                 Ok(report) => {
                     if json {
@@ -7870,7 +7837,7 @@ fn run() -> Result<()> {
                         );
                         let output = JsonOutput::success(json!({
                             "success": true,
-                            "transactions_recovered": transactions_recovered,
+                            "redo_records_applied": redo_records_applied,
                             "stale_locks_cleaned": report.stale_locks_cleaned,
                             "index_rebuilt": report.index_rebuilt,
                             "expired_leases_evicted": report.expired_leases_evicted,
@@ -7883,7 +7850,7 @@ fn run() -> Result<()> {
                         println!("{}", output.to_json_string()?);
                     } else {
                         println!("Recovery complete:");
-                        println!("  • Transactions recovered: {}", transactions_recovered);
+                        println!("  • Redo records applied: {redo_records_applied}");
                         println!("  • Stale locks cleaned: {}", report.stale_locks_cleaned);
                         println!("  • Index rebuilt: {}", report.index_rebuilt);
                         println!(

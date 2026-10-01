@@ -173,8 +173,12 @@ fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
 
     let value: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(
-        value["transactions_recovered"], 1,
+        value["redo_records_applied"], 1,
         "the applied record must reach the recover command's count, got {value}"
+    );
+    assert!(
+        value.get("transactions_recovered").is_none(),
+        "the superseded key must be gone, got {value}"
     );
     assert!(
         published.exists(),

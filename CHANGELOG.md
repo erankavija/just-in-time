@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **Transaction fields from profile and recover output.** `profile apply`,
+  `reconfigure`, and `upgrade` no longer report `plan_hash`, `transaction_id`,
+  or the `warnings` list whose only entry was the transaction-cleanup-pending
+  flag, and `profile apply --dry-run` entries no longer report `plan_hash`; a
+  redo record has no digest to show, no journal directory to name, and no
+  control directory to survive. No replacement identifier is emitted. The
+  `jit recover` key `transactions_recovered` and its "Transactions recovered"
+  line are now `redo_records_applied` and "Redo records applied", counting the
+  leftover redo records the session open applied. The unreachable
+  "repository absence restored" recover branch is gone.
+
 - **The gate's ban on incremental compilation.** `scripts/cargo-ci.sh` exported
   `CARGO_INCREMENTAL=0` for every step, and three sites enforced that export: a
   runtime `incremental-state` verdict in the gate itself, a script-text check in
