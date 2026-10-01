@@ -1788,10 +1788,7 @@ mod tests {
             .expect("a non-empty audit append composes an action");
 
         let RepositoryAction::AppendEvents {
-            offset,
-            expected,
-            bytes,
-            ..
+            offset, expected, ..
         } = action
         else {
             unreachable!("an audit append appends to the event log");
@@ -1803,10 +1800,6 @@ mod tests {
                 tail,
                 mode: FileMode::Regular
             }
-        );
-        assert!(
-            !bytes.starts_with(b"\n"),
-            "a terminated log needs no separator"
         );
     }
 
@@ -2470,6 +2463,15 @@ mod tests {
         })
         .unwrap();
         let terminated = [prior.as_slice(), b"\n"].concat();
+        // A valid final line longer than the tail window, read back to its start.
+        let long = serialize_event(&Event::GateDefinitionCreated {
+            id: "e1".into(),
+            timestamp: fixed_instant(),
+            gate_key: "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize),
+        })
+        .unwrap();
+        let long_log = [terminated.as_slice(), &long].concat();
+        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_log));
         let record = MutationIntent::RecordEvent {
             phase: 0,
             event: Box::new(Event::GateDefinitionCreated {
@@ -2478,8 +2480,12 @@ mod tests {
                 gate_key: "cargo-ci".into(),
             }),
         };
-        for log in [Vec::new(), terminated, prior.clone()] {
+        let whole = |log: Vec<u8>| {
             let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
+            (log, image)
+        };
+        let cases = [Vec::new(), terminated, prior.clone()].map(whole);
+        for (log, image) in cases.into_iter().chain([(long_log, long_image)]) {
             let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
 
             assert_eq!(
@@ -2535,23 +2541,27 @@ mod tests {
     fn test_finalize_rejects_markerless_append_over_torn_tail() {
         // A batch with no profile lifecycle certifier appended after an uncertified
         // torn tail would produce a log the reader rejects, so finalize refuses and
-        // composes nothing.
-        let image = torn_tail_image();
-        let event = Event::GateDefinitionCreated {
-            id: String::new(),
-            timestamp: sentinel_time(),
-            gate_key: "cargo-ci".into(),
-        };
-        let result = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::RecordEvent {
-                phase: 0,
-                event: Box::new(event),
-            }],
-        );
-        assert!(matches!(result, Err(MutationError::UncertifiedTornTail)));
+        // composes nothing, also when the torn line is longer than the tail window.
+        let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize;
+        let long_torn = [TORN_LOG, &vec![b'x'; 2 * window]].concat();
+        let long_image = tail_image(crate::repository_state::EventLogTail::of_bytes(&long_torn));
+        for image in [torn_tail_image(), long_image] {
+            let event = Event::GateDefinitionCreated {
+                id: String::new(),
+                timestamp: sentinel_time(),
+                gate_key: "cargo-ci".into(),
+            };
+            let result = finalize(
+                &layout(),
+                &image,
+                &ctx(),
+                &[MutationIntent::RecordEvent {
+                    phase: 0,
+                    event: Box::new(event),
+                }],
+            );
+            assert!(matches!(result, Err(MutationError::UncertifiedTornTail)));
+        }
     }
 
     #[test]

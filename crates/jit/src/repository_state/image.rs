@@ -2002,40 +2002,51 @@ mod tests {
     /// reaching a producer.
     #[test]
     fn test_close_refuses_captured_bytes_over_the_byte_budget() {
-        let path = VirtualPath::data("index.json").unwrap();
-        let bytes = b"captured payload".to_vec();
-        let close = |max_bytes: u64| {
-            let spec = CaptureSpec::new(
-                [path.clone()],
-                CaptureBudget {
+        let window = EVENT_LOG_TAIL_WINDOW as usize;
+        let log = [vec![b'h'; window], vec![b'\n'], vec![b'x'; window * 3]].concat();
+        let mode = FileMode::Regular;
+        let payload = b"captured payload".to_vec();
+        let read_whole = payload.len();
+        let content = CapturedBytes::new("index", payload).unwrap();
+        let tail = EventLogTail::of_bytes(&log);
+        // A tail's read-back to its final line's start counts like any read.
+        let cases = [
+            (
+                VirtualPath::INDEX,
+                read_whole,
+                RepositoryEntry::File { content, mode },
+            ),
+            (
+                VirtualPath::EVENTS,
+                window * 3 + 1,
+                RepositoryEntry::FileTail { tail, mode },
+            ),
+        ];
+        for (path, read, entry) in cases {
+            let close = |max_bytes: u64| {
+                let budget = CaptureBudget {
                     max_listings: 0,
                     max_bytes,
                     max_depth: 1,
-                },
-            )?;
-            RepositoryImage::close(
-                layout(),
-                spec,
-                BTreeMap::from([(
-                    path.clone(),
-                    RepositoryEntry::File {
-                        content: CapturedBytes::new("index", bytes.clone())?,
-                        mode: FileMode::Regular,
-                    },
-                )]),
-                BTreeMap::new(),
-                BTreeMap::new(),
-                BTreeMap::new(),
-            )
-        };
-        let read = bytes.len() as u64;
+                };
+                let mut spec = CaptureSpec::new([], budget)?;
+                match entry {
+                    RepositoryEntry::FileTail { .. } => spec.discover_tail(path.clone())?,
+                    _ => spec.discover_paths([path.clone()])?,
+                }
+                let entries = BTreeMap::from([(path.clone(), entry.clone())]);
+                let (listings, pinned, linked) = Default::default();
+                RepositoryImage::close(layout(), spec, entries, listings, pinned, linked)
+            };
+            let read = read as u64;
 
-        assert!(close(read).is_ok());
-        assert!(matches!(
-            close(read - 1),
-            Err(CaptureError::ByteBudgetExceeded { actual, maximum })
-                if actual == read && maximum == read - 1
-        ));
+            assert!(close(read).is_ok());
+            assert!(matches!(
+                close(read - 1),
+                Err(CaptureError::ByteBudgetExceeded { actual, maximum })
+                    if actual == read && maximum == read - 1
+            ));
+        }
     }
 
     /// Requesting a listing is what a caller is bounded on, and the refusal

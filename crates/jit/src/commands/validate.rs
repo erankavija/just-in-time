@@ -4531,11 +4531,12 @@ description = \"Full Rust CI pipeline must pass.\"
     }
 
     /// An issue mutation captures no issue document reference, working-tree or
-    /// pinned, while whole-repository validation of the same repository does.
+    /// pinned, and reads the log as a tail, while whole-repository validation of
+    /// the same repository reads all of them.
     #[test]
     fn test_capture_mutation_base_excludes_issue_document_references() {
         use crate::commands::test_helpers::{seed_issue, setup};
-        use crate::repository_state::VirtualPath;
+        use crate::repository_state::{ReadMode, VirtualPath};
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
@@ -4571,6 +4572,11 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!validation.capture_spec().pinned().is_empty());
         assert!(!mutation.capture_spec().contains_path(&document));
         assert!(mutation.capture_spec().pinned().is_empty());
+        let events = |image: &crate::repository_state::RepositoryImage| {
+            image.capture_spec().read_mode(&VirtualPath::EVENTS)
+        };
+        assert_eq!(events(&mutation), Some(ReadMode::Tail));
+        assert_ne!(events(&validation), Some(ReadMode::Tail));
     }
 
     /// A mutation preflight reads the lease configuration, the index, and the
@@ -4680,29 +4686,6 @@ description = \"Full Rust CI pipeline must pass.\"
 
         assert_eq!(base.issues.len(), 2);
         assert_eq!(counter.1, 1);
-    }
-
-    /// The base reads the log as a tail in its one round, even when the
-    /// unterminated final line is longer than the tail window.
-    #[test]
-    fn test_capture_mutation_base_reads_the_log_as_a_tail_whatever_its_final_line() {
-        use crate::repository_state::{ReadMode, VirtualPath};
-
-        let long = "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
-        for log in [format!("{long}\n"), format!("{{}}\n{long}")] {
-            let (executor, _, mut counter) = counted_session();
-            executor.storage().add_data_file("events.jsonl", &log);
-
-            let image = executor
-                .capture_mutation_base(&mut counter, &[], None)
-                .unwrap()
-                .expect("a settled capture")
-                .image;
-
-            let mode = image.capture_spec().read_mode(&VirtualPath::EVENTS);
-            assert_eq!(mode, Some(ReadMode::Tail));
-            assert_eq!(counter.1, 1);
-        }
     }
 
     #[test]
