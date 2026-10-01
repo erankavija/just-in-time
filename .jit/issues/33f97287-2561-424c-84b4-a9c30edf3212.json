@@ -60,6 +60,11 @@
       "status": "passed",
       "updated_at": "2026-10-01T16:13:34.064547563Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T16:17:22.469270085Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "33f97287-2561-424c-84b4-a9c30edf3212",
@@ -77,5 +82,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Listing fingerprint retirement",
-  "updated_at": "2026-10-01T16:13:34.064547563Z"
+  "updated_at": "2026-10-01T16:17:22.469270085Z"
 }
