@@ -715,7 +715,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next"
+          "status": "done — cargo-ci (override, suite-clock 52257 ms), docs-mechanical, doc-review and code-review passed; one rework round (doc-review F1/F2: pages said every file is replaced; ESC-14 owner decision @/issue/ccea63de/decision/D-2). code-review re-run after c88822a5 rework 1 passed (0 findings). Net +5 production lines (148 added / 143 removed per worker)."
         },
         {
           "id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
@@ -2053,7 +2053,6 @@
       }
     ],
     "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
-    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy.",
-    "held": "b4483ad6: all four gates passed (doc-review/code-review 0 findings) but held open until c88822a5 rework fixes the long-unterminated-final-line torn-tail misclassification, which breaks b4483ad6 REQ-03 behaviour on main."
+    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy."
   }
 }
