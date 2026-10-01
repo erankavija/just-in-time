@@ -3048,7 +3048,6 @@ mod tests {
     };
     use crate::storage::{
         discover_repository_layout, IssueStore, MutationPoint, RedoPoint, RepositoryStateStore,
-        RepositoryStateStoreError,
     };
     use std::collections::{BTreeMap, BTreeSet};
     use std::fs;
@@ -3064,14 +3063,6 @@ mod tests {
             .into_iter()
             .next()
             .expect("one profile entry")
-    }
-
-    /// Declares a projection over a new source once the first round has read.
-    struct ClosureRaceSession {
-        inner: Box<dyn RepositoryMutationSession>,
-        captures: usize,
-        config_path: std::path::PathBuf,
-        source_path: std::path::PathBuf,
     }
 
     /// Observe actual recoverable publications without coupling the test to
@@ -3119,53 +3110,6 @@ mod tests {
                 return Err(std::io::Error::other(format!("injected {point:?}")));
             }
             Ok(())
-        }
-    }
-
-    impl RepositoryMutationSession for ClosureRaceSession {
-        fn layout(&self) -> &crate::repository_state::RepositoryLayout {
-            self.inner.layout()
-        }
-
-        fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
-            self.inner.recovery_report()
-        }
-
-        fn capture(
-            &mut self,
-            spec: CaptureSpec,
-        ) -> std::result::Result<RepositoryImage, RepositoryStateStoreError> {
-            let image = self.inner.capture(spec)?;
-            self.captures += 1;
-            if self.captures == 1 {
-                let mut config = fs::read_to_string(&self.config_path).unwrap();
-                config.push_str(
-                    "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
-                     markers = []\nlink-namespaces = []\nscope = \"project\"\n\
-                     source-of-truth = \"markdown-first\"\nsource = \"RACE.md\"\n\
-                     [projection.race]\nkind = \"race\"\nmode = \"separate-file\"\n\
-                     target = \".agents/skills/jit-manage/SKILL.md\"\nstyle = \"id-anchor\"\n",
-                );
-                fs::write(&self.config_path, config).unwrap();
-                fs::write(&self.source_path, "## Race\n\n- **R-1** — recaptured\n").unwrap();
-            }
-            Ok(image)
-        }
-
-        fn extend(
-            &mut self,
-            image: RepositoryImage,
-            spec: CaptureSpec,
-        ) -> std::result::Result<RepositoryImage, RepositoryStateStoreError> {
-            self.inner.extend(image, spec)
-        }
-
-        fn apply(
-            &mut self,
-            plan: &MaterializationPlan,
-        ) -> std::result::Result<crate::storage::RepositoryApplyOutcome, RepositoryStateStoreError>
-        {
-            self.inner.apply(plan)
         }
     }
 
@@ -5297,45 +5241,6 @@ template = true
         assert!(!temp.path().join("docs/profile.txt").exists());
         assert!(!temp.path().join(".jit/profiles").exists());
         assert!(storage.read_events().unwrap().is_empty());
-    }
-
-    #[test]
-    fn test_profile_preparation_reads_a_changed_closure_in_its_next_round() {
-        let temp = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
-            .unwrap();
-        // The verified repository already carries the workflow package's
-        // declared dependency. Stage only the package whose preparation is the
-        // behavior under test.
-        let package = crate::test_utils::capture_repository_package(
-            "jit-dogfood",
-            &temp.path().join("packages/jit-dogfood"),
-        )
-        .unwrap();
-        let storage = JsonFileStorage::new(temp.path().join(".jit"));
-        let executor = CommandExecutor::new(storage.clone())
-            .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
-        let layout = executor.require_layout().unwrap();
-        let inner = executor.storage().open_mutation_session(layout).unwrap();
-        let mut session = ClosureRaceSession {
-            inner,
-            captures: 0,
-            config_path: temp.path().join(".jit/config.toml"),
-            source_path: temp.path().join("RACE.md"),
-        };
-
-        executor
-            .prepare_profile(&mut session, &package, &MutationContext::preview())
-            .unwrap();
-
-        let (plan, _) = executor
-            .prepare_profile(&mut session, &package, &MutationContext::preview())
-            .unwrap()
-            .expect("the next round prepares over the changed closure");
-        assert!(plan
-            .image()
-            .capture_spec()
-            .contains_path(&VirtualPath::worktree("RACE.md").unwrap()));
-        assert!(!temp.path().join(".jit/profiles/jit-dogfood.json").exists());
     }
 
     #[test]

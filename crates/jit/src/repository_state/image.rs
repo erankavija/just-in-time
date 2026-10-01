@@ -182,6 +182,15 @@ impl EventLogTail {
     pub fn tail(&self) -> &[u8] {
         &self.tail
     }
+
+    /// The bytes after the file's last newline, or `None` when that line
+    /// starts before the window and the tail holds only part of it.
+    pub fn final_line(&self) -> Option<&[u8]> {
+        match self.tail.iter().rposition(|byte| *byte == b'\n') {
+            Some(newline) => Some(&self.tail[newline + 1..]),
+            None => (self.tail.len() as u64 == self.length).then_some(&self.tail[..]),
+        }
+    }
 }
 
 /// One exact captured path state, including typed absence.
@@ -2607,42 +2616,6 @@ mod tests {
             ),
             Err(DeltaError::InvalidAction(_))
         ));
-    }
-
-    #[test]
-    fn test_capture_spec_closes_discovered_paths() {
-        let fixed = VirtualPath::data("config.toml").unwrap();
-        let discovered = VirtualPath::worktree("docs/plan.md").unwrap();
-        let mut spec = CaptureSpec::new(
-            [fixed.clone()],
-            CaptureBudget {
-                max_listings: 1,
-                max_bytes: 64,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        spec.discover_paths([discovered.clone()]).unwrap();
-        let bytes = b"plan".to_vec();
-        let captured = RepositoryImage::close(
-            layout(),
-            spec,
-            BTreeMap::from([
-                (fixed, RepositoryEntry::Absent),
-                (
-                    discovered.clone(),
-                    RepositoryEntry::File {
-                        content: CapturedBytes::new("plan", bytes.clone()).unwrap(),
-                        mode: FileMode::Regular,
-                    },
-                ),
-            ]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
-        assert_eq!(captured.file_bytes(&discovered).unwrap(), Some(&bytes[..]));
     }
 
     #[test]

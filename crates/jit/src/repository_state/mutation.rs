@@ -669,16 +669,22 @@ fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
 }
 
 /// The captured event log's length and the bytes after its last newline, from
-/// a whole or a tail read. An unterminated final line longer than the tail
-/// window is judged on the window's bytes.
+/// a whole read or a tail that holds that whole line.
+///
+/// # Errors
+///
+/// [`CaptureError::TailOnlyCapture`] for a tail whose window starts inside the
+/// final line, which cannot say whether that line is torn.
 fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
-    let (length, end) = match image.entry(&VirtualPath::EVENTS)? {
-        RepositoryEntry::FileTail { tail, .. } => (tail.length(), tail.tail()),
-        _ => captured_file_bytes(image, &VirtualPath::EVENTS)?
-            .map_or((0, &[][..]), |log| (log.len() as u64, log)),
-    };
-    let final_line = end.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
-    Ok((length, final_line))
+    if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
+        let final_line = tail
+            .final_line()
+            .ok_or(CaptureError::TailOnlyCapture(VirtualPath::EVENTS))?;
+        return Ok((tail.length(), final_line));
+    }
+    let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
+    let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
+    Ok((log.len() as u64, final_line))
 }
 
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
@@ -1803,27 +1809,33 @@ mod tests {
         );
     }
 
+    /// An image holding the event log as `tail`.
+    fn tail_image(tail: crate::repository_state::EventLogTail) -> RepositoryImage {
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        let mode = FileMode::Regular;
+        let entries = BTreeMap::from([(
+            VirtualPath::EVENTS,
+            RepositoryEntry::FileTail { tail, mode },
+        )]);
+        RepositoryImage::close(
+            layout(),
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
     /// An append over a log read as its tail lands at the log's length and
     /// expects that tail, with no whole-log digest behind it.
     #[test]
     fn test_event_append_over_a_tail_read_offsets_at_its_length_and_expects_the_tail() {
         let log = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
-        let entry = RepositoryEntry::FileTail {
-            tail: tail.clone(),
-            mode: FileMode::Regular,
-        };
-        let image = RepositoryImage::close(
-            layout(),
-            spec,
-            BTreeMap::from([(VirtualPath::EVENTS, entry)]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = tail_image(tail.clone());
 
         let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
             .unwrap()
@@ -1850,6 +1862,19 @@ mod tests {
             !bytes.starts_with(b"\n"),
             "a terminated log needs no separator"
         );
+    }
+
+    /// A tail whose window starts inside the final line cannot say whether that
+    /// line is torn, so the composer refuses it rather than guess.
+    #[test]
+    fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
+        let log = vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize];
+        let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
+
+        assert!(matches!(
+            finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),
+            Err(MutationError::Capture(CaptureError::TailOnlyCapture(_)))
+        ));
     }
 
     #[test]
