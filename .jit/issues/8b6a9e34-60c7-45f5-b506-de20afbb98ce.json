@@ -9,70 +9,18 @@
   "description": "The testing guide names the redo-record benchmark harness as its publication-cost evidence, and the journal-shaped harness it replaces stops shipping.\n\n## Background\n\nThe guide pins publication-cost numbers to an artifact produced by a nine-hundred-line script written around the journal's shape: it asserts the presence and absence of an external bootstrap control directory and counts directory fsync calls, a property of the journal's phase barriers. Both the numbers and the named evidence contract go stale on the first day of the change.\n\nThe guide also maintains a per-test cost attribution table naming tests that this work retires or renames, and a build-budget note derived from measured worst-case figures. The suite profile artifact, pinned at four thousand four hundred and eighty-one tests, goes stale when a large block of tests disappears.\n\n## Success Criteria\n\n- [hard] REQ-01: The guide's publication-cost evidence names the redo-record benchmark harness and its committed artifact.\n- [hard] REQ-02: The journal-shaped benchmark script stops shipping, and contracts reference it nowhere.\n- [hard] REQ-03: The per-test cost attribution table names only tests that exist.\n- [hard] REQ-04: The build-budget note states figures re-derived after the change, holding or tightening.\n- [hard] REQ-05: The suite-timing evidence artifact is refreshed, or its staleness is recorded with the test count it was pinned at and the condition for refreshing it.\n- [hard] REQ-06: The guide's description of a storage round trip states the redo record.\n- [hard] REQ-07: The change removes more lines than it adds.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "b31238e91ee7bed867b363705ea8906e6c1d50ceef1a99ed0db9da77d8207ea0",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../cold-warm-verdict-0708d692/README.md",
-          "resolved_path": "dev/benchmarks/cold-warm-verdict-0708d692/README.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "2c04f2b39aeb35eb79a7456bcc4fb91d4b39f7e0de27a68f4225113a51e9c4c5",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../rust-build-efficiency/report.md",
-          "resolved_path": "dev/benchmarks/rust-build-efficiency/report.md"
-        }
-      ],
       "commit": null,
       "doc_type": "evidence",
       "format": "markdown",
       "label": null,
-      "path": "dev/benchmarks/rust-build-budgets/README.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/benchmarks/rust-build-budgets/README.md"
     },
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-10-01T22:23:15.394898939Z",
@@ -109,5 +57,5 @@
   "priority": "high",
   "state": "done",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-10-01T22:40:24.764100451Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }

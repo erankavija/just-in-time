@@ -9,45 +9,11 @@
   "description": "The redo record's own documentation states that an unreadable leftover record is refused at session open, as the code does.\n\n## Background\n\n`RedoRecord::commit` writes the record in place rather than staging and renaming it, so an interrupted write leaves a truncated file at the record's path. Its rustdoc says such a prefix is one that `RedoRecord::parse` rejects, \"so a later session skips the residue\". That was never the behaviour: `jit:0938d99e` made session open read the leftover record and turn any parse failure into `UnreadableRedoRecord`, refusing to proceed. The refusal is deliberate — a torn write and a committed record later corrupted on disk both fail to parse, and discarding the second would lose a mutation that may already be partly applied.\n\nThe claim contradicts the sentence that follows it in the same comment, which correctly says that session open decides the fate of an occupied record path. It also propagated: `jit:ccea63de` transcribed it faithfully into the storage-format reference, where two independent reviews and the lead caught it, and the reference was corrected in that issue's second rework round. The source it came from was not.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::commit`'s documentation states that an interrupted write leaves a record that session open refuses, and does not say it is skipped or discarded.\n- [hard] REQ-02: No Rust doc comment, comment, or error string in the workspace states that an unreadable leftover record is skipped, discarded, or ignored.\n- [hard] REQ-03: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n\n## Notes\n\nCreated by the execution lead under POL-01 during wave 13's review. Excluded from the epic's REQ-06 redo-record subtotal per ER-01.\n\nA documentation change only: the refusal is `jit:0938d99e`'s reviewed behaviour, owned by `test_open_mutation_session_refuses_a_malformed_leftover_record_naming_it`, and this task changes no code path. The operator procedure for removing an unreadable record belongs to the recovery references, not here.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-09-21T20:06:40.441588127Z",
@@ -81,5 +47,5 @@
   "priority": "high",
   "state": "done",
   "title": "Record documentation states that an unreadable leftover record is refused",
-  "updated_at": "2026-10-01T22:40:25.504896134Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }

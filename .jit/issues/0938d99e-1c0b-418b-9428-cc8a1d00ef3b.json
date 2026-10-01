@@ -9,45 +9,11 @@
   "description": "Opening a mutation session applies a leftover redo record idempotently on both backends and reports how many records it applied.\n\n## Background\n\nSession open runs crash recovery today: it lists pending transactions in two control locations, validates each journal, and either rolls a prepared transaction back or completes a committed one forward. Under the redo record that becomes one step: read a leftover record from the data root's scratch directory and apply it, which is idempotent, then remove it.\n\nThis lands while the kernel still commits. With no writer of records yet, the new path is a no-op on a live repository and is exercised by seeding a record directly, which is what makes it safe to separate from the commit swap.\n\nThe dispatch's reported count feeds the recover command's output and the server's startup report, so its meaning changes from recovered transactions to applied records.\n\n## Success Criteria\n\n- [hard] REQ-01: Opening a session on either backend applies a leftover redo record before any capture, and removes it.\n- [hard] REQ-02: Opening a session twice over the same seeded record leaves the repository in the same semantic state as opening it once.\n- [hard] REQ-03: The dispatch report counts applied redo records, and its count reaches the recover command and the server's startup report.\n- [hard] REQ-04: A session opened on a repository with no leftover record performs no extra read beyond checking the scratch directory.\n- [hard] REQ-05: A malformed leftover record yields a typed recovery failure naming the record, leaving the repository unchanged.\n- [hard] REQ-06: Journal recovery still runs at session open while the kernel commits, so a repository left by the kernel converges as it does today.\n\n## Notes\n\nExpected additive footprint is under 200 production lines.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-09-21T10:19:41.016268108Z",
@@ -82,5 +48,5 @@
   "priority": "high",
   "state": "done",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-10-01T22:40:26.067777633Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }

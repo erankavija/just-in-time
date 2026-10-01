@@ -10,45 +10,11 @@
   "description": "A publication-failure injection in the workspace names an interruption point the redo record defines.\n\n## Background\n\nPublication-failure injection reaches nine command and test modules outside the storage layer: profile, gate, issue, bulk update, dependency, init, gate check, the shared command module, and the concurrent-profile-application suite. Each names a variant of the kernel's thirty-six-point enum. Once the session commits through the record, those points are never reached, and once the kernel retires they no longer compile.\n\nRepointing them ahead of the commit swap keeps each later step compiling and passing. The concurrent-profile-application suite is ported rather than retired: it owns stale-capture rejection under contention, a property the redo record has too, and it is the only test of it.\n\n## Success Criteria\n\n- [hard] REQ-01: Each publication-failure injection in the workspace names an interruption point the record defines.\n- [hard] REQ-02: The kernel's failure-point enum is referenced only by the kernel and by the storage modules that still host it.\n- [hard] REQ-03: The concurrent-profile-application suite injects a record interruption point and still asserts that a contender never publishes a stale capture.\n- [hard] REQ-04: Command-layer test helpers expose the record's points, with the kernel's points removed from their surface.\n- [hard] REQ-05: The workspace builds with no warnings and the suite passes with no test held out of the default run.\n\n## Notes\n\nThe record's points exist at this stage while the kernel still commits, so an injection repointed here fires once the session commits through the record.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-09-21T09:11:26.943913761Z",
@@ -84,5 +50,5 @@
   "priority": "high",
   "state": "done",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-10-01T22:40:24.938135422Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }

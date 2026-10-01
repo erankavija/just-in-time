@@ -9,45 +9,11 @@
   "description": "The redo record reaches disk synced, with its directory fsynced, before a mutation performs its first live write.\n\n## Background\n\nA redo-only commit protocol has no rollback: once the first live file is replaced there is no way back, so the record is already durable at that moment. The shared atomic-write helper writes a temp file and renames it, with no `sync_all` on the file and no fsync on the parent directory, so it gives reader-visibility atomicity. The one synced write primitive in the tree is the transaction kernel's staging helper, which is retiring.\n\nThe helper therefore gains the two operations the record needs: a synced file write and a directory fsync.\n\n## Success Criteria\n\n- [hard] REQ-01: Writing a redo record returns after the record's bytes are synced to disk and its containing directory is fsynced.\n- [hard] REQ-02: The shared atomic-write module exposes a synced write and a directory fsync as named operations, reached by every caller that needs either.\n- [hard] REQ-03: The scratch directory is created when absent, with a mode matching the rest of the data root.\n- [hard] REQ-04: A record write that fails partway leaves a residue a later session skips rather than replays.\n- [hard] REQ-05: Durability behaviour is covered at the storage unit layer without a wall-clock assertion.\n\n## Notes\n\nExpected additive footprint is under 120 production lines across the record writer and the atomic-write module. Per-file replacement during replay stays on the existing temp-file-and-rename path, whose crash survivability rests on the record.\n",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-09-20T09:50:24.886626651Z",
@@ -82,5 +48,5 @@
   "priority": "high",
   "state": "done",
   "title": "Durable redo record write",
-  "updated_at": "2026-10-01T22:40:25.411564813Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }

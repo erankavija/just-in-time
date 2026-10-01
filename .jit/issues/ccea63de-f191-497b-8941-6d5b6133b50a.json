@@ -9,45 +9,11 @@
   "description": "The storage-format reference names the scratch directory as the commit point's home, describes publication as a redo record, and describes recovery as application at session open.\n\n## Background\n\nThe reference is the canonical adopter statement of the repository layout and its write contract. It lists the data root's contents without the scratch directory, states that pending recoverable multi-file transactions live under a transactions subdirectory, names an external bootstrap control directory, and calls the whole thing a transaction, rollback, and mandatory-recovery contract. It also states the machine-local set kept out of version control, where the scratch directory's ignore entry belongs.\n\n## Success Criteria\n\n- [hard] REQ-01: The data-root layout lists the scratch directory and states that it holds the pending redo record.\n- [hard] REQ-02: The write contract describes publication as one synced redo record over the files a mutation writes, applied by replacement and removal.\n- [hard] REQ-03: Recovery is described as idempotent application of a leftover record when a session opens.\n- [hard] REQ-04: The page carries no description of rollback, a journal, a backup, a staging directory, a companion, or an external bootstrap control directory.\n- [hard] REQ-05: The machine-local set states that the scratch directory is ignored and that the engine composes the ignore entry.\n\n\n## Decisions\n\n- D-1: The page states the write contract without the event log's write mechanics. Production publishes `events.jsonl` as one of the record's file replacements: the record constructor, `redo_record_for` in `crates/jit/src/storage/repository_state_store.rs`, passes no event append. The positioned append is `jit:b4483ad6`'s change, and its REQ-06 updates the adopter pages when it lands.\n\n- D-2: Supersedes D-1 now that `jit:b4483ad6` has landed. The canonical publication contract states, in one clause, that the event log is the one file the record extends rather than replaces: its new lines are appended at the length the mutation read. No further event-log write mechanics belong on the page. Decided by the epic owner in session 7.",
   "documents": [
     {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        }
-      ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
       "label": null,
-      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+      "path": "dev/archive/f1dc843a-redo-mutations/active/plan.md"
     }
   ],
   "done_at": "2026-09-21T19:44:11.390185649Z",
@@ -82,5 +48,5 @@
   "priority": "high",
   "state": "done",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-10-01T22:40:27.105624282Z"
+  "updated_at": "2026-10-01T23:22:48.024084713Z"
 }
