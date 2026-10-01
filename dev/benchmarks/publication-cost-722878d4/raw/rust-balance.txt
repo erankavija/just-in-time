@@ -1,7 +1,7 @@
-Rust line balance, 34d37f8be..0e20d3f02, pathspec '*.rs'
+Rust line balance, 34d37f8be..1f8d2bff7, pathspec '*.rs'
 
-  shortstat: 118 files changed, 12049 insertions(+), 14248 deletions(-)
-  shortstat net: -2199
+  shortstat: 118 files changed, 12053 insertions(+), 14279 deletions(-)
+  shortstat net: -2226
 
   excluded first-parent steps (added / removed / net, steps)
     19e7298a   +81     -20         +61  (1)
@@ -14,6 +14,6 @@ Rust line balance, 34d37f8be..0e20d3f02, pathspec '*.rs'
     ce053478   +26     -8          +18  (1)
     total                         -200
 
-  remaining steps: +12407 -14406 over 48 steps (per-step sums)
-  remaining net: -1999
+  remaining steps: +12411 -14437 over 49 steps (per-step sums)
+  remaining net: -2026
   excluded but no Rust-touching step found: 7226f00b

@@ -64,14 +64,14 @@ gf2 with its unqualified `satisfies:` labels, so the copy is otherwise unmodifie
 
 ## Rust line balance from `34d37f8be`
 
-`git diff --shortstat 34d37f8be -- '*.rs'` at `0e20d3f02`, after the epic's last Rust
-change (`dd1b984c`):
+`git diff --shortstat 34d37f8be -- '*.rs'` at `1f8d2bff7`, the epic's last Rust change
+(`ef7848ea`, after `dd1b984c`):
 
 ```
-118 files changed, 12049 insertions(+), 14248 deletions(-)
+118 files changed, 12053 insertions(+), 14279 deletions(-)
 ```
 
-Net −2,199 lines: the work removes more Rust than it adds.
+Net −2,226 lines: the work removes more Rust than it adds.
 
 Attributed balance excluding non-redo-record work landed in the same window, from
 [`rust-balance.py`](rust-balance.py) (`raw/rust-balance.txt`):
@@ -84,6 +84,6 @@ $ python3 dev/benchmarks/publication-cost-722878d4/rust-balance.py 34d37f8be \
 
 The script attributes each first-parent step's `'*.rs'` numstat to its `jit:` tag, so
 a task's merge is excluded with it, and checks that the step nets sum to the
-shortstat net. Excluded steps total −200; the redo-record remainder is **−1,999**
-(`7226f00b` touched no Rust). The output names `0e20d3f02`; later commits change no
+shortstat net. Excluded steps total −200; the redo-record remainder is **−2,026**
+(`7226f00b` touched no Rust). The output names `1f8d2bff7`; later commits change no
 Rust file.
