@@ -37,16 +37,18 @@ so a short id printed by one command is always long enough to hand back to the n
 ## Event Log Records
 
 `.jit/events.jsonl` is the event log, in JSON Lines: one JSON object per line,
-each terminated by a newline. Appending a record serializes it to a single line
-and writes it at the end of the file under an exclusive lock; records are never
-rewritten in place, and reading parses the file line by line, skipping blank
-lines. Every record carries a `type` tag, its own `id`, and a `timestamp`; the
-remaining fields are flat on the object and vary by tag.
+each terminated by a newline. A record is serialized to a single line with its
+object keys sorted, and a mutation appends its lines at the log length it read;
+records are never rewritten in place. The publication contract is
+[Publication and Recovery](storage-format.md#publication-and-recovery). Reading
+parses the file line by line, skipping blank lines. Every record carries a
+`type` tag, its own `id`, and a `timestamp`; the remaining fields are flat on
+the object and vary by tag.
 
 ```jsonl
-{"type":"issue_created","id":"00000000-0000-0000-0000-000000000000","issue_id":"00000000-0000-0000-0000-000000000001","timestamp":"1970-01-01T00:00:00Z","title":"Sample issue","priority":"normal"}
-{"type":"issue_state_changed","id":"00000000-0000-0000-0000-000000000000","issue_id":"00000000-0000-0000-0000-000000000001","timestamp":"1970-01-01T00:00:00Z","from":"ready","to":"in_progress"}
-{"type":"gate_definition_created","id":"00000000-0000-0000-0000-000000000000","timestamp":"1970-01-01T00:00:00Z","gate_key":"tests"}
+{"id":"00000000-0000-0000-0000-000000000000","issue_id":"00000000-0000-0000-0000-000000000001","priority":"normal","timestamp":"1970-01-01T00:00:00Z","title":"Sample issue","type":"issue_created"}
+{"from":"ready","id":"00000000-0000-0000-0000-000000000000","issue_id":"00000000-0000-0000-0000-000000000001","timestamp":"1970-01-01T00:00:00Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"tests","id":"00000000-0000-0000-0000-000000000000","timestamp":"1970-01-01T00:00:00Z","type":"gate_definition_created"}
 ```
 
 The tag vocabulary — every `type` value, what appends it, and which tags carry an
@@ -64,48 +66,48 @@ its coupled issue and event updates.
 
 ```json
 {
-  "schema_version": 1,
-  "run_id": "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21",
-  "gate_key": "tests",
-  "stage": "postcheck",
-  "issue_id": "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64",
-  "commit": "9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910",
   "branch": "main",
-  "tree_dirty": false,
-  "status": "passed",
-  "started_at": "2026-01-09T23:06:40Z",
+  "by": "agent:worker-1",
+  "command": "cargo test --workspace",
+  "commit": "9f1c0f0a2b3c4d5e6f708192a3b4c5d6e7f80910",
   "completed_at": "2026-01-09T23:06:40Z",
   "duration_ms": 12480,
+  "evaluation_stability": "inputs_moved",
   "exit_code": 0,
-  "stdout": "test result: ok. 812 passed; 0 failed",
-  "stderr": "",
-  "command": "cargo test --workspace",
-  "by": "agent:worker-1",
-  "message": "all suites green",
   "findings": {
-    "verdict": "pass",
-    "summary": "no blocking findings",
     "findings": [
       {
-        "id": "F1",
-        "severity": "low",
         "disposition": "advisory",
-        "origin": "issue-impact",
-        "summary": "the temp path deserves a name",
         "file": "crates/jit/src/storage/json.rs",
+        "id": "F1",
         "line": 793,
+        "origin": "issue-impact",
         "references": [
           "@/inv/atomic-writes"
-        ]
+        ],
+        "severity": "low",
+        "summary": "the temp path deserves a name"
       }
-    ]
+    ],
+    "summary": "no blocking findings",
+    "verdict": "pass"
   },
+  "gate_key": "tests",
   "inputs_digest": "105438fba9bc6384d757de31311105b5ea4839a5d519b14fcf59af7307567ef4",
+  "issue_id": "9d1f6c02-4a77-4f2b-8f3d-5e0b7a1c8e64",
+  "message": "all suites green",
   "origin": {
     "derivation": "reused",
     "source_run": "1c4e8a90-3d2b-4f61-9a07-5b8c2d1e6f34"
   },
-  "evaluation_stability": "inputs_moved"
+  "run_id": "7b2b0a4c-2f5a-4d3e-9b1a-6c8f0d5e4a21",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-01-09T23:06:40Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "test result: ok. 812 passed; 0 failed",
+  "tree_dirty": false
 }
 ```
 

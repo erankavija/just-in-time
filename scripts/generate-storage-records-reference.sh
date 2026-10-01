@@ -8,9 +8,10 @@ set -euo pipefail
 #   docs/reference/storage-records.md
 #
 # WHERE THE VALUES COME FROM. The identifier widths come from the constants that
-# enforce them, the event-log sample lines from the tag samples encoded the way
-# the repository-state finalizer publishes them, and the gate-run record from
-# the type schemars derives its field list from — all declared in
+# enforce them, the event-log sample lines from the tag samples encoded by the
+# repository-state finalizer's serializer with the newline its positioned
+# append adds, and the gate-run record from the type schemars derives its
+# field list from — all declared in
 # crates/jit/src/storage/reference.rs and its cited sources, so the page is
 # generated from the definitions rather than restating them
 # (`@/inv/single-source-prose`). The conformance test beside the render asserts

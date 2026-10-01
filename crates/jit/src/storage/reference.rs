@@ -12,16 +12,15 @@
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
 //!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
 //!   [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id) accepts.
-//! - The event-log sample lines are [`EventTag::sample`] records encoded with
-//!   `serde_json::to_string` — the encoding the repository-state finalizer
-//!   publishes to `events.jsonl`. The tag vocabulary is NOT restated here: it is the event
+//! - The event-log sample lines are [`EventTag::sample`] records encoded by
+//!   [`serialize_event`] with the newline terminator the finalizer's positioned
+//!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
 //!   catalog's own projection ([`crate::domain::event_catalog`]), which this page
 //!   links to.
 //! - The gate-run path comes from
 //!   [`gate_run_result_relative_path`](crate::repository_state::gate_run_result_relative_path),
 //!   shared by the repository-state finalizer and storage readers; the record's
-//!   example is a [`GateRunResult`] encoded by the repository-state finalizer
-//!   with `serde_json::to_string_pretty`; each field's presence when unset is
+//!   example is a [`GateRunResult`] encoded by [`serialize_gate_run`]; each field's presence when unset is
 //!   read off that encoding.
 //! - [`GateRunField`] names the record's fields. Conformance tests hold it against
 //!   the property list schemars derives from [`GateRunResult`] itself and against
@@ -34,7 +33,7 @@ use crate::domain::{
     EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
     SHORT_ID_LENGTH,
 };
-use crate::repository_state::gate_run_result_relative_path;
+use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
 use crate::storage::MIN_ID_PREFIX_LENGTH;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -414,8 +413,8 @@ fn field_presence() -> Result<Vec<(GateRunField, Presence)>> {
 
 /// The event-log sample block: one encoded record per listed tag.
 ///
-/// The lines are produced the way the log is written — `serde_json::to_string` of
-/// an [`Event`](crate::domain::Event), one per line — so the block is an encoding
+/// Each line is [`serialize_event`] of an [`Event`](crate::domain::Event) plus
+/// the terminating newline the finalizer appends — so the block is an encoding
 /// of real records rather than a transcription of one. The three tags span the
 /// scopes an adopter has to tell apart: two issue-scoped records that name their
 /// issue, and a registry-scoped record that carries no `issue_id`.
@@ -426,7 +425,12 @@ fn event_log_sample() -> Result<String> {
         EventTag::GateDefinitionCreated,
     ]
     .iter()
-    .map(|tag| Ok(format!("{}\n", serde_json::to_string(&tag.sample())?)))
+    .map(|tag| {
+        Ok(format!(
+            "{}\n",
+            String::from_utf8(serialize_event(&tag.sample())?)?
+        ))
+    })
     .collect()
 }
 
@@ -450,7 +454,7 @@ fn cell(text: &str) -> String {
 ///
 /// Propagates a `serde_json` failure while encoding one of the sample records.
 pub fn render_reference_markdown() -> Result<String> {
-    let example_run = serde_json::to_string_pretty(&sample_gate_run())?;
+    let example_run = String::from_utf8(serialize_gate_run(&sample_gate_run())?)?;
     let events = event_log_sample()?;
 
     // The run's path, straight from the pure helper finalization and readers
@@ -526,11 +530,13 @@ pub fn render_reference_markdown() -> Result<String> {
          ## Event Log Records\n\
          \n\
          `.jit/events.jsonl` is the event log, in JSON Lines: one JSON object per line,\n\
-         each terminated by a newline. Appending a record serializes it to a single line\n\
-         and writes it at the end of the file under an exclusive lock; records are never\n\
-         rewritten in place, and reading parses the file line by line, skipping blank\n\
-         lines. Every record carries a `type` tag, its own `id`, and a `timestamp`; the\n\
-         remaining fields are flat on the object and vary by tag.\n\
+         each terminated by a newline. A record is serialized to a single line with its\n\
+         object keys sorted, and a mutation appends its lines at the log length it read;\n\
+         records are never rewritten in place. The publication contract is\n\
+         [Publication and Recovery](storage-format.md#publication-and-recovery). Reading\n\
+         parses the file line by line, skipping blank lines. Every record carries a\n\
+         `type` tag, its own `id`, and a `timestamp`; the remaining fields are flat on\n\
+         the object and vary by tag.\n\
          \n\
          ```jsonl\n\
          {events}\
