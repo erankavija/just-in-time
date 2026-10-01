@@ -240,11 +240,22 @@ idea), `dev/studies/multi-agent-parallelism-analysis.md` (an `updated_at`
 rollback bug) and `dev/benchmarks/rust-build-efficiency/report.md:30` (a harness
 file backup) are unrelated.
 
-Open residue, owned elsewhere: `scripts/benchmark-transaction.sh` (journal-shaped
-harness) and the `transaction-benchmark-evidence` contract cited at
-`dev/TESTING.md:464,503`. Both belong to 8b6a9e34 REQ-01/REQ-02 (Backlog, blocked on
-722878d4), which retires the script and re-points the guide at the redo-record
-harness.
+The journal-shaped benchmark harness is retired here, delivering 8b6a9e34 REQ-02
+early: `scripts/benchmark-transaction.sh` is deleted (its Rust helper and
+`LD_PRELOAD` fsync shim were heredocs inside it, so no other file existed for it),
+and `dev/TESTING.md` no longer cites it, the `transaction-benchmark-evidence`
+contract, or the publication-cost figures sourced from that artifact. No test,
+gate or docs-mechanical policy referenced either.
+
+```console
+$ rg -n "benchmark-transaction|transaction-benchmark|TRANSACTION_BENCH" -g '!dev/archive/**' -g '!dev/benchmarks/**' -g '!dev/active/**' .
+$ echo $?
+1
+```
+
+Under `dev/active/` the names remain only in the epic's planning record
+(`f1dc843a-redo-mutations/plan.md` LD-4, `investigation.md`, `breakdown.json`,
+`progress.json`, the handoffs), which records the decision to retire them.
 
 Reading order (`dev/architecture/repository-state-materialization.md` §"Where to
 start reading"):
