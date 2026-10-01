@@ -1,17 +1,14 @@
 //! Known current-tree regressions forbidden by the repository-state cutover.
 //!
-//! Publisher access itself is compiler-enforced rather than asserted here: the
-//! in-repository writers (`storage::atomic_write`) and the absent-root
-//! publisher (`storage::init_publish`) are `pub(in crate::storage)`, so
-//! `crate::commands` cannot name them and a regression fails the build. This file covers the
-//! properties visibility cannot express — deleted modules and wrappers,
-//! canonical renderer ownership, and the modules that must reach the filesystem
-//! only through a named discipline or not at all — because `std::fs` is public
-//! to every crate and no `pub(in ...)` restriction reaches it. Each such test
-//! carries a guard asserting the mechanism it is about is still present, so an
-//! absent call shape can only mean the discipline held rather than that the
+//! These are the properties visibility cannot express, because `std::fs` is
+//! public to every crate: deleted modules and wrappers, canonical renderer
+//! ownership, the one mechanism that writes repository state, and the modules
+//! that must reach the filesystem only through a named discipline or not at
+//! all. Each test also asserts the mechanism it is about is still present, so
+//! an absent call shape can only mean the discipline held rather than that the
 //! code it was about moved away.
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 fn production_source(path: &Path) -> String {
@@ -278,34 +275,8 @@ fn top_level_enum_variants(body: &str) -> Vec<String> {
 }
 
 fn functions_with_shape<'a>(source: &'a str, required: &[&str]) -> Vec<&'a str> {
-    let mut starts = source
-        .match_indices('\n')
-        .map(|(index, _)| index + 1)
-        .chain(std::iter::once(0))
-        .filter(|start| {
-            let line = source[*start..]
-                .split_once('\n')
-                .map_or(&source[*start..], |(line, _)| line)
-                .trim_start();
-            [
-                "fn ",
-                "pub fn ",
-                "pub(crate) fn ",
-                "pub(super) fn ",
-                "async fn ",
-                "pub async fn ",
-            ]
-            .into_iter()
-            .any(|prefix| line.starts_with(prefix))
-        })
-        .collect::<Vec<_>>();
-    starts.sort_unstable();
-    starts
-        .iter()
-        .enumerate()
-        .map(|(index, start)| {
-            &source[*start..starts.get(index + 1).copied().unwrap_or(source.len())]
-        })
+    function_bodies(source)
+        .into_iter()
         .filter(|function| required.iter().all(|needle| function.contains(needle)))
         .collect()
 }
@@ -555,32 +526,373 @@ fn contains_cargo_manifest(root: &Path) -> bool {
     })
 }
 
-/// Raw `std::fs` publication is the one residual channel into a repository root
-/// that visibility cannot close: `std::fs` is public to every crate, so no
-/// `pub(in ...)` restriction reaches it. This is therefore a deliberate,
-/// recorded source-text exception to the compiler-enforced mechanism, and it is
-/// kept as narrow as the exception requires — the four cutover command modules,
-/// the four call shapes that publish. A crate-wide `clippy.toml`
-/// `disallowed_methods` entry is the wrong instrument: `commands/snapshot.rs`
-/// legitimately stages exports with raw `std::fs` into temp directories outside
-/// the repository roots, which such a rule would forbid.
-#[test]
-fn test_cutover_command_modules_publish_no_raw_filesystem_writes() {
-    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    for consumer in ["init.rs", "profile.rs", "project.rs", "validate.rs"] {
-        let source = production_source(&source_root.join("commands").join(consumer));
-        for publisher in [
-            "fs::write(",
-            "fs::rename(",
-            "File::create(",
-            "OpenOptions::new(",
-        ] {
-            assert!(
-                !source.contains(publisher),
-                "raw filesystem publication returned in commands/{consumer}: {publisher}"
-            );
+/// A `cfg` attribute that compiles its item only into test builds.
+fn is_test_only_cfg(line: &str) -> bool {
+    let line = line.trim_start();
+    line.strip_prefix("#[cfg(")
+        .or_else(|| line.strip_prefix("#![cfg("))
+        .is_some_and(|predicate| !predicate.starts_with("not(") && predicate.contains("test"))
+}
+
+/// The text a non-test build compiles from `source`, or `None` for a file only
+/// tests compile.
+///
+/// An item behind a test-only `cfg` is dropped through the line closing it at
+/// its own indentation, which rustfmt guarantees. Comment lines are dropped, so
+/// prose naming a shape is not read as code using it.
+fn compiled_text(source: &str) -> Option<String> {
+    if source
+        .lines()
+        .any(|line| line.trim_start().starts_with("#![") && is_test_only_cfg(line))
+    {
+        return None;
+    }
+    let indentation = |line: &str| line.len() - line.trim_start().len();
+    let mut lines = source.lines();
+    let mut compiled = String::new();
+    while let Some(line) = lines.next() {
+        if is_test_only_cfg(line) {
+            let item = lines
+                .by_ref()
+                .find(|item| !item.trim_start().starts_with("#["));
+            if item.is_some_and(|item| !item.trim_end().ends_with([';', '}'])) {
+                // Advances past the line closing the item.
+                lines.by_ref().any(|closing| {
+                    indentation(closing) == indentation(line)
+                        && closing.trim_start().starts_with(['}', ')', ']'])
+                });
+            }
+        } else if !line.trim_start().starts_with("//") {
+            compiled.push_str(line);
+            compiled.push('\n');
         }
     }
+    Some(compiled)
+}
+
+/// `item` with its leading visibility removed.
+fn without_visibility(item: &str) -> &str {
+    let item = item.trim_start();
+    match item.strip_prefix("pub") {
+        Some(rest) if rest.starts_with('(') => rest.split_once(") ").map_or(item, |(_, rest)| rest),
+        Some(rest) if rest.starts_with(' ') => rest.trim_start(),
+        _ => item,
+    }
+}
+
+/// The module an out-of-line `mod name;` declaration on `line` names.
+fn declared_module(line: &str) -> Option<&str> {
+    without_visibility(line)
+        .strip_prefix("mod ")?
+        .trim_end()
+        .strip_suffix(';')
+}
+
+/// `file` and every module file it declares, each with its [`compiled_text`];
+/// a module a non-test build leaves out contributes nothing.
+fn compiled_modules(file: &Path) -> Vec<(PathBuf, String)> {
+    let Some(text) = compiled_text(&std::fs::read_to_string(file).unwrap()) else {
+        return Vec::new();
+    };
+    let directory = match file.file_name().and_then(|name| name.to_str()) {
+        Some("lib.rs" | "main.rs" | "mod.rs") => file.parent().unwrap().to_path_buf(),
+        _ => file.with_extension(""),
+    };
+    let children = text
+        .lines()
+        .filter_map(declared_module)
+        .flat_map(|name| {
+            let child = [
+                directory.join(format!("{name}.rs")),
+                directory.join(name).join("mod.rs"),
+            ]
+            .into_iter()
+            .find(|candidate| candidate.is_file())
+            .unwrap_or_else(|| {
+                panic!(
+                    "module `{name}` in {} resolves to no file, so this walk would miss what \
+                     it compiles",
+                    file.display()
+                )
+            });
+            compiled_modules(&child)
+        })
+        .collect::<Vec<_>>();
+    std::iter::once((file.to_path_buf(), text))
+        .chain(children)
+        .collect()
+}
+
+/// Every source file a non-test build of a workspace member compiles, once
+/// each, keyed by its workspace-relative path.
+fn workspace_compiled_sources() -> Vec<(PathBuf, String)> {
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let manifest = std::fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
+    let manifest = toml::from_str::<toml::Value>(&manifest).unwrap();
+    manifest["workspace"]["members"]
+        .as_array()
+        .expect("the workspace manifest lists its members")
+        .iter()
+        .flat_map(|member| {
+            let source = workspace.join(member.as_str().unwrap()).join("src");
+            ["lib.rs", "main.rs"]
+                .into_iter()
+                .map(move |root| source.join(root))
+        })
+        .filter(|root| root.is_file())
+        .flat_map(|root| compiled_modules(&root))
+        .map(|(path, text)| (path.strip_prefix(&workspace).unwrap().to_path_buf(), text))
+        .collect::<BTreeMap<_, _>>()
+        .into_iter()
+        .collect()
+}
+
+/// Naming one of these reaches the repository's roots: the canonical identity
+/// of a repository path, the capabilities a session opens over the roots, or a
+/// root accessor and the paths joined onto a root.
+const REPOSITORY_ROOT_ADDRESSES: [&str; 9] = [
+    "VirtualPath",
+    "RepositoryRootClass",
+    "RepositoryAction",
+    "CapabilityRoots",
+    "data_root()",
+    "worktree_root()",
+    ".root()",
+    "data_root.join(",
+    "worktree_root.join(",
+];
+
+/// Calls that create, replace, rename, truncate, or remove a filesystem entry,
+/// by path or through an open directory handle.
+const FILESYSTEM_MUTATIONS: [&str; 26] = [
+    "fs::write(",
+    "fs::rename(",
+    "fs::create_dir",
+    "fs::remove_",
+    "fs::copy(",
+    "fs::hard_link(",
+    "fs::set_permissions(",
+    "File::create(",
+    ".write(true)",
+    ".append(true)",
+    ".create(true)",
+    ".create_new(true)",
+    ".create_dir(",
+    ".create_dir_all(",
+    ".remove_file(",
+    ".remove_dir(",
+    ".remove_dir_all(",
+    ".rename(",
+    ".set_len(",
+    ".set_permissions(",
+    ".persist(",
+    "renameat",
+    "rename_noreplace_cap(",
+    "write_file_atomic",
+    "write_file_synced",
+    "create_file_synced",
+];
+
+/// The publishers allowed to write repository state, each found by the
+/// definition it owns, with the reason it may.
+const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
+    (
+        "pub struct RedoRecord {",
+        "the record is a mutation's commit point, written and synced in the data root's \
+         scratch directory before any live file changes",
+    ),
+    (
+        "pub struct RedoApplier {",
+        "applying the record is how a committed mutation, or one a crash left, reaches the \
+         roots",
+    ),
+    (
+        "fn publish_staged_data_root(",
+        "an absent data root cannot be created through the record, whose home is a scratch \
+         directory inside that root; it is staged beside it and published by a no-replace \
+         rename instead",
+    ),
+];
+
+/// Each function's text, from its signature line to the next signature.
+fn function_bodies(source: &str) -> Vec<&str> {
+    let starts = std::iter::once(0)
+        .chain(source.match_indices('\n').map(|(index, _)| index + 1))
+        .filter(|start| {
+            let line = source[*start..].lines().next().unwrap_or_default();
+            ["const ", "async ", "unsafe "]
+                .into_iter()
+                .fold(without_visibility(line), |item, qualifier| {
+                    item.strip_prefix(qualifier).unwrap_or(item)
+                })
+                .starts_with("fn ")
+        })
+        .collect::<Vec<_>>();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(index, start)| {
+            &source[*start..starts.get(index + 1).copied().unwrap_or(source.len())]
+        })
+        .collect()
+}
+
+/// The sources holding a function that both reaches the repository's roots and
+/// mutates the filesystem.
+fn repository_state_writers<'a>(
+    sources: impl IntoIterator<Item = (&'a Path, &'a str)>,
+) -> BTreeSet<PathBuf> {
+    sources
+        .into_iter()
+        .filter(|(_, source)| {
+            function_bodies(source).into_iter().any(|function| {
+                REPOSITORY_ROOT_ADDRESSES
+                    .iter()
+                    .any(|address| function.contains(address))
+                    && FILESYSTEM_MUTATIONS
+                        .iter()
+                        .any(|mutation| function.contains(mutation))
+            })
+        })
+        .map(|(path, _)| path.to_path_buf())
+        .collect()
+}
+
+/// The source owning each [`REPOSITORY_STATE_PUBLISHERS`] definition.
+fn repository_state_publishers(
+    sources: &[(PathBuf, String)],
+) -> Result<BTreeMap<PathBuf, &'static str>, String> {
+    REPOSITORY_STATE_PUBLISHERS
+        .iter()
+        .map(|(definition, reason)| {
+            let owners = sources
+                .iter()
+                .filter(|(_, source)| source.contains(definition))
+                .map(|(path, _)| path.clone())
+                .collect::<Vec<_>>();
+            match owners.as_slice() {
+                [owner] => Ok((owner.clone(), *reason)),
+                _ => Err(format!(
+                    "`{definition}` is defined in {owners:?} rather than in exactly one source"
+                )),
+            }
+        })
+        .collect()
+}
+
+fn assert_only_named_publishers_write_repository_state(
+    writers: &BTreeSet<PathBuf>,
+    publishers: &BTreeMap<PathBuf, &str>,
+) -> Result<(), String> {
+    let unseen = publishers
+        .iter()
+        .filter(|(publisher, _)| !writers.contains(*publisher))
+        .collect::<Vec<_>>();
+    if !unseen.is_empty() {
+        return Err(format!(
+            "the scan no longer sees these publishers write repository state: {unseen:?}; \
+             the absence of any other writer establishes nothing until it does"
+        ));
+    }
+    let direct = writers
+        .iter()
+        .filter(|writer| !publishers.contains_key(*writer))
+        .collect::<Vec<_>>();
+    direct.is_empty().then_some(()).ok_or_else(|| {
+        format!(
+            "repository state written directly in {direct:?}; a mutation reaches the \
+             repository's roots only through its session's redo record (`@/charter/D-17`)"
+        )
+    })
+}
+
+/// Repository state reaches the filesystem through the redo record, and through
+/// the absent-root publisher only where the record cannot exist yet.
+///
+/// Repository state is what `docs/reference/storage-format.md` versions: the
+/// data root's contents and the worktree files a mutation publishes. The
+/// machine-local files it names, the `.git/jit/` control plane, user
+/// configuration, and exports to a caller-chosen path are not, and their
+/// writers address those targets by their own paths rather than by the
+/// repository's roots. A direct writer is therefore a function naming a root or
+/// a repository path's canonical identity beside a filesystem mutation, in any
+/// module a non-test build of the workspace compiles. `std::fs` is public to
+/// every crate, so no visibility rule can close this; a root handed to a helper
+/// as a bare path or handle is beyond what a per-function text scan sees.
+#[test]
+fn test_repository_state_is_written_only_by_the_redo_record_and_the_absent_root_publisher() {
+    let sources = workspace_compiled_sources();
+    let publishers =
+        repository_state_publishers(&sources).unwrap_or_else(|error| panic!("{error}"));
+    let writers = repository_state_writers(
+        sources
+            .iter()
+            .map(|(path, source)| (path.as_path(), source.as_str())),
+    );
+    assert_only_named_publishers_write_repository_state(&writers, &publishers)
+        .unwrap_or_else(|error| panic!("{error}"));
+}
+
+/// Red-first proof for the writer scan: a direct writer is flagged whether it
+/// reaches a root by path or by capability, and neither an export, a test-only
+/// item, nor a comment is.
+#[test]
+fn test_repository_state_writer_scan_flags_direct_writers_and_skips_what_no_build_publishes() {
+    for (fragment, is_writer) in [
+        (
+            "pub fn save_config(&self, text: &str) -> Result<()> {\n    \
+             std::fs::write(self.storage.root().join(\"config.toml\"), text)\n}\n",
+            true,
+        ),
+        (
+            "fn drop_issue(roots: &CapabilityRoots, path: &VirtualPath) {\n    \
+             roots.data().remove_file(path.relative()).unwrap();\n}\n",
+            true,
+        ),
+        (
+            "fn export(base: &Path, bytes: &[u8]) {\n    std::fs::write(base.join(\"issues\"), bytes).unwrap();\n}\n\
+             fn source(layout: &RepositoryLayout) -> PathBuf {\n    layout.data_root().to_path_buf()\n}\n",
+            false,
+        ),
+        (
+            "fn read() {}\n\n#[cfg(all(test, unix))]\nmod tests {\n    fn seed(layout: &RepositoryLayout) {\n        \
+             std::fs::write(layout.data_root().join(\"x\"), b\"\").unwrap();\n    }\n}\n",
+            false,
+        ),
+        (
+            "fn read(layout: &RepositoryLayout) {\n    \
+             // std::fs::write(layout.data_root().join(\"x\"), b\"\")\n}\n",
+            false,
+        ),
+    ] {
+        let compiled = compiled_text(fragment).unwrap();
+        let path = Path::new("commands/fragment.rs");
+        assert_eq!(
+            repository_state_writers([(path, compiled.as_str())]).contains(path),
+            is_writer,
+            "{fragment}"
+        );
+    }
+    assert_eq!(
+        compiled_text("#![cfg(any(test, feature = \"test-support\"))]\nfn seed() {}\n"),
+        None
+    );
+
+    let record = PathBuf::from("storage/record.rs");
+    let publishers = BTreeMap::from([(record.clone(), "the record")]);
+    let command = PathBuf::from("commands/fragment.rs");
+    let direct = assert_only_named_publishers_write_repository_state(
+        &BTreeSet::from([record, command]),
+        &publishers,
+    )
+    .unwrap_err();
+    assert!(
+        direct.contains("repository state written directly in [\"commands/fragment.rs\"]"),
+        "{direct}"
+    );
+    let blind = assert_only_named_publishers_write_repository_state(&BTreeSet::new(), &publishers)
+        .unwrap_err();
+    assert!(blind.contains("no longer sees"), "{blind}");
 }
 
 #[test]
@@ -1107,9 +1419,9 @@ fn test_profile_package_reads_build_no_follow_options_in_one_place() {
 ///
 /// This is what makes "a refused or interrupted add leaves no partially
 /// extracted package" true by construction rather than by cleanup: extraction
-/// produces a value, and the only thing that reaches the filesystem is the
-/// recoverable transaction the command layer publishes the finished tree
-/// through. A module that opened a staging directory would have to unwind it on
+/// produces a value, and the finished tree reaches the filesystem only through
+/// the redo record a mutation session commits once the whole tree exists. A
+/// module that opened a staging directory would have to unwind it on
 /// every refusal path, and the one path that forgot would be the one that
 /// leaked. It is also what makes the read local: no network client, no
 /// subprocess, and no environment lookup can be reached from a module that
@@ -1156,7 +1468,8 @@ fn test_package_archive_read_reaches_no_filesystem_network_or_process() {
 /// Capturing a tree from the repository files a manifest declares and adding
 /// one from a portable archive differ in where the bytes came from, not in how
 /// they land: both derive one plan against one captured image and publish it
-/// through the shared recoverable transaction. A second publication route is
+/// through one mutation session, whose redo record is the commit point either
+/// route reaches. A second publication route is
 /// where the no-replace guarantee, the whole-tree delta, or the retry on a
 /// concurrent change goes missing for one of them
 /// (`@/inv/convention-convergence`).
