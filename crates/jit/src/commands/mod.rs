@@ -221,7 +221,7 @@ pub fn with_dispatch_mutation_annotation<T>(
 //   caller may open and release a preflight session, take a claims guard, and
 //   run an external subprocess between attempts without inverting lock ordering.
 // * [`with_mutation_session`] — the session-passed convenience for pure
-//   single-session sites: it opens one fresh recovered session per attempt and
+//   single-session sites: it opens one fresh mutation session per attempt and
 //   applies the plan the closure returns through [`classify_apply`].
 
 /// Maximum capture/apply attempts before a mutation session is reported
@@ -410,7 +410,7 @@ pub enum SessionStep<T> {
     Retry,
 }
 
-/// Retry driver for the pure single-session sites: open one fresh recovered
+/// Retry driver for the pure single-session sites: open one fresh mutation
 /// session per attempt, hand it to `attempt`, and apply the returned plan
 /// through [`classify_apply`].
 ///
@@ -2061,7 +2061,7 @@ pub struct CommandExecutor<S: IssueStore> {
     /// `open_mutation_session` for exactly this layout. The layout always arrives
     /// from the construction boundary and is never inferred from the storage
     /// parent (the layout authority forbids that). Deepening this seam to a fully
-    /// retained recovered session — reentrant only for this same canonical layout
+    /// retained mutation session — reentrant only for this same canonical layout
     /// (`@/inv` layout coherence) — changes what the executor holds internally, not
     /// these call sites. `None` only when no layout was supplied; a session-opening
     /// command then reports a wiring error rather than proceeding.
@@ -4476,10 +4476,7 @@ mod mutation_session_contract_tests {
         })
         .unwrap();
         assert_eq!(value, 3);
-        assert_eq!(
-            attempts, 3,
-            "each attempt opens one fresh recovered session"
-        );
+        assert_eq!(attempts, 3, "each attempt opens one fresh mutation session");
     }
 
     #[test]

@@ -69,7 +69,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             all_messages.append(&mut messages);
 
             // Repair derived state (default rules/schemas + configured projections)
-            // through the recovered session's transactional repair delta.
+            // through one repair delta in one redo record.
             let (repair_fixes, mut messages) = self.repair_derived_state(dry_run)?;
             total_fixes += repair_fixes;
             all_messages.append(&mut messages);
@@ -99,7 +99,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
     /// Validate the exact repository through the closed-image pipeline.
     ///
-    /// Every backend captures a bounded whole-repository image through the recovered
+    /// Every backend captures a bounded whole-repository image through a
     /// mutation session and validates it with
     /// [`validate_repository`](crate::validation::repository::validate_repository),
     /// so every pass reads only image-projected content and no ambient filesystem or
@@ -126,7 +126,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         Ok(())
     }
 
-    /// Capture the bounded whole-repository validation image through the recovered
+    /// Capture the bounded whole-repository validation image through a mutation
     /// session, in the one round
     /// [`capture_proposed_base_inner`](Self::capture_proposed_base_inner) reads.
     fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
@@ -553,7 +553,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// Repair derived state (default rules/schemas plus every configured
-    /// projection) through the recovered session (`jit validate --fix`).
+    /// projection) through one mutation session (`jit validate --fix`).
     ///
     /// The complete owned-materialization set is derived from declared authority
     /// over one captured image (`MaterializationRequest::RepairDerivedState`) and

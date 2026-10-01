@@ -159,7 +159,7 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
 }
 
 /// Publish the repository-side issue assignment and claim event through one
-/// recovered mutation session.
+/// mutation session.
 ///
 /// Invoked under the held coordinator lock, so the guard order is coordinator ->
 /// bootstrap -> repository -> events. The transition is derived from the captured
@@ -196,7 +196,7 @@ where
         )?)
     };
     // Operation-scoped: a capture/apply retry must keep claim audit identity and
-    // transition time stable while opening a fresh recovered session.
+    // transition time stable while opening a fresh mutation session.
     let context = super::production_mutation_context();
     with_mutation_session(
         storage,

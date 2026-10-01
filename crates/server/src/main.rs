@@ -78,7 +78,7 @@ async fn main() -> Result<()> {
     let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout));
     if recovery_session.recovery_report().recovered_count() > 0 {
         info!(
-            "Recovered {} pending transaction(s) before server startup",
+            "Applied {} leftover redo record(s) before server startup",
             recovery_session.recovery_report().recovered_count()
         );
     }

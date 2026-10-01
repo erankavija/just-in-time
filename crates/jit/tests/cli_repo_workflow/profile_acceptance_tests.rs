@@ -797,7 +797,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     assert!(commands["apply"]["description"]
         .as_str()
         .unwrap()
-        .contains("recoverable multi-target transaction"));
+        .contains("multi-target redo record"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
         expected_keys(&[

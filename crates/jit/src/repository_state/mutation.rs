@@ -8,7 +8,7 @@
 //! a no-op mutation samples neither identity nor time. The
 //! finalizer serializes every repository-owned record (issue upserts/deletes,
 //! `index.json` membership, gate-run/audit artifacts, and events) into one exact
-//! [`RepositoryDelta`] published through the recovered store, preserving
+//! [`RepositoryDelta`] published through one redo record, preserving
 //! `@/inv/event-log` and `@/inv/atomic-writes`.
 //!
 //! This module performs no filesystem I/O and imports only `domain` value types

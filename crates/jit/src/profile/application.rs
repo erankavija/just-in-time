@@ -13,7 +13,7 @@ pub enum ProfileApplicationStatus {
     Unchanged,
     /// A rehearsal found a publication it would make.
     WouldApply,
-    /// A recoverable transaction reached its durable commit point.
+    /// A redo record reached its durable commit point.
     Applied,
 }
 
