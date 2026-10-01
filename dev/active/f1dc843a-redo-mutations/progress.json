@@ -1558,9 +1558,17 @@
         "suite_clock_budget_ms": 30000
       },
       "note": "Observation carried alongside the waves, not a second measurement project. Known live risk: a worker's FIRST gate run in a freshly seeded worktree measured suite-clock 43.0/43.3 s and failed the budget; the same targets passed once settled (LD-7 signature, worse than the 31.8 s previously recorded)."
+    },
+    {
+      "id": "POL-05",
+      "decided_by": "user",
+      "wave": 16,
+      "policy": "Watch disk space: compilation artifacts must not fill the disk, while task throughput stays high.",
+      "actions_session_7": "Before wave 16 dispatch the disk was 93% used (64 GB free). The cache pool held 81 GB, 71 GB of it stale rustc incremental sessions merged from several worktrees and hardlinked into every new worktree. Removed the pool incremental dir and the four fresh worktrees incremental dirs (rustc rebuilds only the jit crate itself incrementally; dependency artifacts in deps/ stay warm), plus Aug-12 leftovers target/b883f916-*, target/jit-metadata-stability-*, target/flycheck0. Result 145 GB free (84%).",
+      "practice": "Dispatch prompts forbid extra target dirs and --release builds. After each reclaim, delete .agents/cache-pool/target/debug/incremental (harvest merges stale sessions newest-wins). Check df before each dispatch; act below 80 GB free."
     }
   ],
-  "session": 6,
+  "session": 7,
   "rework_counter_resets": [
     {
       "issue": "35544121",
@@ -1945,5 +1953,16 @@
     ],
     "notable": "Transaction kernel retired (b0ee2dd6, net -4367 lines). Record vocabulary gained make-directory (OD-7 amended). jit recover reports a failed leftover record as recovery_failed (ESC-13). ccea63de carries owner decision @/issue/ccea63de/decision/D-1.",
     "epic_counts_at_close": "34 done, 4 ready (wave 16), 12 backlog including the epic"
+  },
+  "wave_16_dispatch": {
+    "dispatched_at": "2026-10-01T12:15+03:00",
+    "anchor": "1de043049",
+    "models": {
+      "b4483ad6": "opus",
+      "c88822a5": "opus",
+      "3d9150d7": "opus",
+      "51eb1aa6": "sonnet"
+    },
+    "sequencing_decision": "b4483ad6 and c88822a5 overlap in repository_state/mutation.rs and repository_state_store.rs: c88822a5 length-and-tail log capture presumes the composer prefix copy b4483ad6 deletes. Dispatched concurrently; b4483ad6 told to make the composer need only captured length and bytes after the last newline; c88822a5 told to deliver the phase collapse first and to merge main after b4483ad6 lands before switching the log capture (WAITING-FOR-b4483ad6 protocol)."
   }
 }
