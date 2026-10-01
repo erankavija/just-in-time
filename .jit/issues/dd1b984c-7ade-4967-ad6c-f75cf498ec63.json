@@ -1,0 +1,70 @@
+{
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T20:17:38.765021666Z",
+  "context": {},
+  "created_at": "2026-10-01T20:17:25.607497680Z",
+  "dependencies": [],
+  "description": "Taking the repository write lock or recording the worktree identity never creates an absent data root; initialization is the one path that does.\n\n## Background\n\nEpic REQ-05 allows exactly one publication path beside the redo record: `jit init`, which creates an absent data root from a synced stage directory and a no-replace rename. Two other writers can create `.jit/` when it is absent. `repo_lock::acquire` creates the lock file's parent directory, and `worktree_identity` runs `create_dir_all` on the local `.jit` (`storage/worktree_identity.rs` ~:197). The publication source guard classifies both as lock and identity writes, so it does not see them as root creation. A command that runs either one against a repository with no data root leaves an empty `.jit/` that no publisher produced.\n\n## Success Criteria\n\n- [hard] REQ-01: Acquiring the repository write lock or the worktree bootstrap lock against an absent data root creates no data root and fails or proceeds without one, typed, on both storage backends where the backend has the concept.\n- [hard] REQ-02: Recording or reading the worktree identity against an absent data root creates no data root.\n- [hard] REQ-03: Initialization still creates an absent data root through its publisher, and every command that legitimately runs before initialization keeps working.\n- [hard] REQ-04: The publication source guard fails when production code creates the data root outside the initialization publisher.\n",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa1f1ff8c2a7d664e15e85b908a0b07dcf18ed7874f7ea1149b109e6ab4e0624",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-10-01T20:17:25.607497680Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
+  "labels": [
+    "epic:redo-mutations",
+    "milestone:v1.0",
+    "component:storage",
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-05",
+    "type:task"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Lock and identity writes never create an absent data root",
+  "updated_at": "2026-10-01T20:17:38.765021666Z"
+}

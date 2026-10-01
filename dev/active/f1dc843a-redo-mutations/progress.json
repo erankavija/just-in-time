@@ -985,6 +985,12 @@
       "id": "adb5e9df",
       "session": 8,
       "note": "Not an epic child: parented under milestone 9db27a3a at owner request; driven alongside. Excluded from ER-01."
+    },
+    {
+      "id": "dd1b984c",
+      "session": 8,
+      "reason": "Pre-epic-gate pitfall reconciliation: SP-28 subject is named by epic REQ-05 (no second publication path).",
+      "policy": "POL-01 not applicable (changes shipped behaviour); created as epic remediation under the reconciliation rule"
     }
   ],
   "escalations": [
@@ -1919,7 +1925,8 @@
         "REQ-03",
         "REQ-05"
       ],
-      "closure": "VERIFIED CLOSED at HEAD: discovery.rs keys on RECORD_SCRATCH_DIR/RECORD_FILE_NAME (b0ee2dd6 REQ-05)."
+      "closure": "VERIFIED CLOSED at HEAD: discovery.rs keys on RECORD_SCRATCH_DIR/RECORD_FILE_NAME (b0ee2dd6 REQ-05).",
+      "status": "closed — storage/discovery.rs:86 recognizes a pending redo record (verified session 8)"
     },
     {
       "id": "SP-17",
@@ -1983,7 +1990,7 @@
       "subject": "docs/reference/storage-format.md's legacy UUID `.lock` sidecar sweep paragraph predates this epic and was not verified against current code by the worker that rewrote the page around it.",
       "criterion_subjects": "none in this epic",
       "raised_by": "worker-ccea63de, reported rather than touched — correct, since verifying it is outside the issue's five criteria.",
-      "status": "open — no owner; surfaces in the completion report",
+      "status": "closed — verified session 8 against storage/lock.rs remove_orphaned_issue_read_sidecars and json.rs:1318",
       "renumbered_from": "SP-14 (collided with an earlier session's SP-14)"
     },
     {
@@ -2029,7 +2036,7 @@
       "source": "3d9150d7 rework-2 worker report",
       "subject": "repo_lock::acquire (lock parent) and worktree_identity (create_dir_all(.jit)) can create the data root .jit/ when absent — a second absent-root creation path beside the init root publisher named by 3d9150d7 REQ-02. The guard classifies them as lock/identity writes.",
       "owner": "lead to assess at 3d9150d7 review against REQ-01/REQ-02; candidate POL-01 task",
-      "status": "open"
+      "status": "assigned — dd1b984c (epic REQ-05 names it)"
     },
     {
       "id": "SP-29",

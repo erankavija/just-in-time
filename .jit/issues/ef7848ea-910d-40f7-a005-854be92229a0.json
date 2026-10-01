@@ -3,7 +3,8 @@
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
-    "8b6a9e34-60c7-45f5-b506-de20afbb98ce"
+    "8b6a9e34-60c7-45f5-b506-de20afbb98ce",
+    "dd1b984c-7ade-4967-ad6c-f75cf498ec63"
   ],
   "description": "A committed artifact shows that a mutation's wall time is bounded by what it changes, and the repository's testing guide cites evidence that exists.\n\n## Background\n\nThe point of the mechanism change is a cost that stops scaling with project history. Two terms carried that scaling, and both are gone by the time this phase runs: the event log rewritten whole on every mutation, and the repository re-read and re-hashed across six capture rounds.\n\nProtection is evidence, not a timing assertion. A wall-clock assertion would be the workspace's first throughput assertion, and the project's position is that elapsed time is the wrong thing to decide a test on. The evidence is a harness run over two builds, including a fixture whose event log is ten times larger with the issue set unchanged, so the log term is isolated from the issue-count term. The guide that cites publication-cost evidence is pinned today to an artifact produced by a harness built around the journal, so it moves to the new artifact in the same phase.\n\nThe phase edits the contributor material under `dev/` and `scripts/` and no page of the adopter surface, so the mechanical documentation gate, whose footprint is `docs/`, has nothing to check here.\n\n## Success Criteria\n\n- [hard] REQ-01: Every quantitative claim in the committed artifact traces to the committed harness, which reproduces it from the stated inputs.\n- [hard] REQ-02: The repository's testing guide and benchmark contracts cite only evidence artifacts that exist, produced by harnesses that ship.\n- [hard] REQ-03: The suite holds no wall-clock throughput assertion, and no test is held out of the default run to keep one quiet.\n- [hard] REQ-04: The epic's cumulative Rust line balance from its base revision removes more lines than it adds, recorded in the artifact.\n",
   "documents": [],
@@ -25,5 +26,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T20:17:38.519227972Z"
 }
