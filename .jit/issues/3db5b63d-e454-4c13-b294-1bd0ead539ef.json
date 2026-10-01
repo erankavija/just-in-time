@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-11T19:10:53.669429501Z",
   "context": {},
   "created_at": "2026-08-11T18:51:58.491886834Z",
@@ -32,10 +32,10 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:testing",
-    "satisfies:REQ-04"
+    "satisfies:4b7c06d0/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Pin and configure the nextest foundation",
-  "updated_at": "2026-08-11T20:50:12.949938814Z"
+  "updated_at": "2026-10-01T19:29:18.264960157Z"
 }

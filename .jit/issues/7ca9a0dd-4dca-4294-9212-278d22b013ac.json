@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-16T14:02:53.483606629Z",
   "context": {},
   "created_at": "2026-08-14T06:15:34.269849091Z",
@@ -32,11 +32,11 @@
     "epic:gf2-adopter-reliability",
     "component:gates",
     "component:testing",
-    "satisfies:REQ-03",
-    "satisfies:REQ-06"
+    "satisfies:4a559332/REQ-03",
+    "satisfies:4a559332/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Regression coverage for gate evaluation durability",
-  "updated_at": "2026-08-16T14:41:48.622811678Z"
+  "updated_at": "2026-10-01T19:31:03.562197185Z"
 }

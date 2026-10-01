@@ -30,7 +30,7 @@ names, gate keys, and checkers your project declares.
 - **@/rule/namespace-unique-team** — At most one `team:` label per issue: `team` is a unique namespace. Blocks the write and fails validation. (error, enforced)
 - **@/rule/namespace-unique-type** — At most one `type:` label per issue: `type` is a unique namespace. Blocks the write and fails validation. (error, enforced)
 - **@/rule/namespace-unique-brackets** — At most one `brackets:` label per issue: `brackets` is a unique namespace. Blocks the write and fails validation. (error, enforced)
-- **@/rule/coverage-preview** — On a matching breakdown node, apply the bracketed container's plan-time coverage preview with this issue as the sole firing subject; every [hard] REQ-id must be credited by a satisfies:<id> descendant. (error, enforced)
+- **@/rule/coverage-preview** — On a matching breakdown node, apply the bracketed container's plan-time coverage preview with this issue as the sole firing subject; every [hard] REQ-id must be credited by a satisfies:<container-short-id>/<id> descendant. (error, enforced)
 
 ## Gates
 

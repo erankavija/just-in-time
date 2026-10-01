@@ -45,11 +45,10 @@
     "type:story",
     "epic:addressing-v2",
     "milestone:v1.0",
-    "satisfies:REQ-08",
     "story:uniform-readdressing-migration"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Uniform re-addressing of all kinds with repo data and doc migration",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-10-01T19:31:08.447704854Z"
 }

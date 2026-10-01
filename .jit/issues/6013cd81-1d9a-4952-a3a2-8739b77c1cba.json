@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-03T06:29:56.232808414Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
@@ -27,13 +27,13 @@
     "milestone:v1.0",
     "component:core",
     "story:default-vocabulary",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-16",
     "per:@/issue/e204e63d/decision/D-14",
-    "type:task"
+    "type:task",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Carry the default package in the release archive too",
-  "updated_at": "2026-08-03T06:46:20.985276319Z"
+  "updated_at": "2026-10-01T19:30:09.201294515Z"
 }

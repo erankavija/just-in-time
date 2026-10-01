@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-29T14:10:58.051450262Z",
   "context": {},
   "created_at": "2026-07-26T19:30:08.501698654Z",
@@ -30,10 +30,10 @@
     "component:tooling",
     "type:bug",
     "epic:v1-release",
-    "satisfies:REQ-11"
+    "satisfies:b80e3c70/REQ-11"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Mechanical documentation checker defaults to the archival permanent paths",
-  "updated_at": "2026-07-29T19:14:22.522294903Z"
+  "updated_at": "2026-10-01T19:33:21.898464529Z"
 }

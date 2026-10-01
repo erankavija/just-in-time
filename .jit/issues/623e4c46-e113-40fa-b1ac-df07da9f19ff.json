@@ -32,11 +32,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:development-root-cleanup",
-    "satisfies:REQ-09",
-    "per:@/issue/8e071e18/decision/D-8"
+    "per:@/issue/8e071e18/decision/D-8",
+    "satisfies:8e071e18/REQ-09"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Resolve the adopter guides' citations of relocated artifacts",
-  "updated_at": "2026-07-27T10:45:35.811340417Z"
+  "updated_at": "2026-10-01T19:30:13.620836186Z"
 }

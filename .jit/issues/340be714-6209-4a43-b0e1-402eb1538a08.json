@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-11T21:23:04.267890233Z",
   "context": {},
   "created_at": "2026-08-11T18:51:58.491886834Z",
@@ -32,10 +32,10 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:core",
-    "satisfies:REQ-04"
+    "satisfies:4b7c06d0/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Add journal barrier crash coverage",
-  "updated_at": "2026-08-11T23:55:43.436425981Z"
+  "updated_at": "2026-10-01T19:29:01.927253895Z"
 }

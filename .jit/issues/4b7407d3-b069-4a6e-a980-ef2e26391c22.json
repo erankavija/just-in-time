@@ -1,13 +1,15 @@
 {
-  "id": "4b7407d3-b069-4a6e-a980-ef2e26391c22",
-  "title": "Positional issue title and type flag",
-  "description": "Make the natural first guess for creating and typing an issue work: a positional title and a long-only type flag.\n\n## Background\n\n`issue create` currently accepts only `--title` (cli.rs:436-438), so `jit issue create \"Title\"` with the title positional fails. There is no `--type` flag, and `-t` is already bound to `--title`, so a type flag must be long-only. Type validity already flows through the config `[type_hierarchy]` (config.toml:24) and the baked schema (validation/defaults.rs:192), so no type list belongs in the CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: jit issue create \"Title\" succeeds with the title taken positionally, and the --title flag form remains accepted.\n- [hard] REQ-02: issue create and issue update accept --type <kind>, write a type:<kind> label, and reject a kind not declared in config through the existing validation layer.\n\n## Notes\n\nTouch cli.rs and the create/update handlers; `--type` writes a `type:<kind>` label validated through the existing validation layer (config.toml:24, validation/defaults.rs:192). Update doc-comments in the same change.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:29:37.515978728Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:32.972916570Z",
   "dependencies": [
     "527bf0a6-1b48-4a62-8229-31c3f9308a30"
   ],
+  "description": "Make the natural first guess for creating and typing an issue work: a positional title and a long-only type flag.\n\n## Background\n\n`issue create` currently accepts only `--title` (cli.rs:436-438), so `jit issue create \"Title\"` with the title positional fails. There is no `--type` flag, and `-t` is already bound to `--title`, so a type flag must be long-only. Type validity already flows through the config `[type_hierarchy]` (config.toml:24) and the baked schema (validation/defaults.rs:192), so no type list belongs in the CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: jit issue create \"Title\" succeeds with the title taken positionally, and the --title flag form remains accepted.\n- [hard] REQ-02: issue create and issue update accept --type <kind>, write a type:<kind> label, and reject a kind not declared in config through the existing validation layer.\n\n## Notes\n\nTouch cli.rs and the create/update handlers; `--type` writes a `type:<kind>` label validated through the existing validation layer (config.toml:24, validation/defaults.rs:192). Update doc-comments in the same change.",
+  "documents": [],
+  "done_at": "2026-06-28T02:52:04.923499530Z",
+  "first_ready_at": "2026-06-27T23:43:53.087398111Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,26 +17,25 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T02:46:52.354843833Z"
+      "updated_at": "2026-06-28T02:46:52.354843833Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T02:50:16.252746729Z"
+      "updated_at": "2026-06-28T02:50:16.252746729Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "4b7407d3-b069-4a6e-a980-ef2e26391c22",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02"
+    "satisfies:2e926e39/REQ-01",
+    "satisfies:2e926e39/REQ-02"
   ],
-  "created_at": "2026-06-27T21:43:32.972916570Z",
-  "updated_at": "2026-07-05T19:51:12.963661059Z",
-  "first_ready_at": "2026-06-27T23:43:53.087398111Z",
-  "done_at": "2026-06-28T02:52:04.923499530Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Positional issue title and type flag",
+  "updated_at": "2026-10-01T19:29:38.067731117Z"
 }

@@ -84,18 +84,18 @@
   "labels": [
     "type:task",
     "epic:repository-materialization",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04",
-    "satisfies:REQ-05",
-    "satisfies:REQ-09",
     "component:cli",
     "component:storage",
-    "component:validation"
+    "component:validation",
+    "satisfies:cdc840ad/REQ-01",
+    "satisfies:cdc840ad/REQ-02",
+    "satisfies:cdc840ad/REQ-03",
+    "satisfies:cdc840ad/REQ-04",
+    "satisfies:cdc840ad/REQ-05",
+    "satisfies:cdc840ad/REQ-09"
   ],
   "priority": "high",
   "state": "done",
   "title": "Integrate repository-state cutover",
-  "updated_at": "2026-07-23T09:36:37.631108133Z"
+  "updated_at": "2026-10-01T19:30:19.861529080Z"
 }

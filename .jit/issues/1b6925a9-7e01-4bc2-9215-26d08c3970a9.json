@@ -31,10 +31,10 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:cli",
-    "satisfies:REQ-01"
+    "satisfies:4a559332/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Converge the deletion refusal into the write policy",
-  "updated_at": "2026-08-16T19:49:36.016971060Z"
+  "updated_at": "2026-10-01T19:28:34.569821401Z"
 }

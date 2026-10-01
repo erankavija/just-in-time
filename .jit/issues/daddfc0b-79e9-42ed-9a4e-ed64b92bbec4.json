@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-03T07:17:57.755616025Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
@@ -47,14 +47,14 @@
     "milestone:v1.0",
     "component:core",
     "story:configuration-removal",
-    "satisfies:REQ-01",
     "per:@/issue/e204e63d/decision/D-13",
     "per:@/issue/e204e63d/decision/D-15",
     "enforces:@/invariant/domain-agnostic",
-    "enforces:@/invariant/canonical-cutover"
+    "enforces:@/invariant/canonical-cutover",
+    "satisfies:e204e63d/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Remove the configuration template the binary writes",
-  "updated_at": "2026-08-03T09:30:26.758277846Z"
+  "updated_at": "2026-10-01T19:32:59.452229064Z"
 }

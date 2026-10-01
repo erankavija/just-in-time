@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:sol-scoped-test-profile",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-12T06:58:01.918425207Z",
   "context": {},
   "created_at": "2026-08-12T06:57:45.028588745Z",
@@ -29,11 +29,11 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:testing",
-    "satisfies:REQ-01",
-    "type:task"
+    "type:task",
+    "satisfies:4b7c06d0/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Optimize only the JIT package test profile",
-  "updated_at": "2026-08-12T10:14:42.294564511Z"
+  "updated_at": "2026-10-01T19:33:23.159752121Z"
 }

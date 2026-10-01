@@ -1,13 +1,15 @@
 {
-  "id": "73d98a98-1ab9-4a5b-9022-5e34298ec6d4",
-  "title": "Drop the enforced-but-undeclared drift direction",
-  "description": "Enforcement-drift currently reports two directions; the `enforced-but-undeclared` direction unions rule names and gate keys indiscriminately (drift.rs:352-359) and treats every rule and gate as something an invariant must claim. On the seed registry this produces ~18 findings (11 gate + 7 rule subjects), forcing `jit invariant check` to exit non-zero (has_drift in commands/invariant.rs). The owner decided this nag has no value.\n\nScope: remove the `enforced-but-undeclared` direction entirely from the drift computation (no rule or gate subject reported), leaving `declared-but-unenforced` (an invariants `enforced-by` resolving to nothing) as the SOLE error direction. Update `DriftFinding`/`DriftDirection` (drift.rs:51-127) if the variant is removed, the `commands/invariant.rs` reporting + `has_drift` exit path, and the affected drift unit tests. The seed`s declared-but-unenforced direction is already empty (all four bindings resolve), so check exits 0.\n\n## Success Criteria\n- [hard] REQ-05: Enforcement-drift emits no enforced-but-undeclared finding for any subject (rule or gate), declared-but-unenforced is the only error direction, and `jit invariant check` exits 0 on the seed registry while exiting non-zero when an invariant names an unresolvable `enforced-by`.\n",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-26T21:27:32.665935383Z",
+  "context": {},
+  "created_at": "2026-06-26T20:51:42.211151483Z",
   "dependencies": [
     "10ce6962-8973-4357-b836-da8c0b3a6789"
   ],
+  "description": "Enforcement-drift currently reports two directions; the `enforced-but-undeclared` direction unions rule names and gate keys indiscriminately (drift.rs:352-359) and treats every rule and gate as something an invariant must claim. On the seed registry this produces ~18 findings (11 gate + 7 rule subjects), forcing `jit invariant check` to exit non-zero (has_drift in commands/invariant.rs). The owner decided this nag has no value.\n\nScope: remove the `enforced-but-undeclared` direction entirely from the drift computation (no rule or gate subject reported), leaving `declared-but-unenforced` (an invariants `enforced-by` resolving to nothing) as the SOLE error direction. Update `DriftFinding`/`DriftDirection` (drift.rs:51-127) if the variant is removed, the `commands/invariant.rs` reporting + `has_drift` exit path, and the affected drift unit tests. The seed`s declared-but-unenforced direction is already empty (all four bindings resolve), so check exits 0.\n\n## Success Criteria\n- [hard] REQ-05: Enforcement-drift emits no enforced-but-undeclared finding for any subject (rule or gate), declared-but-unenforced is the only error direction, and `jit invariant check` exits 0 on the seed registry while exiting non-zero when an invariant names an unresolvable `enforced-by`.\n",
+  "documents": [],
+  "done_at": "2026-06-26T22:48:22.694974557Z",
+  "first_ready_at": "2026-06-26T21:19:00.630739528Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,26 +17,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T22:42:32.575207247Z"
+      "updated_at": "2026-06-26T22:42:32.575207247Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T22:45:38.277244917Z"
+      "updated_at": "2026-06-26T22:45:38.277244917Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "73d98a98-1ab9-4a5b-9022-5e34298ec6d4",
   "labels": [
     "type:task",
     "milestone:v1.0",
-    "satisfies:REQ-05",
     "epic:item-sources"
   ],
-  "created_at": "2026-06-26T20:51:42.211151483Z",
-  "updated_at": "2026-07-05T19:51:13.005835879Z",
-  "first_ready_at": "2026-06-26T21:19:00.630739528Z",
-  "claimed_at": "2026-06-26T21:27:32.665935383Z",
-  "done_at": "2026-06-26T22:48:22.694974557Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Drop the enforced-but-undeclared drift direction",
+  "updated_at": "2026-10-01T19:30:49.382539757Z"
 }

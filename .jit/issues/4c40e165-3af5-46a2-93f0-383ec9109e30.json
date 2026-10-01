@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-31T19:31:46.643528094Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
@@ -33,12 +33,12 @@
     "milestone:v1.0",
     "component:core",
     "story:profile-discovery",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-13",
-    "enforces:@/invariant/domain-agnostic"
+    "enforces:@/invariant/domain-agnostic",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Give the contribution vocabulary the tables the scaffold writes",
-  "updated_at": "2026-07-31T23:07:22.032617081Z"
+  "updated_at": "2026-10-01T19:29:40.701305149Z"
 }

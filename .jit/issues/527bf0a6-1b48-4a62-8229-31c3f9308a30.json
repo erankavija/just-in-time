@@ -1,67 +1,68 @@
 {
-  "id": "527bf0a6-1b48-4a62-8229-31c3f9308a30",
-  "title": "CLI command-grammar standard",
-  "description": "A written command-grammar standard for the CLI that every command follows, so the conformance fixes have one canonical form to cite.\n\n## Background\n\nThe CLI grammar is inconsistent and undocumented today. The gate command surface mixes gate configuration, attachment, execution, and inspection in one flat enum (cli.rs:866-1082), and the `-t` short flag means different things on different commands: `-t`=`--title` on `issue create` (cli.rs:437) versus `-t`=`--doc-type` on `doc add` (cli.rs:1179). Without a single named reference there is no canonical form for the rest of the conformance work to conform to.\n\n## Success Criteria\n\n- [hard] REQ-06: A reference document states the command grammar covering positional-versus-flag conventions, id-acceptance semantics across sibling commands, noun/verb structure, and the separation of gate configuration from gate execution and inspection, and it is the named standard the conformance work cites.\n\n## Notes\n\nDocs only, self-contained. The standard must cover positional-vs-flag rules, id-acceptance semantics across sibling commands, noun/verb structure, the gate config-vs-execution/inspection separation, and the `-t` short-flag rule (standardized with `--type` long-only on `issue create`).",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:29:47.763228420Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:32.887687756Z",
   "dependencies": [
     "7f709152-973d-49c9-8848-3845c6782e38"
   ],
+  "description": "A written command-grammar standard for the CLI that every command follows, so the conformance fixes have one canonical form to cite.\n\n## Background\n\nThe CLI grammar is inconsistent and undocumented today. The gate command surface mixes gate configuration, attachment, execution, and inspection in one flat enum (cli.rs:866-1082), and the `-t` short flag means different things on different commands: `-t`=`--title` on `issue create` (cli.rs:437) versus `-t`=`--doc-type` on `doc add` (cli.rs:1179). Without a single named reference there is no canonical form for the rest of the conformance work to conform to.\n\n## Success Criteria\n\n- [hard] REQ-06: A reference document states the command grammar covering positional-versus-flag conventions, id-acceptance semantics across sibling commands, noun/verb structure, and the separation of gate configuration from gate execution and inspection, and it is the named standard the conformance work cites.\n\n## Notes\n\nDocs only, self-contained. The standard must cover positional-vs-flag rules, id-acceptance semantics across sibling commands, noun/verb structure, the gate config-vs-execution/inspection separation, and the `-t` short-flag rule (standardized with `--type` long-only on `issue create`).",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "dd171481a89571e86fad37547102f0ed2e181136335c76a5ce4b47af293dc541",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "5340af10b528f64771c14a4910586fa73b7cdb3ad48b3d6ed855280a065f3b63",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "glossary.md",
+          "resolved_path": "docs/reference/glossary.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "df00dad0b1273dacfb0929976900d8142d85607ba8c4df2d945e1151c0c65fd5",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "CLI Command Grammar Standard",
+      "path": "docs/reference/cli-command-grammar.md"
+    }
+  ],
+  "done_at": "2026-06-27T23:43:52.974000638Z",
+  "first_ready_at": "2026-06-27T21:53:35.747123715Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:03:13.574760211Z"
+      "updated_at": "2026-06-27T23:03:13.574760211Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "docs/reference/cli-command-grammar.md",
-      "commit": null,
-      "label": "CLI Command Grammar Standard",
-      "doc_type": "reference",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "cli-commands.md",
-          "resolved_path": "docs/reference/cli-commands.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "dd171481a89571e86fad37547102f0ed2e181136335c76a5ce4b47af293dc541",
-          "is_shared": false
-        },
-        {
-          "original_path": "glossary.md",
-          "resolved_path": "docs/reference/glossary.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "5340af10b528f64771c14a4910586fa73b7cdb3ad48b3d6ed855280a065f3b63",
-          "is_shared": false
-        },
-        {
-          "original_path": "../concepts/core-model.md",
-          "resolved_path": "docs/concepts/core-model.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "df00dad0b1273dacfb0929976900d8142d85607ba8c4df2d945e1151c0c65fd5",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "527bf0a6-1b48-4a62-8229-31c3f9308a30",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-06"
+    "satisfies:2e926e39/REQ-06"
   ],
-  "created_at": "2026-06-27T21:43:32.887687756Z",
-  "updated_at": "2026-07-05T19:51:12.966536201Z",
-  "first_ready_at": "2026-06-27T21:53:35.747123715Z",
-  "done_at": "2026-06-27T23:43:52.974000638Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "CLI command-grammar standard",
+  "updated_at": "2026-10-01T19:29:48.289865558Z"
 }

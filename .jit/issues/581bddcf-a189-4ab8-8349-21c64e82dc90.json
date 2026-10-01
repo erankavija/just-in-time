@@ -82,11 +82,11 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:testing",
-    "satisfies:REQ-06",
-    "enforces:@/invariant/orthogonal-tests"
+    "enforces:@/invariant/orthogonal-tests",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Consumer-side publication matrix retirement",
-  "updated_at": "2026-09-20T22:17:47.054125667Z"
+  "updated_at": "2026-10-01T19:29:57.747516290Z"
 }

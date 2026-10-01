@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-03T15:15:11.633419078Z",
   "context": {},
   "created_at": "2026-07-01T23:19:51.187363359Z",
@@ -45,11 +45,10 @@
     "type:story",
     "epic:addressing-v2",
     "milestone:v1.0",
-    "satisfies:REQ-09",
     "story:multi-jit-address-form"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Multi-jit address form with project identity and local-only resolution",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-10-01T19:31:47.954856629Z"
 }

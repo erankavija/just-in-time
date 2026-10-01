@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:sol-cli-profile-fixture",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-12T06:53:34.393626177Z",
   "context": {},
   "created_at": "2026-08-12T06:53:15.131539676Z",
@@ -28,12 +28,12 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:testing",
-    "satisfies:REQ-01",
     "type:task",
-    "resolution:candidate-below-hard-performance-bound"
+    "resolution:candidate-below-hard-performance-bound",
+    "satisfies:4b7c06d0/REQ-01"
   ],
   "priority": "high",
   "state": "rejected",
   "title": "Reuse applied profile baselines for CLI prerequisites",
-  "updated_at": "2026-08-12T09:29:24.278699850Z"
+  "updated_at": "2026-10-01T19:32:37.628677358Z"
 }

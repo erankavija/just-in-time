@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:32:54.079367905Z",
   "context": {},
   "created_at": "2026-07-15T11:19:56.076443212Z",
   "dependencies": [
@@ -20,13 +21,13 @@
     "type:task",
     "epic:production-readiness",
     "story:release-orchestration",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
-    "satisfies:REQ-07",
-    "satisfies:REQ-10"
+    "satisfies:8b05a612/REQ-05",
+    "satisfies:8b05a612/REQ-06",
+    "satisfies:8b05a612/REQ-07",
+    "satisfies:8b05a612/REQ-10"
   ],
   "priority": "high",
   "state": "rejected",
   "title": "Implement GHCR publication and recovery workflows",
-  "updated_at": "2026-07-29T13:40:02.926357637Z"
+  "updated_at": "2026-10-01T19:32:54.459250272Z"
 }

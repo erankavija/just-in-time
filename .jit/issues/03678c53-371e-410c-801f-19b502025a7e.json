@@ -38,10 +38,10 @@
     "epic:gf2-adopter-reliability",
     "component:docs",
     "component:mcp",
-    "satisfies:REQ-04"
+    "satisfies:4a559332/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Profile recovery guidance reference",
-  "updated_at": "2026-08-16T19:05:21.500407577Z"
+  "updated_at": "2026-10-01T19:28:05.955861075Z"
 }

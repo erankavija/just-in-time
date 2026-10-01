@@ -1,11 +1,13 @@
 {
-  "id": "d48906de-133e-4676-98cc-0785349f947d",
-  "title": "Correct the storage-format reference layout",
-  "description": "docs/reference/storage-format.md places lease records inside .jit/, but the lease control plane lives in .git/jit/. The directory diagram also omits four first-class registries: rules.toml, templates.toml, invariants.toml, and schemas/.\n\n## Success Criteria\n\n- [hard] REQ-01: The .jit/ diagram contains no lease records and lists rules.toml, templates.toml, invariants.toml, and schemas/ with one-line purposes\n- [hard] REQ-02: The .git/jit/ control plane (claims.index.json, claims.jsonl, heartbeat, locks) is documented in its own subsection\n- [hard] REQ-03: Registry formats are documented in place or cross-linked",
-  "state": "done",
-  "priority": "high",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T23:14:07.761564464Z",
+  "context": {},
+  "created_at": "2026-07-06T15:39:58.880071113Z",
   "dependencies": [],
+  "description": "docs/reference/storage-format.md places lease records inside .jit/, but the lease control plane lives in .git/jit/. The directory diagram also omits four first-class registries: rules.toml, templates.toml, invariants.toml, and schemas/.\n\n## Success Criteria\n\n- [hard] REQ-01: The .jit/ diagram contains no lease records and lists rules.toml, templates.toml, invariants.toml, and schemas/ with one-line purposes\n- [hard] REQ-02: The .git/jit/ control plane (claims.index.json, claims.jsonl, heartbeat, locks) is documented in its own subsection\n- [hard] REQ-03: Registry formats are documented in place or cross-linked",
+  "documents": [],
+  "done_at": "2026-07-10T10:53:55.038576020Z",
+  "first_ready_at": "2026-07-06T15:39:58.880071573Z",
   "gates_required": [
     "jit-validate",
     "code-review",
@@ -14,31 +16,29 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T10:41:48.381461802Z"
+      "updated_at": "2026-07-10T10:41:48.381461802Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T10:47:22.358111112Z"
+      "updated_at": "2026-07-10T10:47:22.358111112Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T00:11:03.271619602Z"
+      "updated_at": "2026-07-10T00:11:03.271619602Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d48906de-133e-4676-98cc-0785349f947d",
   "labels": [
     "type:task",
     "epic:docs-accuracy",
     "component:docs",
-    "satisfies:REQ-01"
+    "satisfies:287c4051/REQ-01"
   ],
-  "created_at": "2026-07-06T15:39:58.880071113Z",
-  "updated_at": "2026-07-10T10:53:55.038577030Z",
-  "first_ready_at": "2026-07-06T15:39:58.880071573Z",
-  "claimed_at": "2026-07-09T23:14:07.761564464Z",
-  "done_at": "2026-07-10T10:53:55.038576020Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Correct the storage-format reference layout",
+  "updated_at": "2026-10-01T19:32:52.685660063Z"
 }

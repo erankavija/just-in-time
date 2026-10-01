@@ -1,13 +1,15 @@
 {
-  "id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
-  "title": "Unified archive preview surface",
-  "description": "Add `jit archive document <path>` and `jit archive container <id>` as non-mutating preview-by-default commands backed by the shared artifact planner. Both run every execution precondition: source availability, explicit complete policy, terminal eligibility, repository-wide ownership, pinned resolution/read semantics, destination conflicts, supported-edge reachability, symlink blockers, dynamic-loading warnings, and action classification. Render the binding schema-version-1 envelope under `--json` and an equivalent human view.\n\n## Success Criteria\n\n- [hard] REQ-01: Preview lists every artifact, action, evidence flag, warning, and blocker while producing no filesystem, issue, or event mutation.\n- [hard] REQ-02: Document and container targets produce the same plan schema through the same planner, and human output conveys the same decisions as JSON.\n- [hard] REQ-03: Missing or partial `[documentation]` policy produces a non-mutating inventory that distinctly reports `unconfigured` or `incomplete`, explains that archival execution is disabled, and never substitutes defaults to claim eligibility.\n- [hard] REQ-04: Fixture tests for Markdown, HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews with deterministic artifact/action/blocker results, and each human rendering represents the same plan as its JSON rendering.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:preview",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-13T18:09:16.615389393Z",
+  "context": {},
+  "created_at": "2026-07-13T00:59:48.565182241Z",
   "dependencies": [
     "0c86d83b-fc85-4696-94a3-65d19d934c9c"
   ],
+  "description": "Add `jit archive document <path>` and `jit archive container <id>` as non-mutating preview-by-default commands backed by the shared artifact planner. Both run every execution precondition: source availability, explicit complete policy, terminal eligibility, repository-wide ownership, pinned resolution/read semantics, destination conflicts, supported-edge reachability, symlink blockers, dynamic-loading warnings, and action classification. Render the binding schema-version-1 envelope under `--json` and an equivalent human view.\n\n## Success Criteria\n\n- [hard] REQ-01: Preview lists every artifact, action, evidence flag, warning, and blocker while producing no filesystem, issue, or event mutation.\n- [hard] REQ-02: Document and container targets produce the same plan schema through the same planner, and human output conveys the same decisions as JSON.\n- [hard] REQ-03: Missing or partial `[documentation]` policy produces a non-mutating inventory that distinctly reports `unconfigured` or `incomplete`, explains that archival execution is disabled, and never substitutes defaults to claim eligibility.\n- [hard] REQ-04: Fixture tests for Markdown, HTML, CSS, CSV, PNG, and SVG roots and bundles produce schema-version-1 previews with deterministic artifact/action/blocker results, and each human rendering represents the same plan as its JSON rendering.",
+  "documents": [],
+  "done_at": "2026-07-13T19:14:54.201359522Z",
+  "first_ready_at": "2026-07-13T00:59:48.565182681Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,37 +17,35 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
+    "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T19:14:46.212089492Z"
+      "updated_at": "2026-07-13T18:55:17.668879556Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T18:59:30.359218016Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T18:55:17.668879556Z"
+      "updated_at": "2026-07-13T18:59:30.359218016Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T19:13:13.342131210Z"
+      "updated_at": "2026-07-13T19:13:13.342131210Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-13T19:14:46.212089492Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "41aa6056-ecec-4924-94a6-a2bb275350ee",
   "labels": [
     "type:task",
     "epic:artifact-archival",
-    "satisfies:REQ-06"
+    "satisfies:7d3a3a47/REQ-06"
   ],
-  "created_at": "2026-07-13T00:59:48.565182241Z",
-  "updated_at": "2026-07-13T19:14:54.201359942Z",
-  "first_ready_at": "2026-07-13T00:59:48.565182681Z",
-  "claimed_at": "2026-07-13T18:09:16.615389393Z",
-  "done_at": "2026-07-13T19:14:54.201359522Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Unified archive preview surface",
+  "updated_at": "2026-10-01T19:29:22.579054896Z"
 }

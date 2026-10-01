@@ -36,11 +36,11 @@
   "labels": [
     "type:task",
     "epic:repository-materialization",
-    "satisfies:REQ-07",
-    "component:validation"
+    "component:validation",
+    "satisfies:cdc840ad/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Author the derived-state-coherence project invariant",
-  "updated_at": "2026-07-23T06:51:38.736260126Z"
+  "updated_at": "2026-10-01T19:33:19.396694653Z"
 }

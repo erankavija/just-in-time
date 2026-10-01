@@ -1,115 +1,115 @@
 {
-  "id": "a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a",
-  "title": "Document the containment and completion model",
-  "description": "State the work-graph's design commitments in user-facing docs: what an edge means, how containment is derived, why containers complete last, and the item address grammar.\n\n## Background\n\nTwo load-bearing properties are currently implicit. First, because a container depends on its contents and blocking follows dependency edges, a container never becomes workable until its whole subtree is terminal — an intended consequence stated nowhere. Second, the addressable-item grammar (project scope `@/<kind>/<self-id>`, issue scope `@/issue/<short-id>/<kind>/<self-id>`, and the `<short-id>/<self-id>` sugar form) is documented only in CLI help text; the reference docs under-specify it.\n\n## Success Criteria\n\n- [hard] REQ-1: A concepts page states the containment model: one edge kind, container-depends-on-contents direction, hierarchy derived from the DAG plus type levels (never stored), membership labels advisory, containers become workable last.\n- [hard] REQ-2: The reference docs specify the full item address grammar, including both scopes, the reserved `issue` segment, and the sugar form with its kind-inference and ambiguity behavior, matching the implementation in `domain/item.rs`.\n- [hard] REQ-3: All added text states current behavior only, with no references to earlier models or transitional narration.\n\n## Notes\n\nFollow the Diátaxis split already used in `docs/`: the model goes under concepts, the grammar under reference. Mermaid for any diagrams.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T14:14:14.367631061Z",
+  "context": {},
+  "created_at": "2026-07-05T22:31:18.727973291Z",
   "dependencies": [],
+  "description": "State the work-graph's design commitments in user-facing docs: what an edge means, how containment is derived, why containers complete last, and the item address grammar.\n\n## Background\n\nTwo load-bearing properties are currently implicit. First, because a container depends on its contents and blocking follows dependency edges, a container never becomes workable until its whole subtree is terminal — an intended consequence stated nowhere. Second, the addressable-item grammar (project scope `@/<kind>/<self-id>`, issue scope `@/issue/<short-id>/<kind>/<self-id>`, and the `<short-id>/<self-id>` sugar form) is documented only in CLI help text; the reference docs under-specify it.\n\n## Success Criteria\n\n- [hard] REQ-1: A concepts page states the containment model: one edge kind, container-depends-on-contents direction, hierarchy derived from the DAG plus type levels (never stored), membership labels advisory, containers become workable last.\n- [hard] REQ-2: The reference docs specify the full item address grammar, including both scopes, the reserved `issue` segment, and the sugar form with its kind-inference and ambiguity behavior, matching the implementation in `domain/item.rs`.\n- [hard] REQ-3: All added text states current behavior only, with no references to earlier models or transitional narration.\n\n## Notes\n\nFollow the Diátaxis split already used in `docs/`: the model goes under concepts, the grammar under reference. Mermaid for any diagrams.",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "9117c502ef7ac41095f765b8d42464ec852f0ef6186fbbad52fe0fec1dfb4e2f",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "hierarchy-resolution.md",
+          "resolved_path": "docs/concepts/hierarchy-resolution.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "12153be512f7b220dce9bb5eb9c004d1e510c26d242595f085a45e5c6caf97d9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "99ed80962935264e23e8e7e1300a5019a2ca4c02b4a52bd94856448d8a1e63ac",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/item-addresses.md",
+          "resolved_path": "docs/reference/item-addresses.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../reference/labels.md",
+          "resolved_path": "docs/reference/labels.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": "Documentation",
+      "path": "docs/concepts/containment-and-completion.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "b3759815b5f944fb5aa2bf554375439d819444ff1c6badd60d5e621b0eea2a36",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "configuration.md",
+          "resolved_path": "docs/reference/configuration.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c837fca5d0e0c9d7215b9593b18a0885068d833c8f3b58c67b5d9d2b15df53e7",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/containment-and-completion.md",
+          "resolved_path": "docs/concepts/containment-and-completion.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "labels.md",
+          "resolved_path": "docs/reference/labels.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2b0e85a05bb20f712ce8183066ae503f9795f8f3ed70a55ee98b81b4f2e2435e",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "cli-commands.md",
+          "resolved_path": "docs/reference/cli-commands.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "documentation",
+      "format": "markdown",
+      "label": "Documentation",
+      "path": "docs/reference/item-addresses.md"
+    }
+  ],
+  "done_at": "2026-07-09T20:48:41.803015195Z",
+  "first_ready_at": "2026-07-05T22:31:18.727973821Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T20:46:41.282575276Z"
+      "updated_at": "2026-07-09T20:46:41.282575276Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "docs/concepts/containment-and-completion.md",
-      "commit": null,
-      "label": "Documentation",
-      "doc_type": "documentation",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "hierarchy-resolution.md",
-          "resolved_path": "docs/concepts/hierarchy-resolution.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "9117c502ef7ac41095f765b8d42464ec852f0ef6186fbbad52fe0fec1dfb4e2f",
-          "is_shared": false
-        },
-        {
-          "original_path": "core-model.md",
-          "resolved_path": "docs/concepts/core-model.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "12153be512f7b220dce9bb5eb9c004d1e510c26d242595f085a45e5c6caf97d9",
-          "is_shared": false
-        },
-        {
-          "original_path": "../reference/item-addresses.md",
-          "resolved_path": "docs/reference/item-addresses.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "99ed80962935264e23e8e7e1300a5019a2ca4c02b4a52bd94856448d8a1e63ac",
-          "is_shared": false
-        },
-        {
-          "original_path": "../reference/labels.md",
-          "resolved_path": "docs/reference/labels.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
-          "is_shared": false
-        }
-      ]
-    },
-    {
-      "path": "docs/reference/item-addresses.md",
-      "commit": null,
-      "label": "Documentation",
-      "doc_type": "documentation",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "configuration.md",
-          "resolved_path": "docs/reference/configuration.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "b3759815b5f944fb5aa2bf554375439d819444ff1c6badd60d5e621b0eea2a36",
-          "is_shared": false
-        },
-        {
-          "original_path": "../concepts/containment-and-completion.md",
-          "resolved_path": "docs/concepts/containment-and-completion.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "c837fca5d0e0c9d7215b9593b18a0885068d833c8f3b58c67b5d9d2b15df53e7",
-          "is_shared": false
-        },
-        {
-          "original_path": "labels.md",
-          "resolved_path": "docs/reference/labels.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "1bdc1faef36bbf3607124448bcd0bdf251b23c9e0256208fb20acc800b6496c9",
-          "is_shared": false
-        },
-        {
-          "original_path": "cli-commands.md",
-          "resolved_path": "docs/reference/cli-commands.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "2b0e85a05bb20f712ce8183066ae503f9795f8f3ed70a55ee98b81b4f2e2435e",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "a1fe0c6e-9d9c-477d-8de4-d6dd170edf3a",
   "labels": [
     "type:task",
     "epic:work-graph-integrity",
     "component:docs",
-    "satisfies:REQ-8"
+    "satisfies:dbe1e821/REQ-8"
   ],
-  "created_at": "2026-07-05T22:31:18.727973291Z",
-  "updated_at": "2026-07-09T20:48:41.803015675Z",
-  "first_ready_at": "2026-07-05T22:31:18.727973821Z",
-  "claimed_at": "2026-07-09T14:14:14.367631061Z",
-  "done_at": "2026-07-09T20:48:41.803015195Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Document the containment and completion model",
+  "updated_at": "2026-10-01T19:32:01.217666368Z"
 }

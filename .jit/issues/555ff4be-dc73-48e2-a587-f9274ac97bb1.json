@@ -75,12 +75,12 @@
     "milestone:v1.0",
     "story:redo-record-foundation",
     "component:storage",
-    "satisfies:REQ-03",
     "per:@/charter/D-17",
-    "enforces:@/invariant/atomic-writes"
+    "enforces:@/invariant/atomic-writes",
+    "satisfies:f1dc843a/REQ-03"
   ],
   "priority": "high",
   "state": "done",
   "title": "Durable redo record write",
-  "updated_at": "2026-09-20T09:50:24.886626651Z"
+  "updated_at": "2026-10-01T19:29:52.357084135Z"
 }

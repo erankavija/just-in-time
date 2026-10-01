@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:sol-stale-nextest",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-12T04:16:40.895898415Z",
   "context": {},
   "created_at": "2026-08-12T04:15:54.707101910Z",
@@ -32,12 +32,12 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:testing",
-    "satisfies:REQ-01",
-    "satisfies:REQ-04",
-    "type:task"
+    "type:task",
+    "satisfies:4b7c06d0/REQ-01",
+    "satisfies:4b7c06d0/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Prebuild the stale-binary semantic fixture inside nextest",
-  "updated_at": "2026-08-12T09:47:11.580413618Z"
+  "updated_at": "2026-10-01T19:28:39.131206553Z"
 }

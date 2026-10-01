@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-30T07:31:55.592750859Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.171847658Z",
@@ -55,10 +55,10 @@
     "type:task",
     "epic:v1-release",
     "milestone:v1.0",
-    "satisfies:REQ-07"
+    "satisfies:b80e3c70/REQ-07"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Align the v1.0 product version and tag contract",
-  "updated_at": "2026-07-30T08:31:39.758668069Z"
+  "updated_at": "2026-10-01T19:30:05.846075284Z"
 }

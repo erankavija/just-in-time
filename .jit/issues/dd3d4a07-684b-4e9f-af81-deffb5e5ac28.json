@@ -31,10 +31,10 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:docs",
-    "satisfies:REQ-01"
+    "satisfies:4a559332/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "State the linked-checkout write stance in the worktree guides",
-  "updated_at": "2026-08-16T19:45:13.860411996Z"
+  "updated_at": "2026-10-01T19:33:01.590974378Z"
 }

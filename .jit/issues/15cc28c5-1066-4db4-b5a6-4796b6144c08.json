@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-11T09:27:38.398785456Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
@@ -54,12 +54,12 @@
     "story:authoring-and-exchange",
     "component:cli",
     "component:storage",
-    "satisfies:REQ-14",
-    "satisfies:REQ-11",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "satisfies:c639cfb5/REQ-14",
+    "satisfies:c639cfb5/REQ-11"
   ],
   "priority": "high",
   "state": "done",
   "title": "Pack a package into a verifiable archive",
-  "updated_at": "2026-08-13T20:37:02.294440178Z"
+  "updated_at": "2026-10-01T19:28:32.549081239Z"
 }

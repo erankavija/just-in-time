@@ -1,39 +1,40 @@
 {
-  "id": "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
-  "title": "Dependency-graph schema fidelity",
-  "description": "Make the exported schema for the dependency-graph command match the shape the command actually emits.\n\n## Success Criteria\n\n- [hard] REQ-15: the exported schema for graph deps matches the response shape the command emits, with no dead-code warning left from an orphaned response type.\n\n## Notes\n\nThe schema maps `graph_deps` to `GraphDepsResponse` (schema.rs:421-423) but the handler emits `GraphDepsTreeResponse` (main.rs:2822-2834). Repoint the schema and, in the same change, remove or repurpose the now-orphaned `GraphDepsResponse` (output.rs:657) so it does not become dead code that fails the clippy gate.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:32:50.218664611Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:34.269145971Z",
   "dependencies": [
     "7f709152-973d-49c9-8848-3845c6782e38"
   ],
+  "description": "Make the exported schema for the dependency-graph command match the shape the command actually emits.\n\n## Success Criteria\n\n- [hard] REQ-15: the exported schema for graph deps matches the response shape the command emits, with no dead-code warning left from an orphaned response type.\n\n## Notes\n\nThe schema maps `graph_deps` to `GraphDepsResponse` (schema.rs:421-423) but the handler emits `GraphDepsTreeResponse` (main.rs:2822-2834). Repoint the schema and, in the same change, remove or repurpose the now-orphaned `GraphDepsResponse` (output.rs:657) so it does not become dead code that fails the clippy gate.",
+  "documents": [],
+  "done_at": "2026-06-27T23:40:30.016489242Z",
+  "first_ready_at": "2026-06-27T21:53:36.064449556Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:27:49.704561475Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:23:57.276530077Z"
+      "updated_at": "2026-06-27T23:23:57.276530077Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-27T23:27:49.704561475Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d287bd4c-78de-438d-8ffe-bb36ae93e7d3",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-15"
+    "satisfies:2e926e39/REQ-15"
   ],
-  "created_at": "2026-06-27T21:43:34.269145971Z",
-  "updated_at": "2026-07-05T19:51:13.092959923Z",
-  "first_ready_at": "2026-06-27T21:53:36.064449556Z",
-  "done_at": "2026-06-27T23:40:30.016489242Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Dependency-graph schema fidelity",
+  "updated_at": "2026-10-01T19:32:50.570894423Z"
 }

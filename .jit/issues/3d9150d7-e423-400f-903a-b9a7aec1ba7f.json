@@ -75,11 +75,11 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:testing",
-    "satisfies:REQ-05",
-    "enforces:@/invariant/convention-convergence"
+    "enforces:@/invariant/convention-convergence",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Publication path source guards",
-  "updated_at": "2026-10-01T11:13:45.398316447Z"
+  "updated_at": "2026-10-01T19:29:17.325855490Z"
 }

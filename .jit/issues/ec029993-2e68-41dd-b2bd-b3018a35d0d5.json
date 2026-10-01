@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:wave7-docs",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T17:07:41.821034159Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
@@ -34,11 +34,11 @@
     "milestone:v1.0",
     "component:cli",
     "story:failure-contract-docs",
-    "satisfies:REQ-07",
-    "per:@/charter/D-13"
+    "per:@/charter/D-13",
+    "satisfies:a2546471/REQ-07"
   ],
   "priority": "normal",
   "state": "done",
   "title": "One canonical statement of the machine-readable failure contract",
-  "updated_at": "2026-07-28T18:18:55.109500470Z"
+  "updated_at": "2026-10-01T19:33:16.835633615Z"
 }

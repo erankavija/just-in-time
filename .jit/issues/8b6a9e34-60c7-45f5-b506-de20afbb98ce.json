@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:31:24.850322727Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
@@ -20,13 +21,13 @@
     "story:mutation-cost-evidence",
     "component:docs",
     "component:testing",
-    "satisfies:REQ-07",
-    "satisfies:REQ-06",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T19:31:25.259364127Z"
 }

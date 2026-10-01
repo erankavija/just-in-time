@@ -76,11 +76,11 @@
     "story:record-publication-cutover",
     "component:storage",
     "component:server",
-    "satisfies:REQ-03",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-03"
   ],
   "priority": "high",
   "state": "done",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-09-21T10:19:41.016268108Z"
+  "updated_at": "2026-10-01T19:28:14.794948232Z"
 }

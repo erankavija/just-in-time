@@ -74,14 +74,14 @@
     "epic:docs-exhaustive-audit",
     "milestone:v1.0",
     "component:docs",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04",
-    "satisfies:REQ-06"
+    "satisfies:2d109173/REQ-01",
+    "satisfies:2d109173/REQ-02",
+    "satisfies:2d109173/REQ-03",
+    "satisfies:2d109173/REQ-04",
+    "satisfies:2d109173/REQ-06"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Root and component documentation audit",
-  "updated_at": "2026-07-29T09:19:08.193794069Z"
+  "updated_at": "2026-10-01T19:29:04.260548456Z"
 }

@@ -78,12 +78,12 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:docs",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-10-01T19:27:40.112351751Z"
+  "updated_at": "2026-10-01T19:32:35.522784988Z"
 }

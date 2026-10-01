@@ -1,13 +1,15 @@
 {
-  "id": "9e9a4f81-a803-4a3c-9303-bce8f0af93ad",
-  "title": "Per-issue validation scoping",
-  "description": "Scope the per-issue validation gate to the issue under review.\n\n## Background\n\nThe jit-validate gate checker is a bare `jit validate` (.jit/gates.json:193), which runs whole-repo validation (`run_rules(None)`) and so fails the issue on unrelated repo-wide findings. The single-issue path `run_rules(Some(id))` already exists (commands/validate.rs:944-982) and `JIT_ISSUE_ID` is already injected into gate execution (gate_execution.rs:53).\n\n## Success Criteria\n\n- [hard] REQ-12: the per-issue validation gate evaluates only the issue under review and does not fail on unrelated repository-wide findings.\n\n## Notes\n\nPoint the gate checker at the single issue (`jit validate $JIT_ISSUE_ID`, the `run_rules(Some(id))` path), not the container-subtree `--scope`. Touch the jit-validate gate checker command (.jit/gates.json) and any preset that defines it; self-contained.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:31:52.832663137Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:33.923593312Z",
   "dependencies": [
     "7f709152-973d-49c9-8848-3845c6782e38"
   ],
+  "description": "Scope the per-issue validation gate to the issue under review.\n\n## Background\n\nThe jit-validate gate checker is a bare `jit validate` (.jit/gates.json:193), which runs whole-repo validation (`run_rules(None)`) and so fails the issue on unrelated repo-wide findings. The single-issue path `run_rules(Some(id))` already exists (commands/validate.rs:944-982) and `JIT_ISSUE_ID` is already injected into gate execution (gate_execution.rs:53).\n\n## Success Criteria\n\n- [hard] REQ-12: the per-issue validation gate evaluates only the issue under review and does not fail on unrelated repository-wide findings.\n\n## Notes\n\nPoint the gate checker at the single issue (`jit validate $JIT_ISSUE_ID`, the `run_rules(Some(id))` path), not the container-subtree `--scope`. Touch the jit-validate gate checker command (.jit/gates.json) and any preset that defines it; self-contained.",
+  "documents": [],
+  "done_at": "2026-06-27T23:44:43.890135485Z",
+  "first_ready_at": "2026-06-27T21:53:35.934378889Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
@@ -15,25 +17,24 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:40:54.916329616Z"
+      "updated_at": "2026-06-27T23:40:54.916329616Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:43:08.961213896Z"
+      "updated_at": "2026-06-27T23:43:08.961213896Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9e9a4f81-a803-4a3c-9303-bce8f0af93ad",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-12"
+    "satisfies:2e926e39/REQ-12"
   ],
-  "created_at": "2026-06-27T21:43:33.923593312Z",
-  "updated_at": "2026-07-05T19:51:13.046968769Z",
-  "first_ready_at": "2026-06-27T21:53:35.934378889Z",
-  "done_at": "2026-06-27T23:44:43.890135485Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Per-issue validation scoping",
+  "updated_at": "2026-10-01T19:31:53.240070507Z"
 }

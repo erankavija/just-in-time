@@ -82,13 +82,13 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:storage",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
     "per:@/charter/D-17",
-    "enforces:@/invariant/canonical-cutover"
+    "enforces:@/invariant/canonical-cutover",
+    "satisfies:f1dc843a/REQ-05",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Transaction kernel retirement",
-  "updated_at": "2026-09-21T16:03:07.670347015Z"
+  "updated_at": "2026-10-01T19:32:11.955032188Z"
 }

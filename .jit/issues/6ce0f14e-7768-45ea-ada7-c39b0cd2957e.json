@@ -1,10 +1,8 @@
 {
-  "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
-  "title": "Documentation review gate",
-  "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve; content conforms to the jit content standards, including Mermaid for all diagrams (ASCII-art diagrams are forbidden in docs).\n\n## Success Criteria\n\n- [hard] REQ-01: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the review dimensions above\n- [hard] REQ-02: The gate produces structured findings\n- [hard] REQ-03: The gate passes on the repository's documentation tree at the time this issue completes\n- [hard] REQ-04: The gate registry description states when to apply the gate to future documentation work\n- [hard] REQ-05: The gate is required on the documentation-cleanup epic containing this work, so the epic completes only through it",
-  "state": "done",
-  "priority": "high",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-10T11:26:54.096308974Z",
+  "context": {},
+  "created_at": "2026-07-06T15:39:58.883953366Z",
   "dependencies": [
     "287f7bc9-c185-49a7-bc68-0102aaada58d",
     "c7f0f690-d147-4a72-abf7-d93ea06ac8cd",
@@ -18,6 +16,10 @@
     "a6e1ae3d-169c-4959-b105-66a418ddc022",
     "f5eb11a2-d368-4ede-aa9f-abdc1343236e"
   ],
+  "description": "Documentation quality regressions currently surface only through manual audits. Define an automatic documentation review gate so the documentation tree stays accurate after cleanup.\n\n## Background\n\nThe gate follows the repository's AI-review script pattern with a documentation-specific prompt (decision pinned 2026-07-06). Review dimensions: statements match the current source tree; adopter docs describe the shipped surface, with repo-local configuration explicitly signalled; current behavior stated without legacy narration; no hardcoded counts that silently rot; links and referenced paths resolve; content conforms to the jit content standards, including Mermaid for all diagrams (ASCII-art diagrams are forbidden in docs).\n\n## Success Criteria\n\n- [hard] REQ-01: A documentation review gate is registered as an automatic gate backed by the repository's AI-review script pattern with a documentation-specific prompt covering the review dimensions above\n- [hard] REQ-02: The gate produces structured findings\n- [hard] REQ-03: The gate passes on the repository's documentation tree at the time this issue completes\n- [hard] REQ-04: The gate registry description states when to apply the gate to future documentation work\n- [hard] REQ-05: The gate is required on the documentation-cleanup epic containing this work, so the epic completes only through it",
+  "documents": [],
+  "done_at": "2026-07-10T15:30:19.556683766Z",
+  "first_ready_at": "2026-07-06T15:39:58.883953626Z",
   "gates_required": [
     "jit-validate",
     "code-review",
@@ -27,36 +29,34 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T15:27:56.974347934Z"
+      "updated_at": "2026-07-10T15:27:56.974347934Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T15:29:19.417406344Z"
+      "updated_at": "2026-07-10T15:29:19.417406344Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T14:45:30.800698207Z"
+      "updated_at": "2026-07-10T14:45:30.800698207Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T14:47:51.856671129Z"
+      "updated_at": "2026-07-10T14:47:51.856671129Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "6ce0f14e-7768-45ea-ada7-c39b0cd2957e",
   "labels": [
     "type:task",
     "epic:docs-accuracy",
     "component:docs",
-    "satisfies:REQ-04"
+    "satisfies:287c4051/REQ-04"
   ],
-  "created_at": "2026-07-06T15:39:58.883953366Z",
-  "updated_at": "2026-07-10T15:30:19.556684286Z",
-  "first_ready_at": "2026-07-06T15:39:58.883953626Z",
-  "claimed_at": "2026-07-10T11:26:54.096308974Z",
-  "done_at": "2026-07-10T15:30:19.556683766Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Documentation review gate",
+  "updated_at": "2026-10-01T19:30:35.331622780Z"
 }

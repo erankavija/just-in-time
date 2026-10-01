@@ -40,11 +40,11 @@
     "type:story",
     "epic:addressing-v2",
     "milestone:v1.0",
-    "satisfies:REQ-01",
-    "story:addressing-core-parser-resolver"
+    "story:addressing-core-parser-resolver",
+    "satisfies:8b05a612/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Kind-segmented scope-aware address parser and resolver",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-10-01T19:29:04.905305555Z"
 }

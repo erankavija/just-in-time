@@ -83,13 +83,13 @@
     "story:record-publication-cutover",
     "component:core",
     "component:storage",
-    "satisfies:REQ-05",
     "per:@/charter/D-17",
     "enforces:@/invariant/convention-convergence",
-    "enforces:@/invariant/derived-state-coherence"
+    "enforces:@/invariant/derived-state-coherence",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Data-root ignore file as a derived materialization",
-  "updated_at": "2026-09-20T22:17:46.743169492Z"
+  "updated_at": "2026-10-01T19:28:13.965505209Z"
 }

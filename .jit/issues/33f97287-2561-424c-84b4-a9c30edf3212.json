@@ -76,12 +76,12 @@
     "story:superseded-design-retirement",
     "component:core",
     "component:storage",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-05",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Listing fingerprint retirement",
-  "updated_at": "2026-10-01T16:17:32.131375598Z"
+  "updated_at": "2026-10-01T19:29:00.984898880Z"
 }

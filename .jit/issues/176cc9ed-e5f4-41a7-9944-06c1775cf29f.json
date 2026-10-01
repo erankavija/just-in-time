@@ -31,10 +31,10 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:docs",
-    "satisfies:REQ-02"
+    "satisfies:4a559332/REQ-02"
   ],
   "priority": "high",
   "state": "done",
   "title": "Recovery guidance for divergent checkout stores",
-  "updated_at": "2026-08-16T19:07:23.432100752Z"
+  "updated_at": "2026-10-01T19:28:32.962705055Z"
 }

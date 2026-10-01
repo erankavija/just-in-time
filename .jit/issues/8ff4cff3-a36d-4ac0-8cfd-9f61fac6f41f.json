@@ -32,11 +32,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:artifact-directory-convention",
-    "satisfies:REQ-05",
-    "per:@/issue/8e071e18/decision/D-2"
+    "per:@/issue/8e071e18/decision/D-2",
+    "satisfies:8e071e18/REQ-05"
   ],
   "priority": "normal",
   "state": "done",
   "title": "State the artifact-directory template field in the adopter template documentation",
-  "updated_at": "2026-07-27T09:26:55.624959023Z"
+  "updated_at": "2026-10-01T19:31:30.671460264Z"
 }

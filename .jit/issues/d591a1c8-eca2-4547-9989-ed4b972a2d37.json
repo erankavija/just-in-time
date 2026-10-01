@@ -84,12 +84,12 @@
     "story:redo-record-foundation",
     "component:testing",
     "component:storage",
-    "satisfies:REQ-03",
     "enforces:@/invariant/orthogonal-tests",
-    "enforces:@/invariant/shared-test-contracts"
+    "enforces:@/invariant/shared-test-contracts",
+    "satisfies:f1dc843a/REQ-03"
   ],
   "priority": "high",
   "state": "done",
   "title": "Shared interruption conformance suite",
-  "updated_at": "2026-09-20T19:15:46.860573747Z"
+  "updated_at": "2026-10-01T19:32:53.677473245Z"
 }

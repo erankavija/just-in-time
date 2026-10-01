@@ -1,11 +1,13 @@
 {
-  "id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
-  "title": "Rewrite TESTING.md for the current workspace layout",
-  "description": "TESTING.md still describes the pre-workspace repository: a cli/ crate root, flat module files, dated test counts, property-based testing listed as future work, and a TestHarness API sketch that does not match the actual harness.\n\n## Success Criteria\n\n- [hard] REQ-01: All paths in TESTING.md point at crates/jit/ locations that exist\n- [hard] REQ-02: The document contains no dated or hardcoded test counts\n- [hard] REQ-03: Property-based testing is described as current practice\n- [hard] REQ-04: The TestHarness description matches the actual API in crates/jit/tests/harness.rs (in-memory backing, real method set)\n- [hard] REQ-05: Every link in the document resolves",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T23:14:07.720989415Z",
+  "context": {},
+  "created_at": "2026-07-06T15:39:58.876375510Z",
   "dependencies": [],
+  "description": "TESTING.md still describes the pre-workspace repository: a cli/ crate root, flat module files, dated test counts, property-based testing listed as future work, and a TestHarness API sketch that does not match the actual harness.\n\n## Success Criteria\n\n- [hard] REQ-01: All paths in TESTING.md point at crates/jit/ locations that exist\n- [hard] REQ-02: The document contains no dated or hardcoded test counts\n- [hard] REQ-03: Property-based testing is described as current practice\n- [hard] REQ-04: The TestHarness description matches the actual API in crates/jit/tests/harness.rs (in-memory backing, real method set)\n- [hard] REQ-05: Every link in the document resolves",
+  "documents": [],
+  "done_at": "2026-07-10T10:33:04.082502935Z",
+  "first_ready_at": "2026-07-06T15:39:58.876375790Z",
   "gates_required": [
     "jit-validate",
     "code-review",
@@ -14,31 +16,29 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T00:07:27.266549708Z"
+      "updated_at": "2026-07-10T00:07:27.266549708Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T00:12:11.266371496Z"
+      "updated_at": "2026-07-10T00:12:11.266371496Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T00:11:03.404648488Z"
+      "updated_at": "2026-07-10T00:11:03.404648488Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c29118f9-72e5-4d20-a20a-4de58cce4b33",
   "labels": [
     "type:task",
     "epic:docs-accuracy",
     "component:docs",
-    "satisfies:REQ-01"
+    "satisfies:287c4051/REQ-01"
   ],
-  "created_at": "2026-07-06T15:39:58.876375510Z",
-  "updated_at": "2026-07-10T10:33:04.082503385Z",
-  "first_ready_at": "2026-07-06T15:39:58.876375790Z",
-  "claimed_at": "2026-07-09T23:14:07.720989415Z",
-  "done_at": "2026-07-10T10:33:04.082502935Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Rewrite TESTING.md for the current workspace layout",
+  "updated_at": "2026-10-01T19:32:38.896636716Z"
 }

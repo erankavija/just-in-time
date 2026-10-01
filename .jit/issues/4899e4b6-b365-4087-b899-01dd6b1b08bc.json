@@ -1,39 +1,39 @@
 {
-  "id": "4899e4b6-b365-4087-b899-01dd6b1b08bc",
-  "title": "Project gate state as a gates array in issue show --json",
-  "description": "Replace the split `gates_required`/`gates_status` in `issue show --json` with a single `gates` array, enriched from each gate's latest run.\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --json` emits `gates: [{key, status, last_run_at, exit_code}]`, one entry per required gate, and no longer emits `gates_required` or `gates_status`.\n- [ ] `last_run_at` and `exit_code` come from the gate's latest `GateRunResult` and are `null` when no run exists; `status` reflects `GateState` (or `pending`).\n- [ ] The change covers `build_gate_context` (which serializes the response), the CLI schema, tests, and CLI-command docs; the domain `Issue` model and the server/web are untouched.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-24T12:26:06.464473826Z",
+  "context": {},
+  "created_at": "2026-06-22T21:20:41.081821293Z",
   "dependencies": [
     "870176ce-8950-4cd9-8755-be1811d9e126"
   ],
+  "description": "Replace the split `gates_required`/`gates_status` in `issue show --json` with a single `gates` array, enriched from each gate's latest run.\n\n## Success Criteria\n\n- [ ] `jit issue show <id> --json` emits `gates: [{key, status, last_run_at, exit_code}]`, one entry per required gate, and no longer emits `gates_required` or `gates_status`.\n- [ ] `last_run_at` and `exit_code` come from the gate's latest `GateRunResult` and are `null` when no run exists; `status` reflects `GateState` (or `pending`).\n- [ ] The change covers `build_gate_context` (which serializes the response), the CLI schema, tests, and CLI-command docs; the domain `Issue` model and the server/web are untouched.",
+  "documents": [],
+  "done_at": "2026-06-24T12:59:24.582695022Z",
+  "first_ready_at": "2026-06-24T12:24:45.974292098Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T12:58:01.792752106Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T12:57:19.153040277Z"
+      "updated_at": "2026-06-24T12:57:19.153040277Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-24T12:58:01.792752106Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "4899e4b6-b365-4087-b899-01dd6b1b08bc",
   "labels": [
     "type:task",
     "epic:agent-ergonomics",
-    "satisfies:REQ-02"
+    "satisfies:53e3fa36/REQ-02"
   ],
-  "created_at": "2026-06-22T21:20:41.081821293Z",
-  "updated_at": "2026-07-05T19:51:12.958831215Z",
-  "first_ready_at": "2026-06-24T12:24:45.974292098Z",
-  "claimed_at": "2026-06-24T12:26:06.464473826Z",
-  "done_at": "2026-06-24T12:59:24.582695022Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Project gate state as a gates array in issue show --json",
+  "updated_at": "2026-10-01T19:29:35.064573846Z"
 }

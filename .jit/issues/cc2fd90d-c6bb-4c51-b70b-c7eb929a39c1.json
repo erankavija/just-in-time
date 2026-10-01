@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:wave5-validate-envelope",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T13:49:40.894024662Z",
   "context": {},
   "created_at": "2026-07-28T13:49:12.354941884Z",
@@ -30,11 +30,11 @@
     "milestone:v1.0",
     "component:cli",
     "story:structural-envelope",
-    "satisfies:REQ-06",
-    "type:task"
+    "type:task",
+    "satisfies:a2546471/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Envelope failing validation reports",
-  "updated_at": "2026-07-28T14:46:32.788048461Z"
+  "updated_at": "2026-10-01T19:32:46.489987877Z"
 }

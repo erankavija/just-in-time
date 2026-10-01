@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-01T20:38:18.203966065Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
@@ -39,13 +39,13 @@
     "milestone:v1.0",
     "component:core",
     "story:default-vocabulary",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-13",
     "per:@/issue/e204e63d/decision/D-20",
-    "enforces:@/invariant/domain-agnostic"
+    "enforces:@/invariant/domain-agnostic",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Assemble the default vocabulary as a package",
-  "updated_at": "2026-08-02T14:13:09.188500220Z"
+  "updated_at": "2026-10-01T19:32:41.801639729Z"
 }

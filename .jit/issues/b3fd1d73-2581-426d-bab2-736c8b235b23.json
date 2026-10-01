@@ -1,13 +1,15 @@
 {
-  "id": "b3fd1d73-2581-426d-bab2-736c8b235b23",
-  "title": "Report unreadable artifacts without aborting archive candidates",
-  "description": "## Objective\n\nMake archive planning and candidate reporting resilient to directory-valued or otherwise unsupported issue document paths while preserving deterministic, path-specific diagnostics.\n\n## Success Criteria\n\n- [hard] `jit archive candidates --json` evaluates and returns every candidate deterministically when repository-wide explicit or embedded roots include a directory; no candidate is omitted because another issue has such a document path.\n- [hard] Direct container/document preview returns a plan with a stable path-specific blocker or warning for an unsupported artifact instead of aborting, and execution remains blocked.\n- [hard] Supported artifacts and ownership classification are unchanged; infrastructure failures that cannot be represented safely are not silently swallowed.\n- [hard] Tests cover a directory-valued local dependency, repository-wide candidate evaluation, no mutation, and canonical JSON diagnostics.\n- [hard] User-facing reference documentation defines the diagnostic and report behavior.",
-  "state": "done",
-  "priority": "high",
-  "assignee": "agent:candidate-resilience",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-13T22:52:17.244957512Z",
+  "context": {},
+  "created_at": "2026-07-13T22:51:02.038564764Z",
   "dependencies": [
     "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b"
   ],
+  "description": "## Objective\n\nMake archive planning and candidate reporting resilient to directory-valued or otherwise unsupported issue document paths while preserving deterministic, path-specific diagnostics.\n\n## Success Criteria\n\n- [hard] `jit archive candidates --json` evaluates and returns every candidate deterministically when repository-wide explicit or embedded roots include a directory; no candidate is omitted because another issue has such a document path.\n- [hard] Direct container/document preview returns a plan with a stable path-specific blocker or warning for an unsupported artifact instead of aborting, and execution remains blocked.\n- [hard] Supported artifacts and ownership classification are unchanged; infrastructure failures that cannot be represented safely are not silently swallowed.\n- [hard] Tests cover a directory-valued local dependency, repository-wide candidate evaluation, no mutation, and canonical JSON diagnostics.\n- [hard] User-facing reference documentation defines the diagnostic and report behavior.",
+  "documents": [],
+  "done_at": "2026-07-13T23:13:51.482148700Z",
+  "first_ready_at": "2026-07-13T22:51:02.038568584Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -17,35 +19,33 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T23:05:41.703616515Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T23:12:29.405844827Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T23:13:42.283384871Z"
+      "updated_at": "2026-07-13T23:05:41.703616515Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T23:09:48.543134731Z"
+      "updated_at": "2026-07-13T23:09:48.543134731Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-07-13T23:12:29.405844827Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-07-13T23:13:42.283384871Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "b3fd1d73-2581-426d-bab2-736c8b235b23",
   "labels": [
     "epic:artifact-archival",
-    "satisfies:REQ-05",
-    "type:task"
+    "type:task",
+    "satisfies:7d3a3a47/REQ-05"
   ],
-  "created_at": "2026-07-13T22:51:02.038564764Z",
-  "updated_at": "2026-07-13T23:13:51.482149740Z",
-  "first_ready_at": "2026-07-13T22:51:02.038568584Z",
-  "claimed_at": "2026-07-13T22:52:17.244957512Z",
-  "done_at": "2026-07-13T23:13:51.482148700Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Report unreadable artifacts without aborting archive candidates",
+  "updated_at": "2026-10-01T19:32:18.670458083Z"
 }

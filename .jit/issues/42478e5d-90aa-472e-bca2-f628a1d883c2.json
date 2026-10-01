@@ -527,12 +527,12 @@
     "component:docs",
     "component:cli",
     "component:core",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Command and recovery references state the redo record",
-  "updated_at": "2026-09-21T20:46:48.288326977Z"
+  "updated_at": "2026-10-01T19:29:23.217418229Z"
 }

@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:30:23.455914211Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.176417991Z",
   "dependencies": [
@@ -21,13 +22,13 @@
   "labels": [
     "type:enhancement",
     "epic:production-readiness",
-    "satisfies:REQ-01",
-    "satisfies:REQ-06",
-    "satisfies:REQ-07",
-    "resolution:folded-into-release-workflow"
+    "resolution:folded-into-release-workflow",
+    "satisfies:8b05a612/REQ-01",
+    "satisfies:8b05a612/REQ-06",
+    "satisfies:8b05a612/REQ-07"
   ],
   "priority": "normal",
   "state": "rejected",
   "title": "Implement OCI candidate producer tooling",
-  "updated_at": "2026-07-29T13:49:59.516152083Z"
+  "updated_at": "2026-10-01T19:30:23.960845688Z"
 }

@@ -31,11 +31,11 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:cli",
-    "satisfies:REQ-04",
-    "satisfies:REQ-06"
+    "satisfies:4a559332/REQ-04",
+    "satisfies:4a559332/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Profile conflict output carries its remedy",
-  "updated_at": "2026-08-16T18:49:56.142691490Z"
+  "updated_at": "2026-10-01T19:31:00.066823927Z"
 }

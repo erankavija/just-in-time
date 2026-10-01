@@ -251,12 +251,12 @@
     "component:docs",
     "component:mcp-server",
     "component:core",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Profiles reference states the redo record",
-  "updated_at": "2026-09-21T18:19:35.677222393Z"
+  "updated_at": "2026-10-01T19:30:57.685047864Z"
 }

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker-8bbe6557",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-13T19:48:07.880404856Z",
   "context": {},
   "created_at": "2026-08-13T19:47:19.259120355Z",
@@ -38,12 +38,12 @@
     "component:storage",
     "component:cli",
     "component:testing",
-    "satisfies:REQ-12",
     "milestone:v1.0",
-    "type:task"
+    "type:task",
+    "satisfies:c639cfb5/REQ-12"
   ],
   "priority": "high",
   "state": "done",
   "title": "Remove unsupported embedded profile provenance",
-  "updated_at": "2026-08-13T20:22:36.311715689Z"
+  "updated_at": "2026-10-01T19:31:26.122298177Z"
 }

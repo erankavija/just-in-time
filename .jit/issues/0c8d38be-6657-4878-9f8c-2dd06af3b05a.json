@@ -32,10 +32,10 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:storage",
-    "satisfies:REQ-01"
+    "satisfies:4a559332/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Publish the override audit record with the mutation it permits",
-  "updated_at": "2026-08-16T17:24:19.989538655Z"
+  "updated_at": "2026-10-01T19:28:19.270954676Z"
 }

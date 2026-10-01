@@ -1,39 +1,40 @@
 {
-  "id": "eb37a05a-884f-4bd2-91d1-b231575cd52c",
-  "title": "Full gate report text",
-  "description": "Show the complete checker report on gate inspection rather than a truncated fragment.\n\n## Background\n\n`print_gate_run_details` truncates the report at `.take(20)` lines (main.rs:418,422) and then prints a file path (main.rs:425) instead of the body, so agents glob the raw run files to read the full report. The full stdout/stderr is already stored, so the truncation is the only obstacle.\n\n## Success Criteria\n\n- [hard] REQ-07: gate inspection output contains the complete checker report with no line truncation and no substitution of a file path for the report body.\n\n## Notes\n\nTouch main.rs:388-426; self-contained. Emit the full stored checker report with no truncation and no file-path substitution.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:33:14.788143762Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:33.491360518Z",
   "dependencies": [
     "527bf0a6-1b48-4a62-8229-31c3f9308a30"
   ],
+  "description": "Show the complete checker report on gate inspection rather than a truncated fragment.\n\n## Background\n\n`print_gate_run_details` truncates the report at `.take(20)` lines (main.rs:418,422) and then prints a file path (main.rs:425) instead of the body, so agents glob the raw run files to read the full report. The full stdout/stderr is already stored, so the truncation is the only obstacle.\n\n## Success Criteria\n\n- [hard] REQ-07: gate inspection output contains the complete checker report with no line truncation and no substitution of a file path for the report body.\n\n## Notes\n\nTouch main.rs:388-426; self-contained. Emit the full stored checker report with no truncation and no file-path substitution.",
+  "documents": [],
+  "done_at": "2026-06-28T01:13:24.923646555Z",
+  "first_ready_at": "2026-06-27T23:43:53.167357494Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T01:00:58.007124020Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T00:59:01.727023182Z"
+      "updated_at": "2026-06-28T00:59:01.727023182Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-28T01:00:58.007124020Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "eb37a05a-884f-4bd2-91d1-b231575cd52c",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-07"
+    "satisfies:2e926e39/REQ-07"
   ],
-  "created_at": "2026-06-27T21:43:33.491360518Z",
-  "updated_at": "2026-07-05T19:51:13.109057634Z",
-  "first_ready_at": "2026-06-27T23:43:53.167357494Z",
-  "done_at": "2026-06-28T01:13:24.923646555Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Full gate report text",
+  "updated_at": "2026-10-01T19:33:15.070992396Z"
 }

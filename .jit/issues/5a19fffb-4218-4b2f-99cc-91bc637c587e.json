@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-27T11:33:42.503313276Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
@@ -34,11 +34,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:development-root-cleanup",
-    "satisfies:REQ-10",
-    "per:@/issue/8e071e18/decision/D-15"
+    "per:@/issue/8e071e18/decision/D-15",
+    "satisfies:8e071e18/REQ-10"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Record the blanket disposition of the session records",
-  "updated_at": "2026-07-29T09:12:10.331072413Z"
+  "updated_at": "2026-10-01T19:29:59.302945946Z"
 }

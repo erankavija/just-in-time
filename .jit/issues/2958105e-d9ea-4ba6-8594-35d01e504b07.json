@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-24T23:27:43.697406423Z",
   "context": {},
   "created_at": "2026-07-24T07:19:49.615370967Z",
@@ -37,13 +37,13 @@
     "epic:repository-state-quality",
     "story:enforced-guarantees",
     "milestone:v1.0",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
-    "satisfies:REQ-07",
-    "satisfies:REQ-08"
+    "satisfies:1cc809de/REQ-05",
+    "satisfies:1cc809de/REQ-06",
+    "satisfies:1cc809de/REQ-07",
+    "satisfies:1cc809de/REQ-08"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Convert narrated materialization guarantees into enforced tests",
-  "updated_at": "2026-07-25T00:10:30.005913882Z"
+  "updated_at": "2026-10-01T19:28:51.050268040Z"
 }

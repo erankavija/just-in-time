@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:30:45.098646716Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
@@ -21,13 +22,13 @@
     "story:mutation-cost-evidence",
     "component:testing",
     "component:docs",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-06",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-01",
+    "satisfies:f1dc843a/REQ-02",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "backlog",
   "title": "Publication cost evidence",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T19:30:45.505294232Z"
 }

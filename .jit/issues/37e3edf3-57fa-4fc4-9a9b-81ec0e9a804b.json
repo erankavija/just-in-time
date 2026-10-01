@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:wave6-envelope-contract",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T15:19:19.494086196Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
@@ -33,11 +33,11 @@
     "milestone:v1.0",
     "component:cli",
     "story:arm-conformance",
-    "satisfies:REQ-05",
-    "enforces:@/invariant/semantic-test-assertions"
+    "enforces:@/invariant/semantic-test-assertions",
+    "satisfies:a2546471/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "The canonical conformance suite for the machine-readable failure envelope",
-  "updated_at": "2026-07-28T16:40:54.121076731Z"
+  "updated_at": "2026-10-01T19:29:07.140947479Z"
 }

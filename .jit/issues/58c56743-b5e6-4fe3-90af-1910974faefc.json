@@ -33,13 +33,13 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:canonical-documentation-home",
-    "satisfies:REQ-12",
-    "satisfies:REQ-04",
     "per:@/charter/D-13",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:8e071e18/REQ-12",
+    "satisfies:8e071e18/REQ-04"
   ],
   "priority": "normal",
   "state": "done",
   "title": "State the artifact layout facts in one adopter reference",
-  "updated_at": "2026-07-27T13:05:44.483113554Z"
+  "updated_at": "2026-10-01T19:29:58.410955833Z"
 }

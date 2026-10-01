@@ -31,10 +31,10 @@
     "type:task",
     "epic:dev-artifact-layout",
     "milestone:v1.0",
-    "satisfies:REQ-09"
+    "satisfies:8e071e18/REQ-09"
   ],
   "priority": "high",
   "state": "done",
   "title": "Archive the usability container's pinned modular-renderer artifact",
-  "updated_at": "2026-07-29T09:09:42.671520241Z"
+  "updated_at": "2026-10-01T19:32:57.405199615Z"
 }

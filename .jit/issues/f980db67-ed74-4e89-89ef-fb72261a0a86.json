@@ -52,11 +52,11 @@
     "component:cli",
     "component:storage",
     "component:docs",
-    "satisfies:REQ-02",
-    "component:mcp"
+    "component:mcp",
+    "satisfies:4a559332/REQ-02"
   ],
   "priority": "high",
   "state": "done",
   "title": "Report divergent checkout stores",
-  "updated_at": "2026-08-16T18:13:16.450381853Z"
+  "updated_at": "2026-10-01T19:33:35.116263960Z"
 }

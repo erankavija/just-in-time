@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-16T08:56:57.296620503Z",
   "context": {},
   "created_at": "2026-08-14T06:15:34.269849091Z",
@@ -31,10 +31,10 @@
     "type:task",
     "epic:gf2-adopter-reliability",
     "component:core",
-    "satisfies:REQ-04"
+    "satisfies:4a559332/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Typed remedy data on profile conflicts",
-  "updated_at": "2026-08-16T12:02:57.840784870Z"
+  "updated_at": "2026-10-01T19:33:01.203886551Z"
 }

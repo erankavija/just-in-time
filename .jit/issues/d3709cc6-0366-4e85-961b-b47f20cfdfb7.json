@@ -1,14 +1,16 @@
 {
-  "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
-  "title": "Remediate Rust dependency advisories",
-  "description": "The committed Rust dependency graph is advisory-free without an ignore list and retains CLI and server behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: cargo audit -D warnings exits zero against the committed Cargo.lock with no advisory ignore or blanket allowlist.\n- [hard] REQ-02: Workspace formatting, clippy with zero warnings, all-target/all-feature builds, and Rust tests pass after the dependency changes.\n- [hard] REQ-03: Any dependency API migration updates every affected CLI or server consumer and its regression tests in the same change.\n\n## Notes\n\nBlast radius: `Cargo.toml`, `Cargo.lock`, affected crate manifests and only source/tests required by changed dependency APIs; CLI and server are verified together.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-15T17:53:57.655577204Z",
+  "context": {},
+  "created_at": "2026-07-15T09:12:53.166170434Z",
   "dependencies": [
     "73482aa1-aa6b-46f6-9d6f-3152a102e558",
     "207364b1-cc06-4bf5-ae61-34908acc898c"
   ],
+  "description": "The committed Rust dependency graph is advisory-free without an ignore list and retains CLI and server behavior.\n\n## Success Criteria\n\n- [hard] REQ-01: cargo audit -D warnings exits zero against the committed Cargo.lock with no advisory ignore or blanket allowlist.\n- [hard] REQ-02: Workspace formatting, clippy with zero warnings, all-target/all-feature builds, and Rust tests pass after the dependency changes.\n- [hard] REQ-03: Any dependency API migration updates every affected CLI or server consumer and its regression tests in the same change.\n\n## Notes\n\nBlast radius: `Cargo.toml`, `Cargo.lock`, affected crate manifests and only source/tests required by changed dependency APIs; CLI and server are verified together.",
+  "documents": [],
+  "done_at": "2026-07-16T11:22:55.599625012Z",
+  "first_ready_at": "2026-07-15T09:12:53.166170684Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -17,43 +19,41 @@
     "dependency-audit"
   ],
   "gates_status": {
-    "dependency-audit": {
+    "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T11:18:23.155035777Z"
+      "updated_at": "2026-07-16T07:33:28.593536947Z",
+      "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T11:07:05.625258523Z"
+      "updated_at": "2026-07-16T11:07:05.625258523Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T11:18:41.165140983Z"
+      "updated_at": "2026-07-16T11:18:41.165140983Z",
+      "updated_by": "auto:executor"
+    },
+    "dependency-audit": {
+      "status": "passed",
+      "updated_at": "2026-07-16T11:18:23.155035777Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T07:36:07.452661876Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T07:33:28.593536947Z"
+      "updated_at": "2026-07-16T07:36:07.452661876Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d3709cc6-0366-4e85-961b-b47f20cfdfb7",
   "labels": [
     "type:bug",
     "epic:production-readiness",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02"
+    "satisfies:8b05a612/REQ-01",
+    "satisfies:8b05a612/REQ-02"
   ],
-  "created_at": "2026-07-15T09:12:53.166170434Z",
-  "updated_at": "2026-07-16T11:22:55.599627772Z",
-  "first_ready_at": "2026-07-15T09:12:53.166170684Z",
-  "claimed_at": "2026-07-15T17:53:57.655577204Z",
-  "done_at": "2026-07-16T11:22:55.599625012Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Remediate Rust dependency advisories",
+  "updated_at": "2026-10-01T19:32:51.905763026Z"
 }

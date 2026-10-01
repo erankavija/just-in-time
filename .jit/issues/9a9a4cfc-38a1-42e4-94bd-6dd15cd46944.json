@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker-9a9a4cfc",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-09T18:01:29.993782225Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
@@ -33,13 +33,13 @@
     "per:@/charter/D-8",
     "story:ownership-and-safe-change",
     "component:storage",
-    "satisfies:REQ-05",
-    "satisfies:REQ-09",
-    "satisfies:REQ-11",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "satisfies:c639cfb5/REQ-05",
+    "satisfies:c639cfb5/REQ-09",
+    "satisfies:c639cfb5/REQ-11"
   ],
   "priority": "high",
   "state": "done",
   "title": "Carry ownership claims in the applied profile record",
-  "updated_at": "2026-08-10T15:43:05.803744869Z"
+  "updated_at": "2026-10-01T19:31:48.850192052Z"
 }

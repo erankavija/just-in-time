@@ -82,12 +82,12 @@
     "story:record-publication-cutover",
     "component:gates",
     "component:docs",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Security review scope names live mechanisms",
-  "updated_at": "2026-09-21T19:52:12.005636852Z"
+  "updated_at": "2026-10-01T19:29:38.865548433Z"
 }

@@ -75,11 +75,11 @@
     "milestone:v1.0",
     "story:redo-record-foundation",
     "component:storage",
-    "satisfies:REQ-04",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-04"
   ],
   "priority": "high",
   "state": "done",
   "title": "Write-set and event-log conflict check",
-  "updated_at": "2026-09-20T09:50:37.948008781Z"
+  "updated_at": "2026-10-01T19:33:37.045035098Z"
 }

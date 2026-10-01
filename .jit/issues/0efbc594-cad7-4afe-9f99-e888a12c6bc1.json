@@ -45,11 +45,11 @@
     "type:story",
     "epic:addressing-v2",
     "milestone:v1.0",
-    "satisfies:REQ-02",
-    "story:label-value-grammar"
+    "story:label-value-grammar",
+    "satisfies:8b05a612/REQ-02"
   ],
   "priority": "high",
   "state": "done",
   "title": "Label-value grammar widening and re-split-site audit",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-10-01T19:28:25.508684111Z"
 }

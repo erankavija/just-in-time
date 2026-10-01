@@ -26,11 +26,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:archive-naming-and-warnings",
-    "satisfies:REQ-07",
-    "per:@/issue/8e071e18/decision/D-9"
+    "per:@/issue/8e071e18/decision/D-9",
+    "satisfies:8e071e18/REQ-07"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Rename the title-slugged archive directory to its bare short id",
-  "updated_at": "2026-07-25T21:37:25.663725002Z"
+  "updated_at": "2026-10-01T19:32:22.189717595Z"
 }

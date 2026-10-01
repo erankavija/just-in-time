@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-03T15:25:35.205386915Z",
   "context": {},
   "created_at": "2026-07-01T23:19:51.065614361Z",
@@ -46,11 +46,11 @@
     "type:story",
     "epic:addressing-v2",
     "milestone:v1.0",
-    "satisfies:REQ-03",
-    "story:rule-addressable-kind"
+    "story:rule-addressable-kind",
+    "satisfies:8b05a612/REQ-03"
   ],
   "priority": "high",
   "state": "done",
   "title": "Rule as an addressable kind with origin lifted out of the id",
-  "updated_at": "2026-07-27T09:57:28.408866984Z"
+  "updated_at": "2026-10-01T19:30:44.664127463Z"
 }

@@ -75,12 +75,12 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:docs",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Storage format reference states the redo record",
-  "updated_at": "2026-10-01T10:38:15.168823049Z"
+  "updated_at": "2026-10-01T19:32:46.882421423Z"
 }

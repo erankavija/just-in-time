@@ -1,47 +1,47 @@
 {
-  "id": "0d8f20a8-db02-43ba-ad9e-8f219b427690",
-  "title": "Build package projection and drift mechanics",
-  "description": "Generic renderer, preset-projection, and drift-check APIs can materialize manifest-declared targets and compare regenerated output without owning or changing the production dogfood payload or live consumers.\n\n## Background\n\nThis task proves reusable projection mechanics against synthetic fixtures. Production package content and live-consumer migration are outside this task.\n\n## Success Criteria\n\n- [hard] REQ-01: Synthetic fixture packages prove exact file projection, managed-region preservation, executable modes, temporary-tree byte comparison, stale/extra/missing target findings, and deterministic ordering.\n- [hard] REQ-02: A synthetic preset fixture derives gate definitions/assets through the same package API and detects an independent-inventory mismatch.\n- [hard] REQ-03: The leaf changes only projection mechanics and fixtures; it does not author production skills/prompts/standards/gates or rewrite `.agents`, scripts, `.jit/reference`, presets, examples, or adopter docs.\n\n## Scope\n\n**Blast radius:** generic renderer, drift, and preset-projection modules plus synthetic fixtures only. Production package content and live-consumer migration are outside this task.\n\n**Green landing:** Synthetic packages prove the reusable mechanics while every production dogfood asset and live path remains byte-unchanged.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:codex-profile-renderer",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-16T12:00:28.261474214Z",
+  "context": {},
+  "created_at": "2026-07-14T22:28:46.041804597Z",
   "dependencies": [
     "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563"
   ],
+  "description": "Generic renderer, preset-projection, and drift-check APIs can materialize manifest-declared targets and compare regenerated output without owning or changing the production dogfood payload or live consumers.\n\n## Background\n\nThis task proves reusable projection mechanics against synthetic fixtures. Production package content and live-consumer migration are outside this task.\n\n## Success Criteria\n\n- [hard] REQ-01: Synthetic fixture packages prove exact file projection, managed-region preservation, executable modes, temporary-tree byte comparison, stale/extra/missing target findings, and deterministic ordering.\n- [hard] REQ-02: A synthetic preset fixture derives gate definitions/assets through the same package API and detects an independent-inventory mismatch.\n- [hard] REQ-03: The leaf changes only projection mechanics and fixtures; it does not author production skills/prompts/standards/gates or rewrite `.agents`, scripts, `.jit/reference`, presets, examples, or adopter docs.\n\n## Scope\n\n**Blast radius:** generic renderer, drift, and preset-projection modules plus synthetic fixtures only. Production package content and live-consumer migration are outside this task.\n\n**Green landing:** Synthetic packages prove the reusable mechanics while every production dogfood asset and live path remains byte-unchanged.",
+  "documents": [],
+  "done_at": "2026-07-16T12:28:15.322142491Z",
+  "first_ready_at": "2026-07-14T22:28:46.041804817Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "repo-validate"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-07-16T12:20:09.860466935Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T12:22:48.849996448Z"
+      "updated_at": "2026-07-16T12:22:48.849996448Z",
+      "updated_by": "auto:executor"
     },
     "repo-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T12:27:18.939790711Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T12:20:09.860466935Z"
+      "updated_at": "2026-07-16T12:27:18.939790711Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0d8f20a8-db02-43ba-ad9e-8f219b427690",
   "labels": [
     "type:task",
     "epic:jit-profiles",
     "milestone:v1.0",
-    "satisfies:REQ-10",
-    "satisfies:REQ-12"
+    "satisfies:9b7b5f9c/REQ-10",
+    "satisfies:9b7b5f9c/REQ-12"
   ],
-  "created_at": "2026-07-14T22:28:46.041804597Z",
-  "updated_at": "2026-07-16T12:28:15.322144381Z",
-  "first_ready_at": "2026-07-14T22:28:46.041804817Z",
-  "claimed_at": "2026-07-16T12:00:28.261474214Z",
-  "done_at": "2026-07-16T12:28:15.322142491Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Build package projection and drift mechanics",
+  "updated_at": "2026-10-01T19:28:23.459942253Z"
 }

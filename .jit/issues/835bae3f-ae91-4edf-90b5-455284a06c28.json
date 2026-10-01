@@ -33,12 +33,12 @@
     "milestone:v1.0",
     "story:redo-record-foundation",
     "component:storage",
-    "satisfies:REQ-03",
-    "satisfies:REQ-05",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-03",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Redo record vocabulary",
-  "updated_at": "2026-09-20T07:39:07.531935834Z"
+  "updated_at": "2026-10-01T19:31:13.685130133Z"
 }

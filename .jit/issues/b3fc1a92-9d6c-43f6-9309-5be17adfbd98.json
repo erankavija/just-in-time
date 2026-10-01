@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-25T16:53:19.979339453Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
@@ -32,10 +32,10 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:area-classification",
-    "satisfies:REQ-01"
+    "satisfies:8e071e18/REQ-01"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Derive the runtime documentation defaults from the shipped declaration",
-  "updated_at": "2026-07-25T19:33:06.734529957Z"
+  "updated_at": "2026-10-01T19:32:17.843793735Z"
 }

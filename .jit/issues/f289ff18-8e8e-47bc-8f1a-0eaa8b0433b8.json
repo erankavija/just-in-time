@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-29T14:10:48.273857877Z",
   "context": {},
   "created_at": "2026-07-27T10:44:26.375581722Z",
@@ -30,10 +30,10 @@
     "component:core",
     "type:bug",
     "epic:v1-release",
-    "satisfies:REQ-11"
+    "satisfies:b80e3c70/REQ-11"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Honour a document reference's commit pin when checking links",
-  "updated_at": "2026-07-29T18:01:03.942575518Z"
+  "updated_at": "2026-10-01T19:33:27.170152523Z"
 }

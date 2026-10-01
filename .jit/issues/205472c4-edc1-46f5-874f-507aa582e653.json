@@ -1,14 +1,16 @@
 {
-  "id": "205472c4-edc1-46f5-874f-507aa582e653",
-  "title": "Add the decision and risk item kinds",
-  "description": "Add `decision` and `risk` as markdown-first item kinds, configured and indexed alongside `requirement`, so that decisions and risks authored in issue descriptions become addressable, queryable items. Their link namespaces (`per:` for decisions, `mitigates:`/`resolves:` for risks) reference items by qualified id. The markdown description remains the sole source of truth: items are parsed and indexed from descriptions with no duplicated structured store. Indexing reuses the generic triple-driven parse path the existing `requirement` kind already uses.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind decision` returns decision items parsed from issue descriptions.\n- [hard] REQ-02: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-03: A `per:<qualified-id>` label resolves to the addressed decision item.\n- [hard] REQ-04: A `mitigates:<qualified-id>` (and `resolves:<qualified-id>`) label resolves to the addressed risk item.\n- [hard] REQ-05: The markdown description is the only source for decision and risk items; no parallel structured store duplicates them.",
-  "state": "done",
-  "priority": "high",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-25T19:28:02.862162605Z",
+  "context": {},
+  "created_at": "2026-06-24T22:44:37.686555299Z",
   "dependencies": [
     "be3eb6ca-d9b1-4963-b1ec-e73baacf4708",
     "b629686b-b1d6-4b5c-833d-558f0022f063"
   ],
+  "description": "Add `decision` and `risk` as markdown-first item kinds, configured and indexed alongside `requirement`, so that decisions and risks authored in issue descriptions become addressable, queryable items. Their link namespaces (`per:` for decisions, `mitigates:`/`resolves:` for risks) reference items by qualified id. The markdown description remains the sole source of truth: items are parsed and indexed from descriptions with no duplicated structured store. Indexing reuses the generic triple-driven parse path the existing `requirement` kind already uses.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind decision` returns decision items parsed from issue descriptions.\n- [hard] REQ-02: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-03: A `per:<qualified-id>` label resolves to the addressed decision item.\n- [hard] REQ-04: A `mitigates:<qualified-id>` (and `resolves:<qualified-id>`) label resolves to the addressed risk item.\n- [hard] REQ-05: The markdown description is the only source for decision and risk items; no parallel structured store duplicates them.",
+  "documents": [],
+  "done_at": "2026-06-25T19:39:43.172375015Z",
+  "first_ready_at": "2026-06-25T18:12:44.047782282Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -16,27 +18,25 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T19:34:57.443924298Z"
+      "updated_at": "2026-06-25T19:34:57.443924298Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T19:38:12.083580354Z"
+      "updated_at": "2026-06-25T19:38:12.083580354Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "205472c4-edc1-46f5-874f-507aa582e653",
   "labels": [
     "type:story",
     "epic:structured-knowledge",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04",
-    "story:decision-risk-kinds"
+    "story:decision-risk-kinds",
+    "satisfies:25064508/REQ-03",
+    "satisfies:25064508/REQ-04"
   ],
-  "created_at": "2026-06-24T22:44:37.686555299Z",
-  "updated_at": "2026-07-05T19:51:12.921343558Z",
-  "first_ready_at": "2026-06-25T18:12:44.047782282Z",
-  "claimed_at": "2026-06-25T19:28:02.862162605Z",
-  "done_at": "2026-06-25T19:39:43.172375015Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add the decision and risk item kinds",
+  "updated_at": "2026-10-01T19:28:39.917788285Z"
 }

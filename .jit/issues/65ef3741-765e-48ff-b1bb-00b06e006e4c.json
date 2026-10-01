@@ -1,13 +1,15 @@
 {
-  "id": "65ef3741-765e-48ff-b1bb-00b06e006e4c",
-  "title": "Gate pass exit-code taxonomy and verdict field",
-  "description": "Give `gate pass` a clear exit-code taxonomy on jit's global `ExitCode` enum, plus a `verdict` field in JSON.\n\n## Success Criteria\n\n- [ ] `jit gate pass` exits `0` on pass, `4` (ValidationFailed) on checker failure, and `10` (ExternalError) on runner/infra error (timeout, command-not-found, crash).\n- [ ] Pre-verdict errors are classified before the run path: issue-not-found `3`, gate-not-required/bad-args `2`; they are never reported as runner error.\n- [ ] The codes are documented in `gate pass --help`, and `gate pass --json` carries a `verdict` field (`pass|fail|error`).\n\n## Notes\n\nMaps `GateRunStatus` Passed/Failed/Error onto the global `ExitCode` enum.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-24T13:28:55.073438444Z",
+  "context": {},
+  "created_at": "2026-06-22T21:20:41.092645156Z",
   "dependencies": [
     "838483f3-6f4b-4d7e-a8aa-3512fd648841"
   ],
+  "description": "Give `gate pass` a clear exit-code taxonomy on jit's global `ExitCode` enum, plus a `verdict` field in JSON.\n\n## Success Criteria\n\n- [ ] `jit gate pass` exits `0` on pass, `4` (ValidationFailed) on checker failure, and `10` (ExternalError) on runner/infra error (timeout, command-not-found, crash).\n- [ ] Pre-verdict errors are classified before the run path: issue-not-found `3`, gate-not-required/bad-args `2`; they are never reported as runner error.\n- [ ] The codes are documented in `gate pass --help`, and `gate pass --json` carries a `verdict` field (`pass|fail|error`).\n\n## Notes\n\nMaps `GateRunStatus` Passed/Failed/Error onto the global `ExitCode` enum.",
+  "documents": [],
+  "done_at": "2026-06-24T13:46:02.629311080Z",
+  "first_ready_at": "2026-06-22T21:32:38.258178479Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,25 +17,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T13:43:40.725995081Z"
+      "updated_at": "2026-06-24T13:43:40.725995081Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T13:44:17.286381501Z"
+      "updated_at": "2026-06-24T13:44:17.286381501Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "65ef3741-765e-48ff-b1bb-00b06e006e4c",
   "labels": [
     "type:task",
     "epic:agent-ergonomics",
-    "satisfies:REQ-04"
+    "satisfies:53e3fa36/REQ-04"
   ],
-  "created_at": "2026-06-22T21:20:41.092645156Z",
-  "updated_at": "2026-07-05T19:51:12.992441030Z",
-  "first_ready_at": "2026-06-22T21:32:38.258178479Z",
-  "claimed_at": "2026-06-24T13:28:55.073438444Z",
-  "done_at": "2026-06-24T13:46:02.629311080Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Gate pass exit-code taxonomy and verdict field",
+  "updated_at": "2026-10-01T19:30:19.217863117Z"
 }

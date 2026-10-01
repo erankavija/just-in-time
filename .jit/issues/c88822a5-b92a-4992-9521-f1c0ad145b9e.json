@@ -83,13 +83,13 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:core",
-    "satisfies:REQ-01",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-01",
+    "satisfies:f1dc843a/REQ-05",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-10-01T15:56:48.260706979Z"
+  "updated_at": "2026-10-01T19:32:44.239074155Z"
 }

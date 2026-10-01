@@ -82,12 +82,12 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:testing",
-    "satisfies:REQ-06",
     "per:@/charter/D-17",
-    "enforces:@/invariant/orthogonal-tests"
+    "enforces:@/invariant/orthogonal-tests",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Superseded rollback coverage retirement",
-  "updated_at": "2026-09-20T22:17:46.102095386Z"
+  "updated_at": "2026-10-01T19:30:51.910715190Z"
 }

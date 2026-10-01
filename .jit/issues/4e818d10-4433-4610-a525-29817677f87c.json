@@ -75,12 +75,12 @@
     "milestone:v1.0",
     "story:redo-record-foundation",
     "component:storage",
-    "satisfies:REQ-03",
     "per:@/charter/D-17",
-    "enforces:@/invariant/shared-test-contracts"
+    "enforces:@/invariant/shared-test-contracts",
+    "satisfies:f1dc843a/REQ-03"
   ],
   "priority": "high",
   "state": "done",
   "title": "Memory-backend record application",
-  "updated_at": "2026-09-20T17:22:05.213995425Z"
+  "updated_at": "2026-10-01T19:29:42.280881281Z"
 }

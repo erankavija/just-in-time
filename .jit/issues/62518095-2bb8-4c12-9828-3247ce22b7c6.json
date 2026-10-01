@@ -28,11 +28,11 @@
   "labels": [
     "epic:gf2-adopter-reliability",
     "component:docs",
-    "satisfies:REQ-02",
-    "type:bug"
+    "type:bug",
+    "satisfies:4a559332/REQ-02"
   ],
   "priority": "high",
   "state": "done",
   "title": "Correct the divergent-store recovery procedure",
-  "updated_at": "2026-08-16T21:47:00.386093090Z"
+  "updated_at": "2026-10-01T19:30:14.737033404Z"
 }

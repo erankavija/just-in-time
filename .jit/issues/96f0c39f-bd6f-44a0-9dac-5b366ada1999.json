@@ -1,13 +1,15 @@
 {
-  "id": "96f0c39f-bd6f-44a0-9dac-5b366ada1999",
-  "title": "Project the registry into a region of CLAUDE.md",
-  "description": "Region projection already exists: `project_invariants` switches `ProjectionMode::{SeparateFile, Region}`; region mode uses `splice_region` (validation/projection.rs:167) to replace only bytes between begin/end markers, atomic write-back through storage, raising a typed `ProjectionError` (never clobbering) on missing/malformed markers. Config `InvariantProjectionConfig` owns target/mode/markers (config.rs:578/596/614).\n\nScope: insert begin/end region markers around the `### Domain Invariants` section of `CLAUDE.md` (line 123) and set `[invariant_projection]` `target=CLAUDE.md`, `mode=region`, reusing the existing region projection. No new engine code is strictly required. The rendered registry output replaces the hand-authored prose (intended dedup). The CLAUDE.md write goes through the storage-backed projection (`write_repo_file`), not `std::fs`.\n\n## Success Criteria\n- [hard] REQ-06: With region markers in place and `mode=region`, `target=CLAUDE.md`, projection replaces only the marked region from the registry (the `### Domain Invariants` section becomes a projection of the registry), and malformed or missing markers raise a typed `ProjectionError` without clobbering the file.\n",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-26T21:27:32.683956538Z",
+  "context": {},
+  "created_at": "2026-06-26T20:51:42.232701269Z",
   "dependencies": [
     "10ce6962-8973-4357-b836-da8c0b3a6789"
   ],
+  "description": "Region projection already exists: `project_invariants` switches `ProjectionMode::{SeparateFile, Region}`; region mode uses `splice_region` (validation/projection.rs:167) to replace only bytes between begin/end markers, atomic write-back through storage, raising a typed `ProjectionError` (never clobbering) on missing/malformed markers. Config `InvariantProjectionConfig` owns target/mode/markers (config.rs:578/596/614).\n\nScope: insert begin/end region markers around the `### Domain Invariants` section of `CLAUDE.md` (line 123) and set `[invariant_projection]` `target=CLAUDE.md`, `mode=region`, reusing the existing region projection. No new engine code is strictly required. The rendered registry output replaces the hand-authored prose (intended dedup). The CLAUDE.md write goes through the storage-backed projection (`write_repo_file`), not `std::fs`.\n\n## Success Criteria\n- [hard] REQ-06: With region markers in place and `mode=region`, `target=CLAUDE.md`, projection replaces only the marked region from the registry (the `### Domain Invariants` section becomes a projection of the registry), and malformed or missing markers raise a typed `ProjectionError` without clobbering the file.\n",
+  "documents": [],
+  "done_at": "2026-06-26T22:54:28.853927216Z",
+  "first_ready_at": "2026-06-26T21:19:00.663757998Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,26 +17,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T22:48:53.425059269Z"
+      "updated_at": "2026-06-26T22:48:53.425059269Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T22:51:15.147354196Z"
+      "updated_at": "2026-06-26T22:51:15.147354196Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "96f0c39f-bd6f-44a0-9dac-5b366ada1999",
   "labels": [
     "type:task",
     "milestone:v1.0",
-    "satisfies:REQ-06",
     "epic:item-sources"
   ],
-  "created_at": "2026-06-26T20:51:42.232701269Z",
-  "updated_at": "2026-07-05T19:51:13.041001325Z",
-  "first_ready_at": "2026-06-26T21:19:00.663757998Z",
-  "claimed_at": "2026-06-26T21:27:32.683956538Z",
-  "done_at": "2026-06-26T22:54:28.853927216Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Project the registry into a region of CLAUDE.md",
+  "updated_at": "2026-10-01T19:31:40.489071895Z"
 }

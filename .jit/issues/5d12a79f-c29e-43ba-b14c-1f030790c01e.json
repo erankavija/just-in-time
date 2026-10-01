@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:30:03.774411987Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
   "dependencies": [
@@ -32,12 +33,12 @@
     "milestone:v1.0",
     "component:core",
     "story:profile-discovery",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-8",
-    "type:task"
+    "type:task",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Resolve a profile package from a given location or the repository's record",
-  "updated_at": "2026-08-02T20:26:30.079805786Z"
+  "updated_at": "2026-10-01T19:30:04.178603780Z"
 }

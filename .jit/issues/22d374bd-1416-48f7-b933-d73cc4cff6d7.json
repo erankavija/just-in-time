@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-30T16:55:24.040057774Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.172773078Z",
@@ -37,10 +37,10 @@
     "type:task",
     "epic:v1-release",
     "milestone:v1.0",
-    "satisfies:REQ-09"
+    "satisfies:b80e3c70/REQ-09"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Add the dual-license and compatibility release record",
-  "updated_at": "2026-07-30T18:24:14.005363309Z"
+  "updated_at": "2026-10-01T19:28:43.698196686Z"
 }

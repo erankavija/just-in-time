@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-30T16:27:30.262472186Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.171353117Z",
@@ -55,10 +55,10 @@
     "type:task",
     "epic:v1-release",
     "milestone:v1.0",
-    "satisfies:REQ-09"
+    "satisfies:b80e3c70/REQ-09"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Make the normal validation suites reusable",
-  "updated_at": "2026-07-30T17:23:13.796209901Z"
+  "updated_at": "2026-10-01T19:33:03.744735666Z"
 }

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-06-25T12:56:12.323745738Z",
   "context": {},
   "created_at": "2026-06-20T19:25:16.025902975Z",
@@ -39,15 +39,15 @@
     "type:task",
     "milestone:v1.0",
     "epic:structured-knowledge",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-04",
-    "satisfies:REQ-08",
-    "satisfies:REQ-09",
-    "satisfies:REQ-10"
+    "satisfies:25064508/REQ-01",
+    "satisfies:25064508/REQ-02",
+    "satisfies:25064508/REQ-04",
+    "satisfies:25064508/REQ-08",
+    "satisfies:25064508/REQ-09",
+    "satisfies:25064508/REQ-10"
   ],
   "priority": "high",
   "state": "done",
   "title": "Addressable structured items in descriptions, with qualified ids",
-  "updated_at": "2026-07-27T10:06:19.467062518Z"
+  "updated_at": "2026-10-01T19:29:55.103319628Z"
 }

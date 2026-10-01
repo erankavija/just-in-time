@@ -74,13 +74,13 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:core",
-    "satisfies:REQ-05",
     "per:@/charter/D-17",
     "enforces:@/invariant/canonical-cutover",
-    "type:task"
+    "type:task",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Bootstrap namespace reservation retires with the kernel",
-  "updated_at": "2026-09-21T17:53:33.296000762Z"
+  "updated_at": "2026-10-01T19:32:26.340586213Z"
 }

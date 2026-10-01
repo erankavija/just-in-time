@@ -82,10 +82,10 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:storage",
-    "satisfies:REQ-05"
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Re-homed no-follow file open",
-  "updated_at": "2026-09-20T22:17:46.419806352Z"
+  "updated_at": "2026-10-01T19:33:24.800864139Z"
 }

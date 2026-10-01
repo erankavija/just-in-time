@@ -77,12 +77,12 @@
     "story:record-publication-cutover",
     "component:storage",
     "component:core",
-    "satisfies:REQ-05",
     "per:@/charter/D-17",
-    "enforces:@/invariant/atomic-writes"
+    "enforces:@/invariant/atomic-writes",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Init publisher for an absent data root",
-  "updated_at": "2026-09-21T15:27:55.080988749Z"
+  "updated_at": "2026-10-01T19:28:28.356728223Z"
 }

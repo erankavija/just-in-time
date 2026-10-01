@@ -1,40 +1,40 @@
 {
-  "id": "52ad3b1f-1048-489a-8595-f04ec846b8b9",
-  "title": "Add the bidirectional enforcement-drift check and the invariant CLI",
-  "description": "Add a bidirectional enforcement-drift check and the `jit invariant` CLI surface. Drift is checked as declaration-consistency (not execution): in one direction, an invariant whose `enforced-by` names a missing or unloadable rule or gate; in the other, a rule or gate that no invariant claims. `jit invariant render` projects the registry and `jit invariant check` runs the drift check, each supporting `--json`; `jit invariant check` exits non-zero when drift is found.\n\nThe declaration-consistency framing follows from the confirmed fact that `Assertion::CheckerCommand` / `enforced-by` bindings are never executed: the local write path skips them (`crates/jit/src/validation/local.rs:288`) and validate has no execution site. A new `Assertion` variant is dispatched at `crates/jit/src/validation/graph.rs:355`; a new `commands/invariant.rs` is registered in `commands/mod.rs` with a thin `main.rs` dispatch arm. This task also corrects the stale docstring at `crates/jit/src/validation/local.rs:300` (which wrongly claims `checker-command` runs during validation).\n\n## Success Criteria\n\n- [hard] REQ-01: Validate reports a declared-but-unenforced invariant (its `enforced-by` names a missing or unloadable rule/gate) as a finding.\n- [hard] REQ-02: Validate reports an enforced-but-undeclared rule/gate (claimed by no invariant) as a finding.\n- [hard] REQ-03: Both drift directions have explicit tests under `cargo test`.\n- [hard] REQ-04: Running `jit invariant render` invokes the configured invariant projection and writes or updates the configured documentation target.\n- [hard] REQ-05: `jit invariant render` and `jit invariant check` each support `--json`.\n- [hard] REQ-06: `jit invariant check` exits non-zero when drift is present.\n- [hard] REQ-07: The stale docstring at `validation/local.rs:300` is corrected to reflect that `checker-command` is not executed during validation.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-25T21:43:45.422988580Z",
+  "context": {},
+  "created_at": "2026-06-24T22:44:37.771419523Z",
   "dependencies": [
     "0d593d90-fe03-4a3c-9a8a-46725c757060"
   ],
+  "description": "Add a bidirectional enforcement-drift check and the `jit invariant` CLI surface. Drift is checked as declaration-consistency (not execution): in one direction, an invariant whose `enforced-by` names a missing or unloadable rule or gate; in the other, a rule or gate that no invariant claims. `jit invariant render` projects the registry and `jit invariant check` runs the drift check, each supporting `--json`; `jit invariant check` exits non-zero when drift is found.\n\nThe declaration-consistency framing follows from the confirmed fact that `Assertion::CheckerCommand` / `enforced-by` bindings are never executed: the local write path skips them (`crates/jit/src/validation/local.rs:288`) and validate has no execution site. A new `Assertion` variant is dispatched at `crates/jit/src/validation/graph.rs:355`; a new `commands/invariant.rs` is registered in `commands/mod.rs` with a thin `main.rs` dispatch arm. This task also corrects the stale docstring at `crates/jit/src/validation/local.rs:300` (which wrongly claims `checker-command` runs during validation).\n\n## Success Criteria\n\n- [hard] REQ-01: Validate reports a declared-but-unenforced invariant (its `enforced-by` names a missing or unloadable rule/gate) as a finding.\n- [hard] REQ-02: Validate reports an enforced-but-undeclared rule/gate (claimed by no invariant) as a finding.\n- [hard] REQ-03: Both drift directions have explicit tests under `cargo test`.\n- [hard] REQ-04: Running `jit invariant render` invokes the configured invariant projection and writes or updates the configured documentation target.\n- [hard] REQ-05: `jit invariant render` and `jit invariant check` each support `--json`.\n- [hard] REQ-06: `jit invariant check` exits non-zero when drift is present.\n- [hard] REQ-07: The stale docstring at `validation/local.rs:300` is corrected to reflect that `checker-command` is not executed during validation.",
+  "documents": [],
+  "done_at": "2026-06-25T23:38:10.197991667Z",
+  "first_ready_at": "2026-06-25T21:11:23.660563017Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T23:35:21.744761962Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T23:32:17.009229899Z"
+      "updated_at": "2026-06-25T23:32:17.009229899Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-25T23:35:21.744761962Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "52ad3b1f-1048-489a-8595-f04ec846b8b9",
   "labels": [
     "type:task",
     "epic:structured-knowledge",
-    "satisfies:REQ-07",
-    "satisfies:REQ-09"
+    "satisfies:25064508/REQ-07",
+    "satisfies:25064508/REQ-09"
   ],
-  "created_at": "2026-06-24T22:44:37.771419523Z",
-  "updated_at": "2026-07-05T19:51:12.967008171Z",
-  "first_ready_at": "2026-06-25T21:11:23.660563017Z",
-  "claimed_at": "2026-06-25T21:43:45.422988580Z",
-  "done_at": "2026-06-25T23:38:10.197991667Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add the bidirectional enforcement-drift check and the invariant CLI",
+  "updated_at": "2026-10-01T19:29:49.154849560Z"
 }

@@ -87,12 +87,12 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:docs",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Generated storage-records reference matches the append encoding",
-  "updated_at": "2026-10-01T15:40:21.381901618Z"
+  "updated_at": "2026-10-01T19:31:31.236361427Z"
 }

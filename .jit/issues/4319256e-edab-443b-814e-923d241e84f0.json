@@ -77,14 +77,14 @@
     "story:record-publication-cutover",
     "component:storage",
     "component:core",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04",
-    "satisfies:REQ-05",
     "per:@/charter/D-17",
-    "enforces:@/invariant/derived-state-coherence"
+    "enforces:@/invariant/derived-state-coherence",
+    "satisfies:f1dc843a/REQ-03",
+    "satisfies:f1dc843a/REQ-04",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Session commit through the redo record",
-  "updated_at": "2026-09-21T14:23:22.533739622Z"
+  "updated_at": "2026-10-01T19:29:24.741382270Z"
 }

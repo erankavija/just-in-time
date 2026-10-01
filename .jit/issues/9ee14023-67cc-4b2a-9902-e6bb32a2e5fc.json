@@ -32,10 +32,10 @@
     "epic:repository-state-quality",
     "story:presentation-succession",
     "milestone:v1.0",
-    "satisfies:REQ-16"
+    "satisfies:1cc809de/REQ-16"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Replace the repository-materialization showcase with a corrected successor",
-  "updated_at": "2026-07-25T05:26:35.177293395Z"
+  "updated_at": "2026-10-01T19:31:54.730498141Z"
 }

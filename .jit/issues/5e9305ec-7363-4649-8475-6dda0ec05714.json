@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-27T13:06:17.256998578Z",
   "context": {},
   "created_at": "2026-07-25T13:20:37.281986323Z",
@@ -33,12 +33,12 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:canonical-documentation-home",
-    "satisfies:REQ-12",
     "per:@/charter/D-13",
-    "enforces:@/invariant/single-source-prose"
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:8e071e18/REQ-12"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Align contributor guides with the shipped archival mechanism",
-  "updated_at": "2026-07-27T13:23:17.675003200Z"
+  "updated_at": "2026-10-01T19:30:06.680301274Z"
 }

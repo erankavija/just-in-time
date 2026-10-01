@@ -132,11 +132,11 @@
     "milestone:v1.0",
     "story:record-publication-cutover",
     "component:docs",
-    "satisfies:REQ-07",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Deployment guide backup procedure",
-  "updated_at": "2026-09-21T16:22:04.492959880Z"
+  "updated_at": "2026-10-01T19:33:11.164438755Z"
 }

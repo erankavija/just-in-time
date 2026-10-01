@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-04T16:35:57.339969995Z",
   "context": {},
   "created_at": "2026-08-04T14:48:08.764545599Z",
@@ -39,12 +39,12 @@
     "epic:guards-and-ergonomics",
     "milestone:v1.0",
     "component:core",
-    "satisfies:REQ-01",
     "enforces:@/invariant/single-source-prose",
-    "type:task"
+    "type:task",
+    "satisfies:f3f7de97/REQ-01"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Bind every published package to the registry it restates",
-  "updated_at": "2026-08-22T11:53:41.182152271Z"
+  "updated_at": "2026-10-01T19:29:10.548902285Z"
 }

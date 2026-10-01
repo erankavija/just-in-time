@@ -1,14 +1,16 @@
 {
-  "id": "be3eb6ca-d9b1-4963-b1ec-e73baacf4708",
-  "title": "Add the risk item kind",
-  "description": "Add `risk` as a markdown-first item kind so risks authored in issue descriptions become addressable, queryable items. Configure the kind in `[item_kinds]` (its section, id-pattern, marker, and the `mitigates:`/`resolves:` link namespaces) and index risks from descriptions via the generic triple-driven parse path the `requirement` kind already uses. The markdown description stays the sole source of truth, with no duplicated structured store. Builds on scoped-id addressing and the six-tuple kind registry.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-02: A `mitigates:<qualified-id>` label and a `resolves:<qualified-id>` label each resolve to the addressed risk item.\n- [hard] REQ-03: The markdown description is the only source for risk items; no parallel structured store duplicates them.\n- [hard] REQ-04: The behavior is covered by `cargo test`.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-25T17:56:37.928334843Z",
+  "context": {},
+  "created_at": "2026-06-24T22:48:19.007985560Z",
   "dependencies": [
     "1e1ea81d-e583-4a1a-9e50-db9ea8eddef5",
     "61b17603-df87-4bd8-8cc5-57bca6be2e71"
   ],
+  "description": "Add `risk` as a markdown-first item kind so risks authored in issue descriptions become addressable, queryable items. Configure the kind in `[item_kinds]` (its section, id-pattern, marker, and the `mitigates:`/`resolves:` link namespaces) and index risks from descriptions via the generic triple-driven parse path the `requirement` kind already uses. The markdown description stays the sole source of truth, with no duplicated structured store. Builds on scoped-id addressing and the six-tuple kind registry.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit item list --kind risk` returns risk items parsed from issue descriptions.\n- [hard] REQ-02: A `mitigates:<qualified-id>` label and a `resolves:<qualified-id>` label each resolve to the addressed risk item.\n- [hard] REQ-03: The markdown description is the only source for risk items; no parallel structured store duplicates them.\n- [hard] REQ-04: The behavior is covered by `cargo test`.",
+  "documents": [],
+  "done_at": "2026-06-25T18:12:44.006046780Z",
+  "first_ready_at": "2026-06-25T16:55:06.011809798Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -16,26 +18,24 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T18:06:52.551861378Z"
+      "updated_at": "2026-06-25T18:06:52.551861378Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T18:10:13.547117963Z"
+      "updated_at": "2026-06-25T18:10:13.547117963Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "be3eb6ca-d9b1-4963-b1ec-e73baacf4708",
   "labels": [
     "type:task",
     "epic:structured-knowledge",
     "story:decision-risk-kinds",
-    "satisfies:REQ-04"
+    "satisfies:25064508/REQ-04"
   ],
-  "created_at": "2026-06-24T22:48:19.007985560Z",
-  "updated_at": "2026-07-05T19:51:13.076310141Z",
-  "first_ready_at": "2026-06-25T16:55:06.011809798Z",
-  "claimed_at": "2026-06-25T17:56:37.928334843Z",
-  "done_at": "2026-06-25T18:12:44.006046780Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add the risk item kind",
+  "updated_at": "2026-10-01T19:32:36.372046342Z"
 }

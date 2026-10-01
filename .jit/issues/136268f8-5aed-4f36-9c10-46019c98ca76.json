@@ -1,13 +1,15 @@
 {
-  "id": "136268f8-5aed-4f36-9c10-46019c98ca76",
-  "title": "Config-declared template role and anchor bindings",
-  "description": "Replace the hardcoded template role and anchor names with repository-configured bindings so the template engine honors INV-DOMAIN-AGNOSTIC end to end.\n\n## Background\n\nThe engine's node types are fully config-driven, but three names are compiled in and reached for by name: `PLANNING_ROLE` and `BREAKDOWN_ROLE` (`templates.rs:546,560`, consumed by breakdown, forced refresh, and validation) and the `container` anchor auto-bound from the positional CLI argument (`main.rs:2726`). A template using different role names silently falls outside the bracket tooling. Decision fixed at epic creation: the bindings become configuration (e.g. a `[templates.roles]` table) with defaults preserving the current names.\n\n## Success Criteria\n\n- [hard] REQ-1: The role names consumed by breakdown, refresh, and validation, and the auto-bound anchor name, are read from repository configuration; absent config yields today's names, so existing repositories work unchanged.\n- [hard] REQ-2: A repository configured with different role and anchor names completes the full bracket flow (apply, breakdown, forced refresh) end to end, verified by an integration test.\n- [hard] REQ-3: No role or anchor name literal remains in non-test engine code.\n- [hard] REQ-4: The configuration reference documents the new keys, their defaults, and what each binding controls.\n\n## Notes\n\nKeep the binding lookup in one place (the template registry or config layer), so consuming commands ask for \"the breakdown role\" rather than re-reading config keys.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T22:56:14.819071596Z",
+  "context": {},
+  "created_at": "2026-07-05T22:31:18.725177409Z",
   "dependencies": [
     "2f447380-e004-40bf-b452-eb0ff6106500"
   ],
+  "description": "Replace the hardcoded template role and anchor names with repository-configured bindings so the template engine honors INV-DOMAIN-AGNOSTIC end to end.\n\n## Background\n\nThe engine's node types are fully config-driven, but three names are compiled in and reached for by name: `PLANNING_ROLE` and `BREAKDOWN_ROLE` (`templates.rs:546,560`, consumed by breakdown, forced refresh, and validation) and the `container` anchor auto-bound from the positional CLI argument (`main.rs:2726`). A template using different role names silently falls outside the bracket tooling. Decision fixed at epic creation: the bindings become configuration (e.g. a `[templates.roles]` table) with defaults preserving the current names.\n\n## Success Criteria\n\n- [hard] REQ-1: The role names consumed by breakdown, refresh, and validation, and the auto-bound anchor name, are read from repository configuration; absent config yields today's names, so existing repositories work unchanged.\n- [hard] REQ-2: A repository configured with different role and anchor names completes the full bracket flow (apply, breakdown, forced refresh) end to end, verified by an integration test.\n- [hard] REQ-3: No role or anchor name literal remains in non-test engine code.\n- [hard] REQ-4: The configuration reference documents the new keys, their defaults, and what each binding controls.\n\n## Notes\n\nKeep the binding lookup in one place (the template registry or config layer), so consuming commands ask for \"the breakdown role\" rather than re-reading config keys.",
+  "documents": [],
+  "done_at": "2026-07-10T08:44:42.129716280Z",
+  "first_ready_at": "2026-07-05T22:31:18.725177849Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
@@ -15,26 +17,24 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T08:40:08.480378129Z"
+      "updated_at": "2026-07-10T08:40:08.480378129Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-10T08:40:30.859779452Z"
+      "updated_at": "2026-07-10T08:40:30.859779452Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "136268f8-5aed-4f36-9c10-46019c98ca76",
   "labels": [
     "type:task",
     "epic:work-graph-integrity",
     "component:cli",
-    "satisfies:REQ-6"
+    "satisfies:dbe1e821/REQ-6"
   ],
-  "created_at": "2026-07-05T22:31:18.725177409Z",
-  "updated_at": "2026-07-10T08:44:42.129717080Z",
-  "first_ready_at": "2026-07-05T22:31:18.725177849Z",
-  "claimed_at": "2026-07-09T22:56:14.819071596Z",
-  "done_at": "2026-07-10T08:44:42.129716280Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Config-declared template role and anchor bindings",
+  "updated_at": "2026-10-01T19:28:31.261527252Z"
 }

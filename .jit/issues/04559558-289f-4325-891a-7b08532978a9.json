@@ -1,40 +1,41 @@
 {
-  "id": "04559558-289f-4325-891a-7b08532978a9",
-  "title": "Graph-template registry: templates.toml schema, loader, and the plan template",
-  "description": "Add the graph-template registry that the apply engine reads.\n\nDefine the template types in a new module (a template; nodes with role, type, gates, doc and description; named anchors; transforms) and a `.jit/templates.toml` loader validated at config load. Author this repo's `plan` template (planning + breakdown nodes, applying to the breakable container type) and expose accessors the existing planning-config consumers will switch to. Additive — the current configuration path stays untouched this wave.\n\n## Success Criteria\n- [ ] [hard] REG-01: `.jit/templates.toml` parses into typed templates; an invalid template fails at config load with a clear error.\n- [ ] [hard] REG-02: The `plan` template is authored and round-trips through the loader.\n- [ ] [hard] REG-03: The registry yields, for a container type, the applicable template and its planning/breakdown node types, doc location, and breakable types.\n- [ ] [hard] REG-04: Existing behavior is unchanged this wave.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:28:07.752544172Z",
+  "context": {},
+  "created_at": "2026-06-22T21:59:04.435372907Z",
   "dependencies": [
     "8b15b679-337c-4841-a708-596498328313"
   ],
+  "description": "Add the graph-template registry that the apply engine reads.\n\nDefine the template types in a new module (a template; nodes with role, type, gates, doc and description; named anchors; transforms) and a `.jit/templates.toml` loader validated at config load. Author this repo's `plan` template (planning + breakdown nodes, applying to the breakable container type) and expose accessors the existing planning-config consumers will switch to. Additive — the current configuration path stays untouched this wave.\n\n## Success Criteria\n- [ ] [hard] REG-01: `.jit/templates.toml` parses into typed templates; an invalid template fails at config load with a clear error.\n- [ ] [hard] REG-02: The `plan` template is authored and round-trips through the loader.\n- [ ] [hard] REG-03: The registry yields, for a container type, the applicable template and its planning/breakdown node types, doc location, and breakable types.\n- [ ] [hard] REG-04: Existing behavior is unchanged this wave.",
+  "documents": [],
+  "done_at": "2026-06-23T14:05:38.965199841Z",
+  "first_ready_at": "2026-06-23T13:15:32.946438422Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T14:02:55.397843164Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T13:58:20.202637020Z"
+      "updated_at": "2026-06-23T13:58:20.202637020Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-23T14:02:55.397843164Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "04559558-289f-4325-891a-7b08532978a9",
   "labels": [
     "epic:graph-templates",
     "milestone:v1.0",
-    "satisfies:REQ-01",
     "type:story",
-    "story:template-registry"
+    "story:template-registry",
+    "satisfies:9ac9fdac/REQ-01"
   ],
-  "created_at": "2026-06-22T21:59:04.435372907Z",
-  "updated_at": "2026-07-05T19:51:12.894927969Z",
-  "first_ready_at": "2026-06-23T13:15:32.946438422Z",
-  "done_at": "2026-06-23T14:05:38.965199841Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Graph-template registry: templates.toml schema, loader, and the plan template",
+  "updated_at": "2026-10-01T19:28:08.861525699Z"
 }

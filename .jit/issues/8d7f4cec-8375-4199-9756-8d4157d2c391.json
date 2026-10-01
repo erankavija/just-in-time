@@ -77,12 +77,12 @@
     "story:record-publication-cutover",
     "component:testing",
     "component:core",
-    "satisfies:REQ-05",
     "per:@/charter/D-17",
-    "enforces:@/invariant/orthogonal-tests"
+    "enforces:@/invariant/orthogonal-tests",
+    "satisfies:f1dc843a/REQ-05"
   ],
   "priority": "high",
   "state": "done",
   "title": "Publication failure injection repoint",
-  "updated_at": "2026-09-21T09:11:26.943913761Z"
+  "updated_at": "2026-10-01T19:31:27.638432875Z"
 }

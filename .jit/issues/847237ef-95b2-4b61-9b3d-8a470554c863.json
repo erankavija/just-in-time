@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:31:16.813492266Z",
   "context": {},
   "created_at": "2026-07-15T11:19:56.071658839Z",
   "dependencies": [],
@@ -17,13 +18,13 @@
     "type:task",
     "epic:production-readiness",
     "story:release-authority-foundation",
-    "satisfies:REQ-03",
-    "satisfies:REQ-04",
-    "satisfies:REQ-05",
-    "resolution:over-engineered"
+    "resolution:over-engineered",
+    "satisfies:8b05a612/REQ-03",
+    "satisfies:8b05a612/REQ-04",
+    "satisfies:8b05a612/REQ-05"
   ],
   "priority": "high",
   "state": "rejected",
   "title": "Implement the fixed-ref tag authority primitive",
-  "updated_at": "2026-07-29T13:50:04.390202177Z"
+  "updated_at": "2026-10-01T19:31:17.345614455Z"
 }

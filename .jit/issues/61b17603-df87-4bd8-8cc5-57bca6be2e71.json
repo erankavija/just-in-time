@@ -1,39 +1,40 @@
 {
-  "id": "61b17603-df87-4bd8-8cc5-57bca6be2e71",
-  "title": "Widen qualified ids to scoped addressing with project scope",
-  "description": "Generalize qualified-id addressing from the issue-scoped form to the full `<scope>/<self-id>` shape, where `scope` is either an issue short-id or `@` for the project. This lets project-level items (not tied to any one issue) be addressed alongside issue-scoped ones, completing the addressing model the rest of the work builds on. The id stays a pure projection, derived from the resolved scope and the parsed self-id and never persisted as a separate field, building on the issue-scope resolver and reusing `resolve_issue_id` (`crates/jit/src/storage/mod.rs:158`) and `Issue::short_id()` (`crates/jit/src/domain/types.rs:237`).\n\n## Success Criteria\n\n- [hard] REQ-01: Resolving `@/<self-id>` (project scope) succeeds and returns the addressed item.\n- [hard] REQ-02: Resolving `<issue-short-id>/<self-id>` succeeds and returns the addressed item.\n- [hard] REQ-03: A self-id that appears more than once within a single scope is reported as a duplicate, rather than silently resolving to one of them.\n- [hard] REQ-04: Self-id uniqueness is enforced per scope: the same self-id may exist under two different scopes without conflict.\n- [hard] REQ-05: No new persisted id field is introduced; the qualified id remains derived from `short_id()` plus the parsed self-id (`cargo test` covers the resolve and degradation paths).",
-  "state": "done",
-  "priority": "high",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:30:12.564732704Z",
+  "context": {},
+  "created_at": "2026-06-24T22:44:00.083611971Z",
   "dependencies": [
     "56ab0224-fd6e-4929-a61e-ffb1a3104496"
   ],
+  "description": "Generalize qualified-id addressing from the issue-scoped form to the full `<scope>/<self-id>` shape, where `scope` is either an issue short-id or `@` for the project. This lets project-level items (not tied to any one issue) be addressed alongside issue-scoped ones, completing the addressing model the rest of the work builds on. The id stays a pure projection, derived from the resolved scope and the parsed self-id and never persisted as a separate field, building on the issue-scope resolver and reusing `resolve_issue_id` (`crates/jit/src/storage/mod.rs:158`) and `Issue::short_id()` (`crates/jit/src/domain/types.rs:237`).\n\n## Success Criteria\n\n- [hard] REQ-01: Resolving `@/<self-id>` (project scope) succeeds and returns the addressed item.\n- [hard] REQ-02: Resolving `<issue-short-id>/<self-id>` succeeds and returns the addressed item.\n- [hard] REQ-03: A self-id that appears more than once within a single scope is reported as a duplicate, rather than silently resolving to one of them.\n- [hard] REQ-04: Self-id uniqueness is enforced per scope: the same self-id may exist under two different scopes without conflict.\n- [hard] REQ-05: No new persisted id field is introduced; the qualified id remains derived from `short_id()` plus the parsed self-id (`cargo test` covers the resolve and degradation paths).",
+  "documents": [],
+  "done_at": "2026-06-25T16:08:10.841685551Z",
+  "first_ready_at": "2026-06-25T13:58:44.687299557Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T16:06:21.747708309Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T16:05:13.077778693Z"
+      "updated_at": "2026-06-25T16:05:13.077778693Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-25T16:06:21.747708309Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "61b17603-df87-4bd8-8cc5-57bca6be2e71",
   "labels": [
     "type:task",
     "epic:structured-knowledge",
-    "satisfies:REQ-01",
-    "satisfies:REQ-10"
+    "satisfies:25064508/REQ-01",
+    "satisfies:25064508/REQ-10"
   ],
-  "created_at": "2026-06-24T22:44:00.083611971Z",
-  "updated_at": "2026-07-05T19:51:12.986571535Z",
-  "first_ready_at": "2026-06-25T13:58:44.687299557Z",
-  "done_at": "2026-06-25T16:08:10.841685551Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Widen qualified ids to scoped addressing with project scope",
+  "updated_at": "2026-10-01T19:30:13.003932862Z"
 }

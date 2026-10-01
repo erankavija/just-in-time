@@ -1,11 +1,13 @@
 {
-  "id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
-  "title": "Refresh mcp-server README tool statements",
-  "description": "mcp-server/README.md hardcodes a stale generated-tool count in four places; the generator currently emits substantially more tools than stated.\n\n## Success Criteria\n\n- [hard] REQ-01: The README carries no hardcoded tool count that can silently rot; it states the generation mechanism instead\n- [hard] REQ-02: Statements about tool generation match the current generator behavior",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-07-09T23:14:07.862399448Z",
+  "context": {},
+  "created_at": "2026-07-06T15:39:58.883006375Z",
   "dependencies": [],
+  "description": "mcp-server/README.md hardcodes a stale generated-tool count in four places; the generator currently emits substantially more tools than stated.\n\n## Success Criteria\n\n- [hard] REQ-01: The README carries no hardcoded tool count that can silently rot; it states the generation mechanism instead\n- [hard] REQ-02: Statements about tool generation match the current generator behavior",
+  "documents": [],
+  "done_at": "2026-07-10T10:33:03.925175350Z",
+  "first_ready_at": "2026-07-06T15:39:58.883006625Z",
   "gates_required": [
     "jit-validate",
     "code-review"
@@ -13,26 +15,24 @@
   "gates_status": {
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T23:54:10.410333953Z"
+      "updated_at": "2026-07-09T23:54:10.410333953Z",
+      "updated_by": "auto:executor"
     },
     "jit-validate": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-09T23:48:52.914509098Z"
+      "updated_at": "2026-07-09T23:48:52.914509098Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "287f7bc9-c185-49a7-bc68-0102aaada58d",
   "labels": [
     "type:task",
     "epic:docs-accuracy",
     "component:docs",
-    "satisfies:REQ-01"
+    "satisfies:287c4051/REQ-01"
   ],
-  "created_at": "2026-07-06T15:39:58.883006375Z",
-  "updated_at": "2026-07-10T10:33:03.925175970Z",
-  "first_ready_at": "2026-07-06T15:39:58.883006625Z",
-  "claimed_at": "2026-07-09T23:14:07.862399448Z",
-  "done_at": "2026-07-10T10:33:03.925175350Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Refresh mcp-server README tool statements",
+  "updated_at": "2026-10-01T19:28:48.979246107Z"
 }

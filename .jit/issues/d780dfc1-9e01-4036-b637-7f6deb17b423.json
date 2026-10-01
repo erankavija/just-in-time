@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:epic-doc-scope",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T19:07:39.539025491Z",
   "context": {},
   "created_at": "2026-07-28T19:07:22.272333933Z",
@@ -30,12 +30,12 @@
     "milestone:v1.0",
     "component:cli",
     "story:failure-contract-docs",
-    "satisfies:REQ-07",
     "per:@/charter/D-13",
-    "type:task"
+    "type:task",
+    "satisfies:a2546471/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Scope the canonical failure contract to post-dispatch failures",
-  "updated_at": "2026-07-28T19:15:12.869676606Z"
+  "updated_at": "2026-10-01T19:32:56.425106487Z"
 }

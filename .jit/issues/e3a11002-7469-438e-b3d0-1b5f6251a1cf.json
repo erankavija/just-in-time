@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T08:23:54.256328292Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
@@ -33,10 +33,10 @@
     "milestone:v1.0",
     "component:cli",
     "story:code-vocabulary",
-    "satisfies:REQ-04"
+    "satisfies:a2546471/REQ-04"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Align the search command's exit status with its reported error code",
-  "updated_at": "2026-07-28T09:55:57.539246317Z"
+  "updated_at": "2026-10-01T19:33:07.227881146Z"
 }

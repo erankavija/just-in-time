@@ -75,12 +75,12 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:core",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-05",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Mutation document closure retirement",
-  "updated_at": "2026-10-01T19:20:16.369332602Z"
+  "updated_at": "2026-10-01T19:31:16.252242274Z"
 }

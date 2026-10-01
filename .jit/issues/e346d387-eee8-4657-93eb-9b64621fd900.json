@@ -95,12 +95,12 @@
     "component:core",
     "component:storage",
     "component:cli",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/essential-code-prose"
+    "enforces:@/invariant/essential-code-prose",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Rust prose and command help state the redo record",
-  "updated_at": "2026-10-01T15:16:09.969948991Z"
+  "updated_at": "2026-10-01T19:33:06.600122442Z"
 }

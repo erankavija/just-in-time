@@ -44,10 +44,10 @@
     "epic:gf2-adopter-reliability",
     "component:storage",
     "component:docs",
-    "satisfies:REQ-01"
+    "satisfies:4a559332/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Worktree write policy configuration key",
-  "updated_at": "2026-08-16T15:07:44.019673390Z"
+  "updated_at": "2026-10-01T19:28:35.398983321Z"
 }

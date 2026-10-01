@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-01T20:38:28.438942856Z",
   "context": {},
   "created_at": "2026-07-31T16:28:27.583411185Z",
@@ -39,12 +39,12 @@
     "milestone:v1.0",
     "component:core",
     "story:profile-discovery",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-8",
-    "enforces:@/invariant/derived-state-coherence"
+    "enforces:@/invariant/derived-state-coherence",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Record where an applied package came from",
-  "updated_at": "2026-08-02T19:58:51.129631100Z"
+  "updated_at": "2026-10-01T19:30:32.645878766Z"
 }

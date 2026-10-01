@@ -61,10 +61,10 @@
     "epic:docs-exhaustive-audit",
     "milestone:v1.0",
     "component:docs",
-    "satisfies:REQ-06"
+    "satisfies:2d109173/REQ-06"
   ],
   "priority": "normal",
   "state": "done",
   "title": "File follow-ups for engine gaps and missing projection surfaces",
-  "updated_at": "2026-07-29T09:19:06.017913667Z"
+  "updated_at": "2026-10-01T19:30:37.556266744Z"
 }

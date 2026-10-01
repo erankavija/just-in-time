@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:sol-jit-artifact-wrapper",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-12T09:14:38.922362798Z",
   "context": {},
   "created_at": "2026-08-12T09:14:12.799098254Z",
@@ -31,11 +31,11 @@
     "epic:test-suite-performance",
     "milestone:v1.0",
     "component:testing",
-    "satisfies:REQ-01",
-    "type:task"
+    "type:task",
+    "satisfies:4b7c06d0/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Screen ordinary JIT artifacts with a compiler wrapper",
-  "updated_at": "2026-08-12T10:59:52.617570250Z"
+  "updated_at": "2026-10-01T19:30:58.532238417Z"
 }

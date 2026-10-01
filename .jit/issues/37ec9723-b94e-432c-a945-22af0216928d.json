@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:29:07.710939009Z",
   "context": {},
   "created_at": "2026-07-15T09:12:53.179589643Z",
   "dependencies": [
@@ -18,13 +19,13 @@
   "labels": [
     "type:task",
     "epic:production-readiness",
-    "satisfies:REQ-01",
-    "satisfies:REQ-04",
-    "satisfies:REQ-05",
-    "resolution:over-engineered"
+    "resolution:over-engineered",
+    "satisfies:8b05a612/REQ-01",
+    "satisfies:8b05a612/REQ-04",
+    "satisfies:8b05a612/REQ-05"
   ],
   "priority": "normal",
   "state": "rejected",
   "title": "Build and attest the frozen MCP candidate",
-  "updated_at": "2026-07-29T13:41:21.328064181Z"
+  "updated_at": "2026-10-01T19:29:08.254357871Z"
 }

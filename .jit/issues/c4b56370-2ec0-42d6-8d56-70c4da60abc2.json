@@ -1,13 +1,15 @@
 {
-  "id": "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
-  "title": "Claim git-requirement error and documentation",
-  "description": "Make claim and lease commands fail clearly outside a git repo and document the requirement.\n\n## Background\n\nClaim and lease commands depend on `get_current_branch`, which already errors outside a git repo but with a generic message (commands/claim.rs:14-29). The project's CLAUDE.md states \"git is optional\", which does not flag the lease exception.\n\n## Success Criteria\n\n- [hard] REQ-17: a claim or lease command run outside a git repository emits an actionable error naming the git requirement, and the project guidance documents that leases require git.\n\n## Notes\n\nTouch commands/claim.rs for an actionable error that names the git requirement, and amend the \"git is optional\" guidance in CLAUDE.md with the lease exception. Self-contained.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:32:39.775876359Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:34.445918121Z",
   "dependencies": [
     "7f709152-973d-49c9-8848-3845c6782e38"
   ],
+  "description": "Make claim and lease commands fail clearly outside a git repo and document the requirement.\n\n## Background\n\nClaim and lease commands depend on `get_current_branch`, which already errors outside a git repo but with a generic message (commands/claim.rs:14-29). The project's CLAUDE.md states \"git is optional\", which does not flag the lease exception.\n\n## Success Criteria\n\n- [hard] REQ-17: a claim or lease command run outside a git repository emits an actionable error naming the git requirement, and the project guidance documents that leases require git.\n\n## Notes\n\nTouch commands/claim.rs for an actionable error that names the git requirement, and amend the \"git is optional\" guidance in CLAUDE.md with the lease exception. Self-contained.",
+  "documents": [],
+  "done_at": "2026-06-27T23:54:25.083183056Z",
+  "first_ready_at": "2026-06-27T21:53:36.030123286Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,25 +17,24 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:52:08.714759671Z"
+      "updated_at": "2026-06-27T23:52:08.714759671Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-27T23:52:59.860319544Z"
+      "updated_at": "2026-06-27T23:52:59.860319544Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c4b56370-2ec0-42d6-8d56-70c4da60abc2",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-17"
+    "satisfies:2e926e39/REQ-17"
   ],
-  "created_at": "2026-06-27T21:43:34.445918121Z",
-  "updated_at": "2026-07-05T19:51:13.080179023Z",
-  "first_ready_at": "2026-06-27T21:53:36.030123286Z",
-  "done_at": "2026-06-27T23:54:25.083183056Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Claim git-requirement error and documentation",
+  "updated_at": "2026-10-01T19:32:40.058717882Z"
 }

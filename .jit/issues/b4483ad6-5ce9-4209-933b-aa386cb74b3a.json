@@ -89,14 +89,14 @@
     "component:core",
     "component:storage",
     "component:docs",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-07",
     "per:@/charter/D-17",
-    "enforces:@/invariant/event-log"
+    "enforces:@/invariant/event-log",
+    "satisfies:f1dc843a/REQ-01",
+    "satisfies:f1dc843a/REQ-02",
+    "satisfies:f1dc843a/REQ-07"
   ],
   "priority": "high",
   "state": "done",
   "title": "Positioned event-log append",
-  "updated_at": "2026-10-01T11:42:30.134881549Z"
+  "updated_at": "2026-10-01T19:32:19.604896444Z"
 }

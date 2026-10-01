@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:lead-c639cfb5",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-08-12T22:26:13.409794106Z",
   "context": {},
   "created_at": "2026-08-08T23:11:26.421913953Z",
@@ -39,11 +39,11 @@
     "per:@/charter/D-8",
     "story:surface-and-evidence",
     "component:cli",
-    "satisfies:REQ-06",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "satisfies:c639cfb5/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Check applied profiles against their packages and the repository",
-  "updated_at": "2026-08-13T04:31:51.681074174Z"
+  "updated_at": "2026-10-01T19:33:26.576752691Z"
 }

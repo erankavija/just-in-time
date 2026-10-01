@@ -1,39 +1,40 @@
 {
-  "id": "a1623187-240c-4077-8b83-48f04d1df04a",
-  "title": "First-guess command residuals",
-  "description": "Remove the remaining commands and flags that fail on the natural first guess.\n\n## Background\n\nSeveral first guesses fail today: `gate define` exposes the mode only as `-m/--mode` with no `--auto` convenience (cli.rs:885-887); `doc add` has `--label`/`--doc-type` but no `--title`, while the canonical human-label flag is `--label` (cli.rs:1175,1179); gate inspection misparses when the gate key and issue id are transposed; and the top-level command set has no reverse-deps or issue-listing entry (cli.rs:39-145).\n\n## Success Criteria\n\n- [hard] REQ-05: gate define --auto sets mode to auto; doc add --title is accepted as an alias for the human label; a gate-inspection call with the gate key and issue id transposed yields an actionable suggestion rather than a misparse; and a top-level reverse-dependency or issue-listing first guess resolves to the canonical command or an actionable error.\n\n## Notes\n\nTouch cli.rs (gate define, doc add, the gate Check variant, top-level Commands) and the affected handlers. `--auto` sets mode=auto; `--title` on `doc add` aliases the `--label` human label; transposed gate-inspection args yield a did-you-mean; the reverse-deps / issue-listing guess resolves to the canonical command or an actionable error.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:31:59.042068338Z",
+  "context": {},
+  "created_at": "2026-06-27T21:43:33.231677634Z",
   "dependencies": [
     "527bf0a6-1b48-4a62-8229-31c3f9308a30"
   ],
+  "description": "Remove the remaining commands and flags that fail on the natural first guess.\n\n## Background\n\nSeveral first guesses fail today: `gate define` exposes the mode only as `-m/--mode` with no `--auto` convenience (cli.rs:885-887); `doc add` has `--label`/`--doc-type` but no `--title`, while the canonical human-label flag is `--label` (cli.rs:1175,1179); gate inspection misparses when the gate key and issue id are transposed; and the top-level command set has no reverse-deps or issue-listing entry (cli.rs:39-145).\n\n## Success Criteria\n\n- [hard] REQ-05: gate define --auto sets mode to auto; doc add --title is accepted as an alias for the human label; a gate-inspection call with the gate key and issue id transposed yields an actionable suggestion rather than a misparse; and a top-level reverse-dependency or issue-listing first guess resolves to the canonical command or an actionable error.\n\n## Notes\n\nTouch cli.rs (gate define, doc add, the gate Check variant, top-level Commands) and the affected handlers. `--auto` sets mode=auto; `--title` on `doc add` aliases the `--label` human label; transposed gate-inspection args yield a did-you-mean; the reverse-deps / issue-listing guess resolves to the canonical command or an actionable error.",
+  "documents": [],
+  "done_at": "2026-06-28T01:13:25.086750552Z",
+  "first_ready_at": "2026-06-27T23:43:53.144124877Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T01:10:56.887713671Z"
-    },
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-28T01:08:36.847229786Z"
+      "updated_at": "2026-06-28T01:08:36.847229786Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-06-28T01:10:56.887713671Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "a1623187-240c-4077-8b83-48f04d1df04a",
   "labels": [
     "type:task",
     "epic:agent-seamlessness",
     "milestone:v1.0",
-    "satisfies:REQ-05"
+    "satisfies:2e926e39/REQ-05"
   ],
-  "created_at": "2026-06-27T21:43:33.231677634Z",
-  "updated_at": "2026-07-05T19:51:13.048474660Z",
-  "first_ready_at": "2026-06-27T23:43:53.144124877Z",
-  "done_at": "2026-06-28T01:13:25.086750552Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "First-guess command residuals",
+  "updated_at": "2026-10-01T19:31:59.502417495Z"
 }

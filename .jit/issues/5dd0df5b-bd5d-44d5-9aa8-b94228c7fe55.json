@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-31T19:26:12.225990118Z",
   "context": {},
   "created_at": "2026-07-31T17:28:56.596684919Z",
@@ -39,12 +39,12 @@
     "milestone:v1.0",
     "component:core",
     "story:profile-discovery",
-    "satisfies:REQ-08",
     "per:@/issue/e204e63d/decision/D-14",
-    "enforces:@/invariant/semantic-types"
+    "enforces:@/invariant/semantic-types",
+    "satisfies:e204e63d/REQ-08"
   ],
   "priority": "high",
   "state": "done",
   "title": "Declare one package's dependency on another",
-  "updated_at": "2026-08-01T20:51:26.336306054Z"
+  "updated_at": "2026-10-01T19:30:04.975110118Z"
 }

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-29T21:35:23.660924136Z",
   "context": {},
   "created_at": "2026-07-29T19:39:44.592267085Z",
@@ -37,12 +37,12 @@
     "milestone:v1.0",
     "component:core",
     "epic:v1-release",
-    "satisfies:REQ-11",
     "enforces:@/invariant/canonical-cutover",
-    "type:bug"
+    "type:bug",
+    "satisfies:b80e3c70/REQ-11"
   ],
   "priority": "high",
   "state": "done",
   "title": "Strip the development root from container archive destinations",
-  "updated_at": "2026-07-29T22:58:44.272607435Z"
+  "updated_at": "2026-10-01T19:30:15.636790241Z"
 }

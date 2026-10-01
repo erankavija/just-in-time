@@ -75,13 +75,13 @@
     "milestone:v1.0",
     "story:superseded-design-retirement",
     "component:core",
-    "satisfies:REQ-05",
-    "satisfies:REQ-06",
     "per:@/charter/D-17",
-    "enforces:@/invariant/canonical-cutover"
+    "enforces:@/invariant/canonical-cutover",
+    "satisfies:f1dc843a/REQ-05",
+    "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
   "state": "done",
   "title": "Plan hash retirement",
-  "updated_at": "2026-10-01T15:32:17.463195106Z"
+  "updated_at": "2026-10-01T19:33:18.089073242Z"
 }

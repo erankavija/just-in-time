@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:32:31.844080913Z",
   "context": {},
   "created_at": "2026-07-29T13:46:37.535084130Z",
   "dependencies": [
@@ -31,15 +32,15 @@
     "epic:v1-release",
     "milestone:v1.0",
     "component:release",
-    "satisfies:REQ-01",
-    "satisfies:REQ-02",
-    "satisfies:REQ-07",
-    "satisfies:REQ-09",
-    "satisfies:REQ-10",
-    "satisfies:REQ-11"
+    "satisfies:b80e3c70/REQ-01",
+    "satisfies:b80e3c70/REQ-02",
+    "satisfies:b80e3c70/REQ-07",
+    "satisfies:b80e3c70/REQ-09",
+    "satisfies:b80e3c70/REQ-10",
+    "satisfies:b80e3c70/REQ-11"
   ],
   "priority": "critical",
   "state": "backlog",
   "title": "Cut the v1.0.0 tag and verify the published release",
-  "updated_at": "2026-09-19T20:28:53.755672211Z"
+  "updated_at": "2026-10-01T19:32:32.251880086Z"
 }

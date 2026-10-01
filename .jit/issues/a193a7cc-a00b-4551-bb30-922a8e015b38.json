@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-07-28T10:13:38.980276619Z",
   "context": {},
   "created_at": "2026-07-27T21:43:44.885062384Z",
@@ -34,11 +34,11 @@
     "milestone:v1.0",
     "component:cli",
     "story:code-vocabulary",
-    "satisfies:REQ-04",
-    "enforces:@/invariant/semantic-test-assertions"
+    "enforces:@/invariant/semantic-test-assertions",
+    "satisfies:a2546471/REQ-04"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Bind the exit-status projection to the machine-readable invocation form",
-  "updated_at": "2026-07-28T13:34:55.781399060Z"
+  "updated_at": "2026-10-01T19:32:00.387096508Z"
 }

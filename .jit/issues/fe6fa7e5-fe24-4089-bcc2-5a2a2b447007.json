@@ -33,11 +33,11 @@
     "milestone:v1.0",
     "story:mutation-cost-evidence",
     "component:testing",
-    "satisfies:REQ-02",
-    "per:@/charter/D-17"
+    "per:@/charter/D-17",
+    "satisfies:f1dc843a/REQ-02"
   ],
   "priority": "high",
   "state": "done",
   "title": "Benchmark harness event-log scale",
-  "updated_at": "2026-09-20T06:46:48.387078006Z"
+  "updated_at": "2026-10-01T19:33:40.364391592Z"
 }

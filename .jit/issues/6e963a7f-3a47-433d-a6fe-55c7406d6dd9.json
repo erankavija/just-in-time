@@ -32,11 +32,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:development-root-cleanup",
-    "satisfies:REQ-09",
-    "per:@/issue/8e071e18/decision/D-8"
+    "per:@/issue/8e071e18/decision/D-8",
+    "satisfies:8e071e18/REQ-09"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Resolve the changelog's citations of relocated artifacts",
-  "updated_at": "2026-07-27T11:45:08.037810233Z"
+  "updated_at": "2026-10-01T19:30:38.063854615Z"
 }

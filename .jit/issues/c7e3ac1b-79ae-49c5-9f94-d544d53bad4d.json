@@ -26,11 +26,11 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:development-root-cleanup",
-    "satisfies:REQ-09",
-    "per:@/issue/8e071e18/decision/D-13"
+    "per:@/issue/8e071e18/decision/D-13",
+    "satisfies:8e071e18/REQ-09"
   ],
   "priority": "normal",
   "state": "done",
   "title": "Resolve the benchmark generators' citations of their own output areas",
-  "updated_at": "2026-07-27T11:45:03.840367988Z"
+  "updated_at": "2026-10-01T19:32:42.765856757Z"
 }

@@ -1,13 +1,15 @@
 {
-  "id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3",
-  "title": "Skip gate pass when already passed at HEAD",
-  "description": "Skip re-running a gate's (often expensive) checker when it already passed at the current HEAD commit.\n\n## Success Criteria\n\n- [ ] `jit gate pass <id> <gate>` on a gate already passed for the current HEAD exits `0` without re-running the checker and reports `already_passed: true` in `--json`.\n- [ ] `--force` re-runs the checker unconditionally.",
-  "state": "done",
-  "priority": "normal",
-  "assignee": "agent:claude",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-06-24T13:46:30.975990450Z",
+  "context": {},
+  "created_at": "2026-06-22T21:20:41.097443987Z",
   "dependencies": [
     "65ef3741-765e-48ff-b1bb-00b06e006e4c"
   ],
+  "description": "Skip re-running a gate's (often expensive) checker when it already passed at the current HEAD commit.\n\n## Success Criteria\n\n- [ ] `jit gate pass <id> <gate>` on a gate already passed for the current HEAD exits `0` without re-running the checker and reports `already_passed: true` in `--json`.\n- [ ] `--force` re-runs the checker unconditionally.",
+  "documents": [],
+  "done_at": "2026-06-24T14:07:16.376583922Z",
+  "first_ready_at": "2026-06-24T13:46:02.703648301Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -15,25 +17,23 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T14:05:01.625406449Z"
+      "updated_at": "2026-06-24T14:05:01.625406449Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-24T14:05:37.094925857Z"
+      "updated_at": "2026-06-24T14:05:37.094925857Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9bfcc474-d09b-4b0f-9c02-684f3d056cd3",
   "labels": [
     "type:task",
     "epic:agent-ergonomics",
-    "satisfies:REQ-05"
+    "satisfies:53e3fa36/REQ-05"
   ],
-  "created_at": "2026-06-22T21:20:41.097443987Z",
-  "updated_at": "2026-07-05T19:51:13.045581298Z",
-  "first_ready_at": "2026-06-24T13:46:02.703648301Z",
-  "claimed_at": "2026-06-24T13:46:30.975990450Z",
-  "done_at": "2026-06-24T14:07:16.376583922Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Skip gate pass when already passed at HEAD",
+  "updated_at": "2026-10-01T19:31:50.533251714Z"
 }

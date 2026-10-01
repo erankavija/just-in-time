@@ -34,10 +34,10 @@
     "epic:gf2-adopter-reliability",
     "component:cli",
     "component:storage",
-    "satisfies:REQ-01"
+    "satisfies:4a559332/REQ-01"
   ],
   "priority": "high",
   "state": "done",
   "title": "Refuse state-mutating commands in linked worktrees",
-  "updated_at": "2026-08-16T19:27:00.144917292Z"
+  "updated_at": "2026-10-01T19:33:29.977205309Z"
 }

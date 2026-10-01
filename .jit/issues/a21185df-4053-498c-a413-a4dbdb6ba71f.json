@@ -28,13 +28,13 @@
     "epic:dev-artifact-layout",
     "milestone:v1.0",
     "story:development-root-cleanup",
-    "satisfies:REQ-09",
     "per:@/issue/8e071e18/decision/D-10",
     "enforces:@/invariant/derived-state-coherence",
-    "per:@/issue/8e071e18/decision/D-21"
+    "per:@/issue/8e071e18/decision/D-21",
+    "satisfies:8e071e18/REQ-09"
   ],
   "priority": "high",
   "state": "done",
   "title": "Archive the documentation lifecycle phase two container's linked artifacts",
-  "updated_at": "2026-07-27T09:59:30.933811176Z"
+  "updated_at": "2026-10-01T19:32:01.851185054Z"
 }
