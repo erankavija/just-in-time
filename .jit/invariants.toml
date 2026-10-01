@@ -40,12 +40,12 @@ kind = "advisory"
 
 [[invariants]]
 id = "atomic-writes"
-statement = "All file replacements use the temp-file + atomic-rename pattern; new-file publication uses verified staging plus atomic no-replace publication, so an occupied destination is never overwritten."
+statement = "File replacements use the temp-file and atomic-rename pattern, and the event log grows by a positioned append at the length the mutation read. A mutation commits when its redo record is synced, and a session opening over a leftover record applies it idempotently. No-replace publication covers repository content: initialization publishes an absent data root from a synced stage directory by a no-replace rename, refusing an occupied destination."
 kind = "advisory"
 
 [[invariants]]
 id = "derived-state-coherence"
-statement = "Every semantic mutation derives its coupled materializations from one final repository view and publishes the resulting state recoverably."
+statement = "Every semantic mutation derives its coupled materializations from one read of the repository taken under the repository write lock, fails with a retryable conflict when a path it creates, writes, or removes changed since that read, and publishes through one synced redo record, so an interruption leaves either the prior state or a record the next session completes."
 kind = "advisory"
 
 [[invariants]]
