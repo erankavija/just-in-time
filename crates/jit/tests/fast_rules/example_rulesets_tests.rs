@@ -1203,14 +1203,8 @@ mod cross_epic {
 
     #[test]
     fn test_cross_epic_large_fixture_50_collisions() {
-        // Performance and correctness on a repo-scale fixture: 300 unique-value
-        // epics + 100 colliding epics forming 50 collision pairs = 400 epics.
-        // The evaluator must find exactly 50 findings (one per colliding value).
-        //
-        // Design: single-pass O(n * k) HashMap; no N^2 scan. This test confirms
-        // correctness at scale; the elapsed time is measured (with a generous
-        // anti-regression bound) in
-        // validation::graph::tests::test_label_uniqueness_large_fixture_correctness.
+        // 300 unique-value epics + 100 colliding epics forming 50 collision pairs:
+        // the evaluator finds exactly 50 findings (one per colliding value).
         let set = load_example("cross-epic");
         let rules = graph_rules(&set);
 

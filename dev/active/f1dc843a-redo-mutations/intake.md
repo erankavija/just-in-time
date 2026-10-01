@@ -37,7 +37,7 @@ Method:
   - This repository has 1104 issues and a 3.2 MB event log, and enforces
     leases.
 - Each row is the median of three runs of one `jit issue update`.
-- The harness is [bench.sh](bench.sh). Run it as `bench.sh <jit-binary> <label>`.
+- The harness is [benchmark-mutation-cost.sh](../../../scripts/benchmark-mutation-cost.sh), formerly `bench.sh` in this directory. Run it as `scripts/benchmark-mutation-cost.sh <jit-binary> <label>`.
 
 | Build | gf2 changing | gf2 idempotent | jit changing | jit idempotent | jit lease-refused |
 | --- | ---: | ---: | ---: | ---: | ---: |

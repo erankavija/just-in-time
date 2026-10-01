@@ -1,5 +1,8 @@
 #!/usr/bin/env zsh
-# Usage: bench.sh <jit-binary> <label>
+# scripts/benchmark-mutation-cost.sh — label-update publication cost harness
+# (jit:722878d4). Its committed run is dev/benchmarks/publication-cost-722878d4/.
+#
+# Usage: benchmark-mutation-cost.sh <jit-binary> <label>
 #
 # Times issue mutations on fresh copies of gf2 and just-in-time, and on a third
 # fixture carrying just-in-time's issues and index under an event log inflated
@@ -19,24 +22,27 @@
 # line parses, and no id repeats (@/inv/event-log). The harness verifies all
 # three before measuring.
 #
-# Fixtures are built beside this script, so run it from a copy on tmpfs. Every
-# absolute path it needs is listed under "path dependencies" in its output and
-# checked before the first fixture is built.
+# Fixtures are built under BENCH_WORK_ROOT/bench-<label> (default work root
+# /dev/shm/jit-benchmark-mutation-cost; keep it on tmpfs). BENCH_GF2_REPO and
+# BENCH_JIT_REPO override the fixture sources (defaults ~/Projects/gf2 and
+# ~/Projects/just-in-time). Every absolute path it needs is listed under "path
+# dependencies" in its output and checked before the first fixture is built.
 zmodload zsh/datetime
 zmodload -F zsh/stat b:zstat
 set -u
+ME=${0:t}
 
-(( $# == 2 )) || { print -u2 "bench.sh: usage: bench.sh <jit-binary> <label>"; exit 2 }
+(( $# == 2 )) || { print -u2 "$ME: usage: $ME <jit-binary> <label>"; exit 2 }
 BIN=${commands[$1]:-${1:A}} LABEL=$2
-S=${0:A:h}
-WORK=$S/bench-$LABEL
+ROOT=${BENCH_WORK_ROOT:-/dev/shm/jit-benchmark-mutation-cost}
+WORK=${ROOT:A}/bench-$LABEL
 
-GF2_REPO=$HOME/Projects/gf2
-JIT_REPO=$HOME/Projects/just-in-time
+GF2_REPO=${BENCH_GF2_REPO:-$HOME/Projects/gf2}
+JIT_REPO=${BENCH_JIT_REPO:-$HOME/Projects/just-in-time}
 LOG=.jit/events.jsonl
 GIT=${commands[git]:-} RSYNC=${commands[rsync]:-} PYTHON=${commands[python3]:-}
 
-fail() { print -u2 "bench.sh: $*"; exit 1 }
+fail() { print -u2 "$ME: $*"; exit 1 }
 
 require() { # <what> <path>; the path must exist
   [[ -n $2 && -e $2 ]] || fail "missing $1: ${2:-not on PATH}"
@@ -62,7 +68,7 @@ for name repo in gf2 $GF2_REPO jit $JIT_REPO; do
   require "$name repository" $repo
   require "$name event log" $repo/$LOG
 done
-[[ -w $S ]] || fail "work root is not writable: $S"
+mkdir -p $ROOT 2>/dev/null && [[ -w $ROOT ]] || fail "work root is not writable: $ROOT"
 
 rm -rf $WORK && mkdir -p $WORK
 

@@ -7,9 +7,11 @@ balance. Every figure below is copied from a file under `raw/`.
 
 ## Harness, builds, and conditions
 
-- **Harness:** [`dev/active/f1dc843a-redo-mutations/bench.sh`](../../active/f1dc843a-redo-mutations/bench.sh)
-  at commit `b85bdf018`, run from a copy in `/dev/shm`:
-  `zsh ./bench.sh <binary> base > raw/base.txt`, then the same with `tip`.
+- **Harness:** [`scripts/benchmark-mutation-cost.sh`](../../../scripts/benchmark-mutation-cost.sh).
+  The recorded runs used it at commit `b85bdf018`, as `bench.sh` run from a copy in
+  `/dev/shm/bench-722878d4`; its runs and output are unchanged since. Reproduce with
+  `BENCH_WORK_ROOT=/dev/shm/bench-722878d4 scripts/benchmark-mutation-cost.sh <binary> base > raw/base.txt`,
+  then the same with `tip`.
   Each scenario is three runs; the reported figure is their median.
 - **Before (`base`):** `34d37f8be6ea3ab1f45153e64974f05d2b9445f2`, built in a detached
   worktree with `cargo build --release --locked -p jit`; binary sha256
@@ -62,13 +64,14 @@ gf2 with its unqualified `satisfies:` labels, so the copy is otherwise unmodifie
 
 ## Rust line balance from `34d37f8be`
 
-`git diff --shortstat 34d37f8be -- '*.rs'` at this artifact's commit:
+`git diff --shortstat 34d37f8be -- '*.rs'` at `1f8d2bff7`, the epic's last Rust change
+(`ef7848ea`, after `dd1b984c`):
 
 ```
-118 files changed, 11728 insertions(+), 14235 deletions(-)
+118 files changed, 12053 insertions(+), 14279 deletions(-)
 ```
 
-Net −2,507 lines: the work removes more Rust than it adds.
+Net −2,226 lines: the work removes more Rust than it adds.
 
 Attributed balance excluding non-redo-record work landed in the same window, from
 [`rust-balance.py`](rust-balance.py) (`raw/rust-balance.txt`):
@@ -81,6 +84,6 @@ $ python3 dev/benchmarks/publication-cost-722878d4/rust-balance.py 34d37f8be \
 
 The script attributes each first-parent step's `'*.rs'` numstat to its `jit:` tag, so
 a task's merge is excluded with it, and checks that the step nets sum to the
-shortstat net. Excluded steps total −200; the redo-record remainder is **−2,307**
-(`7226f00b` touched no Rust). The output names `b85bdf018`; later commits on this
-branch change no Rust file.
+shortstat net. Excluded steps total −200; the redo-record remainder is **−2,026**
+(`7226f00b` touched no Rust). The output names `1f8d2bff7`; later commits change no
+Rust file.
