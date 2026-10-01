@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "44baf78151ae0a3337a50035a95b168c75fd31d3",
+  "completed_at": "2026-10-01T11:00:43.401034284Z",
+  "duration_ms": 342694,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/mutation.rs",
+        "id": "F1",
+        "line": 680,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c88822a5/requirement/REQ-03",
+          "@/invariant/event-log"
+        ],
+        "severity": "high",
+        "summary": "A valid final event JSON line longer than the tail window is misclassified as a torn tail, causing ordinary mutations to fail."
+      }
+    ],
+    "summary": "Tail-only capture misclassifies valid long unterminated event-log records as torn tails.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "83b5cb24-e93c-40c2-8358-63df115492c8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T10:55:00.706281781Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 23527 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f71a-7659-7ee0-b0df-1c6620434056\n--------\nuser\n--- 23514 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cd72a03ce, 5dbe781c6, 9dad92320, 826ee8e, 44baf7815 (`jit:c88822a5`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/gates.toml\nResolved items: @/issue/c88822a5/requirement/REQ-01, REQ-03, REQ-05, REQ-06 (.jit/issues/c88822a5-b92a-4992-9521-f1c0ad145b9e.json); @/invariant/event-log (.jit/invariants.toml); @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T10:51:43Z); code-review pending\nTruncation recovery: Per-commit/path patch and current-source reads; scoped phase-policy search; excluded truncated benchmark and historical gate-run output as outside the attributable impact cone.\n\n1. **F1 — Tail capture misclassifies a valid long final event line.** `captured_log_end` reduces an event log to its last 4096 bytes, then treats that suffix as the complete final line at [mutation.rs:680](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/mutation.rs:680). A valid unterminated final JSON event longer than the window therefore becomes an invalid JSON suffix and is rejected as an uncertified torn tail at line 1242. Event payloads can contain unbounded profile/variable collections, and no line-size constraint rules this input out. Ordinary state mutations then fail instead of appending their event. This is blocking, issue-impact. References: `@/issue/c88822a5/requirement/REQ-03`, `@/invariant/event-log`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Tail-only capture misclassifies valid long unterminated event-log records as torn tails.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A valid final event JSON line longer than the tail window is misclassified as a torn tail, causing ordinary mutations to fail.\",\"file\":\"crates/jit/src/repository_state/mutation.rs\",\"line\":680,\"references\":[\"@/issue/c88822a5/requirement/REQ-03\",\"@/invariant/event-log\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
