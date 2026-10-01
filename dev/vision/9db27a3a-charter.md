@@ -142,7 +142,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - **Chosen:** v1.0 ships the whole profile lifecycle: offline packages
   discovered from declared locations, composed by declared package-to-package
   dependency and by semantic identity with shared ownership, resolved through
-  declared non-secret variables, published through one recoverable transaction
+  declared non-secret variables, published through one redo record (D-17)
   carrying durable ownership records, and then reconfigured, upgraded,
   captured, packed, exchanged, checked, and previewed. Two packages ship:
   `jit-default` carrying the domain vocabulary a repository needs to be usable,
@@ -167,7 +167,8 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   lifecycle carries no migration boundary for a pre-release record shape
   (`@/inv/canonical-cutover`); a repository holding one re-derives its package
   through capture.
-- **Date:** 2026-07-14, amended 2026-07-31, reversed 2026-08-10
+- **Date:** 2026-07-14, amended 2026-07-31, reversed 2026-08-10, amended
+  2026-10-01
 
 ### D-9: Cut redundant release surfaces, not product capabilities
 
@@ -318,13 +319,14 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   validation. Immediately before commit it compares the live bytes of every file
   it writes with the bytes it read, and checks the event log's length and tail,
   returning a retryable conflict on any difference. Its commit point is one
-  synced redo record under the data root's gitignored `tmp/`, holding the
-  complete new bytes and mode of each written file, each deleted path, and the
-  event append as an offset and its bytes. Paths are relative to the data root
-  or the worktree, so projections, profile assets, and archived documents
-  publish through the same record. Applying the record replaces each file by
-  temp-file and rename, removes each deleted path, writes the append at its
-  offset, and deletes the record. Opening a session replays a leftover record
+  synced redo record under the data root's gitignored `tmp/`, holding each
+  directory it makes that no other operation's path lies beneath, the complete
+  new bytes and mode of each written file, each deleted path, and the event
+  append as an offset and its bytes. Paths are relative to the data root or the
+  worktree, so projections, profile assets, and archived documents publish
+  through the same record. Applying the record makes each directory, replaces
+  each file by temp-file and rename, removes each deleted path, writes the
+  append at its offset, and deletes the record. Opening a session replays a leftover record
   idempotently. `jit init` creates an absent data root through a small publisher
   of its own (a synced stage directory and a no-replace rename), because no
   `tmp/` exists before it, and writes the data root's `.gitignore` naming
@@ -355,4 +357,4 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   so no rollback, backup, or staging is needed. The accepted cost is that an
   external edit to a file a mutation read but does not write is not detected
   during that mutation; that makes one result stale, and corrupts nothing.
-- **Date:** 2026-09-19
+- **Date:** 2026-09-19, amended 2026-10-01
