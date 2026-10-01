@@ -68,6 +68,11 @@
       "status": "passed",
       "updated_at": "2026-10-01T13:48:35.478029884Z",
       "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T13:48:46.772665296Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "e346d387-eee8-4657-93eb-9b64621fd900",
@@ -86,5 +91,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Rust prose and command help state the redo record",
-  "updated_at": "2026-10-01T13:48:35.478029884Z"
+  "updated_at": "2026-10-01T13:48:46.772665296Z"
 }
