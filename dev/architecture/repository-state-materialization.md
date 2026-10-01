@@ -81,11 +81,11 @@ all planning. It is built by `RepositoryImage::close` from a `CaptureSpec`
 `max_bytes`, `max_depth`), so capture cannot walk an unbounded tree. The image
 holds, per canonical path, a `RepositoryEntry` — `File` (with bytes, `FileMode`,
 and an `EntryIdentity`), `FileTail` (a path the spec reads as its length and
-bounded tail), `Directory`, or `Absent` — plus `ListingFingerprint`s and
+bounded tail), `Directory`, or `Absent` — plus `DirectoryListing`s (child names) and
 pinned/linked-worktree evidence.
 
 A mutation captures in one round. What it reads first names what it reads
-next (the index names the issue files, the issues name their documents), so
+next (the index names the issue files, the issues name their plan documents), so
 the session grows the image with `RepositoryMutationSession::extend`, which
 reads only the requests the image does not already hold; nothing is read twice,
 so no read is compared with an earlier one.

@@ -287,22 +287,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            apply_overlay, finalize_config_edit, CaptureBudget, CaptureSpec, VirtualPath,
+            apply_overlay, finalize_config_edit, CaptureSpec, VirtualPath,
         };
         let layout = self.require_layout()?;
         let config_vpath = VirtualPath::CONFIG;
-        let budget = CaptureBudget {
-            max_listings: 0,
-            max_bytes: 64 * 1024 * 1024,
-            max_depth: 6,
-        };
-
         with_mutation_session(self.storage(), &layout, "config set", |session| {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
-            let Some(config_image) = capture_or_retry(
-                session.capture(CaptureSpec::new([config_vpath.clone()], budget)?),
-            )?
+            let Some(config_image) = capture_or_retry(session.capture(CaptureSpec::new(
+                [config_vpath.clone()],
+                super::validate::MUTATION_CAPTURE_BUDGET,
+            )?))?
             else {
                 return Ok(SessionStep::Retry);
             };
@@ -315,12 +310,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             edit_config_document(&mut doc, key, value)?;
             let edited_bytes = doc.to_string().into_bytes();
 
-            // Capture the whole-repository closure over the EDITED config (so a new
-            // projection source/target enters the closure), then finalize, validate
-            // the finalized-delta overlay, and publish under one held session.
+            // Grow the same round to the whole-repository closure over the EDITED
+            // config (so a new projection source/target enters the closure), then
+            // finalize, validate the finalized-delta overlay, and publish under one
+            // held session.
             let overrides =
                 std::iter::once((config_vpath.clone(), Some(edited_bytes.clone()))).collect();
-            let Some(base) = self.capture_proposed_base(session, &overrides, &[], None)? else {
+            let Some(base) =
+                self.capture_proposed_base(session, &overrides, &[], Some(config_image))?
+            else {
                 return Ok(SessionStep::Retry);
             };
             // Declarations are read from the config-overlaid image so the effective

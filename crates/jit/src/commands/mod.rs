@@ -537,38 +537,32 @@ struct PrecheckEvidence {
 struct PrecheckValidationView {
     listings: std::collections::BTreeMap<
         crate::repository_state::VirtualPath,
-        crate::repository_state::ListingFingerprint,
-    >,
-    pinned: std::collections::BTreeMap<
-        (String, String),
-        crate::repository_state::PinnedDocumentEvidence,
-    >,
-    linked: std::collections::BTreeMap<
-        crate::repository_state::VirtualPath,
-        crate::repository_state::LinkedWorktreeEvidence,
+        crate::repository_state::DirectoryListing,
     >,
 }
 
 impl PrecheckEvidence {
+    /// Whether `image` holds these inputs unchanged, compared over the inputs
+    /// it reads: a mutation base reads no issue document reference.
     fn matches(&self, image: &crate::repository_state::RepositoryImage) -> Result<bool> {
-        let inputs = self
+        let inputs_unchanged = self
             .inputs
             .iter()
-            .map(|(path, _)| {
+            .filter(|(path, _)| image.capture_spec().contains_path(path))
+            .map(|(path, identity)| {
                 image
                     .entry(path)
-                    .map(|entry| (path.clone(), entry.identity().cloned()))
+                    .map(|entry| entry.identity() == identity.as_ref())
             })
             .collect::<std::result::Result<Vec<_>, _>>()?;
         let validation_view = self
             .validation_view
             .as_ref()
             .map(|_| PrecheckValidationView {
-                listings: image.listing_fingerprints().clone(),
-                pinned: image.pinned_evidence().clone(),
-                linked: image.linked_worktree_evidence().clone(),
+                listings: image.directory_listings().clone(),
             });
-        Ok(inputs == self.inputs && validation_view == self.validation_view)
+        Ok(inputs_unchanged.into_iter().all(|unchanged| unchanged)
+            && validation_view == self.validation_view)
     }
 }
 
@@ -610,6 +604,18 @@ pub(crate) fn is_broad_builtin_precheck(gate: &crate::declarations::GateDefiniti
         )
 }
 
+/// Whether one of `issue`'s precheck gates validates the whole repository.
+fn has_broad_precheck(issue: &Issue, registry: &crate::declarations::GateRegistry) -> bool {
+    issue
+        .gates_required
+        .iter()
+        .filter_map(|key| registry.gates.get(key))
+        .any(|gate| {
+            gate.stage == crate::declarations::GateStage::Precheck
+                && is_broad_builtin_precheck(gate)
+        })
+}
+
 fn captured_precheck_plan(
     image: &crate::repository_state::RepositoryImage,
     issue: &Issue,
@@ -625,9 +631,7 @@ fn captured_precheck_plan(
         .filter_map(|key| registry.gates.get(key).map(|gate| (key, gate)))
         .filter(|(_, gate)| gate.stage == GateStage::Precheck)
         .collect::<Vec<_>>();
-    let broad_builtin = gates
-        .iter()
-        .any(|(_, gate)| is_broad_builtin_precheck(gate));
+    let broad_builtin = has_broad_precheck(issue, registry);
     let consumes_history = gates.iter().any(|(_, gate)| {
         gate.mode == GateMode::Auto
             && gate
@@ -699,9 +703,7 @@ fn captured_precheck_plan(
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let validation_view = broad_builtin.then(|| PrecheckValidationView {
-        listings: image.listing_fingerprints().clone(),
-        pinned: image.pinned_evidence().clone(),
-        linked: image.linked_worktree_evidence().clone(),
+        listings: image.directory_listings().clone(),
     });
     Ok(CapturedPrecheckPlan {
         evidence: PrecheckEvidence {
@@ -1972,11 +1974,11 @@ fn discover_gate_run_results(
     let root = VirtualPath::GATE_RUNS;
     spec.discover_paths([root.clone()])?;
     spec.discover_listing(root.clone())?;
-    if let Some(listing) = image.listing_fingerprints().get(&root) {
+    if let Some(listing) = image.directory_listings().get(&root) {
         spec.discover_paths(
             listing
-                .children()
-                .keys()
+                .names()
+                .iter()
                 .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )?;
@@ -2683,20 +2685,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("lifecycle mutation", || {
             let (expected_target, expected_precheck_required, precheck) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(light) =
-                    self.capture_mutation_preflight(preflight.as_mut(), request.issue_id())?
+                // Precheck gates run outside the repository lock, so a
+                // transition that runs them grows its preflight to the full base.
+                let Some(light) = self.capture_mutation_preflight(
+                    preflight.as_mut(),
+                    request.issue_id(),
+                    |target| lifecycle_requires_prechecks(&request, target),
+                )?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                let should_precheck = lifecycle_requires_prechecks(&request, &light.target);
-                // Precheck gates run outside the repository lock, so only a
-                // transition that runs them reads its full base before the guard.
-                let precheck = if should_precheck {
-                    let Some(crate::commands::validate::MutationBase { image, issues }) = self
-                        .capture_mutation_base(preflight.as_mut(), &[], Some(request.issue_id()))?
-                    else {
-                        return Ok(AttemptOutcome::Retry);
-                    };
+                let should_precheck = light.issues.is_some();
+                let precheck = if let Some(issues) = light.issues {
+                    let image = light.image;
                     let issue = issues
                         .into_iter()
                         .find(|issue| issue.id == light.target.id)
@@ -2706,6 +2707,20 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .config_manager
                         .enforcement_mode_from_config(declarations.config())?;
                     let registry = declarations.gates;
+                    // A precheck validating the whole repository runs over
+                    // the validation base.
+                    let image = match has_broad_precheck(&issue, &registry) {
+                        false => image,
+                        true => match self.capture_proposed_base(
+                            preflight.as_mut(),
+                            &std::collections::BTreeMap::new(),
+                            &[],
+                            Some(image),
+                        )? {
+                            Some(image) => image,
+                            None => return Ok(AttemptOutcome::Retry),
+                        },
+                    };
                     let plan = captured_precheck_plan(&image, &issue, &registry)?;
                     Some(PrecheckPreflight {
                         plan,

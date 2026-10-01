@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bbcce27c8d046aa3acf23d00b5ff785e02a2f5a3",
+  "completed_at": "2026-10-01T16:02:34.155041755Z",
+  "duration_ms": 64404,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed redo-record documentation is accurate, discoverable, and consistent with the current implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "816df12a-a2ff-49dc-85aa-5a7da65dabab",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b3f68796-b20b-44d8-846d-cc9e100817bd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T16:01:29.750281567Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task `816df12a` (configured level 4; no DAG-resolved children). Individually inspected its six reachable `jit:816df12a` commits, including the merge and gate-record commits. The resulting footprint updates the invariant registry, its generated guidance projection, shipped dogfood profile declarations, charter source, and the storage-format reference. Current-tree behavior matches the documented redo-record ordering and recovery semantics.\n\nDocumentation impact: the sole adopter-facing update, `docs/reference/storage-format.md`, accurately and concisely describes the current publication and recovery contract. No further adopter documentation update is required.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed redo-record documentation is accurate, discoverable, and consistent with the current implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

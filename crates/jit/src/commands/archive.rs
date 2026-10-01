@@ -353,11 +353,11 @@ fn image_evidence(
             let entries = match scope {
                 ArtifactListingScope::MetadataOnly => Vec::new(),
                 ArtifactListingScope::ImmediateChildren => image
-                    .listing_fingerprints()
+                    .directory_listings()
                     .get(&vpath)
                     .context("archive directory listing was not captured")?
-                    .children()
-                    .keys()
+                    .names()
+                    .iter()
                     .map(|name| normalize_artifact_path(&format!("{path}/{name}")))
                     .collect(),
                 // The two recursive scopes differ only in whether a descended
@@ -472,9 +472,9 @@ fn capture_directory_tree(
     };
     super::grow_discovering(session, image, |image, spec| {
         let mut paths = vec![root_path.clone()];
-        for (directory, listing) in image.listing_fingerprints() {
+        for (directory, listing) in image.directory_listings() {
             if beneath(image, directory) {
-                for name in listing.children().keys() {
+                for name in listing.names().iter() {
                     let physical = image.layout().resolve(directory)?.join(name);
                     paths.push(image.layout().classify_and_canonicalize(physical)?);
                 }
@@ -550,7 +550,7 @@ impl CommandExecutor<JsonFileStorage> {
         session: &mut dyn RepositoryMutationSession,
         target: ArchiveTarget<'_>,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, ArtifactPlan)>> {
-        let Some(mut image) = self.capture_proposed_base_without_documents(session)? else {
+        let Some(mut image) = self.capture_archive_base(session)? else {
             return Ok(None);
         };
         let config = crate::repository_state::assemble_config(&image)?;
@@ -612,11 +612,11 @@ impl CommandExecutor<JsonFileStorage> {
                         return Ok(None);
                     }
                     image
-                        .listing_fingerprints()
+                        .directory_listings()
                         .get(&archive_path)
                         .context("archive root listing was not captured")?
-                        .children()
-                        .keys()
+                        .names()
+                        .iter()
                         .map(|name| normalize_artifact_path(&format!("{archive_root}/{name}")))
                         .collect::<Vec<_>>()
                 } else {

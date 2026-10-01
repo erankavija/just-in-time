@@ -58,6 +58,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-10-01T15:56:48.260706979Z",
   "first_ready_at": "2026-09-21T20:58:06.621376704Z",
   "gates_required": [
     "cargo-ci",
@@ -66,12 +67,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-01T15:17:55.706503390Z",
+      "updated_at": "2026-10-01T15:54:19.476231462Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-01T15:22:16.306223421Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T15:56:34.546409657Z",
       "updated_by": "auto:executor"
     }
   },
@@ -88,7 +89,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-10-01T15:22:16.306223421Z"
+  "updated_at": "2026-10-01T15:56:48.260706979Z"
 }

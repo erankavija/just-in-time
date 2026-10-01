@@ -6,12 +6,11 @@
 //! record's home is inside the root that does not exist yet.
 
 use crate::repository_state::{
-    CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, EntryIdentity, EventLogTail,
-    ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    ListingFingerprint, MaterializationPlan, PinnedDocumentEvidence, PinnedSourceClass, ReadMode,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
-    RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence, RootRelativePath,
-    VirtualPath,
+    CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, DirectoryListing, EntryIdentity,
+    EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
+    MaterializationPlan, PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction,
+    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
+    RepositoryRootClass, RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
@@ -1134,13 +1133,7 @@ fn capture_capability_image(
         .map(|path| {
             let listing = match prior.listings.remove(path) {
                 Some(listing) => listing,
-                None => inspect_capability_listing(
-                    layout,
-                    roots,
-                    path,
-                    spec.is_advisory(path),
-                    &entries,
-                )?,
+                None => inspect_capability_listing(layout, roots, path, spec.is_advisory(path))?,
             };
             Ok((path.clone(), listing))
         })
@@ -1325,38 +1318,24 @@ fn memory_listing(
     layout: &RepositoryLayout,
     state: &MemoryRepositoryState,
     path: &VirtualPath,
-) -> Result<ListingFingerprint, RepositoryStateStoreError> {
+) -> Result<DirectoryListing, RepositoryStateStoreError> {
     let physical_parent = layout.resolve(path)?;
-    let children = state
+    let names = state
         .entries
         .iter()
-        .filter(|(candidate, entry)| {
-            entry.identity().is_some()
-                && layout
-                    .resolve(candidate)
-                    .ok()
-                    .and_then(|physical| physical.parent().map(Path::to_path_buf))
-                    .as_ref()
-                    == Some(&physical_parent)
-        })
-        .filter_map(|(candidate, entry)| {
+        .filter(|(_, entry)| entry.identity().is_some())
+        .filter_map(|(candidate, _)| {
             let physical = layout.resolve(candidate).ok()?;
-            Some((
-                physical.file_name()?.to_str()?.to_string(),
-                entry.identity()?.clone(),
-            ))
-        })
-        .collect();
-    // Mirror inspect_capability_listing: a directory yields its fingerprint, an
-    // absent path yields the absent fingerprint, and any other kind (file, symlink,
-    // unsupported) is an error rather than a fabricated directory listing.
+            (physical.parent() == Some(physical_parent.as_path()))
+                .then(|| Some(physical.file_name()?.to_str()?.to_string()))
+                .flatten()
+        });
+    // Mirror inspect_capability_listing: a directory lists its children, an
+    // absent path lists none, and any other kind (file, symlink, unsupported) is
+    // an error rather than a fabricated directory listing.
     match state.entries.get(path) {
-        Some(RepositoryEntry::Directory { identity, .. }) => {
-            ListingFingerprint::for_directory(identity.clone(), children).map_err(Into::into)
-        }
-        None | Some(RepositoryEntry::Absent) => {
-            ListingFingerprint::for_absent().map_err(Into::into)
-        }
+        Some(RepositoryEntry::Directory { .. }) => DirectoryListing::new(names).map_err(Into::into),
+        None | Some(RepositoryEntry::Absent) => Ok(DirectoryListing::default()),
         Some(_) => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
     }
 }
@@ -1493,23 +1472,19 @@ fn advisory_unreadable_entry(
     })
 }
 
-/// Fingerprint the directory at `path`. A child this capture already inspected
-/// as an exact path in `captured` keeps that identity, so each captured file is
-/// read once and the image states one identity for it.
+/// List the directory at `path`. An advisory directory whose children cannot be
+/// enumerated for lack of permission lists none.
 fn inspect_capability_listing(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
     advisory: bool,
-    captured: &BTreeMap<VirtualPath, RepositoryEntry>,
-) -> Result<ListingFingerprint, RepositoryStateStoreError> {
-    let entry = inspect_capability_entry(layout, roots, path, ReadMode::Whole)?;
-    let RepositoryEntry::Directory { identity, .. } = entry else {
-        return match entry {
-            RepositoryEntry::Absent => ListingFingerprint::for_absent().map_err(Into::into),
-            _ => Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
-        };
-    };
+) -> Result<DirectoryListing, RepositoryStateStoreError> {
+    match inspect_capability_entry(layout, roots, path, ReadMode::Whole)? {
+        RepositoryEntry::Directory { .. } => {}
+        RepositoryEntry::Absent => return Ok(DirectoryListing::default()),
+        _ => return Err(RepositoryStateStoreError::UnsafeTarget(format!("{path:?}"))),
+    }
     let root = roots.root(path.root_class()).expect("directory is present");
     let directory = if path.relative().is_root() {
         root.try_clone()?
@@ -1517,47 +1492,29 @@ fn inspect_capability_listing(
         match open_descendant_dir_nofollow(root, path.relative().as_path()) {
             Ok(directory) => directory,
             Err(error) if advisory && is_advisory_permission_denied(&error) => {
-                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
+                return Ok(DirectoryListing::default())
             }
             Err(error) => return Err(error),
         }
     };
-    let physical_directory = layout.resolve(path)?;
-    let mut children = BTreeMap::new();
-    let entries = match directory.entries() {
-        Ok(entries) => entries,
-        Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
-            return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
-        }
-        Err(error) => return Err(error.into()),
+    let names = match directory.entries() {
+        Ok(entries) => entries
+            .map(|entry| {
+                entry?
+                    .file_name()
+                    .into_string()
+                    .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))
+            })
+            .collect::<Result<Vec<_>, _>>(),
+        Err(error) => Err(error.into()),
     };
-    for entry in entries {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) if advisory && error.kind() == ErrorKind::PermissionDenied => {
-                return ListingFingerprint::for_advisory_unreadable(identity).map_err(Into::into)
-            }
-            Err(error) => return Err(error.into()),
-        };
-        let name = entry
-            .file_name()
-            .into_string()
-            .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
-        let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
-        let identity = match captured.get(&child).and_then(RepositoryEntry::identity) {
-            Some(identity) => Some(identity.clone()),
-            None => match inspect_capability_entry(layout, roots, &child, ReadMode::Whole) {
-                Ok(entry) => entry.identity().cloned(),
-                Err(error) if advisory && is_advisory_permission_denied(&error) => {
-                    advisory_unreadable_entry(&child)?.identity().cloned()
-                }
-                Err(error) => return Err(error),
-            },
+    match names {
+        Ok(names) => DirectoryListing::new(names).map_err(Into::into),
+        Err(error) if advisory && is_advisory_permission_denied(&error) => {
+            Ok(DirectoryListing::default())
         }
-        .ok_or_else(|| RepositoryStateStoreError::RetryableConflict { path: name.clone() })?;
-        children.insert(name, identity);
+        Err(error) => Err(error),
     }
-    ListingFingerprint::for_directory(identity, children).map_err(Into::into)
 }
 
 fn inspect_capability_leaf(

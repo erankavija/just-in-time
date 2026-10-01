@@ -2583,11 +2583,11 @@ pub(super) fn recorded_profile_ids(
     profiles_dir: &VirtualPath,
 ) -> Result<BTreeSet<String>> {
     Ok(image
-        .listing_fingerprints()
+        .directory_listings()
         .get(profiles_dir)
         .ok_or_else(|| anyhow::anyhow!("capture did not list {profiles_dir:?}"))?
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter_map(|name| record_name_profile_id(name))
         .map(str::to_string)
         .collect())

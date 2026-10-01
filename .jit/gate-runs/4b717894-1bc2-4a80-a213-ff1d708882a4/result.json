@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8f5a04414207e59dc4348d49eab3f31f8a1ad5d1",
+  "completed_at": "2026-10-01T16:17:22.141467618Z",
+  "duration_ms": 227164,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met by the attributable current-tree implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "33f97287-2561-424c-84b4-a9c30edf3212",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4b717894-1bc2-4a80-a213-ff1d708882a4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T16:13:34.976481165Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ecee39948 refactor; 2d7d7a6ff merge (no first-parent patch); 8f5a04414 gate-record commit\nPolicy sources: AGENTS.md (applies to all affected paths; no nested AGENTS.md)\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/33f97287/requirement/REQ-01 through REQ-05 and @/issue/e590fa91/requirement/REQ-05 through REQ-06 (markdown-first issue descriptions); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T16:10:10Z); code-review pending (no exit code)\nTruncation recovery: Re-read affected patches and current image, storage, command, test, and policy ranges in narrower calls.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met by the attributable current-tree implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

@@ -687,7 +687,9 @@ Each precheck checker runs at most once per transition. A repository that
 changes while a checker is running does not cost a second execution and does
 not discard the verdict it already reached: the run is recorded, carrying the
 `evaluation_stability` the [gate run record](../reference/storage-records.md#gate-run-records)
-describes.
+describes. For a precheck that validates the whole repository, that stability
+covers what the transition itself reads; an issue-linked document that changes
+during the run leaves it `stable`.
 
 ### Postchecks (After Work Completes)
 
