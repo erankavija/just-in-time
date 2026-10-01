@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "103749c263b7859c8c120d72c13e9b411cd7d102",
+  "completed_at": "2026-10-01T22:51:21.896360448Z",
+  "duration_ms": 208649,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/guarantees.md",
+        "id": "F1",
+        "line": 78,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/inv/atomic-writes"
+        ],
+        "severity": "medium",
+        "summary": "The guarantee states that event-log extension precedes deletion, but the redo applier deletes before appending."
+      }
+    ],
+    "summary": "The redo-record documentation has one issue-impact accuracy error in its stated application order.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b38128ae-bb04-474c-bc44-41af72b72bce",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:47:53.246611286Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.kfkVC0WizZ: binary file matches\n--- agent stderr (first 12 of 38074 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f9a7-1ca0-7dd0-a214-2d475d2cbd3f\n--------\n--- 38062 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: this configured epic has 52 DAG-resolved descendants, all `done`. I inspected 507 unique reachable `jit:<short-id>` commits individually with rename/copy detection; 33 changed adopter-facing documentation. The combined documentation contract is otherwise discoverable and consistently describes redo-record publication.\n\n1. **F1 — blocking, issue-impact, medium:** [docs/concepts/guarantees.md](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:78) gives the forward application order as “extend the event log, remove the deleted paths.” The implementation removes deleted paths before appending the event log ([redo_apply.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/redo_apply.rs:161)). Replace the passage with: “make the directories, replace the files, remove the deleted paths, extend the event log, then remove the record.”\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The redo-record documentation has one issue-impact accuracy error in its stated application order.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The guarantee states that event-log extension precedes deletion, but the redo applier deletes before appending.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":78,\"references\":[\"@/charter/D-17\",\"@/inv/atomic-writes\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
