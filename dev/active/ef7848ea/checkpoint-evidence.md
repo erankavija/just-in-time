@@ -62,7 +62,7 @@ $ rg -n "dev/benchmarks/|benchmark" dev/TESTING.md   # citations, by target
 Contract and policy files naming evidence: `scripts/profile-test-suite.sh` (writes
 `suite-profile.json`), `scripts/rust-build-budget.sh:39` and `scripts/cargo-ci.sh:156`
 (`rust-build-budgets/README.md`), `scripts/cargo-ci.sh:380,386`
-(`provenance-removal-355565c2/README.md`, `cold-warm-verdict-0708d692/README.md`); all exist.
+(`dev/archive/4b7c06d0-test-suite-performance/benchmarks/provenance-removal-355565c2/README.md`, `dev/benchmarks/cold-warm-verdict-0708d692/README.md`); both exist.
 `scripts/docs-*.toml` and `.config/nextest.toml` name no evidence artifact. The retired
 `transaction-benchmark-evidence` contract and `scripts/benchmark-transaction.sh` appear only in
 `dev/active/` planning records. `rust-build-efficiency/report.md:36` mentions the removed

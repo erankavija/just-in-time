@@ -29,7 +29,8 @@ balance. Every figure below is copied from a file under `raw/`.
 | tip | 0.90 6.42 23.84 | 0.90 6.42 23.84 |
 
 The 5- and 15-minute figures are decaying load from an earlier job on the shared
-host; nothing ran beside the measurements.
+host. The 1-minute figures are the only record of concurrent load; no process
+isolation was applied.
 
 ## Fixtures
 

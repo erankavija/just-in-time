@@ -377,7 +377,7 @@ run_step clippy "${NICE_PREFIX[@]}" cargo clippy --workspace --all-targets -- -D
 # every fresh clone and every CI runner — with nothing wrong in the tree. The
 # recorded cargo-ci run for jit:6d10e5d4 at commit e2da055a reports a 239,771 ms
 # suite-clock on a tree whose warm clock is an order of magnitude smaller
-# (dev/benchmarks/provenance-removal-355565c2/README.md), because a
+# (dev/archive/4b7c06d0-test-suite-performance/benchmarks/provenance-removal-355565c2/README.md), because a
 # dependency-profile change had invalidated every artifact.
 #
 # Compiling here was not enough on its own: measured at one commit on one host,
