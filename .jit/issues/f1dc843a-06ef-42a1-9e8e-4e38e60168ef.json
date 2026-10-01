@@ -84,6 +84,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/completion-report.md"
     }
   ],
+  "done_at": "2026-10-01T23:21:59.126552238Z",
   "first_ready_at": "2026-09-19T20:28:46.980500035Z",
   "gates_required": [
     "cargo-ci",
@@ -129,7 +130,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T23:21:45.470488603Z"
+  "updated_at": "2026-10-01T23:21:59.126552238Z"
 }

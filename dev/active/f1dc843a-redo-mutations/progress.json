@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 22,
+  "current_wave": 23,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -873,7 +873,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — session 8 dispatch (opus)"
+          "status": "done — session 8"
         }
       ]
     },
@@ -889,7 +889,7 @@
             "doc-review",
             "holistic-review"
           ],
-          "status": "pending"
+          "status": "done — session 8"
         }
       ]
     }
@@ -2176,7 +2176,8 @@
       "c88822a5": "opus, continuation of rework 2 of 2 on preserved WIP (counter unchanged: the interrupted attempt was never reviewed)",
       "ec72359b": "sonnet, continuation of first dispatch on preserved WIP",
       "e346d387": "opus, fresh first dispatch, SP-27 forms assigned under REQ-01"
-    }
+    },
+    "epic_gates": "all five passed 02:19 after two doc rounds (redo application order in guarantees.md; leftover-record application scoped to mutation sessions)"
   },
   "checkpoint_reconciliation_e590fa91": {
     "session": 8,
@@ -2210,5 +2211,7 @@
         "resolution": "not named by e590fa91; completion report"
       }
     ]
-  }
+  },
+  "status": "done",
+  "completed_at": "2026-10-02T02:20+03:00"
 }
