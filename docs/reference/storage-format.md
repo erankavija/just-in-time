@@ -61,10 +61,11 @@ complete the fixed set. Their paths come from the
 [`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
 implementations. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
 their inodes for advisory-lock race safety; they are opened with
-create-if-absent semantics and are not unlinked. Neither a lock under `.jit/`
-nor `worktree.json` creates `.jit/`: against an absent data root either fails as
-repository-not-found. `.jit-bootstrap.lock` lives beside the data root and needs
-none. `jit init` alone creates the data root. A shared read never makes write
+create-if-absent semantics and are not unlinked. No lock and no
+`worktree.json` write creates `.jit/`; `jit init` alone creates the data root.
+Against an absent data root, acquiring `.repo-write.lock` and recording
+`worktree.json` fail as repository-not-found, and `.jit-bootstrap.lock`, beside
+the data root, is acquired without it. A shared read never makes write
 access a precondition: where it cannot create or open the lock file for writing
 it opens an existing one read-only, which still excludes a writer, and where no
 regular lock file can be opened at all it reads without an advisory lock and
