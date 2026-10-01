@@ -388,6 +388,9 @@ test target or dependency feature:
 per-test duration, `warm_duration_ms`, for every test nextest ran in the default
 `cargo nextest run --workspace` invocation — 4,481 tests at revision `cb8d42c3`, cache
 state warm, one warmup run ahead of the measured run, `ceil(exec_time_seconds * 1000)`.
+It predates the redo-record cutover, which retired and renamed tests, so it is stale against
+the current suite; refresh it with `./scripts/profile-test-suite.sh` before adding a row
+below or changing a figure, since every figure in these tables is read from it.
 Nothing in that profile is close to either enforced ceiling: the slowest single test,
 5,324 ms, sits well under the per-test bound in
 [`.config/nextest.toml`](../.config/nextest.toml), and the whole default run sits
@@ -463,7 +466,10 @@ Each of these spawns the compiled `jit` binary, once or several times in the sam
 report of the same drift), to pack, apply, validate, or repair a profile package on disk.
 `test_profile_pack_and_add_carry_a_package_at_the_model_limits` carries the packaging
 fixture at its model limits directly through the CLI; the rest of this table pays the same
-durable-publication machinery at smaller scale, often several times per test.
+durable-publication machinery at smaller scale, often several times per test. What one
+publication costs at repository scale is measured by the redo-record harness
+[`bench.sh`](active/f1dc843a-redo-mutations/bench.sh), whose committed run is
+[dev/benchmarks/publication-cost-722878d4/](benchmarks/publication-cost-722878d4/README.md).
 
 | Test | Warm (ms) |
 | --- | ---: |
@@ -515,7 +521,6 @@ repair correctness across every owned class of a real profile package.
 | `commands::init::tests::test_fresh_profile_init_publishes_complete_valid_repo_without_git` | 1,199 |
 | `commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged` | 996 |
 | `commands::profile::tests::test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules` | 909 |
-| `commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands` | 892 |
 | `profile::package_archive::tests::test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits` | 529 |
 
 ### Genuine concurrency: real threads, timers, and watchers
@@ -581,7 +586,6 @@ the slowest of the group, which repeats a failing gate to exercise history compa
 | Test | Warm (ms) |
 | --- | ---: |
 | `commands::gate_check::tests::test_run_history_is_compacted_to_one_latest_run` | 1,848 |
-| `commands::gate_check::tests::test_check_gate_reexecutes_for_new_same_issue_run_but_not_unrelated_run` | 550 |
 | `commands::gate_check::tests::test_check_gate_run_history_keeps_only_latest_legacy_run` | 547 |
 | `commands::gate_check::tests::test_check_all_gates_respects_priority_order` | 541 |
 | `commands::gate_check::tests::test_check_all_gates_stable_sort_same_priority` | 537 |
