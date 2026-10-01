@@ -85,7 +85,13 @@
     "doc-review",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T22:47:36.185597951Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "labels": [
     "epic:redo-mutations",
@@ -98,5 +104,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T22:45:31.065626409Z"
+  "updated_at": "2026-10-01T22:47:36.185597951Z"
 }
