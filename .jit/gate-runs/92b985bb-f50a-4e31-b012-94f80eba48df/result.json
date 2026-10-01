@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0218de2e209268bbee5bdfeadbb3e64ea4c66507",
+  "completed_at": "2026-10-01T23:01:18.356403804Z",
+  "duration_ms": 162120,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f1dc843a-redo-mutations/handoff.md",
+        "id": "F1",
+        "line": 74,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "Linked handoffs retain the removed bench.sh harness path and its 124 ms/372 ms figures lack a current committed raw artifact."
+      }
+    ],
+    "summary": "All hard criteria are verifiably met; one advisory stale handoff reference remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "92b985bb-f50a-4e31-b012-94f80eba48df",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:58:36.235948472Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. [low, advisory] Linked handoffs retain the removed `bench.sh` harness path; its 124 ms/372 ms figures lack a current committed raw artifact. See `handoff.md:74`, `handoff-2.md:70`, and `handoff-3.md:171`. The current benchmark artifact substantiates REQ-01/02 separately.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are verifiably met; one advisory stale handoff reference remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Linked handoffs retain the removed bench.sh harness path and its 124 ms/372 ms figures lack a current committed raw artifact.\",\"file\":\"dev/active/f1dc843a-redo-mutations/handoff.md\",\"line\":74,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
