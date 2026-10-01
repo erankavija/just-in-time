@@ -56,11 +56,10 @@ pub(crate) use export::{
 };
 pub(crate) use image::CapturedAnswers;
 pub use image::{
-    plan_hash, CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
+    CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
     EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
-    PlanHashError, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositorySeed, RepositorySeedKind, RepositoryTargetKind, SeedError, TargetClaim,
+    ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction,
+    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim,
     EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
@@ -149,15 +148,7 @@ pub fn finalize_gate_registry_edit(
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    let seed = context
-        .repository_seed(intents)
-        .map_err(GateRegistryEditError::Mutation)?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )?)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 /// A typed failure raised while finalizing a gate-registry edit.
@@ -177,7 +168,7 @@ pub enum GateRegistryEditError {
     /// The typed edit's registry disagreed with the projection declarations.
     #[error("gate registry edit and projection declarations disagree")]
     DeclarationMismatch,
-    /// The record finalizer or seed derivation failed.
+    /// The record finalizer failed.
     #[error(transparent)]
     Mutation(#[from] MutationError),
     /// The edited registry could not be serialized canonically.
@@ -186,9 +177,6 @@ pub enum GateRegistryEditError {
     /// The proposed-state overlay could not be closed.
     #[error(transparent)]
     Overlay(#[from] OverlayError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
 }
 pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
@@ -587,8 +575,6 @@ pub struct MaterializationPlan {
     image: RepositoryImage,
     /// Exact normalized delta.
     delta: RepositoryDelta,
-    /// Semantic hash covering the complete image and inputs.
-    hash: String,
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
@@ -659,22 +645,18 @@ pub(crate) struct ProfileContributionMaterialization {
     pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
-/// Complete producer output awaiting the shared plan-identity tail.
+/// Complete producer output awaiting the shared plan tail.
 struct MaterializationDerivation {
     delta: RepositoryDelta,
-    seed: RepositorySeed,
-    intent: MaterializationIntent,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
     applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 impl MaterializationDerivation {
-    fn new(delta: RepositoryDelta, seed: RepositorySeed, intent: MaterializationIntent) -> Self {
+    fn new(delta: RepositoryDelta) -> Self {
         Self {
             delta,
-            seed,
-            intent,
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
@@ -715,11 +697,6 @@ impl MaterializationPlan {
         &self.delta
     }
 
-    /// The semantic identity computed from the captured image and complete plan inputs.
-    pub fn hash(&self) -> &str {
-        &self.hash
-    }
-
     /// Return the count produced for one configured projection in this plan.
     pub(crate) fn projection_count(&self, name: &str) -> Option<usize> {
         self.projection_counts.get(name).copied()
@@ -740,23 +717,16 @@ impl MaterializationPlan {
         &self.applied_profiles
     }
 
-    /// Close a delta into a plan whose identity is computed from all plan inputs.
-    pub(crate) fn new(
-        image: &RepositoryImage,
-        seed: &RepositorySeed,
-        intent: &MaterializationIntent,
-        delta: RepositoryDelta,
-    ) -> Result<Self, PlanHashError> {
-        let hash = plan_hash(image, seed, intent, &delta)?;
-        Ok(Self {
+    /// Close a delta over the image it was derived from.
+    pub(crate) fn new(image: &RepositoryImage, delta: RepositoryDelta) -> Self {
+        Self {
             image: image.clone(),
             delta,
-            hash,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
-        })
+        }
     }
 
     fn with_projection_counts(mut self, counts: std::collections::BTreeMap<String, usize>) -> Self {
@@ -797,15 +767,11 @@ pub enum MaterializationRequest<'a> {
     SemanticMutation {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
     },
     /// Render the selected configured projections (`None` selects all).
     RenderConfiguredProjections {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
         /// Declaration-scoped projection names.
         selected: Option<std::collections::BTreeSet<String>>,
     },
@@ -816,8 +782,6 @@ pub enum MaterializationRequest<'a> {
         /// Neutral claims for every installed profile whose exact package
         /// identity was proven from repository provenance.
         profiles: Vec<ProfileClaims>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
     },
     /// Derive a fresh or missing-file repository scaffold.
     Initialize {
@@ -851,46 +815,23 @@ pub fn derive_materialization(
     request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     let (derivation, projection_counts) = match request {
-        MaterializationRequest::SemanticMutation { declarations, seed } => {
+        MaterializationRequest::SemanticMutation { declarations } => {
             let delta = derive_semantic_mutation(image, &declarations)?;
-            (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::SemanticMutation,
-                ),
-                Default::default(),
-            )
+            (MaterializationDerivation::new(delta), Default::default())
         }
         MaterializationRequest::RenderConfiguredProjections {
             declarations,
-            seed,
             selected,
         } => {
             let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
-            (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::RenderConfiguredProjections { selected },
-                ),
-                counts,
-            )
+            (MaterializationDerivation::new(delta), counts)
         }
         MaterializationRequest::RepairDerivedState {
             declarations,
             profiles,
-            seed,
         } => {
             let delta = derive_repair(image, &declarations, profiles)?;
-            (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::RepairDerivedState,
-                ),
-                Default::default(),
-            )
+            (MaterializationDerivation::new(delta), Default::default())
         }
         MaterializationRequest::Initialize { scaffold, context } => (
             initialize::derive_initialization(image, scaffold, context)?,
@@ -913,20 +854,15 @@ pub fn derive_materialization(
     };
     let MaterializationDerivation {
         delta,
-        seed,
-        intent,
         profile_targets,
         profile_contributions,
         applied_profiles,
     } = derivation;
-    MaterializationPlan::new(image, &seed, &intent, delta)
-        .map(|plan| {
-            plan.with_projection_counts(projection_counts)
-                .with_profile_targets(profile_targets)
-                .with_profile_contributions(profile_contributions)
-                .with_applied_profiles(applied_profiles)
-        })
-        .map_err(Into::into)
+    Ok(MaterializationPlan::new(image, delta)
+        .with_projection_counts(projection_counts)
+        .with_profile_targets(profile_targets)
+        .with_profile_contributions(profile_contributions)
+        .with_applied_profiles(applied_profiles))
 }
 
 /// Finalize an authored `config.toml` edit plus the complete coupled producer set
@@ -940,8 +876,7 @@ pub fn derive_materialization(
 /// that edited configuration, exactly as [`derive_semantic_mutation`] does. The
 /// authored `config.toml` write carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
-/// exactly what was captured; the whole set publishes under the existing
-/// [`MaterializationIntent::SemanticMutation`].
+/// exactly what was captured.
 ///
 /// This is a constrained, single-declaration entry invoking the closed complete
 /// producer set — `config.toml` only, never a generic authored-bytes seam. Other
@@ -950,7 +885,6 @@ pub fn finalize_config_edit(
     base: &RepositoryImage,
     edited_config_bytes: &[u8],
     declarations: RepositoryDeclarations<'_>,
-    seed: &RepositorySeed,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     // The edit must parse before any planning: a malformed config is a typed
     // planning error, not a published file.
@@ -980,8 +914,7 @@ pub fn finalize_config_edit(
     };
     actions.extend(compose_complete(&overlaid, &edited_declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    MaterializationPlan::new(base, seed, &MaterializationIntent::SemanticMutation, delta)
-        .map_err(Into::into)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 /// Pure derivation failure.
@@ -993,9 +926,6 @@ pub enum RepositoryStateError {
     /// Delta normalization rejected an alias or duplicate target.
     #[error(transparent)]
     Delta(#[from] DeltaError),
-    /// Plan identity serialization failed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
     /// Managed-document composition rejected an ambiguous or malformed claim.
     #[error(transparent)]
     ManagedDocument(#[from] ManagedDocumentError),
@@ -1323,21 +1253,10 @@ mod tests {
     }
 
     fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "repository-state-test".into(),
-            },
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
         MaterializationPlan::new(
             image,
-            &seed,
-            &MaterializationIntent::SemanticMutation,
             RepositoryDelta::new(image.layout(), actions).unwrap(),
         )
-        .unwrap()
     }
 
     #[test]

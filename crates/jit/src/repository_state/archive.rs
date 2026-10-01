@@ -2,9 +2,9 @@
 
 use super::mutation::finalize_delta;
 use super::{
-    ExpectedPreimage, FileMode, MaterializationIntent, MaterializationPlan, MutationContext,
-    MutationError, MutationIntent, ProducerError, RepositoryAction, RepositoryDelta,
-    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+    ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
+    MutationIntent, ProducerError, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_plan::{
@@ -324,14 +324,7 @@ pub fn finalize_archive_execution(
     let mut all_actions = actions;
     all_actions.extend(record_actions);
     let delta = RepositoryDelta::new(image.layout(), all_actions)?;
-    let materialization = MaterializationPlan::new(
-        image,
-        &context
-            .repository_seed(&intents)
-            .map_err(ArchiveExecutionError::Mutation)?,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )?;
+    let materialization = MaterializationPlan::new(image, delta);
     let mut warnings = plan
         .warnings()
         .iter()

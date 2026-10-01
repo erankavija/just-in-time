@@ -505,13 +505,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         crate::output::DivergenceResponse,
     )> {
         let layout = self.require_layout()?;
-        let seed = repair_seed()?;
         with_mutation_session(
             self.storage(),
             &layout,
             "repository validation",
             |session| {
-                let Some(derived) = self.capture_repair_plan(session, &seed)? else {
+                let Some(derived) = self.capture_repair_plan(session)? else {
                     return Ok(SessionStep::Retry);
                 };
                 let captured = match derived {
@@ -560,9 +559,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         use crate::repository_state::RepositoryAction;
 
         let layout = self.require_layout()?;
-        let seed = repair_seed()?;
         with_mutation_session(self.storage(), &layout, "derived-state repair", |session| {
-            let Some(derived) = self.capture_repair_plan(session, &seed)? else {
+            let Some(derived) = self.capture_repair_plan(session)? else {
                 return Ok(SessionStep::Retry);
             };
             let mut captured = derived.map_err(|failure| {
@@ -625,7 +623,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     fn capture_repair_plan(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        seed: &crate::repository_state::RepositorySeed,
     ) -> Result<
         Option<
             std::result::Result<
@@ -710,7 +707,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     MaterializationRequest::RepairDerivedState {
                         declarations: declarations.borrowed(),
                         profiles,
-                        seed,
                     },
                 ) {
                     Ok(plan) => Some(plan),
@@ -1069,17 +1065,6 @@ fn captured_divergences(
         count: divergences.len(),
         divergences,
     })
-}
-
-fn repair_seed() -> Result<crate::repository_state::RepositorySeed> {
-    crate::repository_state::RepositorySeed::new(
-        crate::repository_state::RepositorySeedKind::Command {
-            name: "validate derived state".to_string(),
-        },
-        Default::default(),
-        Default::default(),
-    )
-    .map_err(Into::into)
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.
@@ -3618,7 +3603,7 @@ depends_on = ["planning"]
             .unwrap()
             .expect("a settled capture");
         let captured = executor
-            .capture_repair_plan(session.as_mut(), &repair_seed().unwrap())
+            .capture_repair_plan(session.as_mut())
             .unwrap()
             .expect("a settled capture")
             .expect("a repository that has applied no profile validates");
@@ -3662,7 +3647,7 @@ depends_on = ["planning"]
             .unwrap();
 
         let captured = executor
-            .capture_repair_plan(session.as_mut(), &repair_seed().unwrap())
+            .capture_repair_plan(session.as_mut())
             .unwrap()
             .expect("a settled capture")
             .expect("a record whose package resolves validates");

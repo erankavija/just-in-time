@@ -15,10 +15,9 @@
 //! and the pure `repository_state` vocabulary.
 
 use super::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationIntent,
-    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind,
-    RootRelativePath, SeedError, VirtualPath,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction,
+    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
+    RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{
@@ -29,7 +28,6 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
-use std::collections::BTreeMap;
 
 /// Injected wall-clock source for the single mutation timestamp.
 ///
@@ -133,10 +131,8 @@ impl IdAuthority {
         }
     }
 
-    /// The seed if already determined without drawing the random source: a fixed
-    /// seed, or a lazy seed already sampled by an allocation. `None` means no
-    /// identifier has been allocated, so no-op finalization can hash its plan
-    /// without forcing a sample.
+    /// The seed if already determined, without drawing the random source.
+    #[cfg(test)]
     fn sampled_seed(&self) -> Option<[u8; 32]> {
         match &self.seed {
             SeedSource::Fixed(seed) => Some(*seed),
@@ -324,35 +320,6 @@ impl MutationContext {
         self.next_index.set(index + 1);
         self.ids.uuid_at(index)
     }
-
-    /// Close the identity seed and exact semantic intents into the typed seed
-    /// consumed by the repository plan-hash API. The seed enters the hash only
-    /// once it has been drawn — a fixed seed, or a production seed sampled by an
-    /// allocation in this finalize. A no-op allocates nothing, so its production
-    /// seed stays undrawn and is omitted, keeping no-op finalization free of any
-    /// identity or time sampling. Repeated finalization with this context reuses
-    /// its sampled seed, so equivalent plans hash identically on both backends.
-    pub(crate) fn repository_seed(
-        &self,
-        intents: &[MutationIntent],
-    ) -> Result<RepositorySeed, MutationError> {
-        let context_seed = self
-            .ids
-            .sampled_seed()
-            .map(|seed| seed.to_vec())
-            .unwrap_or_default();
-        RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "repository-state-mutation-v1".to_string(),
-            },
-            BTreeMap::new(),
-            BTreeMap::from([
-                ("context_seed".to_string(), context_seed),
-                ("intents".to_string(), canonical_json(intents, false)?),
-            ]),
-        )
-        .map_err(Into::into)
-    }
 }
 
 /// One repository-owned semantic mutation, free of identifiers and timestamps.
@@ -489,12 +456,6 @@ pub enum MutationError {
     /// An authored gate registry could not be serialized canonically.
     #[error(transparent)]
     GateDeclaration(#[from] crate::declarations::GateDeclarationError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
-    /// The complete semantic plan could not be hashed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
     /// A captured record could not be parsed.
     #[error("captured record at {path:?} is malformed: {reason}")]
     MalformedRecord {
@@ -748,10 +709,7 @@ fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee)
 /// The single typed-to-byte finalizer for repository-owned records.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
-/// `intents`, it produces one exact [`MaterializationPlan`]. Its semantic hash
-/// covers the complete captured image, the unchanged context seed, the closed
-/// intent representation, [`MaterializationIntent::SemanticMutation`], and the
-/// final delta. When no transition occurs the plan carries an empty delta having
+/// `intents`, it produces one exact [`MaterializationPlan`]. When no transition occurs the plan carries an empty delta having
 /// sampled neither an identifier nor the mutation timestamp, so a no-op emits no
 /// bytes. Identifiers are allocated in the frozen order — new issue ids first
 /// (creation order), gate-run/record ids next, event ids last after canonical
@@ -764,14 +722,7 @@ pub fn finalize(
     intents: &[MutationIntent],
 ) -> Result<MaterializationPlan, MutationError> {
     let delta = finalize_delta(layout, image, context, intents)?;
-    let seed = context.repository_seed(intents)?;
-    MaterializationPlan::new(
-        image,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )
-    .map_err(Into::into)
+    Ok(MaterializationPlan::new(image, delta))
 }
 
 pub(super) fn finalize_delta(
@@ -1581,11 +1532,6 @@ mod tests {
             serde_json::to_vec(retry.delta()).unwrap(),
             "delta bytes must be stable across reconstructed values"
         );
-        assert_eq!(
-            first.hash(),
-            retry.hash(),
-            "semantic plan hashes must be stable across retries"
-        );
     }
 
     /// The override fact a dispatch site installs when it lets an invocation
@@ -2032,7 +1978,6 @@ mod tests {
         };
         let first = finalize(&layout(), &image, &ctx(), std::slice::from_ref(&intent)).unwrap();
         let retry = finalize(&layout(), &image, &ctx(), &[intent]).unwrap();
-        assert_eq!(first.hash(), retry.hash());
         assert_eq!(first.delta(), retry.delta());
         let written = first
             .delta()

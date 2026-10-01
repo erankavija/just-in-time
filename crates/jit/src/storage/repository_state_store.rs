@@ -32,8 +32,6 @@ use std::sync::{Arc, Mutex};
 /// Successful application of one exact repository delta.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RepositoryApplyOutcome {
-    /// Complete semantic plan hash supplied unchanged to storage and recovery.
-    pub transaction_hash: String,
     /// Number of normalized actions applied.
     pub actions_applied: usize,
 }
@@ -577,7 +575,6 @@ impl RepositoryMutationSession for JsonMutationSession {
             .map(|(locker, path)| locker.lock_exclusive(path))
             .transpose()?;
         let outcome = RepositoryApplyOutcome {
-            transaction_hash: plan.hash().to_string(),
             actions_applied: delta.actions().len(),
         };
         match (self.roots.data.is_some(), delta.actions().is_empty()) {
@@ -735,7 +732,6 @@ impl RepositoryMutationSession for MemoryMutationSession {
         let interruptions = self.storage.mutation_interruptions();
         interruptions.check(&MutationPoint::BeforeCommitCheck)?;
         let outcome = RepositoryApplyOutcome {
-            transaction_hash: plan.hash().to_string(),
             actions_applied: delta.actions().len(),
         };
         let data_root_exists = self.storage.repository_state().data_root_exists;

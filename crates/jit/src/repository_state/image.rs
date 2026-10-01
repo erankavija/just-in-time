@@ -100,7 +100,7 @@ impl EntryIdentity {
 ///
 /// The only constructor hashes the bytes, so an identity can never disagree
 /// with the bytes it describes and a closed image need not re-hash them. It
-/// serializes as its identity alone, which binds the bytes into a plan hash.
+/// serializes as its identity alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapturedBytes {
     identity: EntryIdentity,
@@ -473,7 +473,7 @@ pub struct PinnedDocumentEvidence {
     object_oid: Option<String>,
     /// Exact object/content identity, including SHA-256 and byte size.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present, bound into the plan hash through `identity`.
+    /// Exact bytes when present; serialization carries `identity` alone.
     #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
     /// Stable absence/unavailable reason.
@@ -626,7 +626,7 @@ pub struct LinkedWorktreeEvidence {
     source: LinkedWorktreeSourceClass,
     /// Exact identity when present.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present, bound into the plan hash through `identity`.
+    /// Exact bytes when present; serialization carries `identity` alone.
     #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
 }
@@ -1215,130 +1215,6 @@ fn captured_byte_count(
         .fold(0, u64::saturating_add)
 }
 
-/// Typed command/profile input included in a semantic plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct RepositorySeed {
-    /// Closed seed source and semantic operation identity.
-    kind: RepositorySeedKind,
-    /// Sorted typed scalar facts.
-    facts: BTreeMap<String, String>,
-    /// Sorted exact immutable payloads.
-    payloads: BTreeMap<String, Vec<u8>>,
-}
-
-impl RepositorySeed {
-    /// Construct typed semantic input with non-empty stable names.
-    pub fn new(
-        kind: RepositorySeedKind,
-        facts: BTreeMap<String, String>,
-        payloads: BTreeMap<String, Vec<u8>>,
-    ) -> Result<Self, SeedError> {
-        kind.validate()?;
-        for key in facts.keys().chain(payloads.keys()) {
-            validate_seed_text("key", key)?;
-        }
-        Ok(Self {
-            kind,
-            facts,
-            payloads,
-        })
-    }
-
-    /// Semantic source class.
-    pub fn kind(&self) -> &RepositorySeedKind {
-        &self.kind
-    }
-}
-
-/// Closed source class for semantic seed data.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RepositorySeedKind {
-    /// An ordinary command mutation.
-    Command {
-        /// Stable command semantic name.
-        name: String,
-    },
-    /// A fresh repository initialization.
-    Initialization,
-    /// A profile operation.
-    Profile {
-        /// Profile identity.
-        name: String,
-        /// Profile declaration version.
-        version: String,
-        /// Exact package identity.
-        package_hash: String,
-    },
-}
-
-impl RepositorySeedKind {
-    fn validate(&self) -> Result<(), SeedError> {
-        match self {
-            Self::Command { name } => validate_seed_text("command name", name),
-            Self::Initialization => Ok(()),
-            Self::Profile {
-                name,
-                version,
-                package_hash,
-            } => {
-                validate_seed_text("profile name", name)?;
-                validate_seed_text("profile version", version)?;
-                validate_seed_text("profile package hash", package_hash)
-            }
-        }
-    }
-}
-
-fn validate_seed_text(field: &'static str, value: &str) -> Result<(), SeedError> {
-    if value.is_empty() || value.chars().any(char::is_control) {
-        Err(SeedError::InvalidText { field })
-    } else {
-        Ok(())
-    }
-}
-
-/// Constrained complete materialization operation.
-///
-/// The render variant carries a `selected` name set that scopes WHICH declared
-/// projections are in scope for this operation, not WHICH producer families run.
-/// This is declaration scope, not an à-la-carte producer switch: each selected
-/// projection's output still derives completely from its own declared sources, so
-/// a `jit project render <name>` renders exactly that projection's target from its
-/// own closure and leaves sibling projections' targets untouched. Semantic-mutation
-/// and repair intents remain complete over every declared projection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MaterializationIntent {
-    /// Full derived-state rebuild after a semantic mutation.
-    SemanticMutation,
-    /// Render the configured projections in scope. `None` selects every declared
-    /// projection; `Some(set)` scopes the operation to exactly the named
-    /// projections (each rendered completely from its own declared sources).
-    RenderConfiguredProjections {
-        /// The declaration-scoped projection names, or `None` for all.
-        selected: Option<std::collections::BTreeSet<String>>,
-    },
-    /// Repair every explicitly owned derived-state drift finding.
-    RepairDerivedState,
-    /// Publish a fresh (or missing-file) repository scaffold, optionally with a
-    /// profile, as one complete delta.
-    InitializeRepository,
-    /// Apply a profile to an existing repository as one complete delta.
-    ApplyProfile,
-    /// Publish one explicitly selected repository-contained export file.
-    /// Finalized by
-    /// [`finalize_repository_export`](crate::repository_state::finalize_repository_export),
-    /// not the declaration-derived producer graph.
-    RepositoryExport,
-    /// Republish one whole package tree at a worktree destination from the
-    /// sources its manifest declares. Finalized by
-    /// [`finalize_package_tree_capture`](crate::repository_state::finalize_package_tree_capture),
-    /// not the declaration-derived producer graph: the content comes from a
-    /// package manifest rather than from this repository's declarations.
-    CapturePackageTree,
-}
-
 /// Stable ownership identity for a target claim.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct TargetClaim {
@@ -1486,7 +1362,7 @@ pub enum RepositoryAction {
         path: VirtualPath,
         owner: String,
         expected: ExpectedPreimage,
-        /// Exact bytes to publish, bound into the plan hash through their digest.
+        /// Exact bytes to publish; serialization carries their digest.
         #[serde(serialize_with = "serialize_content_digest")]
         bytes: Vec<u8>,
         mode: FileMode,
@@ -1748,32 +1624,8 @@ fn validate_owner(owner: &str) -> Result<(), DeltaError> {
     }
 }
 
-/// Deterministic plan hash over layout, capture, evidence, seed, intent, and delta.
-pub fn plan_hash(
-    image: &RepositoryImage,
-    seed: &RepositorySeed,
-    intent: &MaterializationIntent,
-    delta: &RepositoryDelta,
-) -> Result<String, PlanHashError> {
-    let mut hasher = Sha256::new();
-    hash_field(&mut hasher, b"jit-repository-plan-v1");
-    hash_serialized(&mut hasher, &image.layout)?;
-    hash_serialized(&mut hasher, &image.spec)?;
-    hash_serialized(&mut hasher, &image.entries.iter().collect::<Vec<_>>())?;
-    hash_serialized(&mut hasher, &image.listings.iter().collect::<Vec<_>>())?;
-    hash_serialized(&mut hasher, &image.pinned.iter().collect::<Vec<_>>())?;
-    hash_serialized(
-        &mut hasher,
-        &image.linked_worktree.iter().collect::<Vec<_>>(),
-    )?;
-    hash_serialized(&mut hasher, seed)?;
-    hash_serialized(&mut hasher, intent)?;
-    hash_serialized(&mut hasher, delta)?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-/// Serialize bytes as their SHA-256 digest and length, so plan identity commits
-/// to written content without encoding it byte by byte.
+/// Serialize bytes as their SHA-256 digest and length, so a serialized delta
+/// commits to written content without encoding it byte by byte.
 fn serialize_content_digest<S: serde::Serializer>(
     bytes: &[u8],
     serializer: S,
@@ -1784,11 +1636,6 @@ fn serialize_content_digest<S: serde::Serializer>(
 fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
     hasher.update((bytes.len() as u64).to_be_bytes());
     hasher.update(bytes);
-}
-
-fn hash_serialized(hasher: &mut Sha256, value: &impl Serialize) -> Result<(), PlanHashError> {
-    hash_field(hasher, &serde_json::to_vec(value)?);
-    Ok(())
 }
 
 /// Capture closure failure.
@@ -1871,19 +1718,6 @@ pub enum DeltaError {
     #[error("delta action is invalid: {0}")]
     InvalidAction(String),
 }
-
-/// Invalid typed semantic seed.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum SeedError {
-    /// A stable semantic identifier was empty or contained controls.
-    #[error("repository seed {field} is empty or contains control characters")]
-    InvalidText { field: &'static str },
-}
-
-/// Failure to serialize the closed typed plan vocabulary.
-#[derive(Debug, thiserror::Error)]
-#[error("failed to serialize repository plan identity: {0}")]
-pub struct PlanHashError(#[from] serde_json::Error);
 
 #[cfg(test)]
 mod tests {
@@ -2624,16 +2458,6 @@ mod tests {
             ),
             Err(CaptureError::LinkedEvidenceRequiresDataPath(_))
         ));
-        assert!(matches!(
-            RepositorySeed::new(
-                RepositorySeedKind::Command {
-                    name: String::new(),
-                },
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
-            Err(SeedError::InvalidText { .. })
-        ));
 
         let path = VirtualPath::data("index.json").unwrap();
         assert!(matches!(
@@ -2656,75 +2480,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_plan_hash_is_deterministic_and_covers_entry_listing_and_seed() {
-        let captured = image(1, 2);
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "test".into(),
-            },
-            BTreeMap::from([("key".into(), "value".into())]),
-            BTreeMap::new(),
-        )
-        .unwrap();
-        let delta = RepositoryDelta::new(&layout(), Vec::new()).unwrap();
-        let hash = plan_hash(
-            &captured,
-            &seed,
-            &MaterializationIntent::SemanticMutation,
-            &delta,
-        )
-        .unwrap();
-        assert_eq!(
-            hash,
-            plan_hash(
-                &captured,
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        assert_ne!(
-            hash,
-            plan_hash(
-                &image(9, 2),
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        assert_ne!(
-            hash,
-            plan_hash(
-                &image(1, 9),
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        let changed_seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "changed".into(),
-            },
-            seed.facts.clone(),
-            seed.payloads.clone(),
-        )
-        .unwrap();
-        assert_ne!(
-            hash,
-            plan_hash(
-                &captured,
-                &changed_seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-    }
-
     proptest::proptest! {
         /// Captured bytes carry exactly the identity their bytes hash to.
         #[test]
@@ -2740,8 +2495,3 @@ mod tests {
         }
     }
 }
-
-// Include property-based tests
-#[cfg(test)]
-#[path = "image_plan_hash_property_tests.rs"]
-mod plan_hash_property_tests;

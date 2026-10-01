@@ -1,10 +1,9 @@
 //! Typed classification and pure finalization of repository export files.
 
 use super::{
-    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationIntent,
-    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind,
-    RootRelativePath, SeedError, VirtualPath,
+    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
+    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
@@ -117,10 +116,6 @@ pub(crate) enum RepositoryExportError {
     Capture(#[from] CaptureError),
     #[error(transparent)]
     Delta(#[from] super::DeltaError),
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
-    #[error(transparent)]
-    Seed(#[from] SeedError),
     #[error("repository export target must be below a selected root: {0:?}")]
     RootTarget(VirtualPath),
     #[error("repository export parent is not an ordinary directory: {0:?}")]
@@ -233,25 +228,7 @@ fn finalize_export_payload(
         }
     };
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Command {
-            name: "repository-export".to_string(),
-        },
-        BTreeMap::from([
-            (
-                "target".to_string(),
-                serde_json::to_string(target).map_err(PlanHashError::from)?,
-            ),
-            ("owner".to_string(), EXPORT_OWNER.to_string()),
-        ]),
-        BTreeMap::new(),
-    )?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::RepositoryExport,
-        delta,
-    )?)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 fn require_absent(

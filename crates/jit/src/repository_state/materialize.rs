@@ -652,11 +652,10 @@ mod tests {
     use crate::repository_state::{
         compare_materializations, derive_materialization, repair_target_paths, CaptureBudget,
         CaptureSpec, CapturedBytes, Contribution, InitializationScaffold, MapEntryTarget,
-        MaterializationDriftKind, MaterializationIntent, MaterializationPlan,
-        MaterializationRequest, MutationContext, ProfileApplicationInput, ProfileAssetClaim,
-        ProfileClaims, ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim,
-        RepositoryAction, RepositoryImage, RepositoryLayout, RepositoryRootEvidence,
-        RepositorySeed, RepositorySeedKind, TargetClaim,
+        MaterializationDriftKind, MaterializationPlan, MaterializationRequest, MutationContext,
+        ProfileApplicationInput, ProfileAssetClaim, ProfileClaims, ProfileContributionClaim,
+        ProfilePackageId, ProfileRegionClaim, RepositoryAction, RepositoryImage, RepositoryLayout,
+        RepositoryRootEvidence, TargetClaim,
     };
     use std::collections::BTreeMap;
 
@@ -867,8 +866,7 @@ kind = "advisory"
         let plan = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections {
+            TestIntent::RenderConfiguredProjections {
                 selected: Some(in_scope),
             },
         )
@@ -883,8 +881,7 @@ kind = "advisory"
         let plan2 = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections {
+            TestIntent::RenderConfiguredProjections {
                 selected: Some(out_of_scope),
             },
         )
@@ -907,48 +904,41 @@ kind = "advisory"
         }
     }
 
+    enum TestIntent {
+        SemanticMutation,
+        RenderConfiguredProjections {
+            selected: Option<std::collections::BTreeSet<String>>,
+        },
+        RepairDerivedState,
+    }
+
     fn derive_declared(
         image: &RepositoryImage,
         declarations: RepositoryDeclarations<'_>,
-        seed: &RepositorySeed,
-        intent: MaterializationIntent,
+        intent: TestIntent,
     ) -> Result<MaterializationPlan, RepositoryStateError> {
-        let request = match intent {
-            MaterializationIntent::SemanticMutation => {
-                MaterializationRequest::SemanticMutation { declarations, seed }
-            }
-            MaterializationIntent::RenderConfiguredProjections { selected } => {
-                MaterializationRequest::RenderConfiguredProjections {
-                    declarations,
-                    seed,
-                    selected,
+        derive_materialization(
+            image,
+            match intent {
+                TestIntent::SemanticMutation => {
+                    MaterializationRequest::SemanticMutation { declarations }
                 }
-            }
-            MaterializationIntent::RepairDerivedState => {
-                MaterializationRequest::RepairDerivedState {
+                TestIntent::RenderConfiguredProjections { selected } => {
+                    MaterializationRequest::RenderConfiguredProjections {
+                        declarations,
+                        selected,
+                    }
+                }
+                TestIntent::RepairDerivedState => MaterializationRequest::RepairDerivedState {
                     declarations,
                     profiles: Vec::new(),
-                    seed,
-                }
-            }
-            other => panic!("unsupported test materialization intent: {other:?}"),
-        };
-        derive_materialization(image, request)
+                },
+            },
+        )
     }
 
     fn config_decls(config: &str) -> crate::declarations::ConfigurationDeclarations {
         crate::declarations::parse_configuration(config.as_bytes()).unwrap()
-    }
-
-    fn seed() -> RepositorySeed {
-        RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "materialize-test".into(),
-            },
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
     }
 
     fn agents_with_region(region: &str, inner: &str) -> String {
@@ -956,7 +946,7 @@ kind = "advisory"
     }
 
     #[test]
-    fn test_derive_materialization_produces_plan_identity_for_every_request_variant() {
+    fn test_derive_materialization_closes_over_its_image_for_every_request_variant() {
         let config = config_decls(CONFIG);
         let (gate_registry, rule_set) = (gates(), rules());
         let declared_image = image(&[
@@ -971,7 +961,6 @@ kind = "advisory"
             &declared_image,
             MaterializationRequest::SemanticMutation {
                 declarations: declarations(&config, &gate_registry, &rule_set),
-                seed: &seed(),
             },
         )
         .unwrap();
@@ -979,7 +968,6 @@ kind = "advisory"
             &declared_image,
             MaterializationRequest::RenderConfiguredProjections {
                 declarations: declarations(&config, &gate_registry, &rule_set),
-                seed: &seed(),
                 selected: None,
             },
         )
@@ -989,7 +977,6 @@ kind = "advisory"
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&config, &gate_registry, &rule_set),
                 profiles: Vec::new(),
-                seed: &seed(),
             },
         )
         .unwrap();
@@ -1054,22 +1041,14 @@ kind = "advisory"
         )
         .unwrap();
 
-        for (variant, plan) in [
-            ("SemanticMutation", semantic),
-            ("RenderConfiguredProjections", render),
-            ("RepairDerivedState", repair),
-            ("Initialize", initialize),
-            ("ApplyProfileSelection", apply_profile),
+        for (variant, plan, input) in [
+            ("SemanticMutation", semantic, &declared_image),
+            ("RenderConfiguredProjections", render, &declared_image),
+            ("RepairDerivedState", repair, &declared_image),
+            ("Initialize", initialize, &initialization_image),
+            ("ApplyProfileSelection", apply_profile, &profile_image),
         ] {
-            assert_eq!(
-                plan.hash().len(),
-                64,
-                "{variant} must produce a SHA-256 plan identity"
-            );
-            assert!(
-                plan.hash().bytes().all(|byte| byte.is_ascii_hexdigit()),
-                "{variant} plan identity must be hexadecimal"
-            );
+            assert_eq!(plan.image(), input, "{variant} must close over its image");
         }
     }
 
@@ -1089,8 +1068,7 @@ kind = "advisory"
         let plan = derive_declared(
             &image,
             decls,
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let actions = plan.delta().actions();
@@ -1124,8 +1102,7 @@ kind = "advisory"
         let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = &plan.delta().actions()[0] else {
@@ -1141,8 +1118,7 @@ kind = "advisory"
         let plan2 = derive_declared(
             &fresh,
             decls,
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         assert!(
@@ -1171,20 +1147,18 @@ kind = "advisory"
         let plan_a = derive_declared(
             &build(),
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         let plan_b = derive_declared(
             &build(),
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
-        // Determinism: identical delta and plan hash across runs.
+        // Determinism: identical plan across runs.
         assert_eq!(plan_a.delta(), plan_b.delta());
-        assert_eq!(plan_a.hash(), plan_b.hash());
+        assert_eq!(plan_a.image(), plan_b.image());
         let RepositoryAction::WriteFile { bytes, .. } = &plan_a.delta().actions()[0] else {
             panic!("expected single composed write");
         };
@@ -1212,8 +1186,7 @@ kind = "advisory"
         let plan = derive_declared(
             &stale,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RenderConfiguredProjections { selected: None },
+            TestIntent::RenderConfiguredProjections { selected: None },
         )
         .unwrap();
         // Comparing the expected plan against the same stale image reports the
@@ -1245,8 +1218,7 @@ kind = "advisory"
         let plan = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
         .unwrap();
         let RepositoryAction::WriteFile { bytes, .. } = &plan.delta().actions()[0] else {
@@ -1298,8 +1270,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::SemanticMutation,
+            TestIntent::SemanticMutation,
         )
         .unwrap();
         assert!(
@@ -1342,8 +1313,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::SemanticMutation,
+            TestIntent::SemanticMutation,
         )
         .unwrap();
 
@@ -1413,8 +1383,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
         .unwrap();
         assert!(
@@ -1462,8 +1431,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
         .unwrap();
         let deletes: Vec<&VirtualPath> = plan
@@ -1521,8 +1489,7 @@ kind = "advisory"
         let result = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         );
         let err = result.expect_err("duplicate rule names must be non-repairable");
         assert!(
@@ -1568,8 +1535,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
         .unwrap();
         assert!(
@@ -1609,8 +1575,7 @@ kind = "advisory"
         let result = derive_declared(
             &image,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         );
         let err = result.expect_err("ambiguous markers must be non-repairable");
         assert!(
@@ -1674,8 +1639,7 @@ kind = "advisory"
         let plan = derive_declared(
             &img,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
         .unwrap();
         let non_delete: Vec<&RepositoryAction> = plan
@@ -1813,7 +1777,6 @@ kind = "advisory"
             MaterializationRequest::RepairDerivedState {
                 declarations: declarations(&cfg, &g, &r),
                 profiles: vec![profile_claims.clone()],
-                seed: &seed(),
             },
         )
         .unwrap();
@@ -1897,8 +1860,7 @@ kind = "advisory"
         derive_declared(
             image,
             declarations(&cfg, &g, &r),
-            &seed(),
-            MaterializationIntent::RepairDerivedState,
+            TestIntent::RepairDerivedState,
         )
     }
 
