@@ -98,7 +98,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T20:15:12.703303820Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
   "labels": [
     "type:task",
@@ -115,5 +121,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication cost evidence",
-  "updated_at": "2026-10-01T20:15:01.671186909Z"
+  "updated_at": "2026-10-01T20:15:12.703303820Z"
 }
