@@ -55,7 +55,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T16:22:19.192326573Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8454236c-c254-419c-826e-0b8da050711f",
   "labels": [
     "type:task",
@@ -70,5 +76,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation document closure retirement",
-  "updated_at": "2026-10-01T15:56:50.104552276Z"
+  "updated_at": "2026-10-01T16:22:19.192326573Z"
 }
