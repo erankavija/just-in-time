@@ -63,7 +63,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-01T10:54:59.009505977Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
   "labels": [
     "type:task",
@@ -79,5 +85,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-10-01T09:10:20.734148986Z"
+  "updated_at": "2026-10-01T10:54:59.009505977Z"
 }
