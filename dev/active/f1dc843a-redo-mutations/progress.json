@@ -726,7 +726,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — merged through rework 1; rework 2 of 2 dispatched under owner decision D-1"
+          "status": "in_progress — rework 2 merged (a592b3177/7ae26783e); code-review R3 failed F1/F2; ESC-17; rework 3 (counter reset) running"
         }
       ]
     },
@@ -742,7 +742,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — dispatched early in session 7 (deps done)"
+          "status": "done — session 8; code-review R1 two stale-prose findings fixed by lead (974e13fb1, d27d57cf5); cargo-ci (override) and code-review passed. Production net -496."
         },
         {
           "id": "33f97287-2561-424c-84b4-a9c30edf3212",
@@ -777,7 +777,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — session 8 fresh dispatch (session-7 worker made no edits)"
+          "status": "done — session 8; all four gates passed first time after REQ-04 amendment (ESC-16)."
         }
       ]
     },
@@ -807,7 +807,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "done — session 8 (sonnet); all four gates passed, zero rework."
         }
       ]
     },
@@ -1141,6 +1141,34 @@
       "situation": "Rework 1 fixed long-unterminated-final-line misclassification by reading the whole log; code-review R2-F1 failed it against REQ-03 bounded tail.",
       "decision": "Owner chose: tail grows to the final line start (bounded by one line, never by history), recorded as @/issue/c88822a5/decision/D-1.",
       "status": "resolved"
+    },
+    {
+      "id": "ESC-16",
+      "session": 8,
+      "wave": 17,
+      "issue": "e346d387",
+      "category": "4 / criterion unsatisfiable",
+      "situation": "REQ-04 sweep found 174 occurrences naming live publication mechanisms (ExpectedPreimage, init stage dir, temp-file staging, external publish); 816df12a REQ-01 itself mandates \"synced stage\" wording.",
+      "decision": "Owner chose to amend REQ-04 to admit live-mechanism senses, each named in evidence; recorded @/issue/e346d387/decision/D-1.",
+      "status": "resolved"
+    },
+    {
+      "id": "ESC-17",
+      "session": 8,
+      "wave": 16,
+      "issue": "c88822a5",
+      "category": "5 / rework cap exceeded",
+      "situation": "Code-review R3 after rework 2: F1 precheck lifecycle preflight captures twice (REQ-01); F2 all-lines net +38 (REQ-07) while production net is -35.",
+      "decision": "Owner: F1 rework with counter reset (one preflight round extending its spec in-round when prechecks apply). F2: after a duplicated-coverage assessment (27 lines true duplicates, ~79 lines relocatable to cheaper owning layer), owner chose dedupe + relocate under the literal all-lines reading.",
+      "status": "resolved — rework 3 dispatched"
+    },
+    {
+      "id": "ESC-18",
+      "session": 8,
+      "category": "build budget under external load",
+      "situation": "gf2 project drove load to 60+; cargo-ci failed only suite-duration budget.",
+      "decision": "Owner authorized BUSY_HOST_OVERRIDE=1 for this session (not standing).",
+      "status": "resolved"
     }
   ],
   "rework_counts": {
@@ -1160,7 +1188,8 @@
     "42478e5d": 1,
     "3d9150d7": 2,
     "b4483ad6": 1,
-    "c88822a5": 2
+    "c88822a5": 0,
+    "ec72359b": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -1610,6 +1639,11 @@
       "previous_count": 2,
       "reason": "Owner guidance under ESC-12 resets the counter.",
       "session": 6
+    },
+    {
+      "issue": "c88822a5",
+      "session": 8,
+      "by": "owner (ESC-17)"
     }
   ],
   "checkpoint_reconciliation": {
@@ -1971,6 +2005,30 @@
       "subject": "repo_lock::acquire (lock parent) and worktree_identity (create_dir_all(.jit)) can create the data root .jit/ when absent — a second absent-root creation path beside the init root publisher named by 3d9150d7 REQ-02. The guard classifies them as lock/identity writes.",
       "owner": "lead to assess at 3d9150d7 review against REQ-01/REQ-02; candidate POL-01 task",
       "status": "open"
+    },
+    {
+      "id": "SP-29",
+      "session": 8,
+      "source": "lead sweep after ec72359b",
+      "subject": "\"repository transaction\" prose remains at commands/mod.rs:3194, storage/mod.rs:1, main.rs:2574 (outside e346d387 literal forms).",
+      "owner": "e590fa91 checkpoint (superseded design retirement) — close before its gate",
+      "status": "open"
+    },
+    {
+      "id": "SP-30",
+      "session": 8,
+      "source": "c88822a5 coverage assessment",
+      "subject": "Profile preparation lost its same-round closure-race test in a5b7346ac; the template round test owns template closure only.",
+      "owner": "assess at c88822a5 review",
+      "status": "open"
+    },
+    {
+      "id": "SP-31",
+      "session": 8,
+      "source": "gf2 session",
+      "subject": "Issue adb5e9df (remove unqualified satisfies coverage form) created by gf2 session, committed unparented in 95f506692. Outside this epic.",
+      "owner": "owner",
+      "status": "reported"
     }
   ],
   "checkpoint_reconciliation_fbd6c859": {
