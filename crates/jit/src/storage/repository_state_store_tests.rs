@@ -326,7 +326,7 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
 }
 
 #[test]
-fn test_json_and_memory_share_absent_root_actions_and_hash() {
+fn test_json_and_memory_share_absent_root_actions_and_outcome() {
     let temp = TempDir::new().unwrap();
     let data = temp.path().join(".jit");
     let layout = discover_repository_layout(temp.path(), &data).unwrap();
@@ -378,7 +378,7 @@ fn image_binding_delta(layout: &RepositoryLayout) -> RepositoryDelta {
 }
 
 #[test]
-fn test_json_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
+fn test_json_plan_owns_exact_image_and_applies_only_against_it() {
     let temp = TempDir::new().unwrap();
     let data = temp.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -413,7 +413,7 @@ fn test_json_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
 }
 
 #[test]
-fn test_memory_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
+fn test_memory_plan_owns_exact_image_and_applies_only_against_it() {
     let temp = TempDir::new().unwrap();
     let layout = RepositoryLayout::new(
         RepositoryRootEvidence::new(temp.path(), "wt", true),

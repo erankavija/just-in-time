@@ -216,7 +216,7 @@ impl PackageTreeCapture {
 /// the tree does not declare. A file already exactly as declared is reported
 /// [`TreeFileDisposition::Unchanged`] and carries no action, so republishing an
 /// unchanged tree publishes nothing. A directory the tree no longer needs is
-/// left in place: the repository transaction publishes files, and an empty
+/// left in place: a delta deletes only files, and an empty
 /// directory carries no content the tree declares.
 ///
 /// # Errors
@@ -225,7 +225,7 @@ impl PackageTreeCapture {
 /// a directory holds something else; [`PackageTreeCaptureError::UnsafeOccupant`]
 /// when the destination holds an entry that is neither an ordinary file nor a
 /// directory, which a republication may neither publish over nor remove; the
-/// capture, delta, seed, and plan-hash failures of the shared plan boundary.
+/// capture and delta failures of the shared plan boundary.
 pub fn finalize_package_tree_capture(
     base: &RepositoryImage,
     capture: &PackageTreeCapture,
