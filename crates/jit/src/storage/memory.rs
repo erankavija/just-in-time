@@ -1199,6 +1199,15 @@ mod tests {
     }
 
     #[test]
+    fn test_acquire_repo_write_lock_over_absent_data_root_leaves_it_absent() {
+        let storage = InMemoryStorage::new();
+
+        let _guard = storage.acquire_repo_write_lock().unwrap();
+
+        assert!(!storage.repository_state().data_root_exists);
+    }
+
+    #[test]
     fn test_worktree_fixture_does_not_materialize_data_root() {
         let storage = InMemoryStorage::new();
         storage.add_worktree_file("docs/guide.md", "guide");

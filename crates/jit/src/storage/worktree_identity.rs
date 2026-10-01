@@ -4,7 +4,7 @@
 //! to support parallel multi-agent work with git worktrees.
 
 use crate::storage::atomic_write::{sync_directory, write_file_synced};
-use crate::storage::StorageWarning;
+use crate::storage::{RepositoryNotFoundError, StorageWarning};
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -58,7 +58,8 @@ pub fn generate_worktree_id(path: &Path, created_at: DateTime<Utc>) -> String {
 /// Load or create worktree identity.
 ///
 /// If `worktree.json` exists, load it and check for relocation.
-/// If it doesn't exist, generate a new identity and persist it.
+/// If it doesn't exist, generate a new identity and persist it. An absent data
+/// root fails with [`RepositoryNotFoundError`]; only initialization creates it.
 ///
 /// # Relocation Detection
 ///
@@ -98,6 +99,9 @@ pub fn load_or_create_worktree_identity_with_warnings(
     paths: &crate::storage::worktree_paths::WorktreePaths,
     branch: &str,
 ) -> Result<(WorktreeIdentity, Vec<StorageWarning>)> {
+    if !paths.local_jit.is_dir() {
+        return Err(RepositoryNotFoundError::new(paths.local_jit.display().to_string()).into());
+    }
     let mut warnings = Vec::new();
 
     let wt_file = paths.local_jit.join("worktree.json");
@@ -193,9 +197,6 @@ pub fn load_or_create_worktree_identity_with_warnings(
         relocated_at: None,
     };
 
-    // Ensure .jit directory exists
-    fs::create_dir_all(&paths.local_jit).context("Failed to create .jit directory")?;
-
     // Write atomically
     write_identity_atomic(&wt_file, &identity)?;
 
@@ -282,6 +283,38 @@ mod tests {
         let id2 = generate_worktree_id(&path, timestamp);
 
         assert_eq!(id1, id2);
+    }
+
+    #[test]
+    fn test_load_or_create_worktree_identity_over_absent_data_root_refuses_without_creating_it() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let data_root = temp.path().join(".jit");
+        let paths = crate::storage::worktree_paths::WorktreePaths::detect_for_data_root(
+            &data_root,
+            temp.path(),
+        )
+        .unwrap();
+
+        let error = load_or_create_worktree_identity_with_warnings(&paths, "main").unwrap_err();
+
+        assert!(
+            error
+                .downcast_ref::<crate::storage::RepositoryNotFoundError>()
+                .is_some(),
+            "{error:#}"
+        );
+        assert!(
+            !data_root.exists(),
+            "recording the identity created the data root"
+        );
+    }
+
+    #[test]
+    fn test_read_worktree_id_over_absent_data_root_creates_nothing() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        assert_eq!(read_worktree_id(temp.path()).unwrap(), None);
+        assert!(!temp.path().join(".jit").exists());
     }
 
     #[test]
