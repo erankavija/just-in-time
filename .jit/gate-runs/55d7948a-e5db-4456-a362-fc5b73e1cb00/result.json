@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2c8f7cff51e83fbc924109cd89bfc762333a1fa6",
+  "completed_at": "2026-10-01T19:42:37.110630533Z",
+  "duration_ms": 270305,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Qualified-only coverage, migration diagnostics, nested-scope coverage, and same-manifest key references satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "adb5e9df-0fd3-4bf4-8703-d852df09d883",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "55d7948a-e5db-4456-a362-fc5b73e1cb00",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T19:38:06.804916100Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fe3081ff1, b1646fdb4, f5db41ba2, 697140537, 83889eb0d, 4efc77ea, 6851128c, b044724c, 972ac824, e7559c3d, 2cebdc5c, 6435bea1, 373ada9d, 2c8f7cff\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml, registry-first); @/gate/jit-validate (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci failed (exit 1; six late-suite timeouts not tied to this change); docs-mechanical passed (exit 0); code-review pending\nTruncation recovery: re-read truncated patches by commit and affected path/range; excluded historical event/archive records outside the impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Qualified-only coverage, migration diagnostics, nested-scope coverage, and same-manifest key references satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
