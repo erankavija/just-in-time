@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1dc1fd49b83ababf0f457420741b984d489ba9f7",
+  "completed_at": "2026-10-01T19:20:05.305328545Z",
+  "duration_ms": 207353,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior stability finding is addressed by the issue's accepted D-1 boundary.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8454236c-c254-419c-826e-0b8da050711f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f78f49f6-09e9-4ece-831d-58f83eea91f4",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T19:16:37.952099022Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: dfd377f23, 641402705, ba4d32ee8, 6d4e6a8eb, 086e4a7e5, d9db7d47b, 1dc1fd49b\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/issue/8454236c/requirement/REQ-01–REQ-06 and @/issue/8454236c/decision/D-1 (.jit/issues/8454236c-c254-419c-826e-0b8da050711f.json); @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T19:16:12Z)\nTruncation recovery: partitioned reads by tagged commit/path; narrowed source and test line ranges for capture, validation, and precheck behavior\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior stability finding is addressed by the issue's accepted D-1 boundary.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
