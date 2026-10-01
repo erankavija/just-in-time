@@ -688,7 +688,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "ready — next"
+          "status": "done — cargo-ci (suite-clock 25922 ms) and code-review (0 findings) passed after two rework rounds: R1 src/bin targets missed (closed: roots from cargo metadata), R2 helper writers escaped the per-function scan (closed: inverted guard — every production filesystem writer is a publisher, a classified non-repository target, or a confined helper). SP-28 surfaced."
         },
         {
           "id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
