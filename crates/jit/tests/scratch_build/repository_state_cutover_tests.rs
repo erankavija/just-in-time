@@ -696,9 +696,10 @@ const FILESYSTEM_MUTATIONS: [&str; 22] = [
 /// Calls that create a directory, by path or through an open directory handle.
 const DIRECTORY_CREATIONS: [&str; 3] = ["fs::create_dir", ".create_dir(", ".create_dir_all("];
 
-/// The definition owning initialization's publisher, the one writer allowed to
-/// create an absent data root.
-const DATA_ROOT_PUBLISHER: &str = "fn publish_staged_data_root(";
+/// The one function allowed to create a directory that can become the data
+/// root: initialization's publisher stages the new root beside it, and
+/// `publish_staged_data_root` renames that stage into place.
+const DATA_ROOT_CREATOR: &str = "stage_new_data_root";
 
 /// The publishers allowed to write repository state, each found by the
 /// definition it owns, with the reason it may.
@@ -714,7 +715,7 @@ const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
          roots",
     ),
     (
-        DATA_ROOT_PUBLISHER,
+        "fn publish_staged_data_root(",
         "an absent data root cannot be created through the record, whose home is a scratch \
          directory inside that root; it is staged beside it and published by a no-replace \
          rename instead",
@@ -895,12 +896,44 @@ fn names_function(code: &str, function: &str) -> bool {
     })
 }
 
+/// Where a publisher's writes are sanctioned: every function of a module, or
+/// one named function in it.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct Publisher {
+    module: PathBuf,
+    function: Option<String>,
+}
+
+impl Publisher {
+    fn module(module: impl Into<PathBuf>) -> Self {
+        Self {
+            module: module.into(),
+            function: None,
+        }
+    }
+
+    fn function(module: impl Into<PathBuf>, function: &str) -> Self {
+        Self {
+            module: module.into(),
+            function: Some(function.to_string()),
+        }
+    }
+
+    fn covers(&self, function: &ProductionFunction) -> bool {
+        self.module == function.module
+            && self
+                .function
+                .as_ref()
+                .is_none_or(|name| *name == function.name)
+    }
+}
+
 /// What the writer scan found: the functions writing an unclassified target,
 /// and the publishers and classes that matched a write.
 #[derive(Debug, Default)]
 struct WriterScan {
     unclassified: BTreeSet<String>,
-    publishers_seen: BTreeSet<PathBuf>,
+    publishers_seen: BTreeSet<Publisher>,
     classes_seen: BTreeSet<&'static str>,
 }
 
@@ -917,7 +950,7 @@ fn scan_filesystem_writers(
     functions: &[ProductionFunction],
     mutations: &[&str],
     classes: &[WriteClass],
-    publishers: &BTreeSet<PathBuf>,
+    publishers: &BTreeSet<Publisher>,
 ) -> WriterScan {
     let mut scan = WriterScan::default();
     let mut classified = BTreeSet::new();
@@ -944,15 +977,18 @@ fn scan_filesystem_writers(
             let class = classes.iter().find(|(_, markers, _)| {
                 markers.iter().any(|marker| function.code.contains(marker))
             });
-            match (publishers.contains(&function.module), class) {
-                (true, _) => {
-                    scan.publishers_seen.insert(function.module.clone());
+            let publisher = publishers
+                .iter()
+                .find(|publisher| publisher.covers(function));
+            match (publisher, class) {
+                (Some(publisher), _) => {
+                    scan.publishers_seen.insert(publisher.clone());
                 }
-                (false, Some((class, _, _))) => {
+                (None, Some((class, _, _))) => {
                     scan.classes_seen.insert(class);
                 }
-                (false, None) if !function.is_exported => delegated.push(function.name.clone()),
-                (false, None) => {
+                (None, None) if !function.is_exported => delegated.push(function.name.clone()),
+                (None, None) => {
                     scan.unclassified.insert(format!(
                         "{}::{}",
                         function.module.display(),
@@ -964,11 +1000,11 @@ fn scan_filesystem_writers(
     }
 }
 
-/// The source owning each of `definitions`.
+/// The module owning each of `definitions`, as a whole-module publisher.
 fn publisher_sources(
     sources: &[(PathBuf, String)],
     definitions: &[&str],
-) -> Result<BTreeSet<PathBuf>, String> {
+) -> Result<BTreeSet<Publisher>, String> {
     definitions
         .iter()
         .map(|definition| {
@@ -978,7 +1014,7 @@ fn publisher_sources(
                 .map(|(path, _)| path.clone())
                 .collect::<Vec<_>>();
             match owners.as_slice() {
-                [owner] => Ok(owner.clone()),
+                [owner] => Ok(Publisher::module(owner.clone())),
                 _ => Err(format!(
                     "`{definition}` is defined in {owners:?} rather than in exactly one source"
                 )),
@@ -987,11 +1023,26 @@ fn publisher_sources(
         .collect()
 }
 
+/// The one production function named `name`, as a single-function publisher.
+fn publisher_function(functions: &[ProductionFunction], name: &str) -> Result<Publisher, String> {
+    let owners = functions
+        .iter()
+        .filter(|function| function.name == name)
+        .map(|function| function.module.clone())
+        .collect::<Vec<_>>();
+    match owners.as_slice() {
+        [owner] => Ok(Publisher::function(owner.clone(), name)),
+        _ => Err(format!(
+            "`fn {name}` is defined in {owners:?} rather than exactly once"
+        )),
+    }
+}
+
 /// Every publisher and class was seen writing, and no writer is unclassified;
 /// `rule` names what an unclassified writer breaks.
 fn assert_writers_classified(
     scan: &WriterScan,
-    publishers: &BTreeSet<PathBuf>,
+    publishers: &BTreeSet<Publisher>,
     classes: &[WriteClass],
     rule: &str,
 ) -> Result<(), String> {
@@ -1065,27 +1116,25 @@ const DATA_ROOT_CREATION_RULE: &str = "an absent data root is created only by in
 /// The repository-state scan admits lock and identity writes by their target
 /// file, which lives inside the data root, so it cannot see such a writer
 /// creating the root as that file's parent. This scan holds every directory
-/// creation to the classes whose target cannot be the data root.
+/// creation outside [`DATA_ROOT_CREATOR`] — the function, not its module — to
+/// the classes whose target cannot be the data root.
 #[test]
 fn test_data_root_is_created_only_by_the_initialization_publisher() {
-    let sources = workspace_compiled_sources();
-    let publishers = publisher_sources(&sources, &[DATA_ROOT_PUBLISHER])
-        .unwrap_or_else(|error| panic!("{error}"));
+    let functions = production_functions(&workspace_compiled_sources());
+    let publishers =
+        BTreeSet::from([publisher_function(&functions, DATA_ROOT_CREATOR)
+            .unwrap_or_else(|error| panic!("{error}"))]);
     let classes = non_data_root_directories();
-    let scan = scan_filesystem_writers(
-        &production_functions(&sources),
-        &DIRECTORY_CREATIONS,
-        &classes,
-        &publishers,
-    );
+    let scan = scan_filesystem_writers(&functions, &DIRECTORY_CREATIONS, &classes, &publishers);
     assert_writers_classified(&scan, &publishers, &classes, DATA_ROOT_CREATION_RULE)
         .unwrap_or_else(|error| panic!("{error}"));
 }
 
 /// Red-first proof for the data-root creation scan: a lock or identity writer
 /// creating its file's directory is flagged although the repository-state scan
-/// admits it, while a creation beneath a held root or in the initialization
-/// publisher is not.
+/// admits it, and so is a creator in the publisher's module outside the
+/// publisher function, while a creation beneath a held root, in the publisher,
+/// or in a private helper only the publisher calls is not.
 #[test]
 fn test_data_root_creation_scan_flags_lock_and_identity_writers_creating_their_directory() {
     let functions = |fragments: &[(&str, &str)]| {
@@ -1117,16 +1166,19 @@ fn test_data_root_creation_scan_flags_lock_and_identity_writers_creating_their_d
         ),
         (
             "storage/init_publish.rs",
-            "pub fn stage(parent: &Dir, leaf: &str) {\n    parent.create_dir(leaf).unwrap();\n}\n",
+            "pub fn stage(parent: &Dir, leaf: &str) {\n    \
+             parent.create_dir(leaf).unwrap();\n    make_child(parent);\n}\n\n\
+             fn make_child(parent: &Dir) {\n    parent.create_dir(\"child\").unwrap();\n}\n\n\
+             pub fn scaffold(parent: &Dir) {\n    parent.create_dir(\".jit\").unwrap();\n}\n",
         ),
     ]);
-    let init_publisher = BTreeSet::from([PathBuf::from("storage/init_publish.rs")]);
+    let init_publisher = BTreeSet::from([Publisher::function("storage/init_publish.rs", "stage")]);
 
     let admitted = scan_filesystem_writers(
         &writers,
         &FILESYSTEM_MUTATIONS,
         &NON_REPOSITORY_WRITES,
-        &init_publisher,
+        &BTreeSet::from([Publisher::module("storage/init_publish.rs")]),
     );
     assert!(admitted.unclassified.is_empty(), "{admitted:?}");
 
@@ -1139,6 +1191,7 @@ fn test_data_root_creation_scan_flags_lock_and_identity_writers_creating_their_d
     assert_eq!(
         flagged.unclassified,
         BTreeSet::from([
+            "storage/init_publish.rs::scaffold".to_string(),
             "storage/repo_lock.rs::acquire".to_string(),
             "storage/worktree_identity.rs::record".to_string(),
         ])
@@ -1193,8 +1246,7 @@ fn test_repository_state_writer_scan_flags_unclassified_writers_wherever_their_p
         None
     );
 
-    let record = PathBuf::from("storage/record.rs");
-    let publishers = BTreeSet::from([record.clone()]);
+    let publishers = BTreeSet::from([Publisher::module("storage/record.rs")]);
     let complete = WriterScan {
         unclassified: BTreeSet::from(["commands/save.rs::save".to_string()]),
         publishers_seen: publishers.clone(),
