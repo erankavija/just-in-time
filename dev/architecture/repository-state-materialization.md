@@ -85,7 +85,7 @@ bounded tail), `Directory`, or `Absent` — plus `ListingFingerprint`s and
 pinned/linked-worktree evidence.
 
 A mutation captures in one round. What it reads first names what it reads
-next (the index names the issue files, the issues name their documents), so
+next (the index names the issue files, the issues name their plan documents), so
 the session grows the image with `RepositoryMutationSession::extend`, which
 reads only the requests the image does not already hold; nothing is read twice,
 so no read is compared with an earlier one.

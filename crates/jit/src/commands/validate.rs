@@ -178,7 +178,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// schema files, profile assets, directories, provenance) into the base so a
     /// subsequent `apply` finds each action's captured preimage; `start` is an
     /// image this session's round has already read, which the base grows from.
-    /// Sharing one held session lets a caller capture the base and apply its
+    /// The base also reads every issue document reference: its working-tree
+    /// entry when unpinned, and its pinned evidence. Sharing one held session lets a caller capture the base and apply its
     /// delta under the same guard without a second, deadlock-prone session.
     pub(crate) fn capture_proposed_base(
         &self,
@@ -190,25 +191,25 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         extra_paths: &[crate::repository_state::VirtualPath],
         start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_proposed_base_inner(
+        let Some((image, issues)) = self.capture_proposed_base_inner(
             session,
             start,
             overrides,
             extra_paths,
-            &[],
             None,
-            DocumentCapture::All,
             false,
-        )
-        .map(|captured| captured.map(|(image, _)| image))
+            false,
+        )?
+        else {
+            return Ok(None);
+        };
+        super::grow_discovering(session, image, |_, spec| {
+            discover_document_references(&issues, spec)
+        })
     }
 
     /// The base an issue mutation derives from: the registries, every issue,
-    /// and only the plan documents its transition rules read.
-    ///
-    /// Issue document references are left out because only whole-repository
-    /// validation reads them, unless `precheck_target` requires a precheck gate
-    /// that validates the whole captured repository.
+    /// and the plan documents its transition rules read.
     pub(crate) fn capture_mutation_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -220,9 +221,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             &std::collections::BTreeMap::new(),
             extra_paths,
-            &[],
             precheck_target,
-            DocumentCapture::PlanOnly,
+            true,
             false,
         )
         .map(|captured| captured.map(|(image, issues)| MutationBase { image, issues }))
@@ -294,9 +294,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(image),
             &std::collections::BTreeMap::new(),
             &[],
-            &[],
             Some(requested),
-            DocumentCapture::PlanOnly,
+            true,
             false,
         )?;
         Ok(grown.map(|(image, issues)| MutationPreflight {
@@ -306,7 +305,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         }))
     }
 
-    pub(crate) fn capture_proposed_base_without_documents(
+    /// The base an archive plan reads: the log whole, with a listing budget
+    /// for every directory below the archive roots.
+    pub(crate) fn capture_archive_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
@@ -315,9 +316,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             None,
             &std::collections::BTreeMap::new(),
             &[],
-            &[],
             None,
-            DocumentCapture::None,
+            false,
             true,
         )
         .map(|captured| captured.map(|(image, _)| image))
@@ -327,11 +327,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// part of it already.
     ///
     /// The round reads the registries, the event log (as its length and tail
-    /// for a mutation), the profile records,
-    /// and the caller's paths and listings; then the validation closure those
-    /// registries plan; then what the captured issues name: the documents
-    /// `documents` admits, and a precheck target's prompt files and gate-run
-    /// results.
+    /// for a `mutation`, which also parses issues strictly), the profile
+    /// records, and the caller's paths; then the validation closure those
+    /// registries plan; then what the captured issues name: the plan
+    /// documents, and a precheck target's prompt files and gate-run results.
     #[allow(clippy::too_many_arguments)]
     fn capture_proposed_base_inner(
         &self,
@@ -342,9 +341,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        extra_listings: &[crate::repository_state::VirtualPath],
         precheck_target: Option<&str>,
-        documents: DocumentCapture,
+        mutation: bool,
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
@@ -378,16 +376,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             )?;
             // A mutation appends to the log, so it reads the log's length and
             // tail; validation parses it, so it reads it whole.
-            match documents {
-                DocumentCapture::PlanOnly => spec.discover_tail(VirtualPath::EVENTS)?,
-                _ => spec.discover_paths([VirtualPath::EVENTS])?,
+            match mutation {
+                true => spec.discover_tail(VirtualPath::EVENTS)?,
+                false => spec.discover_paths([VirtualPath::EVENTS])?,
             }
-            Ok(spec.discover_listings(
-                extra_listings
-                    .iter()
-                    .cloned()
-                    .chain([VirtualPath::PROFILES]),
-            )?)
+            Ok(spec.discover_listings([VirtualPath::PROFILES])?)
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
         // proposed absence) when present, otherwise the captured base bytes.
@@ -454,9 +447,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 // image; a repository without an index yet has none. Validation
                 // parses the overlaid set leniently and reports defects as
                 // findings.
-                let parsed = if documents == DocumentCapture::PlanOnly
-                    && image.file_bytes(&VirtualPath::INDEX)?.is_some()
-                {
+                let parsed = if mutation && image.file_bytes(&VirtualPath::INDEX)?.is_some() {
                     super::captured_active_issues(image)?
                 } else {
                     effective_issues(image, &all_ids, &effective)?
@@ -468,7 +459,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     &config,
                     &effective,
                     precheck_target,
-                    documents,
                 )?;
                 issues = Some(parsed);
             }
@@ -661,22 +651,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         };
 
         let profiles_dir = VirtualPath::PROFILES;
-        let listings = std::slice::from_ref(&profiles_dir);
         let capture = |session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
                        start,
                        paths: &[VirtualPath]| {
-            self.capture_proposed_base_inner(
-                session,
-                start,
-                &std::collections::BTreeMap::new(),
-                paths,
-                listings,
-                None,
-                DocumentCapture::All,
-                false,
-            )
+            self.capture_proposed_base(session, &std::collections::BTreeMap::new(), paths, start)
         };
-        let Some((base, _)) = capture(session, None, &[])? else {
+        let Some(base) = capture(session, None, &[])? else {
             return Ok(None);
         };
         // The base reads every profile record, and the records name the
@@ -701,7 +681,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .map(|(record_path, _)| Ok(record_path.clone())),
             )
             .collect::<Result<Vec<_>>>()?;
-        let Some((image, _)) = capture(session, Some(base), &profile_paths)? else {
+        let Some(image) = capture(session, Some(base), &profile_paths)? else {
             return Ok(None);
         };
         let profiles = match captured_profile_repair_claims(&image, &packages)? {
@@ -1149,7 +1129,7 @@ fn effective_issues(
 }
 
 /// Parse the (possibly overlaid) template registry, needed to derive plan-document
-/// paths for the document closure.
+/// paths.
 ///
 /// Best-effort like the rest of closure planning: a malformed `templates.toml`
 /// yields an empty registry (no plan-document paths), and the subsequent
@@ -1175,9 +1155,9 @@ fn effective_templates(
     })
 }
 
-/// Add what the captured `issues` name to `spec`: the documents `documents`
-/// admits, all of them when a precheck target's gate validates the whole
-/// repository, and that target's precheck prompt files.
+/// Add what the captured `issues` name to `spec`: the plan documents, and a
+/// precheck target's prompt files, with the log whole when one of its gates
+/// validates the whole repository.
 ///
 /// Returns whether a precheck gate consumes the gate-run history, which the
 /// round then reads as well.
@@ -1188,7 +1168,6 @@ fn discover_issue_closure(
     config: &JitConfig,
     effective: &Effective<'_>,
     precheck_target: Option<&str>,
-    documents: DocumentCapture,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -1215,20 +1194,10 @@ fn discover_issue_closure(
         }
         None => Vec::new(),
     };
-    // A broad precheck validates the whole repository, so it reads what
-    // validation reads.
-    let documents = match precheck.iter().any(super::is_broad_builtin_precheck) {
-        true => {
-            spec.discover_paths([crate::repository_state::VirtualPath::EVENTS])?;
-            DocumentCapture::All
-        }
-        false => documents,
-    };
-    let (worktree_docs, pinned) = document_capture_closure(issues, &full_config, documents)?;
-    spec.discover_paths(worktree_docs)?;
-    for (revision, path) in pinned {
-        spec.discover_pinned(revision, path)?;
+    if precheck.iter().any(super::is_broad_builtin_precheck) {
+        spec.discover_paths([crate::repository_state::VirtualPath::EVENTS])?;
     }
+    spec.discover_paths(plan_document_paths(issues, &full_config)?)?;
     let automated = || {
         precheck
             .iter()
@@ -1255,13 +1224,6 @@ fn discover_issue_closure(
     )?;
     Ok(automated().any(super::checker_consumes_run_history))
 }
-
-/// The document closure: working-tree document/plan paths to capture,
-/// plus pinned-document `(revision, path)` evidence requests.
-type DocumentClosure = (
-    Vec<crate::repository_state::VirtualPath>,
-    Vec<(String, String)>,
-);
 
 /// Capture budget for mutation bases and preflights.
 pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
@@ -1292,53 +1254,29 @@ pub(crate) struct MutationPreflight {
     pub(crate) issues: Option<Vec<Issue>>,
 }
 
-/// Which issue-linked documents a base capture reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DocumentCapture {
-    /// Every document reference and plan document, as whole-repository
-    /// validation reads them.
-    All,
-    /// Plan documents only, as issue mutations' transition rules read them.
-    PlanOnly,
-    /// No issue-linked document.
-    None,
+/// Request every issue document reference: its working-tree entry when
+/// unpinned, and its pinned evidence.
+fn discover_document_references(
+    issues: &[Issue],
+    spec: &mut crate::repository_state::CaptureSpec,
+) -> Result<()> {
+    issues
+        .iter()
+        .flat_map(|issue| &issue.documents)
+        .try_for_each(|document| {
+            let requests = crate::document::DocumentReferenceRequests::for_reference(document)?;
+            spec.discover_paths(requests.worktree().cloned())?;
+            let (revision, path) = requests.pinned();
+            Ok(spec.discover_pinned(revision, path)?)
+        })
 }
 
-/// Enumerate the document and plan-document capture closure that
-/// `documents` admits.
-///
-/// Returns every working-tree document path to capture and every pinned-document
-/// `(revision, path)` request: a document pinned to a commit is captured as
-/// pinned evidence at that commit; an unpinned document is captured as its
-/// working-tree entry plus HEAD evidence for the fallback. Each breakable
-/// container's derived plan-document path (mirroring plan-content projection's
-/// planning-node resolution) is added as a working-tree path so a container whose
-/// criteria live in an external plan validates against image-projected content.
-fn document_capture_closure(
+/// Each breakable container's plan-document path, from its planning node as
+/// plan-content projection resolves it.
+fn plan_document_paths(
     issues: &[Issue],
     config: &JitConfig,
-    documents: DocumentCapture,
-) -> Result<DocumentClosure> {
-    use crate::document::DocumentReferenceRequests;
-    use crate::repository_state::VirtualPath;
-    let mut worktree = Vec::new();
-    let mut pinned = Vec::new();
-    if documents == DocumentCapture::None {
-        return Ok((worktree, pinned));
-    }
-    let references = if documents == DocumentCapture::All {
-        issues
-    } else {
-        &[]
-    };
-    for issue in references {
-        for document in &issue.documents {
-            let requests = DocumentReferenceRequests::for_reference(document)?;
-            worktree.extend(requests.worktree().cloned());
-            let (revision, path) = requests.pinned();
-            pinned.push((revision.to_string(), path.to_string()));
-        }
-    }
+) -> Result<Vec<crate::repository_state::VirtualPath>> {
     let templates = &config.templates;
     let breakable: std::collections::HashSet<String> =
         templates.breakable_types().into_iter().collect();
@@ -1346,26 +1284,18 @@ fn document_capture_closure(
         .iter()
         .map(|issue| (issue.id.as_str(), issue))
         .collect();
-    for issue in issues {
-        let Some(issue_type) = crate::labels::type_label_value(&issue.labels)
-            .filter(|issue_type| breakable.contains(*issue_type))
-        else {
-            continue;
-        };
-        let Some(template) = templates.template_for_container(issue_type) else {
-            continue;
-        };
-        if template.plan_doc_location(&templates.roles).is_none() {
-            continue;
-        }
-        let planning =
-            crate::commands::find_planning_node(issue, template, &templates.roles, &by_id);
-        let Some(path) = planning.and_then(crate::commands::planning_node_plan_path) else {
-            continue;
-        };
-        worktree.push(VirtualPath::worktree(&path)?);
-    }
-    Ok((worktree, pinned))
+    issues
+        .iter()
+        .filter_map(|issue| {
+            let template = crate::labels::type_label_value(&issue.labels)
+                .filter(|issue_type| breakable.contains(*issue_type))
+                .and_then(|issue_type| templates.template_for_container(issue_type))
+                .filter(|template| template.plan_doc_location(&templates.roles).is_some())?;
+            crate::commands::find_planning_node(issue, template, &templates.roles, &by_id)
+                .and_then(crate::commands::planning_node_plan_path)
+        })
+        .map(|path| Ok(crate::repository_state::VirtualPath::worktree(&path)?))
+        .collect()
 }
 
 /// Project the plan-document content map from a captured validation image — the
@@ -1376,7 +1306,7 @@ fn document_capture_closure(
 /// slice still finds a bracket's planning node), while content is emitted only for
 /// `emit_for`. Each breakable container whose bracket planning node records an
 /// external plan reference contributes its plan-document bytes, read from the
-/// image's captured plan-document entries (enqueued by [`document_capture_closure`])
+/// image's captured plan-document entries (enqueued by [`plan_document_paths`])
 /// rather than the live filesystem. A not-yet-authored plan whose planning node is
 /// not `done` is omitted (a freshly-applied bracket validates cleanly before its
 /// plan exists); a missing plan whose planning node is `done` is an error.
