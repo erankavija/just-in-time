@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9865c3ee38319f7449fcc5779d905f93cc704dcf",
+  "completed_at": "2026-10-01T22:37:35.684088282Z",
+  "duration_ms": 111964,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The delivered story’s combined adopter-facing documentation impact is accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "ef7848ea-910d-40f7-a005-854be92229a0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "818dc970-fb60-4c23-b88a-5f72e232a551",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:35:43.719196321Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `ef7848ea` is a container-capable story with four resolved, delivered children. I reviewed the union of 43 individually tagged commits for it and those children. The only adopter-facing change is the accurate storage-reference update at [docs/reference/storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:64); its links validate. The prior review had no unresolved blocking findings.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered story’s combined adopter-facing documentation impact is accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
