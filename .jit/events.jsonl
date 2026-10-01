@@ -16200,3 +16200,4 @@
 {"fields":["documents"],"id":"a074317c-1b38-48aa-96af-5813177460e5","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:17:38.604953298Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"ready","id":"9b77aede-adb8-4dff-9e68-4f31d04f9319","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:17:38.765021666Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"ba31a2b9-4ba4-4e73-aba5-97e4f7827767","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:17:38.765021666Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"836b4fd5-618a-43b3-a794-e480a97e50cb","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:31:39.196191681Z","type":"gate_failed","updated_by":"auto:executor"}

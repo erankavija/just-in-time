@@ -53,7 +53,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T20:31:39.196191681Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
   "labels": [
     "epic:redo-mutations",
@@ -66,5 +72,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Lock and identity writes never create an absent data root",
-  "updated_at": "2026-10-01T20:17:38.765021666Z"
+  "updated_at": "2026-10-01T20:31:39.196191681Z"
 }
