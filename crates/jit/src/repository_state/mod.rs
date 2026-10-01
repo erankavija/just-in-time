@@ -1,7 +1,7 @@
 //! Pure closed repository-state capture and materialization vocabulary.
 //!
 //! This subsystem owns canonical paths, immutable images, bounded capture,
-//! managed-document composition, exact deltas, and deterministic plan identity.
+//! managed-document composition, and exact deltas.
 //! It performs no filesystem I/O and imports no validation, storage, command, or
 //! profile modules.
 

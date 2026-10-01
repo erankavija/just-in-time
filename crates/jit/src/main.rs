@@ -153,7 +153,7 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
     // Projection, managed-document, profile-target-conflict, ambiguous-ownership,
     // gate-registry-edit, and archive-execution failures are validation failures (4);
     // a layout rejection is an argument error (2); capture/parse producer failures and
-    // the structural plan-identity/delta/overlay/initialization failures keep the
+    // the structural delta/overlay/initialization failures keep the
     // generic code (1). The `project render` command additionally unwraps this error
     // to its bare inner `ProjectionError`/`ManagedDocumentError`, which the checks
     // above classify identically.

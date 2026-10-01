@@ -552,7 +552,7 @@ pub enum ArchiveExecutionError {
     /// canonicalizing a path, including the proposed-layout edge check.
     #[error(transparent)]
     Producer(#[from] ProducerError),
-    /// The record finalizer or seed derivation failed.
+    /// The record finalizer failed.
     #[error(transparent)]
     Mutation(#[from] MutationError),
 }
