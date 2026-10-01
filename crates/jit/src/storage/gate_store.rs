@@ -2,7 +2,7 @@
 //!
 //! Authored semantics and pure parsing live in [`crate::declarations`]. This
 //! module owns only the `.jit/gates.toml` read boundary and delegates parsing
-//! to that neutral owner. Repository-state transactions own publication.
+//! to that neutral owner. Mutation sessions own publication.
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
 use anyhow::{Context, Result};

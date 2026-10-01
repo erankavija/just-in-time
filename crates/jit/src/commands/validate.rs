@@ -589,7 +589,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             })?;
             // One message per changed owned target. Include mode-only drift: an
             // executable profile asset can have correct bytes but still require a
-            // transaction, and treating that delta as empty would skip repair.
+            // publication, and treating that delta as empty would skip repair.
             let changed = plan
                 .delta()
                 .actions()

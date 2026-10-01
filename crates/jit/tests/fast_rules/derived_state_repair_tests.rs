@@ -798,7 +798,7 @@ fn test_harness_validate_fix_repairs_mode_only_profile_drift() {
 }
 
 #[test]
-fn test_harness_validate_fix_rejects_ambiguous_ownership_transactionally() {
+fn test_harness_validate_fix_rejects_ambiguous_ownership_without_writing() {
     let (_source, mut harness) = profiled_harness(false);
     write(
         &harness,

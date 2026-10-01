@@ -1670,7 +1670,7 @@ fn archived_citation() -> ArchivedCitation {
     archived_citation_with_scan_directories(0)
 }
 
-/// Add empty scan directories to exercise the transaction's complete-listing
+/// Add empty scan directories to exercise the archive capture's complete-listing
 /// closure without changing the one citation the fixture reports.
 fn archived_citation_with_scan_directories(directory_count: usize) -> ArchivedCitation {
     let repo = citation_scan_repo(false, "See fixtures/root.md for the source of truth.\n");

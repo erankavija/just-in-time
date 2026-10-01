@@ -37,7 +37,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 /// Project dependency-first unique durable results back onto ordered root
-/// observations. A repeated selector observes the transaction's first result,
+/// observations. A repeated selector observes the publication's first result,
 /// then reports an unchanged second observation without attempting another
 /// publication.
 fn selection_profile_results(
@@ -52,7 +52,7 @@ fn selection_profile_results(
 ///
 /// A closure member the caller did not name is still part of what the selection
 /// settles, so it is reported once, before the roots. A repeated root selector
-/// observes the transaction its first occurrence accounts for, so its later
+/// observes the publication its first occurrence accounts for, so its later
 /// observations report what [`SelectionObservation::observe_without_publishing`]
 /// leaves — one meaning of "this observation publishes nothing", stated once
 /// per answer type rather than per projection.
@@ -341,7 +341,7 @@ pub enum ProfileDependencyError {
     },
 }
 
-/// Profile application conflict detected before transaction preparation.
+/// Profile application conflict detected before anything is published.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
     /// Reconfiguration selected package bytes that no longer match the
@@ -730,7 +730,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// Publication is whole and recoverable: the destination ends up carrying
     /// exactly the manifest, the declared asset sources, and the declared region
     /// sources, with every file it held that the manifest no longer declares
-    /// removed in the same transaction (`@/inv/atomic-writes`). Capturing a
+    /// removed in the same publication (`@/inv/atomic-writes`). Capturing a
     /// package whose owned content was edited in place therefore publishes a
     /// tree whose identity reflects that edit, which is what lets re-applying it
     /// reconcile the repository.
@@ -1064,8 +1064,8 @@ impl CommandExecutor<JsonFileStorage> {
     /// Publish one built archive at the output path the caller named.
     ///
     /// The destination is classified exactly as a snapshot export's is, so an
-    /// archive written inside a repository root goes through the repository
-    /// transaction and one written outside goes through the shared external
+    /// archive written inside a repository root goes through the mutation
+    /// session's redo record and one written outside goes through the shared external
     /// publisher. Both refuse an occupied path.
     fn publish_package_archive(
         &self,
@@ -1853,7 +1853,7 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Publish already resolved package candidates through the one aggregate
-    /// profile-selection transaction.
+    /// profile-selection publication.
     fn apply_resolved_profile_selection(
         &self,
         packages: &[ProfilePackage],
@@ -5316,7 +5316,7 @@ template = true
     }
 
     #[test]
-    fn test_apply_profile_selection_publishes_multiple_packages_through_one_transaction() {
+    fn test_apply_profile_selection_publishes_multiple_packages_through_one_publication() {
         let temp = TempDir::new().unwrap();
         let bootstrap = JsonFileStorage::new(temp.path().join(".jit"));
         CommandExecutor::new(bootstrap.clone())
@@ -8054,7 +8054,7 @@ target = "docs/guide.md"
 
     /// Recapturing an unchanged package publishes nothing: every path is
     /// already what the manifest declares, so the delta is empty and no
-    /// transaction reaches its commit point.
+    /// redo record is committed.
     #[test]
     fn test_capture_profile_package_publishes_nothing_when_the_destination_is_already_captured() {
         let (temp, storage, executor, _fixture) = fixture();

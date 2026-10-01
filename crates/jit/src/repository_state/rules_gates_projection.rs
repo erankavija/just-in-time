@@ -7,7 +7,7 @@
 //!
 //! - the [`ProjectionMode`] / [`ProjectionStyle`] configuration knobs,
 //! - the strict managed-document engine, and
-//! - the shared, typed [`ProjectionError`] plus the storage transaction boundary.
+//! - the shared, typed [`ProjectionError`] plus the storage publication boundary.
 //!
 //! [`render_rules_and_gates_markdown`] is the built-in `full`-style render for the
 //! `rule` + `gate` registry-first kinds: it takes the two registries directly,

@@ -1765,7 +1765,7 @@ mod tests {
         assert!(!lease_id.is_empty());
 
         // Issue is assigned with a stamped claimed_at, and exactly one claim event
-        // was appended in the same transaction (@/inv/event-log).
+        // was appended in the same publication (@/inv/event-log).
         let issue = storage.load_issue(&issue_id)?;
         assert_eq!(
             issue.assignee.as_ref().map(|a| a.to_string()),
@@ -1782,7 +1782,7 @@ mod tests {
         let issue_id = create_test_issue(&storage, "Split Issue")?;
 
         // First acquire publishes the assigned issue and its claim event in one
-        // transaction.
+        // redo record.
         execute_claim_acquire_synchronized_test(&temp, &storage, &issue_id, 600, "agent:worker")?;
         assert_eq!(claim_events_for(&storage, &issue_id, "agent:worker"), 1);
         assert!(storage.load_issue(&issue_id)?.assignee.is_some());

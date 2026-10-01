@@ -395,7 +395,7 @@ comfortably under `MAX_TEST_SUITE_SECONDS` — see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
 for the exact measured margin. The tables below attribute cost, not risk: for every test whose
 measured cost is a direct consequence of the property it proves — a real subprocess, a
-real transaction round trip through the storage journal, real filesystem publication,
+real redo-record round trip through storage, real filesystem publication,
 genuine concurrency, or a property-based search over many generated cases — this names it,
 its warm cost, and the mechanism. A cost this attribution does not find a mechanism for
 belongs to a reducibility issue, not to this table.
@@ -461,12 +461,8 @@ files' own configuration comments for the exact rationale.
 Each of these spawns the compiled `jit` binary, once or several times in the same test
 (a dry run, an apply, then a second apply to prove the no-op; a plain-text and a `--json`
 report of the same drift), to pack, apply, validate, or repair a profile package on disk.
-`dev/benchmarks/test-suite-performance-4b7c06d0.json` (contract `transaction-benchmark-evidence`)
-measures exactly that publication cost at the packaging fixture's model limits — 511
-assets, 1,023 distinct source directories: a `profile add` against an existing data root
-carries a median 249 ms and 1,046 directory fsync calls, and a `profiled init` publication
-carries a median 419 ms. `test_profile_pack_and_add_carry_a_package_at_the_model_limits`
-exercises that fixture directly through the CLI; the rest of this table pays the same
+`test_profile_pack_and_add_carry_a_package_at_the_model_limits` carries the packaging
+fixture at its model limits directly through the CLI; the rest of this table pays the same
 durable-publication machinery at smaller scale, often several times per test.
 
 | Test | Warm (ms) |
@@ -500,9 +496,8 @@ and `profile::` modules that, per "1. Unit Tests" above, work against a real
 composes, or repairs a real, complete profile package's owned surface (schemas, registries,
 rules, generated docs) rather than a one-file fixture, so the cost scales with the
 package's real owned-materialization count. `test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits`
-packs the same `write_package_tree_at_model_limits` fixture the transaction benchmark's
-`profile_pack`/`profile_add` measurements above use, directly through the library rather
-than the CLI. `test_validate_fix_repairs_owned_materializations_in_memory` is the one
+packs the same `write_package_tree_at_model_limits` fixture, directly through the library
+rather than the CLI. `test_validate_fix_repairs_owned_materializations_in_memory` is the one
 exception to the real-filesystem description above — it seeds an equivalently complete
 in-memory repository fixture instead — but the property proven, and the cost, is the same:
 repair correctness across every owned class of a real profile package.

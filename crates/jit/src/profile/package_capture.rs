@@ -47,8 +47,7 @@
 //! target, and one placed outside the worktree is refused before any open.
 //!
 //! Publication belongs to the caller — this module reads and validates, and the
-//! command layer publishes the result through the shared recoverable
-//! transaction.
+//! command layer publishes the result through a mutation session.
 
 use super::nofollow::{classify_open_failure, is_executable, open_path_nofollow, OpenRefusal};
 use super::{

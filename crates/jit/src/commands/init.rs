@@ -427,7 +427,7 @@ impl CommandExecutor<JsonFileStorage> {
 ///
 /// The response intentionally reports only the user-facing scaffold files plus
 /// the worktree `.gitattributes` claim. Derived schemas, projections, and
-/// other materialization refreshes remain internal transaction details. Every
+/// other materialization refreshes remain internal publication details. Every
 /// reported creation or modification is nevertheless proven by the finalized
 /// action's expected preimage; no ambient filesystem probe participates.
 fn init_response_paths(
@@ -898,7 +898,7 @@ source-of-truth = \"registry-first\"\n";
     }
 
     #[test]
-    fn test_profiled_init_publishes_its_complete_closure_through_one_transaction() {
+    fn test_profiled_init_publishes_its_complete_closure_through_one_publication() {
         let repo = TempDir::new().unwrap();
         crate::test_utils::write_package_declaring(
             &composition_package(),

@@ -6,7 +6,7 @@
 //! metadata — and this module renders every neutral byte and composes one exact
 //! [`RepositoryDelta`] over the captured base image, including the audit append.
 //! The command opens the mutation session, captures the base under its guard,
-//! and applies the returned plan; it never hand-builds a transaction or a
+//! and applies the returned plan; it never hand-builds a redo record or a
 //! command-local final-byte inventory.
 //!
 //! The profile's asset/region/registry claims arrive as a

@@ -1574,13 +1574,13 @@ pub enum Event {
     ProfileLifecycle {
         /// Event ID.
         id: String,
-        /// When the transaction was constructed.
+        /// When the lifecycle operation was recorded.
         timestamp: DateTime<Utc>,
         /// Requested lifecycle operation.
         operation: ProfileLifecycleOperation,
         /// Per-profile outcomes in stable aggregate order.
         profiles: Vec<ProfileLifecycleProfile>,
-        /// Whether the transaction isolated a pre-existing non-newline,
+        /// Whether this append isolated a pre-existing non-newline,
         /// malformed event tail immediately before this record.
         isolated_torn_tail: bool,
     },

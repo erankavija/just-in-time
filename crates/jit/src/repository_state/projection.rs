@@ -23,7 +23,7 @@
 //! and the atomic write itself are orchestrated by the two-phase
 //! [`project_render`](crate::commands) command, which renders and materializes
 //! EVERY projection before writing ANY target so a failing render leaves the tree
-//! untouched; publication lands through the repository-state transaction.
+//! untouched; publication lands through the mutation session's redo record.
 //!
 //! Target path, mode, style, and delimiters come ONLY from
 //! [`ProjectionConfig`](crate::config::ProjectionConfig); this module hardcodes no
@@ -40,7 +40,7 @@ use thiserror::Error;
 ///
 /// Shared by [`require_target`] here, the body-rendering wiring in
 /// [`project_render`](crate::repository_state::projection_render), and the
-/// transaction-backed project-render command. Managed-region structure is
+/// session-backed project-render command. Managed-region structure is
 /// validated exclusively by
 /// [`managed_document`](crate::repository_state::managed_document).
 #[derive(Debug, Error)]

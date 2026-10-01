@@ -1978,7 +1978,7 @@ mod tests {
     }
 
     #[test]
-    fn test_capture_spec_failed_discovery_is_transactional() {
+    fn test_capture_spec_failed_discovery_leaves_the_spec_unchanged() {
         let fixed = VirtualPath::data("index.json").unwrap();
         let mut spec = CaptureSpec::new(
             [fixed.clone()],

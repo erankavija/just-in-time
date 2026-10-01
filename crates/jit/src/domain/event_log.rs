@@ -37,7 +37,7 @@ pub enum EventLogError {
 /// Invalid JSON is rejected except for exactly one physical line immediately
 /// followed by a valid [`Event::ProfileLifecycle`] whose
 /// `isolated_torn_tail` flag is true. That marker is written in the same
-/// transaction as the preserved prefix, making the exception explicit and
+/// append that isolates the preserved prefix, making the exception explicit and
 /// auditable rather than broadly accepting malformed history.
 pub fn parse_known_events(contents: &str) -> Result<Vec<Event>, EventLogError> {
     let lines = contents.lines().collect::<Vec<_>>();

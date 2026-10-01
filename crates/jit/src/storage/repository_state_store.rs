@@ -67,7 +67,7 @@ pub enum RepositoryStateStoreError {
     #[error("mutation writes worktree targets and creates no data root at {path}, so no redo record can commit it")]
     UncommittableWorktreeMutation { path: PathBuf },
     #[error("repository recovery or publication failed: {0}")]
-    Transaction(#[source] anyhow::Error),
+    Publication(#[source] anyhow::Error),
     #[error("leftover redo record {path} is not readable: {source}")]
     UnreadableRedoRecord {
         path: String,
@@ -619,7 +619,7 @@ impl JsonMutationSession {
         ensure_write_set_unchanged(&self.roots, image, &record)?;
         record
             .commit(self.layout.data_root())
-            .map_err(RepositoryStateStoreError::Transaction)?;
+            .map_err(RepositoryStateStoreError::Publication)?;
         RedoApplier::new(SessionRedoInterruptions::new(interruptions))
             .apply(&self.roots, &record)
             .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
@@ -664,7 +664,7 @@ impl JsonMutationSession {
             // into the root, and an interruption between them leaves it there.
             record
                 .commit(&init_publish::stage_path(self.layout.data_root()))
-                .map_err(RepositoryStateStoreError::Transaction)?;
+                .map_err(RepositoryStateStoreError::Publication)?;
         }
         interruptions.check(&MutationPoint::BeforeRootPublication)?;
         init_publish::publish_staged_data_root(
@@ -1364,7 +1364,7 @@ fn ensure_memory_parent_exists(
     ) {
         Ok(())
     } else {
-        Err(RepositoryStateStoreError::Transaction(anyhow::anyhow!(
+        Err(RepositoryStateStoreError::Publication(anyhow::anyhow!(
             "missing target parent: {parent_path:?}"
         )))
     }

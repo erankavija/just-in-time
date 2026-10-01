@@ -869,18 +869,15 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Execute a freshly recomputed document archive plan under one write guard.
     pub fn execute_archive_document(&self, path: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_transaction(ArchiveTarget::Document(path))
+        self.execute_archive_target(ArchiveTarget::Document(path))
     }
 
     /// Execute a freshly recomputed container archive plan under one write guard.
     pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_transaction(ArchiveTarget::Container(id))
+        self.execute_archive_target(ArchiveTarget::Container(id))
     }
 
-    fn execute_archive_transaction(
-        &self,
-        target: ArchiveTarget<'_>,
-    ) -> Result<ArchiveExecutionResult> {
+    fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionResult> {
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "archive execution", |session| {

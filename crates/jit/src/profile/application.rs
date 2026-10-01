@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// Whether an application published a transaction.
+/// Whether an application published its changes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProfileApplicationStatus {
@@ -474,7 +474,7 @@ pub struct ProfileCaptureEntry {
     pub file_count: usize,
     /// Total captured package byte size.
     pub byte_size: usize,
-    /// Whether the capture published a transaction.
+    /// Whether the capture published its changes.
     pub status: ProfileApplicationStatus,
     /// Every path the capture decided about, in canonical path order.
     pub targets: Vec<ProfileTargetChange>,
