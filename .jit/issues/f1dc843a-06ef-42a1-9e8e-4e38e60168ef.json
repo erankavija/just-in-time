@@ -91,6 +91,11 @@
       "updated_at": "2026-10-01T22:47:36.185597951Z",
       "updated_by": "auto:executor"
     },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T22:47:52.691007330Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "status": "passed",
       "updated_at": "2026-10-01T22:47:41.693878994Z",
@@ -109,5 +114,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T22:47:41.693878994Z"
+  "updated_at": "2026-10-01T22:47:52.691007330Z"
 }
