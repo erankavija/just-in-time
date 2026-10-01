@@ -2934,15 +2934,11 @@ pub(super) fn applied_profile_result(
         &package.model().version,
         package_origin(package, layout)?,
     );
-    let changed = status == ProfileApplicationStatus::Applied;
     Ok(ProfileApplyResult {
         id: preview.id,
         version: preview.version,
         origin: preview.origin,
         status,
-        plan_hash: preview.plan_hash,
-        transaction_id: changed.then(|| plan.hash().to_string()),
-        warnings: Vec::new(),
         targets: preview.targets,
         contributions: preview.contributions,
     })
@@ -5570,10 +5566,6 @@ template = true
             .profiles
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Unchanged));
-        assert!(reapplied
-            .profiles
-            .iter()
-            .all(|profile| profile.transaction_id.is_none()));
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             events
@@ -6445,10 +6437,6 @@ template = true
             "{:?}",
             reapplied.profiles
         );
-        assert!(reapplied
-            .profiles
-            .iter()
-            .all(|profile| profile.transaction_id.is_none()));
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             events
@@ -7733,17 +7721,9 @@ template = true
             repeat.targets
         );
         assert_eq!(
-            (
-                repeat.id.as_str(),
-                repeat.version.as_str(),
-                &repeat.plan_hash
-            ),
-            (
-                publishing.id.as_str(),
-                publishing.version.as_str(),
-                &publishing.plan_hash
-            ),
-            "a repeat still names its profile, its version, and the plan it came from"
+            (repeat.id.as_str(), repeat.version.as_str()),
+            (publishing.id.as_str(), publishing.version.as_str()),
+            "a repeat still names its profile and its version"
         );
     }
 

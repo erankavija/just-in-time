@@ -380,10 +380,10 @@ root occurrence in selector order. A repeated root's later observations are
 identity, target hashes, size, and stored provenance record when present.
 Showing that record does not re-verify current target bytes. Use
 `jit profile apply --profile id:jit-dogfood --dry-run` for exact current-state
-verification of the named package and its dependency closure: it returns the
-deterministic plan hash and every package's target and declaration decisions
-without writing. Successful reapplication of an exact installation returns
-`unchanged` for every package of the set.
+verification of the named package and its dependency closure: it returns every
+package's target and declaration decisions without writing. Successful
+reapplication of an exact installation returns `unchanged` for every package of
+the set.
 
 Profiled `jit init` combines the neutral init scaffold and profile projection
 into one validated, recoverable publication. The scaffold and the complete

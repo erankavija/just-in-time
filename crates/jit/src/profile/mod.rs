@@ -45,11 +45,11 @@ pub use agreement::{
 };
 pub(crate) use application::SelectionObservation;
 pub use application::{
-    ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplicationWarning,
-    ProfileApplyResult, ProfileCaptureEntry, ProfileCaptureResult, ProfileCollection,
-    ProfileComposedApplyResult, ProfileContributionChange, ProfileListResult, ProfilePackEntry,
-    ProfilePackResult, ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry,
-    ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileAddEntry, ProfileAddResult, ProfileApplicationStatus, ProfileApplyResult,
+    ProfileCaptureEntry, ProfileCaptureResult, ProfileCollection, ProfileComposedApplyResult,
+    ProfileContributionChange, ProfileListResult, ProfilePackEntry, ProfilePackResult,
+    ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
+    ProfileSummary, ProfileTargetAction, ProfileTargetChange,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,
