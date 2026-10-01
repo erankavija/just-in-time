@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e5cf8978791de0529d34d0bab080afbc194f52f6",
+  "completed_at": "2026-10-01T23:10:50.165437063Z",
+  "duration_ms": 544869,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F1",
+        "line": 107,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17"
+        ],
+        "severity": "medium",
+        "summary": "Recovery scope is ambiguous and implies read-only commands apply leftover redo records, contrary to current dispatch behavior."
+      }
+    ],
+    "summary": "The canonical storage reference incorrectly implies that every command applies a leftover redo record; only mutating commands do.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ffd65d85-f024-4e30-9a34-516ed2e4a269",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T23:01:45.295625426Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.2KdbGTYKPh: binary file matches\n--- agent stderr (first 12 of 23725 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f9b3-ceeb-7980-a988-a3e6ed317116\n--------\n--- 23713 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: container review covered the epic and all 51 delivered DAG descendants. I inspected 409 individually tagged commits with rename detection; planning `99a12b66` and breakdown `df3e10fb` had no tags, so their issue intent supplied fallback context.\n\n1. **F1 — blocking, issue-impact, medium:** [storage-format.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-format.md:107) says a session applies a leftover record before serving “the command,” but recovery dispatch intentionally excludes read-only commands. This conflicts with the troubleshooting guidance and can make users expect a read-only command to complete recovery. Replace it with language scoped to mutation sessions/mutating commands and state that read-only commands leave the record pending.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The canonical storage reference incorrectly implies that every command applies a leftover redo record; only mutating commands do.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Recovery scope is ambiguous and implies read-only commands apply leftover redo records, contrary to current dispatch behavior.\",\"file\":\"docs/reference/storage-format.md\",\"line\":107,\"references\":[\"@/charter/D-17\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
