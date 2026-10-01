@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e61addcbbbf127eb1f21b3001ac6155474965137",
+  "completed_at": "2026-10-01T09:59:12.862709983Z",
+  "duration_ms": 360519,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria hold in the current tree, and the prior advisory stale test comment was removed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "220e584b-d1c9-413e-bb46-b0ceb40fb313",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T09:53:12.343680961Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 4befe0fa0, d61672f8a, 6a013fd8d, 4e3efa078, 079d291c8, 882ef0c9, 36209e81, f284046c, 9a23b7a3, 39d5266f (`jit:51eb1aa6`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, essential-code-prose, semantic-test-assertions, orthogonal-tests (.jit/invariants.toml); @/issue/51eb1aa6/requirement/REQ-05 and REQ-07 (.jit/issues/51eb1aa6-186d-44c0-a60f-a1e3b0393110.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-01T09:47:24Z); mcp-ci passed (exit 0, 2026-10-01T09:32:30Z); doc-review passed (exit 0, 2026-10-01T09:37:18Z); docs-mechanical passed (exit 0, 2026-10-01T09:32:26Z)\nTruncation recovery: separately read feature source, tests, docs, merge-only progress patch, bridge generation, and current workspace schema projections\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria hold in the current tree, and the prior advisory stale test comment was removed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
