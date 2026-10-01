@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e5f5c6cf3ca0760d3c67ffc682d4634fff7f7bbc",
+  "completed_at": "2026-10-01T20:47:37.190424135Z",
+  "duration_ms": 253611,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable implementation satisfies the absent-data-root lock, identity, initialization, documentation, and function-scoped source-guard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f2741928-ad31-4184-a29d-03bcd52bc6cf",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T20:43:23.579171166Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: eb1330ae, 1ce833793, dccf72a1, b3c7bdd2, e9a046de, 07794db, 5d8e53a, 27bab3bc, 0b6e964d, f206fba2, 3981bd75, 2b4fe615, e5f5c6cf\nPolicy sources: AGENTS.md\nResolved items: @/issue/dd1b984c/requirement/REQ-01–REQ-04 (.jit/issues/dd1b984c-7ade-4967-ad6c-f75cf498ec63.json), @/issue/f1dc843a/requirement/REQ-05 (.jit/issues/f1dc843a-06ef-42a1-9e8e-4e38e60168ef.json), @/charter/D-17 (dev/vision/9db27a3a-charter.md), @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T20:42:14Z); prior code-review failed (exit 1, 2026-10-01T20:37:50Z), with F1/F2 addressed by 3981bd75\nTruncation recovery: recovered focused source/test/document ranges and individual tagged-commit patches; excluded generated target fixture policy files as outside the attributable paths\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable implementation satisfies the absent-data-root lock, identity, initialization, documentation, and function-scoped source-guard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
