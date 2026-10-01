@@ -49,6 +49,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "first_ready_at": "2026-10-01T15:16:10.158320748Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -68,7 +69,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Generated storage-records reference matches the append encoding",
-  "updated_at": "2026-10-01T13:10:42.448866268Z"
+  "updated_at": "2026-10-01T15:16:10.158320748Z"
 }

@@ -56,6 +56,7 @@
       "path": "dev/active/e346d387/sweep-evidence.md"
     }
   ],
+  "done_at": "2026-10-01T15:16:09.969948991Z",
   "first_ready_at": "2026-10-01T11:42:30.442072007Z",
   "gates_required": [
     "cargo-ci",
@@ -99,7 +100,7 @@
     "enforces:@/invariant/essential-code-prose"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Rust prose and command help state the redo record",
-  "updated_at": "2026-10-01T13:55:43.463716563Z"
+  "updated_at": "2026-10-01T15:16:09.969948991Z"
 }
