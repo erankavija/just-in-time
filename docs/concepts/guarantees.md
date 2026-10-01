@@ -60,23 +60,25 @@ JIT keeps the dependency graph transitively reduced. When `A→B→C` already ho
 ### Atomic Operations
 
 **Guarantee:** A mutation is published through one durable redo record over the
-files it writes, and each of those files is replaced by temp-file-and-rename.
+files it writes. The record extends the event log, and it replaces each other
+file by temp-file-and-rename.
 (`@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`,
 `@/charter/D-17`)
 
 **How it works:**
 
 Before it touches anything live, a mutation describes everything it will write:
-the directories it creates, the complete new bytes of every file it publishes,
-and the paths it removes. That description is the **redo record**. JIT writes
+the directories it creates, the complete new bytes of every file it replaces,
+the lines it appends to the event log, and the paths it removes. That description is the **redo record**. JIT writes
 it as `redo.record` in the data root's scratch directory, `.jit/tmp/`, syncs its
 bytes and fsyncs the directory entries naming them, and only then writes a live
 file. The record's durable write is the mutation's commit point
 (`crates/jit/src/storage/redo_record.rs`).
 
-Applying it is one forward pass: make the directories, replace the files, remove
-the deleted paths, then remove the record. Every step tolerates being redone — a
-directory already present, a replacement that overwrites, a removal whose target
+Applying it is one forward pass: make the directories, replace the files, extend
+the event log, remove the deleted paths, then remove the record. Every step
+tolerates being redone — a directory already present, a replacement that
+overwrites, an append written again at the same place, a removal whose target
 is already gone — so applying a record twice reaches the same state as applying
 it once (`crates/jit/src/storage/redo_apply.rs`).
 
@@ -97,12 +99,10 @@ syncs them, and renames onto the target. Keeping both paths in one directory
 makes the rename a same-filesystem operation, so readers never observe a
 partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
 
-`events.jsonl` grows by a positioned append instead: a mutation that records
-events carries the log length it captured together with the bytes to write
-there, and applying the record writes those bytes in place at that offset, so
-re-applying it leaves the same log. When the captured log ends in an
-unterminated line, the appended bytes begin with the separating newline. The
-record is applied under the repository
+`events.jsonl` is the exception: the record extends it in place rather than
+replacing it, as the
+[storage format reference](../reference/storage-format.md#publication-and-recovery)
+specifies. The record is applied under the repository
 write lock and `.events.lock`; event readers take the same lock shared
 (`crates/jit/src/storage/json.rs`).
 
