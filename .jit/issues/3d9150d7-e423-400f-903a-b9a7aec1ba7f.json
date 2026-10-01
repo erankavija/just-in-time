@@ -62,8 +62,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-01T10:49:31.938938827Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T11:13:28.124723781Z",
       "updated_by": "auto:executor"
     }
   },
@@ -80,5 +80,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication path source guards",
-  "updated_at": "2026-10-01T11:09:56.208459853Z"
+  "updated_at": "2026-10-01T11:13:28.124723781Z"
 }

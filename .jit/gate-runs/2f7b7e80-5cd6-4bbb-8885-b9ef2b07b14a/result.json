@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3e2a101e770c2d7b5a2bfa2fc1e05038465e21c9",
+  "completed_at": "2026-10-01T11:13:27.814785132Z",
+  "duration_ms": 204242,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met; the prior helper-path finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2f7b7e80-5cd6-4bbb-8885-b9ef2b07b14a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T11:10:03.572589428Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:3d9150d7` commits 70ae408f3, a458bfd1c, b44bfaff4, e61addcbb, 8c0f2ca58, c57a7b0d2, 02cffab0c, d3c5c04bf, 6f451f18e, a915612d0, 3e2a101e7\nPolicy sources: `AGENTS.md`\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/{convention-convergence,canonical-cutover,semantic-test-assertions,orthogonal-tests,bounded-rust-build-footprint,essential-code-prose} (.jit/invariants.toml); @/issue/3d9150d7/requirement/{REQ-01,REQ-05} (issue Markdown)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T11:06:53Z); prior code-review F1 was remediated and rechecked\nTruncation recovery: Initial broad source search truncated; recovered with per-commit patches and bounded source reads.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met; the prior helper-path finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
