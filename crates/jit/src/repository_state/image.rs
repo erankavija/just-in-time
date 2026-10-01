@@ -138,13 +138,17 @@ impl Serialize for CapturedBytes {
     }
 }
 
-/// Bytes at the end of a file a [`ReadMode::Tail`] capture keeps.
+/// Bytes at the end of a file a [`ReadMode::Tail`] capture keeps at least.
 ///
 /// A byte window rather than the last complete line: the event log's torn-tail
 /// protocol admits an incomplete final line, so its end is not a line boundary.
 pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
 
-/// A file's exact length with its last `min(length, window)` bytes.
+/// A file's exact length with its last `min(length, window)` bytes, reaching
+/// back to the newline before the final line when that line starts earlier.
+///
+/// The tail is bounded by the final line, never by the file's history: it
+/// holds that line whole, so [`final_line`](Self::final_line) can judge it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EventLogTail {
     length: u64,
@@ -154,21 +158,51 @@ pub struct EventLogTail {
 impl EventLogTail {
     /// The length and tail of `bytes`.
     pub fn of_bytes(bytes: &[u8]) -> Self {
-        let window = usize::try_from(EVENT_LOG_TAIL_WINDOW).unwrap_or(usize::MAX);
+        let slice = |start: u64, len: u64| {
+            let (start, len) = (start as usize, len as usize);
+            Ok::<_, std::convert::Infallible>(bytes[start..start + len].to_vec())
+        };
+        let tail =
+            Self::read_tail(bytes.len() as u64, slice).unwrap_or_else(|never| match never {});
         Self {
             length: bytes.len() as u64,
-            tail: bytes[bytes.len().saturating_sub(window)..].to_vec(),
+            tail,
         }
+    }
+
+    /// The tail of a file `length` bytes long, through `read(start, len)`:
+    /// the last window, then earlier windows until one holds the newline
+    /// before the final line, kept from that newline on.
+    pub fn read_tail<E>(
+        length: u64,
+        mut read: impl FnMut(u64, u64) -> Result<Vec<u8>, E>,
+    ) -> Result<Vec<u8>, E> {
+        let mut start = length - length.min(EVENT_LOG_TAIL_WINDOW);
+        let mut tail = read(start, length - start)?;
+        while start > 0 && !tail.contains(&b'\n') {
+            let from = start.saturating_sub(EVENT_LOG_TAIL_WINDOW);
+            let mut earlier = read(from, start - from)?;
+            if let Some(newline) = earlier.iter().rposition(|byte| *byte == b'\n') {
+                earlier.drain(..newline);
+            }
+            earlier.extend(tail);
+            (tail, start) = (earlier, from);
+        }
+        Ok(tail)
     }
 
     /// A boundary reading of a file `length` bytes long ending in `tail`.
     ///
     /// # Errors
     ///
-    /// [`CaptureError::InvalidTail`] unless `tail` holds exactly the last
-    /// `min(length, window)` bytes.
+    /// [`CaptureError::InvalidTail`] unless `tail` holds the last
+    /// `min(length, window)` bytes, or a longer suffix that is the whole file
+    /// or begins at the newline before a final line it holds whole.
     pub fn new(length: u64, tail: Vec<u8>) -> Result<Self, CaptureError> {
-        (tail.len() as u64 == length.min(EVENT_LOG_TAIL_WINDOW))
+        let len = tail.len() as u64;
+        let window = length.min(EVENT_LOG_TAIL_WINDOW);
+        let line_bounded = tail.first() == Some(&b'\n') && !tail[1..].contains(&b'\n');
+        (len == window || (window < len && len <= length && (len == length || line_bounded)))
             .then_some(Self { length, tail })
             .ok_or(CaptureError::InvalidTail { length })
     }
@@ -178,13 +212,13 @@ impl EventLogTail {
         self.length
     }
 
-    /// The file's last `min(length, window)` bytes.
+    /// The file's last bytes, as [`EventLogTail`] bounds them.
     pub fn tail(&self) -> &[u8] {
         &self.tail
     }
 
-    /// The bytes after the file's last newline, or `None` when that line
-    /// starts before the window and the tail holds only part of it.
+    /// The bytes after the file's last newline, or `None` when the tail holds
+    /// only part of that line.
     pub fn final_line(&self) -> Option<&[u8]> {
         match self.tail.iter().rposition(|byte| *byte == b'\n') {
             Some(newline) => Some(&self.tail[newline + 1..]),
@@ -678,8 +712,8 @@ pub struct CaptureBudget {
 pub enum ReadMode {
     /// Every byte.
     Whole,
-    /// The length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, as an
-    /// [`EventLogTail`].
+    /// The length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, reaching back
+    /// to the final line's start, as an [`EventLogTail`].
     Tail,
 }
 
@@ -1768,7 +1802,7 @@ pub enum CaptureError {
     IncompleteCapture(VirtualPath),
     #[error("capture read only the length and tail of {0:?}")]
     TailOnlyCapture(VirtualPath),
-    #[error("a tail of a {length}-byte file must hold its last min(length, window) bytes")]
+    #[error("a tail of a {length}-byte file must hold its last window bytes and its final line")]
     InvalidTail { length: u64 },
     #[error("capture provided unrequested path {0:?}")]
     UnexpectedCapturedPath(VirtualPath),

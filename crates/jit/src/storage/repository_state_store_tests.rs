@@ -1,7 +1,7 @@
 use super::*;
 use crate::repository_state::{
     plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
-    RepositorySeedKind,
+    RepositorySeedKind, EVENT_LOG_TAIL_WINDOW,
 };
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
@@ -1261,33 +1261,35 @@ fn test_conformance_extend_reads_only_what_the_image_lacks_on_both_backends() {
     }
 }
 
-/// A tail read holds the file's length and its last window of bytes, and a
-/// producer asking for the whole file fails typed.
+/// A tail read holds the file's length and its last window of bytes, reaching
+/// back to the newline before a final line that starts earlier, and a producer
+/// asking for the whole file fails typed.
 #[test]
 fn test_conformance_tail_capture_holds_length_and_window_on_both_backends() {
-    let log = (0..EVENT_LOG_TAIL_WINDOW * 2 + 7)
+    let window = EVENT_LOG_TAIL_WINDOW as usize;
+    let lines = (0..window * 2 + 7)
         .map(|byte| byte as u8)
         .collect::<Vec<_>>();
-    let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
-    for (mut session, _) in sessions {
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+    let long_line = [vec![b'h'; window * 2], vec![b'\n'], vec![b'x'; window * 3]].concat();
+    for (log, kept) in [(lines, window), (long_line, window * 3 + 1)] {
+        let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
+        for (mut session, _) in sessions {
+            let mut spec = CaptureSpec::new([], budget()).unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
 
-        let image = session.capture(spec).unwrap();
+            let image = session.capture(spec).unwrap();
 
-        let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS).unwrap()
-        else {
-            panic!("a tail read captures a tail");
-        };
-        assert_eq!(tail.length(), log.len() as u64);
-        assert_eq!(
-            tail.tail(),
-            &log[log.len() - EVENT_LOG_TAIL_WINDOW as usize..]
-        );
-        assert!(matches!(
-            image.file_bytes(&VirtualPath::EVENTS),
-            Err(CaptureError::TailOnlyCapture(_))
-        ));
+            let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS).unwrap()
+            else {
+                panic!("a tail read captures a tail");
+            };
+            assert_eq!(tail.length(), log.len() as u64);
+            assert_eq!(tail.tail(), &log[log.len() - kept..]);
+            assert!(matches!(
+                image.file_bytes(&VirtualPath::EVENTS),
+                Err(CaptureError::TailOnlyCapture(_))
+            ));
+        }
     }
 }
 
