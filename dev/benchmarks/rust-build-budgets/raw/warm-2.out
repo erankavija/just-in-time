@@ -1,12 +1,11 @@
-=== warm sample 2, commit a3c2f597a, start 2026-08-13T14:33:12+03:00
-  ✓ incremental-baseline: 0 entries already present under /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-0708d692/target, none of them this run's (33 ms)
-  ✓ fmt: ok (1553 ms)
-  ✓ clippy: ok (192 ms)
-  ✓ suite-build: built in 499 ms, warmed 17 executables (1918057680 bytes) in 66 ms (568 ms)
-  ✓ test: 4514 passed, 0 failed, 7 skipped (18019 ms)
-  ✓ doctest: 63 passed, 0 failed, 0 ignored (4534 ms)
-  ✓ suite-clock: 22571 ms
-  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1596001608/2147483648 profile=line-tables-only incremental=disabled dep-features=pruned suite-duration=22571ms (81 ms)
-  ✓ incremental-state: no incremental state created by this run (0 pre-existing entries ignored) (34 ms)
+=== warm sample 2, commit 1e9d168c9, start 2026-10-01T23:35:21+03:00, loadavg 8.19 5.44 9.44 2/1596 1820205
+  ✓ fmt: ok (1609 ms)
+  ✓ clippy: ok (260 ms)
+  ✓ suite-build: built in 2215 ms, warmed 17 executables (2070725936 bytes) in 71 ms (2289 ms)
+  ✓ test: 4711 passed, 0 failed, 0 skipped (17842 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (4577 ms)
+  ✓ suite-clock: 22437 ms
+  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1739334912/2147483648 profile=line-tables-only dep-features=pruned suite-duration=22437ms (84 ms)
 
-=== exit=0 end 2026-08-13T14:33:37+03:00
+=== exit=0 end 2026-10-01T23:35:47+03:00, loadavg 14.87 7.21 9.90 3/1605 1858836

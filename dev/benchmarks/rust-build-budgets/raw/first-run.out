@@ -1,0 +1,11 @@
+=== warm sample 0, commit 1e9d168c9, start 2026-10-01T23:33:43+03:00, loadavg 1.35 4.18 9.54 1/1656 1737385
+  ✓ fmt: ok (1590 ms)
+  ✓ clippy: ok (18913 ms)
+  ✓ suite-build: built in 17465 ms, warmed 17 executables (2070725936 bytes) in 71 ms (17540 ms)
+  ✓ test: 4711 passed, 0 failed, 0 skipped (22192 ms)
+  ✓ doctest: 63 passed, 0 failed, 0 ignored (7225 ms)
+  ✓ suite-clock: 29726 ms
+  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (46 ms)
+  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1739334912/2147483648 profile=line-tables-only dep-features=pruned suite-duration=29726ms (774 ms)
+
+=== exit=0 end 2026-10-01T23:34:52+03:00, loadavg 6.32 4.86 9.37 1/1657 1781156
