@@ -9,7 +9,30 @@
   "description": "Prose and citation assertions over markdown artifacts move from the Rust test suite to the mechanical documentation gate.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/code_review_policy_test.rs` (357 lines, 14 tests) reads `AGENTS.md` and `contrib/gates/code-review-prompt.md` as text and asserts policy phrases in them. `test_packaged_qualified_item_citations_resolve_from_installed_registries` (`crates/jit/src/profile/repository_package.rs:299`) asserts that every `@/` citation in package content resolves from the registries the package installs — the property `scripts/docs-check-citations.sh` already checks as the `docs-mechanical` gate's M3 step over its configured footprint.\n\nTwo consequences follow. One property is proven twice, by two mechanisms in two languages. And a commit that changes only prose is gated by neither: the mechanical gate's footprint is `docs/`, and a prose commit does not run the Rust suite. Three documentation commits on this epic's planning bracket left the Rust suite failing on `main` until `ce053478` repaired it.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust test asserts the textual content of a markdown artifact.\n- [hard] REQ-02: Every policy phrase `code_review_policy_test.rs` asserted is asserted by a committed checker the `docs-mechanical` gate runs.\n- [hard] REQ-03: The packaged-citation resolution property is asserted once in the workspace, by the mechanical checker.\n- [hard] REQ-04: The mechanical checkers reach `AGENTS.md` and `contrib/gates/`.\n- [hard] REQ-05: Removing a required policy phrase, and adding an unresolvable `@/` citation to package content, each fail the gate; the demonstration is recorded.\n- [hard] REQ-06: The change removes more lines of Rust than it adds.\n\n## Notes\n\nNot redo-record work, and excluded from the redo-record subtotal of the epic's REQ-06 line balance (`ER-01`): its Rust deletions must not be credited to the storage layer shrinking.",
   "documents": [
     {
+      "commit": null,
+      "doc_type": "notes",
+      "format": "markdown",
+      "label": "Relocation evidence (2d4fda72)",
+      "path": "dev/active/2d4fda72/relocation-evidence.md"
+    },
+    {
       "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
         {
           "asset_type": "local",
           "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
@@ -20,41 +43,18 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "intake.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
           "is_shared": false,
           "mime_type": null,
-          "original_path": "bench.sh",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
         }
       ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Epic plan (f1dc843a)",
+      "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
-    },
-    {
-      "commit": null,
-      "doc_type": "notes",
-      "format": "markdown",
-      "label": "Relocation evidence (2d4fda72)",
-      "path": "dev/active/2d4fda72/relocation-evidence.md"
     }
   ],
   "done_at": "2026-09-20T10:16:42.468573758Z",
@@ -92,5 +92,5 @@
   "priority": "high",
   "state": "done",
   "title": "Documentation assertions leave the Rust suite",
-  "updated_at": "2026-09-20T10:16:42.468573758Z"
+  "updated_at": "2026-10-01T22:40:24.428046747Z"
 }

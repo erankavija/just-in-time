@@ -12,15 +12,15 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
           "is_shared": false,
-          "mime_type": null,
-          "original_path": "bench.sh",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
         },
         {
           "asset_type": "local",
-          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "intake.md",
@@ -28,11 +28,11 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
           "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "investigation.md",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
         },
         {
           "asset_type": "local",
@@ -46,7 +46,7 @@
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Epic plan",
+      "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
@@ -82,5 +82,5 @@
   "priority": "high",
   "state": "done",
   "title": "Session open applies a leftover record",
-  "updated_at": "2026-10-01T19:28:14.794948232Z"
+  "updated_at": "2026-10-01T22:40:26.067777633Z"
 }

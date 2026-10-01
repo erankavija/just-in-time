@@ -9,7 +9,22 @@
   "description": "Measure what a mutation's whole-log read costs at scale, and determine whether the single-pass capture specification can take the event log as length and tail instead of whole bytes.\n\n## Background\n\nEpic criterion REQ-02 requires a label update's median wall time on a repository whose event log is ten times larger to differ by less than 10 % from the same update on the original repository.\n\nTwo whole-log costs sit on the mutation path today. The finalizer copies the whole log and recomposes it (`crates/jit/src/repository_state/mutation.rs:1224`), which `b4483ad6` replaces with a positioned append. Capture also reads the log whole into the image, and `c88822a5` REQ-03 keeps it there: \"The capture's base specification reads the registries, the index, the event log, the indexed issue files, and the plan documents a transition rule consults.\"\n\nOnce the append encoding lands, the read is what remains. The pre-commit conflict check already compares the log as its length plus its last `min(len, 4096)` bytes (`crates/jit/src/storage/repository_state_store.rs`, `faa668c9`), not as whole bytes. The whole-log *parse* is claim-specific (`captured_events`, `mutation.rs:695`, reached only from the `ClaimIssue` arm at `:884`).\n\nThis issue answers, with measurements rather than argument, whether REQ-02 is reachable while capture reads the log whole.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed measurement reports the cost of reading the event log into the capture image at the benchmark fixture's 1x and 10x sizes, separated from the rest of a label update.\n- [hard] REQ-02: The measurement states the projected 10x-versus-1x difference for a label update once the positioned append removes the whole-log rewrite, and whether that difference is under 10 %.\n- [hard] REQ-03: Every consumer of the captured event-log bytes is enumerated with its `file:line`, and each is classified as needing the whole log, a bounded tail, or only length.\n- [hard] REQ-04: The finding states whether `c88822a5` REQ-03 can stand as written, and if it cannot, states the amendment it needs and which consumers block it.\n- [hard] REQ-05: No production behaviour changes in this issue.\n\n## Notes\n\nInvestigation only. It exists because `c88822a5` lands at wave 16 and the epic's REQ-02 evidence is produced at wave 21; discovering there that the criterion is unreachable would put remediation on top of finished work.\n\nNot redo-record delivery; excluded from the redo-record subtotal of the epic's REQ-06 line balance (`ER-01`).",
   "documents": [
     {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Whole-log read cost vs REQ-02",
+      "path": "dev/active/7226f00b/whole-log-read-cost.md"
+    },
+    {
       "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
+        },
         {
           "asset_type": "local",
           "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
@@ -20,19 +35,11 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "intake.md",
           "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "bench.sh",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
         },
         {
           "asset_type": "local",
@@ -46,15 +53,8 @@
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Epic plan (f1dc843a)",
+      "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
-    },
-    {
-      "commit": null,
-      "doc_type": "research",
-      "format": "markdown",
-      "label": "Whole-log read cost vs REQ-02",
-      "path": "dev/active/7226f00b/whole-log-read-cost.md"
     }
   ],
   "done_at": "2026-09-20T11:28:26.363891348Z",
@@ -79,5 +79,5 @@
   "priority": "critical",
   "state": "done",
   "title": "Whole-log read cost and the single-pass capture specification",
-  "updated_at": "2026-09-20T11:28:26.363891348Z"
+  "updated_at": "2026-10-01T22:40:26.161531676Z"
 }

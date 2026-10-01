@@ -10,6 +10,13 @@
   "description": "One conformance suite proves the redo record's interruption matrix on both storage backends, compile-enforced over the interruption-point enum.\n\n## Background\n\nThe record's crash contract is that an interruption at any step leaves the complete old state, or the complete new state once the leftover record is applied again. That is the mechanism's own behaviour matrix, so it is proven once, against the mechanism, and each consumer proves only that it reaches the mechanism.\n\nBoth backends run the same suite, driven by generic functions over the storage trait, the pattern the storage suite already uses. Coverage is compile-enforced over the point enum: adding a point without classifying it fails the build. The list it replaces is hand-maintained and covers thirty of thirty-six points.\n\n## Success Criteria\n\n- [hard] REQ-01: One suite drives an interruption at each interruption-point value, on the filesystem backend and the in-memory backend, from the same driver.\n- [hard] REQ-02: After an interruption before the record is durable, the repository reads back as the complete old state.\n- [hard] REQ-03: After an interruption at or after the record becomes durable, re-applying the leftover record yields the complete new state, and applying it a second time yields it again.\n- [hard] REQ-04: Coverage over the point enum is compile-enforced, so a new point fails the build until it is classified.\n- [hard] REQ-05: The suite asserts semantic state rather than a copied byte inventory, and each test states one property.\n- [hard] REQ-06: The suite adds no new integration-test target.\n\n## Notes\n\nExpected footprint is under 400 test lines. The suite lives beside the mechanism in the storage layer, the cheapest layer that can observe the property. Session-open replay is a separate property with its own owner.\n",
   "documents": [
     {
+      "commit": null,
+      "doc_type": "artifact",
+      "format": "markdown",
+      "label": "Interruption conformance suite",
+      "path": "crates/jit/src/storage/redo_conformance.rs"
+    },
+    {
       "assets": [
         {
           "asset_type": "local",
@@ -21,14 +28,6 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "bench.sh",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
-        },
-        {
-          "asset_type": "local",
           "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
           "is_shared": false,
           "mime_type": "text/markdown",
@@ -37,25 +36,26 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "content_hash": "bc2223ed49737e8e78bc23457d5416260ba0a25a41a1cfcb24410586ffefeadb",
           "is_shared": false,
           "mime_type": "text/markdown",
           "original_path": "intake.md",
           "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
         }
       ],
       "commit": null,
       "doc_type": "design",
       "format": "markdown",
-      "label": "Epic plan",
+      "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
-    },
-    {
-      "commit": null,
-      "doc_type": "artifact",
-      "format": "markdown",
-      "label": "Interruption conformance suite",
-      "path": "crates/jit/src/storage/redo_conformance.rs"
     }
   ],
   "done_at": "2026-09-20T19:15:46.860573747Z",
@@ -91,5 +91,5 @@
   "priority": "high",
   "state": "done",
   "title": "Shared interruption conformance suite",
-  "updated_at": "2026-10-01T19:32:53.677473245Z"
+  "updated_at": "2026-10-01T22:40:26.914276045Z"
 }

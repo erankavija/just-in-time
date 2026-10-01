@@ -13,56 +13,6 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "aa1f1ff8c2a7d664e15e85b908a0b07dcf18ed7874f7ea1149b109e6ab4e0624",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../active/f1dc843a-redo-mutations/bench.sh",
-          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "1ff67454951e463917ee1d265eb265a73876bb3d0052810ee62d8d21afce6974",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "rust-balance.py",
-          "resolved_path": "dev/benchmarks/publication-cost-722878d4/rust-balance.py"
-        }
-      ],
-      "commit": null,
-      "doc_type": "evidence",
-      "format": "markdown",
-      "label": null,
-      "path": "dev/benchmarks/publication-cost-722878d4/README.md"
-    },
-    {
-      "assets": [
-        {
-          "asset_type": "local",
-          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
-          "is_shared": false,
-          "mime_type": null,
-          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
-          "resolved_path": "scripts/benchmark-mutation-cost.sh"
-        },
-        {
-          "asset_type": "local",
-          "content_hash": "3a71bf89068f6597382c6bc6e694ccdd374657107660b45b99dcd43f03dcfcc4",
-          "is_shared": false,
-          "mime_type": "text/markdown",
-          "original_path": "../../benchmarks/publication-cost-722878d4/README.md",
-          "resolved_path": "dev/benchmarks/publication-cost-722878d4/README.md"
-        }
-      ],
-      "commit": null,
-      "doc_type": "evidence",
-      "format": "markdown",
-      "label": null,
-      "path": "dev/active/ef7848ea/checkpoint-evidence.md"
-    },
-    {
-      "assets": [
-        {
-          "asset_type": "local",
           "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
           "is_shared": false,
           "mime_type": null,
@@ -99,6 +49,56 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1ff67454951e463917ee1d265eb265a73876bb3d0052810ee62d8d21afce6974",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "rust-balance.py",
+          "resolved_path": "dev/benchmarks/publication-cost-722878d4/rust-balance.py"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/benchmarks/publication-cost-722878d4/README.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "12a2257ef46ee903d23bf95aeed3974f7e4a8f6b3dd719ad20c1f87a83d02da2",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../benchmarks/publication-cost-722878d4/README.md",
+          "resolved_path": "dev/benchmarks/publication-cost-722878d4/README.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/ef7848ea/checkpoint-evidence.md"
     }
   ],
   "first_ready_at": "2026-10-01T22:23:15.518009497Z",
@@ -131,5 +131,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-10-01T22:40:02.385628243Z"
+  "updated_at": "2026-10-01T22:40:17.368255272Z"
 }
