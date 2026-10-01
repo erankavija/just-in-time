@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ac46b5a4211ff68d47e873ca2ea0b158037c78b5",
+  "completed_at": "2026-10-01T22:54:51.131075744Z",
+  "duration_ms": 208423,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/guarantees.md",
+        "id": "F1",
+        "line": 78,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/invariant/atomic-writes"
+        ],
+        "severity": "medium",
+        "summary": "The guarantee states that event-log extension precedes deletion, but the redo applier deletes before appending."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/gate-runs/28e043e6-8782-4814-99b7-f71273b9efd6/result.json",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/gate-semantics",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The current cargo-ci gate failed with six timed-out tests and has no subsequent passing evidence, leaving the container's required gate unsatisfied."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f1dc843a-redo-mutations/handoff.md",
+        "id": "F3",
+        "line": 74,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "low",
+        "summary": "Linked handoff material still identifies a removed bench.sh path as the benchmark harness after its relocation to scripts/benchmark-mutation-cost.sh."
+      }
+    ],
+    "summary": "A live redo-record documentation contradiction and failed cargo-ci gate block completion; linked handoffs also retain a stale harness path.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3ca4de8a-8ac5-447b-bd35-cdb8c4a1241b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:51:22.707733947Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12328 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f9aa-4d7f-78d3-b65c-15eb22a5eab5\n--------\nuser\n--- 12315 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, medium:** `docs/concepts/guarantees.md:78-79` states event-log extension precedes deletion, but `redo_apply.rs:161-173` deletes first. This violates the redo-record publication documentation requirement.\n\n2. **F2 — blocking, high:** The recorded `cargo-ci` gate failed: six tests timed out, and no later passing run exists. The container remains `Ready`, so its required quality evidence is incomplete.\n\n3. **F3 — advisory, low:** Linked handoff documents still name the removed `dev/active/f1dc843a-redo-mutations/bench.sh` as the benchmark harness; the shipped harness is now `scripts/benchmark-mutation-cost.sh`.\n\nTotal findings: 3\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"A live redo-record documentation contradiction and failed cargo-ci gate block completion; linked handoffs also retain a stale harness path.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The guarantee states that event-log extension precedes deletion, but the redo applier deletes before appending.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":78,\"references\":[\"@/charter/D-17\",\"@/invariant/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The current cargo-ci gate failed with six timed-out tests and has no subsequent passing evidence, leaving the container's required gate unsatisfied.\",\"file\":\".jit/gate-runs/28e043e6-8782-4814-99b7-f71273b9efd6/result.json\",\"references\":[\"@/invariant/gate-semantics\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F3\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Linked handoff material still identifies a removed bench.sh path as the benchmark harness after its relocation to scripts/benchmark-mutation-cost.sh.\",\"file\":\"dev/active/f1dc843a-redo-mutations/handoff.md\",\"line\":74,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
