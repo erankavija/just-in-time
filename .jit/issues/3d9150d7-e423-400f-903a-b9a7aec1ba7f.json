@@ -55,7 +55,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-01T09:53:05.749614884Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
   "labels": [
     "type:task",
@@ -69,5 +75,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication path source guards",
-  "updated_at": "2026-10-01T09:10:17.970444604Z"
+  "updated_at": "2026-10-01T09:53:05.749614884Z"
 }

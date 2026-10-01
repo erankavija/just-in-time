@@ -1,0 +1,45 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "31e3dd533ba010436c811d1a335843ac13193561",
+  "completed_at": "2026-10-01T09:53:05.413872420Z",
+  "duration_ms": 254606,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 631,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3d9150d7/requirement/REQ-01",
+          "@/charter/D-17",
+          "@/invariant/convention-convergence",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The source walk scans only lib.rs and main.rs, so a direct writer in an auto-discovered src/bin target is not checked."
+      }
+    ],
+    "summary": "The publication-path guard omits Cargo auto-discovered binary targets, allowing a second direct repository writer to evade detection.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "31338ad3-f051-47bd-9fab-5c35d87de4d0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T09:48:50.807112579Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5121 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f6dd-e559-7b33-a3a1-a8e653f04b24\n--------\nuser\n--- 5108 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `70ae408f3`, `a458bfd1c`, and merge `b44bfaff4` (`jit:3d9150d7`); union affects `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/3d9150d7/requirement/REQ-01`, `REQ-05` (issue description, markdown-first); `@/charter/D-17` (`dev/vision/9db27a3a-charter.md`, markdown-first); `@/invariant/convention-convergence`, `orthogonal-tests`, `essential-code-prose`, `semantic-test-assertions`, `canonical-cutover`, `bounded-rust-build-footprint` (`.jit/invariants.toml`, registry-first); `@/gate/jit-validate` (`.jit/gates.toml`, registry-first)\nGate evidence: `cargo-ci`: pending, no exit code or recorded run\nTruncation recovery: bounded rereads covered the task plan linkage, item registries, tagged patches including the merge, current guard lines, and named publisher implementations\n\n1. **[blocking][issue-impact]** `workspace_compiled_sources` enumerates only `src/lib.rs` and `src/main.rs` for each workspace member. Cargo also compiles auto-discovered `src/bin/*.rs` binary targets, so adding a direct repository-state writer in such a target leaves the writer set unchanged and the guard passing. This fails hard REQ-01’s required regression protection for another module/publication path. Fix target discovery to include Cargo binary targets (including auto-discovered bins), and cover that path in the guard’s focused test. References: `@/issue/3d9150d7/requirement/REQ-01`, `@/charter/D-17`, `@/invariant/convention-convergence`, `@/invariant/orthogonal-tests`. ([repository_state_cutover_tests.rs](crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:631))\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The publication-path guard omits Cargo auto-discovered binary targets, allowing a second direct repository writer to evade detection.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The source walk scans only lib.rs and main.rs, so a direct writer in an auto-discovered src/bin target is not checked.\",\"file\":\"crates/jit/tests/scratch_build/repository_state_cutover_tests.rs\",\"line\":631,\"references\":[\"@/issue/3d9150d7/requirement/REQ-01\",\"@/charter/D-17\",\"@/invariant/convention-convergence\",\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
