@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d289b1b9d7f94108073b3731171125a7a7bcdb7b",
+  "completed_at": "2026-10-01T11:05:28.171520556Z",
+  "duration_ms": 149996,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are satisfied by the attributable current implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7a6978ef-27d7-47c2-91b6-dad0c08eebc9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T11:02:58.174905590Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 5103867df, 73f3a20e8, e6d929844, 6ae4530b, 973fec7f, a47047c8, 904ad19f, 3a7eb71b, f58a29c2, a55073aa, d289b1b9\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/event-log, @/invariant/atomic-writes, @/invariant/derived-state-coherence, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T10:18:31Z); doc-review passed (exit 0, 2026-10-01T11:01:53Z); docs-mechanical passed (exit 0, 2026-10-01T11:01:34Z)\nTruncation recovery: recovered relevant evidence with commit-, path-, merge-, and hunk-bounded reads after truncated broad reads\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are satisfied by the attributable current implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
