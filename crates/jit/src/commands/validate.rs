@@ -1634,8 +1634,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// resolver [`resolve_link_label`](crate::commands::CommandExecutor::resolve_link_label),
     /// so resolution logic is not forked. A candidate that fails to resolve yields
     /// one [`GraphFinding`] attributed to the owning issue, naming the dangling
-    /// qualified id; a resolvable candidate (and a legacy unqualified label, and a
-    /// non-link namespace) yields nothing.
+    /// qualified id. A link-namespace label with a bare self-id yields the
+    /// [`unqualified_link_message`](crate::domain::item::unqualified_link_message)
+    /// finding; a resolvable candidate and a non-link namespace yield nothing.
     ///
     /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
     /// so a dangling link fails `jit validate`. The rule name is the constant
@@ -1652,8 +1653,8 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // Derive the link-namespace set generically from the configured kinds — no
         // kind-name literal, just the namespaces each kind declares.
-        let link_namespaces: BTreeSet<String> = self
-            .item_kinds()?
+        let kinds = self.item_kinds()?;
+        let link_namespaces: BTreeSet<String> = kinds
             .iter()
             .flat_map(|kind| kind.link_namespaces().iter().cloned())
             .collect();
@@ -1664,9 +1665,22 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let Some((namespace, value)) = label.split_once(':') else {
                     continue;
                 };
-                // Only labels in a declared link-namespace whose value is a
-                // qualified id are link references; everything else (legacy
-                // unqualified labels, non-link namespaces) is left alone.
+                if let Some(message) = crate::domain::item::unqualified_link_message(
+                    &issue.short_id(),
+                    namespace,
+                    value,
+                    &kinds,
+                ) {
+                    findings.push(GraphFinding::for_issue(
+                        issue.id.clone(),
+                        Finding {
+                            rule: DANGLING_LINK_RULE.to_string(),
+                            severity: Severity::Error,
+                            message,
+                        },
+                    ));
+                    continue;
+                }
                 if !link_namespaces.contains(namespace) {
                     continue;
                 }
@@ -4277,13 +4291,14 @@ description = \"Full Rust CI pipeline must pass.\"
     }
 
     #[test]
-    fn test_dangling_link_findings_unqualified_and_non_link_ns_ignored() {
-        // A legacy unqualified label (`satisfies:REQ-01`) and a non-link namespace
-        // (`type:task`) are NOT link references and produce no finding.
+    fn test_dangling_link_findings_reports_unqualified_link_and_ignores_non_link_ns() {
+        // An unqualified link label is reported once; non-link namespaces are not.
         let node = issue_with_labels("node", "", &["satisfies:REQ-01", "type:task", "epic:foo"]);
         let exec = dangling_exec(vec![node]);
         let issues = exec.storage().list_issues().unwrap();
-        assert!(exec.dangling_link_findings(&issues).unwrap().is_empty());
+        let findings = exec.dangling_link_findings(&issues).unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert!(findings[0].finding.message.contains("'satisfies:REQ-01'"));
     }
 
     #[test]

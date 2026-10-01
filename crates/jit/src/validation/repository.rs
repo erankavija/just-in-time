@@ -14,8 +14,8 @@ use crate::declarations::GateRegistry;
 use crate::document::content_parser_for;
 use crate::domain::item::{
     expand_sugar_address, index_items, index_project_sources, is_qualified_reference,
-    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds, AddressScope,
-    ProjectSource, RawScopeItem,
+    load_toml_scope_items, parse_kind_segmented_address, resolve_item_kinds,
+    unqualified_link_message, AddressScope, ProjectSource, RawScopeItem,
 };
 use crate::domain::{parse_known_events, Issue, ReadinessCorrection, SHORT_ID_LENGTH};
 use crate::graph::DependencyGraph;
@@ -819,6 +819,19 @@ fn collect_item_link_findings(
             let Some((namespace, value)) = label.split_once(':') else {
                 continue;
             };
+            if let Some(message) =
+                unqualified_link_message(&issue.short_id(), namespace, value, &kinds)
+            {
+                findings.push(ReportedFinding::new(
+                    Some(issue.id.clone()),
+                    &Finding {
+                        rule: crate::commands::DANGLING_LINK_RULE.to_string(),
+                        severity: Severity::Error,
+                        message,
+                    },
+                ));
+                continue;
+            }
             if !link_namespaces.contains(namespace) || !is_qualified_reference(value) {
                 continue;
             }
@@ -1275,6 +1288,35 @@ mod tests {
             .findings
             .iter()
             .any(|finding| finding.rule == crate::commands::DANGLING_LINK_RULE));
+    }
+
+    #[test]
+    fn test_validate_live_reports_unqualified_item_link() {
+        let repo = fixture();
+        let config = "[type_hierarchy.types]\ntask = 4\n[namespaces.type]\ndescription = \"Issue type\"\nunique = true\n[namespaces.enforces]\ndescription = \"Item link\"\nunique = false\n\
+            [item_kinds.invariant]\nsection = \"success_criteria\"\nid-pattern = \"[a-z-]+\"\nmarkers = []\nlink-namespaces = [\"enforces\"]\nscope = \"project\"\nsource-of-truth = \"registry-first\"\nsource = { toml = \".jit/invariants.toml\", table = \"invariants\", id-field = \"id\", text-field = \"statement\" }\n\
+            ";
+        std::fs::write(repo.path().join(".jit/config.toml"), config).unwrap();
+        executor(&repo).validate_with_fix(true, false).unwrap();
+        let index: RepositoryIndex =
+            serde_json::from_slice(&read_fixture(&repo, ".jit/index.json").unwrap()).unwrap();
+        let id = &index.all_ids[0];
+        let mut issue: Issue = serde_json::from_slice(
+            &read_fixture(&repo, &format!(".jit/issues/{id}.json")).unwrap(),
+        )
+        .unwrap();
+        issue.labels.push("enforces:planned".to_string());
+        std::fs::write(
+            repo.path().join(format!(".jit/issues/{id}.json")),
+            serde_json::to_vec_pretty(&issue).unwrap(),
+        )
+        .unwrap();
+
+        let live = validate_live(&repo).unwrap();
+        assert!(live.rule_report.findings.iter().any(|finding| {
+            finding.rule == crate::commands::DANGLING_LINK_RULE
+                && finding.message.contains("'enforces:@/invariant/planned'")
+        }));
     }
 
     #[test]

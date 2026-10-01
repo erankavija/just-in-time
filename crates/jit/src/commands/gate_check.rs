@@ -3010,21 +3010,23 @@ source-of-truth = "markdown-first"
         seed_repo_file(&executor.storage, ".jit/config.toml", config);
         seed_rule_validation_rules(&executor);
 
-        let mut child = crate::domain::types::fixture_issue(
-            "Selected implementation".to_string(),
-            String::new(),
-        );
-        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-        let child_id = child.id.clone();
-        seed_issue(&executor.storage, child);
-
         let mut container = crate::domain::types::fixture_issue(
             "Selected container".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: selected work\n".to_string(),
         );
         container.labels = vec!["type:epic".to_string()];
-        container.dependencies = vec![child_id];
         let container_short = container.short_id();
+
+        let mut child = crate::domain::types::fixture_issue(
+            "Selected implementation".to_string(),
+            String::new(),
+        );
+        child.labels = vec![
+            "type:task".to_string(),
+            format!("satisfies:{container_short}/REQ-01"),
+        ];
+        container.dependencies = vec![child.id.clone()];
+        seed_issue(&executor.storage, child);
         seed_issue(&executor.storage, container);
 
         let selected_id = add_builtin_gate(

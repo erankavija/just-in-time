@@ -753,7 +753,7 @@ fn test_validate_rule_cli_resolves_partial_id_and_isolates_selected_application(
     let _child = create_labeled_issue(
         &temp,
         "Selected implementation",
-        &["type:task", "satisfies:REQ-01"],
+        &["type:task", &format!("satisfies:{}/REQ-01", &selected[..8])],
     );
     bin()
         .current_dir(temp.path())

@@ -920,7 +920,7 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// Used to classify the value half of a `<namespace>:<value>` link label: a
 /// qualified value addresses a specific item and is resolved through
 /// [`expand_sugar_address`] / [`parse_kind_segmented_address`], whereas a bare
-/// self-id (`REQ-01`) is left to the legacy unqualified coverage rules.
+/// self-id (`REQ-01`) addresses nothing (see [`unqualified_link_message`]).
 ///
 /// Every address form carries at least one `/`: the explicit `@`-prefixed
 /// kind-segmented forms (`@/<kind>/<self-id>`,
@@ -929,6 +929,50 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// qualified/unqualified boundary.
 pub fn is_qualified_reference(value: &str) -> bool {
     value.contains('/')
+}
+
+/// The validation message for a link label whose value is a bare self-id, or
+/// `None` when the label is qualified or `namespace` is no kind's link namespace.
+///
+/// A bare self-id names no owning scope, so it addresses no item and credits no
+/// coverage. The message names the qualified replacement for every kind that
+/// links through `namespace`: `<namespace>:<short-id>/<value>` for an
+/// issue-scope kind, `<namespace>:@/<kind>/<value>` for a project-scope kind.
+pub fn unqualified_link_message(
+    issue_short_id: &str,
+    namespace: &str,
+    value: &str,
+    kinds: &[ItemKind],
+) -> Option<String> {
+    if is_qualified_reference(value) {
+        return None;
+    }
+    let replacements: Vec<String> = kinds
+        .iter()
+        .filter(|kind| kind.link_namespaces().iter().any(|ns| ns == namespace))
+        .map(|kind| {
+            if kind.kind_scope().is_project() {
+                format!(
+                    "'{namespace}:{PROJECT_SCOPE_SENTINEL}/{}/{value}'",
+                    kind.name()
+                )
+            } else {
+                format!(
+                    "'{namespace}:<short-id>/{value}' (<short-id>: the issue that declares \
+                     '{value}')"
+                )
+            }
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    (!replacements.is_empty()).then(|| {
+        format!(
+            "issue {issue_short_id} has an unqualified item link '{namespace}:{value}' that \
+             addresses no item and credits nothing; replace it with {}",
+            replacements.join(" or ")
+        )
+    })
 }
 
 /// One addressable item projected from a scope's source.
@@ -1636,6 +1680,41 @@ mod tests {
 
     fn invariant_kind() -> ItemKind {
         ItemKind::from_config("invariant", &invariant_cfg()).unwrap()
+    }
+
+    #[test]
+    fn test_unqualified_link_message_names_replacement_per_kind_scope() {
+        let kinds = [req_kind(), invariant_kind()];
+        let issue_scoped = unqualified_link_message("abc12345", "satisfies", "REQ-01", &kinds)
+            .expect("bare satisfies value is reported");
+        assert!(
+            issue_scoped.contains("'satisfies:REQ-01'"),
+            "{issue_scoped}"
+        );
+        assert!(
+            issue_scoped.contains("'satisfies:<short-id>/REQ-01'"),
+            "{issue_scoped}"
+        );
+        let project_scoped = unqualified_link_message("abc12345", "enforces", "dag", &kinds)
+            .expect("bare enforces value is reported");
+        assert!(
+            project_scoped.contains("'enforces:@/invariant/dag'"),
+            "{project_scoped}"
+        );
+    }
+
+    #[test]
+    fn test_unqualified_link_message_ignores_qualified_and_non_link_labels() {
+        let kinds = [req_kind()];
+        assert!(unqualified_link_message("a", "satisfies", "abc12345/REQ-01", &kinds).is_none());
+        assert!(unqualified_link_message(
+            "a",
+            "satisfies",
+            "@/issue/abc12345/requirement/REQ-01",
+            &kinds
+        )
+        .is_none());
+        assert!(unqualified_link_message("a", "type", "task", &kinds).is_none());
     }
 
     /// The four canonical kinds, in name order (the package-supplied set).

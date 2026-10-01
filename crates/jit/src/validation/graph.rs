@@ -60,8 +60,8 @@ use crate::declarations::rules::{
 };
 use crate::validation::engine::Finding;
 
-/// Default label namespace whose values are criterion ids a child claims to
-/// satisfy (e.g. `satisfies:REQ-01`).
+/// Default label namespace whose values name the criterion a child claims to
+/// satisfy (e.g. `satisfies:<container-short-id>/REQ-01`).
 const DEFAULT_SATISFIES_NAMESPACE: &str = "satisfies";
 
 /// Default projection slug of the section holding success criteria.
@@ -113,42 +113,26 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 /// `rg -n "splitn|split_once|\.split\(" crates/jit/src crates/server/src --type rust`
 /// and classify against these three buckets rather than re-deriving them.
 ///
-/// Whether a link `label` credits criterion `id` for the scope `scope_short_id`,
-/// accepting BOTH the legacy unqualified form and the qualified form (REQ-05).
+/// Whether a link `label` credits criterion `id` owned by the issue whose short
+/// id is `scope_short_id`.
 ///
-/// The single matcher used by `label-coverage` and `criteria-to-check` so the
-/// qualified-vs-unqualified comparison logic exists in exactly one place:
+/// The single matcher behind `label-coverage` and `criteria-to-check`. Only a
+/// label that names the criterion's owner credits it:
 ///
-/// - **Unqualified** `<namespace>:<id>` — credited iff the value equals `id`.
-///   This is the pre-existing behavior, kept exactly so every existing label
-///   keeps crediting as before (backward compatible).
-/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff the self-id
-///   part (after the `/`) equals `id` AND `scope` matches `scope_short_id`. The
-///   scope is the criteria-owning issue's short id, so a qualified label pointing
-///   at a DIFFERENT scope does not spuriously credit coverage.
-/// - **`@`-address** `<namespace>:@…` — routed through
-///   [`parse_kind_segmented_address`]: only the issue form
-///   `@/issue/<short-id>/<kind>/<self-id>` can credit, and only when its
-///   short-id matches `scope_short_id` and its self-id equals `id`. The KIND
-///   segment is parsed but IGNORED (binding decision D10 + f4b5e3f4 REQ-04):
-///   crediting turns on scope + self-id alone, never on kind. The project
-///   (`@/<kind>/<self-id>`) and named-project (`@<name>/<kind>/<self-id>`) forms
-///   address project-scoped items, which are never issue criteria, so they never
-///   credit. A parse error never credits (and never panics).
+/// - **Qualified** `<namespace>:<scope>/<self-id>` — credited iff `scope` equals
+///   `scope_short_id` and `self-id` equals `id`.
+/// - **`@`-address** `<namespace>:@…` — parsed by
+///   [`parse_kind_segmented_address`]; only the issue form
+///   `@/issue/<short-id>/<kind>/<self-id>` credits, on scope and self-id alone
+///   (the kind is ignored, D10 + f4b5e3f4 REQ-04). Project-scoped forms and
+///   parse errors never credit.
 ///
-/// `scope_short_id` is the short id of the issue that owns the criterion (the
-/// container for `label-coverage`, the issue itself for `criteria-to-check`).
+/// An unqualified `<namespace>:<id>` names no owner, so it credits nothing;
+/// validation reports it for migration (jit:adb5e9df).
 fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str) -> bool {
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
     };
-    // An `@`-prefixed value is a structural address: route it through the
-    // kind-segmented address parser so the credit decision reads the PARSED
-    // (scope, self-id) components rather than re-splitting the raw string. Only
-    // the issue-scoped form credits, and only on scope + self-id equality — the
-    // kind is parsed but ignored (D10 + f4b5e3f4 REQ-04). Project / named-project
-    // forms address project-scoped items (never issue criteria), and a parse
-    // error never credits.
     if value.starts_with(PROJECT_SCOPE_SENTINEL) {
         return match parse_kind_segmented_address(value) {
             Ok(addr) => match addr.scope {
@@ -158,16 +142,11 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
             Err(_) => false,
         };
     }
-    // A non-`@` value keeps its own two-segment `<short-id>/<self-id>` split: this
-    // IS the structural handling for the sugar shape here. `expand_sugar_address`
-    // is deliberately NOT used — it needs the configured kind list and would add
-    // kind semantics D10 forbids at this crediting site.
-    match value.split_once('/') {
-        // Qualified `<scope>/<self-id>`: scope must match and self-id must equal id.
-        Some((scope, self_id)) => scope == scope_short_id && self_id == id,
-        // Unqualified `<id>`: legacy exact match (bare form).
-        None => value == id,
-    }
+    // `expand_sugar_address` is not used: it needs the configured kind list and
+    // would add kind semantics D10 forbids at this crediting site.
+    value
+        .split_once('/')
+        .is_some_and(|(scope, self_id)| scope == scope_short_id && self_id == id)
 }
 
 /// Prefix every `config-error` finding message carries, so a [`GraphFinding`]
@@ -772,7 +751,8 @@ fn optional_str<'a>(
 ///
 /// Every canonical criterion id declared in the **container** issue's
 /// success-criteria section must be satisfied by at least one related child
-/// carrying the derived `satisfies:<id>` label, optionally in a required state.
+/// carrying `satisfies:<container-short-id>/<id>` (or the equivalent
+/// `@/issue/…` address), optionally in a required state.
 /// The issues whose criteria are checked are those matching the rule's
 /// [`Rule::when`] selector (the *firing* issues); by default the firing issue is
 /// its own container, but `container-from-label` can redirect the criteria source
@@ -792,7 +772,8 @@ fn optional_str<'a>(
 /// - `id-pattern` (string, optional, default `"[A-Z][A-Z0-9]*-[0-9]+"`): regex
 ///   that extracts the criterion id from an item's text.
 /// - `satisfies-namespace` (string, optional, default `"satisfies"`): label
-///   namespace on children whose value is the satisfied criterion id.
+///   namespace on children whose value names the satisfied criterion (see
+///   [`label_credits_id`]).
 /// - `child-state` (string, optional): when set, a satisfying child must be in
 ///   this lifecycle state (snake_case, e.g. `"done"`). **Absent means any
 ///   state** — there is no `"any"` token.
@@ -919,11 +900,9 @@ fn evaluate_label_coverage(
         }
     };
 
-    // A child satisfies criterion `id` if it carries the `satisfies-ns` label for
-    // `id` — either the legacy unqualified `satisfies-ns:id` OR the qualified
-    // `satisfies-ns:<container-short-id>/id` (REQ-05) — and (when configured) is
-    // in `child-state`. `container_short_id` is the criteria-owning container's
-    // short id, threaded in so the qualified form's scope can be checked.
+    // A child satisfies criterion `id` if it carries a `satisfies-ns` label
+    // naming `id` of the container `container_short_id` and (when configured) is
+    // in `child-state`.
     let state_matcher = child_state.map(|s| Selector {
         state: Some(StatePredicate::single(s)),
         ..Selector::default()
@@ -1010,8 +989,6 @@ fn evaluate_label_coverage(
             };
             let candidates: Vec<&Issue> =
                 children_of(container, graph_context, child_link, &exclude_types);
-            // The qualified `satisfies:` form is scoped to the criteria-owning
-            // container's short id.
             let container_short = container.short_id();
             criteria
                 .into_iter()
@@ -1563,7 +1540,7 @@ fn evaluate_gate_recency(
 /// - `gate_prefix` (optional): prefix for gate keys. A criterion `id` is
 ///   gate-checked when `"<gate_prefix><id>"` is in `gates_required`.
 /// - `check_namespace` (optional): label namespace. A criterion `id` is
-///   label-checked when `"<check_namespace>:<id>"` is a label.
+///   label-checked when the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
 ///
 /// The finding message names exactly the missing mechanism(s). When only one
 /// mechanism is configured, the message names only that one; when both are
@@ -1608,7 +1585,12 @@ fn evaluate_criteria_to_check(
             ids.into_iter()
                 .filter(|id| !criterion_is_checked(issue, id, gate_prefix, check_namespace))
                 .map(|id| {
-                    let missing = describe_missing(id.as_str(), gate_prefix, check_namespace);
+                    let missing = describe_missing(
+                        id.as_str(),
+                        &issue.short_id(),
+                        gate_prefix,
+                        check_namespace,
+                    );
                     issue_finding(
                         rule,
                         &issue.id,
@@ -1624,7 +1606,8 @@ fn evaluate_criteria_to_check(
 ///
 /// A criterion is checked when EITHER the issue has a `gates_required` entry
 /// equal to `"<gate_prefix><id>"` (gate-checked) OR the issue carries a label
-/// `"<check_namespace>:<id>"` (label-checked). Either mechanism alone satisfies.
+/// naming its own criterion, `"<check_namespace>:<own-short-id>/<id>"`
+/// (label-checked). Either mechanism alone satisfies.
 fn criterion_is_checked(
     issue: &Issue,
     id: &str,
@@ -1638,9 +1621,7 @@ fn criterion_is_checked(
         })
         .unwrap_or(false);
 
-    // The criterion lives on `issue` itself, so a qualified `<ns>:<scope>/<id>`
-    // label is credited only when its scope equals this issue's own short id
-    // (REQ-05); the legacy unqualified `<ns>:<id>` still credits unchanged.
+    // The criterion lives on `issue` itself, so the label must name this issue.
     let label_checked = check_namespace
         .map(|ns| {
             let scope = issue.short_id();
@@ -1655,16 +1636,23 @@ fn criterion_is_checked(
 }
 
 /// Build the "expected …" clause of an unmapped-criterion finding, naming only
-/// the configured mechanism(s).
+/// the configured mechanism(s). `scope` is the criterion owner's short id.
 ///
-/// - Both configured: `expected gate '<gate_prefix><id>' or label '<ns>:<id>'`
+/// - Both configured: `expected gate '<gate_prefix><id>' or label '<ns>:<scope>/<id>'`
 /// - Only gate:       `expected gate '<gate_prefix><id>'`
-/// - Only label:      `expected label '<ns>:<id>'`
-fn describe_missing(id: &str, gate_prefix: Option<&str>, check_namespace: Option<&str>) -> String {
+/// - Only label:      `expected label '<ns>:<scope>/<id>'`
+fn describe_missing(
+    id: &str,
+    scope: &str,
+    gate_prefix: Option<&str>,
+    check_namespace: Option<&str>,
+) -> String {
     match (gate_prefix, check_namespace) {
-        (Some(prefix), Some(ns)) => format!("expected gate '{prefix}{id}' or label '{ns}:{id}'"),
+        (Some(prefix), Some(ns)) => {
+            format!("expected gate '{prefix}{id}' or label '{ns}:{scope}/{id}'")
+        }
         (Some(prefix), None) => format!("expected gate '{prefix}{id}'"),
-        (None, Some(ns)) => format!("expected label '{ns}:{id}'"),
+        (None, Some(ns)) => format!("expected label '{ns}:{scope}/{id}'"),
         // At-least-one is enforced at load; this arm is unreachable in practice.
         (None, None) => "expected a verification mechanism (none configured)".to_string(),
     }
@@ -1877,50 +1865,46 @@ mod tests {
         Utc.with_ymd_and_hms(2026, 6, 10, 12, 0, 0).unwrap()
     }
 
-    // --- label_credits_id (shared qualified/unqualified matcher) -----------
+    // --- label_credits_id (shared crediting matcher) ------------------------
+
+    /// Test helper: the qualified label crediting `owner`'s criterion `id`.
+    fn satisfies(owner: &Issue, id: &str) -> String {
+        format!("satisfies:{}/{id}", owner.short_id())
+    }
 
     #[test]
-    fn test_label_credits_id_unqualified_and_qualified() {
-        // Legacy unqualified form.
-        assert!(label_credits_id(
-            "satisfies:REQ-01",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
-        // Qualified form with matching scope.
+    fn test_label_credits_id_qualified_form_requires_matching_scope_and_self_id() {
         assert!(label_credits_id(
             "satisfies:abc12345/REQ-01",
             "satisfies",
             "REQ-01",
             "abc12345"
         ));
-        // Qualified form, scope mismatch → not credited.
-        assert!(!label_credits_id(
+        // Scope mismatch, self-id mismatch, wrong namespace, no namespace.
+        for label in [
             "satisfies:deadbeef/REQ-01",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
-        // Wrong namespace, wrong self-id, and non-namespaced labels are rejected.
-        assert!(!label_credits_id(
-            "other:REQ-01",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
-        assert!(!label_credits_id(
-            "satisfies:REQ-02",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
-        assert!(!label_credits_id(
+            "satisfies:abc12345/REQ-02",
+            "other:abc12345/REQ-01",
             "plainlabel",
-            "satisfies",
-            "REQ-01",
-            "abc12345"
-        ));
+        ] {
+            assert!(
+                !label_credits_id(label, "satisfies", "REQ-01", "abc12345"),
+                "{label}"
+            );
+        }
+    }
+
+    proptest::proptest! {
+        /// An unqualified label names no owner, so it credits no criterion of
+        /// any scope — including the id it spells.
+        #[test]
+        fn test_label_credits_id_unqualified_label_credits_nothing(
+            id in "[A-Z][A-Z0-9]{0,3}-[0-9]{1,3}",
+            scope in "[0-9a-f]{8}",
+        ) {
+            let label = format!("satisfies:{id}");
+            proptest::prop_assert!(!label_credits_id(&label, "satisfies", &id, &scope));
+        }
     }
 
     #[test]
@@ -2043,7 +2027,7 @@ source-of-truth = "markdown-first"
 
         // Covered case: a done child satisfies the criterion.
         let initiative = initiative_with_criteria(&["REQ-01"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
         let issues = [initiative, child];
@@ -2090,23 +2074,23 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_label_coverage_cross_scope_same_self_id_credits_container_bare_label() {
+    fn test_label_coverage_cross_scope_same_self_id_credits_container_label() {
         // REQ-06: a container `<C>/REQ-01` and an action-scope `<T>/REQ-01` share the
         // self-id REQ-01 but resolve to DISTINCT qualified ids (different scope
-        // prefixes); the bracket coverage gate still credits the container's BARE
-        // `satisfies:REQ-01` label against the container's criterion, so the
-        // same-named action-scope id neither shadows it nor alters coverage.
+        // prefixes); the bracket coverage gate credits the container's criterion
+        // from `satisfies:<C>/REQ-01`, so the same-named action-scope id neither
+        // shadows it nor alters coverage.
         let rule = coverage_rule("child-link = \"dependencies\"");
         let mut container = initiative_with_criteria(&["REQ-01"]);
         // The impl action ALSO has a REQ-01 in its OWN description (action scope) and
-        // credits the container's criterion with a BARE satisfies label.
+        // credits the container's criterion.
         let mut impl_node = crate::domain::types::fixture_issue(
             "impl".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: the action's own criterion\n".to_string(),
         );
         impl_node.labels = vec![
             format!("type:{}", test_type(4)),
-            "satisfies:REQ-01".to_string(),
+            satisfies(&container, "REQ-01"),
         ];
         container.dependencies = vec![impl_node.id.clone()];
 
@@ -2138,7 +2122,7 @@ source-of-truth = "markdown-first"
             "same self-id under different scopes must be distinct qualified ids"
         );
 
-        // Coverage still credits the container's bare label.
+        // Coverage credits the container's criterion.
         let findings = evaluate_graph(
             &[&rule],
             &[container, impl_node],
@@ -2149,7 +2133,7 @@ source-of-truth = "markdown-first"
         );
         assert!(
             findings.is_empty(),
-            "bare satisfies:REQ-01 must still credit the container criterion despite a \
+            "the container label must credit the container criterion despite a \
              same-named action-scope id: {findings:?}"
         );
     }
@@ -2158,7 +2142,7 @@ source-of-truth = "markdown-first"
     fn test_label_coverage_satisfied_by_child() {
         let rule = coverage_rule("child-state = \"done\"");
         let initiative = initiative_with_criteria(&["REQ-01"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
@@ -2175,65 +2159,66 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_label_coverage_satisfied_by_qualified_label() {
-        // REQ-05: a child carrying the QUALIFIED `satisfies:<container-short>/REQ-01`
-        // credits criterion REQ-01 just like the unqualified form, so the engine
-        // (not only the command helper) honors qualified link references.
-        let rule = coverage_rule("child-state = \"done\"");
-        let initiative = initiative_with_criteria(&["REQ-01"]);
-        let qualified = format!("satisfies:{}/REQ-01", initiative.short_id());
-        let mut child = issue("child", &[&qualified]);
-        child.dependencies = vec![initiative.id.clone()];
-        child.state = State::Done;
+    fn test_label_coverage_nested_containers_sharing_id_credit_only_own_scope() {
+        // An epic depends on a nested story; both declare REQ-01 and a task under
+        // the story carries the only satisfies label. The walk from the epic
+        // reaches the task, but the label credits only the container it names
+        // (jit:adb5e9df REQ-05).
+        let rule_at = |level: u8| {
+            rule_from(&format!(
+                "[[rules]]\nname = \"coverage-{level}\"\nwhen = {{ type = \"{}\" }}\n\
+                 severity = \"error\"\nassert = {{ label-coverage = {{ \
+                 child-link = \"dependencies\" }} }}\n",
+                test_type(level)
+            ))
+        };
+        let (epic_rule, story_rule) = (rule_at(2), rule_at(3));
+        let criteria = "## Success Criteria\n\n- [hard] REQ-01: do the thing\n";
+        let mut epic = typed_issue("epic", 2, &[]);
+        epic.description = criteria.to_string();
+        let mut story = typed_issue("story", 3, &[]);
+        story.description = criteria.to_string();
+        epic.dependencies = vec![story.id.clone()];
 
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative, child],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert!(
-            findings.is_empty(),
-            "qualified satisfies label must cover the criterion: {findings:?}"
-        );
-    }
+        let uncovered = |label: &str| -> Vec<String> {
+            let mut task = typed_issue("task", 4, &[label]);
+            task.state = State::Done;
+            let mut story = story.clone();
+            story.dependencies = vec![task.id.clone()];
+            evaluate_graph(
+                &[&epic_rule, &story_rule],
+                &[epic.clone(), story, task],
+                &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
+                ContentFormat::Markdown,
+                fixed_now(),
+                &HashMap::new(),
+            )
+            .into_iter()
+            .filter_map(|f| f.issue_id)
+            .collect()
+        };
 
-    #[test]
-    fn test_label_coverage_qualified_label_wrong_scope_is_uncovered() {
-        // A qualified label whose scope does NOT match the criteria-owning
-        // container must not spuriously credit coverage.
-        let rule = coverage_rule("child-state = \"done\"");
-        let initiative = initiative_with_criteria(&["REQ-01"]);
-        // The address scope points at an unrelated issue id, not this initiative.
-        let mut child = issue("child", &["satisfies:deadbeef/REQ-01"]);
-        child.dependencies = vec![initiative.id.clone()];
-        child.state = State::Done;
-
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative, child],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
+        assert_eq!(
+            uncovered(&satisfies(&story, "REQ-01")),
+            vec![epic.id.clone()]
         );
         assert_eq!(
-            findings.len(),
-            1,
-            "wrong-scope qualified label must not cover: {findings:?}"
+            uncovered(&satisfies(&epic, "REQ-01")),
+            vec![story.id.clone()]
         );
-        assert!(findings[0].finding.message.contains("REQ-01"));
+        // A label naming no container credits neither.
+        let mut both = uncovered("satisfies:REQ-01");
+        both.sort();
+        let mut expected = vec![epic.id.clone(), story.id.clone()];
+        expected.sort();
+        assert_eq!(both, expected);
     }
 
     #[test]
     fn test_label_coverage_unsatisfied_reports_finding() {
         let rule = coverage_rule("child-state = \"done\"");
         let initiative = initiative_with_criteria(&["REQ-01", "REQ-02"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
 
@@ -2257,7 +2242,7 @@ source-of-truth = "markdown-first"
     fn test_label_coverage_wrong_state_is_uncovered() {
         let rule = coverage_rule("child-state = \"done\"");
         let initiative = initiative_with_criteria(&["REQ-01"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
         child.state = State::InProgress; // not done
 
@@ -2280,7 +2265,7 @@ source-of-truth = "markdown-first"
         let body = "## Success Criteria\n\n- [hard] REQ-01: must\n- [aspirational] REQ-99: nice\n";
         let mut initiative = typed_issue(&test_type(2), 2, &[]);
         initiative.description = body.to_string();
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
 
         let rules = vec![&rule];
@@ -2339,7 +2324,7 @@ source-of-truth = "markdown-first"
         let rule = coverage_rule("child-link = \"any\"");
         let initiative = initiative_with_criteria(&["REQ-01"]);
         // Child has NO dependency edge to the initiative, but child-link=any.
-        let child = issue("child", &["satisfies:REQ-01"]);
+        let child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
 
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -2388,7 +2373,7 @@ source-of-truth = "markdown-first"
         let rule = coverage_rule("child-link = \"dependencies\"");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
         let mut sink = typed_issue("sink", 4, &[]);
-        let deep = typed_issue("deep", 4, &["satisfies:REQ-01"]);
+        let deep = typed_issue("deep", 4, &[&satisfies(&initiative, "REQ-01")]);
         // initiative depends on sink; sink depends on deep.
         initiative.dependencies = vec![sink.id.clone()];
         sink.dependencies = vec![deep.id.clone()];
@@ -2442,7 +2427,7 @@ source-of-truth = "markdown-first"
         let rule = coverage_rule(""); // default child-link = dependents
         let initiative = initiative_chain_head(&["REQ-01"]);
         let mut a = typed_issue("a", 4, &[]);
-        let mut b = typed_issue("b", 4, &["satisfies:REQ-01"]);
+        let mut b = typed_issue("b", 4, &[&satisfies(&initiative, "REQ-01")]);
         a.dependencies = vec![initiative.id.clone()]; // a depends on initiative
         b.dependencies = vec![a.id.clone()]; // b depends on a (so transitively on initiative)
 
@@ -2473,7 +2458,7 @@ source-of-truth = "markdown-first"
         let mut initiative = initiative_chain_head(&["REQ-01"]);
         let mut impl_node = typed_issue("impl", 4, &[]);
         let mut breakdown = issue("B", &["type:breakdown"]);
-        let plan = issue("P", &["type:planning", "satisfies:REQ-01"]);
+        let plan = issue("P", &["type:planning", &satisfies(&initiative, "REQ-01")]);
         initiative.dependencies = vec![impl_node.id.clone()];
         impl_node.dependencies = vec![breakdown.id.clone()];
         breakdown.dependencies = vec![plan.id.clone()];
@@ -2502,7 +2487,7 @@ source-of-truth = "markdown-first"
         let rule =
             coverage_rule("child-link = \"dependencies\", child-type-exclude = [\"breakdown\"]");
         let mut initiative = initiative_chain_head(&["REQ-01"]);
-        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &[&satisfies(&initiative, "REQ-01")]);
         let breakdown = issue("B", &["type:breakdown"]);
         initiative.dependencies = vec![impl_node.id.clone()];
         impl_node.dependencies = vec![breakdown.id.clone()];
@@ -2553,7 +2538,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &[&satisfies(&container, "REQ-01")]);
         let mut breakdown = issue("B", &["type:breakdown"]);
         // Container depends on impl (its subtree); B brackets the container.
         container.dependencies = vec![impl_node.id.clone()];
@@ -2622,7 +2607,7 @@ source-of-truth = "markdown-first"
              child-link = \"dependencies\", container-from-label = \"brackets\" } }\n",
         );
         let mut container = initiative_with_criteria(&["REQ-01"]);
-        let mut impl_node = typed_issue("impl", 4, &["satisfies:REQ-01"]);
+        let mut impl_node = typed_issue("impl", 4, &[&satisfies(&container, "REQ-01")]);
         impl_node.state = State::Backlog; // drafted, not done
         let mut breakdown = issue("B", &["type:breakdown"]);
         container.dependencies = vec![impl_node.id.clone()];
@@ -3466,29 +3451,8 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_criteria_to_check_label_mapped_id_passes() {
-        // A criterion satisfied via a label must produce no finding.
-        let rule = ctc_rule("check-namespace = \"checks\"");
-        let mut initiative = initiative_with_sc(&["REQ-01: do the thing"]);
-        initiative.labels.push("checks:REQ-01".to_string());
-        let rules = vec![&rule];
-        let findings = evaluate_graph(
-            &rules,
-            &[initiative],
-            &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
-            ContentFormat::Markdown,
-            fixed_now(),
-            &HashMap::new(),
-        );
-        assert!(
-            findings.is_empty(),
-            "label-mapped criterion must produce no finding: {findings:?}"
-        );
-    }
-
-    #[test]
-    fn test_criteria_to_check_qualified_label_mapped_id_passes() {
-        // REQ-05: a QUALIFIED `<ns>:<own-short-id>/REQ-01` label on the issue that
-        // owns the criterion credits it, alongside the unqualified form.
+        // A `<ns>:<own-short-id>/REQ-01` label on the issue that owns the
+        // criterion credits it.
         let rule = ctc_rule("check-namespace = \"checks\"");
         let mut initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let qualified = format!("checks:{}/REQ-01", initiative.short_id());
@@ -3538,6 +3502,7 @@ source-of-truth = "markdown-first"
         let rule = ctc_rule("gate-prefix = \"verify:\", check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         let id = initiative.id.clone();
+        let short = initiative.short_id();
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3559,7 +3524,7 @@ source-of-truth = "markdown-first"
             "finding must name the expected gate: {msg}"
         );
         assert!(
-            msg.contains("checks:REQ-01"),
+            msg.contains(&format!("checks:{short}/REQ-01")),
             "finding must name the expected label: {msg}"
         );
     }
@@ -3630,6 +3595,7 @@ source-of-truth = "markdown-first"
         // When only check-namespace is configured the finding names only the label.
         let rule = ctc_rule("check-namespace = \"checks\"");
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
+        let short = initiative.short_id();
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3642,7 +3608,7 @@ source-of-truth = "markdown-first"
         assert_eq!(findings.len(), 1);
         let msg = &findings[0].finding.message;
         assert!(
-            msg.contains("checks:REQ-01"),
+            msg.contains(&format!("checks:{short}/REQ-01")),
             "label-only finding must name the label: {msg}"
         );
         assert!(
@@ -3679,7 +3645,11 @@ source-of-truth = "markdown-first"
         let initiative = initiative_with_sc(&["REQ-01: do the thing"]);
         // A dependent child carries the would-be mapping; per-issue semantics
         // mean this is irrelevant to the initiative.
-        let mut child = typed_issue("child", 4, &["checks:REQ-01"]);
+        let mut child = typed_issue(
+            "child",
+            4,
+            &[&format!("checks:{}/REQ-01", initiative.short_id())],
+        );
         child.dependencies = vec![initiative.id.clone()];
         child.gates_required = vec!["verify:REQ-01".to_string()];
         let initiative_id = initiative.id.clone();
@@ -4214,7 +4184,7 @@ source-of-truth = "markdown-first"
 
         // Covered: a done child credits REQ-01 → no findings from either rule.
         let initiative = initiative_with_criteria(&["REQ-01"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &[&satisfies(&initiative, "REQ-01")]);
         child.dependencies = vec![initiative.id.clone()];
         child.state = State::Done;
         let covered = [initiative, child];
@@ -4440,7 +4410,10 @@ assert = { label-coverage = { marker = "[hard]", id-pattern = "REQ-[0-9]+", cont
 
         let mut selected = issue("selected breakdown", &["type:breakdown"]);
         let mut selected_container = initiative_with_criteria(&["REQ-01"]);
-        let selected_child = issue("selected child", &["satisfies:REQ-01"]);
+        let selected_child = issue(
+            "selected child",
+            &[&satisfies(&selected_container, "REQ-01")],
+        );
         selected
             .labels
             .push(format!("brackets:{}", selected_container.short_id()));
