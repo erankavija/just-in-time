@@ -106,7 +106,13 @@
     "doc-review",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T22:31:07.313184227Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ef7848ea-910d-40f7-a005-854be92229a0",
   "labels": [
     "type:story",
@@ -120,5 +126,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-10-01T22:29:48.985676912Z"
+  "updated_at": "2026-10-01T22:31:07.313184227Z"
 }
