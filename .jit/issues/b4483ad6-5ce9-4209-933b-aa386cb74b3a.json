@@ -62,6 +62,11 @@
       "status": "passed",
       "updated_at": "2026-10-01T10:23:41.657946279Z",
       "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T10:24:39.655218124Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
@@ -82,5 +87,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Positioned event-log append",
-  "updated_at": "2026-10-01T10:23:41.657946279Z"
+  "updated_at": "2026-10-01T10:24:39.655218124Z"
 }

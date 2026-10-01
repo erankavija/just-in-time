@@ -15278,3 +15278,4 @@
 {"id":"cf0d6cca-40c0-4170-ba1f-731dbdd5bd72","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T10:06:09.636727198Z","type":"issue_completed"}
 {"from":"backlog","id":"d1d54dda-cbac-4b1e-ac45-29956b2db28b","issue_id":"ec72359b-67dd-4dcd-8639-74b751b1cdf9","timestamp":"2026-10-01T10:06:13.797861236Z","to":"ready","type":"issue_state_changed"}
 {"gate_key":"cargo-ci","id":"d9696581-905a-4b6e-aeee-ea7f861513b8","issue_id":"b4483ad6-5ce9-4209-933b-aa386cb74b3a","timestamp":"2026-10-01T10:23:41.657946279Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"docs-mechanical","id":"17f89ff0-b43a-4abd-bfc1-7546db58144a","issue_id":"b4483ad6-5ce9-4209-933b-aa386cb74b3a","timestamp":"2026-10-01T10:24:39.655218124Z","type":"gate_passed","updated_by":"auto:executor"}
