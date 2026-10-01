@@ -384,5 +384,5 @@ flowchart LR
   table, and `REQ-` ids in the container's success criteria.
 - [Intake brief](intake.md) — measurements, profile attribution, and the owner decisions
   settled before the epic was filed.
-- [Benchmark harness](bench.sh) — the evidence harness for REQ-01 and REQ-02.
+- [Benchmark harness](../../../scripts/benchmark-mutation-cost.sh) — the evidence harness for REQ-01 and REQ-02.
 - `@/charter/D-17` — the governing decision.

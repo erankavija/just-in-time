@@ -7,9 +7,11 @@ balance. Every figure below is copied from a file under `raw/`.
 
 ## Harness, builds, and conditions
 
-- **Harness:** [`dev/active/f1dc843a-redo-mutations/bench.sh`](../../active/f1dc843a-redo-mutations/bench.sh)
-  at commit `b85bdf018`, run from a copy in `/dev/shm`:
-  `zsh ./bench.sh <binary> base > raw/base.txt`, then the same with `tip`.
+- **Harness:** [`scripts/benchmark-mutation-cost.sh`](../../../scripts/benchmark-mutation-cost.sh).
+  The recorded runs used it at commit `b85bdf018`, as `bench.sh` run from a copy in
+  `/dev/shm/bench-722878d4`; its runs and output are unchanged since. Reproduce with
+  `BENCH_WORK_ROOT=/dev/shm/bench-722878d4 scripts/benchmark-mutation-cost.sh <binary> base > raw/base.txt`,
+  then the same with `tip`.
   Each scenario is three runs; the reported figure is their median.
 - **Before (`base`):** `34d37f8be6ea3ab1f45153e64974f05d2b9445f2`, built in a detached
   worktree with `cargo build --release --locked -p jit`; binary sha256

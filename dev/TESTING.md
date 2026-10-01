@@ -456,7 +456,7 @@ report of the same drift), to pack, apply, validate, or repair a profile package
 `test_profile_pack_and_add_carry_a_package_at_the_model_limits` carries the packaging
 fixture at its model limits directly through the CLI; the rest of this table pays the same
 durable-publication machinery at smaller scale, often several times per test. Publication
-cost at repository scale is measured by the redo-record harness [`bench.sh`](active/f1dc843a-redo-mutations/bench.sh);
+cost at repository scale is measured by [`scripts/benchmark-mutation-cost.sh`](../scripts/benchmark-mutation-cost.sh);
 its committed run is [dev/benchmarks/publication-cost-722878d4/](benchmarks/publication-cost-722878d4/README.md).
 
 | Test | Warm (ms) |
