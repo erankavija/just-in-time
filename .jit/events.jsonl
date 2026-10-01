@@ -15265,3 +15265,4 @@
 {"fields":["documents"],"id":"3e0fa51c-a086-4328-884b-c8d4bdc38786","issue_id":"c88822a5-b92a-4992-9521-f1c0ad145b9e","timestamp":"2026-10-01T09:10:20.247821485Z","type":"issue_updated","updated_by":"doc-add"}
 {"from":"ready","id":"997d807c-4487-4f48-915b-a7b29207523d","issue_id":"c88822a5-b92a-4992-9521-f1c0ad145b9e","timestamp":"2026-10-01T09:10:20.734148986Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"b154f34e-6c19-412e-8722-8a125f991999","issue_id":"c88822a5-b92a-4992-9521-f1c0ad145b9e","timestamp":"2026-10-01T09:10:20.734148986Z","type":"issue_claimed"}
+{"gate_key":"docs-mechanical","id":"c1a358c2-bed4-46c2-b60e-004f74a0fc9b","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T09:32:29.783975733Z","type":"gate_passed","updated_by":"auto:executor"}
