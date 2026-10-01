@@ -324,14 +324,7 @@ pub fn finalize_archive_execution(
     let mut all_actions = actions;
     all_actions.extend(record_actions);
     let delta = RepositoryDelta::new(image.layout(), all_actions)?;
-    let materialization = MaterializationPlan::new(
-        image,
-        &context
-            .repository_seed(&intents)
-            .map_err(ArchiveExecutionError::Mutation)?,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )?;
+    let materialization = MaterializationPlan::new(image, delta);
     let mut warnings = plan
         .warnings()
         .iter()

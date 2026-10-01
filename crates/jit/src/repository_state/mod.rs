@@ -56,10 +56,10 @@ pub(crate) use export::{
 };
 pub(crate) use image::CapturedAnswers;
 pub use image::{
-    plan_hash, CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
+    CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
     EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
     ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
-    PlanHashError, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
+    ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
     RepositorySeed, RepositorySeedKind, RepositoryTargetKind, SeedError, TargetClaim,
     EVENT_LOG_TAIL_WINDOW,
 };
@@ -149,15 +149,7 @@ pub fn finalize_gate_registry_edit(
     let mut actions = record_plan.delta().actions().to_vec();
     actions.extend(compose_complete(&overlaid, &declarations)?);
     let delta = RepositoryDelta::new(layout, actions)?;
-    let seed = context
-        .repository_seed(intents)
-        .map_err(GateRegistryEditError::Mutation)?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )?)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 /// A typed failure raised while finalizing a gate-registry edit.
@@ -587,8 +579,6 @@ pub struct MaterializationPlan {
     image: RepositoryImage,
     /// Exact normalized delta.
     delta: RepositoryDelta,
-    /// Semantic hash covering the complete image and inputs.
-    hash: String,
     /// Per-projection row counts produced by a configured-projection render.
     projection_counts: std::collections::BTreeMap<String, usize>,
     profile_targets: Vec<ProfileTargetMaterialization>,
@@ -715,11 +705,6 @@ impl MaterializationPlan {
         &self.delta
     }
 
-    /// The semantic identity computed from the captured image and complete plan inputs.
-    pub fn hash(&self) -> &str {
-        &self.hash
-    }
-
     /// Return the count produced for one configured projection in this plan.
     pub(crate) fn projection_count(&self, name: &str) -> Option<usize> {
         self.projection_counts.get(name).copied()
@@ -740,23 +725,16 @@ impl MaterializationPlan {
         &self.applied_profiles
     }
 
-    /// Close a delta into a plan whose identity is computed from all plan inputs.
-    pub(crate) fn new(
-        image: &RepositoryImage,
-        seed: &RepositorySeed,
-        intent: &MaterializationIntent,
-        delta: RepositoryDelta,
-    ) -> Result<Self, PlanHashError> {
-        let hash = plan_hash(image, seed, intent, &delta)?;
-        Ok(Self {
+    /// Close a delta over the image it was derived from.
+    pub(crate) fn new(image: &RepositoryImage, delta: RepositoryDelta) -> Self {
+        Self {
             image: image.clone(),
             delta,
-            hash,
             projection_counts: std::collections::BTreeMap::new(),
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
-        })
+        }
     }
 
     fn with_projection_counts(mut self, counts: std::collections::BTreeMap<String, usize>) -> Self {
@@ -919,14 +897,11 @@ pub fn derive_materialization(
         profile_contributions,
         applied_profiles,
     } = derivation;
-    MaterializationPlan::new(image, &seed, &intent, delta)
-        .map(|plan| {
-            plan.with_projection_counts(projection_counts)
-                .with_profile_targets(profile_targets)
-                .with_profile_contributions(profile_contributions)
-                .with_applied_profiles(applied_profiles)
-        })
-        .map_err(Into::into)
+    Ok(MaterializationPlan::new(image, delta)
+        .with_projection_counts(projection_counts)
+        .with_profile_targets(profile_targets)
+        .with_profile_contributions(profile_contributions)
+        .with_applied_profiles(applied_profiles))
 }
 
 /// Finalize an authored `config.toml` edit plus the complete coupled producer set
@@ -980,8 +955,7 @@ pub fn finalize_config_edit(
     };
     actions.extend(compose_complete(&overlaid, &edited_declarations)?);
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    MaterializationPlan::new(base, seed, &MaterializationIntent::SemanticMutation, delta)
-        .map_err(Into::into)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 /// Pure derivation failure.
@@ -1323,21 +1297,10 @@ mod tests {
     }
 
     fn plan(image: &RepositoryImage, actions: Vec<RepositoryAction>) -> MaterializationPlan {
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "repository-state-test".into(),
-            },
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
         MaterializationPlan::new(
             image,
-            &seed,
-            &MaterializationIntent::SemanticMutation,
             RepositoryDelta::new(image.layout(), actions).unwrap(),
         )
-        .unwrap()
     }
 
     #[test]

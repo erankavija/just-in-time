@@ -233,25 +233,7 @@ fn finalize_export_payload(
         }
     };
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Command {
-            name: "repository-export".to_string(),
-        },
-        BTreeMap::from([
-            (
-                "target".to_string(),
-                serde_json::to_string(target).map_err(PlanHashError::from)?,
-            ),
-            ("owner".to_string(), EXPORT_OWNER.to_string()),
-        ]),
-        BTreeMap::new(),
-    )?;
-    Ok(MaterializationPlan::new(
-        base,
-        &seed,
-        &MaterializationIntent::RepositoryExport,
-        delta,
-    )?)
+    Ok(MaterializationPlan::new(base, delta))
 }
 
 fn require_absent(

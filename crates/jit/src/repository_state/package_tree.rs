@@ -353,28 +353,7 @@ pub fn finalize_package_tree_capture(
         .chain(removal_actions)
         .collect::<Vec<_>>();
     let delta = RepositoryDelta::new(base.layout(), actions)?;
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Command {
-            name: "package-tree-capture".to_string(),
-        },
-        BTreeMap::from([
-            (
-                "destination".to_string(),
-                serde_json::to_string(&capture.destination).map_err(PlanHashError::from)?,
-            ),
-            ("owner".to_string(), CAPTURE_OWNER.to_string()),
-        ]),
-        BTreeMap::new(),
-    )?;
-    Ok((
-        MaterializationPlan::new(
-            base,
-            &seed,
-            &MaterializationIntent::CapturePackageTree,
-            delta,
-        )?,
-        outcomes,
-    ))
+    Ok((MaterializationPlan::new(base, delta), outcomes))
 }
 
 /// The repository identity of one named child of a captured directory.

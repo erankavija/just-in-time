@@ -764,14 +764,7 @@ pub fn finalize(
     intents: &[MutationIntent],
 ) -> Result<MaterializationPlan, MutationError> {
     let delta = finalize_delta(layout, image, context, intents)?;
-    let seed = context.repository_seed(intents)?;
-    MaterializationPlan::new(
-        image,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta,
-    )
-    .map_err(Into::into)
+    Ok(MaterializationPlan::new(image, delta))
 }
 
 pub(super) fn finalize_delta(

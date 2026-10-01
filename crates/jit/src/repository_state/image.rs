@@ -100,7 +100,7 @@ impl EntryIdentity {
 ///
 /// The only constructor hashes the bytes, so an identity can never disagree
 /// with the bytes it describes and a closed image need not re-hash them. It
-/// serializes as its identity alone, which binds the bytes into a plan hash.
+/// serializes as its identity alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CapturedBytes {
     identity: EntryIdentity,
@@ -435,7 +435,7 @@ pub struct PinnedDocumentEvidence {
     object_oid: Option<String>,
     /// Exact object/content identity, including SHA-256 and byte size.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present, bound into the plan hash through `identity`.
+    /// Exact bytes when present; serialization carries `identity` alone.
     #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
     /// Stable absence/unavailable reason.
@@ -588,7 +588,7 @@ pub struct LinkedWorktreeEvidence {
     source: LinkedWorktreeSourceClass,
     /// Exact identity when present.
     identity: Option<EntryIdentity>,
-    /// Exact bytes when present, bound into the plan hash through `identity`.
+    /// Exact bytes when present; serialization carries `identity` alone.
     #[serde(skip_serializing)]
     bytes: Option<Vec<u8>>,
 }
@@ -1448,7 +1448,7 @@ pub enum RepositoryAction {
         path: VirtualPath,
         owner: String,
         expected: ExpectedPreimage,
-        /// Exact bytes to publish, bound into the plan hash through their digest.
+        /// Exact bytes to publish; serialization carries their digest.
         #[serde(serialize_with = "serialize_content_digest")]
         bytes: Vec<u8>,
         mode: FileMode,
@@ -1710,47 +1710,13 @@ fn validate_owner(owner: &str) -> Result<(), DeltaError> {
     }
 }
 
-/// Deterministic plan hash over layout, capture, evidence, seed, intent, and delta.
-pub fn plan_hash(
-    image: &RepositoryImage,
-    seed: &RepositorySeed,
-    intent: &MaterializationIntent,
-    delta: &RepositoryDelta,
-) -> Result<String, PlanHashError> {
-    let mut hasher = Sha256::new();
-    hash_field(&mut hasher, b"jit-repository-plan-v1");
-    hash_serialized(&mut hasher, &image.layout)?;
-    hash_serialized(&mut hasher, &image.spec)?;
-    hash_serialized(&mut hasher, &image.entries.iter().collect::<Vec<_>>())?;
-    hash_serialized(&mut hasher, &image.listings.iter().collect::<Vec<_>>())?;
-    hash_serialized(&mut hasher, &image.pinned.iter().collect::<Vec<_>>())?;
-    hash_serialized(
-        &mut hasher,
-        &image.linked_worktree.iter().collect::<Vec<_>>(),
-    )?;
-    hash_serialized(&mut hasher, seed)?;
-    hash_serialized(&mut hasher, intent)?;
-    hash_serialized(&mut hasher, delta)?;
-    Ok(format!("{:x}", hasher.finalize()))
-}
-
-/// Serialize bytes as their SHA-256 digest and length, so plan identity commits
-/// to written content without encoding it byte by byte.
+/// Serialize bytes as their SHA-256 digest and length, so a serialized delta
+/// commits to written content without encoding it byte by byte.
 fn serialize_content_digest<S: serde::Serializer>(
     bytes: &[u8],
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
     (format!("{:x}", Sha256::digest(bytes)), bytes.len()).serialize(serializer)
-}
-
-fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
-    hasher.update(bytes);
-}
-
-fn hash_serialized(hasher: &mut Sha256, value: &impl Serialize) -> Result<(), PlanHashError> {
-    hash_field(hasher, &serde_json::to_vec(value)?);
-    Ok(())
 }
 
 /// Capture closure failure.
@@ -1841,11 +1807,6 @@ pub enum SeedError {
     #[error("repository seed {field} is empty or contains control characters")]
     InvalidText { field: &'static str },
 }
-
-/// Failure to serialize the closed typed plan vocabulary.
-#[derive(Debug, thiserror::Error)]
-#[error("failed to serialize repository plan identity: {0}")]
-pub struct PlanHashError(#[from] serde_json::Error);
 
 #[cfg(test)]
 mod tests {
@@ -2618,75 +2579,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_plan_hash_is_deterministic_and_covers_entry_listing_and_seed() {
-        let captured = image(1, 2);
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "test".into(),
-            },
-            BTreeMap::from([("key".into(), "value".into())]),
-            BTreeMap::new(),
-        )
-        .unwrap();
-        let delta = RepositoryDelta::new(&layout(), Vec::new()).unwrap();
-        let hash = plan_hash(
-            &captured,
-            &seed,
-            &MaterializationIntent::SemanticMutation,
-            &delta,
-        )
-        .unwrap();
-        assert_eq!(
-            hash,
-            plan_hash(
-                &captured,
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        assert_ne!(
-            hash,
-            plan_hash(
-                &image(9, 2),
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        assert_ne!(
-            hash,
-            plan_hash(
-                &image(1, 9),
-                &seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-        let changed_seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "changed".into(),
-            },
-            seed.facts.clone(),
-            seed.payloads.clone(),
-        )
-        .unwrap();
-        assert_ne!(
-            hash,
-            plan_hash(
-                &captured,
-                &changed_seed,
-                &MaterializationIntent::SemanticMutation,
-                &delta
-            )
-            .unwrap()
-        );
-    }
-
     proptest::proptest! {
         /// Captured bytes carry exactly the identity their bytes hash to.
         #[test]
@@ -2703,7 +2595,3 @@ mod tests {
     }
 }
 
-// Include property-based tests
-#[cfg(test)]
-#[path = "image_plan_hash_property_tests.rs"]
-mod plan_hash_property_tests;
