@@ -140,8 +140,6 @@ fn test_recover_help_describes_purpose() {
         .stdout(predicate::str::contains("stale"));
 }
 
-/// REQ-03 at the recover command. The field keeps its transaction spelling;
-/// jit:51eb1aa6 renames it.
 #[test]
 fn test_recover_reports_the_leftover_redo_record_its_session_applied() {
     use jit::storage::{PutFile, RedoRecord};
