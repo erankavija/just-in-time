@@ -105,7 +105,7 @@
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-10-01T22:55:56.525128949Z",
+      "updated_at": "2026-10-01T23:01:44.703951299Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
@@ -131,5 +131,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T23:01:33.664121558Z"
+  "updated_at": "2026-10-01T23:01:44.703951299Z"
 }
