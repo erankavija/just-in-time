@@ -715,7 +715,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next"
+          "status": "done — cargo-ci (override, suite-clock 52257 ms), docs-mechanical, doc-review and code-review passed; one rework round (doc-review F1/F2: pages said every file is replaced; ESC-14 owner decision @/issue/ccea63de/decision/D-2). code-review re-run after c88822a5 rework 1 passed (0 findings). Net +5 production lines (148 added / 143 removed per worker)."
         },
         {
           "id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
@@ -726,7 +726,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "ready — next"
+          "status": "in_progress — merged through rework 1; rework 2 of 2 dispatched under owner decision D-1"
         }
       ]
     },
@@ -742,7 +742,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "in_progress — dispatched early in session 7 (deps done)"
         },
         {
           "id": "33f97287-2561-424c-84b4-a9c30edf3212",
@@ -777,7 +777,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "in_progress — dispatched early in session 7 (deps done)"
         }
       ]
     },
@@ -1694,7 +1694,8 @@
       "session": 6,
       "path": "dev/active/f1dc843a-redo-mutations/handoff-4.md",
       "note": "Session 5 left no handoff; session 6 reconstructed its state from progress.json and the gate-run records."
-    }
+    },
+    "handoff-5.md (session 7)"
   ],
   "session_2_summary": {
     "closed": [
@@ -2053,7 +2054,27 @@
       }
     ],
     "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
-    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy.",
-    "held": "b4483ad6: all four gates passed (doc-review/code-review 0 findings) but held open until c88822a5 rework fixes the long-unterminated-final-line torn-tail misclassification, which breaks b4483ad6 REQ-03 behaviour on main."
+    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy."
+  },
+  "session_7_summary": {
+    "closed": [
+      "51eb1aa6",
+      "3d9150d7",
+      "b4483ad6"
+    ],
+    "in_flight_at_handoff": {
+      "c88822a5": "rework 2 of 2 running",
+      "ec72359b": "wave 17, first dispatch running (sonnet)",
+      "e346d387": "wave 17, first dispatch running (opus)"
+    },
+    "escalations": [
+      "ESC-14",
+      "ESC-15"
+    ],
+    "decisions": [
+      "@/issue/ccea63de/decision/D-2",
+      "@/issue/c88822a5/decision/D-1"
+    ],
+    "epic_counts_at_handoff": "37 done, 3 in_progress, 10 backlog"
   }
 }
