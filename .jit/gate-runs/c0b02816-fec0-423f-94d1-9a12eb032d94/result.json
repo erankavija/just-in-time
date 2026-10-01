@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "978b137f80bcdb79bd62f0aa07e2ad6eae74d387",
+  "completed_at": "2026-10-01T15:38:47.414756786Z",
+  "duration_ms": 268844,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The generated reference is current, uses the finalizer serializers, describes positioned event append, and has deterministic regeneration evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "91168745-1434-4cf8-9442-ab8d3e9135f8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c0b02816-fec0-423f-94d1-9a12eb032d94",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T15:34:18.570334253Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:91168745 commits 110f81fa7, 4a1e5b6c4, 97c2f4f53, 978b137f8\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; docs/reference/storage-format.md\nResolved items: @/issue/91168745/requirement/REQ-01–REQ-03; @/issue/f1dc843a/requirement/REQ-07; @/charter/D-17; @/invariant/single-source-prose; @/invariant/essential-code-prose\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T15:32:48Z); doc-review pending; docs-mechanical passed (exit 0, 2026-10-01T15:34:14Z)\nTruncation recovery: narrowed tagged patches by path; read current renderer, serializer, generator, projection checker, and governing sources; excluded the overbroad REQ-07 search outside this issue’s cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The generated reference is current, uses the finalizer serializers, describes positioned event append, and has deterministic regeneration evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

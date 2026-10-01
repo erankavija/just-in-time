@@ -63,6 +63,11 @@
       "updated_at": "2026-10-01T15:34:06.682132868Z",
       "updated_by": "auto:executor"
     },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T15:38:47.724937622Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-10-01T15:34:17.768948527Z",
@@ -83,5 +88,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Generated storage-records reference matches the append encoding",
-  "updated_at": "2026-10-01T15:34:17.768948527Z"
+  "updated_at": "2026-10-01T15:38:47.724937622Z"
 }
