@@ -75,6 +75,13 @@
       "format": "markdown",
       "label": null,
       "path": "scripts/benchmark-mutation-cost.sh"
+    },
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/completion-report.md"
     }
   ],
   "first_ready_at": "2026-09-19T20:28:46.980500035Z",
@@ -124,5 +131,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T23:01:18.592554704Z"
+  "updated_at": "2026-10-01T23:01:33.664121558Z"
 }

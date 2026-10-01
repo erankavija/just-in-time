@@ -16338,3 +16338,4 @@
 {"gate_key":"docs-mechanical","id":"d73c72d7-d7e2-4235-be79-187400eba049","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T22:55:56.525128949Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"8ee9216b-5239-498e-97df-d1e0a9fb2d1f","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T22:58:35.670145039Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"c6fa4160-9a23-45fe-8cf9-05e44c8ff0a6","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T23:01:18.592554704Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["documents"],"id":"bf469711-4797-42b6-bd55-b10fe8e2590a","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T23:01:33.664121558Z","type":"issue_updated","updated_by":"doc-add"}
