@@ -207,8 +207,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// and only the plan documents its transition rules read.
     ///
     /// Issue document references are left out because only whole-repository
-    /// validation reads them. They are captured after all when `precheck_target`
-    /// requires a precheck gate that validates the whole captured repository.
+    /// validation reads them, unless `precheck_target` requires a precheck gate
+    /// that validates the whole captured repository.
     pub(crate) fn capture_mutation_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -233,11 +233,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// `requested` names.
     ///
     /// Only issues whose ids match `requested` are read, and the target is
-    /// resolved among them exactly as a full capture resolves it.
+    /// resolved among them exactly as a full capture resolves it. When
+    /// `needs_base` holds for the target, the same round grows to the
+    /// [`capture_mutation_base`](Self::capture_mutation_base) read, with
+    /// `requested` as its precheck target.
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         requested: &str,
+        needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
@@ -278,7 +282,28 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             .into_iter()
             .find(|issue| issue.id == target_id)
             .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target_id))?;
-        Ok(Some(MutationPreflight { image, target }))
+        if !needs_base(&target) {
+            return Ok(Some(MutationPreflight {
+                image,
+                target,
+                issues: None,
+            }));
+        }
+        let grown = self.capture_proposed_base_inner(
+            session,
+            Some(image),
+            &std::collections::BTreeMap::new(),
+            &[],
+            &[],
+            Some(requested),
+            DocumentCapture::PlanOnly,
+            false,
+        )?;
+        Ok(grown.map(|(image, issues)| MutationPreflight {
+            image,
+            target,
+            issues: Some(issues),
+        }))
     }
 
     pub(crate) fn capture_proposed_base_without_documents(
@@ -637,12 +662,27 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
         let profiles_dir = VirtualPath::PROFILES;
         let listings = std::slice::from_ref(&profiles_dir);
-        let Some((records, recorded)) =
-            super::profile::capture_applied_records(session, &profiles_dir)?
-        else {
+        let capture = |session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+                       start,
+                       paths: &[VirtualPath]| {
+            self.capture_proposed_base_inner(
+                session,
+                start,
+                &std::collections::BTreeMap::new(),
+                paths,
+                listings,
+                None,
+                DocumentCapture::All,
+                false,
+            )
+        };
+        let Some((base, _)) = capture(session, None, &[])? else {
             return Ok(None);
         };
-        let packages = match resolve_recorded_packages(&records, &recorded)? {
+        // The base reads every profile record, and the records name the
+        // packages whose targets repair needs: they join the same round.
+        let recorded = super::profile::recorded_profile_ids(&base, &profiles_dir)?;
+        let packages = match resolve_recorded_packages(&base, &recorded)? {
             None => return Ok(None),
             Some(Ok(packages)) => packages,
             Some(Err(failure)) => return Ok(Some(Err(failure))),
@@ -651,8 +691,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             .iter()
             .flat_map(|(_, package)| package.hashes().targets.keys())
             .map(|path| {
-                records
-                    .layout()
+                base.layout()
                     .classify_repository_relative(path)
                     .map_err(Into::into)
             })
@@ -662,28 +701,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .map(|(record_path, _)| Ok(record_path.clone())),
             )
             .collect::<Result<Vec<_>>>()?;
-        // The whole-repository base plus the profile records' listing: the
-        // records are the repository's own statement of which packages repair
-        // needs, a question an exact-path closure cannot express.
-        let Some((image, _)) = self.capture_proposed_base_inner(
-            session,
-            None,
-            &std::collections::BTreeMap::new(),
-            &profile_paths,
-            listings,
-            None,
-            DocumentCapture::All,
-            false,
-        )?
-        else {
+        let Some((image, _)) = capture(session, Some(base), &profile_paths)? else {
             return Ok(None);
         };
-        // The closure was planned from the record set the records capture saw; a
-        // concurrent application or removal restarts the attempt rather than
-        // deriving repair over a stale answer.
-        if super::profile::recorded_profile_ids(&image, &profiles_dir)? != recorded {
-            return Ok(None);
-        }
         let profiles = match captured_profile_repair_claims(&image, &packages)? {
             Some(Ok(profiles)) => profiles,
             Some(Err(failure)) => return Ok(Some(Err(failure))),
@@ -1244,7 +1264,7 @@ type DocumentClosure = (
 );
 
 /// Capture budget for mutation bases and preflights.
-const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
+pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 256,
         max_bytes: 512 * 1024 * 1024,
@@ -1263,10 +1283,13 @@ pub(crate) struct MutationBase {
 /// The lease inputs and target issue a mutation reads before taking the claims
 /// guard, from [`CommandExecutor::capture_mutation_preflight`].
 pub(crate) struct MutationPreflight {
-    /// Configuration, index, and candidate issues.
+    /// Configuration, index, and candidate issues, or the full mutation base
+    /// when `issues` is present.
     pub(crate) image: crate::repository_state::RepositoryImage,
     /// The issue the request names.
     pub(crate) target: Issue,
+    /// Every indexed issue, when the preflight grew to the full base.
+    pub(crate) issues: Option<Vec<Issue>>,
 }
 
 /// Which issue-linked documents a base capture reads.
@@ -4508,11 +4531,12 @@ description = \"Full Rust CI pipeline must pass.\"
     }
 
     /// An issue mutation captures no issue document reference, working-tree or
-    /// pinned, while whole-repository validation of the same repository does.
+    /// pinned, and reads the log as a tail, while whole-repository validation of
+    /// the same repository reads all of them.
     #[test]
     fn test_capture_mutation_base_excludes_issue_document_references() {
         use crate::commands::test_helpers::{seed_issue, setup};
-        use crate::repository_state::VirtualPath;
+        use crate::repository_state::{ReadMode, VirtualPath};
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
@@ -4548,6 +4572,11 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!validation.capture_spec().pinned().is_empty());
         assert!(!mutation.capture_spec().contains_path(&document));
         assert!(mutation.capture_spec().pinned().is_empty());
+        let events = |image: &crate::repository_state::RepositoryImage| {
+            image.capture_spec().read_mode(&VirtualPath::EVENTS)
+        };
+        assert_eq!(events(&mutation), Some(ReadMode::Tail));
+        assert_ne!(events(&validation), Some(ReadMode::Tail));
     }
 
     /// A mutation preflight reads the lease configuration, the index, and the
@@ -4569,7 +4598,7 @@ description = \"Full Rust CI pipeline must pass.\"
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
 
         let preflight = executor
-            .capture_mutation_preflight(session.as_mut(), &target_id[..8])
+            .capture_mutation_preflight(session.as_mut(), &target_id[..8], |_| false)
             .unwrap()
             .expect("a settled capture");
 
@@ -4621,8 +4650,8 @@ description = \"Full Rust CI pipeline must pass.\"
         }
     }
 
-    /// An executor holding two issues, the first's id, and a counter over a
-    /// fresh session.
+    /// An executor holding a `Ready` target and another issue, the target's
+    /// id, and a counter over a fresh session.
     fn counted_session() -> (
         CommandExecutor<crate::storage::InMemoryStorage>,
         String,
@@ -4632,8 +4661,9 @@ description = \"Full Rust CI pipeline must pass.\"
         use crate::storage::RepositoryStateStore;
 
         let executor = setup();
-        let issues = ["Target", "Other"]
+        let mut issues = ["Target", "Other"]
             .map(|title| crate::domain::types::fixture_issue(title.to_string(), String::new()));
+        issues[0].state = crate::domain::State::Ready;
         let target_id = issues[0].id.clone();
         issues
             .into_iter()
@@ -4658,38 +4688,39 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(counter.1, 1);
     }
 
-    /// The base reads the log as a tail in its one round, even when the
-    /// unterminated final line is longer than the tail window.
-    #[test]
-    fn test_capture_mutation_base_reads_the_log_as_a_tail_whatever_its_final_line() {
-        use crate::repository_state::{ReadMode, VirtualPath};
-
-        let long = "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
-        for log in [format!("{long}\n"), format!("{{}}\n{long}")] {
-            let (executor, _, mut counter) = counted_session();
-            executor.storage().add_data_file("events.jsonl", &log);
-
-            let image = executor
-                .capture_mutation_base(&mut counter, &[], None)
-                .unwrap()
-                .expect("a settled capture")
-                .image;
-
-            let mode = image.capture_spec().read_mode(&VirtualPath::EVENTS);
-            assert_eq!(mode, Some(ReadMode::Tail));
-            assert_eq!(counter.1, 1);
-        }
-    }
-
     #[test]
     fn test_capture_mutation_preflight_reads_in_one_round() {
         let (executor, target_id, mut counter) = counted_session();
 
         executor
-            .capture_mutation_preflight(&mut counter, &target_id[..8])
+            .capture_mutation_preflight(&mut counter, &target_id[..8], |_| false)
             .unwrap()
             .expect("a settled capture");
 
+        assert_eq!(counter.1, 1);
+    }
+
+    /// A transition that runs prechecks grows its preflight to the full base
+    /// within the preflight's one round.
+    #[test]
+    fn test_capture_mutation_preflight_precheck_transition_reads_base_in_one_round() {
+        let (executor, target_id, mut counter) = counted_session();
+        let start = crate::commands::CapturedLifecycleMutation::State {
+            issue_id: target_id.clone(),
+            target: crate::domain::State::InProgress,
+            force: false,
+            divert_unpassed_gates: false,
+            enforce_lease: false,
+        };
+
+        let preflight = executor
+            .capture_mutation_preflight(&mut counter, &target_id, |target| {
+                crate::commands::lifecycle_requires_prechecks(&start, target)
+            })
+            .unwrap()
+            .expect("a settled capture");
+
+        assert_eq!(preflight.issues.map(|issues| issues.len()), Some(2));
         assert_eq!(counter.1, 1);
     }
 }

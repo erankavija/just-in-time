@@ -181,7 +181,8 @@ impl CommandExecutor<JsonFileStorage> {
             &layout,
             "repository initialization",
             |session| {
-                let (config, project_name) = self.resolve_init_config(&mut *session, repo_dir)?;
+                let (config, project_name, config_image) =
+                    self.resolve_init_config(&mut *session, repo_dir)?;
                 let profiles = packages
                     .iter()
                     .map(|package| {
@@ -211,7 +212,7 @@ impl CommandExecutor<JsonFileStorage> {
                     &mut *session,
                     &probe_overrides,
                     &extra_paths,
-                    None,
+                    Some(config_image),
                 )?
                 else {
                     return Ok(SessionStep::Retry);
@@ -336,19 +337,20 @@ impl CommandExecutor<JsonFileStorage> {
     /// Resolve the effective configuration bytes and project identity: an existing
     /// `config.toml` is preserved (its authored project name kept), otherwise the
     /// structural minimum is rendered under a slug of the repository directory
-    /// name.
+    /// name. Returns the round's image for the base to grow from.
     fn resolve_init_config(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         repo_dir: &Path,
-    ) -> Result<(String, ProjectName)> {
-        use crate::repository_state::{CaptureBudget, CaptureSpec};
-        let budget = CaptureBudget {
-            max_listings: 0,
-            max_bytes: 64 * 1024 * 1024,
-            max_depth: 6,
-        };
-        let spec = CaptureSpec::new([VirtualPath::CONFIG], budget)?;
+    ) -> Result<(
+        String,
+        ProjectName,
+        crate::repository_state::RepositoryImage,
+    )> {
+        let spec = crate::repository_state::CaptureSpec::new(
+            [VirtualPath::CONFIG],
+            super::validate::MUTATION_CAPTURE_BUDGET,
+        )?;
         let image = session.capture(spec)?;
         let generated_name: ProjectName = slugify_project_name(
             repo_dir
@@ -357,23 +359,24 @@ impl CommandExecutor<JsonFileStorage> {
                 .unwrap_or(""),
         )
         .parse()?;
-        match super::image_repo_bytes(&image, ".jit/config.toml")? {
+        let (config, project_name) = match super::image_repo_bytes(&image, ".jit/config.toml")? {
             Some(bytes) => {
                 let config =
                     String::from_utf8(bytes).context("existing .jit/config.toml is not UTF-8")?;
                 let parsed = crate::declarations::parse_configuration(config.as_bytes())
                     .context("Failed to parse existing init configuration")?;
                 let project_name = parsed.project_name().cloned().unwrap_or(generated_name);
-                Ok((config, project_name))
+                (config, project_name)
             }
-            None => Ok((
+            None => (
                 crate::repository_state::render_repo_config(
                     &crate::repository_state::structural_minimum_config(),
                     &generated_name,
                 ),
                 generated_name,
-            )),
-        }
+            ),
+        };
+        Ok((config, project_name, image))
     }
 
     /// Capture the neutral proposed base and convert one resolved package into
