@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bcd8fafb10d1c4831af802ecca6b0fc101832c2f",
+  "completed_at": "2026-10-01T22:40:02.164928911Z",
+  "duration_ms": 145671,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/ef7848ea-910d-40f7-a005-854be92229a0.json",
+        "id": "F1",
+        "line": 16,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ef7848ea/REQ-02",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Linked evidence metadata resolves the publication-cost harness to deleted bench.sh and records a stale README hash."
+      }
+    ],
+    "summary": "REQ-02 remains unmet because linked publication-cost evidence metadata still names a deleted harness and a stale artifact identity.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "ef7848ea-910d-40f7-a005-854be92229a0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c2ad2eba-b760-4d12-99d9-f0d099d9cbd3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:37:36.493612829Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2961 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f99d-b208-7fb2-a66c-80ce94815db2\n--------\nuser\n--- 2948 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking (medium):** The linked evidence manifest remains stale: it resolves the publication-cost README’s harness asset to deleted `dev/active/f1dc843a-redo-mutations/bench.sh`, and the checkpoint’s linked README hash does not match the current artifact. This leaves the evidence closure half-migrated despite the shipped harness at `scripts/benchmark-mutation-cost.sh`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 remains unmet because linked publication-cost evidence metadata still names a deleted harness and a stale artifact identity.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Linked evidence metadata resolves the publication-cost harness to deleted bench.sh and records a stale README hash.\",\"file\":\".jit/issues/ef7848ea-910d-40f7-a005-854be92229a0.json\",\"line\":16,\"references\":[\"@/issue/ef7848ea/REQ-02\",\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}

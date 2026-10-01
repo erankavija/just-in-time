@@ -114,7 +114,7 @@
     },
     "holistic-review": {
       "status": "failed",
-      "updated_at": "2026-10-01T22:35:03.772340769Z",
+      "updated_at": "2026-10-01T22:40:02.385628243Z",
       "updated_by": "auto:executor"
     }
   },
@@ -131,5 +131,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-10-01T22:37:35.904951145Z"
+  "updated_at": "2026-10-01T22:40:02.385628243Z"
 }
