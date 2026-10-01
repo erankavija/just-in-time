@@ -56,11 +56,11 @@ pub(crate) use export::{
 };
 pub(crate) use image::CapturedAnswers;
 pub use image::{
-    CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
-    EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction,
-    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim,
-    EVENT_LOG_TAIL_WINDOW,
+    CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
+    EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence,
+    LinkedWorktreeSourceClass, PinnedDocumentEvidence, PinnedSourceClass, ReadMode,
+    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryTargetKind,
+    TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};

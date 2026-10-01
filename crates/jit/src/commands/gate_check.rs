@@ -416,7 +416,7 @@ fn captured_gate_evaluation(
         .map(|(path, value)| (path.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
     let validation_view = broad_validation.then(|| super::PrecheckValidationView {
-        listings: image.listing_fingerprints().clone(),
+        listings: image.directory_listings().clone(),
     });
     Ok(CapturedGateEvaluation {
         evidence: GateEvaluationEvidence {

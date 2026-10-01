@@ -537,7 +537,7 @@ struct PrecheckEvidence {
 struct PrecheckValidationView {
     listings: std::collections::BTreeMap<
         crate::repository_state::VirtualPath,
-        crate::repository_state::ListingFingerprint,
+        crate::repository_state::DirectoryListing,
     >,
 }
 
@@ -559,7 +559,7 @@ impl PrecheckEvidence {
             .validation_view
             .as_ref()
             .map(|_| PrecheckValidationView {
-                listings: image.listing_fingerprints().clone(),
+                listings: image.directory_listings().clone(),
             });
         Ok(inputs_unchanged.into_iter().all(|unchanged| unchanged)
             && validation_view == self.validation_view)
@@ -703,7 +703,7 @@ fn captured_precheck_plan(
         })
         .collect::<std::result::Result<Vec<_>, _>>()?;
     let validation_view = broad_builtin.then(|| PrecheckValidationView {
-        listings: image.listing_fingerprints().clone(),
+        listings: image.directory_listings().clone(),
     });
     Ok(CapturedPrecheckPlan {
         evidence: PrecheckEvidence {
@@ -1974,11 +1974,11 @@ fn discover_gate_run_results(
     let root = VirtualPath::GATE_RUNS;
     spec.discover_paths([root.clone()])?;
     spec.discover_listing(root.clone())?;
-    if let Some(listing) = image.listing_fingerprints().get(&root) {
+    if let Some(listing) = image.directory_listings().get(&root) {
         spec.discover_paths(
             listing
-                .children()
-                .keys()
+                .names()
+                .iter()
                 .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
                 .collect::<std::result::Result<Vec<_>, _>>()?,
         )?;

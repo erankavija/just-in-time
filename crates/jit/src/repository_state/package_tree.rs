@@ -159,13 +159,13 @@ impl PackageTreeCapture {
         spec: &mut CaptureSpec,
     ) -> Result<(), PackageTreeCaptureError> {
         let listed = image
-            .listing_fingerprints()
+            .directory_listings()
             .iter()
             .filter(|(path, _)| *path == &self.destination || self.contains(path))
             .flat_map(|(path, listing)| {
                 listing
-                    .children()
-                    .keys()
+                    .names()
+                    .iter()
                     .map(|name| child_path(path, name))
                     .collect::<Vec<_>>()
             })

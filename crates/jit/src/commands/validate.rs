@@ -398,11 +398,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             if spec != image.capture_spec() {
                 return Ok(());
             }
-            if let Some(listing) = image.listing_fingerprints().get(&VirtualPath::PROFILES) {
+            if let Some(listing) = image.directory_listings().get(&VirtualPath::PROFILES) {
                 spec.discover_paths(
                     listing
-                        .children()
-                        .keys()
+                        .names()
+                        .iter()
                         .map(|name| VirtualPath::data(format!("profiles/{name}")))
                         .collect::<Result<Vec<_>, _>>()?,
                 )?;

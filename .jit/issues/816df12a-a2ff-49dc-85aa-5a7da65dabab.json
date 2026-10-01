@@ -51,13 +51,30 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-10-01T16:02:57.818041380Z",
   "first_ready_at": "2026-10-01T15:56:48.925372505Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T16:02:34.478673545Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T16:01:27.626788303Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-10-01T16:01:28.889910683Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "816df12a-a2ff-49dc-85aa-5a7da65dabab",
   "labels": [
     "type:task",
@@ -72,7 +89,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Repository declarations state the redo record",
-  "updated_at": "2026-10-01T15:56:50.537492689Z"
+  "updated_at": "2026-10-01T16:02:57.818041380Z"
 }

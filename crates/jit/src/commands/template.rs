@@ -629,12 +629,12 @@ fn parse_template_index(
 }
 
 fn listed_json_paths(image: &RepositoryImage, dir: &VirtualPath) -> Result<Vec<VirtualPath>> {
-    let Some(listing) = image.listing_fingerprints().get(dir) else {
+    let Some(listing) = image.directory_listings().get(dir) else {
         return Err(anyhow!("complete listing is absent for {dir:?}"));
     };
     listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .map(|name| {
             VirtualPath::data(format!("{}/{}", dir.relative().as_str(), name)).map_err(Into::into)
@@ -646,7 +646,7 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
     let index = parse_template_index(image)?;
     let dir = VirtualPath::ISSUES;
     let listing = image
-        .listing_fingerprints()
+        .directory_listings()
         .get(&dir)
         .ok_or_else(|| anyhow!("complete issues listing is absent from template capture"))?;
     let indexed = index
@@ -655,8 +655,8 @@ fn parse_template_issues(image: &RepositoryImage) -> Result<Vec<Issue>> {
         .map(|id| format!("{id}.json"))
         .collect::<BTreeSet<_>>();
     let listed = listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .cloned()
         .collect::<BTreeSet<_>>();

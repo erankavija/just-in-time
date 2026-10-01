@@ -258,13 +258,13 @@ fn listed_gate_preset_paths(
     use crate::repository_state::VirtualPath;
     let directory = VirtualPath::GATE_PRESETS;
     let listing = image
-        .listing_fingerprints()
+        .directory_listings()
         .get(&directory)
         .ok_or_else(|| anyhow!("complete custom gate preset listing is absent"))?;
     let prefix = directory.relative().as_str();
     listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .map(|name| VirtualPath::data(format!("{prefix}/{name}")).map_err(Into::into))
         .collect()
@@ -353,12 +353,12 @@ fn capture_gate_preset_image(
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
         .and_then(crate::storage::json::parse_repository_index)?;
     let listing = image
-        .listing_fingerprints()
+        .directory_listings()
         .get(&issues_dir)
         .ok_or_else(|| anyhow!("complete issues listing is absent"))?;
     let listed = listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .cloned()
         .collect::<std::collections::BTreeSet<_>>();
