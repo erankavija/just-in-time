@@ -662,6 +662,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
         path,
     );
 
+    let credit = format!("satisfies:{}/REQ-01", &container_id[..8]);
     let implementation = success_json_with_path(
         &repo.path,
         &[
@@ -675,7 +676,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
             "--label",
             "epic:acceptance",
             "--label",
-            "satisfies:REQ-01",
+            &credit,
             "--json",
         ],
         path,

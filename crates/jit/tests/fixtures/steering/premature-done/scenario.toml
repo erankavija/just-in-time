@@ -2,9 +2,9 @@
 #
 # A well-formed in-flight epic with req:REQ-01 and no children attempts to
 # transition to done. The transition-time graph evaluation (CC-2) runs the
-# done-scoped sdd-hard-criteria-covered and sdd-req-is-satisfied rules against
-# the epic's dependency neighborhood. Both are enforce=true and fire because no
-# child satisfies REQ-01. The transition is blocked, exit 4.
+# done-scoped sdd-hard-criteria-covered rule against the epic's dependency
+# neighborhood. It is enforce=true and fires because no child satisfies REQ-01.
+# The transition is blocked, exit 4.
 ruleset = "sdd"
 
 [[steps]]

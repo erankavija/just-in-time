@@ -799,14 +799,15 @@ fn test_bracket_breakdown_rejects_cyclic_child_plan() {
 // `jit apply plan` and is never run/stamped/fabricated by breakdown. The gate is
 // run later by the standard gate runner (`jit gate evaluate <B> coverage-preview`).
 
-/// A child that credits the given `[hard]` criterion id via `satisfies:<id>`.
-fn child_satisfying(title: &str, req_id: &str) -> BracketChild {
+/// A child that credits the container's `[hard]` criterion via
+/// `satisfies:<container-short-id>/<id>`.
+fn child_satisfying(title: &str, container_id: &str, req_id: &str) -> BracketChild {
     BracketChild {
         title: title.to_string(),
         description: String::new(),
         priority: Priority::Normal,
         gates: vec![],
-        labels: vec![format!("satisfies:{req_id}")],
+        labels: vec![format!("satisfies:{}/{req_id}", &container_id[..8])],
         deps: vec![],
     }
 }
@@ -816,7 +817,7 @@ fn test_bracket_breakdown_leaves_coverage_gate_pending_and_forwards_credit() {
     let h = harness();
     let template = plan_template();
     // Container declares [hard] REQ-01 (scaffold_container's body), covered by
-    // the child's satisfies:REQ-01 label.
+    // the child's satisfies:<C>/REQ-01 label.
     let (c, _p) = scaffold_container(&h, &template, "Auth epic");
 
     let result = h
@@ -824,18 +825,19 @@ fn test_bracket_breakdown_leaves_coverage_gate_pending_and_forwards_credit() {
         .bracket_breakdown_with_template(
             &template,
             &c,
-            vec![child_satisfying("Build login", "REQ-01")],
+            vec![child_satisfying("Build login", &c, "REQ-01")],
         )
         .unwrap();
 
     assert_eq!(result.coverage_gate_preset, "coverage-preview");
 
-    // The child carries its satisfies:<id> coverage credit (forwarded by the
-    // splicer to create_issue's labels) — what the coverage gate later reads.
+    // The child carries its coverage credit (forwarded by the splicer to
+    // create_issue's labels) — what the coverage gate later reads.
     let kid = h.get_issue(&result.child_ids[0]);
+    let credit = format!("satisfies:{}/REQ-01", &c[..8]);
     assert!(
-        kid.labels.contains(&"satisfies:REQ-01".to_string()),
-        "child must carry its satisfies:REQ-01 coverage credit, got {:?}",
+        kid.labels.contains(&credit),
+        "child must carry its {credit} coverage credit, got {:?}",
         kid.labels
     );
 

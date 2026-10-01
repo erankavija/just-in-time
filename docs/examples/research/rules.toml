@@ -23,8 +23,9 @@
 #   type:experiment — a concrete experiment designed to test one or more
 #                     hypotheses. Its body has a `## Method` section (the
 #                     experimental protocol) and an `## Evidence` section
-#                     (observations and results). Experiments carry `tests:<id>`
-#                     labels naming the hypotheses they test. The goal lists its
+#                     (observations and results). Experiments carry
+#                     `tests:<goal-short-id>/<id>` labels naming the goal
+#                     hypotheses they test. The goal lists its
 #                     experiments as dependencies (the parent-depends-on-children
 #                     containment used throughout this ruleset, wired by
 #                     `jit dep add <goal> <experiment>`), so each experiment
@@ -32,7 +33,8 @@
 #
 # LABEL NAMESPACES:
 #   hyp:     on goals      — declared hypotheses (e.g. hyp:H-1)
-#   tests:   on experiments — which hypothesis the experiment tests (e.g. tests:H-1)
+#   tests:   on experiments — which goal hypothesis the experiment tests
+#            (e.g. tests:5c21327f/H-1)
 #
 # WHAT THE ENGINE ENFORCES:
 #   1. Structure — a goal body must have `## Hypotheses` and `## Success Criteria`
@@ -46,21 +48,22 @@
 #      immediately.
 #   3. Hypothesis coverage at done — when a goal reaches done, every hypothesis
 #      declared as `[hard]` in `## Hypotheses` must be tested by at least one
-#      done experiment that carries `tests:<id>` (label-coverage, enforce = true
-#      at state = "done"). A goal in any state other than done produces ZERO
+#      done experiment that carries `tests:<goal-short-id>/<id>` (label-coverage,
+#      enforce = true at state = "done"). A goal in any state other than done produces ZERO
 #      error findings from this rule; it only fires at the done transition.
-#   4. tests: reference integrity — every `tests:<id>` on an experiment resolves
-#      to a declared `hyp:<id>` on the linked goal (label-reference, warn). A
-#      typo'd hypothesis id surfaces without blocking.
+#   4. tests: reference integrity — the sibling `config.toml` declares
+#      hypotheses as items linked through `tests:`, so `jit validate` reports a
+#      `tests:<goal-short-id>/<id>` label naming no declared hypothesis as a
+#      dangling item link.
 #   5. Hypothesis coverage PREVIEW at breakdown — the bracket's plan-time check.
 #      The same coverage check as (3), but fired on the transient `breakdown` node
 #      `B` (keyed on `type:breakdown`, container resolved via `brackets:`), with
-#      `child-state` OMITTED so a `tests:<id>` child in ANY state counts (drafted
+#      `child-state` OMITTED so a `tests:` child in ANY state counts (drafted
 #      experiments sit in backlog at breakdown time). An uncovered `[hard]`
 #      hypothesis BLOCKS the breakdown gate. See the bracket note below.
 #
 # LIFECYCLE NOTE:
-#   Rules (2) and (4) are always-on (no state predicate) because a stray or
+#   Checks (2) and (4) are always-on (no state predicate) because a stray or
 #   dangling label is wrong at any lifecycle phase. Rule (3) is scoped
 #   `state = "done"` with `enforce = true`: a goal in backlog, ready, in_progress
 #   or gated is quiet, but the goal cannot complete until every [hard] hypothesis
@@ -214,7 +217,7 @@ assert = { criteria-label-match = { namespace = "hyp", criteria-section = "hypot
 # must be covered by at least one done experiment that (a) the goal depends on
 # (containment: the goal lists its experiments as dependencies, the same
 # parent-depends-on-children convention `jit dep add <goal> <experiment>` wires)
-# and (b) carries `tests:<id>`. The block exits 4 and prints which hypothesis ids
+# and (b) carries `tests:<goal-short-id>/<id>`. The block exits 4 and prints which hypothesis ids
 # are uncovered; `jit issue update --state done --force` bypasses the block and
 # records a graph-rule-bypassed event in the audit log.
 #
@@ -253,7 +256,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
 #     DONE). This preview rule OMITS `child-state` entirely — an absent
 #     `child-state` means "any state". At breakdown time the drafted experiments
 #     sit in backlog, so the check is *mapping EXISTS* (a child carrying
-#     `tests:<id>` in ANY state), not *mapping done*. Note: `"any"` is NOT a valid
+#     `tests:<C-short-id>/<id>` in ANY state), not *mapping done*. Note: `"any"` is NOT a valid
 #     token; the absence of the key is how "any state" is expressed.
 #
 # `child-link = "dependencies"` walks `C`'s dependency closure (the experiment
@@ -278,17 +281,3 @@ when = { type = "breakdown", state = ["in_progress", "gated", "done"] }
 severity = "error"
 enforce = true
 assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]", id-pattern = "H-[0-9]+", satisfies-namespace = "tests", child-link = "dependencies", child-type-exclude = ["planning", "breakdown"], container-from-label = "brackets" } }
-
-# --- Graph: tests: resolves to a declared hyp: ----------------------------
-# Reference integrity in the OTHER direction: an experiment's `tests:<id>` label
-# must resolve to a declared `hyp:<id>` on the linked goal (the goal that the
-# experiment depends on). A typo'd `tests:H-99` on an experiment surfaces here
-# as a warning so authors can catch it without blocking the whole validate run.
-# `scope = "linked"` keeps resolution inside the goal/experiment graph so an
-# experiment cannot accidentally "test" a hypothesis belonging to an unrelated
-# goal with an identically-numbered hypothesis.
-[[rules]]
-name = "research-tests-references-a-hyp"
-when = { label = "tests:*" }
-severity = "warn"
-assert = { label-reference = { from = "tests", to = "hyp", scope = "linked" } }

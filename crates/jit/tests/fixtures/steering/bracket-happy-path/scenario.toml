@@ -2,7 +2,7 @@
 #
 # A well-formed plan-before-fan-out bracket passes the BREAKDOWN gate end-to-end.
 # Same spine `C -> child -> B` as bracket-coverage-gap, but the impl child DOES
-# carry satisfies:REQ-01, so every [hard] criterion is covered.
+# carry satisfies:$container_short/REQ-01, so every [hard] criterion is covered.
 #
 # The native breakdown gate applies the configured preview rule to B as its sole
 # firing issue. REQ-01 is satisfied by the child (in ANY state, drafts sit in
@@ -36,13 +36,13 @@ argv = [
 capture = "id"
 id_slot = "container"
 
-# Impl child WITH satisfies:REQ-01 -> REQ-01 covered.
+# Impl child WITH satisfies:$container_short/REQ-01 -> REQ-01 covered.
 [[steps]]
 argv = [
   "issue", "create",
   "--title", "Impl child (covered)",
   "--label", "type:task",
-  "--label", "satisfies:REQ-01",
+  "--label", "satisfies:$container_short/REQ-01",
   "--force",
   "--description", "Implements REQ-01.",
 ]

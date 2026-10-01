@@ -339,7 +339,7 @@ fn test_harness_item_kind_compatible_with_label_coverage() {
 
     // REQ-05: a generic link label `<ns>:<issue>/<self-id>` (here the
     // requirement kind's `satisfies` namespace) resolves to the addressed item
-    // via its qualified id — not merely the legacy unqualified `satisfies:REQ-01`.
+    // via its qualified id.
     let h = TestHarness::new().with_item_kinds();
     let container = h.create_issue_with_desc(
         "Container",

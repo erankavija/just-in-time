@@ -207,7 +207,7 @@ fn test_sdd_example_declares_planning_template() {
 #[test]
 fn test_sdd_uncovered_hard_criterion_blocked_at_breakdown_gate() {
     // Bracket spine: C(epic, [hard] REQ-01) ──dep→ impl ──dep→ B(type:breakdown).
-    // The drafted impl child does NOT carry satisfies:REQ-01, so the preview
+    // The drafted impl child does NOT carry satisfies:<C>/REQ-01, so the preview
     // coverage rule (keyed on B, container resolved via brackets:, child-state
     // omitted) must report REQ-01 uncovered — the breakdown gate BLOCKS.
     //
@@ -279,7 +279,7 @@ fn test_sdd_preview_silent_while_breakdown_node_in_backlog() {
 
 #[test]
 fn test_sdd_preview_passes_when_backlog_child_carries_mapping() {
-    // Same spine, but the (still-Backlog) impl child carries satisfies:REQ-01.
+    // Same spine, but the (still-Backlog) impl child carries satisfies:<C>/REQ-01.
     // The preview rule OMITS child-state, so a mapping in ANY state (Backlog
     // here) satisfies it -> the breakdown gate passes. This is the preview vs
     // closure distinction: closure would still require child-state = "done".
@@ -288,7 +288,10 @@ fn test_sdd_preview_passes_when_backlog_child_carries_mapping() {
 
     let mut container = breakable_container();
     let mut impl_node = crate::fixture_issue("draft impl".to_string(), String::new());
-    impl_node.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    impl_node.labels = vec![
+        "type:task".to_string(),
+        format!("satisfies:{}/REQ-01", container.short_id()),
+    ];
     impl_node.state = State::Backlog; // NOT done
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
@@ -315,7 +318,7 @@ fn test_sdd_preview_passes_when_backlog_child_carries_mapping() {
 fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
     // child-type-exclude = ["planning", "breakdown"]: the walk from C must halt
     // at B and never credit a satisfies: label sitting on the planning node P
-    // BEYOND the breakdown boundary. So even though P carries satisfies:REQ-01,
+    // BEYOND the breakdown boundary. So even though P carries satisfies:<C>/REQ-01,
     // the criterion reads uncovered at the breakdown gate.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
@@ -331,9 +334,12 @@ fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
     // Breakdown is underway (the preview rule is state-gated to in_progress/
     // gated/done, so a backlog B that has not started breakdown stays silent).
     breakdown.state = State::InProgress;
-    // P, beyond the boundary, is the only carrier of satisfies:REQ-01.
+    // P, beyond the boundary, is the only carrier of satisfies:<C>/REQ-01.
     let mut plan = crate::fixture_issue("plan".to_string(), String::new());
-    plan.labels = vec!["type:planning".to_string(), "satisfies:REQ-01".to_string()];
+    plan.labels = vec![
+        "type:planning".to_string(),
+        format!("satisfies:{}/REQ-01", container.short_id()),
+    ];
 
     container.dependencies = vec![impl_node.id.clone()];
     impl_node.dependencies = vec![breakdown.id.clone()];
@@ -354,7 +360,7 @@ fn test_sdd_preview_excludes_bracket_types_and_halts_walk() {
 fn test_sdd_preview_credits_non_sink_impl_interior() {
     // Coverage traversal is transitive: a satisfies: on a NON-SINK impl issue
     // (deep in the interior, not directly adjacent to C) is still credited.
-    // Spine: C ──dep→ impl_a ──dep→ impl_b(satisfies:REQ-01) ──dep→ B.
+    // Spine: C ──dep→ impl_a ──dep→ impl_b(satisfies:<C>/REQ-01) ──dep→ B.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
@@ -362,7 +368,10 @@ fn test_sdd_preview_credits_non_sink_impl_interior() {
     let mut impl_a = crate::fixture_issue("impl a (sink)".to_string(), String::new());
     impl_a.labels = vec!["type:task".to_string()];
     let mut impl_b = crate::fixture_issue("impl b (interior)".to_string(), String::new());
-    impl_b.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    impl_b.labels = vec![
+        "type:task".to_string(),
+        format!("satisfies:{}/REQ-01", container.short_id()),
+    ];
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
@@ -393,7 +402,7 @@ fn test_sdd_preview_credits_non_sink_impl_interior() {
 #[test]
 fn test_sdd_closure_rule_still_requires_done_child() {
     // The existing closure rule (sdd-hard-criteria-covered, child-state = "done")
-    // must be unchanged: at done, a Backlog child carrying satisfies:REQ-01 does
+    // must be unchanged: at done, a Backlog child carrying satisfies:<C>/REQ-01 does
     // NOT satisfy it (closure needs mapping DONE). This is the preview/closure
     // split — preview accepts any state, closure requires done.
     let set = load_example("sdd");
@@ -403,7 +412,10 @@ fn test_sdd_closure_rule_still_requires_done_child() {
     epic.state = State::Done;
     // A child satisfying REQ-01 but still in Backlog (not done).
     let mut child = crate::fixture_issue("impl".to_string(), String::new());
-    child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    child.labels = vec![
+        "type:task".to_string(),
+        format!("satisfies:{}/REQ-01", epic.short_id()),
+    ];
     child.state = State::Backlog;
     epic.dependencies.push(child.id.clone());
 
