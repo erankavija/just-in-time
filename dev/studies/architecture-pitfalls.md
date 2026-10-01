@@ -166,8 +166,9 @@ executor.create_issue(
 **Symptom:** `.unwrap()` doesn't work on `JsonFileStorage::new()`
 
 **Why:** The constructor only records the data path. Repository initialization
-is a command operation with an explicit, validated layout and a recovered
-mutation session.
+is a command operation with an explicit, validated layout and a mutation session,
+which publishes an absent data root from a synced stage directory by a no-replace
+rename.
 
 **Fix:**
 ```rust
