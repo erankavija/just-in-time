@@ -57,8 +57,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-01T13:31:53.951762812Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T13:44:30.918818078Z",
       "updated_by": "auto:executor"
     }
   },
@@ -77,5 +77,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan hash retirement",
-  "updated_at": "2026-10-01T13:31:53.951762812Z"
+  "updated_at": "2026-10-01T13:44:30.918818078Z"
 }
