@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f234be3487f6a7e52b855d1714aaf0b359cb8cd4",
+  "completed_at": "2026-10-01T13:53:36.980511598Z",
+  "duration_ms": 289267,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable prose, help, errors, tests, and sweep evidence satisfy the issue criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e346d387-eee8-4657-93eb-9b64621fd900",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "41fb6e8a-e386-48e2-9336-5e3978ffd489",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T13:48:47.713391788Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: ce2b709e6, 3b939976b, f1c648e06, 207f0e173, fb1e24429, f234be348\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose and @/invariant/atomic-writes (.jit/invariants.toml); @/issue/e346d387/decision/D-1 (.jit/issues/e346d387-eee8-4657-93eb-9b64621fd900.json); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-01T13:48:35Z); docs-mechanical passed, exit 0 (2026-10-01T13:48:43Z); doc-review pending\nTruncation recovery: reread patches by path, sweep evidence by line range, and targeted current help/terminology searches\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable prose, help, errors, tests, and sweep evidence satisfy the issue criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
