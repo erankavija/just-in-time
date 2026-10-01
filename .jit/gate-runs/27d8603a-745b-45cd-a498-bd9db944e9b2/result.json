@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0b6e964d45e3f11fcac502799aabe6999a8916b9",
+  "completed_at": "2026-10-01T20:37:50.573931747Z",
+  "duration_ms": 97898,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 947,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd1b984c/requirement/REQ-04",
+          "@/issue/f1dc843a/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "The data-root source guard exempts every directory-creating function in the initialization publisher's module, so it does not fail for a creator outside the publisher function."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/storage-format.md",
+        "id": "F2",
+        "line": 64,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/dd1b984c/requirement/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "The storage reference incorrectly says all locks under .jit fail as repository-not-found when absent; shared locks instead proceed without an OS lock."
+      }
+    ],
+    "summary": "The source guard is module-scoped rather than publisher-scoped, and the updated storage reference still misstates shared-lock behavior without a data root.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "27d8603a-745b-45cd-a498-bd9db944e9b2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T20:36:12.675789397Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5143 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f92e-8fac-7802-907d-67a564a76b13\n--------\nuser\n--- 5130 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: eb1330ae1, 1ce833793, dccf72a1, b3c7bdd28, e9a046de1, 07794db90, 5d8e53a6, 27bab3bc, 0b6e964d\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/issue/f1dc843a/requirement/REQ-05 and @/issue/dd1b984c/requirement/REQ-01 through REQ-04 (issue descriptions); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T20:35:43Z)\nTruncation recovery: narrowed reads of the linked plan, source guard, lock paths, and current documentation after the initial combined read truncated.\n\n1. [blocking][issue-impact][high] [repository_state_cutover_tests.rs:947](crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:947) exempts every directory-creating function in the module containing `publish_staged_data_root`, rather than that publisher function. The added test itself accepts a distinct `stage` function merely because it is placed in `storage/init_publish.rs` ([line 1119](crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:1119)). Thus a production root-creation function added elsewhere in that module would not fail the guard, leaving REQ-04 unmet. References: @/issue/dd1b984c/requirement/REQ-04, @/issue/f1dc843a/requirement/REQ-05.\n\n2. [blocking][issue-impact][medium] [storage-format.md:64](docs/reference/storage-format.md:64) says a lock under `.jit/` fails as repository-not-found when the root is absent. Shared `.index.lock`, `.gates.lock`, and `.events.lock` acquisitions instead deliberately proceed without an OS lock when their path cannot be opened ([lock.rs:253](crates/jit/src/storage/lock.rs:253)); they do not create `.jit/`, but they are not typed repository-not-found failures. Scope the statement to the repository write lock or document shared-lock behavior accurately. References: @/issue/dd1b984c/requirement/REQ-01.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The source guard is module-scoped rather than publisher-scoped, and the updated storage reference still misstates shared-lock behavior without a data root.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The data-root source guard exempts every directory-creating function in the initialization publisher's module, so it does not fail for a creator outside the publisher function.\",\"file\":\"crates/jit/tests/scratch_build/repository_state_cutover_tests.rs\",\"line\":947,\"references\":[\"@/issue/dd1b984c/requirement/REQ-04\",\"@/issue/f1dc843a/requirement/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The storage reference incorrectly says all locks under .jit fail as repository-not-found when absent; shared locks instead proceed without an OS lock.\",\"file\":\"docs/reference/storage-format.md\",\"line\":64,\"references\":[\"@/issue/dd1b984c/requirement/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
