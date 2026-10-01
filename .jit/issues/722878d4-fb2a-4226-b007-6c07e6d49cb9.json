@@ -93,6 +93,7 @@
       "path": "dev/benchmarks/publication-cost-722878d4/README.md"
     }
   ],
+  "done_at": "2026-10-01T20:16:12.755333671Z",
   "first_ready_at": "2026-10-01T20:07:18.790524283Z",
   "gates_required": [
     "doc-review",
@@ -124,7 +125,7 @@
     "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Publication cost evidence",
-  "updated_at": "2026-10-01T20:16:02.714284369Z"
+  "updated_at": "2026-10-01T20:16:12.755333671Z"
 }

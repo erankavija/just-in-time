@@ -7,7 +7,50 @@
     "722878d4-fb2a-4226-b007-6c07e6d49cb9"
   ],
   "description": "The testing guide names the redo-record benchmark harness as its publication-cost evidence, and the journal-shaped harness it replaces stops shipping.\n\n## Background\n\nThe guide pins publication-cost numbers to an artifact produced by a nine-hundred-line script written around the journal's shape: it asserts the presence and absence of an external bootstrap control directory and counts directory fsync calls, a property of the journal's phase barriers. Both the numbers and the named evidence contract go stale on the first day of the change.\n\nThe guide also maintains a per-test cost attribution table naming tests that this work retires or renames, and a build-budget note derived from measured worst-case figures. The suite profile artifact, pinned at four thousand four hundred and eighty-one tests, goes stale when a large block of tests disappears.\n\n## Success Criteria\n\n- [hard] REQ-01: The guide's publication-cost evidence names the redo-record benchmark harness and its committed artifact.\n- [hard] REQ-02: The journal-shaped benchmark script stops shipping, and contracts reference it nowhere.\n- [hard] REQ-03: The per-test cost attribution table names only tests that exist.\n- [hard] REQ-04: The build-budget note states figures re-derived after the change, holding or tightening.\n- [hard] REQ-05: The suite-timing evidence artifact is refreshed, or its staleness is recorded with the test count it was pinned at and the condition for refreshing it.\n- [hard] REQ-06: The guide's description of a storage round trip states the redo record.\n- [hard] REQ-07: The change removes more lines than it adds.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "aa1f1ff8c2a7d664e15e85b908a0b07dcf18ed7874f7ea1149b109e6ab4e0624",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
+  "first_ready_at": "2026-10-01T20:16:12.845167299Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -27,7 +70,7 @@
     "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-10-01T19:31:25.259364127Z"
+  "updated_at": "2026-10-01T20:16:13.049145830Z"
 }
