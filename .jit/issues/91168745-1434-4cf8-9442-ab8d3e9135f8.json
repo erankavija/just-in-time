@@ -6,7 +6,49 @@
     "e346d387-eee8-4657-93eb-9b64621fd900"
   ],
   "description": "The generated storage-records reference is regenerated from its Rust source and describes the event log's positioned append.\n\n## Background\n\nThe storage-records reference is generated from the record definitions the binary writes with, and its generator's own header states that its event-log sample lines are encoded the way the repository-state finalizer publishes them. The finalizer's encoding changes when the log starts growing by positioned append, so the generator and the page move with it.\n\nRegenerating after the source prose changes is what keeps the page honest; editing generated output would edit a projection rather than its authority.\n\n## Success Criteria\n\n- [hard] REQ-01: The generated reference is produced by regeneration from its source.\n- [hard] REQ-02: The storage-records reference and its generator describe the event log's positioned append.\n- [hard] REQ-03: Regenerating a second time produces no diff.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -28,5 +70,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Generated storage-records reference matches the append encoding",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T13:10:42.448866268Z"
 }

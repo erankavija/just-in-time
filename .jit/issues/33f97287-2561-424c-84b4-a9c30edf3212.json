@@ -6,7 +6,49 @@
     "c88822a5-b92a-4992-9521-f1c0ad145b9e"
   ],
   "description": "A captured listing carries child names without per-child identity, so a mutation stops hashing directory entries it does not write.\n\n## Background\n\nA captured image carries, beside its file entries, a fingerprint of each discovered directory listing: the complete set of child names with their identities. Its purpose was to detect a sibling file appearing or vanishing between capture and commit. Archive planning and the shared command module read those listings as data — which children exist, under which directory — at nine sites, so name discovery stays; the per-child identity is what goes.\n\nThe race-detection guarantee is dropped deliberately. A mutation no longer detects a directory-entry race, and the repository write lock is what makes that acceptable for the files a mutation writes.\n\n## Success Criteria\n\n- [hard] REQ-01: No listing fingerprint type and no fingerprint accessor survives in the workspace, and a captured listing carries child names without per-child identity.\n- [hard] REQ-02: Commands that consulted a listing as data still read the child names they need from the captured image.\n- [hard] REQ-03: Capture byte and name budgets still bound what a listing read may consume, and a rogue directory still refuses the capture.\n- [hard] REQ-04: The source-text policy assertion naming the fingerprint accessor is retargeted, with its reason stated where it lands.\n- [hard] REQ-05: The change removes more lines than it adds.\n\n## Notes\n\nThe budget coverage over oversized listings states a real property and survives.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -27,5 +69,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Listing fingerprint retirement",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T13:10:42.129508206Z"
 }
