@@ -451,15 +451,8 @@ fn init_response_paths(
             .actions()
             .iter()
             .find(|action| action.path() == &path)
-            .is_some_and(|action| {
-                matches!(
-                    action,
-                    RepositoryAction::WriteFile {
-                        expected: ExpectedPreimage::Absent,
-                        ..
-                    }
-                )
-            })
+            // Each of these paths is a file, so an absent preimage means it is created.
+            .is_some_and(|action| *action.expected() == ExpectedPreimage::Absent)
             .then(|| reported.to_string()))
     })
     .collect::<Result<Vec<_>>>()?
