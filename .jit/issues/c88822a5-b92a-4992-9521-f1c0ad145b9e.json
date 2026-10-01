@@ -71,7 +71,7 @@
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-10-01T11:34:44.600528132Z",
+      "updated_at": "2026-10-01T13:43:58.185591953Z",
       "updated_by": "auto:executor"
     }
   },
@@ -90,5 +90,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-10-01T13:39:55.666578342Z"
+  "updated_at": "2026-10-01T13:43:58.185591953Z"
 }
