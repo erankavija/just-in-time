@@ -80,7 +80,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T22:21:34.967382684Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8b6a9e34-60c7-45f5-b506-de20afbb98ce",
   "labels": [
     "type:task",
@@ -97,5 +103,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-10-01T22:21:25.204128264Z"
+  "updated_at": "2026-10-01T22:21:34.967382684Z"
 }
