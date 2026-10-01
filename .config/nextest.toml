@@ -8,7 +8,7 @@ slow-timeout = { period = "15s", terminate-after = 4 }
 [[profile.default.scripts]]
 filter = '''
 (binary(cli_item_validate) & (test(/^invariant_registry_story_tests::/) | test(/^item_cli_tests::/) | test(/^project_render_cli_tests::/) | test(/^type_hierarchy_fix_tests::/) | test(/^validate_cli_rule_tests::/))) |
-(binary(jit) & test(/^(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair|commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands)$/))
+(binary(jit) & test(/^(commands::init::tests::test_single_profile_reinit_attributes_coupled_schema_repair)$/))
 '''
 setup = 'default-repository-fixture'
 

@@ -104,7 +104,8 @@ makes without a deliberate topology change, while still failing the regression
 Accepted by the owner on 2026-08-13: the fresh-target margin of 3,168 ms, of which
 about 4.3 s is first-run fixture construction paid inside the clock. Moving that
 construction outside the clock is a follow-up if a cold failure recurs, not v1.0
-work. The post-cutover fixture-cache margin, 274 ms, has not been put to the owner.
+work. The post-cutover fixture-cache margin of 274 ms was accepted by the owner on
+2026-10-01.
 
 ## Provenance
 
