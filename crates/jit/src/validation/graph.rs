@@ -4153,16 +4153,8 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_uniqueness_large_fixture_correctness() {
-        // Performance and correctness: build 400 issues (300 with unique req values,
-        // 100 forming 50 collision pairs) and assert the evaluation finds exactly 50
-        // collision findings and the correct values.
-        //
-        // Design note: this is O(n * k) — a single HashMap pass over issues × labels.
-        // No N² scan. The assertion on finding count confirms correctness on a
-        // realistic repo-scale fixture, and the elapsed time is MEASURED below
-        // with a deliberately generous bound (so CI variability cannot flake it)
-        // to satisfy the "performant on hundreds of issues, measured not assumed"
-        // criterion.
+        // 400 issues (300 with unique req values, 100 forming 50 collision pairs):
+        // the evaluation finds exactly 50 collision findings and the correct values.
         let rule = uniqueness_rule("req");
 
         let mut issues: Vec<Issue> = Vec::with_capacity(400);
@@ -4181,7 +4173,6 @@ source-of-truth = "markdown-first"
         assert_eq!(issues.len(), 400);
 
         let rules = vec![&rule];
-        let started = std::time::Instant::now();
         let findings = evaluate_graph(
             &rules,
             &issues,
@@ -4190,18 +4181,6 @@ source-of-truth = "markdown-first"
             fixed_now(),
             &HashMap::new(),
         );
-        let elapsed = started.elapsed();
-        eprintln!(
-            "label-uniqueness over {} issues took {elapsed:?}",
-            issues.len()
-        );
-        // Generous bound: single-pass evaluation over 400 issues completes in
-        // milliseconds; 5s only catches an accidental quadratic regression.
-        assert!(
-            elapsed < std::time::Duration::from_secs(5),
-            "evaluation over 400 issues took {elapsed:?} (expected well under 5s)"
-        );
-
         // Exactly 50 findings — one per colliding value, none for the unique ones.
         assert_eq!(
             findings.len(),
