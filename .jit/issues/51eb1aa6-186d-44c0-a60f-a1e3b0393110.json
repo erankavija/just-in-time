@@ -60,8 +60,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-01T09:48:21.700589560Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T10:05:47.357295461Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -102,5 +102,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Transaction fields leave the command output",
-  "updated_at": "2026-10-01T09:59:13.179140442Z"
+  "updated_at": "2026-10-01T10:05:47.357295461Z"
 }
