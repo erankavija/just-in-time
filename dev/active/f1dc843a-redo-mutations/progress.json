@@ -1131,6 +1131,16 @@
       "situation": "doc-review F2 flagged storage-format.md#publication-and-recovery as saying every written file is replaced, false after the positioned append; owner decision @/issue/ccea63de/decision/D-1 kept event-log mechanics off that page, premised on whole-file replacement.",
       "decision": "Owner chose: amend the canonical page with one clause (the event log is extended, not replaced, at the length read), recorded as @/issue/ccea63de/decision/D-2 superseding D-1.",
       "status": "resolved"
+    },
+    {
+      "id": "ESC-15",
+      "session": 7,
+      "wave": 16,
+      "issue": "c88822a5",
+      "category": "6 / criterion reading (last rework)",
+      "situation": "Rework 1 fixed long-unterminated-final-line misclassification by reading the whole log; code-review R2-F1 failed it against REQ-03 bounded tail.",
+      "decision": "Owner chose: tail grows to the final line start (bounded by one line, never by history), recorded as @/issue/c88822a5/decision/D-1.",
+      "status": "resolved"
     }
   ],
   "rework_counts": {
@@ -1150,7 +1160,7 @@
     "42478e5d": 1,
     "3d9150d7": 2,
     "b4483ad6": 1,
-    "c88822a5": 1
+    "c88822a5": 2
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -1320,6 +1330,12 @@
       "session": 6,
       "finding": "Sequential gate runs in one shell batch leave each earlier run's gate record uncommitted, so every later run in the batch reports Tree: dirty. Separately, the lead wrote progress.json twice while a gate was running.",
       "fix": "Commit .jit/ between sequential gate evaluations, and never write tracked files while a gate is running."
+    },
+    {
+      "id": "PF-24",
+      "session": 7,
+      "finding": "Rework prompts that list a fix shape without stating the criterion it must still satisfy invite a fix that trades one criterion for another: c88822a5 rework 1 fixed R1-F1 by a whole-log read that violated REQ-03, and also deleted three tests citing REQ-07. State in every rework which criteria bound the fix.",
+      "status": "adopted"
     }
   ],
   "evidence_requirements": [
