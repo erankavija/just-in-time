@@ -318,7 +318,7 @@ Issues are stored as JSON files in `.jit/issues/{id}.json`:
 
 **Storage guarantees:**
 - One redo record per mutation, over every file that mutation writes
-- Atomic writes (write-temp-rename pattern)
+- Atomic replacements (write-temp-rename pattern); the event log is extended in place
 - No partial writes from crashes; an interrupted mutation is applied forward at the next session
 - JSON validation on read
 - Git-optional (works without version control)
