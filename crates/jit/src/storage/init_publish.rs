@@ -44,7 +44,7 @@ fn stage_name(data_leaf: &str) -> String {
 /// # Errors
 ///
 /// Returns an error when a non-directory occupies the stage name, when an
-/// action neither creates a directory nor writes a file — nothing exists yet
+/// action neither creates a directory nor writes a file from its start — nothing exists yet
 /// for a mode change or a deletion to name — or when the filesystem refuses an
 /// operation.
 pub(in crate::storage) fn stage_new_data_root<'a>(
@@ -58,6 +58,11 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
     let root = open_child_dir_nofollow(data_parent, &stage)?;
     actions.into_iter().try_for_each(|action| {
         let relative = action.path().relative();
+        let stage_file = |bytes: &[u8], mode| {
+            let (parent, leaf) = open_or_create_capability_parent(&root, relative.as_path())?;
+            write_staged_file(&parent, &leaf, bytes, mode)
+                .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
+        };
         match action {
             RepositoryAction::CreateDirectory { .. } if relative.is_root() => Ok(()),
             RepositoryAction::CreateDirectory { .. } => {
@@ -67,12 +72,13 @@ pub(in crate::storage) fn stage_new_data_root<'a>(
                     outcome => outcome.map_err(Into::into),
                 }
             }
-            RepositoryAction::WriteFile { bytes, mode, .. } => {
-                let (parent, leaf) = open_or_create_capability_parent(&root, relative.as_path())?;
-                write_staged_file(&parent, &leaf, bytes, *mode)
-                    .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))
-            }
-            RepositoryAction::SetMode { .. } | RepositoryAction::DeleteFile { .. } => Err(
+            RepositoryAction::WriteFile { bytes, mode, .. } => stage_file(bytes, *mode),
+            RepositoryAction::AppendEvents {
+                offset: 0, bytes, ..
+            } => stage_file(bytes, crate::repository_state::FileMode::Regular),
+            RepositoryAction::SetMode { .. }
+            | RepositoryAction::DeleteFile { .. }
+            | RepositoryAction::AppendEvents { .. } => Err(
                 RepositoryStateStoreError::UnsafeTarget(format!("{:?}", action.path())),
             ),
         }
