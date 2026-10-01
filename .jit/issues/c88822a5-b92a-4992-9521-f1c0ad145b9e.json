@@ -66,7 +66,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-10-01T11:28:54.393958581Z",
+      "updated_at": "2026-10-01T13:39:55.666578342Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -90,5 +90,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-10-01T11:42:01.711479530Z"
+  "updated_at": "2026-10-01T13:39:55.666578342Z"
 }
