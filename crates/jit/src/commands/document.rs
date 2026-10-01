@@ -314,30 +314,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             } else {
                 document_scan_capture_spec(initial_paths, &source, &BTreeSet::new())?
             };
-            let Some(image) = capture_or_retry(session.capture(initial_spec))? else {
+            let Some(image) = capture_discovering(session, initial_spec, |image, spec| {
+                if skip_scan {
+                    return Ok(());
+                }
+                let scan = scan_document_source(&layout, image, path, &source)?;
+                discover_scan_assets(spec, &source, &scan.required_paths)
+            })?
+            else {
                 return Ok(SessionStep::Retry);
             };
-
-            let initial_scan = if skip_scan {
+            let scan = if skip_scan {
                 CapturedDocumentScan::empty()
             } else {
                 scan_document_source(&layout, &image, path, &source)?
-            };
-            let captured_asset_paths = initial_scan.required_paths.clone();
-            let (image, scan) = if captured_asset_paths.is_empty() {
-                (image, initial_scan)
-            } else {
-                let expanded_paths = BTreeSet::from([issue_path.clone(), events_path.clone()]);
-                let spec =
-                    document_scan_capture_spec(expanded_paths, &source, &captured_asset_paths)?;
-                let Some(image) = capture_or_retry(session.capture(spec))? else {
-                    return Ok(SessionStep::Retry);
-                };
-                let scan = scan_document_source(&layout, &image, path, &source)?;
-                if !scan.required_paths.is_subset(&captured_asset_paths) {
-                    return Ok(SessionStep::Retry);
-                }
-                (image, scan)
             };
             let scan = hydrate_document_scan(&layout, &image, &source, scan)?;
 
@@ -971,34 +961,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 &source,
                 &Default::default(),
             )?;
-            let Some(image) = capture_or_retry(session.capture(initial))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let issue = captured_issue(&image, &issue_path, issue_id)?;
-            let current_assets = issue
-                .documents
-                .iter()
-                .find(|document| document.path == path)
-                .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?
-                .assets
-                .clone();
-            let initial_scan = scan_document_source(&layout, &image, path, &source)?;
-            if let Some(warning) = initial_scan.warning {
-                warnings.push(warning.message().to_string());
-                return Ok(SessionStep::Done(match warning {
-                    DocumentScanWarning::Missing(_) => current_assets,
-                    DocumentScanWarning::Failed(_) => Vec::new(),
-                }));
-            }
-            let expanded_paths = initial_scan.required_paths;
-            let expanded = document_scan_capture_spec(
-                [issue_path.clone(), events_path.clone()]
-                    .into_iter()
-                    .collect(),
-                &source,
-                &expanded_paths,
-            )?;
-            let Some(image) = capture_or_retry(session.capture(expanded))? else {
+            let Some(image) = capture_discovering(session, initial, |image, spec| {
+                let scan = scan_document_source(&layout, image, path, &source)?;
+                discover_scan_assets(spec, &source, &scan.required_paths)
+            })?
+            else {
                 return Ok(SessionStep::Retry);
             };
             let mut issue = captured_issue(&image, &issue_path, issue_id)?;
@@ -1008,9 +975,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .find(|document| document.path == path)
                 .ok_or_else(|| anyhow!("document '{path}' changed during rescan"))?;
             let scan = scan_document_source(&layout, &image, path, &source)?;
-            if !scan.required_paths.is_subset(&expanded_paths) {
-                return Ok(SessionStep::Retry);
-            }
             if let Some(warning) = scan.warning {
                 warnings.push(warning.message().to_string());
                 return Ok(SessionStep::Done(match warning {
@@ -1367,25 +1331,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         with_mutation_session(&self.storage, layout, "document link check", |session| {
             let spec = link_check_capture_spec(documents, &BTreeSet::new())?;
-            let Some(image) = capture_or_retry(session.capture(spec))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let targets = pinned_link_targets(&image, documents, link_validator);
-            if targets.is_empty() {
-                return Ok(SessionStep::Done(read_documents(
-                    &image,
-                    documents,
-                    link_validator,
-                )?));
-            }
-            let Some(image) =
-                capture_or_retry(session.capture(link_check_capture_spec(documents, &targets)?))?
+            let Some(image) = capture_discovering(session, spec, |image, spec| {
+                pinned_link_targets(image, documents, link_validator)
+                    .iter()
+                    .try_for_each(|(revision, path)| discover_derived_pinned(spec, revision, path))
+            })?
             else {
                 return Ok(SessionStep::Retry);
             };
-            if !pinned_link_targets(&image, documents, link_validator).is_subset(&targets) {
-                return Ok(SessionStep::Retry);
-            }
             Ok(SessionStep::Done(read_documents(
                 &image,
                 documents,
@@ -1428,7 +1381,7 @@ fn link_check_capture_spec(
     use crate::repository_state::CaptureSpec;
     use std::collections::BTreeSet;
 
-    let mut spec = CaptureSpec::phase_one(Vec::new(), LINK_CHECK_CAPTURE_BUDGET)?;
+    let mut spec = CaptureSpec::new(Vec::new(), LINK_CHECK_CAPTURE_BUDGET)?;
     let mut worktree = BTreeSet::new();
     for (_, document) in documents {
         let requests = DocumentReferenceRequests::for_reference(document)?;
@@ -1579,14 +1532,9 @@ fn read_document(
 fn document_capture_spec(
     paths: std::collections::BTreeSet<crate::repository_state::VirtualPath>,
 ) -> Result<crate::repository_state::CaptureSpec> {
-    use crate::repository_state::{CaptureSpec, RepositoryRootClass};
+    use crate::repository_state::CaptureSpec;
 
-    let (worktree_paths, data_paths): (Vec<_>, Vec<_>) = paths
-        .into_iter()
-        .partition(|path| path.root_class() == RepositoryRootClass::Worktree);
-    let mut spec = CaptureSpec::phase_one(data_paths, document_capture_budget())?;
-    spec.discover_paths(worktree_paths)?;
-    Ok(spec)
+    Ok(CaptureSpec::new(paths, document_capture_budget())?)
 }
 
 fn document_scan_capture_spec(
@@ -1595,6 +1543,16 @@ fn document_scan_capture_spec(
     asset_paths: &std::collections::BTreeSet<crate::repository_state::VirtualPath>,
 ) -> Result<crate::repository_state::CaptureSpec> {
     let mut spec = document_capture_spec(data_paths)?;
+    discover_scan_assets(&mut spec, source, asset_paths)?;
+    Ok(spec)
+}
+
+/// Add a scan's source document and the assets it requires to `spec`.
+fn discover_scan_assets(
+    spec: &mut crate::repository_state::CaptureSpec,
+    source: &DocumentScanSource,
+    asset_paths: &std::collections::BTreeSet<crate::repository_state::VirtualPath>,
+) -> Result<()> {
     match source {
         DocumentScanSource::Worktree(document_path) => {
             spec.discover_paths(asset_paths.iter().cloned().chain([document_path.clone()]))?
@@ -1606,7 +1564,7 @@ fn document_scan_capture_spec(
             }
         }
     }
-    Ok(spec)
+    Ok(())
 }
 
 fn captured_issue(

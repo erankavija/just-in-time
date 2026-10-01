@@ -148,10 +148,7 @@ impl PackageTreeCapture {
             paths.extend(path.ancestor_directories()?);
             paths.insert(path);
         }
-        // Every path here is worktree content, which phase one never reads, so
-        // the whole set is discovered rather than fixed.
-        let mut spec = CaptureSpec::phase_one(std::iter::empty(), budget)?;
-        spec.discover_paths(paths)?;
+        let mut spec = CaptureSpec::new(paths, budget)?;
         spec.discover_listing(self.destination.clone())?;
         Ok(spec)
     }

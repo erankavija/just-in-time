@@ -106,7 +106,7 @@ impl RepositoryExportIntent {
             .iter()
             .filter(|path| path.root_class() == RepositoryRootClass::Data)
             .cloned();
-        let mut spec = CaptureSpec::phase_one(fixed, budget)?;
+        let mut spec = CaptureSpec::new(fixed, budget)?;
         spec.discover_paths(
             paths
                 .into_iter()

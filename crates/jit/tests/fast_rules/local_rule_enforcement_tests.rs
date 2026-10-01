@@ -804,6 +804,15 @@ impl jit::storage::RepositoryMutationSession for FailingMutationSession {
         self.inner.capture(spec)
     }
 
+    fn extend(
+        &mut self,
+        image: jit::repository_state::RepositoryImage,
+        spec: jit::repository_state::CaptureSpec,
+    ) -> Result<jit::repository_state::RepositoryImage, jit::storage::RepositoryStateStoreError>
+    {
+        self.inner.extend(image, spec)
+    }
+
     fn apply(
         &mut self,
         _plan: &jit::repository_state::MaterializationPlan,

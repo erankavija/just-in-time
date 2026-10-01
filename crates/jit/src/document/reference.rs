@@ -334,7 +334,7 @@ mod tests {
     ) -> RepositoryImage {
         let requests = DocumentReferenceRequests::for_reference(document).unwrap();
         let (revision, path) = requests.pinned();
-        let mut spec = CaptureSpec::phase_one(Vec::new(), BUDGET).unwrap();
+        let mut spec = CaptureSpec::new(Vec::new(), BUDGET).unwrap();
         let mut entries = BTreeMap::new();
         if let Some(worktree) = requests.worktree() {
             spec.discover_paths([worktree.clone()]).unwrap();

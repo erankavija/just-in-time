@@ -165,7 +165,7 @@ mod tests {
             paths.push(path.clone());
             entries.insert(path, file_entry(text));
         }
-        let mut spec = CaptureSpec::phase_one(paths, budget).unwrap();
+        let mut spec = CaptureSpec::new(paths, budget).unwrap();
         let mut listings = BTreeMap::new();
         if let Some(names) = issues_listing {
             let dir = VirtualPath::data("issues").unwrap();

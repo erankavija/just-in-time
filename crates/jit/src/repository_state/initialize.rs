@@ -1429,7 +1429,7 @@ mod tests {
             .iter()
             .map(|(path, _)| path.clone())
             .collect::<Vec<_>>();
-        let spec = CaptureSpec::phase_one(
+        let spec = CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,

@@ -52,39 +52,30 @@ impl<S: IssueStore> CommandExecutor<S> {
         // authority across fresh-session conflict retries.
         let context = super::production_mutation_context();
         with_mutation_session(&self.storage, &layout, "lifecycle migration", |session| {
-            let Some(first) = capture_or_retry(session.capture(CaptureSpec::phase_one(
-                [index_path.clone(), events_path.clone()],
-                budget,
-            )?))?
+            let spec = CaptureSpec::new([index_path.clone(), events_path.clone()], budget)?;
+            let Some(image) = capture_discovering(session, spec, |image, spec| {
+                let index = crate::storage::json::parse_repository_index(
+                    image.file_bytes(&index_path)?.ok_or_else(|| {
+                        anyhow!("index.json is absent during lifecycle migration")
+                    })?,
+                )?;
+                Ok(spec.discover_paths(
+                    index
+                        .all_ids
+                        .iter()
+                        .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )?)
+            })?
             else {
                 return Ok(SessionStep::Retry);
             };
-            let discovery_index = crate::storage::json::parse_repository_index(
-                first
-                    .file_bytes(&index_path)?
-                    .ok_or_else(|| anyhow!("index.json is absent during lifecycle migration"))?,
-            )?;
-            let discovered_ids = discovery_index.all_ids;
-            let mut spec =
-                CaptureSpec::phase_one([index_path.clone(), events_path.clone()], budget)?;
-            spec.discover_paths(
-                discovered_ids
-                    .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )?;
-            let Some(image) = capture_or_retry(session.capture(spec))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let index = crate::storage::json::parse_repository_index(
+            let ids = crate::storage::json::parse_repository_index(
                 image
                     .file_bytes(&index_path)?
                     .ok_or_else(|| anyhow!("index.json is absent during lifecycle migration"))?,
-            )?;
-            let ids = index.all_ids;
-            if ids != discovered_ids {
-                return Ok(SessionStep::Retry);
-            }
+            )?
+            .all_ids;
             let event_text = std::str::from_utf8(image.file_bytes(&events_path)?.unwrap_or(&[]))?;
             let events = crate::domain::parse_known_events(event_text)?;
             let issues = ids

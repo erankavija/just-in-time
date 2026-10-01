@@ -1446,7 +1446,7 @@ mod tests {
     /// Build an image over a fixed set of `Data(...)` entries.
     fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
         let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        let spec = CaptureSpec::phase_one(paths, budget()).unwrap();
+        let spec = CaptureSpec::new(paths, budget()).unwrap();
         RepositoryImage::close(
             layout(),
             spec,

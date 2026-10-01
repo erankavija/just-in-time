@@ -607,7 +607,7 @@ mod tests {
     use crate::domain::DocumentReference;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
-        RepositoryLayout, RepositoryRootClass, RepositoryRootEvidence,
+        RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -631,10 +631,7 @@ mod tests {
         MutationContext::preview()
     }
 
-    /// Close an image over the given entries. Phase one accepts only fixed
-    /// `Data(...)` paths (`@/inv/...` capture discipline); every `Worktree(...)`
-    /// path — every document/artifact path this finalizer touches — is enqueued
-    /// as a discovered phase-two path instead. Every finalization reads the
+    /// Close an image over the given entries. Every finalization reads the
     /// archive-coverage event tail first, so an absent `events.jsonl` entry is
     /// captured by default unless the caller supplies its own.
     fn image_with(mut entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
@@ -642,12 +639,8 @@ mod tests {
         if !entries.iter().any(|(path, _)| path == &events_path) {
             entries.push((events_path, RepositoryEntry::Absent));
         }
-        let (data_paths, worktree_paths): (Vec<_>, Vec<_>) = entries
-            .iter()
-            .map(|(path, _)| path.clone())
-            .partition(|path| path.root_class() == RepositoryRootClass::Data);
-        let mut spec = CaptureSpec::phase_one(data_paths, budget()).unwrap();
-        spec.discover_paths(worktree_paths).unwrap();
+        let spec =
+            CaptureSpec::new(entries.iter().map(|(path, _)| path.clone()), budget()).unwrap();
         RepositoryImage::close(
             layout(),
             spec,

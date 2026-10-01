@@ -57,7 +57,7 @@ fn test_json_apply_admits_an_advisory_listing_that_became_readable() {
     let secret_path = VirtualPath::worktree("notes/secret").unwrap();
     let published_path = VirtualPath::worktree("published.txt").unwrap();
     let spec = || {
-        let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
         spec.discover_advisory_paths([secret_path.clone()]).unwrap();
         spec.discover_paths([published_path.clone()]).unwrap();
         spec.discover_listing(secret_path.clone()).unwrap();
@@ -169,7 +169,7 @@ fn test_json_linked_capture_reads_uncommitted_primary_store_through_worktree_pat
     storage.configure_worktree_paths(&paths);
     let mut session = storage.open_mutation_session(layout).unwrap();
     let path = VirtualPath::data("config.toml").unwrap();
-    let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+    let mut spec = CaptureSpec::new([], budget()).unwrap();
     spec.discover_linked_worktree(path.clone()).unwrap();
 
     let image = session.capture(spec).unwrap();
@@ -180,7 +180,7 @@ fn test_json_linked_capture_reads_uncommitted_primary_store_through_worktree_pat
 }
 
 fn initial_spec() -> CaptureSpec {
-    let mut spec = CaptureSpec::phase_one(
+    let mut spec = CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("index.json").unwrap(),
@@ -287,7 +287,7 @@ fn issue_creation_delta(
 }
 
 fn issue_creation_spec(issue_id: &str) -> CaptureSpec {
-    CaptureSpec::phase_one(
+    CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("index.json").unwrap(),
@@ -373,7 +373,7 @@ fn test_json_and_memory_share_absent_root_actions_and_hash() {
 }
 
 fn image_binding_spec() -> CaptureSpec {
-    CaptureSpec::phase_one(
+    CaptureSpec::new(
         [
             VirtualPath::data("target.txt").unwrap(),
             VirtualPath::data("evidence.txt").unwrap(),
@@ -489,7 +489,7 @@ fn test_set_mode_replaces_inode_without_chmodding_external_hard_link() {
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
     let path = VirtualPath::data("mode.txt").unwrap();
     let image = session
-        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .capture(CaptureSpec::new([path.clone()], budget()).unwrap())
         .unwrap();
     let delta = RepositoryDelta::new(
         &layout,
@@ -528,7 +528,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
     let path = VirtualPath::data("index.json").unwrap();
     let mut first = storage.open_mutation_session(stale_layout.clone()).unwrap();
     let image = first
-        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .capture(CaptureSpec::new([path.clone()], budget()).unwrap())
         .unwrap();
     let delta = RepositoryDelta::new(
         &stale_layout,
@@ -546,7 +546,7 @@ fn test_same_storage_reuses_its_own_absent_root_publication_evidence() {
 
     let mut second = storage.open_mutation_session(stale_layout).unwrap();
     let refreshed = second
-        .capture(CaptureSpec::phase_one([path.clone()], budget()).unwrap())
+        .capture(CaptureSpec::new([path.clone()], budget()).unwrap())
         .unwrap();
     assert!(matches!(
         refreshed.entry(&path),
@@ -662,7 +662,7 @@ fn test_memory_set_mode_uses_exact_file_preimage() {
         );
     }
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::phase_one([VirtualPath::data("tool").unwrap()], budget()).unwrap();
+    let spec = CaptureSpec::new([VirtualPath::data("tool").unwrap()], budget()).unwrap();
     let image = session.capture(spec).unwrap();
     let path = VirtualPath::data("tool").unwrap();
     let delta = RepositoryDelta::new(
@@ -701,6 +701,7 @@ enum SemanticEntry {
     Absent,
     Directory(FileMode),
     File(Vec<u8>, FileMode),
+    FileTail(u64, Vec<u8>, FileMode),
     Symlink(Vec<u8>),
     Unsupported,
 }
@@ -711,6 +712,9 @@ fn semantic_entry(entry: &RepositoryEntry) -> SemanticEntry {
         RepositoryEntry::Directory { mode, .. } => SemanticEntry::Directory(*mode),
         RepositoryEntry::File { content, mode } => {
             SemanticEntry::File(content.bytes().to_vec(), *mode)
+        }
+        RepositoryEntry::FileTail { tail, mode } => {
+            SemanticEntry::FileTail(tail.length(), tail.tail().to_vec(), *mode)
         }
         RepositoryEntry::Symlink { target, .. } => SemanticEntry::Symlink(target.bytes().to_vec()),
         RepositoryEntry::Unsupported { .. } => SemanticEntry::Unsupported,
@@ -770,7 +774,7 @@ fn test_conformance_absent_root_publishes_identically_across_topologies() {
 
 #[cfg(unix)]
 fn existing_conformance_spec() -> CaptureSpec {
-    let mut spec = CaptureSpec::phase_one(
+    let mut spec = CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("keep.txt").unwrap(),
@@ -934,7 +938,7 @@ fn test_conformance_worktree_only_absent_root_is_refused_as_uncommittable() {
     let note = worktree.path().join("note.txt");
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let make_spec = || {
-        let mut spec = CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+        let mut spec = CaptureSpec::new([VirtualPath::data("").unwrap()], budget()).unwrap();
         spec.discover_paths([VirtualPath::worktree("note.txt").unwrap()])
             .unwrap();
         spec
@@ -1000,7 +1004,7 @@ fn test_conformance_empty_delta_is_a_noop_on_both_backends() {
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let spec = || CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+    let spec = || CaptureSpec::new([VirtualPath::data("").unwrap()], budget()).unwrap();
     let delta = RepositoryDelta::new(&layout, vec![]).unwrap();
 
     let memory = InMemoryStorage::new();
@@ -1048,7 +1052,7 @@ fn test_conformance_a_nested_write_creates_its_parent_on_both_backends() {
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let nested = VirtualPath::data("nested/file.txt").unwrap();
     let spec = || {
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             [
                 VirtualPath::data("").unwrap(),
                 VirtualPath::data("nested").unwrap(),
@@ -1096,7 +1100,7 @@ fn test_conformance_listing_over_file_errors_on_both_backends() {
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = || {
         let mut spec =
-            CaptureSpec::phase_one([VirtualPath::data("file.txt").unwrap()], budget()).unwrap();
+            CaptureSpec::new([VirtualPath::data("file.txt").unwrap()], budget()).unwrap();
         spec.discover_listing(VirtualPath::data("file.txt").unwrap())
             .unwrap();
         spec
@@ -1125,7 +1129,7 @@ fn test_conformance_worktree_root_listing_canonicalizes_nested_data_child() {
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = || {
         let root = VirtualPath::worktree("").unwrap();
-        let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
         spec.discover_paths([root.clone()]).unwrap();
         spec.discover_listing(root).unwrap();
         spec
@@ -1169,7 +1173,7 @@ fn test_json_session_opens_beneath_non_utf8_ancestor() {
     let storage = JsonFileStorage::new(&data);
     let mut session = storage.open_mutation_session(layout).unwrap();
     let image = session
-        .capture(CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap())
+        .capture(CaptureSpec::new([VirtualPath::data("").unwrap()], budget()).unwrap())
         .unwrap();
 
     assert!(matches!(
@@ -1188,7 +1192,7 @@ fn test_capture_listing_child_shares_the_identity_of_its_captured_path() {
     std::fs::write(data.join("issues").join("a.json"), b"{}").unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let path = VirtualPath::data("issues/a.json").unwrap();
-    let mut spec = CaptureSpec::phase_one([path.clone()], budget()).unwrap();
+    let mut spec = CaptureSpec::new([path.clone()], budget()).unwrap();
     spec.discover_listing(VirtualPath::data("issues").unwrap())
         .unwrap();
 
@@ -1204,6 +1208,94 @@ fn test_capture_listing_child_shares_the_identity_of_its_captured_path() {
     assert_eq!(Some(listed), image.entry(&path).unwrap().identity());
 }
 
+/// Replaces a file's bytes behind a session's back.
+type Writer = Box<dyn Fn(&VirtualPath, &[u8])>;
+type WrittenSession = (Box<dyn RepositoryMutationSession>, Writer);
+
+/// A session over `files` on each backend, with its [`Writer`].
+fn sessions_over(files: &[(VirtualPath, &[u8])]) -> (TempDir, [WrittenSession; 2]) {
+    let worktree = TempDir::new().unwrap();
+    let data = worktree.path().join(".jit");
+    std::fs::create_dir(&data).unwrap();
+    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
+    let resolve = layout.clone();
+    let json: Writer =
+        Box::new(move |path, bytes| std::fs::write(resolve.resolve(path).unwrap(), bytes).unwrap());
+    files.iter().for_each(|(path, bytes)| json(path, bytes));
+    let memory = InMemoryStorage::new();
+    seed_memory_existing(&memory, files);
+    let sessions = [
+        JsonFileStorage::new(&data).open_mutation_session(layout.clone()),
+        memory.open_mutation_session(layout),
+    ]
+    .map(Result::unwrap);
+    let memory: Writer =
+        Box::new(move |path, bytes| seed_memory_existing(&memory, &[(path.clone(), bytes)]));
+    let [json_session, memory_session] = sessions;
+    (worktree, [(json_session, json), (memory_session, memory)])
+}
+
+/// Growing an image reads only what it lacks: a path it holds keeps the bytes
+/// first read, and a path asked for in another read mode is read again.
+#[test]
+fn test_conformance_extend_reads_only_what_the_image_lacks_on_both_backends() {
+    let (kept, added) = (VirtualPath::INDEX, VirtualPath::CONFIG);
+    let log = vec![b'x'; EVENT_LOG_TAIL_WINDOW as usize + 1];
+    let (_worktree, sessions) = sessions_over(&[
+        (kept.clone(), b"first"),
+        (added.clone(), b"added"),
+        (VirtualPath::EVENTS, &log),
+    ]);
+    for (mut session, write) in sessions {
+        let mut spec = CaptureSpec::new([kept.clone()], budget()).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        let image = session.capture(spec).unwrap();
+        write(&kept, b"second");
+        let mut spec = image.capture_spec().clone();
+        spec.discover_paths([added.clone(), VirtualPath::EVENTS])
+            .unwrap();
+
+        let grown = session.extend(image, spec).unwrap();
+
+        assert_eq!(grown.file_bytes(&kept).unwrap(), Some(&b"first"[..]));
+        assert_eq!(grown.file_bytes(&added).unwrap(), Some(&b"added"[..]));
+        assert_eq!(
+            grown.file_bytes(&VirtualPath::EVENTS).unwrap(),
+            Some(&log[..])
+        );
+    }
+}
+
+/// A tail read holds the file's length and its last window of bytes, and a
+/// producer asking for the whole file fails typed.
+#[test]
+fn test_conformance_tail_capture_holds_length_and_window_on_both_backends() {
+    let log = (0..EVENT_LOG_TAIL_WINDOW * 2 + 7)
+        .map(|byte| byte as u8)
+        .collect::<Vec<_>>();
+    let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
+    for (mut session, _) in sessions {
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+
+        let image = session.capture(spec).unwrap();
+
+        let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS).unwrap()
+        else {
+            panic!("a tail read captures a tail");
+        };
+        assert_eq!(tail.length(), log.len() as u64);
+        assert_eq!(
+            tail.tail(),
+            &log[log.len() - EVENT_LOG_TAIL_WINDOW as usize..]
+        );
+        assert!(matches!(
+            image.file_bytes(&VirtualPath::EVENTS),
+            Err(CaptureError::TailOnlyCapture(_))
+        ));
+    }
+}
+
 fn capture_listing_errors(
     children: &[(&str, &[u8])],
     budget: CaptureBudget,
@@ -1216,7 +1308,7 @@ fn capture_listing_errors(
     }
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = || {
-        let mut spec = CaptureSpec::phase_one([], budget).unwrap();
+        let mut spec = CaptureSpec::new([], budget).unwrap();
         spec.discover_listing(VirtualPath::data("issues").unwrap())
             .unwrap();
         spec
@@ -1313,7 +1405,7 @@ fn test_conformance_empty_delta_ignores_armed_injectors() {
         let data = worktree.path().join(".jit");
         std::fs::create_dir(&data).unwrap();
         let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-        let spec = || CaptureSpec::phase_one([VirtualPath::data("").unwrap()], budget()).unwrap();
+        let spec = || CaptureSpec::new([VirtualPath::data("").unwrap()], budget()).unwrap();
         let delta = RepositoryDelta::new(&layout, vec![]).unwrap();
 
         // An empty delta writes no record on either backend, so no step of a
@@ -1356,7 +1448,7 @@ fn test_conformance_absent_root_data_only_materializes_data_root_dir() {
         let data = worktree.path().join(".jit");
         let layout = discover_repository_layout(worktree.path(), &data).unwrap();
         let spec = || {
-            CaptureSpec::phase_one(
+            CaptureSpec::new(
                 [
                     VirtualPath::data("").unwrap(),
                     VirtualPath::data("index.json").unwrap(),
@@ -1498,7 +1590,7 @@ fn test_json_apply_rejects_data_root_replaced_since_capture_as_retryable_conflic
 
     let storage = JsonFileStorage::new(&data);
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::phase_one(
+    let spec = CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("keep.txt").unwrap(),
@@ -1561,8 +1653,7 @@ fn test_absent_data_parent_replacement_before_publication_never_succeeds() {
     let storage = JsonFileStorage::with_mutation_interruptions(&data, injector);
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
     let path = VirtualPath::data("index.json").unwrap();
-    let spec =
-        CaptureSpec::phase_one([VirtualPath::data("").unwrap(), path.clone()], budget()).unwrap();
+    let spec = CaptureSpec::new([VirtualPath::data("").unwrap(), path.clone()], budget()).unwrap();
     let image = session.capture(spec).unwrap();
     let delta = RepositoryDelta::new(
         &layout,
@@ -1597,8 +1688,7 @@ fn test_delta_rejects_captured_cross_root_hard_link_alias() {
 
     let storage = JsonFileStorage::new(&data);
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
-    let mut spec =
-        CaptureSpec::phase_one([VirtualPath::data("shared").unwrap()], budget()).unwrap();
+    let mut spec = CaptureSpec::new([VirtualPath::data("shared").unwrap()], budget()).unwrap();
     spec.discover_paths([VirtualPath::worktree("shared").unwrap()])
         .unwrap();
     let image = session.capture(spec).unwrap();
@@ -1649,7 +1739,7 @@ fn test_memory_apply_rejects_stale_preimage_as_retryable_conflict() {
     seed_memory_existing(&memory, &[(VirtualPath::data("x").unwrap(), b"v1")]);
 
     let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-    let spec = CaptureSpec::phase_one([VirtualPath::data("x").unwrap()], budget()).unwrap();
+    let spec = CaptureSpec::new([VirtualPath::data("x").unwrap()], budget()).unwrap();
     let image = session.capture(spec).unwrap();
     let expected = ExpectedPreimage::of(image.entry(&VirtualPath::data("x").unwrap()).unwrap());
     let delta = RepositoryDelta::new(
@@ -1785,7 +1875,7 @@ fn seed_memory_issue(memory: &InMemoryStorage, id: &str, issue: &Issue, events: 
 }
 
 fn claim_spec(id: &str) -> CaptureSpec {
-    CaptureSpec::phase_one(
+    CaptureSpec::new(
         [
             VirtualPath::data(format!("issues/{id}.json")).unwrap(),
             VirtualPath::data("events.jsonl").unwrap(),
@@ -1993,8 +2083,7 @@ fn test_conformance_identical_full_finalizer_plan_hash_matches_both_backends() {
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let spec =
-        CaptureSpec::phase_one([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
+    let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
     let event = Event::GateDefinitionCreated {
         id: String::new(),
         timestamp: req01_instant(),
@@ -2036,7 +2125,7 @@ fn test_conformance_reconstructed_issue_maps_match_across_backends() {
     std::fs::create_dir_all(data.join("issues")).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let issue_id = crate::repository_state::IdAuthority::from_seed([31u8; 32]).uuid_at(0);
-    let spec = CaptureSpec::phase_one(
+    let spec = CaptureSpec::new(
         [
             VirtualPath::data("issues").unwrap(),
             VirtualPath::data("index.json").unwrap(),
@@ -2215,8 +2304,7 @@ fn test_conformance_empty_finalizer_noop_hash_matches_without_clock_sampling() {
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let spec =
-        CaptureSpec::phase_one([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
+    let spec = CaptureSpec::new([VirtualPath::data("events.jsonl").unwrap()], budget()).unwrap();
     let json = JsonFileStorage::new(&data);
     let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
     let json_image = json_session.capture(spec.clone()).unwrap();
@@ -2317,7 +2405,7 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
         .unwrap()
     };
     let spec = || {
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             [
                 VirtualPath::data("gate-runs").unwrap(),
                 run_dir.clone(),
@@ -2493,7 +2581,7 @@ fn test_conformance_finalize_gate_run_and_provenance_match_across_backends() {
         ]
     };
     let spec = || {
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             [
                 VirtualPath::data("gate-runs").unwrap(),
                 run_dir.clone(),
@@ -2565,7 +2653,7 @@ fn test_conformance_finalize_create_issue_multi_event_match_across_backends() {
         ]
     };
     let spec = || {
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             [
                 VirtualPath::data("issues").unwrap(),
                 issue_file.clone(),
@@ -2685,7 +2773,7 @@ fn capture_process_log(log: &Path) -> Vec<String> {
 
 #[cfg(unix)]
 fn pinned_capture_spec(paths: impl IntoIterator<Item = &'static str>) -> CaptureSpec {
-    let mut spec = CaptureSpec::phase_one([], budget()).unwrap();
+    let mut spec = CaptureSpec::new([], budget()).unwrap();
     paths
         .into_iter()
         .try_for_each(|path| spec.discover_pinned("HEAD", path))
@@ -2867,7 +2955,8 @@ impl WriteSetFixture {
             &self.roots,
             &worktree_paths,
             &self.storage,
-            CaptureSpec::phase_one(paths, budget()).unwrap(),
+            CaptureSpec::new(paths, budget()).unwrap(),
+            CapturedAnswers::default(),
         )
         .unwrap()
     }
@@ -3424,7 +3513,7 @@ fn assert_open_applies_the_leftover<B: SessionRecordBackend>() {
 
     let mut session = backend.open().unwrap();
     let image = session
-        .capture(CaptureSpec::phase_one([leftover_target()], budget()).unwrap())
+        .capture(CaptureSpec::new([leftover_target()], budget()).unwrap())
         .unwrap();
 
     assert!(
@@ -3463,7 +3552,7 @@ fn assert_an_interrupted_publication_converges<B: SessionRecordBackend>() {
             .open_interrupted(MutationPoint::Redo(RedoPoint::BeforePut { index: 0 }))
             .unwrap();
         let image = session
-            .capture(CaptureSpec::phase_one([target.clone()], budget()).unwrap())
+            .capture(CaptureSpec::new([target.clone()], budget()).unwrap())
             .unwrap();
         let delta = RepositoryDelta::new(
             session.layout(),

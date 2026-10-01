@@ -241,6 +241,16 @@ impl jit::storage::RepositoryMutationSession for PublicationProbeSession {
         Ok(image)
     }
 
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, jit::storage::RepositoryStateStoreError> {
+        let image = self.inner.extend(image, spec)?;
+        self.captures.lock().unwrap().push(image.clone());
+        Ok(image)
+    }
+
     fn apply(
         &mut self,
         plan: &jit::repository_state::MaterializationPlan,
@@ -449,7 +459,7 @@ fn repository_image<S: IssueStore + RepositoryStateStore>(store: &S) -> Reposito
             .into_iter()
             .map(|issue| VirtualPath::data(format!("issues/{}.json", issue.id)).unwrap()),
     );
-    let mut spec = CaptureSpec::phase_one(paths, SNAPSHOT_BUDGET).unwrap();
+    let mut spec = CaptureSpec::new(paths, SNAPSHOT_BUDGET).unwrap();
     spec.discover_listing(VirtualPath::data("issues").unwrap())
         .unwrap();
     let mut session = store.open_mutation_session(layout).unwrap();
@@ -668,8 +678,11 @@ fn test_lease_preflight_never_resolves_an_issue_under_repository_session() {
     assert_eq!(store.active_sessions.load(Ordering::SeqCst), 0);
 }
 
+/// A closure changed before the round reads the configuration is discovered
+/// in that same round: the image that holds the new configuration also holds
+/// the projection target it declares.
 #[test]
-fn test_phase_two_closure_change_retries_with_same_template_node_count() {
+fn test_template_round_discovers_a_changed_closure() {
     let changed_config = r#"
 [item_kinds.invariant]
 section = "success_criteria"
@@ -706,20 +719,14 @@ target = "docs/closure.md"
         .unwrap();
 
     let target = VirtualPath::worktree("docs/closure.md").unwrap();
-    let captures = store.captures();
+    let config = VirtualPath::data("config.toml").unwrap();
     assert!(store.closure_rewritten.load(Ordering::SeqCst));
-    assert!(captures.iter().any(|image| {
-        let config = VirtualPath::data("config.toml").unwrap();
-        image.capture_spec().paths().any(|path| path == &config)
-            && image
-                .file_bytes(&config)
-                .unwrap()
-                .is_some_and(|bytes| bytes == changed_config.as_bytes())
-            && !image.capture_spec().paths().any(|path| path == &target)
-    }));
-    assert!(captures
-        .iter()
-        .any(|image| image.capture_spec().paths().any(|path| path == &target)));
+    let published = store.captures().pop().expect("the round captured");
+    assert_eq!(
+        published.file_bytes(&config).unwrap(),
+        Some(changed_config.as_bytes())
+    );
+    assert!(published.capture_spec().read_mode(&target).is_some());
     assert_eq!(store.apply_calls(), calls_before + 1);
 }
 

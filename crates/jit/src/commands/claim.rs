@@ -187,7 +187,7 @@ where
         agent: agent.clone(),
     }];
     let build_spec = || -> Result<CaptureSpec> {
-        Ok(CaptureSpec::phase_one(
+        Ok(CaptureSpec::new(
             [
                 VirtualPath::data(format!("issues/{full_id}.json"))?,
                 VirtualPath::EVENTS,

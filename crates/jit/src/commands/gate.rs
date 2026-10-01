@@ -311,69 +311,47 @@ fn capture_gate_preset_image(
 
     let presets_dir = VirtualPath::GATE_PRESETS;
     let issues_dir = VirtualPath::ISSUES;
-    let mut first_spec = CaptureSpec::phase_one(
+    let mut spec = CaptureSpec::new(
         captured_gate_preset_fixed_paths(),
         GATE_PRESET_CAPTURE_BUDGET,
     )?;
-    first_spec.discover_listing(presets_dir.clone())?;
-    first_spec.discover_listing(issues_dir.clone())?;
-    let Some(first) = capture_or_retry(session.capture(first_spec))? else {
-        return Ok(None);
-    };
-    let discovered_presets = listed_gate_preset_paths(&first)?;
-    let index_bytes = first
-        .file_bytes(&VirtualPath::INDEX)?
-        .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-    let discovered_index = crate::storage::json::parse_repository_index(index_bytes)?;
-    let issue_paths = discovered_index
-        .all_ids
-        .iter()
-        .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
-        .collect::<Result<Vec<_>>>()?;
-    let closure = if include_projection_closure {
-        let config = assemble_config(&first)?;
-        let rules_text = super::image_repo_bytes(&first, ".jit/rules.toml")?
-            .map(String::from_utf8)
-            .transpose()?;
-        render_capture_closure(first.layout(), &config, &[], rules_text.as_deref())?
-    } else {
-        Vec::new()
-    };
-
-    let mut spec = CaptureSpec::phase_one(
-        captured_gate_preset_fixed_paths(),
-        GATE_PRESET_CAPTURE_BUDGET,
-    )?;
-    let presets_prefix = presets_dir.relative().as_str();
+    spec.discover_listings([presets_dir.clone(), issues_dir.clone()])?;
     let create_path = create_target
-        .map(|name| VirtualPath::data(format!("{presets_prefix}/{name}.json")))
+        .map(|name| VirtualPath::data(format!("{}/{name}.json", presets_dir.relative().as_str())))
         .transpose()?;
-    spec.discover_paths(
-        discovered_presets
+    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+        let index_bytes = image
+            .file_bytes(&VirtualPath::INDEX)?
+            .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+        let issue_paths = crate::storage::json::parse_repository_index(index_bytes)?
+            .all_ids
             .iter()
-            .cloned()
-            .chain(issue_paths)
-            .chain(closure)
-            .chain(create_path),
-    )?;
-    spec.discover_listing(presets_dir)?;
-    spec.discover_listing(issues_dir.clone())?;
-    let Some(image) = capture_or_retry(session.capture(spec))? else {
+            .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+            .collect::<Result<Vec<_>>>()?;
+        let closure = if include_projection_closure {
+            let config = assemble_config(image)?;
+            let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            render_capture_closure(image.layout(), &config, &[], rules_text.as_deref())?
+        } else {
+            Vec::new()
+        };
+        Ok(spec.discover_paths(
+            listed_gate_preset_paths(image)?
+                .into_iter()
+                .chain(issue_paths)
+                .chain(closure)
+                .chain(create_path.clone()),
+        )?)
+    })?
+    else {
         return Ok(None);
     };
-    if listed_gate_preset_paths(&image)? != discovered_presets {
-        return Ok(None);
-    }
     let current_index = image
         .file_bytes(&VirtualPath::INDEX)?
         .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))
         .and_then(crate::storage::json::parse_repository_index)?;
-    if current_index.schema_version != discovered_index.schema_version
-        || current_index.all_ids != discovered_index.all_ids
-        || current_index.deleted_ids != discovered_index.deleted_ids
-    {
-        return Ok(None);
-    }
     let listing = image
         .listing_fingerprints()
         .get(&issues_dir)
@@ -1125,25 +1103,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             &layout,
             "gate registry mutation",
             |session| {
-                let Some(image_one) = capture_or_retry(
-                    session.capture(CaptureSpec::phase_one(registries()?, budget)?),
-                )?
+                let spec = CaptureSpec::new(registries()?, budget)?;
+                let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+                    let config = assemble_config(image)?;
+                    let rules_text = super::image_repo_bytes(image, ".jit/rules.toml")?
+                        .map(String::from_utf8)
+                        .transpose()?;
+                    Ok(spec.discover_paths(render_capture_closure(
+                        image.layout(),
+                        &config,
+                        &[],
+                        rules_text.as_deref(),
+                    )?)?)
+                })?
                 else {
-                    return Ok(SessionStep::Retry);
-                };
-                let config = assemble_config(&image_one)?;
-                let rules_text = super::image_repo_bytes(&image_one, ".jit/rules.toml")?
-                    .map(String::from_utf8)
-                    .transpose()?;
-                let closure = render_capture_closure(
-                    image_one.layout(),
-                    &config,
-                    &[],
-                    rules_text.as_deref(),
-                )?;
-                let mut spec = CaptureSpec::phase_one(registries()?, budget)?;
-                spec.discover_paths(closure)?;
-                let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
                 let gates_path = VirtualPath::GATES;
@@ -2240,7 +2213,7 @@ style = "full"
         seed_repo_file(&storage, ".jit/config.toml", "");
         let layout = storage.repository_layout();
         let spec = || {
-            CaptureSpec::phase_one(
+            CaptureSpec::new(
                 [
                     VirtualPath::data("config.toml").unwrap(),
                     VirtualPath::data("invariants.toml").unwrap(),
