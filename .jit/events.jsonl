@@ -16186,3 +16186,4 @@
 {"fields":["documents"],"id":"5f03792a-3fc5-4517-89d9-ee3a2d5b3508","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:19.049107636Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"aedd9143-f224-4479-a425-df6fb9154b0e","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:15:01.671186909Z","type":"issue_updated","updated_by":"doc-add"}
 {"gate_key":"docs-mechanical","id":"ff1a6f65-33ce-44fb-8a7d-81868a761608","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:15:12.703303820Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"020561b0-d7e6-491e-9c0d-4dc5b089f240","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:16:02.714284369Z","type":"gate_passed","updated_by":"auto:executor"}

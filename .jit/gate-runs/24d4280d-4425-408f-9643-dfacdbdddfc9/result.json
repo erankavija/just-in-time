@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fe0b87298c02fa2ecb3eced0b99ca5f04e362f77",
+  "completed_at": "2026-10-01T20:16:02.502378344Z",
+  "duration_ms": 49246,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue changes only internal benchmark evidence and tracker records, with no adopter-facing documentation impact.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "722878d4-fb2a-4226-b007-6c07e6d49cb9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "24d4280d-4425-408f-9643-dfacdbdddfc9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T20:15:13.255878274Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `722878d4` is a leaf task (maximum hierarchy level; no resolved DAG children). I inspected its five reachable `jit:722878d4` commits individually with rename detection. Their union changes only the internal benchmark harness, evidence artifact under `dev/`, and `.jit` records; the merge duplicates earlier tagged content.\n\nNo adopter-facing command, workflow, configuration, or documentation contract changed. No adopter documentation update is required.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue changes only internal benchmark evidence and tracker records, with no adopter-facing documentation impact.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
