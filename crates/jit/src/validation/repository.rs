@@ -291,9 +291,11 @@ pub(crate) fn validate_repository_with_materializations(
     }
 
     if let Some(records) = &records {
-        let credit_namespaces = rules_loaded
-            .then(|| crate::validation::graph::coverage_credit_namespaces(&rules.rules))
-            .unwrap_or_default();
+        let credit_namespaces = if rules_loaded {
+            crate::validation::graph::coverage_credit_namespaces(&rules.rules)
+        } else {
+            HashSet::new()
+        };
         match collect_item_link_findings(read, &records.issues, &config, &credit_namespaces)
             .context("item-links validation pass")
         {
