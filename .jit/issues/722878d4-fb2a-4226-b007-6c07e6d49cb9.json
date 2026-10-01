@@ -8,7 +8,67 @@
     "fe6fa7e5-fe24-4089-bcc2-5a2a2b447007"
   ],
   "description": "A committed artifact reports label-update latency before and after the change, on both repositories and on a ten-times larger event log, together with the workspace line balance.\n\n## Background\n\nPerformance is protected by benchmark evidence rather than by a timing assertion in the suite. A wall-clock assertion would be the workspace's first throughput assertion, contradicts the project's position that elapsed time is the wrong thing to decide a test on, and could not be parked when it flaked.\n\nThe artifact is produced by the repository's benchmark harness against two builds: the base revision and the tip. It reports a changing label update, an idempotent one, and a lease-refused one, on the adopter-scale repository and on this repository, plus the ten-times log fixture. It also records the cumulative line balance of the work over the workspace's Rust sources from the base revision.\n\n## Success Criteria\n\n- [hard] REQ-01: A committed artifact reports the median of three runs for a changing, an idempotent, and a lease-refused label update, before and after, on the adopter-scale repository and on this repository.\n- [hard] REQ-02: The median wall time of a changing label update after the change is under 100 milliseconds on both repositories.\n- [hard] REQ-03: The artifact reports the same scenarios on the ten-times event-log fixture, and the changing-update median differs from the unmodified repository's by less than ten percent.\n- [hard] REQ-04: The artifact states the event-log byte size and the issue count of each repository it measured.\n- [hard] REQ-05: The artifact reports the cumulative Rust line balance from the base revision `34d37f8be` over the workspace, measured with `git diff --shortstat 34d37f8be -- '*.rs'`, and that balance removes more lines than it adds.\n- [hard] REQ-06: The artifact names the harness, the two builds, and the machine conditions that produced it.\n\n## Notes\n\nThe base revision is Rust-identical to the revision at which this work began, so either spelling measures the same thing.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "61f1309b9e0134506f31e9b7abcfc4b7f777078cbde8ff6c2c8fe650695e93f2",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "footprint.py",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/footprint.py"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/footprint.md"
+    }
+  ],
+  "first_ready_at": "2026-10-01T20:07:18.790524283Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -28,7 +88,7 @@
     "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Publication cost evidence",
-  "updated_at": "2026-10-01T19:30:45.505294232Z"
+  "updated_at": "2026-10-01T20:07:19.049107636Z"
 }

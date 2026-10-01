@@ -16177,3 +16177,10 @@
 {"gate_key":"holistic-review","id":"ab3b15cb-46ed-4a3b-98a2-6e236dd3ac53","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:02:45.499862834Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"cargo-ci","id":"7d122f00-1c49-48b7-ba14-90f3fd342e64","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:03:31.720188848Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"holistic-review","id":"38ce6acf-e1da-498b-8546-efa8f6f70de7","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:07:01.616866518Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"e9c927bf-e9bf-4556-8ab9-751f2dae5485","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:07:18.702284915Z","to":"done","type":"issue_state_changed"}
+{"id":"9596c0f6-9c86-4b0f-bb37-f576f32dddf5","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:07:18.702284915Z","type":"issue_completed"}
+{"from":"backlog","id":"f92965b9-0407-4df3-815c-e70a8ead2ff0","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:18.790524283Z","to":"ready","type":"issue_state_changed"}
+{"from":"ready","id":"8ba16a5e-6d2e-41fb-afc0-3dff78b8793e","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:18.940578485Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:jit-execution-lead","id":"f1da09fb-03b4-4ae6-9237-f5ffad1555dc","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:18.940578485Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"2f25c157-e792-4b20-b338-40c42f172bf9","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:18.996133322Z","type":"issue_updated","updated_by":"doc-add"}
+{"fields":["documents"],"id":"5f03792a-3fc5-4517-89d9-ee3a2d5b3508","issue_id":"722878d4-fb2a-4226-b007-6c07e6d49cb9","timestamp":"2026-10-01T20:07:19.049107636Z","type":"issue_updated","updated_by":"doc-add"}

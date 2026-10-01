@@ -76,6 +76,7 @@
       "path": "dev/active/e590fa91/phase-net.py"
     }
   ],
+  "done_at": "2026-10-01T20:07:18.702284915Z",
   "first_ready_at": "2026-10-01T19:27:40.600747356Z",
   "gates_required": [
     "cargo-ci",
@@ -118,7 +119,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T20:07:01.616866518Z"
+  "updated_at": "2026-10-01T20:07:18.702284915Z"
 }
