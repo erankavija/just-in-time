@@ -16323,3 +16323,4 @@
 {"fields":["documents"],"id":"dec96b80-fa4a-4d9e-8b17-aa079774438e","issue_id":"faa668c9-158b-4e08-af34-79ae81b58dd7","timestamp":"2026-10-01T22:40:28.424299607Z","type":"issue_updated","updated_by":"doc-add"}
 {"fields":["documents"],"id":"565fd5f7-6812-4379-9cd2-41db8bac8a70","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T22:40:35.677797772Z","type":"issue_updated","updated_by":"doc-remove"}
 {"fields":["documents"],"id":"c4b10725-73f3-4282-a83f-3bdddc10cb46","issue_id":"f1dc843a-06ef-42a1-9e8e-4e38e60168ef","timestamp":"2026-10-01T22:40:35.727909032Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"doc-review","id":"4046ed3d-c2aa-4e5b-a2e9-d37a52cdb4d3","issue_id":"ef7848ea-910d-40f7-a005-854be92229a0","timestamp":"2026-10-01T22:42:50.228801858Z","type":"gate_passed","updated_by":"auto:executor"}
