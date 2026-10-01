@@ -73,11 +73,8 @@ fn capture(
         .into_iter()
         .map(|path| layout.classify_repository_relative(path).unwrap())
         .collect::<Vec<_>>();
-    let (fixed, discovered): (Vec<_>, Vec<_>) = paths
-        .into_iter()
-        .partition(|path| path.root_class() == RepositoryRootClass::Data);
-    let mut spec = CaptureSpec::new(
-        fixed,
+    let spec = CaptureSpec::new(
+        paths,
         CaptureBudget {
             max_listings: 0,
             max_bytes: 16 * 1024 * 1024,
@@ -85,7 +82,6 @@ fn capture(
         },
     )
     .unwrap();
-    spec.discover_paths(discovered).unwrap();
     let mut session = harness
         .storage
         .open_mutation_session(layout.clone())

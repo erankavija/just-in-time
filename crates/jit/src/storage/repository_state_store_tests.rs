@@ -180,17 +180,15 @@ fn test_json_linked_capture_reads_uncommitted_primary_store_through_worktree_pat
 }
 
 fn initial_spec() -> CaptureSpec {
-    let mut spec = CaptureSpec::new(
+    CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("index.json").unwrap(),
+            VirtualPath::worktree("note.txt").unwrap(),
         ],
         budget(),
     )
-    .unwrap();
-    spec.discover_paths([VirtualPath::worktree("note.txt").unwrap()])
-        .unwrap();
-    spec
+    .unwrap()
 }
 
 fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
@@ -774,7 +772,7 @@ fn test_conformance_absent_root_publishes_identically_across_topologies() {
 
 #[cfg(unix)]
 fn existing_conformance_spec() -> CaptureSpec {
-    let mut spec = CaptureSpec::new(
+    CaptureSpec::new(
         [
             VirtualPath::data("").unwrap(),
             VirtualPath::data("keep.txt").unwrap(),
@@ -783,13 +781,11 @@ fn existing_conformance_spec() -> CaptureSpec {
             VirtualPath::data("chmod.txt").unwrap(),
             VirtualPath::data("generated").unwrap(),
             VirtualPath::data("generated/new.txt").unwrap(),
+            VirtualPath::worktree("out.txt").unwrap(),
         ],
         budget(),
     )
-    .unwrap();
-    spec.discover_paths([VirtualPath::worktree("out.txt").unwrap()])
-        .unwrap();
-    spec
+    .unwrap()
 }
 
 fn seed_memory_existing(memory: &InMemoryStorage, files: &[(VirtualPath, &[u8])]) {
@@ -1129,8 +1125,7 @@ fn test_conformance_worktree_root_listing_canonicalizes_nested_data_child() {
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let spec = || {
         let root = VirtualPath::worktree("").unwrap();
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_paths([root.clone()]).unwrap();
+        let mut spec = CaptureSpec::new([root.clone()], budget()).unwrap();
         spec.discover_listing(root).unwrap();
         spec
     };

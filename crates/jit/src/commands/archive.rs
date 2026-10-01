@@ -318,21 +318,13 @@ fn capture_more(
     }
 }
 
-/// [`capture_more`] of `paths` (advisory ones when `advisory`) and `listings`.
+/// [`capture_more`] of `paths`.
 fn capture_paths(
     session: &mut dyn RepositoryMutationSession,
     image: &mut crate::repository_state::RepositoryImage,
-    advisory: bool,
     paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
-    listings: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
 ) -> Result<bool> {
-    capture_more(session, image, |spec| {
-        match advisory {
-            true => spec.discover_advisory_paths(paths)?,
-            false => spec.discover_paths(paths)?,
-        }
-        Ok(spec.discover_listings(listings)?)
-    })
+    capture_more(session, image, |spec| Ok(spec.discover_paths(paths)?))
 }
 
 fn image_path(
@@ -450,7 +442,7 @@ fn capture_artifact_evidence(
         if requested.is_empty() {
             return Ok(true);
         }
-        if !capture_paths(session, image, false, requested.values().cloned(), [])? {
+        if !capture_paths(session, image, requested.values().cloned())? {
             return Ok(false);
         }
         for (path, _) in requested {
@@ -464,75 +456,45 @@ fn capture_artifact_evidence(
 
 fn capture_directory_tree(
     session: &mut dyn RepositoryMutationSession,
-    mut image: crate::repository_state::RepositoryImage,
+    image: crate::repository_state::RepositoryImage,
     root: &str,
     advisory: bool,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::RepositoryEntry;
     let root_path = image_path(image.layout(), root)?;
-    if !image.entries().contains_key(&root_path)
-        && !capture_paths(session, &mut image, advisory, [root_path.clone()], [])?
-    {
-        return Ok(None);
-    }
-    match image.entry(&root_path)? {
-        RepositoryEntry::Absent
-        | RepositoryEntry::File { .. }
-        | RepositoryEntry::FileTail { .. }
-        | RepositoryEntry::Symlink { .. }
-        | RepositoryEntry::Unsupported { .. } => return Ok(Some(image)),
-        RepositoryEntry::Directory { .. } => {}
-    }
-    if !image.listing_fingerprints().contains_key(&root_path)
-        && !capture_paths(session, &mut image, advisory, [], [root_path.clone()])?
-    {
-        return Ok(None);
-    }
     let root_physical = image.layout().resolve(&root_path)?;
-    loop {
-        let mut paths = BTreeSet::new();
+    let beneath = |image: &crate::repository_state::RepositoryImage,
+                   path: &crate::repository_state::VirtualPath| {
+        image
+            .layout()
+            .resolve(path)
+            .is_ok_and(|physical| physical.starts_with(&root_physical))
+    };
+    super::grow_discovering(session, image, |image, spec| {
+        let mut paths = vec![root_path.clone()];
         for (directory, listing) in image.listing_fingerprints() {
-            if image
-                .layout()
-                .resolve(directory)?
-                .starts_with(&root_physical)
-            {
+            if beneath(image, directory) {
                 for name in listing.children().keys() {
-                    let child = image
-                        .layout()
-                        .classify_and_canonicalize(image.layout().resolve(directory)?.join(name))?;
-                    if !image.entries().contains_key(&child) {
-                        paths.insert(child);
-                    }
+                    let physical = image.layout().resolve(directory)?.join(name);
+                    paths.push(image.layout().classify_and_canonicalize(physical)?);
                 }
             }
         }
-        if !paths.is_empty() {
-            if !capture_paths(session, &mut image, advisory, paths, [])? {
-                return Ok(None);
-            }
-            continue;
+        paths.retain(|path| !spec.contains_path(path));
+        match advisory {
+            true => spec.discover_advisory_paths(paths)?,
+            false => spec.discover_paths(paths)?,
         }
-        let listings = image
-            .entries()
-            .iter()
-            .filter(|(path, entry)| {
-                matches!(entry, RepositoryEntry::Directory { .. })
-                    && image
-                        .layout()
-                        .resolve(path)
-                        .is_ok_and(|physical| physical.starts_with(&root_physical))
-                    && !image.listing_fingerprints().contains_key(path)
-            })
-            .map(|(path, _)| path.clone())
-            .collect::<BTreeSet<_>>();
-        if listings.is_empty() {
-            return Ok(Some(image));
-        }
-        if !capture_paths(session, &mut image, advisory, [], listings)? {
-            return Ok(None);
-        }
-    }
+        Ok(spec.discover_listings(
+            image
+                .entries()
+                .iter()
+                .filter(|(path, entry)| {
+                    matches!(entry, RepositoryEntry::Directory { .. }) && beneath(image, path)
+                })
+                .map(|(path, _)| path.clone()),
+        )?)
+    })
 }
 
 /// Capture and derive the advisory citation evidence for the configured scan
@@ -644,7 +606,9 @@ impl CommandExecutor<JsonFileStorage> {
                     Some(ArtifactEvidence::Directory { .. })
                 );
                 let children = if archive_is_directory {
-                    if !capture_paths(session, &mut image, false, [], [archive_path.clone()])? {
+                    if !capture_more(session, &mut image, |spec| {
+                        Ok(spec.discover_listing(archive_path.clone())?)
+                    })? {
                         return Ok(None);
                     }
                     image
@@ -665,7 +629,7 @@ impl CommandExecutor<JsonFileStorage> {
                 if archive_is_directory {
                     child_paths.push(image_path(image.layout(), &legacy)?);
                 }
-                if !capture_paths(session, &mut image, false, child_paths, [])? {
+                if !capture_paths(session, &mut image, child_paths)? {
                     return Ok(None);
                 }
                 let mut markers = Vec::new();
@@ -681,7 +645,7 @@ impl CommandExecutor<JsonFileStorage> {
                         )?);
                     }
                 }
-                if !capture_paths(session, &mut image, false, markers, [])? {
+                if !capture_paths(session, &mut image, markers)? {
                     return Ok(None);
                 }
                 let mut evidence = ArtifactEvidenceMap::from([

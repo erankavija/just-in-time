@@ -801,7 +801,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
         if checker_needs_validation_image(checker) {
-            return self.grow_proposed_base(session, initial, &BTreeMap::new(), run_paths);
+            return self.capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial));
         }
         let layout = initial.layout().clone();
         super::grow_discovering(session, initial, |image, spec| {

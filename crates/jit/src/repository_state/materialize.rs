@@ -737,12 +737,8 @@ kind = "advisory"
     }
 
     fn absent_image(paths: Vec<VirtualPath>) -> RepositoryImage {
-        let (data_paths, worktree_paths): (Vec<_>, Vec<_>) =
-            paths.iter().cloned().partition(|path| {
-                path.root_class() == crate::repository_state::RepositoryRootClass::Data
-            });
-        let mut spec = CaptureSpec::new(
-            data_paths,
+        let spec = CaptureSpec::new(
+            paths.iter().cloned(),
             CaptureBudget {
                 max_listings: 0,
                 max_bytes: 1 << 20,
@@ -750,7 +746,6 @@ kind = "advisory"
             },
         )
         .unwrap();
-        spec.discover_paths(worktree_paths).unwrap();
         RepositoryImage::close(
             layout(),
             spec,

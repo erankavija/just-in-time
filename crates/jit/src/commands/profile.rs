@@ -1027,20 +1027,14 @@ impl CommandExecutor<JsonFileStorage> {
         with_mutation_session(self.storage(), layout, "profile package tree", |session| {
             // The destination's whole subtree must be read before the delta is
             // derived, because a file it holds that the tree no longer declares
-            // is one a republication removes. A listing names its children and
-            // an entry says which of them are directories, so the declaration is
-            // expanded against each freshly captured image until it stops
-            // growing; the session revalidates every path it settles on, so a
-            // file appearing beneath the destination meanwhile is a retryable
-            // conflict rather than content that survives.
-            let mut spec = capture.capture_spec(budget)?;
-            let image = loop {
-                let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
-                    return Ok(SessionStep::Retry);
-                };
-                if !capture.expand_destination_closure(&image, &mut spec)? {
-                    break image;
-                }
+            // is one a republication removes.
+            let Some(image) = super::capture_discovering(
+                session,
+                capture.capture_spec(budget)?,
+                |image, spec| Ok(capture.expand_destination_closure(image, spec)?),
+            )?
+            else {
+                return Ok(SessionStep::Retry);
             };
             if placement == TreePlacement::RequireAbsent
                 && !matches!(image.entry(destination)?, RepositoryEntry::Absent)
@@ -2125,7 +2119,7 @@ impl CommandExecutor<JsonFileStorage> {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
         let Some(base) =
-            self.grow_proposed_base(session, base, &BTreeMap::new(), &expanded_paths)?
+            self.capture_proposed_base(session, &BTreeMap::new(), &expanded_paths, Some(base))?
         else {
             return Ok(None);
         };
@@ -2148,7 +2142,9 @@ impl CommandExecutor<JsonFileStorage> {
                 .map(|action| action.path().clone()),
         );
         let overrides = super::validation_overlay(preview.image(), preview.delta())?;
-        let Some(probe) = self.grow_proposed_base(session, base, &overrides, &extra_paths)? else {
+        let Some(probe) =
+            self.capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
+        else {
             return Ok(None);
         };
         let inputs =

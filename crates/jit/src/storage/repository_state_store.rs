@@ -548,8 +548,7 @@ impl RepositoryMutationSession for JsonMutationSession {
         image: RepositoryImage,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
-        let prior = image.into_answers(&spec);
-        self.capture_over(prior, spec)
+        self.capture_over(image.into_answers(&spec), spec)
     }
 
     fn apply(
@@ -716,8 +715,7 @@ impl RepositoryMutationSession for MemoryMutationSession {
         image: RepositoryImage,
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
-        let prior = image.into_answers(&spec);
-        self.capture_over(prior, spec)
+        self.capture_over(image.into_answers(&spec), spec)
     }
 
     fn apply(
@@ -948,24 +946,14 @@ fn ensure_write_set_unchanged_against(
     if !touches_event_log {
         return Ok(());
     }
-    match captured.entry(&VirtualPath::EVENTS)? {
-        // An ordinary captured log is the only state carrying a tail to compare;
-        // any other occupant is compared like any other write target.
-        RepositoryEntry::File { content, .. } => {
-            ensure_log_tail_unchanged(EventLogTail::of_bytes(content.bytes()), live_log_tail)
-        }
-        RepositoryEntry::FileTail { tail, .. } => {
-            ensure_log_tail_unchanged(tail.clone(), live_log_tail)
-        }
-        _ => ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
-    }
-}
-
-fn ensure_log_tail_unchanged(
-    captured: EventLogTail,
-    live_log_tail: &dyn Fn() -> Result<Option<EventLogTail>, RepositoryStateStoreError>,
-) -> Result<(), RepositoryStateStoreError> {
-    (live_log_tail()? == Some(captured))
+    // An ordinary captured log is the only state carrying a tail to compare;
+    // any other occupant is compared like any other write target.
+    let tail = match captured.entry(&VirtualPath::EVENTS)? {
+        RepositoryEntry::File { content, .. } => EventLogTail::of_bytes(content.bytes()),
+        RepositoryEntry::FileTail { tail, .. } => tail.clone(),
+        _ => return ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
+    };
+    (live_log_tail()? == Some(tail))
         .then_some(())
         .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS))
 }

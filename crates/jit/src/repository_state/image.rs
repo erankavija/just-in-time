@@ -835,9 +835,6 @@ impl CaptureSpec {
     }
 
     fn validate(&self) -> Result<(), CaptureError> {
-        if self.advisory.iter().any(|path| !self.contains_path(path)) {
-            return Err(CaptureError::AdvisoryPathNotCaptured);
-        }
         if self.listings.len() > self.budget.max_listings {
             return Err(CaptureError::ListingBudgetExceeded {
                 actual: self.listings.len(),
@@ -910,6 +907,14 @@ impl RepositoryImage {
             layout.ensure_canonical(path)?;
             if !spec.contains_path(path) {
                 return Err(CaptureError::UnexpectedCapturedPath(path.clone()));
+            }
+            if matches!(entry, RepositoryEntry::FileTail { .. })
+                && spec.read_mode(path) != Some(ReadMode::Tail)
+            {
+                return Err(CaptureError::InvalidCapturedEntry {
+                    path: path.clone(),
+                    reason: "a tail answers only a tail request".into(),
+                });
             }
             validate_entry(path, entry)?;
         }
@@ -1659,7 +1664,10 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
             ..
         }
         | RepositoryAction::AppendEvents {
-            expected: ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
+            expected:
+                ExpectedPreimage::Absent
+                | ExpectedPreimage::File { .. }
+                | ExpectedPreimage::FileTail { .. },
             ..
         }
         | RepositoryAction::SetMode {
@@ -1747,8 +1755,6 @@ pub enum CaptureError {
     ByteBudgetExceeded { actual: u64, maximum: u64 },
     #[error("capture path {0:?} exceeds the depth budget")]
     DepthBudgetExceeded(VirtualPath),
-    #[error("advisory capture path was not included in the capture read set")]
-    AdvisoryPathNotCaptured,
     #[error("capture did not provide requested path {0:?}")]
     IncompleteCapture(VirtualPath),
     #[error("capture read only the length and tail of {0:?}")]

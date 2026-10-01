@@ -241,8 +241,12 @@ impl CommandExecutor<JsonFileStorage> {
 
                 // Grow the probe by the exact write set's validation closure, then
                 // finalize, validate, and publish under the same held session.
-                let Some(base) =
-                    self.grow_proposed_base(&mut *session, probe, &delta_overlay, &extra_paths)?
+                let Some(base) = self.capture_proposed_base(
+                    &mut *session,
+                    &delta_overlay,
+                    &extra_paths,
+                    Some(probe),
+                )?
                 else {
                     return Ok(SessionStep::Retry);
                 };

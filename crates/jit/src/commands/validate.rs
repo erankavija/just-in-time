@@ -176,9 +176,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// the proposed declarations (so a proposed init/profile state captures what
     /// its passes read); `extra_paths` discovers additional delta targets (init
     /// schema files, profile assets, directories, provenance) into the base so a
-    /// subsequent `apply` finds each action's captured preimage. Sharing one held
-    /// session lets a caller capture the base and apply its delta under the same
-    /// guard without a second, deadlock-prone session.
+    /// subsequent `apply` finds each action's captured preimage; `start` is an
+    /// image this session's round has already read, which the base grows from.
+    /// Sharing one held session lets a caller capture the base and apply its
+    /// delta under the same guard without a second, deadlock-prone session.
     pub(crate) fn capture_proposed_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -187,36 +188,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&str>,
+        start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         self.capture_proposed_base_inner(
             session,
-            None,
-            overrides,
-            extra_paths,
-            &[],
-            precheck_target,
-            DocumentCapture::All,
-            false,
-        )
-        .map(|captured| captured.map(|(image, _)| image))
-    }
-
-    /// [`capture_proposed_base`](Self::capture_proposed_base) grown from an
-    /// `image` this session's round has read.
-    pub(crate) fn grow_proposed_base(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        image: crate::repository_state::RepositoryImage,
-        overrides: &std::collections::BTreeMap<
-            crate::repository_state::VirtualPath,
-            Option<Vec<u8>>,
-        >,
-        extra_paths: &[crate::repository_state::VirtualPath],
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_proposed_base_inner(
-            session,
-            Some(image),
+            start,
             overrides,
             extra_paths,
             &[],
@@ -322,36 +298,11 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         .map(|captured| captured.map(|(image, _)| image))
     }
 
-    /// The whole-repository validation base plus a complete listing of each
-    /// path in `extra_listings`.
-    ///
-    /// Derived-state repair lists `.jit/profiles/` because the applied-profile
-    /// records it holds are the repository's own statement of which profile
-    /// packages, if any, repair needs; an exact-path closure cannot express a
-    /// question whose answer is the directory's occupants.
-    fn capture_proposed_base_with_listings(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        extra_paths: &[crate::repository_state::VirtualPath],
-        extra_listings: &[crate::repository_state::VirtualPath],
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_proposed_base_inner(
-            session,
-            None,
-            &std::collections::BTreeMap::new(),
-            extra_paths,
-            extra_listings,
-            None,
-            DocumentCapture::All,
-            false,
-        )
-        .map(|captured| captured.map(|(image, _)| image))
-    }
-
     /// One capture round of the base, from `start` when the caller has read
     /// part of it already.
     ///
-    /// The round reads the registries, the event log, the profile records,
+    /// The round reads the registries, the event log (as its length and tail
+    /// for a mutation), the profile records,
     /// and the caller's paths and listings; then the validation closure those
     /// registries plan; then what the captured issues name: the documents
     /// `documents` admits, and a precheck target's prompt files and gate-run
@@ -396,11 +347,16 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     VirtualPath::GATES,
                     VirtualPath::TEMPLATES,
                     VirtualPath::INDEX,
-                    VirtualPath::EVENTS,
                 ]
                 .into_iter()
                 .chain(extra_paths.iter().cloned()),
             )?;
+            // A mutation appends to the log, so it reads the log's length and
+            // tail; validation parses it, so it reads it whole.
+            match documents {
+                DocumentCapture::PlanOnly => spec.discover_tail(VirtualPath::EVENTS)?,
+                _ => spec.discover_paths([VirtualPath::EVENTS])?,
+            }
             Ok(spec.discover_listings(
                 extra_listings
                     .iter()
@@ -456,7 +412,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .listings
                     .iter()
                     .all(|listing| read.listings().contains(listing));
-            spec.discover_paths(closure.paths)?;
+            // The base already reads the log in the mode this capture needs.
+            spec.discover_paths(
+                closure
+                    .paths
+                    .into_iter()
+                    .filter(|path| *path != VirtualPath::EVENTS),
+            )?;
             spec.discover_listings(closure.listings)?;
             if !closure_read {
                 return Ok(());
@@ -703,8 +665,19 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .map(|(record_path, _)| Ok(record_path.clone())),
             )
             .collect::<Result<Vec<_>>>()?;
-        let Some(image) =
-            self.capture_proposed_base_with_listings(session, &profile_paths, listings)?
+        // The whole-repository base plus the profile records' listing: the
+        // records are the repository's own statement of which packages repair
+        // needs, a question an exact-path closure cannot express.
+        let Some((image, _)) = self.capture_proposed_base_inner(
+            session,
+            None,
+            &std::collections::BTreeMap::new(),
+            &profile_paths,
+            listings,
+            None,
+            DocumentCapture::All,
+            false,
+        )?
         else {
             return Ok(None);
         };
@@ -1227,19 +1200,23 @@ fn discover_issue_closure(
                 Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
                 None => crate::declarations::GateRegistry::default(),
             };
-            let prechecks = issue
+            issue
                 .gates_required
                 .iter()
                 .filter_map(|key| gates.gates.get(key))
                 .filter(|gate| gate.stage == GateStage::Precheck)
                 .cloned()
-                .collect::<Vec<_>>();
-            prechecks
+                .collect()
         }
         None => Vec::new(),
     };
+    // A broad precheck validates the whole repository, so it reads what
+    // validation reads.
     let documents = match precheck.iter().any(super::is_broad_builtin_precheck) {
-        true => DocumentCapture::All,
+        true => {
+            spec.discover_paths([crate::repository_state::VirtualPath::EVENTS])?;
+            DocumentCapture::All
+        }
         false => documents,
     };
     let (worktree_docs, pinned) = document_capture_closure(issues, &full_config, documents)?;
@@ -4623,45 +4600,39 @@ description = \"Full Rust CI pipeline must pass.\"
     /// A session counting the capture rounds it opens.
     struct RoundCounter(Box<dyn crate::storage::RepositoryMutationSession>, usize);
 
-    impl crate::storage::RepositoryMutationSession for RoundCounter {
-        fn layout(&self) -> &crate::repository_state::RepositoryLayout {
-            self.0.layout()
-        }
+    mod round_counter {
+        use super::RoundCounter;
+        use crate::repository_state::{CaptureSpec, MaterializationPlan, RepositoryImage};
+        use crate::storage::{RepositoryApplyOutcome, RepositoryStateStoreError as Error};
 
-        fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
-            self.0.recovery_report()
-        }
+        impl crate::storage::RepositoryMutationSession for RoundCounter {
+            fn layout(&self) -> &crate::repository_state::RepositoryLayout {
+                self.0.layout()
+            }
 
-        fn capture(
-            &mut self,
-            spec: crate::repository_state::CaptureSpec,
-        ) -> std::result::Result<
-            crate::repository_state::RepositoryImage,
-            crate::storage::RepositoryStateStoreError,
-        > {
-            self.1 += 1;
-            self.0.capture(spec)
-        }
+            fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
+                self.0.recovery_report()
+            }
 
-        fn extend(
-            &mut self,
-            image: crate::repository_state::RepositoryImage,
-            spec: crate::repository_state::CaptureSpec,
-        ) -> std::result::Result<
-            crate::repository_state::RepositoryImage,
-            crate::storage::RepositoryStateStoreError,
-        > {
-            self.0.extend(image, spec)
-        }
+            fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, Error> {
+                self.1 += 1;
+                self.0.capture(spec)
+            }
 
-        fn apply(
-            &mut self,
-            plan: &crate::repository_state::MaterializationPlan,
-        ) -> std::result::Result<
-            crate::storage::RepositoryApplyOutcome,
-            crate::storage::RepositoryStateStoreError,
-        > {
-            self.0.apply(plan)
+            fn extend(
+                &mut self,
+                image: RepositoryImage,
+                spec: CaptureSpec,
+            ) -> Result<RepositoryImage, Error> {
+                self.0.extend(image, spec)
+            }
+
+            fn apply(
+                &mut self,
+                plan: &MaterializationPlan,
+            ) -> Result<RepositoryApplyOutcome, Error> {
+                self.0.apply(plan)
+            }
         }
     }
 
@@ -4700,6 +4671,31 @@ description = \"Full Rust CI pipeline must pass.\"
 
         assert_eq!(base.issues.len(), 2);
         assert_eq!(counter.1, 1);
+    }
+
+    /// A mutation reads the log it appends to as its length and tail, while
+    /// validation, which parses it, reads it whole.
+    #[test]
+    fn test_capture_mutation_base_reads_the_event_log_as_its_tail() {
+        use crate::repository_state::{ReadMode, VirtualPath};
+
+        let (executor, _, mut counter) = counted_session();
+
+        let mutation = executor
+            .capture_mutation_base(&mut counter, &[], None)
+            .unwrap()
+            .expect("a settled capture")
+            .image;
+        let validation = executor
+            .capture_proposed_base(&mut counter, &std::collections::BTreeMap::new(), &[], None)
+            .unwrap()
+            .expect("a settled capture");
+
+        let mode = |image: &crate::repository_state::RepositoryImage| {
+            image.capture_spec().read_mode(&VirtualPath::EVENTS)
+        };
+        assert_eq!(mode(&mutation), Some(ReadMode::Tail));
+        assert_eq!(mode(&validation), Some(ReadMode::Whole));
     }
 
     #[test]
