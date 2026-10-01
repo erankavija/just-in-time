@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f3bfcf4a66836e3afe4c2ba2c5b9d2d22d6f13c8",
+  "completed_at": "2026-10-01T13:55:43.120229404Z",
+  "duration_ms": 119768,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf's redo-record terminology and recover-command documentation are accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "e346d387-eee8-4657-93eb-9b64621fd900",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b8edd9e8-481a-414f-8dfd-8ceac2df2f65",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T13:53:43.351409464Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf-only union of seven reachable `jit:e346d387` commits, individually inspected with rename detection; no fallback attribution was needed. The current CLI help and recovery references accurately describe leftover redo-record application, and the one affected adopter reference is concise and correct.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf's redo-record terminology and recover-command documentation are accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
