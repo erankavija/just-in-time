@@ -5,6 +5,15 @@
 # fixture carrying just-in-time's issues and index under an event log inflated
 # to ten times the bytes. Wall clock only, median of three runs.
 #
+# Every fixture runs the same three label updates: one refused for want of a
+# lease, one that changes the label, and one that repeats it. A fixture whose
+# source declares no [worktree] section (gf2) has lease enforcement off, so its
+# copy gets `[worktree] enforce_leases = "strict"` appended before measuring.
+#
+# Runs start only once the 1-minute load average is below BENCH_MAX_LOAD
+# (default 2.0), polled every 30 s for at most 30 minutes; the load average is
+# printed before and after the runs.
+#
 # The inflated log is built during the sync step, by replaying the source log's
 # own lines under fresh event ids, so the fixture is a real data root, every
 # line parses, and no id repeats (@/inv/event-log). The harness verifies all
@@ -37,7 +46,8 @@ FIXTURES=(gf2 jit jit-10x)
 typeset -A FIXTURE_SOURCE=(gf2 $GF2_REPO jit $JIT_REPO jit-10x $JIT_REPO)
 typeset -A FIXTURE_ISSUE=(gf2 79873126 jit a68eb999 jit-10x a68eb999)
 typeset -A FIXTURE_LOG_MULTIPLE=(gf2 1 jit 1 jit-10x 10)
-typeset -A SOURCE_LOG_BYTES FIXTURE_LOG_BYTES MEDIAN
+typeset -A SOURCE_LOG_BYTES FIXTURE_LOG_BYTES FIXTURE_ISSUES FIXTURE_LEASES MEDIAN
+MAX_LOAD=${BENCH_MAX_LOAD:-2.0}
 
 print "path dependencies"
 printf "  %-14s %s\n" jit-binary "$BIN" git "$GIT" rsync "$RSYNC" python3 "$PYTHON" \
@@ -55,6 +65,11 @@ done
 [[ -w $S ]] || fail "work root is not writable: $S"
 
 rm -rf $WORK && mkdir -p $WORK
+
+print "\nbuild and sources"
+printf "  %-14s %s\n" jit-version "$($BIN --version)" \
+  jit-sha256 "$(sha256sum $BIN | cut -d' ' -f1)" \
+  gf2-head "$($GIT -C $GF2_REPO rev-parse HEAD)" jit-head "$($GIT -C $JIT_REPO rev-parse HEAD)"
 
 inflate_event_log() { # <log> <multiple>; replays the log's lines under fresh ids
   $PYTHON - $1 $2 <<'PY'
@@ -127,6 +142,13 @@ prepare() { # <fixture>
     inflate_event_log $WORK/$fixture/$LOG $multiple || fail "$fixture: inflating the event log failed"
   fi
   FIXTURE_LOG_BYTES[$fixture]=$(zstat -L +size $WORK/$fixture/$LOG)
+  FIXTURE_ISSUES[$fixture]=$(print -l $WORK/$fixture/.jit/issues/*.json(N) | wc -l)
+  if grep -q '^\[worktree\]' $WORK/$fixture/.jit/config.toml; then
+    FIXTURE_LEASES[$fixture]="source [worktree] section"
+  else
+    print '\n[worktree]\nenforce_leases = "strict"' >> $WORK/$fixture/.jit/config.toml
+    FIXTURE_LEASES[$fixture]="strict, appended to the copy"
+  fi
   verify_fixture $fixture $repo $multiple
 }
 
@@ -176,29 +198,42 @@ for fixture in $FIXTURES; do
   prepare $fixture
 done
 
-print "\nevent log bytes"
-printf "  %-8s %12s %12s %9s\n" fixture source-log fixture-log multiple
+print "\nfixture sizes"
+printf "  %-8s %12s %12s %9s %7s  %s\n" fixture source-log fixture-log multiple issues leases
 for fixture in $FIXTURES; do
-  printf "  %-8s %12d %12d %8.2fx\n" $fixture \
+  printf "  %-8s %12d %12d %8.2fx %7d  %s\n" $fixture \
     $SOURCE_LOG_BYTES[$fixture] $FIXTURE_LOG_BYTES[$fixture] \
-    $(( 1.0 * FIXTURE_LOG_BYTES[$fixture] / SOURCE_LOG_BYTES[$fixture] ))
+    $(( 1.0 * FIXTURE_LOG_BYTES[$fixture] / SOURCE_LOG_BYTES[$fixture] )) \
+    $FIXTURE_ISSUES[$fixture] $FIXTURE_LEASES[$fixture]
 done
+
+load1() { cut -d' ' -f1 /proc/loadavg }
+print "\nmachine"
+printf "  %-14s %s\n" cpu "$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ //')" \
+  cores "$(nproc)" kernel "$(uname -r)" fixture-fs "$(df --output=fstype $WORK | tail -1)"
+for wait in {0..60}; do
+  (( $(load1) < MAX_LOAD )) && break
+  (( wait < 60 )) || fail "1-minute load stayed at or above $MAX_LOAD for 30 minutes"
+  print "  load $(load1) >= $MAX_LOAD; waiting 30 s"
+  sleep 30
+done
+print "  loadavg-start  $(</proc/loadavg)"
 
 print "\nruns"
 for fixture in $FIXTURES; do
   id=$FIXTURE_ISSUE[$fixture]
-  if [[ $FIXTURE_SOURCE[$fixture] == $JIT_REPO ]]; then
-    # This repository enforces leases; the refused case runs before acquiring one.
-    scenario $fixture lease-refused - $BIN issue update $id --label team:perf-bench
-    claim_lease $fixture $id
-    export JIT_AGENT_ID=agent:bench
-  fi
+  # The refused case runs before the lease is acquired.
+  scenario $fixture lease-refused - $BIN issue update $id --label team:perf-bench
+  claim_lease $fixture $id
+  export JIT_AGENT_ID=agent:bench
   scenario $fixture changing-label "$BIN issue update $id --remove-label team:perf-bench" \
     $BIN issue update $id --label team:perf-bench
   (cd $WORK/$fixture && $BIN issue update $id --label team:perf-bench >/dev/null 2>&1)
   scenario $fixture idempotent-label - $BIN issue update $id --label team:perf-bench
   unset JIT_AGENT_ID
 done
+
+print "  loadavg-end    $(</proc/loadavg)"
 
 print "\nmedian ms, unmodified beside the ten-times log"
 printf "  %-16s %8s %8s %8s %8s\n" scenario $FIXTURES ratio

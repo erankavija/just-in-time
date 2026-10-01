@@ -1,0 +1,57 @@
+path dependencies
+  jit-binary     /home/vkaskivuo/Projects/just-in-time/.agents/worktrees/agent-722878d4/target/release/jit
+  git            /usr/bin/git
+  rsync          /usr/bin/rsync
+  python3        /usr/bin/python3
+  gf2-repo       /home/vkaskivuo/Projects/gf2
+  gf2-log        /home/vkaskivuo/Projects/gf2/.jit/events.jsonl
+  jit-repo       /home/vkaskivuo/Projects/just-in-time
+  jit-log        /home/vkaskivuo/Projects/just-in-time/.jit/events.jsonl
+  work-root      /dev/shm/bench-722878d4/bench-tip
+
+build and sources
+  jit-version    jit 1.0.0 (profile release)
+  jit-sha256     65892a8f9eb537840554848ed4a5ac8266cefebbac2143dc1e2e626713a0d122
+  gf2-head       6bf634098a7fdfb510bb3718b834b88bfb2b8245
+  jit-head       c0b1b4e2e6794a95184cd6cc1d9d8650b811a1d0
+
+fixtures
+  gf2 <- /home/vkaskivuo/Projects/gf2 (log x1)
+  jit <- /home/vkaskivuo/Projects/just-in-time (log x1)
+  jit-10x <- /home/vkaskivuo/Projects/just-in-time (log x10)
+  161861 event ids, all distinct
+  jit validate accepts jit-10x
+
+fixture sizes
+  fixture    source-log  fixture-log  multiple  issues  leases
+  gf2           3300903      3300903     1.00x    1002  strict, appended to the copy
+  jit           3627204      3627204     1.00x    1136  source [worktree] section
+  jit-10x       3627204     36272154    10.00x    1136  source [worktree] section
+
+machine
+  cpu            AMD Ryzen 9 5900X 12-Core Processor
+  cores          24
+  kernel         7.2.6-arch2-1
+  fixture-fs     tmpfs
+  loadavg-start  0.90 6.42 23.84 1/1587 1487381
+
+runs
+gf2      lease-refused         43 ms  (runs: 42, 43, 45; exits 1,1,1)
+gf2      claim-acquire    exit 0 Warning: Worktree relocated: /home/vkaskivuo/Projects/gf2 -> /dev/shm/bench-722878d4/bench-tip/gf2
+gf2      changing-label        49 ms  (runs: 49, 48, 50; exits 0,0,0)
+gf2      idempotent-label      45 ms  (runs: 44, 45, 45; exits 0,0,0)
+jit      lease-refused         46 ms  (runs: 46, 46, 49; exits 1,1,1)
+jit      claim-acquire    exit 0 Warning: Worktree relocated: /home/vkaskivuo/Projects/just-in-time -> /dev/shm/bench-722878d4/bench-tip/jit
+jit      changing-label        49 ms  (runs: 48, 50, 49; exits 0,0,0)
+jit      idempotent-label      48 ms  (runs: 48, 48, 48; exits 0,0,0)
+jit-10x  lease-refused         47 ms  (runs: 46, 51, 47; exits 1,1,1)
+jit-10x  claim-acquire    exit 0 Warning: Worktree relocated: /home/vkaskivuo/Projects/just-in-time -> /dev/shm/bench-722878d4/bench-tip/jit-10x
+jit-10x  changing-label        50 ms  (runs: 50, 49, 50; exits 0,0,0)
+jit-10x  idempotent-label      49 ms  (runs: 48, 49, 50; exits 0,0,0)
+  loadavg-end    0.90 6.42 23.84 1/1587 1487642
+
+median ms, unmodified beside the ten-times log
+  scenario              gf2      jit  jit-10x    ratio
+  lease-refused          43       46       47    1.02x
+  changing-label         49       49       50    1.02x
+  idempotent-label       45       48       49    1.02x
