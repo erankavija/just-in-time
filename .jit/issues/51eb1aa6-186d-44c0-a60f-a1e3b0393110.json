@@ -63,6 +63,11 @@
       "status": "passed",
       "updated_at": "2026-10-01T09:32:29.783975733Z",
       "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-01T09:32:32.666104296Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
@@ -82,5 +87,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Transaction fields leave the command output",
-  "updated_at": "2026-10-01T09:32:29.783975733Z"
+  "updated_at": "2026-10-01T09:32:32.666104296Z"
 }
