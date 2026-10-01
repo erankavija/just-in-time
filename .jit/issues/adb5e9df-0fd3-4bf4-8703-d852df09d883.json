@@ -12,7 +12,13 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T19:37:54.542453257Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "adb5e9df-0fd3-4bf4-8703-d852df09d883",
   "labels": [
     "component:core",
@@ -23,5 +29,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the unqualified satisfies coverage form",
-  "updated_at": "2026-10-01T19:16:12.817195185Z"
+  "updated_at": "2026-10-01T19:37:54.542453257Z"
 }
