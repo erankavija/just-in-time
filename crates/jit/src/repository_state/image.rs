@@ -182,6 +182,15 @@ impl EventLogTail {
     pub fn tail(&self) -> &[u8] {
         &self.tail
     }
+
+    /// The bytes after the file's last newline, or `None` when that line
+    /// starts before the window and the tail holds only part of it.
+    pub fn final_line(&self) -> Option<&[u8]> {
+        match self.tail.iter().rposition(|byte| *byte == b'\n') {
+            Some(newline) => Some(&self.tail[newline + 1..]),
+            None => (self.tail.len() as u64 == self.length).then_some(&self.tail[..]),
+        }
+    }
 }
 
 /// One exact captured path state, including typed absence.
