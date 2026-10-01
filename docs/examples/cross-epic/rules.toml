@@ -39,13 +39,12 @@ assert = { label-uniqueness = { namespace = "req", scope = "all" } }
 # ---------------------------------------------------------------------------
 #
 # In a multi-team repository two epics may independently choose REQ-01 as their
-# first requirement id, especially if teams use per-epic numbering. Once both
-# epics have children that `satisfies:REQ-01`, the `sdd-req-is-satisfied` rule
-# (label-reference, linked scope) will resolve the reference only within each
-# epic's linked neighborhood — so NEITHER epic surfaces a finding, and the
-# contradiction is hidden.
+# first requirement id, especially if teams use per-epic numbering. Coverage
+# stays correct — each child credits `satisfies:<epic-short-id>/REQ-01`, naming
+# its own epic — but a bare `REQ-01` cited in prose, reviews, or commit
+# messages no longer identifies one requirement.
 #
-# cross-epic-req-uniqueness catches this at repository scale.
+# cross-epic-req-uniqueness catches the shared id at repository scale.
 #
 # Example collision:
 #   Epic A (id: aaaa) declares req:REQ-01 (their login requirement)

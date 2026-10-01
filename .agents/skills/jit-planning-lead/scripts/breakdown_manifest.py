@@ -34,6 +34,9 @@ WARNING_CODES = {
 }
 
 
+# A same-manifest container reference, resolved by batch-create: {<key>.short_id}.
+KEY_REFERENCE = re.compile(r"\{([^{}]+)\.short_id\}")
+
 def load(path):
     return json.loads(Path(path).read_text())
 
@@ -289,7 +292,14 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
                 errors.append(f"{at}.{field} must be a unique string array")
         labels = entry.get("labels")
         if strings(labels):
-            satisfied.update(label.removeprefix("satisfies:") for label in labels if label.startswith("satisfies:"))
+            credits = [label.removeprefix("satisfies:") for label in labels if label.startswith("satisfies:")]
+            for credit in credits:
+                if "/" not in credit:
+                    errors.append(f"{at} has unqualified label 'satisfies:{credit}'; use 'satisfies:<container-short-id>/{credit}'")
+                reference = KEY_REFERENCE.fullmatch(credit.split("/", 1)[0])
+                if reference and reference.group(1) not in key_set:
+                    errors.append(f"{at} label 'satisfies:{credit}' references unknown key '{reference.group(1)}'")
+            satisfied.update(credit for credit in credits if "/" in credit)
         dependencies = entry.get("depends_on")
         if strings(dependencies):
             for dep in dependencies:
@@ -407,6 +417,9 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
     unknown_sources = covered - set(known_sources)
     if unknown_sources:
         errors.append(f"unknown source refs: {', '.join(sorted(unknown_sources))}")
+    for criterion in required_criteria:
+        if "/" not in criterion:
+            errors.append(f"required criterion '{criterion}' must be qualified as <container-short-id>/{criterion}")
     missing_criteria = set(required_criteria) - satisfied
     if missing_criteria:
         errors.append(f"satisfies coverage missing: {', '.join(sorted(missing_criteria))}")

@@ -35,7 +35,7 @@ and the transition repair:
 | `sloppy-spec-body` | Prose (no bullets) under Success Criteria; create blocked (exit 4) | Re-author the body with Markdown bullet criteria |
 | `typo-heading` | `## Sucess Criteria` typo; create blocked with a did-you-mean hint (exit 4) | Fix the heading spelling in the body |
 | `stray-req` | `req:REQ-77` names no criterion; `jit validate` exits 1 | Remove the stray label (or add the criterion) |
-| `premature-done` | Epic with `req:REQ-01` and no satisfying child transitions to done; blocked (exit 4) | Create a child labelled `satisfies:REQ-01`, `dep add <epic> <child>`, walk the child `in_progress` → `done`, then retry the epic's done transition |
+| `premature-done` | Epic with `req:REQ-01` and no satisfying child transitions to done; blocked (exit 4) | Create a child labelled `satisfies:<epic-short-id>/REQ-01`, `dep add <epic> <child>`, walk the child `in_progress` → `done`, then retry the epic's done transition |
 
 The first three are single-command corrections (a new body or one label edit);
 `premature-done` is a multi-command repair the agent chains across iterations,
@@ -140,7 +140,7 @@ Semantics of the loop, per iteration:
   failing command's shape (not scenario name strings): a well-formed body for
   the write failures; remove-stray-label for the validate failure; and, for the
   `premature-done` transition, a four-step repair issued one command per
-  iteration (create a `satisfies:REQ-01` child with a valid body → `dep add
+  iteration (create a `satisfies:<epic-short-id>/REQ-01` child with a valid body → `dep add
   <epic> <child>` → child `in_progress` → child `done`), sequenced from the
   history and parsing the child's uuid from its own create output. Deterministic;
   used by `--smoke` and as a loop sanity check. Expected to green the three

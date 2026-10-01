@@ -129,7 +129,7 @@ fn build_scenario(h: &TestHarness) -> Scenario {
             "type:task",
             &format!("epic:{}", short(&e)),
             "component:core",
-            "satisfies:REQ-01",
+            &format!("satisfies:{}/REQ-01", short(&e)),
         ],
     );
     let c2 = new_issue(

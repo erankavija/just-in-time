@@ -432,14 +432,18 @@ def _is_transition_argv(argv: list[str], state: str) -> bool:
 
 def _oracle_child_uuid(history: list[dict[str, Any]]) -> Optional[str]:
     """Extract the satisfies-child uuid the oracle created earlier, by reading
-    the stdout of its own `issue create ... satisfies:REQ-01` command.
+    the stdout of its own `issue create ... satisfies:<epic-short>/REQ-01`
+    command.
 
     The agent must extract created ids from prior output itself; this mirrors
     that for the deterministic oracle (uuid is on the "Created issue:" line).
     """
     for h in history:
         argv = h.get("argv", [])
-        if argv[:2] == ["issue", "create"] and "satisfies:REQ-01" in argv:
+        credits = any(
+            a.startswith("satisfies:") and a.endswith("/REQ-01") for a in argv
+        )
+        if argv[:2] == ["issue", "create"] and credits:
             uuid = first_uuid(h.get("stdout", "") or h.get("output", ""))
             if uuid is not None:
                 return uuid
@@ -490,7 +494,7 @@ def oracle_action(task: dict[str, Any], ids: dict[str, str]) -> AgentAction:
                 argv=[
                     "issue", "create",
                     "--title", "Satisfy REQ-01",
-                    "--label", "satisfies:REQ-01",
+                    "--label", f"satisfies:{epic[:8]}/REQ-01",
                     "--description", ORACLE_VALID_BODY,
                 ]
             )

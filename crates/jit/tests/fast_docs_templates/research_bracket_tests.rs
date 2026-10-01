@@ -224,7 +224,7 @@ fn test_research_example_declares_planning_template_no_epic() {
 #[test]
 fn test_research_uncovered_hard_hypothesis_blocked_at_breakdown_gate() {
     // Bracket spine: C(goal, [hard] H-1) ──dep→ experiment ──dep→ B(type:breakdown).
-    // The drafted experiment does NOT carry tests:H-1, so the preview coverage
+    // The drafted experiment does NOT carry tests:<C>/H-1, so the preview coverage
     // rule (keyed on B, container resolved via brackets:, child-state omitted)
     // must report H-1 uncovered — the breakdown gate BLOCKS.
     //
@@ -295,7 +295,7 @@ fn test_research_preview_silent_while_breakdown_node_in_backlog() {
 
 #[test]
 fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
-    // Same spine, but the (still-backlog) experiment carries tests:H-1. The
+    // Same spine, but the (still-backlog) experiment carries tests:<C>/H-1. The
     // preview rule OMITS child-state, so a mapping in ANY state (backlog here)
     // satisfies it -> the breakdown gate passes. This is the preview vs closure
     // distinction: closure would still require child-state = "done".
@@ -304,7 +304,10 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
 
     let mut container = breakable_container();
     let mut experiment = crate::fixture_issue("draft experiment".to_string(), String::new());
-    experiment.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
+    experiment.labels = vec![
+        "type:experiment".to_string(),
+        format!("tests:{}/H-1", container.short_id()),
+    ];
     experiment.state = State::Backlog; // NOT done
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
@@ -331,7 +334,7 @@ fn test_research_preview_passes_when_backlog_experiment_carries_mapping() {
 fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     // child-type-exclude = ["planning", "breakdown"]: the walk from C must halt
     // at B and never credit a tests: label sitting on the planning node P BEYOND
-    // the breakdown boundary. So even though P carries tests:H-1, the hypothesis
+    // the breakdown boundary. So even though P carries tests:<C>/H-1, the hypothesis
     // reads uncovered at the breakdown gate.
     let set = load_example("research");
     let rules = graph_rules(&set);
@@ -347,9 +350,12 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
     // Breakdown is underway (the preview rule is state-gated to in_progress/
     // gated/done, so a backlog B that has not started breakdown stays silent).
     breakdown.state = State::InProgress;
-    // P, beyond the boundary, is the only carrier of tests:H-1.
+    // P, beyond the boundary, is the only carrier of tests:<C>/H-1.
     let mut plan = crate::fixture_issue("plan".to_string(), String::new());
-    plan.labels = vec!["type:planning".to_string(), "tests:H-1".to_string()];
+    plan.labels = vec![
+        "type:planning".to_string(),
+        format!("tests:{}/H-1", container.short_id()),
+    ];
 
     container.dependencies = vec![experiment.id.clone()];
     experiment.dependencies = vec![breakdown.id.clone()];
@@ -370,7 +376,7 @@ fn test_research_preview_excludes_bracket_types_and_halts_walk() {
 fn test_research_preview_credits_non_sink_experiment_interior() {
     // Coverage traversal is transitive: a tests: on a NON-SINK experiment (deep
     // in the interior, not directly adjacent to C) is still credited.
-    // Spine: C ──dep→ exp_a ──dep→ exp_b(tests:H-1) ──dep→ B.
+    // Spine: C ──dep→ exp_a ──dep→ exp_b(tests:<C>/H-1) ──dep→ B.
     let set = load_example("research");
     let rules = graph_rules(&set);
 
@@ -378,7 +384,10 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
     let mut exp_a = crate::fixture_issue("exp a (sink)".to_string(), String::new());
     exp_a.labels = vec!["type:experiment".to_string()];
     let mut exp_b = crate::fixture_issue("exp b (interior)".to_string(), String::new());
-    exp_b.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
+    exp_b.labels = vec![
+        "type:experiment".to_string(),
+        format!("tests:{}/H-1", container.short_id()),
+    ];
     let mut breakdown = crate::fixture_issue("breakdown".to_string(), String::new());
     breakdown.labels = vec![
         "type:breakdown".to_string(),
@@ -410,7 +419,7 @@ fn test_research_preview_credits_non_sink_experiment_interior() {
 fn test_research_closure_rule_still_requires_done_experiment() {
     // The existing closure rule (research-hard-hypotheses-covered-at-done,
     // child-state = "done") must be unchanged in semantics: at done, a backlog
-    // experiment carrying tests:H-1 does NOT satisfy it (closure needs mapping
+    // experiment carrying tests:<C>/H-1 does NOT satisfy it (closure needs mapping
     // DONE). This is the preview/closure split — preview accepts any state,
     // closure requires done.
     let set = load_example("research");
@@ -420,7 +429,10 @@ fn test_research_closure_rule_still_requires_done_experiment() {
     goal.state = State::Done;
     // An experiment testing H-1 but still in backlog (not done).
     let mut experiment = crate::fixture_issue("experiment".to_string(), String::new());
-    experiment.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
+    experiment.labels = vec![
+        "type:experiment".to_string(),
+        format!("tests:{}/H-1", goal.short_id()),
+    ];
     experiment.state = State::Backlog;
     goal.dependencies.push(experiment.id.clone());
 

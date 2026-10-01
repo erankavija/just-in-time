@@ -69,11 +69,22 @@ unique = false
 examples = ["hyp:H-1"]
 
 [namespaces.tests]
-description = "On an experiment: the hypothesis id it tests."
+description = "On an experiment: the goal hypothesis it tests, qualified by the goal's short id."
 unique = false
-examples = ["tests:H-1"]
+examples = ["tests:5c21327f/H-1"]
 
 [namespaces.brackets]
 description = "On a breakdown node B: names the container C used by the preview rule's container-from-label setting."
 unique = true
 examples = ["brackets:5c21327f"]
+
+# Hypotheses are addressable items linked through `tests:`, so `jit validate`
+# reports a `tests:<goal-short-id>/<id>` label that names no declared hypothesis
+# as a dangling item link.
+[item_kinds.hypothesis]
+section = "hypotheses"
+id-pattern = "H-[0-9]+"
+markers = ["[hard]", "[exploratory]"]
+link-namespaces = ["tests"]
+scope = "issue"
+source-of-truth = "markdown-first"

@@ -166,7 +166,11 @@ Two knobs make this bracket-aware:
   (unbracketed) container this exclusion is simply a no-op.
 
 `child-link = "dependencies"` makes the walk transitive, so a criterion satisfied
-by a non-sink impl issue deep in the subgraph is still credited.
+by a non-sink impl issue deep in the subgraph is still credited. A child credits
+`C`'s criterion `REQ-01` with `satisfies:<C-short-id>/REQ-01`; the label names
+`C`, so a nested container's own `REQ-01` is never credited by it. A manifest
+that also creates a story credits the story through its manifest key
+([key references](../reference/cli-commands.md#batch-create-with-dependency-wiring-jit-issue-batch-create)).
 
 ## Step 3 — Add the preview coverage rule
 

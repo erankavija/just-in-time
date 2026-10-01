@@ -62,11 +62,22 @@ unique = false
 examples = ["req:REQ-01"]
 
 [namespaces.satisfies]
-description = "On a child: the requirement id it implements."
+description = "On a child: the epic criterion it implements, qualified by the epic's short id."
 unique = false
-examples = ["satisfies:REQ-01"]
+examples = ["satisfies:2fbd2a82/REQ-01"]
 
 [namespaces.brackets]
 description = "On a breakdown node B: names the container C used by the preview rule's container-from-label setting."
 unique = true
 examples = ["brackets:2fbd2a82"]
+
+# Success criteria are addressable `requirement` items linked through
+# `satisfies:`, so `jit validate` reports a `satisfies:<epic-short-id>/<id>` label
+# that names no declared criterion as a dangling item link.
+[item_kinds.requirement]
+section = "success_criteria"
+id-pattern = "REQ-[0-9]+"
+markers = ["[hard]", "[aspirational]"]
+link-namespaces = ["satisfies"]
+scope = "issue"
+source-of-truth = "markdown-first"

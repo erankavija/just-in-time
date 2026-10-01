@@ -920,7 +920,7 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// Used to classify the value half of a `<namespace>:<value>` link label: a
 /// qualified value addresses a specific item and is resolved through
 /// [`expand_sugar_address`] / [`parse_kind_segmented_address`], whereas a bare
-/// self-id (`REQ-01`) is left to the legacy unqualified coverage rules.
+/// self-id (`REQ-01`) addresses nothing (see [`unqualified_link_message`]).
 ///
 /// Every address form carries at least one `/`: the explicit `@`-prefixed
 /// kind-segmented forms (`@/<kind>/<self-id>`,
@@ -929,6 +929,56 @@ pub fn qualified_id(scope: &Scope, kind: &str, self_id: &str) -> String {
 /// qualified/unqualified boundary.
 pub fn is_qualified_reference(value: &str) -> bool {
     value.contains('/')
+}
+
+/// The validation message for a link label whose value is a bare self-id, or
+/// `None` when the label is qualified or `namespace` neither links a kind nor is
+/// in `credit_namespaces` (the namespaces coverage rules credit through).
+///
+/// A bare self-id names no owning scope, so it addresses no item and credits no
+/// coverage. The message names each qualified replacement:
+/// `<namespace>:@/<kind>/<value>` for a project-scope kind, and
+/// `<namespace>:<short-id>/<value>` for an issue-scope kind or a credit namespace.
+pub fn unqualified_link_message(
+    issue_short_id: &str,
+    namespace: &str,
+    value: &str,
+    kinds: &[ItemKind],
+    credit_namespaces: &HashSet<String>,
+) -> Option<String> {
+    if is_qualified_reference(value) {
+        return None;
+    }
+    let issue_scoped =
+        format!("'{namespace}:<short-id>/{value}' (<short-id>: the issue that declares '{value}')");
+    let replacements: Vec<String> = kinds
+        .iter()
+        .filter(|kind| kind.link_namespaces().iter().any(|ns| ns == namespace))
+        .map(|kind| {
+            if kind.kind_scope().is_project() {
+                format!(
+                    "'{namespace}:{PROJECT_SCOPE_SENTINEL}/{}/{value}'",
+                    kind.name()
+                )
+            } else {
+                issue_scoped.clone()
+            }
+        })
+        .chain(
+            credit_namespaces
+                .contains(namespace)
+                .then(|| issue_scoped.clone()),
+        )
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    (!replacements.is_empty()).then(|| {
+        format!(
+            "issue {issue_short_id} has an unqualified link label '{namespace}:{value}' that \
+             addresses no item and credits nothing; replace it with {}",
+            replacements.join(" or ")
+        )
+    })
 }
 
 /// One addressable item projected from a scope's source.
@@ -1636,6 +1686,53 @@ mod tests {
 
     fn invariant_kind() -> ItemKind {
         ItemKind::from_config("invariant", &invariant_cfg()).unwrap()
+    }
+
+    #[test]
+    fn test_unqualified_link_message_names_replacement_per_kind_scope() {
+        let kinds = [req_kind(), invariant_kind()];
+        let none = HashSet::new();
+        let issue_scoped =
+            unqualified_link_message("abc12345", "satisfies", "REQ-01", &kinds, &none)
+                .expect("bare satisfies value is reported");
+        assert!(
+            issue_scoped.contains("'satisfies:REQ-01'"),
+            "{issue_scoped}"
+        );
+        assert!(
+            issue_scoped.contains("'satisfies:<short-id>/REQ-01'"),
+            "{issue_scoped}"
+        );
+        let project_scoped = unqualified_link_message("abc12345", "enforces", "dag", &kinds, &none)
+            .expect("bare enforces value is reported");
+        assert!(
+            project_scoped.contains("'enforces:@/invariant/dag'"),
+            "{project_scoped}"
+        );
+    }
+
+    #[test]
+    fn test_unqualified_link_message_reports_credit_namespace_without_kind() {
+        let credit = HashSet::from(["tests".to_string()]);
+        let message = unqualified_link_message("abc12345", "tests", "H-1", &[], &credit)
+            .expect("bare credit-namespace value is reported");
+        assert!(message.contains("'tests:<short-id>/H-1'"), "{message}");
+    }
+
+    #[test]
+    fn test_unqualified_link_message_ignores_qualified_and_non_link_labels() {
+        let kinds = [req_kind()];
+        let credit = HashSet::from(["satisfies".to_string()]);
+        for (namespace, value) in [
+            ("satisfies", "abc12345/REQ-01"),
+            ("satisfies", "@/issue/abc12345/requirement/REQ-01"),
+            ("type", "task"),
+        ] {
+            assert!(
+                unqualified_link_message("a", namespace, value, &kinds, &credit).is_none(),
+                "{namespace}:{value}"
+            );
+        }
     }
 
     /// The four canonical kinds, in name order (the package-supplied set).

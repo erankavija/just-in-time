@@ -39,7 +39,7 @@ Run all checks without mutation:
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py validate \
   <manifest> --config .jit/config.toml --known-source <every-valid-source-id> ... \
   --required-source <mandatory-source-id> ... \
-  --required-criterion <criterion-id> ... --deny-warnings
+  --required-criterion <C-short-id>/<criterion-id> ... --deny-warnings  # {<key>.short_id}/<id> for a manifest container
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
   <manifest> <plan> --check                 # bracketed work
 jit issue batch-create --from-json <manifest> --dry-run --json

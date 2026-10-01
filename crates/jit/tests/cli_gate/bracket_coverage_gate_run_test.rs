@@ -149,20 +149,23 @@ fn setup_bracket_repo() -> TempDir {
 }
 
 /// Build a bracket `C → child → B` by hand (the shape `bracket_breakdown`
-/// produces) with the coverage-preview gate attached to `B`. `child_labels`
-/// carries the child's coverage credits (`satisfies:<id>`), if any. Returns
+/// produces) with the coverage-preview gate attached to `B`. When `covered`, the
+/// child credits the criterion with `satisfies:<C-short-id>/<req_id>`. Returns
 /// `(container_id, breakdown_id)`.
 fn build_bracket(
     temp: &TempDir,
     container_title: &str,
     req_id: &str,
-    child_labels: &[&str],
+    covered: bool,
 ) -> (String, String) {
     let description = format!("## Success Criteria\n\n- [hard] {req_id}: it works\n");
     let c = create_issue(temp, container_title, &description, &["type:epic"]);
 
+    let credit = format!("satisfies:{}/{req_id}", &c[..8]);
     let mut kid_labels = vec!["type:task"];
-    kid_labels.extend_from_slice(child_labels);
+    if covered {
+        kid_labels.push(&credit);
+    }
     let k = create_issue(temp, "Impl child", "", &kid_labels);
 
     let b = create_issue(
@@ -220,8 +223,8 @@ fn assert_gate_run(temp: &TempDir, breakdown_id: &str, expected_status: &str) {
 #[test]
 fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
     let temp = setup_bracket_repo();
-    // Child credits REQ-01 via satisfies:REQ-01 → coverage complete.
-    let (_c, b) = build_bracket(&temp, "Auth epic", "REQ-01", &["satisfies:REQ-01"]);
+    // Child credits the container's REQ-01 → coverage complete.
+    let (_c, b) = build_bracket(&temp, "Auth epic", "REQ-01", true);
 
     // Run the ATTACHED gate via the standard runner. Covered → exit 0.
     jit(&temp)
@@ -248,7 +251,7 @@ fn test_attached_coverage_gate_runs_and_passes_when_hard_criterion_covered() {
 fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
     let temp = setup_bracket_repo();
     // Child carries NO satisfies label → REQ-77 left uncovered.
-    let (_c, b) = build_bracket(&temp, "Pay epic", "REQ-77", &[]);
+    let (_c, b) = build_bracket(&temp, "Pay epic", "REQ-77", false);
 
     // Run the ATTACHED gate via the standard runner. Uncovered → exit 4.
     jit(&temp)
@@ -286,9 +289,9 @@ fn test_attached_coverage_gate_runs_and_fails_when_hard_criterion_uncovered() {
 fn test_selected_rule_ignores_historical_rejected_bracket_target() {
     let temp = setup_bracket_repo();
     let (_selected_container, selected_breakdown) =
-        build_bracket(&temp, "Current epic", "REQ-01", &["satisfies:REQ-01"]);
+        build_bracket(&temp, "Current epic", "REQ-01", true);
     let (historical_container, _historical_breakdown) =
-        build_bracket(&temp, "Historical epic", "REQ-99", &[]);
+        build_bracket(&temp, "Historical epic", "REQ-99", false);
 
     // The historical target is rejected and its breakdown is unrelated to the
     // selected gate application. Both issues remain in the repository image so

@@ -1,9 +1,9 @@
 # Scenario: happy-path-done
 #
 # The correct end-to-end SDD flow: epic with req:REQ-01 + a child issue carrying
-# satisfies:REQ-01. The epic depends on the child (jit dep add epic child).
-# The child walks to done, then the epic transitions to done. The coverage and
-# derivation rules are satisfied, exit 0.
+# satisfies:$epic_short/REQ-01. The epic depends on the child (jit dep add epic child).
+# The child walks to done, then the epic transitions to done. The coverage rule
+# is satisfied, exit 0.
 ruleset = "sdd"
 
 [[steps]]
@@ -37,7 +37,7 @@ capture = "none"
 argv = [
   "issue", "create",
   "--title", "Implementing child",
-  "--label", "satisfies:REQ-01",
+  "--label", "satisfies:$epic_short/REQ-01",
   "--force",
   "--description", "Implements REQ-01.",
 ]

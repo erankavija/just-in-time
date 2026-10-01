@@ -89,8 +89,11 @@ requires the bare `@` sentinel.
   has exactly four, the first being `issue`. Any other segment count is a parse
   error naming the offending address.
 - An address carries at least one `/`. A bare self-id (`REQ-01`) is therefore not
-  an address, which is how link labels distinguish a qualified reference from an
-  unqualified one.
+  an address. A link label with a bare value (`satisfies:REQ-01`) addresses no
+  item and credits no coverage; `jit validate` reports it under
+  `dangling-item-link` with its qualified replacement
+  (`satisfies:<short-id>/REQ-01`). The same holds for a namespace a
+  `label-coverage` or `criteria-to-check` rule credits through.
 
 ### Uniqueness
 

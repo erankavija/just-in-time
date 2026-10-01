@@ -5,7 +5,7 @@
     "description": "Define the shared manifest shape.\n\n## Success Criteria\n\n- The schema rejects invalid entries.",
     "type": "task",
     "priority": "high",
-    "labels": ["component:planning", "satisfies:REQ-01"],
+    "labels": ["component:planning", "satisfies:0a1b2c3d/REQ-01"],
     "gates": ["cargo-ci"],
     "depends_on": [],
     "planning": {

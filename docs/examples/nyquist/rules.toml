@@ -4,7 +4,8 @@
 # have an explicit VERIFICATION PATH before the work is considered complete.
 # "Verification" means one of:
 #   - the issue has a required gate keyed "verify:<id>", OR
-#   - the issue carries a label "checks:<id>"
+#   - the issue carries a label "checks:<own-short-id>/<id>" naming its own
+#     criterion
 # either mechanism satisfies the requirement.
 #
 # Engine kind used:
@@ -29,7 +30,7 @@
 #
 #   2. For each [hard] criterion, declare a verification path. Choose either:
 #      a) Add the gate to gates_required:  "verify:REQ-01"
-#      b) Add a checks: label:             "checks:REQ-01"
+#      b) Add a checks: label:             "checks:<epic-short-id>/REQ-01"
 #
 #   3. `jit validate` reports any [hard] criterion with no verification path.
 #      The always-on variant (below) fires during planning; the done-scoped

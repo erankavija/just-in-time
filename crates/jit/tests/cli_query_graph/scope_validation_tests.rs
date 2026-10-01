@@ -180,6 +180,24 @@ fn executor_with_rules_and_templates(
 }
 
 /// Seed an exact issue preimage into the in-memory aggregate, returning its id.
+/// The deterministic id [`seed`] assigns, so a child can name its container's
+/// short id before the container exists.
+fn seed_id(title: &str, description: &str) -> String {
+    let hash = title
+        .bytes()
+        .chain(description.bytes())
+        .fold(0xcbf29ce484222325_u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+        });
+    format!("{hash:016x}-fixture")
+}
+
+/// The `satisfies` label crediting criterion `req` of the issue `seed` creates
+/// from `title` and `description`.
+fn credit(title: &str, description: &str, req: &str) -> String {
+    format!("satisfies:{}/{req}", &seed_id(title, description)[..8])
+}
+
 fn seed(
     executor: &CommandExecutor<InMemoryStorage>,
     title: &str,
@@ -188,13 +206,7 @@ fn seed(
     deps: &[String],
 ) -> String {
     let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
-    let hash = title
-        .bytes()
-        .chain(description.bytes())
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-        });
-    issue.id = format!("{hash:016x}-fixture");
+    issue.id = seed_id(title, description);
     issue.labels = labels.iter().map(|s| s.to_string()).collect();
     issue.dependencies = deps.to_vec();
     issue.state = State::Backlog;
@@ -215,8 +227,8 @@ assert = { label-coverage = { } }
 
 /// Wire a bracket spine `C -> impl -> B`, where `B` carries the success criteria
 /// and a dependent impl child may or may not satisfy them. Returns (container,
-/// breakdown) ids. `impl_satisfies` decides whether the impl child carries the
-/// `satisfies:REQ-01` label.
+/// breakdown) ids. `impl_satisfies` decides whether the impl child credits B's
+/// REQ-01.
 fn spine_with_breakdown_criteria(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
@@ -229,8 +241,9 @@ fn spine_with_breakdown_criteria(
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n",
         &[],
     );
+    let credit = format!("satisfies:{}/REQ-01", &b[..8]);
     let impl_labels: Vec<&str> = if impl_satisfies {
-        vec!["type:task", "satisfies:REQ-01"]
+        vec!["type:task", &credit]
     } else {
         vec!["type:task"]
     };
@@ -248,10 +261,14 @@ fn spine_with_breakdown_criteria(
 /// A selected breakdown whose configured rule reads criteria from its bracketed
 /// container, plus a satisfying child in that container's dependency context.
 fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (String, String) {
+    let criteria = "## Success Criteria\n\n- [hard] REQ-01: selected work\n";
     let child = seed(
         executor,
         "selected implementation",
-        &["type:task", "satisfies:REQ-01"],
+        &[
+            "type:task",
+            &credit("selected container", criteria, "REQ-01"),
+        ],
         "",
         &[],
     );
@@ -259,7 +276,7 @@ fn selected_rule_fixture(executor: &CommandExecutor<InMemoryStorage>) -> (String
         executor,
         "selected container",
         &["type:epic"],
-        "## Success Criteria\n\n- [hard] REQ-01: selected work\n",
+        criteria,
         std::slice::from_ref(&child),
     );
     let container_short = executor
@@ -852,13 +869,15 @@ assert = { label-coverage = { satisfies-namespace = "satisfies", child-link = "d
 /// Wire `C -> impl`, where C is a breakable container whose `description` carries
 /// NO criteria — its `## Success Criteria` section lives ONLY in the external
 /// plan file written at `dev/active/{C.id}-plan.md`. `impl_satisfies` decides
-/// whether the dependency child claims `satisfies:REQ-77`.
+/// whether the dependency child credits the container's REQ-77.
 fn container_with_external_plan(
     executor: &CommandExecutor<InMemoryStorage>,
     impl_satisfies: bool,
 ) -> String {
+    let body = "no criteria in the body — the plan lives in the external file";
+    let credit = credit("container", body, "REQ-77");
     let impl_labels: Vec<&str> = if impl_satisfies {
-        vec!["type:task", "satisfies:REQ-77"]
+        vec!["type:task", &credit]
     } else {
         vec!["type:task"]
     };
@@ -868,7 +887,7 @@ fn container_with_external_plan(
         executor,
         "container",
         &["type:epic"],
-        "no criteria in the body — the plan lives in the external file",
+        body,
         std::slice::from_ref(&impl_id),
     );
 
@@ -1032,7 +1051,10 @@ fn test_scope_relinked_nondefault_plan_covered_is_clean() {
     let impl_id = seed(
         &executor,
         "impl",
-        &["type:task", "satisfies:REQ-77"],
+        &[
+            "type:task",
+            &credit("container", "body without criteria", "REQ-77"),
+        ],
         "",
         &[],
     );
@@ -1122,13 +1144,7 @@ mod file_backed_external_plan {
         deps: &[String],
     ) -> String {
         let mut issue = crate::fixture_issue(title.to_string(), description.to_string());
-        let hash = title
-            .bytes()
-            .chain(description.bytes())
-            .fold(0xcbf29ce484222325_u64, |hash, byte| {
-                (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3)
-            });
-        issue.id = format!("{hash:016x}-fixture");
+        issue.id = super::seed_id(title, description);
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.dependencies = deps.to_vec();
         issue.state = State::Backlog;
@@ -1145,19 +1161,21 @@ mod file_backed_external_plan {
         executor: &CommandExecutor<JsonFileStorage>,
         impl_satisfies: bool,
     ) -> String {
-        let impl_labels: Vec<&str> = if impl_satisfies {
-            vec!["type:task", "satisfies:REQ-77"]
-        } else {
-            vec!["type:task"]
-        };
-        let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
         let c = seed(
             executor,
             "container",
             &["type:epic"],
             "no criteria in the body — the plan lives in the external file",
-            std::slice::from_ref(&impl_id),
+            &[],
         );
+        let credit = format!("satisfies:{}/REQ-77", &c[..8]);
+        let impl_labels: Vec<&str> = if impl_satisfies {
+            vec!["type:task", &credit]
+        } else {
+            vec!["type:task"]
+        };
+        let impl_id = seed(executor, "impl", &impl_labels, "", &[]);
+        executor.add_dependency(&c, &impl_id).unwrap();
 
         // Write the plan under the REPO ROOT, NOT under `.jit/`.
         let plan_dir = repo_root.path().join("dev/active");
@@ -1278,8 +1296,8 @@ assert = {{ label-coverage = {{ }} }}
     }
 
     /// Build a `C -> impl -> B` spine where B carries the criterion from the
-    /// shared taxonomy fixture. Returns (repository, container-id). The impl child carries
-    /// `satisfies:REQ-01` only when `covered`.
+    /// shared taxonomy fixture. Returns (repository, container-id). The impl child credits
+    /// B's REQ-01 only when `covered`.
     fn setup_spine(covered: bool) -> (crate::TaxonomyRepo, String) {
         let dir = crate::setup_test_repo_with_taxonomy();
         let breakdown_type = dir.taxonomy.type_at_level(3);
@@ -1297,8 +1315,9 @@ assert = {{ label-coverage = {{ }} }}
             &[breakdown_label.as_str()],
         );
         let implementation_label = crate::type_label(&dir.taxonomy, 4);
+        let credit = format!("satisfies:{}/REQ-01", &b[..8]);
         let impl_labels: &[&str] = if covered {
-            &[implementation_label.as_str(), "satisfies:REQ-01"]
+            &[implementation_label.as_str(), credit.as_str()]
         } else {
             &[implementation_label.as_str()]
         };

@@ -59,7 +59,7 @@ DIR="$(jit doc dir <C> dev/active)"
   "$DIR/breakdown.json" --config .jit/config.toml \
   --plan "$DIR/plan.md" --known-source <every-valid-source-id> ... \
   --required-source <mandatory-source-id> ... \
-  --required-criterion <criterion-id> ... --deny-warnings
+  --required-criterion <C-short-id>/<criterion-id> ... --deny-warnings  # {<key>.short_id}/<id> for a manifest container
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \
   "$DIR/breakdown.json" "$DIR/plan.md" --write
 .agents/skills/jit-planning-lead/scripts/breakdown_manifest.py render \

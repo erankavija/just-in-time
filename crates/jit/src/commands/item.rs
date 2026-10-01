@@ -514,10 +514,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// reported as an error rather than silently dropped.
     ///
     /// Returns `Ok(None)` when the label's namespace is not a registered link
-    /// namespace OR when the value is unqualified (the legacy `satisfies:REQ-01`
-    /// shape) — those are not generic qualified references and the caller may
-    /// handle them by the existing unqualified rules. A namespace that DOES match
-    /// but whose qualified id cannot be resolved is an `Err`.
+    /// namespace OR when the value is a bare self-id (`satisfies:REQ-01`), which
+    /// addresses no item; validation reports the latter through
+    /// [`unqualified_link_message`](crate::domain::item::unqualified_link_message).
+    /// A namespace that DOES match but whose qualified id cannot be resolved is
+    /// an `Err`.
     pub fn resolve_link_label(&self, label: &str) -> Result<Option<ItemShowResult>> {
         let Some((namespace, value)) = label.split_once(':') else {
             return Ok(None);
@@ -534,8 +535,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         // A generic qualified reference is any address-grammar form (explicit
-        // kind-segmented or `<short-id>/<self-id>` sugar); the legacy unqualified
-        // `satisfies:REQ-01` shape has no `/` and is left to the existing rules.
+        // kind-segmented or `<short-id>/<self-id>` sugar); a bare self-id has no
+        // `/` and addresses nothing.
         if !is_qualified_reference(value) {
             return Ok(None);
         }
@@ -969,8 +970,7 @@ source-of-truth = \"registry-first\"
     #[test]
     fn test_resolve_link_label_classifies_all_address_forms() {
         // REQ-03: resolve_link_label treats every address form (explicit project,
-        // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference,
-        // and a bare self-id as unqualified.
+        // explicit issue, and `<short>/<self-id>` sugar) as a qualified reference.
         let issue = crate::domain::types::fixture_issue(
             "A".to_string(),
             "## Success Criteria\n\n- [hard] REQ-01: atomic writes\n".to_string(),
@@ -1005,12 +1005,6 @@ source-of-truth = \"registry-first\"
             .resolve_link_label(&format!("satisfies:{short}/REQ-01"))
             .unwrap();
         assert_eq!(sugar.unwrap().item.self_id, "REQ-01");
-
-        // A bare self-id is not a qualified reference (left to the legacy rules).
-        assert!(exec
-            .resolve_link_label("satisfies:REQ-01")
-            .unwrap()
-            .is_none());
     }
 
     #[test]
@@ -1835,7 +1829,7 @@ stage = \"postcheck\"
     fn test_resolve_link_label_unqualified_and_unknown_ns_are_none() {
         let a = issue_with_criteria("A", "## Success Criteria\n\n- [hard] REQ-01: a\n");
         let exec = executor_with(vec![a]);
-        // Legacy unqualified shape: not a generic qualified reference.
+        // A bare self-id addresses no item.
         assert!(exec
             .resolve_link_label("satisfies:REQ-01")
             .unwrap()

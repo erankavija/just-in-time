@@ -9,7 +9,7 @@
 #   * B (type:breakdown) carries brackets:$container_short, putting it inside C's dependency
 #     closure so the preview rule `sdd-coverage-preview` evaluates B and resolves
 #     its container C via the brackets: label.
-#   * The impl child does NOT carry satisfies:REQ-01, so REQ-01 is uncovered.
+#   * The impl child does NOT carry satisfies:$container_short/REQ-01, so REQ-01 is uncovered.
 #
 # The native breakdown gate applies the configured preview rule to B as its sole
 # firing issue. REQ-01 has no satisfying child in ANY state, so that gate blocks
@@ -40,7 +40,7 @@ argv = [
 capture = "id"
 id_slot = "container"
 
-# Impl child WITHOUT satisfies:REQ-01 -> REQ-01 left uncovered.
+# Impl child WITHOUT satisfies:$container_short/REQ-01 -> REQ-01 left uncovered.
 [[steps]]
 argv = [
   "issue", "create",

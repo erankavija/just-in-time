@@ -23,7 +23,9 @@ linked from [plan-schema.md](plan-schema.md). Write only a bare JSON array to
 
 Use semantic kebab-case keys, never `T1`/`C2`. Descriptions are final standalone
 issue bodies with observable `## Success Criteria`; labels include membership
-and exact `satisfies:<id>` credits; gates are concrete configured keys. Express
+and exact `satisfies:<container-short-id>/<id>` credits
+(`satisfies:{<key>.short_id}/<id>` for a container created in this manifest);
+gates are concrete configured keys. Express
 relationships only in `depends_on`.
 
 `planning` supplies one concise `outcome`, semantic `contract_refs` (possibly

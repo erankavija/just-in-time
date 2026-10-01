@@ -191,29 +191,32 @@ fn test_sdd_bad_req_id_format_fails_local() {
 }
 
 // ---------------------------------------------------------------------------
-// 2b. SDD — graph rules: coverage and reference-integrity.
+// 2b. SDD — graph rules: coverage and stray-req detection.
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_sdd_graph_coverage_and_reference_pass_when_satisfied() {
+fn test_sdd_graph_coverage_passes_when_satisfied() {
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    // Epic in `done` state: the lifecycle-scoped coverage and derivation rules
-    // are active and must produce no findings when the criterion is covered.
+    // Epic in `done` state: the lifecycle-scoped coverage rule is active and
+    // must produce no findings when the criterion is covered.
     let mut epic = sdd_compliant_epic();
     epic.state = State::Done;
     // A done child the epic depends on (containment), satisfying the one [hard]
     // criterion REQ-01.
     let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
-    child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    child.labels = vec![
+        "type:task".to_string(),
+        format!("satisfies:{}/REQ-01", epic.short_id()),
+    ];
     child.state = State::Done;
     epic.dependencies.push(child.id.clone());
 
     let findings = issue_graph_findings(&rules, &[epic, child]);
     assert!(
         findings.is_empty(),
-        "covered + resolvable references must yield no graph findings: {findings:?}"
+        "a covered criterion must yield no graph findings: {findings:?}"
     );
 }
 
@@ -235,45 +238,23 @@ fn test_sdd_graph_coverage_fails_when_hard_criterion_uncovered() {
 }
 
 #[test]
-fn test_sdd_graph_reference_warns_on_dangling_satisfies() {
-    let set = load_example("sdd");
-    let rules = graph_rules(&set);
-
-    let mut epic = sdd_compliant_epic(); // declares req:REQ-01
-
-    // Child satisfies a req id that is declared NOWHERE -> dangling reference.
-    let mut child = crate::fixture_issue("rogue".to_string(), String::new());
-    child.labels = vec!["type:task".to_string(), "satisfies:REQ-99".to_string()];
-    child.state = State::Done;
-    epic.dependencies.push(child.id.clone());
-
-    let findings = issue_graph_findings(&rules, &[epic, child]);
-    assert!(
-        findings.iter().any(|f| f.finding.message.contains("REQ-99")
-            && f.finding.rule == "sdd-satisfies-references-a-req"),
-        "a dangling satisfies: reference must be reported: {findings:?}"
-    );
-}
-
-#[test]
 fn test_sdd_graph_stray_req_label_is_reported() {
-    // A `req:REQ-77` label whose id is absent from the criteria prose is a stray.
-    // After the lifecycle-aware rework, two rules cover this:
-    //   * sdd-req-matches-a-criterion (always-on, any state): fires because
-    //     REQ-77 is not in the Success Criteria section.
-    //   * sdd-req-is-satisfied (done-scoped, enforce=true): fires at done because
-    //     no child satisfies REQ-77.
+    // A `req:REQ-77` label whose id is absent from the criteria prose is a stray:
+    // sdd-req-matches-a-criterion (always-on, any state) fires because REQ-77 is
+    // not in the Success Criteria section.
     let set = load_example("sdd");
     let rules = graph_rules(&set);
 
-    // Epic in `done` state: both stray detection and derivation rules are active.
     let mut epic = sdd_compliant_epic();
     epic.state = State::Done;
     epic.labels.push("req:REQ-77".to_string());
 
     // A done child satisfies only REQ-01.
     let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
-    child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+    child.labels = vec![
+        "type:task".to_string(),
+        format!("satisfies:{}/REQ-01", epic.short_id()),
+    ];
     child.state = State::Done;
     epic.dependencies.push(child.id.clone());
 
@@ -284,56 +265,13 @@ fn test_sdd_graph_stray_req_label_is_reported() {
             && f.finding.rule == "sdd-req-matches-a-criterion"),
         "a stray req: label must be reported by criteria-label-match: {findings:?}"
     );
-    // At done, the derivation rule also fires for REQ-77.
-    assert!(
-        findings
-            .iter()
-            .any(|f| f.finding.message.contains("REQ-77")
-                && f.finding.rule == "sdd-req-is-satisfied"),
-        "an unsatisfied req: label must be reported by sdd-req-is-satisfied at done: {findings:?}"
-    );
-    // The legitimate req:REQ-01 must NOT be flagged as stray or unsatisfied.
-    assert!(
-        !findings
-            .iter()
-            .any(|f| f.finding.rule == "sdd-req-is-satisfied"
-                && f.finding.message.contains("REQ-01")),
-        "a satisfied req: label must not be flagged as unsatisfied: {findings:?}"
-    );
+    // The legitimate req:REQ-01 must NOT be flagged as stray.
     assert!(
         !findings
             .iter()
             .any(|f| f.finding.rule == "sdd-req-matches-a-criterion"
                 && f.finding.message.contains("REQ-01")),
         "a criterion-matching req: label must not be flagged as stray: {findings:?}"
-    );
-}
-
-#[test]
-fn test_sdd_graph_req_resolution_is_scoped_to_linked_graph() {
-    // `scope = "linked"`: an epic's `req:REQ-01` is NOT satisfied by a
-    // `satisfies:REQ-01` on an UNRELATED issue (no dependency edge to the epic).
-    // Cross-epic matches must not count, so the done-scoped derivation rule fires.
-    let set = load_example("sdd");
-    let rules = graph_rules(&set);
-
-    // Epic in `done` state so the derivation rule is active.
-    let mut epic = sdd_compliant_epic(); // declares req:REQ-01
-    epic.state = State::Done;
-
-    // An unrelated issue satisfies REQ-01 but is NOT linked to this epic.
-    let mut unrelated = crate::fixture_issue("unrelated".to_string(), String::new());
-    unrelated.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
-    unrelated.state = State::Done;
-    // deliberately NO dependency edge to the epic
-
-    let findings = issue_graph_findings(&rules, &[epic, unrelated]);
-    assert!(
-        findings
-            .iter()
-            .any(|f| f.finding.rule == "sdd-req-is-satisfied"
-                && f.finding.message.contains("REQ-01")),
-        "under linked scope an unrelated satisfies: must NOT resolve the epic's req: {findings:?}"
     );
 }
 
@@ -728,7 +666,10 @@ mod sdd_lifecycle {
 
         // A child the epic depends on (containment), still in progress (not done).
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
-        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.labels = vec![
+            "type:task".to_string(),
+            format!("satisfies:{}/REQ-01", epic.short_id()),
+        ];
         child.state = State::InProgress;
         epic.dependencies.push(child.id.clone());
 
@@ -799,8 +740,8 @@ mod sdd_lifecycle {
     //
     // An in-progress epic with a stray req:REQ-77 (absent from the criteria prose)
     // must yield a finding from the always-on sdd-req-matches-a-criterion rule.
-    // The done-scoped rules (sdd-hard-criteria-covered, sdd-req-is-satisfied) must
-    // NOT fire because the epic is not in state done.
+    // The done-scoped coverage rule must NOT fire because the epic is not in
+    // state done.
     #[test]
     fn test_sdd_stray_req_on_in_flight_epic_yields_only_criteria_label_match() {
         let set = load_example("sdd");
@@ -818,7 +759,10 @@ mod sdd_lifecycle {
 
         // A child in progress (not done) so the in-flight state is realistic.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
-        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.labels = vec![
+            "type:task".to_string(),
+            format!("satisfies:{}/REQ-01", epic.short_id()),
+        ];
         child.state = State::InProgress;
         epic.dependencies.push(child.id.clone());
 
@@ -833,24 +777,18 @@ mod sdd_lifecycle {
             "stray req:REQ-77 on in-flight epic must be caught by criteria-label-match: {findings:?}"
         );
 
-        // The done-scoped rules must NOT fire for an in-progress epic.
+        // The done-scoped rule must NOT fire for an in-progress epic.
         assert!(
             !findings
                 .iter()
                 .any(|f| f.finding.rule == "sdd-hard-criteria-covered"),
             "sdd-hard-criteria-covered must not fire for an in-progress epic: {findings:?}"
         );
-        assert!(
-            !findings
-                .iter()
-                .any(|f| f.finding.rule == "sdd-req-is-satisfied"),
-            "sdd-req-is-satisfied must not fire for an in-progress epic: {findings:?}"
-        );
     }
 
     // Scenario (d): happy path -> done transition succeeds.
     //
-    // An epic with a covered [hard] criterion (done child with satisfies:REQ-01)
+    // An epic with a covered [hard] criterion (done child crediting its REQ-01)
     // must be able to transition to done without being blocked.
     #[test]
     fn test_sdd_happy_path_done_transition_succeeds() {
@@ -865,7 +803,10 @@ mod sdd_lifecycle {
 
         // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
-        child.labels = vec!["type:task".to_string(), "satisfies:REQ-01".to_string()];
+        child.labels = vec![
+            "type:task".to_string(),
+            format!("satisfies:{}/REQ-01", epic.short_id()),
+        ];
         child.state = State::Done;
         let child_id = child.id.clone();
         crate::harness::seed_memory_issue(executor.storage(), &child);
@@ -1026,10 +967,11 @@ mod nyquist {
     /// An epic with [hard] criteria REQ-01 and REQ-02, both verified via labels.
     fn epic_with_label_verification() -> Issue {
         let mut epic = crate::fixture_issue("Feature Y".to_string(), nyquist_compliant_body());
+        let short = epic.short_id();
         epic.labels = vec![
             "type:epic".to_string(),
-            "checks:REQ-01".to_string(),
-            "checks:REQ-02".to_string(),
+            format!("checks:{short}/REQ-01"),
+            format!("checks:{short}/REQ-02"),
         ];
         epic
     }
@@ -1091,6 +1033,7 @@ mod nyquist {
         let rules = graph_rules(&set);
         let mut epic = crate::fixture_issue("Feature W".to_string(), nyquist_compliant_body());
         epic.labels = vec!["type:epic".to_string()]; // no gates, no checks labels
+        let short = epic.short_id();
 
         let findings = issue_graph_findings(&rules, std::slice::from_ref(&epic));
         let req01_finding = findings
@@ -1106,7 +1049,7 @@ mod nyquist {
             "finding must name the expected gate: {msg}"
         );
         assert!(
-            msg.contains("checks:REQ-01"),
+            msg.contains(&format!("checks:{short}/REQ-01")),
             "finding must name the expected label: {msg}"
         );
     }
@@ -1346,8 +1289,8 @@ mod research {
         goal
     }
 
-    /// A `type:experiment` that tests hypothesis H-1 and has the required
-    /// `## Method` and `## Evidence` sections.
+    /// A `type:experiment` that tests the goal's hypothesis H-1 and has the
+    /// required `## Method` and `## Evidence` sections.
     fn compliant_experiment(goal_id: &str) -> Issue {
         let body = "## Method\n\n\
             - train with 10x the original dataset size\n\
@@ -1355,8 +1298,11 @@ mod research {
             ## Evidence\n\n\
             - accuracy reached 96.3%, exceeding the 95% threshold\n";
         let mut exp = crate::fixture_issue("Scale training data".to_string(), body.to_string());
-        exp.labels = vec!["type:experiment".to_string(), "tests:H-1".to_string()];
-        let _ = goal_id; // containment is wired by the caller: goal depends on exp
+        // Containment is wired by the caller: goal depends on exp.
+        exp.labels = vec![
+            "type:experiment".to_string(),
+            format!("tests:{}/H-1", &goal_id[..8]),
+        ];
         exp.state = State::Done;
         exp
     }
@@ -1619,7 +1565,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
     #[test]
     fn test_research_done_transition_blocked_when_hypothesis_uncovered() {
         // A `type:goal` in state `in_progress` with a `[hard]` hypothesis H-1
-        // but NO done experiment that `tests:H-1`. The done transition must be
+        // but NO done experiment that tests it. The done transition must be
         // blocked by the enforcing coverage rule (exit 4 semantics via
         // TransitionBlockedError).
         let executor = research_coverage_executor();
@@ -1676,11 +1622,12 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
     #[test]
     fn test_research_happy_path_covered_goal_completes() {
         // Goal with [hard] H-1; one done experiment the goal depends on, which
-        // carries tests:H-1. Graph findings must be empty; done transition succeeds.
+        // credits the goal's H-1. Graph findings must be empty.
         let set = load_example("research");
         let rules = graph_rules(&set);
 
         let mut goal = compliant_goal();
+        goal.state = State::Done;
         let exp = compliant_experiment(&goal.id);
         goal.dependencies.push(exp.id.clone());
 
@@ -1692,44 +1639,6 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         assert!(
             error_findings.is_empty(),
             "a covered done goal must yield no error findings: {error_findings:?}"
-        );
-    }
-
-    #[test]
-    fn test_research_tests_references_a_hyp_warns_on_dangling_tests_label() {
-        // An experiment that claims `tests:H-99`, but the linked goal only
-        // declares `hyp:H-1`. The `research-tests-references-a-hyp` rule (warn)
-        // must surface the dangling reference without blocking.
-        let set = load_example("research");
-        let rules = graph_rules(&set);
-
-        let mut goal = compliant_goal(); // declares hyp:H-1
-        let mut exp = compliant_experiment(&goal.id);
-        goal.dependencies.push(exp.id.clone());
-        // Override the tests: label to reference a nonexistent hypothesis.
-        exp.labels = vec![
-            "type:experiment".to_string(),
-            "tests:H-99".to_string(), // no hyp:H-99 on the goal
-        ];
-
-        let findings = issue_graph_findings(&rules, &[goal, exp]);
-        assert!(
-            findings
-                .iter()
-                .any(|f| f.finding.rule == "research-tests-references-a-hyp"
-                    && f.finding.message.contains("H-99")),
-            "a dangling tests: reference must be reported by research-tests-references-a-hyp: \
-             {findings:?}"
-        );
-        // Verify the finding is a warn (not error) so it does not block.
-        let dangling = findings
-            .iter()
-            .find(|f| f.finding.rule == "research-tests-references-a-hyp")
-            .expect("dangling tests: finding must exist");
-        assert_eq!(
-            dangling.finding.severity,
-            jit::declarations::rules::Severity::Warn,
-            "dangling tests: reference must be a warning, not an error"
         );
     }
 

@@ -27,7 +27,8 @@ in order — each gate blocks the next step. Section numbers refer to the skill'
    (`.agents/skills/jit-breakdown/SKILL.md`). Its bracket path consumes the
    pre-created `B` (already typed, labeled `brackets:<C-short-id>`, gated, and
    depending on `P`), drafts the impl children in Backlog with their
-   `satisfies:<criterion-id>` coverage labels, and splices the interior spine
+   `satisfies:<C-short-id>/<criterion-id>` coverage labels (a story the manifest
+   creates is credited as `satisfies:{<story-key>.short_id}/<criterion-id>`), and splices the interior spine
    (sources → `B`, `C` → sinks; transitive reduction drops the scaffold's
    `C → B` edge). Apply gate inheritance + per-task quality gates to the drafted
    children (Section 3B bullets). Self-approve the decomposition; escalate only

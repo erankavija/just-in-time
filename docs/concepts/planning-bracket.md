@@ -210,8 +210,8 @@ two knobs:
 
 - **The closure rule** sets `child-state = "done"` and fires on the container at
   `when = { type = "<container>", state = "done" }`. It asks *mapping DONE*: every
-  `[hard]` criterion is satisfied by a child that carries the satisfies label **and
-  is itself done**. This is the back-end enforcement that bites at the `→ done`
+  `[hard]` criterion is satisfied by a child that carries
+  `satisfies:<C-short-id>/<id>` **and is itself done**. This is the back-end enforcement that bites at the `→ done`
   transition, blocking completion (exit 4) if anything is uncovered.
 
 - **The preview rule** **omits `child-state` entirely** and fires on the transient

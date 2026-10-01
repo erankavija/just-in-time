@@ -18,6 +18,7 @@
 //!   one recoverable repository delta.
 
 use super::*;
+use crate::domain::SHORT_ID_LENGTH;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 use thiserror::Error;
@@ -106,6 +107,13 @@ pub enum BatchValidationProblem {
     DuplicateKey { key: String },
     /// An entry's `depends_on` names a key not defined anywhere in the file.
     UnknownDependency { key: String, missing: String },
+    /// An entry's coverage-credit label references (`{<key>.short_id}`) a key
+    /// not defined anywhere in the file.
+    UnknownLabelKey {
+        key: String,
+        label: String,
+        missing: String,
+    },
     /// The symbolic `depends_on` graph contains a cycle (the keys forming it).
     Cycle { keys: Vec<String> },
     /// An entry's priority string does not parse.
@@ -129,6 +137,15 @@ impl std::fmt::Display for BatchValidationProblem {
             Self::UnknownDependency { key, missing } => write!(
                 f,
                 "entry '{key}' depends_on '{missing}', which is not defined in the file"
+            ),
+            Self::UnknownLabelKey {
+                key,
+                label,
+                missing,
+            } => write!(
+                f,
+                "entry '{key}' label '{label}' references key '{missing}', which is not defined \
+                 in the file"
             ),
             Self::Cycle { keys } => {
                 write!(f, "dependency cycle among keys: {}", keys.join(" -> "))
@@ -315,9 +332,21 @@ impl<S: IssueStore> CommandExecutor<S> {
                         }
                         Ok::<_, anyhow::Error>(edges)
                     })?;
+            let credit = Self::batch_credit_namespaces(&declarations)?;
+            let short_id_of = |key: &str| {
+                positions
+                    .get(key)
+                    .map(|&index| created_issue_ids[index][..SHORT_ID_LENGTH].to_string())
+            };
             let drafts = defs
                 .iter()
                 .map(|def| {
+                    let def = &BatchIssueDef {
+                        labels: resolve_labels(def, &credit, short_id_of).map_err(|_| {
+                            anyhow!("validated batch contains an unresolved label key")
+                        })?,
+                        ..def.clone()
+                    };
                     let priority = def
                         .priority
                         .as_deref()
@@ -373,7 +402,31 @@ impl<S: IssueStore> CommandExecutor<S> {
         // The set of defined keys, for resolving `depends_on` references.
         let defined: HashSet<&str> = defs.iter().map(|d| d.key.as_str()).collect();
 
-        // 2. Unknown `depends_on` references.
+        // 2a. Unknown keys referenced by coverage-credit labels. Each known key
+        //     resolves to a shape-valid placeholder here: ids are allocated only
+        //     at creation, and write validation below needs the final label shape.
+        let credit = Self::batch_credit_namespaces(declarations)?;
+        let placeholder = "0".repeat(SHORT_ID_LENGTH);
+        let resolved_labels: Vec<Option<Vec<String>>> = defs
+            .iter()
+            .map(|def| {
+                resolve_labels(def, &credit, |key| {
+                    defined.contains(key).then(|| placeholder.clone())
+                })
+                .map_err(|unknown| {
+                    problems.extend(unknown.into_iter().map(|(label, missing)| {
+                        BatchValidationProblem::UnknownLabelKey {
+                            key: def.key.clone(),
+                            label,
+                            missing,
+                        }
+                    }))
+                })
+                .ok()
+            })
+            .collect();
+
+        // 2b. Unknown `depends_on` references.
         for def in defs {
             for dep in &def.depends_on {
                 if !defined.contains(dep.as_str()) {
@@ -407,7 +460,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             });
         let gate_registry = declarations.gates();
 
-        for def in defs {
+        for (def, labels) in defs.iter().zip(resolved_labels) {
             // Priority must parse before we can build the candidate issue; a parse
             // failure is reported and we skip write-time validation for this entry
             // (there is no valid shape to validate).
@@ -455,7 +508,14 @@ impl<S: IssueStore> CommandExecutor<S> {
             // publication, so all entry-attributed problems are reported together.
             // This derivation does not save; a blocking finding is returned as an
             // error whose message we attribute to this entry's key.
-            let candidate = Self::batch_candidate_issue(def, priority, declarations.config());
+            let Some(labels) = labels else {
+                continue;
+            };
+            let resolved = BatchIssueDef {
+                labels,
+                ..def.clone()
+            };
+            let candidate = Self::batch_candidate_issue(&resolved, priority, declarations.config());
             if let Err(err) =
                 derive_write_validation(&candidate, declarations, declarations.config(), false)
             {
@@ -514,6 +574,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue
     }
 
+    /// The label namespaces in which a `{<key>.short_id}` reference resolves:
+    /// those that credit an issue-scoped item under the captured declarations.
+    fn batch_credit_namespaces(
+        declarations: &crate::repository_state::CapturedRepositoryDeclarations,
+    ) -> Result<HashSet<String>> {
+        let kinds =
+            crate::domain::item::resolve_item_kinds(declarations.config().item_kinds.as_ref())?;
+        Ok(crate::validation::graph::issue_credit_namespaces(
+            &declarations.rules().rules,
+            &kinds,
+        ))
+    }
+
     fn collect_batch_problems(&self, defs: &[BatchIssueDef]) -> Result<Vec<BatchValidationProblem>>
     where
         S: crate::storage::RepositoryStateStore,
@@ -525,6 +598,35 @@ impl<S: IssueStore> CommandExecutor<S> {
             .image;
         let declarations = crate::repository_state::declarations_from_image(&image)?;
         Self::collect_batch_problems_from_declarations(defs, &declarations)
+    }
+}
+
+/// `def`'s labels with every manifest-key reference in a `credit` namespace
+/// resolved through `short_id_of`, or every `(label, missing key)` that does not
+/// resolve.
+fn resolve_labels(
+    def: &BatchIssueDef,
+    credit: &HashSet<String>,
+    short_id_of: impl Fn(&str) -> Option<String>,
+) -> std::result::Result<Vec<String>, Vec<(String, String)>> {
+    let (resolved, unknown): (Vec<_>, Vec<_>) = def
+        .labels
+        .iter()
+        .map(|label| {
+            crate::domain::key_reference::resolve_key_reference(label, credit, &short_id_of)
+                .map_err(|missing| (label.clone(), missing))
+        })
+        .partition(std::result::Result::is_ok);
+    if unknown.is_empty() {
+        Ok(resolved
+            .into_iter()
+            .filter_map(std::result::Result::ok)
+            .collect())
+    } else {
+        Err(unknown
+            .into_iter()
+            .filter_map(std::result::Result::err)
+            .collect())
     }
 }
 
@@ -815,6 +917,72 @@ mod tests {
             problem,
             BatchValidationProblem::UnknownDependency { key, missing }
                 if key == "a" && missing == "ghost"
+        )));
+        assert!(exec.storage().list_issues().unwrap().is_empty());
+    }
+
+    /// An executor whose rules credit a story-level container's criteria through
+    /// `satisfies` labels on its dependency closure.
+    fn coverage_executor() -> CommandExecutor<InMemoryStorage> {
+        let exec = executor();
+        let rules = format!(
+            "[[rules]]\nname = \"story-coverage\"\nwhen = {{ type = \"{}\" }}\n\
+             severity = \"error\"\nassert = {{ label-coverage = {{ child-link = \"dependencies\" }} }}\n",
+            crate::test_taxonomy::test_taxonomy().type_at_level(3)
+        );
+        std::fs::write(exec.storage().root().join("rules.toml"), &rules).unwrap();
+        exec.storage().add_data_file("rules.toml", &rules);
+        exec
+    }
+
+    fn typed_def(key: &str, level: u8, deps: &[&str]) -> BatchIssueDef {
+        BatchIssueDef {
+            r#type: Some(
+                crate::test_taxonomy::test_taxonomy()
+                    .type_at_level(level)
+                    .to_string(),
+            ),
+            ..def(key, deps)
+        }
+    }
+
+    #[test]
+    fn test_batch_create_key_reference_credits_container_created_in_same_manifest() {
+        let exec = coverage_executor();
+        let mut story = typed_def("story", 3, &["task"]);
+        story.description = "## Success Criteria\n\n- [hard] REQ-01: works\n".to_string();
+        let mut task = typed_def("task", 4, &[]);
+        task.labels = vec!["satisfies:{story.short_id}/REQ-01".to_string()];
+
+        let map = exec
+            .batch_create_from_json(vec![story, task])
+            .unwrap()
+            .as_map();
+
+        let task = exec.storage().load_issue(&map["task"]).unwrap();
+        assert!(task.labels.contains(&format!(
+            "satisfies:{}/REQ-01",
+            &map["story"][..SHORT_ID_LENGTH]
+        )));
+        let report = exec.run_rules(None).unwrap();
+        assert!(
+            !report.findings.iter().any(|f| f.rule == "story-coverage"),
+            "{:?}",
+            report.findings
+        );
+    }
+
+    #[test]
+    fn test_batch_create_unknown_label_key_returns_typed_error_without_writes() {
+        let exec = coverage_executor();
+        let mut task = def("task", &[]);
+        task.labels = vec!["satisfies:{ghost.short_id}/REQ-01".to_string()];
+        let err = exec.batch_create_from_json(vec![task]).unwrap_err();
+        let validation = err.downcast_ref::<BatchValidationError>().unwrap();
+        assert!(validation.problems.iter().any(|problem| matches!(
+            problem,
+            BatchValidationProblem::UnknownLabelKey { key, missing, .. }
+                if key == "task" && missing == "ghost"
         )));
         assert!(exec.storage().list_issues().unwrap().is_empty());
     }

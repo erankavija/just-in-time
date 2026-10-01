@@ -637,7 +637,8 @@ pub enum Assertion {
     },
     /// Every criterion in a configured section maps to a verifiable check.
     /// Graph scope. "Checked" means the issue carries a required gate keyed
-    /// `<gate-prefix><id>` (in `gates_required`) OR a label `<check-namespace>:<id>`.
+    /// `<gate-prefix><id>` (in `gates_required`) OR a label
+    /// `<check-namespace>:<own-short-id>/<id>` naming its own criterion.
     /// At least one of `gate_prefix` / `check_namespace` must be set (config error
     /// otherwise). Criteria and marker filtering reuse the same `criterion_ids`
     /// extractor as `label-coverage`.
@@ -667,7 +668,7 @@ pub enum Assertion {
         /// the issue has `"<gate_prefix><id>"` in `gates_required`.
         gate_prefix: Option<String>,
         /// Optional label namespace. A criterion `<id>` is "label-checked" when
-        /// the issue carries `"<check_namespace>:<id>"`.
+        /// the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
         check_namespace: Option<String>,
     },
     /// Assert that each value in a label namespace is owned by at most one issue

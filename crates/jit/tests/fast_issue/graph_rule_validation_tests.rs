@@ -158,7 +158,7 @@ assert = { label-coverage = { } }
         "## Success Criteria\n\n- [hard] REQ-01: do the thing\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
-    // A dependent child that does NOT carry satisfies:REQ-01.
+    // A dependent child that carries no satisfies label.
     let mut child = crate::fixture_issue("child".to_string(), String::new());
     child.labels = vec!["type:task".to_string()];
     child.dependencies = vec![epic.id.clone()];
