@@ -74,6 +74,31 @@
       "format": "markdown",
       "label": null,
       "path": "dev/benchmarks/publication-cost-722878d4/README.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "05fc076cec103cffb91c78e30f4e1a92faa4b6023b6fdf415da62e87af33051c",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../../scripts/benchmark-mutation-cost.sh",
+          "resolved_path": "scripts/benchmark-mutation-cost.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "3a71bf89068f6597382c6bc6e694ccdd374657107660b45b99dcd43f03dcfcc4",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../benchmarks/publication-cost-722878d4/README.md",
+          "resolved_path": "dev/benchmarks/publication-cost-722878d4/README.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/ef7848ea/checkpoint-evidence.md"
     }
   ],
   "first_ready_at": "2026-10-01T22:23:15.518009497Z",
@@ -95,5 +120,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-10-01T22:23:15.883466619Z"
+  "updated_at": "2026-10-01T22:29:48.985676912Z"
 }
