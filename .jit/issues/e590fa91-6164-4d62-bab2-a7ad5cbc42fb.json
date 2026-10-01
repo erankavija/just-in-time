@@ -100,8 +100,8 @@
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "status": "failed",
-      "updated_at": "2026-10-01T20:02:45.499862834Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T20:07:01.616866518Z",
       "updated_by": "auto:executor"
     }
   },
@@ -120,5 +120,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T20:03:31.720188848Z"
+  "updated_at": "2026-10-01T20:07:01.616866518Z"
 }
