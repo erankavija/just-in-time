@@ -693,6 +693,13 @@ const FILESYSTEM_MUTATIONS: [&str; 22] = [
     "renameat",
 ];
 
+/// Calls that create a directory, by path or through an open directory handle.
+const DIRECTORY_CREATIONS: [&str; 3] = ["fs::create_dir", ".create_dir(", ".create_dir_all("];
+
+/// The definition owning initialization's publisher, the one writer allowed to
+/// create an absent data root.
+const DATA_ROOT_PUBLISHER: &str = "fn publish_staged_data_root(";
+
 /// The publishers allowed to write repository state, each found by the
 /// definition it owns, with the reason it may.
 const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
@@ -707,17 +714,21 @@ const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
          roots",
     ),
     (
-        "fn publish_staged_data_root(",
+        DATA_ROOT_PUBLISHER,
         "an absent data root cannot be created through the record, whose home is a scratch \
          directory inside that root; it is staged beside it and published by a no-replace \
          rename instead",
     ),
 ];
 
+/// A class of writes: its name, the markers recognising it in the writing
+/// function's code, and the reason its target is safe.
+type WriteClass = (&'static str, &'static [&'static str], &'static str);
+
 /// Writes whose target lies outside repository state, each class recognised by
 /// the shape that fixes its target: any one of its markers in the writing
 /// function's code.
-const NON_REPOSITORY_WRITES: [(&str, &[&str], &str); 9] = [
+const NON_REPOSITORY_WRITES: [WriteClass; 9] = [
     (
         "advisory lock",
         &[
@@ -773,6 +784,44 @@ const NON_REPOSITORY_WRITES: [(&str, &[&str], &str); 9] = [
          repository exists",
     ),
 ];
+
+/// The [`NON_REPOSITORY_WRITES`] classes whose targets lie outside every
+/// repository root, so a directory they create is never the data root. Lock,
+/// identity, debris, and server-state targets live inside the data root, where
+/// creating a parent directory can create the root itself.
+const OUTSIDE_ROOT_WRITES: [&str; 5] = [
+    "claims control plane",
+    "git hooks",
+    "export",
+    "user configuration",
+    "build script",
+];
+
+/// Directory creations inside a repository root whose target is never the
+/// data root itself.
+const IN_ROOT_DIRECTORIES: [WriteClass; 2] = [
+    (
+        "beneath a held root",
+        &["CapabilityRoots"],
+        "capability roots hold only roots that exist, so a directory created through one \
+         lies beneath that root, never at it",
+    ),
+    (
+        "redo record scratch",
+        &["RECORD_SCRATCH_DIR"],
+        "the record's scratch directory is created non-recursively inside a data root that \
+         already exists",
+    ),
+];
+
+/// Directory creations whose target cannot be the data root.
+fn non_data_root_directories() -> Vec<WriteClass> {
+    NON_REPOSITORY_WRITES
+        .into_iter()
+        .filter(|(class, _, _)| OUTSIDE_ROOT_WRITES.contains(class))
+        .chain(IN_ROOT_DIRECTORIES)
+        .collect()
+}
 
 /// Each function's text, from its signature line to the next signature.
 fn function_bodies(source: &str) -> Vec<&str> {
@@ -855,17 +904,19 @@ struct WriterScan {
     classes_seen: BTreeSet<&'static str>,
 }
 
-/// Classify every function that mutates the filesystem.
+/// Classify every function that performs one of `mutations`.
 ///
 /// A write inside a publisher is the sanctioned route, and calling a publisher
-/// is going through it. Any other writer must match a
-/// [`NON_REPOSITORY_WRITES`] class. A writer no class matches and that its own
+/// is going through it. Any other writer must match one of `classes`. A writer
+/// no class matches and that its own
 /// module tree confines — a private helper or a storage-private primitive —
 /// hands the question to its callers: each function naming it is a writer in
 /// turn, wherever its path came from. An exported writer no class matches is
 /// unclassified.
 fn scan_filesystem_writers(
     functions: &[ProductionFunction],
+    mutations: &[&str],
+    classes: &[WriteClass],
     publishers: &BTreeSet<PathBuf>,
 ) -> WriterScan {
     let mut scan = WriterScan::default();
@@ -877,7 +928,7 @@ fn scan_filesystem_writers(
             .enumerate()
             .filter(|(index, function)| {
                 !classified.contains(index)
-                    && (FILESYSTEM_MUTATIONS
+                    && (mutations
                         .iter()
                         .any(|mutation| function.code.contains(mutation))
                         || delegated
@@ -890,7 +941,7 @@ fn scan_filesystem_writers(
         }
         for (index, function) in writers {
             classified.insert(index);
-            let class = NON_REPOSITORY_WRITES.iter().find(|(_, markers, _)| {
+            let class = classes.iter().find(|(_, markers, _)| {
                 markers.iter().any(|marker| function.code.contains(marker))
             });
             match (publishers.contains(&function.module), class) {
@@ -913,11 +964,14 @@ fn scan_filesystem_writers(
     }
 }
 
-/// The source owning each [`REPOSITORY_STATE_PUBLISHERS`] definition.
-fn repository_state_publishers(sources: &[(PathBuf, String)]) -> Result<BTreeSet<PathBuf>, String> {
-    REPOSITORY_STATE_PUBLISHERS
+/// The source owning each of `definitions`.
+fn publisher_sources(
+    sources: &[(PathBuf, String)],
+    definitions: &[&str],
+) -> Result<BTreeSet<PathBuf>, String> {
+    definitions
         .iter()
-        .map(|(definition, _)| {
+        .map(|definition| {
             let owners = sources
                 .iter()
                 .filter(|(_, source)| source.contains(definition))
@@ -933,14 +987,18 @@ fn repository_state_publishers(sources: &[(PathBuf, String)]) -> Result<BTreeSet
         .collect()
 }
 
-fn assert_only_named_publishers_write_repository_state(
+/// Every publisher and class was seen writing, and no writer is unclassified;
+/// `rule` names what an unclassified writer breaks.
+fn assert_writers_classified(
     scan: &WriterScan,
     publishers: &BTreeSet<PathBuf>,
+    classes: &[WriteClass],
+    rule: &str,
 ) -> Result<(), String> {
     let unseen_publishers = publishers
         .difference(&scan.publishers_seen)
         .collect::<Vec<_>>();
-    let unseen_classes = NON_REPOSITORY_WRITES
+    let unseen_classes = classes
         .iter()
         .map(|(class, _, _)| *class)
         .filter(|class| !scan.classes_seen.contains(class))
@@ -954,9 +1012,7 @@ fn assert_only_named_publishers_write_repository_state(
     }
     scan.unclassified.is_empty().then_some(()).ok_or_else(|| {
         format!(
-            "filesystem writes to an unclassified target in {:?}; a mutation reaches the \
-             repository's roots only through its session's redo record (`@/charter/D-17`), \
-             and any other write names the non-repository class it belongs to",
+            "filesystem writes to an unclassified target in {:?}; {rule}",
             scan.unclassified
         )
     })
@@ -976,11 +1032,117 @@ fn assert_only_named_publishers_write_repository_state(
 #[test]
 fn test_repository_state_is_written_only_by_the_redo_record_and_the_absent_root_publisher() {
     let sources = workspace_compiled_sources();
+    let definitions = REPOSITORY_STATE_PUBLISHERS.map(|(definition, _)| definition);
     let publishers =
-        repository_state_publishers(&sources).unwrap_or_else(|error| panic!("{error}"));
-    let scan = scan_filesystem_writers(&production_functions(&sources), &publishers);
-    assert_only_named_publishers_write_repository_state(&scan, &publishers)
+        publisher_sources(&sources, &definitions).unwrap_or_else(|error| panic!("{error}"));
+    let scan = scan_filesystem_writers(
+        &production_functions(&sources),
+        &FILESYSTEM_MUTATIONS,
+        &NON_REPOSITORY_WRITES,
+        &publishers,
+    );
+    assert_writers_classified(
+        &scan,
+        &publishers,
+        &NON_REPOSITORY_WRITES,
+        REPOSITORY_STATE_RULE,
+    )
+    .unwrap_or_else(|error| panic!("{error}"));
+}
+
+/// What an unclassified repository-state writer breaks.
+const REPOSITORY_STATE_RULE: &str = "a mutation reaches the repository's roots only through its \
+     session's redo record (`@/charter/D-17`), and any other write names the non-repository \
+     class it belongs to";
+
+/// What an unclassified directory creation breaks.
+const DATA_ROOT_CREATION_RULE: &str = "an absent data root is created only by initialization's \
+     publisher, and any other directory creation names the class that keeps its target from \
+     being the data root";
+
+/// An absent data root is created only by initialization's publisher.
+///
+/// The repository-state scan admits lock and identity writes by their target
+/// file, which lives inside the data root, so it cannot see such a writer
+/// creating the root as that file's parent. This scan holds every directory
+/// creation to the classes whose target cannot be the data root.
+#[test]
+fn test_data_root_is_created_only_by_the_initialization_publisher() {
+    let sources = workspace_compiled_sources();
+    let publishers = publisher_sources(&sources, &[DATA_ROOT_PUBLISHER])
         .unwrap_or_else(|error| panic!("{error}"));
+    let classes = non_data_root_directories();
+    let scan = scan_filesystem_writers(
+        &production_functions(&sources),
+        &DIRECTORY_CREATIONS,
+        &classes,
+        &publishers,
+    );
+    assert_writers_classified(&scan, &publishers, &classes, DATA_ROOT_CREATION_RULE)
+        .unwrap_or_else(|error| panic!("{error}"));
+}
+
+/// Red-first proof for the data-root creation scan: a lock or identity writer
+/// creating its file's directory is flagged although the repository-state scan
+/// admits it, while a creation beneath a held root or in the initialization
+/// publisher is not.
+#[test]
+fn test_data_root_creation_scan_flags_lock_and_identity_writers_creating_their_directory() {
+    let functions = |fragments: &[(&str, &str)]| {
+        production_functions(
+            &fragments
+                .iter()
+                .map(|(module, fragment)| {
+                    (PathBuf::from(module), production_text(fragment).unwrap())
+                })
+                .collect::<Vec<_>>(),
+        )
+    };
+    let writers = functions(&[
+        (
+            "storage/repo_lock.rs",
+            "pub fn acquire(path: &Path) {\n    \
+             std::fs::create_dir_all(path.parent().unwrap()).unwrap();\n    \
+             locker.lock_exclusive(path);\n}\n",
+        ),
+        (
+            "storage/worktree_identity.rs",
+            "pub fn record(paths: &WorktreePaths, identity: &WorktreeIdentity) {\n    \
+             fs::create_dir_all(&paths.local_jit).unwrap();\n}\n",
+        ),
+        (
+            "storage/redo_apply.rs",
+            "fn make(roots: &CapabilityRoots, leaf: &str) {\n    \
+             roots.data().create_dir(leaf).unwrap();\n}\n",
+        ),
+        (
+            "storage/init_publish.rs",
+            "pub fn stage(parent: &Dir, leaf: &str) {\n    parent.create_dir(leaf).unwrap();\n}\n",
+        ),
+    ]);
+    let init_publisher = BTreeSet::from([PathBuf::from("storage/init_publish.rs")]);
+
+    let admitted = scan_filesystem_writers(
+        &writers,
+        &FILESYSTEM_MUTATIONS,
+        &NON_REPOSITORY_WRITES,
+        &init_publisher,
+    );
+    assert!(admitted.unclassified.is_empty(), "{admitted:?}");
+
+    let flagged = scan_filesystem_writers(
+        &writers,
+        &DIRECTORY_CREATIONS,
+        &non_data_root_directories(),
+        &init_publisher,
+    );
+    assert_eq!(
+        flagged.unclassified,
+        BTreeSet::from([
+            "storage/repo_lock.rs::acquire".to_string(),
+            "storage/worktree_identity.rs::record".to_string(),
+        ])
+    );
 }
 
 /// Red-first proof for the writer scan: a helper writing a path it was handed
@@ -993,7 +1155,13 @@ fn test_repository_state_writer_scan_flags_unclassified_writers_wherever_their_p
             .iter()
             .map(|(module, fragment)| (PathBuf::from(module), production_text(fragment).unwrap()))
             .collect::<Vec<_>>();
-        scan_filesystem_writers(&production_functions(&sources), &BTreeSet::new()).unclassified
+        scan_filesystem_writers(
+            &production_functions(&sources),
+            &FILESYSTEM_MUTATIONS,
+            &NON_REPOSITORY_WRITES,
+            &BTreeSet::new(),
+        )
+        .unclassified
     };
     let helper =
         "fn put(path: &Path, bytes: &[u8]) {\n    std::fs::write(path, bytes).unwrap();\n}\n";
@@ -1035,18 +1203,25 @@ fn test_repository_state_writer_scan_flags_unclassified_writers_wherever_their_p
             .map(|(class, _, _)| *class)
             .collect(),
     };
-    let direct =
-        assert_only_named_publishers_write_repository_state(&complete, &publishers).unwrap_err();
+    let direct = assert_writers_classified(
+        &complete,
+        &publishers,
+        &NON_REPOSITORY_WRITES,
+        REPOSITORY_STATE_RULE,
+    )
+    .unwrap_err();
     assert!(
         direct.contains("unclassified target in {\"commands/save.rs::save\"}"),
         "{direct}"
     );
-    let blind = assert_only_named_publishers_write_repository_state(
+    let blind = assert_writers_classified(
         &WriterScan {
             classes_seen: BTreeSet::new(),
             ..complete
         },
         &publishers,
+        &NON_REPOSITORY_WRITES,
+        REPOSITORY_STATE_RULE,
     )
     .unwrap_err();
     assert!(blind.contains("no longer sees"), "{blind}");
