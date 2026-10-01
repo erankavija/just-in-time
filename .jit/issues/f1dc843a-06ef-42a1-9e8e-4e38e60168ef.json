@@ -109,8 +109,8 @@
       "updated_by": "auto:executor"
     },
     "holistic-review": {
-      "status": "passed",
-      "updated_at": "2026-10-01T23:01:18.592554704Z",
+      "status": "failed",
+      "updated_at": "2026-10-01T23:13:58.407298851Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
@@ -131,5 +131,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T23:10:50.401534078Z"
+  "updated_at": "2026-10-01T23:13:58.407298851Z"
 }
