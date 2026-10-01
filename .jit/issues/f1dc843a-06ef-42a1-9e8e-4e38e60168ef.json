@@ -12,13 +12,6 @@
   "documents": [
     {
       "commit": null,
-      "doc_type": "artifact",
-      "format": "markdown",
-      "label": "Mutation benchmark harness",
-      "path": "dev/active/f1dc843a-redo-mutations/bench.sh"
-    },
-    {
-      "commit": null,
       "doc_type": "notes",
       "format": "markdown",
       "label": "Session 1 handoff",
@@ -75,6 +68,13 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/intake.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "artifact",
+      "format": "markdown",
+      "label": null,
+      "path": "scripts/benchmark-mutation-cost.sh"
     }
   ],
   "first_ready_at": "2026-09-19T20:28:46.980500035Z",
@@ -98,5 +98,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Mutations commit through a redo record and never scale with project history",
-  "updated_at": "2026-10-01T22:40:28.329540718Z"
+  "updated_at": "2026-10-01T22:40:35.727909032Z"
 }
