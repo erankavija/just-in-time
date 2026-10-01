@@ -958,7 +958,7 @@ mod tests {
     }
 
     /// A file-backed executor with the fixture's canonical layout, used to capture
-    /// whole-repository validation images through the recovered session.
+    /// whole-repository validation images through a mutation session.
     fn executor(repo: &tempfile::TempDir) -> crate::commands::CommandExecutor<JsonFileStorage> {
         let data = repo.path().join(".jit");
         let layout = crate::storage::discover_repository_layout(repo.path(), &data).unwrap();

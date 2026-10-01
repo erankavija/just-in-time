@@ -62,8 +62,8 @@ pub fn resolve_listener(bind_addr: &str) -> Result<(TcpListener, ListenerSource)
     Ok((listener, ListenerSource::Bound))
 }
 
-/// Recover and validate a mutation-capable server repository before constructing
-/// any command executor or configuration cache.
+/// Apply any leftover redo record and validate a mutation-capable server
+/// repository before constructing any command executor or configuration cache.
 pub fn prepare_server_storage(
     data_dir: impl AsRef<Path>,
     layout: RepositoryLayout,
@@ -71,7 +71,7 @@ pub fn prepare_server_storage(
     let storage = JsonFileStorage::new(data_dir);
     let recovery_session = storage
         .open_mutation_session(layout)
-        .context("Failed to recover pending repository transaction state")?;
+        .context("Failed to open the repository session or apply its leftover redo record")?;
     storage.validate().map_err(|error| {
         anyhow::anyhow!(
             "Failed to initialize storage: {}\n\n\

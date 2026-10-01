@@ -6,7 +6,7 @@
 //! [`ProjectName`], REQ-03 of the multi-jit story: an invalid identity must
 //! never reach the file). User-global config IO is delegated to the explicit
 //! [`crate::storage::user_config_store`] control plane; repository config edits
-//! publish through the recovered repository-state session.
+//! publish through a repository-state mutation session.
 //!
 //! `jit config get` (see [`CommandExecutor::get_config`]): a dotted-key
 //! accessor covering the WHOLE configuration surface (jit:043ae624), built by
@@ -232,7 +232,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Resolves the target file and edits a formatting-preserving TOML document.
     /// User-global writes use the capability-confined user-config store;
-    /// repository writes publish through the recovered mutation session. `value`
+    /// repository writes publish through the mutation session. `value`
     /// is parsed into the expected type BEFORE the write: `project.name` is validated through
     /// [`ProjectName`] so an invalid identity is rejected and the file is left
     /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
@@ -271,8 +271,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Publish a repo `config.toml` edit plus its coupled derived state through the
-    /// recovered mutation session, in one recoverable transaction.
+    /// Publish a repo `config.toml` edit plus its coupled derived state through one
+    /// mutation session, in one redo record.
     ///
     /// The edited, preservation-safe `config.toml` bytes are produced with
     /// toml_edit over the captured document, then
@@ -590,7 +590,7 @@ schema = 1
         // F1: `jit config set validation.strictness <invalid>` must be rejected
         // eagerly, and must not overwrite a previously-valid persisted value.
         let dir = tempfile::TempDir::new().unwrap();
-        // A repo `config set` publishes through the recovered session and validates
+        // A repo `config set` publishes through the mutation session and validates
         // the proposed repository, so it needs an initialized, layout-backed repo.
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         std::fs::write(dir.path().join("config.toml"), taxonomy.config_fragment()).unwrap();

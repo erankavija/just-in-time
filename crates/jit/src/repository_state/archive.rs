@@ -16,7 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const OWNER: &str = "archive-execution";
 
-/// Close a captured archive plan into one recoverable repository transaction.
+/// Close a captured archive plan into one materialization plan, which
+/// publishes as one redo record.
 pub fn finalize_archive_execution(
     image: &RepositoryImage,
     context: &MutationContext,

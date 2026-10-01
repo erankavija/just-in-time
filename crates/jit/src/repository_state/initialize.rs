@@ -5,7 +5,7 @@
 //! project name, and (for a profile) its neutral claims and provenance
 //! metadata — and this module renders every neutral byte and composes one exact
 //! [`RepositoryDelta`] over the captured base image, including the audit append.
-//! The command opens the recovered session, captures the base under its guard,
+//! The command opens the mutation session, captures the base under its guard,
 //! and applies the returned plan; it never hand-builds a transaction or a
 //! command-local final-byte inventory.
 //!
@@ -522,7 +522,7 @@ impl InitializationScaffold {
 /// Combine neutral initialization and an aggregate profile closure into one
 /// final delta. Both partial derivations remain pure proposed-state planning;
 /// this function rebuilds every write with the original captured preimage so
-/// one recovered session can publish the entire repository image atomically.
+/// one mutation session can publish the entire repository image atomically.
 fn derive_initialization_with_profiles(
     base: &RepositoryImage,
     scaffold: &InitializationScaffold,

@@ -112,7 +112,7 @@ impl InMemoryStorage {
                 let relative = path.strip_prefix(repository_root).with_context(|| {
                     format!("fixture path {} escaped its repository", path.display())
                 })?;
-                // Machine-local transaction control, which no repository path
+                // The redo record's scratch directory, which no repository path
                 // addresses: a published root carries it from the publication
                 // that created it.
                 if relative == Path::new(".jit").join(RECORD_SCRATCH_DIR) {

@@ -421,7 +421,7 @@ fn test_invalid_env_write_stance_token_fails_the_invocation_naming_accepted_toke
 ///
 /// A refusal is observable as this map being unchanged: it covers the issue
 /// records, the event log, the machine-local worktree identity, and any residue
-/// a partially-opened session would have staged.
+/// a partially-opened session would have left.
 fn store_bytes(checkout: &Path) -> std::collections::BTreeMap<std::path::PathBuf, Vec<u8>> {
     fn collect(
         directory: &Path,

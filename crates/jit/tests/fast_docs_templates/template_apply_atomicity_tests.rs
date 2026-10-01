@@ -485,8 +485,8 @@ fn assert_publication_failure_is_atomic<S: IssueStore + RepositoryStateStore>(
     assert!(error.to_string().contains("publication failure"), "{error}");
     assert_eq!(repository_image(&store), before);
 
-    // The one-shot fault is exhausted: a fresh recovered session can publish the
-    // complete scaffold, proving the failure left no blocking transaction state.
+    // The one-shot fault is exhausted: a fresh mutation session can publish the
+    // complete scaffold, proving the failure left no blocking redo record.
     let result = executor
         .apply_template_with(
             &plan_template(taxonomy),

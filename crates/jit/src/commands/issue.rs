@@ -566,8 +566,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `add_dependency`'s Ready-to-Backlog demotion, it intentionally bypasses
     /// the active-lease check on the dependents; only the issue actually being
     /// deleted is lease-checked (above). The dependent rewrites, deletion, index
-    /// update, and audit events publish through one recovered repository delta,
-    /// so recovery retains either the complete old graph or the complete new
+    /// update, and audit events publish through one redo record,
+    /// so the repository ends with either the complete old graph or the complete new
     /// graph. `jit dep rm` (which matches a raw stored dependency id without
     /// requiring target resolution) and `jit issue show --json`'s
     /// `dangling_dependency_ids` field remain as defense-in-depth for legacy or

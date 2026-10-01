@@ -546,7 +546,7 @@ pub fn render_reference_markdown() -> Result<String> {
          The `<run-id>` is a UUID v4 minted per execution, so runs accumulate: a rerun\n\
          writes a new directory beside the old one, and the history of a gate on an issue\n\
          is the set of run directories whose record names that issue. The record is\n\
-         written as pretty-printed JSON in the same recoverable repository transaction as\n\
+         written as pretty-printed JSON in the same redo record as\n\
          its coupled issue and event updates.\n\
          \n\
          ```json\n\

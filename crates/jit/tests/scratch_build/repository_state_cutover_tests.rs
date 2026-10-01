@@ -1576,7 +1576,7 @@ fn test_profile_package_reads_build_no_follow_options_in_one_place() {
 /// extracted package" true by construction rather than by cleanup: extraction
 /// produces a value, and the finished tree reaches the filesystem only through
 /// the redo record a mutation session commits once the whole tree exists. A
-/// module that opened a staging directory would have to unwind it on
+/// module that wrote the tree itself would have to unwind it on
 /// every refusal path, and the one path that forgot would be the one that
 /// leaked. It is also what makes the read local: no network client, no
 /// subprocess, and no environment lookup can be reached from a module that
