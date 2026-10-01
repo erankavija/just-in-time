@@ -634,7 +634,7 @@ JIT is designed with isolation and fault tolerance:
   indefinite lease is not auto-evicted and remains until a heartbeat,
   `jit claim release`, or `jit claim force-evict`. Either way the issue stays
   assigned until `jit issue release` or `jit issue unassign` clears its assignee
-- Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which append rather than re-read the log, keep working
+- Malformed `events.jsonl` line → event *reads* fail fast with a parse error (never silently skipped); issue operations, which read only the log's length and final line, keep working, while a claim, which parses the log to reflect it, fails with a malformed-record error
 
 **✓ No cascading failures:**
 

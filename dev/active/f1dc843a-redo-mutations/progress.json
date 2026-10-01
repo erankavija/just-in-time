@@ -2000,7 +2000,7 @@
       "subject": "docs/concepts/guarantees.md:634 (Graceful Degradation) says that with a malformed events.jsonl line, 'issue operations, which append rather than re-read the log, keep working'. Some mutations do parse the captured log: captured_events at repository_state/mutation.rs:694 runs parse_known_events and returns MalformedRecord on failure, and the claim path uses it.",
       "criterion_subjects": "none in this epic — it concerns read tolerance, not publication or cost.",
       "raised_by": "worker-ead8f86d during rework, reported rather than fixed, correctly: it predates the issue.",
-      "status": "open — no owner; surfaces in the completion report",
+      "status": "closed — session 8 lead fix in guarantees.md (claim path parses the whole log: repository_state/mutation.rs captured_events)",
       "renumbered_from": "SP-15 (collided with an earlier session's SP-15)"
     },
     {
