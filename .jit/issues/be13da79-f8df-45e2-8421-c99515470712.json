@@ -53,6 +53,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-10-01T19:27:40.112351751Z",
   "first_ready_at": "2026-10-01T19:20:16.555326223Z",
   "gates_required": [
     "doc-review",
@@ -82,7 +83,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-10-01T19:27:29.248702221Z"
+  "updated_at": "2026-10-01T19:27:40.112351751Z"
 }

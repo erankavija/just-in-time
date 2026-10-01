@@ -52,6 +52,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "first_ready_at": "2026-10-01T19:27:40.600747356Z",
   "gates_required": [
     "cargo-ci",
     "doc-review",
@@ -72,7 +73,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T19:20:24.174821983Z"
+  "updated_at": "2026-10-01T19:27:40.600747356Z"
 }
