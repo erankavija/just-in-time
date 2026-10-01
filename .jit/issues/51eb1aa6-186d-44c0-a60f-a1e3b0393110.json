@@ -50,6 +50,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "done_at": "2026-10-01T10:06:09.636727198Z",
   "first_ready_at": "2026-09-21T20:58:06.032425194Z",
   "gates_required": [
     "cargo-ci",
@@ -100,7 +101,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Transaction fields leave the command output",
-  "updated_at": "2026-10-01T10:05:47.357295461Z"
+  "updated_at": "2026-10-01T10:06:09.636727198Z"
 }

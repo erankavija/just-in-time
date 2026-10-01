@@ -7,6 +7,7 @@
   ],
   "description": "No hash is computed over captured entries; the plan carries its delta alone.\n\n## Background\n\nThe plan hash is a free function over a captured image's entries, with its own error type, a field and accessor on the materialization plan, a field on the publication outcome, a field on the journal, and a property-test file asserting permutation invariance and injectivity. Its purpose was to let publication revalidate that the image it publishes from is the one the planner derived from. The redo record compares the bytes of the files it writes, so the digest has no consumer.\n\nThe profile output field it fed has already gone, and the journal with it.\n\n## Success Criteria\n\n- [hard] REQ-01: No plan-hash function, plan-hash error type, plan hash field, or plan hash accessor survives in the workspace.\n- [hard] REQ-02: The materialization plan exposes its image and its delta.\n- [hard] REQ-03: The plan-hash property-test file is gone, with its property-test regression seeds swept.\n- [hard] REQ-04: Cross-backend coverage that compared two plans by digest compares them semantically.\n- [hard] REQ-05: The change removes more lines than it adds.\n",
   "documents": [],
+  "first_ready_at": "2026-10-01T10:06:13.797861236Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -25,7 +26,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Plan hash retirement",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T10:06:13.797861236Z"
 }
