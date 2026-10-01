@@ -5181,12 +5181,11 @@ template = true
             .iter()
             .any(|path| path == ".jit/profiles/planner-asset-only.json"));
         assert!(paths.iter().any(|path| path == ".jit/events.jsonl"));
-        assert_eq!(plan.hash().len(), 64);
         assert_eq!(changes.len(), 1);
     }
 
     #[test]
-    fn test_profile_dry_run_hash_is_stable_across_repeated_plans() {
+    fn test_profile_dry_run_plan_is_stable_across_repeated_plans() {
         let (_temp, _storage, executor, package) = fixture();
         let layout = executor.require_layout().unwrap();
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
@@ -5201,7 +5200,7 @@ template = true
             .unwrap()
             .unwrap();
 
-        assert_eq!(first.0.hash(), second.0.hash());
+        assert_eq!(first.0.delta(), second.0.delta());
         assert_eq!(first.1, second.1);
     }
 

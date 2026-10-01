@@ -125,11 +125,11 @@ filesystem (`materialize.rs` module contract).
 
 Planning converts semantic intent into a `MaterializationPlan`: an exact
 `RepositoryDelta` of normalized `RepositoryAction`s (`CreateDirectory`,
-`WriteFile`, `SetMode`, `DeleteFile`), the captured image, and a semantic `hash`.
+`WriteFile`, `SetMode`, `DeleteFile`), and the captured image.
 Each action carries an `ExpectedPreimage` (`Absent`, `File`, `Directory`, …) so
 publication can verify the target against exactly what was captured.
 
-### One typed request enum, one shared identity tail
+### One typed request enum, one shared tail
 
 `derive_materialization` is the single closed entry to the constrained producer
 graph. It matches on a `MaterializationRequest`, whose variants are the only ways
@@ -145,10 +145,8 @@ to enter planning:
 
 The match is deliberately closed: a caller cannot register a callback or select an
 individual producer family; adding a family means extending this function. Every
-variant funnels through one shared plan-identity tail — `MaterializationPlan::new`
-computes `plan_hash(image, seed, intent, delta)` over a `RepositorySeed` and a
-`MaterializationIntent` — so all requests produce identity the same way and no
-variant can skip hashing.
+variant funnels through one shared tail, `MaterializationPlan::new(image, delta)`,
+so every plan carries the image it was derived from and its delta.
 
 ```mermaid
 flowchart TD
@@ -163,7 +161,7 @@ flowchart TD
     RP --> TAIL
     IN --> TAIL
     AP --> TAIL
-    TAIL["MaterializationPlan::new &rarr; plan_hash(image, seed, intent, delta)"]
+    TAIL["MaterializationPlan::new(image, delta)"]
 ```
 
 ### The complete producer set
@@ -261,9 +259,8 @@ exact plan.
   authority for init/profile deltas that carry their own asset actions.
 
 The finalizer serializes every record canonically (`serialize_issue`,
-`serialize_event`, `serialize_gate_run`, `fresh_index_bytes`) and closes the
-intents into a `RepositorySeed`, so equivalent plans hash identically on the
-JSON-file and in-memory backends.
+`serialize_event`, `serialize_gate_run`, `fresh_index_bytes`), so equivalent plans
+are equal on the JSON-file and in-memory backends.
 
 ### Command-layer retry combinators
 
@@ -300,7 +297,7 @@ plan is published through:
   the delta is fully captured, then re-captures the read set under the held guard.
   If the fresh capture differs from the plan's image it returns
   `RetryableConflict { path }` naming the first divergence — nothing durable is
-  written. Otherwise it hands the delta and plan hash to the kernel and returns a
+  written. Otherwise it hands the delta to the kernel and returns a
   `RepositoryApplyOutcome`.
 
 ```mermaid
@@ -313,11 +310,11 @@ sequenceDiagram
     C->>S: capture(spec)
     S-->>C: RepositoryImage
     C->>P: derive_materialization / finalize
-    P-->>C: MaterializationPlan (delta + hash)
+    P-->>C: MaterializationPlan (image + delta)
     C->>S: apply(plan)
     S->>S: revalidate + re-capture read set
     alt image unchanged
-        S->>K: execute_repository_delta(delta, hash)
+        S->>K: execute_repository_delta(delta)
         K-->>S: FileTransactionOutcome
         S-->>C: RepositoryApplyOutcome
     else changed under session

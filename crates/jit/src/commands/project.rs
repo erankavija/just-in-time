@@ -20,7 +20,6 @@
 
 use super::*;
 use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
-use std::collections::BTreeMap;
 
 /// The result of rendering ONE projection, serialized as an element of
 /// [`ProjectRenderResult::projections`].
@@ -134,8 +133,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     pub fn project_render(&self, name: Option<&str>) -> Result<ProjectRenderResult> {
         use crate::repository_state::{
             assemble_config, derive_materialization, render_capture_closure, require_target,
-            CaptureBudget, CaptureSpec, MaterializationRequest, RepositorySeed, RepositorySeedKind,
-            VirtualPath,
+            CaptureBudget, CaptureSpec, MaterializationRequest, VirtualPath,
         };
         use std::collections::BTreeSet;
 
@@ -145,13 +143,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             max_bytes: 256 * 1024 * 1024,
             max_depth: 16,
         };
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "project render".to_string(),
-            },
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )?;
         let registries = || -> Result<[VirtualPath; 4]> {
             Ok([
                 VirtualPath::CONFIG,
@@ -195,7 +186,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 &image,
                 MaterializationRequest::RenderConfiguredProjections {
                     declarations: declarations.borrowed(),
-                    seed: &seed,
                     selected: Some(selected_set),
                 },
             )

@@ -162,24 +162,6 @@ pub fn validate_repository(
 ) -> std::result::Result<RepositoryValidationReport, RepositoryValidationFailure> {
     let declarations = crate::repository_state::validation_declarations_from_image(image)
         .map_err(|error| RepositoryValidationFailure::declaration(error.into()))?;
-    let seed = crate::repository_state::RepositorySeed::new(
-        crate::repository_state::RepositorySeedKind::Command {
-            name: "validate repository".to_string(),
-        },
-        Default::default(),
-        Default::default(),
-    )
-    .map_err(|error| {
-        RepositoryValidationFailure::new(
-            error.into(),
-            RepositoryValidationReport {
-                passes: Vec::new(),
-                issue_count: 0,
-                event_count: 0,
-                rule_report: RuleReport::default(),
-            },
-        )
-    })?;
     let expected = declarations
         .rules_loaded()
         .then(|| {
@@ -188,7 +170,6 @@ pub fn validate_repository(
                 crate::repository_state::MaterializationRequest::RepairDerivedState {
                     declarations: declarations.borrowed(),
                     profiles: Vec::new(),
-                    seed: &seed,
                 },
             )
         })
@@ -1015,20 +996,11 @@ mod tests {
         .unwrap();
         let proposed = executor.capture_validation_image_with(&overrides).unwrap();
         let declarations = crate::repository_state::declarations_from_image(&proposed).unwrap();
-        let seed = crate::repository_state::RepositorySeed::new(
-            crate::repository_state::RepositorySeedKind::Command {
-                name: "validation test proposal".to_string(),
-            },
-            Default::default(),
-            Default::default(),
-        )
-        .unwrap();
         let plan = crate::repository_state::derive_materialization(
             &proposed,
             crate::repository_state::MaterializationRequest::RepairDerivedState {
                 declarations: declarations.borrowed(),
                 profiles: Vec::new(),
-                seed: &seed,
             },
         )
         .unwrap();
