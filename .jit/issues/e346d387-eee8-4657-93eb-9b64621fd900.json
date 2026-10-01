@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T11:43:03.796092320Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "b4483ad6-5ce9-4209-933b-aa386cb74b3a"
   ],
   "description": "Module docs, function contracts, error strings, and the recover command's help name the redo record.\n\n## Background\n\nRoughly forty Rust doc comments across the command, storage, repository-state, and server layers describe publication as one recoverable transaction, a recovered session, or a preimage check. Error strings in the storage layer name journal, control-directory, and event-log writes. The recover command's help exists verbatim twice, once on the command enumeration and once on its implementation, and both feed adopter-facing surfaces.\n\nThe project keeps comments to what the code leaves non-obvious, so what replaces the retired prose is a short module orientation plus contract and invariant notes.\n\nThe sweep terms are: `one recoverable transaction`, `recovered session`, `preimage`, `journal`, `stage`, `staging`, `backup`, `reverse action`, and `roll back`.\n\n## Success Criteria\n\n- [hard] REQ-01: No Rust doc comment, error string, or help text in the workspace describes journaled rollback, a transaction backup, a staging directory, a reverse action, or a worktree companion.\n- [hard] REQ-02: The recover command's two copies of its help state the same behaviour and describe application of a leftover record at session open.\n- [hard] REQ-03: Error strings name the redo record where they named the journal.\n- [hard] REQ-04: A sweep over the nine terms listed in this issue returns, in the workspace sources outside pinned archives, only occurrences whose sense is unrelated to publication, each named in the completion evidence.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-10-01T11:42:30.442072007Z",
   "gates_required": [
     "cargo-ci",
@@ -29,7 +72,7 @@
     "enforces:@/invariant/essential-code-prose"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Rust prose and command help state the redo record",
-  "updated_at": "2026-10-01T11:42:30.442072007Z"
+  "updated_at": "2026-10-01T11:43:03.796092320Z"
 }
