@@ -15335,3 +15335,5 @@
 {"gate_key":"cargo-ci","id":"d45d6a92-01e3-45b4-9f75-8136ac24de60","issue_id":"91168745-1434-4cf8-9442-ab8d3e9135f8","timestamp":"2026-10-01T15:34:06.682132868Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"2da9f797-9b72-4507-a92c-2289dcb907e3","issue_id":"91168745-1434-4cf8-9442-ab8d3e9135f8","timestamp":"2026-10-01T15:34:17.768948527Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"88340ed4-b2f2-4337-86c2-657c61d8aef2","issue_id":"91168745-1434-4cf8-9442-ab8d3e9135f8","timestamp":"2026-10-01T15:38:47.724937622Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"4ff91a8d-2581-4c94-ac47-3cf5975ee0d1","issue_id":"adb5e9df-0fd3-4bf4-8703-d852df09d883","priority":"normal","timestamp":"2026-10-01T15:39:26.302689085Z","title":"Remove the unqualified satisfies coverage form","type":"issue_created"}
+{"gate_key":"doc-review","id":"01ef3cde-d90c-4aec-8de5-631d495f088a","issue_id":"91168745-1434-4cf8-9442-ab8d3e9135f8","timestamp":"2026-10-01T15:39:59.901537192Z","type":"gate_passed","updated_by":"auto:executor"}

@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-01T15:39:26.302689085Z",
+  "dependencies": [],
+  "description": "Remove the unqualified `satisfies:<id>` coverage form so every coverage credit names the container whose criterion it satisfies, and nested containers can reuse criterion ids without crediting each other.\n\n## Background\n\n`label_credits_id` in `crates/jit/src/validation/graph.rs` accepts three label shapes: the qualified `satisfies:<container-short-id>/<id>`, the structural `satisfies:@/issue/<id>/<kind>/<id>`, and the legacy unqualified `satisfies:<id>` (`None => value == id`). `label-coverage` walks the whole dependency subtree, so an unqualified label on a story's child also credits the same-numbered criterion of every enclosing container. A consuming repository hit this while planning an epic with two nested stories: the stories' children carried `satisfies:REQ-01..10` for the story criteria and falsely credited the epic's REQ-01..10, which forced a manual renumbering of the story criteria to REQ-21..27 and REQ-31..40. The qualified form already scopes credit correctly; only the unqualified arm causes the collision.\n\n## Success Criteria\n\n- [hard] REQ-01: `label-coverage` and every other coverage-crediting path credit a criterion only through the qualified or structural form; an unqualified `satisfies:<id>` label credits nothing.\n- [hard] REQ-02: An unqualified `satisfies:<id>` label is reported by validation with a message naming the qualified replacement, so consuming repositories find every label to migrate.\n- [hard] REQ-03: The unqualified matching branch and the tests that pin its crediting behavior are removed; the qualified and structural behavior suites still pass.\n- [hard] REQ-04: Templates, skills, bundled profiles, documentation and examples in this repository emit and describe only the qualified form.\n- [hard] REQ-05: A coverage fixture with an epic and a nested story that both declare `REQ-01` shows each container credited only by labels scoped to it.\n\n## Notes\n\nThe migration of existing unqualified labels in consuming repositories is their own work; this issue covers the engine, its bundled content, and the diagnostic that finds labels to migrate. The change follows the canonical-cutover invariant: the superseded form is removed rather than kept as a compatibility path.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-01T15:39:26.302689085Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "adb5e9df-0fd3-4bf4-8703-d852df09d883",
+  "labels": [
+    "component:core",
+    "milestone:v1.0",
+    "enforces:@/invariant/canonical-cutover",
+    "type:task"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Remove the unqualified satisfies coverage form",
+  "updated_at": "2026-10-01T15:39:26.302689085Z"
+}
