@@ -1121,6 +1121,16 @@
       "resolution": "Owner chose B: jit recover classifies its own session-open failure to read or apply the leftover record as recovery_failed, at the CLI layer, with one owning test; the error-code entry states it. Other commands keep their codes.",
       "resolved_by": "user",
       "status": "closed"
+    },
+    {
+      "id": "ESC-14",
+      "session": 7,
+      "wave": 16,
+      "issue": "b4483ad6",
+      "category": "4 (owner decision conflicts with a doc-review finding)",
+      "situation": "doc-review F2 flagged storage-format.md#publication-and-recovery as saying every written file is replaced, false after the positioned append; owner decision @/issue/ccea63de/decision/D-1 kept event-log mechanics off that page, premised on whole-file replacement.",
+      "decision": "Owner chose: amend the canonical page with one clause (the event log is extended, not replaced, at the length read), recorded as @/issue/ccea63de/decision/D-2 superseding D-1.",
+      "status": "resolved"
     }
   ],
   "rework_counts": {
@@ -1138,7 +1148,8 @@
     "ead8f86d": 2,
     "79252d23": 1,
     "42478e5d": 1,
-    "3d9150d7": 1
+    "3d9150d7": 1,
+    "b4483ad6": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -2003,6 +2014,15 @@
         "suite_clock_ms": 33468,
         "test_ms": 20581,
         "doctest_ms": 12847,
+        "verdict": "passed"
+      },
+      {
+        "issue": "b4483ad6",
+        "run": "cold after merge, BUSY_HOST_OVERRIDE",
+        "suite_clock_ms": 52257,
+        "test_ms": 45858,
+        "suite_build_ms": 110958,
+        "clippy_ms": 31526,
         "verdict": "passed"
       }
     ],
