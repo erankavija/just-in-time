@@ -54,12 +54,14 @@ pub(crate) use export::{
     classify_repository_export, finalize_repository_export, ExternalExportPath,
     RepositoryExportDestination, RepositoryExportError, RepositoryExportIntent,
 };
+pub(crate) use image::CapturedAnswers;
 pub use image::{
     plan_hash, CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
-    ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
+    EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
     ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
-    PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
+    PlanHashError, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
     RepositorySeed, RepositorySeedKind, RepositoryTargetKind, SeedError, TargetClaim,
+    EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
@@ -1343,7 +1345,7 @@ mod tests {
         let layout = layout();
         let image = RepositoryImage::close(
             layout.clone(),
-            CaptureSpec::phase_one(Vec::<VirtualPath>::new(), budget()).unwrap(),
+            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -1406,7 +1408,7 @@ mod tests {
         let mode_identity = mode_content.identity().clone();
         let image = RepositoryImage::close(
             layout.clone(),
-            CaptureSpec::phase_one(
+            CaptureSpec::new(
                 [
                     create.clone(),
                     delete.clone(),
@@ -1506,7 +1508,7 @@ mod tests {
     fn empty_image() -> RepositoryImage {
         RepositoryImage::close(
             layout(),
-            CaptureSpec::phase_one(Vec::<VirtualPath>::new(), budget()).unwrap(),
+            CaptureSpec::new(Vec::<VirtualPath>::new(), budget()).unwrap(),
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -1519,7 +1521,7 @@ mod tests {
         let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
         RepositoryImage::close(
             layout(),
-            CaptureSpec::phase_one(paths, budget()).unwrap(),
+            CaptureSpec::new(paths, budget()).unwrap(),
             entries.into_iter().collect::<BTreeMap<_, _>>(),
             BTreeMap::new(),
             BTreeMap::new(),

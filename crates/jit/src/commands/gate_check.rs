@@ -725,30 +725,28 @@ impl<S: IssueStore> CommandExecutor<S> {
             max_depth: 32,
         };
         with_mutation_session(&self.storage, layout, "gate target binding", |session| {
-            let mut spec = CaptureSpec::phase_one([VirtualPath::INDEX], budget)?;
-            let Some(index_image) = capture_or_retry(session.capture(spec.clone()))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let index = captured_repository_index(&index_image)?;
-            let candidates = index
-                .all_ids
-                .iter()
-                .filter(|id| {
-                    if normalized.len() == 32 {
-                        id.as_str() == requested
-                    } else {
-                        id.to_lowercase().replace('-', "").starts_with(&normalized)
-                    }
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            spec.discover_paths(
-                candidates
-                    .iter()
-                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                    .collect::<std::result::Result<Vec<_>, _>>()?,
-            )?;
-            let Some(image) = capture_or_retry(session.capture(spec))? else {
+            let mut candidates = Vec::new();
+            let spec = CaptureSpec::new([VirtualPath::INDEX], budget)?;
+            let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+                candidates = captured_repository_index(image)?
+                    .all_ids
+                    .into_iter()
+                    .filter(|id| {
+                        if normalized.len() == 32 {
+                            id.as_str() == requested
+                        } else {
+                            id.to_lowercase().replace('-', "").starts_with(&normalized)
+                        }
+                    })
+                    .collect();
+                Ok(spec.discover_paths(
+                    candidates
+                        .iter()
+                        .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                        .collect::<std::result::Result<Vec<_>, _>>()?,
+                )?)
+            })?
+            else {
                 return Ok(SessionStep::Retry);
             };
             let issues = candidates
@@ -791,8 +789,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             VirtualPath::GATE_RUNS,
         ];
         paths.extend(run_paths.iter().cloned());
-        let mut spec = CaptureSpec::phase_one(paths, budget)?;
-        let Some(initial) = capture_or_retry(session.capture(spec.clone()))? else {
+        let Some(initial) = capture_or_retry(session.capture(CaptureSpec::new(paths, budget)?))?
+        else {
             return Ok(None);
         };
         let issue = captured_bound_issue(&initial, target_id)?;
@@ -803,50 +801,44 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
         if checker_needs_validation_image(checker) {
-            let Some(image) =
-                self.capture_proposed_base(session, &BTreeMap::new(), run_paths, None)?
-            else {
-                return Ok(None);
-            };
-            return Ok(Some(image));
+            return self.capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial));
         }
-
-        spec.discover_paths(
-            issue
-                .dependencies
-                .iter()
-                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                .collect::<std::result::Result<Vec<_>, _>>()?,
-        )?;
-        if matches!(checker, GateChecker::Exec { .. }) {
-            for document in &issue.documents {
-                let requests = crate::document::DocumentReferenceRequests::for_reference(document)?;
-                if let Some(worktree) = requests.worktree() {
-                    spec.discover_paths([worktree.clone()])?;
+        let layout = initial.layout().clone();
+        super::grow_discovering(session, initial, |image, spec| {
+            spec.discover_paths(
+                issue
+                    .dependencies
+                    .iter()
+                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                    .collect::<std::result::Result<Vec<_>, _>>()?,
+            )?;
+            if matches!(checker, GateChecker::Exec { .. }) {
+                for document in &issue.documents {
+                    let requests =
+                        crate::document::DocumentReferenceRequests::for_reference(document)?;
+                    if let Some(worktree) = requests.worktree() {
+                        spec.discover_paths([worktree.clone()])?;
+                    }
+                    let (revision, path) = requests.pinned();
+                    spec.discover_pinned(revision, path)?;
                 }
-                let (revision, path) = requests.pinned();
-                spec.discover_pinned(revision, path)?;
             }
-        }
-        if let GateChecker::Exec {
-            pass_context: true,
-            prompt_file: Some(path),
-            ..
-        } = checker
-        {
-            let prompt = initial
-                .layout()
-                .classify_repository_relative(path)
-                .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))?;
-            spec.discover_paths([prompt])?;
-        }
-        match capture_or_retry(session.capture(spec))? {
-            Some(image) if super::checker_consumes_run_history(checker) => {
-                super::capture_gate_run_results(session, image)
+            if let GateChecker::Exec {
+                pass_context: true,
+                prompt_file: Some(path),
+                ..
+            } = checker
+            {
+                let prompt = layout.classify_repository_relative(path).map_err(|_| {
+                    anyhow!("prompt_file '{}' resolves outside the repository", path)
+                })?;
+                spec.discover_paths([prompt])?;
             }
-            Some(image) => Ok(Some(image)),
-            None => Ok(None),
-        }
+            if super::checker_consumes_run_history(checker) {
+                super::discover_gate_run_results(image, spec)?;
+            }
+            Ok(())
+        })
     }
 
     /// Check a single gate for an issue

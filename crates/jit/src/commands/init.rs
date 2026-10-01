@@ -217,19 +217,14 @@ impl CommandExecutor<JsonFileStorage> {
                     return Ok(SessionStep::Retry);
                 };
                 if scaffold.has_profiles() {
-                    extra_paths.extend(scaffold.profile_capture_closure(&probe)?);
-                    let Some(expanded) = self.capture_proposed_base(
-                        &mut *session,
-                        &probe_overrides,
-                        &extra_paths,
-                        None,
-                    )?
+                    let closure = scaffold.profile_capture_closure(&probe)?;
+                    let mut spec = probe.capture_spec().clone();
+                    spec.discover_paths(closure.iter().cloned())?;
+                    extra_paths.extend(closure);
+                    let Some(expanded) = super::capture_or_retry(session.extend(probe, spec))?
                     else {
                         return Ok(SessionStep::Retry);
                     };
-                    if !expanded.has_stable_overlap(&probe) {
-                        return Ok(SessionStep::Retry);
-                    }
                     probe = expanded;
                 }
                 let delta_overlay = super::validation_overlay(
@@ -244,11 +239,14 @@ impl CommandExecutor<JsonFileStorage> {
                     .delta(),
                 )?;
 
-                // Re-capture the base with the exact write set so the validation closure
-                // and the delta's preimages come from one coherent image, then finalize,
-                // validate, and publish under the same held session.
-                let Some(base) =
-                    self.capture_proposed_base(&mut *session, &delta_overlay, &extra_paths, None)?
+                // Grow the probe by the exact write set's validation closure, then
+                // finalize, validate, and publish under the same held session.
+                let Some(base) = self.capture_proposed_base(
+                    &mut *session,
+                    &delta_overlay,
+                    &extra_paths,
+                    Some(probe),
+                )?
                 else {
                     return Ok(SessionStep::Retry);
                 };
@@ -350,7 +348,7 @@ impl CommandExecutor<JsonFileStorage> {
             max_bytes: 64 * 1024 * 1024,
             max_depth: 6,
         };
-        let spec = CaptureSpec::phase_one([VirtualPath::CONFIG], budget)?;
+        let spec = CaptureSpec::new([VirtualPath::CONFIG], budget)?;
         let image = session.capture(spec)?;
         let generated_name: ProjectName = slugify_project_name(
             repo_dir

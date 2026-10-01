@@ -309,7 +309,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             // Read the current config for a preservation-safe edit from the closed
             // image, so a concurrent edit is caught by the apply-time preimage check.
             let Some(config_image) = capture_or_retry(
-                session.capture(CaptureSpec::phase_one([config_vpath.clone()], budget)?),
+                session.capture(CaptureSpec::new([config_vpath.clone()], budget)?),
             )?
             else {
                 return Ok(SessionStep::Retry);

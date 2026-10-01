@@ -9,8 +9,8 @@
 //! parsing or output formatting (the layer boundary in AGENTS.md "Separation of
 //! Concerns"). The target path, mode, style, and delimiters come ONLY from config.
 //!
-//! The render captures a bounded two-phase closure (the engine registries, then
-//! the selected projections' sources and targets and the schema files the
+//! The render captures one bounded round (the engine registries, then the
+//! selected projections' sources and targets and the schema files the
 //! effective rules reference) and reads only that image-projected content. Every
 //! typed failure (unknown kind, missing source, missing target, absent markers)
 //! surfaces from the canonical derivation BEFORE the exact delta is applied, so a
@@ -122,7 +122,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// `name = None` every declared projection is rendered in name order (an absent
     /// registry renders nothing). The render captures the engine registries and,
     /// after parsing them, the selected projections' sources and targets plus the
-    /// schema files the effective rules reference (a bounded two-phase capture); it
+    /// schema files the effective rules reference (one bounded capture round); it
     /// reads only that image-projected content. Every projection body is composed
     /// through the ONE managed-document engine and the resulting exact delta is
     /// applied through [`RepositoryStateStore`](crate::storage::RepositoryStateStore),
@@ -161,52 +161,31 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             ])
         };
 
-        // Bounded two-phase capture with conflict retry: phase one reads the engine
-        // registries, then the parsed declarations enumerate the phase-two closure.
+        // One bounded capture round: the engine registries, then the closure
+        // their declarations enumerate.
         with_mutation_session(self.storage(), &layout, "project render", |session| {
-            let phase_one = CaptureSpec::phase_one(registries()?, budget)?;
-            let Some(image_one) = capture_or_retry(session.capture(phase_one))? else {
-                return Ok(SessionStep::Retry);
-            };
-            let config_one = assemble_config(&image_one)?;
-            let selected_names = selected_projection_names(&config_one, name)?;
-            let rules_text = image_repo_bytes(&image_one, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
-            let closure = render_capture_closure(
-                image_one.layout(),
-                &config_one,
-                &selected_names,
-                rules_text.as_deref(),
-            )
-            .map_err(project_producer_error)?;
-            let mut phase_two = CaptureSpec::phase_one(registries()?, budget)?;
-            phase_two.discover_paths(closure)?;
-            let Some(image) = capture_or_retry(session.capture(phase_two))? else {
+            let spec = CaptureSpec::new(registries()?, budget)?;
+            let Some(image) = capture_discovering(session, spec, |image, spec| {
+                let config = assemble_config(image)?;
+                let rules_text = image_repo_bytes(image, ".jit/rules.toml")?
+                    .map(String::from_utf8)
+                    .transpose()?;
+                let closure = render_capture_closure(
+                    image.layout(),
+                    &config,
+                    &selected_projection_names(&config, name)?,
+                    rules_text.as_deref(),
+                )
+                .map_err(project_producer_error)?;
+                Ok(spec.discover_paths(closure)?)
+            })?
+            else {
                 return Ok(SessionStep::Retry);
             };
 
             let declarations = crate::repository_state::declarations_from_image(&image)?;
             let config = declarations.config();
             let selected_names = selected_projection_names(config, name)?;
-            let final_rules = image_repo_bytes(&image, ".jit/rules.toml")?
-                .map(String::from_utf8)
-                .transpose()?;
-            let final_closure = render_capture_closure(
-                image.layout(),
-                config,
-                &selected_names,
-                final_rules.as_deref(),
-            )
-            .map_err(project_producer_error)?;
-            let captured = image
-                .capture_spec()
-                .paths()
-                .cloned()
-                .collect::<BTreeSet<_>>();
-            if final_closure.into_iter().collect::<BTreeSet<_>>() != captured {
-                return Ok(SessionStep::Retry);
-            }
 
             // Derive the exact delta over the same image and apply it. The delta
             // is scoped to the selected projections (declaration scope), so a

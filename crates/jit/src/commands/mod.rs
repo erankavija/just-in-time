@@ -295,6 +295,47 @@ pub fn capture_or_retry(
     }
 }
 
+/// Capture `spec` and, in the same round, every request `discover` adds from
+/// the image read so far, until it adds none.
+///
+/// Each request is read once: the session grows the image rather than
+/// recapturing it, so no read is compared with an earlier one. `Ok(None)` is a
+/// retryable conflict.
+pub(crate) fn capture_discovering(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    spec: crate::repository_state::CaptureSpec,
+    discover: impl FnMut(
+        &crate::repository_state::RepositoryImage,
+        &mut crate::repository_state::CaptureSpec,
+    ) -> Result<()>,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    match capture_or_retry(session.capture(spec))? {
+        Some(image) => grow_discovering(session, image, discover),
+        None => Ok(None),
+    }
+}
+
+/// [`capture_discovering`] continued from an `image` the round has read.
+pub(crate) fn grow_discovering(
+    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+    image: crate::repository_state::RepositoryImage,
+    mut discover: impl FnMut(
+        &crate::repository_state::RepositoryImage,
+        &mut crate::repository_state::CaptureSpec,
+    ) -> Result<()>,
+) -> Result<Option<crate::repository_state::RepositoryImage>> {
+    let mut image = Some(image);
+    while let Some(read) = image {
+        let mut spec = read.capture_spec().clone();
+        discover(&read, &mut spec)?;
+        if &spec == read.capture_spec() {
+            return Ok(Some(read));
+        }
+        image = capture_or_retry(session.extend(read, spec))?;
+    }
+    Ok(None)
+}
+
 /// Report an occupied repository export target as the caller-facing
 /// already-exists failure naming the output path the invocation asked for.
 ///
@@ -1918,49 +1959,32 @@ fn captured_active_issues(image: &crate::repository_state::RepositoryImage) -> R
     Ok(issues)
 }
 
-/// Close gate-run history over one complete root listing and exact canonical
-/// result leaves. Direct non-directory occupants are captured as evidence but
+/// Add the gate-run root and its complete listing to `spec`, then each run
+/// directory the image lists, then the result leaf of each the image holds as
+/// a directory. Direct non-directory occupants are captured as evidence but
 /// ignored as storage clutter, matching the typed readers.
-fn capture_gate_run_results(
-    session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-    image: crate::repository_state::RepositoryImage,
-) -> Result<Option<crate::repository_state::RepositoryImage>> {
+fn discover_gate_run_results(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+) -> Result<()> {
     use crate::repository_state::VirtualPath;
 
     let root = VirtualPath::GATE_RUNS;
-    let mut spec = image.capture_spec().clone();
-    let image = if image.listing_fingerprints().contains_key(&root) {
-        image
-    } else {
-        spec.discover_paths([root.clone()])?;
-        spec.discover_listing(root.clone())?;
-        let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
-            return Ok(None);
-        };
-        image
-    };
-    let children = image
-        .listing_fingerprints()
-        .get(&root)
-        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?
-        .children()
-        .keys()
-        .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    if children.is_empty() {
-        return Ok(Some(image));
+    spec.discover_paths([root.clone()])?;
+    spec.discover_listing(root.clone())?;
+    if let Some(listing) = image.listing_fingerprints().get(&root) {
+        spec.discover_paths(
+            listing
+                .children()
+                .keys()
+                .map(|run_id| VirtualPath::data(format!("gate-runs/{run_id}")))
+                .collect::<std::result::Result<Vec<_>, _>>()?,
+        )?;
     }
-    spec.discover_paths(children)?;
-    let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
-        return Ok(None);
-    };
-    let results = crate::repository_state::captured_gate_run_result_paths(&image)?
-        .ok_or_else(|| anyhow!("captured gate-run root has no complete listing"))?;
-    if results.is_empty() {
-        return Ok(Some(image));
-    }
-    spec.discover_paths(results)?;
-    capture_or_retry(session.capture(spec))
+    spec.discover_paths(
+        crate::repository_state::captured_gate_run_result_paths(image)?.unwrap_or_default(),
+    )?;
+    Ok(())
 }
 
 fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {
@@ -2197,7 +2221,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if request.captures_gate_registry() {
                     paths.insert(VirtualPath::GATES);
                 }
-                let spec = CaptureSpec::phase_one(paths, issue_mutation_capture_budget())?;
+                let spec = CaptureSpec::new(paths, issue_mutation_capture_budget())?;
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
@@ -3580,7 +3604,7 @@ mod tests {
             VirtualPath::data(format!("issues/{id}.json")).unwrap(),
             VirtualPath::data("events.jsonl").unwrap(),
         ]);
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -3598,7 +3622,7 @@ mod tests {
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
-        CaptureSpec::phase_one(
+        CaptureSpec::new(
             paths,
             CaptureBudget {
                 max_listings: 0,
@@ -4356,10 +4380,7 @@ mod mutation_session_contract_tests {
             max_depth: 6,
         };
         let image = session
-            .capture(
-                CaptureSpec::phase_one([VirtualPath::data("config.toml").unwrap()], budget)
-                    .unwrap(),
-            )
+            .capture(CaptureSpec::new([VirtualPath::data("config.toml").unwrap()], budget).unwrap())
             .unwrap();
         assert!(capture_or_retry(Ok(image)).unwrap().is_some());
     }

@@ -148,29 +148,23 @@ impl PackageTreeCapture {
             paths.extend(path.ancestor_directories()?);
             paths.insert(path);
         }
-        // Every path here is worktree content, which phase one never reads, so
-        // the whole set is discovered rather than fixed.
-        let mut spec = CaptureSpec::phase_one(std::iter::empty(), budget)?;
-        spec.discover_paths(paths)?;
+        let mut spec = CaptureSpec::new(paths, budget)?;
         spec.discover_listing(self.destination.clone())?;
         Ok(spec)
     }
 
     /// Extend `spec` with everything `image` shows beneath the destination that
-    /// `spec` does not already declare, and report whether it grew.
+    /// `spec` does not already declare.
     ///
     /// A listing names its children; a child the image shows to be a directory
     /// needs a listing of its own. One pass therefore reaches one level deeper,
-    /// and a caller repeats until nothing is added, at which point the
-    /// declaration covers the whole destination subtree. Every path it adds is
-    /// read and revalidated by the same session, so a file that appears beneath
-    /// the destination between two attempts is a retryable conflict rather than
-    /// content that survives the republication.
+    /// and a capture round repeats it until nothing is added, at which point the
+    /// declaration covers the whole destination subtree.
     pub fn expand_destination_closure(
         &self,
         image: &RepositoryImage,
         spec: &mut CaptureSpec,
-    ) -> Result<bool, PackageTreeCaptureError> {
+    ) -> Result<(), PackageTreeCaptureError> {
         let listed = image
             .listing_fingerprints()
             .iter()
@@ -192,10 +186,8 @@ impl PackageTreeCapture {
             .map(|(path, _)| path.clone())
             .collect::<Vec<_>>();
 
-        let before = (spec.paths().count(), spec.listings().len());
         spec.discover_paths(listed)?;
-        spec.discover_listings(directories)?;
-        Ok((spec.paths().count(), spec.listings().len()) != before)
+        Ok(spec.discover_listings(directories)?)
     }
 
     /// Whether `path` sits strictly beneath the destination.

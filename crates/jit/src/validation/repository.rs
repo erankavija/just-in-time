@@ -151,7 +151,7 @@ fn image_read(image: &RepositoryImage, repo_rel: &str) -> Result<Option<Vec<u8>>
 /// Validate the exact repository captured in `image` through the full read-only
 /// pipeline.
 ///
-/// The image is the single closed evidence source (plan §2 two-phase capture): a
+/// The image is the single closed evidence source: a
 /// live capture validates the working tree, and an overlay image
 /// ([`apply_overlay`](crate::repository_state::apply_overlay)) validates a proposed
 /// final state. Every pass reads only image-projected content — no live filesystem

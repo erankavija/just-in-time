@@ -22,7 +22,7 @@ fn layout() -> RepositoryLayout {
 /// folds the image, seed, and intent in alongside the delta, but this property
 /// only varies the delta, so the surrounding plan context stays fixed.
 fn empty_image(layout: RepositoryLayout) -> RepositoryImage {
-    let spec = CaptureSpec::phase_one(
+    let spec = CaptureSpec::new(
         Vec::<VirtualPath>::new(),
         CaptureBudget {
             max_listings: 0,

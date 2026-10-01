@@ -77,11 +77,18 @@ flowchart TD
 
 A `RepositoryImage` (`repository_state/image.rs`) is the single closed input to
 all planning. It is built by `RepositoryImage::close` from a `CaptureSpec`
-(`CaptureSpec::phase_one`) bounded by a `CaptureBudget` (`max_listings`,
+(`CaptureSpec::new`) bounded by a `CaptureBudget` (`max_listings`,
 `max_bytes`, `max_depth`), so capture cannot walk an unbounded tree. The image
 holds, per canonical path, a `RepositoryEntry` — `File` (with bytes, `FileMode`,
-and an `EntryIdentity`), `Directory`, or `Absent` — plus `ListingFingerprint`s
-and pinned/linked-worktree evidence.
+and an `EntryIdentity`), `FileTail` (a path the spec reads as its length and
+bounded tail), `Directory`, or `Absent` — plus `ListingFingerprint`s and
+pinned/linked-worktree evidence.
+
+A mutation captures in one round. What it reads first names what it reads
+next (the index names the issue files, the issues name their documents), so
+the session grows the image with `RepositoryMutationSession::extend`, which
+reads only the requests the image does not already hold; nothing is read twice,
+so no read is compared with an earlier one.
 
 Those three bound the one place a capture grows beyond what a caller declared:
 expanding a complete listing names children nobody asked for, and `max_listings`

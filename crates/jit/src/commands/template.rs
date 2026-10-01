@@ -402,77 +402,30 @@ fn capture_template_image(
     container_id: &str,
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::GATE_PRESETS;
-    let issues_dir = VirtualPath::ISSUES;
-    let mut first_spec = CaptureSpec::phase_one(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
-    first_spec.discover_listing(presets_dir.clone())?;
-    let Some(first) = capture_or_retry(session.capture(first_spec))? else {
-        return Ok(None);
-    };
-    let discovered_index = parse_template_index(&first)?;
-    let discovered_presets = listed_json_paths(&first, &presets_dir)?;
-    let closure = template_declaration_closure(&first)?;
-
-    let mut spec = CaptureSpec::phase_one(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
-    let mut discovered_paths = discovered_index
-        .all_ids
-        .iter()
-        .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
-        .collect::<Result<Vec<_>>>()?;
-    discovered_paths.extend(discovered_presets.iter().cloned());
-    discovered_paths.extend(closure.iter().cloned());
-    spec.discover_paths(discovered_paths)?;
-    spec.discover_listing(issues_dir)?;
-    spec.discover_listing(presets_dir.clone())?;
-    let Some(mut image) = capture_or_retry(session.capture(spec.clone()))? else {
-        return Ok(None);
-    };
-    if !template_static_capture_matches(
-        &image,
-        &discovered_index,
-        &presets_dir,
-        &discovered_presets,
-        &closure,
-    )? {
-        return Ok(None);
-    }
-
-    let derived = template_operation_capture_paths(&image, context, request, container_id)?;
-    if derived
-        .iter()
-        .all(|path| image.capture_spec().contains_path(path))
-    {
-        return Ok(Some(image));
-    }
-    spec.discover_paths(derived.iter().cloned())?;
-    let Some(next_image) = capture_or_retry(session.capture(spec))? else {
-        return Ok(None);
-    };
-    image = next_image;
-    if !template_static_capture_matches(
-        &image,
-        &discovered_index,
-        &presets_dir,
-        &discovered_presets,
-        &closure,
-    )? || template_operation_capture_paths(&image, context, request, container_id)? != derived
-    {
-        return Ok(None);
-    }
-    Ok(Some(image))
-}
-
-fn template_static_capture_matches(
-    image: &RepositoryImage,
-    index: &crate::repository_state::RepositoryIndex,
-    presets_dir: &VirtualPath,
-    presets: &[VirtualPath],
-    closure: &[VirtualPath],
-) -> Result<bool> {
-    let captured = parse_template_index(image)?;
-    Ok(captured.all_ids == index.all_ids
-        && captured.deleted_ids == index.deleted_ids
-        && listed_json_paths(image, presets_dir)? == presets
-        && template_declaration_closure(image)? == closure)
+    let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
+    spec.discover_listings([presets_dir.clone(), VirtualPath::ISSUES])?;
+    capture_discovering(session, spec, |image, spec| {
+        let declarations = parse_template_index(image)?
+            .all_ids
+            .iter()
+            .map(|id| VirtualPath::data(format!("issues/{id}.json")).map_err(Into::into))
+            .chain(listed_json_paths(image, &presets_dir)?.into_iter().map(Ok))
+            .chain(template_declaration_closure(image)?.into_iter().map(Ok))
+            .collect::<Result<Vec<_>>>()?;
+        let declarations_read = declarations
+            .iter()
+            .all(|path| image.capture_spec().contains_path(path));
+        spec.discover_paths(declarations)?;
+        if declarations_read {
+            spec.discover_paths(template_operation_capture_paths(
+                image,
+                context,
+                request,
+                container_id,
+            )?)?;
+        }
+        Ok(())
+    })
 }
 
 fn template_declaration_closure(image: &RepositoryImage) -> Result<Vec<VirtualPath>> {

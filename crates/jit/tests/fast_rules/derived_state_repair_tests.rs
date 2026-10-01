@@ -73,11 +73,8 @@ fn capture(
         .into_iter()
         .map(|path| layout.classify_repository_relative(path).unwrap())
         .collect::<Vec<_>>();
-    let (fixed, discovered): (Vec<_>, Vec<_>) = paths
-        .into_iter()
-        .partition(|path| path.root_class() == RepositoryRootClass::Data);
-    let mut spec = CaptureSpec::phase_one(
-        fixed,
+    let spec = CaptureSpec::new(
+        paths,
         CaptureBudget {
             max_listings: 0,
             max_bytes: 16 * 1024 * 1024,
@@ -85,7 +82,6 @@ fn capture(
         },
     )
     .unwrap();
-    spec.discover_paths(discovered).unwrap();
     let mut session = harness
         .storage
         .open_mutation_session(layout.clone())
@@ -140,7 +136,7 @@ fn repository_image(
     .collect::<Vec<_>>();
     let mut session = storage.open_mutation_session(layout.clone()).unwrap();
     let image_one = session
-        .capture(CaptureSpec::phase_one(registries.clone(), budget).unwrap())
+        .capture(CaptureSpec::new(registries.clone(), budget).unwrap())
         .unwrap();
 
     let config = assemble_config(&image_one).unwrap();
@@ -150,7 +146,7 @@ fn repository_image(
         .map(|bytes| std::str::from_utf8(bytes).unwrap().to_string());
     let closure = validate_capture_closure(layout, &config, &[], rules_content.as_deref()).unwrap();
 
-    let mut spec = CaptureSpec::phase_one(registries, budget).unwrap();
+    let mut spec = CaptureSpec::new(registries, budget).unwrap();
     spec.discover_paths(closure.paths).unwrap();
     for listing in &closure.listings {
         spec.discover_listing(listing.clone()).unwrap();

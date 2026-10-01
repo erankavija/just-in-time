@@ -124,6 +124,16 @@ pub fn action_overrides<'a>(
                 Some(Ok((path.clone(), Some(bytes.clone()))))
             }
             RepositoryAction::DeleteFile { path, .. } => Some(Ok((path.clone(), None))),
+            // A log read as its tail keeps that tail: nothing over the
+            // overlay can read the bytes before it.
+            RepositoryAction::AppendEvents { .. }
+                if matches!(
+                    base.entry(action.path()),
+                    Ok(crate::repository_state::RepositoryEntry::FileTail { .. })
+                ) =>
+            {
+                None
+            }
             RepositoryAction::AppendEvents { offset, bytes, .. } => {
                 Some(base.file_bytes(action.path()).map(|log| {
                     let mut log = log.unwrap_or_default().to_vec();
@@ -194,7 +204,7 @@ mod tests {
             paths.push(path.clone());
             entries.insert(path, file_entry(text));
         }
-        let mut spec = CaptureSpec::phase_one(paths, budget).unwrap();
+        let mut spec = CaptureSpec::new(paths, budget).unwrap();
         let mut listings = BTreeMap::new();
         if let Some(names) = issues_listing {
             let dir = VirtualPath::data("issues").unwrap();

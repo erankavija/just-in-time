@@ -34,7 +34,7 @@ mod tests {
         let run_dir = VirtualPath::data(format!("gate-runs/{run_id}")).unwrap();
         let run_file =
             VirtualPath::data(gate_run_result_relative_path(&run_id).unwrap().as_path()).unwrap();
-        let spec = CaptureSpec::phase_one(
+        let spec = CaptureSpec::new(
             [VirtualPath::data("gate-runs").unwrap(), run_dir, run_file],
             CaptureBudget {
                 max_listings: 0,

@@ -297,83 +297,34 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 }
 
+/// Grow `image` by the requests `add` puts in its spec, reading only those;
+/// `false` is a retryable conflict.
 fn capture_more(
     session: &mut dyn RepositoryMutationSession,
     image: &mut crate::repository_state::RepositoryImage,
-    paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
-    listings: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
+    add: impl FnOnce(&mut crate::repository_state::CaptureSpec) -> Result<()>,
 ) -> Result<bool> {
-    let paths = paths.into_iter().collect::<BTreeSet<_>>();
-    let listings = listings.into_iter().collect::<BTreeSet<_>>();
-    if paths.iter().all(|path| {
-        image
-            .capture_spec()
-            .paths()
-            .any(|captured| captured == path)
-    }) && listings
-        .iter()
-        .all(|path| image.capture_spec().listings().contains(path))
-    {
+    let mut spec = image.capture_spec().clone();
+    add(&mut spec)?;
+    if &spec == image.capture_spec() {
         return Ok(true);
     }
-    let mut spec = image.capture_spec().clone();
-    spec.discover_paths(paths)?;
-    for listing in listings {
-        spec.discover_listing(listing)?;
-    }
-    match capture_or_retry(session.capture(spec))? {
-        Some(next) if next.has_stable_overlap(image) => {
+    match capture_or_retry(session.extend(image.clone(), spec))? {
+        Some(next) => {
             *image = next;
             Ok(true)
         }
-        Some(_) | None => Ok(false),
+        None => Ok(false),
     }
 }
 
-fn capture_advisory_more(
+/// [`capture_more`] of `paths`.
+fn capture_paths(
     session: &mut dyn RepositoryMutationSession,
     image: &mut crate::repository_state::RepositoryImage,
     paths: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
-    listings: impl IntoIterator<Item = crate::repository_state::VirtualPath>,
 ) -> Result<bool> {
-    let paths = paths.into_iter().collect::<BTreeSet<_>>();
-    let listings = listings.into_iter().collect::<BTreeSet<_>>();
-    let mut spec = image.capture_spec().clone();
-    spec.discover_advisory_paths(paths)?;
-    for listing in listings {
-        spec.discover_listing(listing)?;
-    }
-    match capture_or_retry(session.capture(spec))? {
-        Some(next) if next.has_stable_overlap(image) => {
-            *image = next;
-            Ok(true)
-        }
-        Some(_) | None => Ok(false),
-    }
-}
-
-fn capture_pinned_more(
-    session: &mut dyn RepositoryMutationSession,
-    image: &mut crate::repository_state::RepositoryImage,
-    requests: &BTreeSet<(String, String)>,
-) -> Result<bool> {
-    if requests
-        .iter()
-        .all(|request| image.pinned_evidence().contains_key(request))
-    {
-        return Ok(true);
-    }
-    let mut spec = image.capture_spec().clone();
-    for (revision, path) in requests {
-        spec.discover_pinned(revision.clone(), path.clone())?;
-    }
-    match capture_or_retry(session.capture(spec))? {
-        Some(next) if next.has_stable_overlap(image) => {
-            *image = next;
-            Ok(true)
-        }
-        Some(_) | None => Ok(false),
-    }
+    capture_more(session, image, |spec| Ok(spec.discover_paths(paths)?))
 }
 
 fn image_path(
@@ -393,6 +344,9 @@ fn image_evidence(
     Ok(match image.entry(&vpath)? {
         RepositoryEntry::Absent => ArtifactEvidence::Missing,
         RepositoryEntry::File { content, .. } => ArtifactEvidence::File(content.bytes().to_vec()),
+        RepositoryEntry::FileTail { .. } => {
+            return Err(crate::repository_state::CaptureError::TailOnlyCapture(vpath).into())
+        }
         RepositoryEntry::Symlink { .. } => ArtifactEvidence::Symlink,
         RepositoryEntry::Unsupported { .. } => ArtifactEvidence::Unsupported,
         RepositoryEntry::Directory { .. } => {
@@ -488,7 +442,7 @@ fn capture_artifact_evidence(
         if requested.is_empty() {
             return Ok(true);
         }
-        if !capture_more(session, image, requested.values().cloned(), [])? {
+        if !capture_paths(session, image, requested.values().cloned())? {
             return Ok(false);
         }
         for (path, _) in requested {
@@ -502,90 +456,45 @@ fn capture_artifact_evidence(
 
 fn capture_directory_tree(
     session: &mut dyn RepositoryMutationSession,
-    mut image: crate::repository_state::RepositoryImage,
+    image: crate::repository_state::RepositoryImage,
     root: &str,
     advisory: bool,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::RepositoryEntry;
     let root_path = image_path(image.layout(), root)?;
-    if !image.entries().contains_key(&root_path)
-        && !(if advisory {
-            capture_advisory_more(session, &mut image, [root_path.clone()], [])?
-        } else {
-            capture_more(session, &mut image, [root_path.clone()], [])?
-        })
-    {
-        return Ok(None);
-    }
-    match image.entry(&root_path)? {
-        RepositoryEntry::Absent
-        | RepositoryEntry::File { .. }
-        | RepositoryEntry::Symlink { .. }
-        | RepositoryEntry::Unsupported { .. } => return Ok(Some(image)),
-        RepositoryEntry::Directory { .. } => {}
-    }
-    if !image.listing_fingerprints().contains_key(&root_path)
-        && !(if advisory {
-            capture_advisory_more(session, &mut image, [], [root_path.clone()])?
-        } else {
-            capture_more(session, &mut image, [], [root_path.clone()])?
-        })
-    {
-        return Ok(None);
-    }
     let root_physical = image.layout().resolve(&root_path)?;
-    loop {
-        let mut paths = BTreeSet::new();
+    let beneath = |image: &crate::repository_state::RepositoryImage,
+                   path: &crate::repository_state::VirtualPath| {
+        image
+            .layout()
+            .resolve(path)
+            .is_ok_and(|physical| physical.starts_with(&root_physical))
+    };
+    super::grow_discovering(session, image, |image, spec| {
+        let mut paths = vec![root_path.clone()];
         for (directory, listing) in image.listing_fingerprints() {
-            if image
-                .layout()
-                .resolve(directory)?
-                .starts_with(&root_physical)
-            {
+            if beneath(image, directory) {
                 for name in listing.children().keys() {
-                    let child = image
-                        .layout()
-                        .classify_and_canonicalize(image.layout().resolve(directory)?.join(name))?;
-                    if !image.entries().contains_key(&child) {
-                        paths.insert(child);
-                    }
+                    let physical = image.layout().resolve(directory)?.join(name);
+                    paths.push(image.layout().classify_and_canonicalize(physical)?);
                 }
             }
         }
-        if !paths.is_empty() {
-            if !(if advisory {
-                capture_advisory_more(session, &mut image, paths, [])?
-            } else {
-                capture_more(session, &mut image, paths, [])?
-            }) {
-                return Ok(None);
-            }
-            continue;
+        paths.retain(|path| !spec.contains_path(path));
+        match advisory {
+            true => spec.discover_advisory_paths(paths)?,
+            false => spec.discover_paths(paths)?,
         }
-        let listings = image
-            .entries()
-            .iter()
-            .filter(|(path, entry)| {
-                matches!(entry, RepositoryEntry::Directory { .. })
-                    && image
-                        .layout()
-                        .resolve(path)
-                        .is_ok_and(|physical| physical.starts_with(&root_physical))
-                    && !image.listing_fingerprints().contains_key(path)
-            })
-            .map(|(path, _)| path.clone())
-            .collect::<BTreeSet<_>>();
-        if listings.is_empty() {
-            return Ok(Some(image));
-        }
-        if !(if advisory {
-            capture_advisory_more(session, &mut image, [], listings)?
-        } else {
-            capture_more(session, &mut image, [], listings)?
-        }) {
-            return Ok(None);
-        }
-    }
+        Ok(spec.discover_listings(
+            image
+                .entries()
+                .iter()
+                .filter(|(path, entry)| {
+                    matches!(entry, RepositoryEntry::Directory { .. }) && beneath(image, path)
+                })
+                .map(|(path, _)| path.clone()),
+        )?)
+    })
 }
 
 /// Capture and derive the advisory citation evidence for the configured scan
@@ -697,7 +606,9 @@ impl CommandExecutor<JsonFileStorage> {
                     Some(ArtifactEvidence::Directory { .. })
                 );
                 let children = if archive_is_directory {
-                    if !capture_more(session, &mut image, [], [archive_path.clone()])? {
+                    if !capture_more(session, &mut image, |spec| {
+                        Ok(spec.discover_listing(archive_path.clone())?)
+                    })? {
                         return Ok(None);
                     }
                     image
@@ -718,7 +629,7 @@ impl CommandExecutor<JsonFileStorage> {
                 if archive_is_directory {
                     child_paths.push(image_path(image.layout(), &legacy)?);
                 }
-                if !capture_more(session, &mut image, child_paths, [])? {
+                if !capture_paths(session, &mut image, child_paths)? {
                     return Ok(None);
                 }
                 let mut markers = Vec::new();
@@ -734,7 +645,7 @@ impl CommandExecutor<JsonFileStorage> {
                         )?);
                     }
                 }
-                if !capture_more(session, &mut image, markers, [])? {
+                if !capture_paths(session, &mut image, markers)? {
                     return Ok(None);
                 }
                 let mut evidence = ArtifactEvidenceMap::from([
@@ -794,7 +705,12 @@ impl CommandExecutor<JsonFileStorage> {
             ),
         };
         let pinned_requests = pinned_root_requests(&inventory_issues, &hierarchy, explicit)?;
-        if !capture_pinned_more(session, &mut image, &pinned_requests)? {
+        if !capture_more(session, &mut image, |spec| {
+            pinned_requests
+                .iter()
+                .try_for_each(|(revision, path)| spec.discover_pinned(revision, path))
+                .map_err(Into::into)
+        })? {
             return Ok(None);
         }
         let pinned = pinned_requests

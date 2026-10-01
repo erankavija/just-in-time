@@ -138,6 +138,52 @@ impl Serialize for CapturedBytes {
     }
 }
 
+/// Bytes at the end of a file a [`ReadMode::Tail`] capture keeps.
+///
+/// A byte window rather than the last complete line: the event log's torn-tail
+/// protocol admits an incomplete final line, so its end is not a line boundary.
+pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
+
+/// A file's exact length with its last `min(length, window)` bytes.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct EventLogTail {
+    length: u64,
+    tail: Vec<u8>,
+}
+
+impl EventLogTail {
+    /// The length and tail of `bytes`.
+    pub fn of_bytes(bytes: &[u8]) -> Self {
+        let window = usize::try_from(EVENT_LOG_TAIL_WINDOW).unwrap_or(usize::MAX);
+        Self {
+            length: bytes.len() as u64,
+            tail: bytes[bytes.len().saturating_sub(window)..].to_vec(),
+        }
+    }
+
+    /// A boundary reading of a file `length` bytes long ending in `tail`.
+    ///
+    /// # Errors
+    ///
+    /// [`CaptureError::InvalidTail`] unless `tail` holds exactly the last
+    /// `min(length, window)` bytes.
+    pub fn new(length: u64, tail: Vec<u8>) -> Result<Self, CaptureError> {
+        (tail.len() as u64 == length.min(EVENT_LOG_TAIL_WINDOW))
+            .then_some(Self { length, tail })
+            .ok_or(CaptureError::InvalidTail { length })
+    }
+
+    /// The file's exact byte length.
+    pub fn length(&self) -> u64 {
+        self.length
+    }
+
+    /// The file's last `min(length, window)` bytes.
+    pub fn tail(&self) -> &[u8] {
+        &self.tail
+    }
+}
+
 /// One exact captured path state, including typed absence.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum RepositoryEntry {
@@ -155,6 +201,13 @@ pub enum RepositoryEntry {
         /// Exact directory identity.
         identity: EntryIdentity,
         /// Normalized directory mode.
+        mode: FileMode,
+    },
+    /// An ordinary file read as its length and tail ([`ReadMode::Tail`]).
+    FileTail {
+        /// Exact length and bounded tail.
+        tail: EventLogTail,
+        /// Normalized mode.
         mode: FileMode,
     },
     /// A symbolic link, never followed.
@@ -176,10 +229,10 @@ pub enum RepositoryEntry {
 }
 
 impl RepositoryEntry {
-    /// Exact identity when an occupant exists.
+    /// Exact identity when an occupant exists and was read whole.
     pub fn identity(&self) -> Option<&EntryIdentity> {
         match self {
-            Self::Absent => None,
+            Self::Absent | Self::FileTail { .. } => None,
             Self::File { content, .. } => Some(content.identity()),
             Self::Symlink { target, .. } => Some(target.identity()),
             Self::Directory { identity, .. } | Self::Unsupported { identity, .. } => Some(identity),
@@ -206,7 +259,7 @@ impl RepositoryTargetKind {
     /// Classify a captured working-tree entry without filesystem I/O.
     pub fn from_entry(entry: &RepositoryEntry) -> Self {
         match entry {
-            RepositoryEntry::File { .. } => Self::File,
+            RepositoryEntry::File { .. } | RepositoryEntry::FileTail { .. } => Self::File,
             RepositoryEntry::Directory { .. } => Self::Directory,
             RepositoryEntry::Absent => Self::Missing,
             RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
@@ -565,7 +618,7 @@ impl LinkedWorktreeEvidence {
 
     fn validate_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
         self.ensure_request(request)?;
-        if self.path.root_class() != super::RepositoryRootClass::Data {
+        if self.path.root_class() != RepositoryRootClass::Data {
             return Err(CaptureError::LinkedEvidenceRequiresDataPath(
                 self.path.clone(),
             ));
@@ -583,7 +636,7 @@ impl LinkedWorktreeEvidence {
     }
 }
 
-/// Explicit bounds for phase-two capture closure.
+/// Explicit bounds for one capture.
 ///
 /// Each dimension bounds something a capture can be asked for without anyone
 /// having declared it. A capture grows on its own in exactly one place —
@@ -611,11 +664,23 @@ pub struct CaptureBudget {
     pub max_depth: usize,
 }
 
-/// Normalized two-phase capture request.
+/// How much of an ordinary file a capture reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReadMode {
+    /// Every byte.
+    Whole,
+    /// The length and the last [`EVENT_LOG_TAIL_WINDOW`] bytes, as an
+    /// [`EventLogTail`].
+    Tail,
+}
+
+/// Normalized capture request: exact paths with their read modes, listings,
+/// and evidence requests.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CaptureSpec {
-    fixed: BTreeSet<VirtualPath>,
-    discovered: BTreeSet<VirtualPath>,
+    paths: BTreeSet<VirtualPath>,
+    /// The paths read as [`ReadMode::Tail`]; every other path is read whole.
+    tails: BTreeSet<VirtualPath>,
     advisory: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
@@ -624,35 +689,45 @@ pub struct CaptureSpec {
 }
 
 impl CaptureSpec {
-    /// Begin phase one with fixed declaration paths and explicit bounds.
-    pub fn phase_one(
-        fixed: impl IntoIterator<Item = VirtualPath>,
+    /// Request `paths` whole, within `budget`.
+    pub fn new(
+        paths: impl IntoIterator<Item = VirtualPath>,
         budget: CaptureBudget,
     ) -> Result<Self, CaptureError> {
-        let spec = Self {
-            fixed: fixed.into_iter().collect(),
-            discovered: BTreeSet::new(),
+        let mut spec = Self {
+            paths: BTreeSet::new(),
+            tails: BTreeSet::new(),
             advisory: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
             linked_worktree: BTreeSet::new(),
             budget,
         };
-        spec.validate()?;
+        spec.discover_paths(paths)?;
         Ok(spec)
     }
 
-    /// Add paths discovered by parsing already captured bytes.
+    /// Add paths to read whole; a path requested as a tail is read whole instead.
     pub fn discover_paths(
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
         let mut candidate = self.clone();
-        candidate.discovered.extend(
-            paths
-                .into_iter()
-                .filter(|path| !candidate.fixed.contains(path)),
-        );
+        for path in paths {
+            candidate.tails.remove(&path);
+            candidate.paths.insert(path);
+        }
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Add a path to read as its length and tail, unless it is already requested.
+    pub fn discover_tail(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
+        let mut candidate = self.clone();
+        if candidate.paths.insert(path.clone()) {
+            candidate.tails.insert(path);
+        }
         candidate.validate()?;
         *self = candidate;
         Ok(())
@@ -663,14 +738,10 @@ impl CaptureSpec {
         &mut self,
         paths: impl IntoIterator<Item = VirtualPath>,
     ) -> Result<(), CaptureError> {
+        let paths = paths.into_iter().collect::<Vec<_>>();
         let mut candidate = self.clone();
-        for path in paths {
-            if !candidate.fixed.contains(&path) {
-                candidate.discovered.insert(path.clone());
-            }
-            candidate.advisory.insert(path);
-        }
-        candidate.validate()?;
+        candidate.advisory.extend(paths.iter().cloned());
+        candidate.discover_paths(paths)?;
         *self = candidate;
         Ok(())
     }
@@ -729,9 +800,18 @@ impl CaptureSpec {
         Ok(())
     }
 
-    /// Every exact path in deterministic work-queue order.
+    /// Every exact path in canonical order.
     pub fn paths(&self) -> impl Iterator<Item = &VirtualPath> {
-        self.fixed.iter().chain(self.discovered.iter())
+        self.paths.iter()
+    }
+
+    /// How `path` is read, when it is requested.
+    pub fn read_mode(&self, path: &VirtualPath) -> Option<ReadMode> {
+        match (self.paths.contains(path), self.tails.contains(path)) {
+            (false, _) => None,
+            (true, false) => Some(ReadMode::Whole),
+            (true, true) => Some(ReadMode::Tail),
+        }
     }
 
     /// Every complete-listing request.
@@ -755,22 +835,6 @@ impl CaptureSpec {
     }
 
     fn validate(&self) -> Result<(), CaptureError> {
-        // Phase one reads only fixed `Data(...)` declaration roots; every Worktree
-        // path (documents, projection targets, linked-worktree reads) is enqueued
-        // in phase two, never in the fixed set.
-        if let Some(path) = self
-            .fixed
-            .iter()
-            .find(|path| path.root_class() != RepositoryRootClass::Data)
-        {
-            return Err(CaptureError::PhaseOneRequiresDataPath(path.clone()));
-        }
-        if self.discovered.iter().any(|path| self.fixed.contains(path)) {
-            return Err(CaptureError::DuplicateCapturePath);
-        }
-        if self.advisory.iter().any(|path| !self.contains_path(path)) {
-            return Err(CaptureError::AdvisoryPathNotCaptured);
-        }
         if self.listings.len() > self.budget.max_listings {
             return Err(CaptureError::ListingBudgetExceeded {
                 actual: self.listings.len(),
@@ -793,7 +857,7 @@ impl CaptureSpec {
             path.ensure_semantic()?;
         }
         for path in &self.linked_worktree {
-            if path.root_class() != super::RepositoryRootClass::Data {
+            if path.root_class() != RepositoryRootClass::Data {
                 return Err(CaptureError::LinkedEvidenceRequiresDataPath(path.clone()));
             }
         }
@@ -804,8 +868,17 @@ impl CaptureSpec {
     }
 
     pub(crate) fn contains_path(&self, path: &VirtualPath) -> bool {
-        self.fixed.contains(path) || self.discovered.contains(path)
+        self.paths.contains(path)
     }
+}
+
+/// Reads an earlier capture made, keyed as in a [`RepositoryImage`].
+#[derive(Debug, Default)]
+pub(crate) struct CapturedAnswers {
+    pub(crate) entries: BTreeMap<VirtualPath, RepositoryEntry>,
+    pub(crate) listings: BTreeMap<VirtualPath, ListingFingerprint>,
+    pub(crate) pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
+    pub(crate) linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 }
 
 /// Complete immutable repository image consumed by pure producers.
@@ -834,6 +907,14 @@ impl RepositoryImage {
             layout.ensure_canonical(path)?;
             if !spec.contains_path(path) {
                 return Err(CaptureError::UnexpectedCapturedPath(path.clone()));
+            }
+            if matches!(entry, RepositoryEntry::FileTail { .. })
+                && spec.read_mode(path) != Some(ReadMode::Tail)
+            {
+                return Err(CaptureError::InvalidCapturedEntry {
+                    path: path.clone(),
+                    reason: "a tail answers only a tail request".into(),
+                });
             }
             validate_entry(path, entry)?;
         }
@@ -949,6 +1030,7 @@ impl RepositoryImage {
     pub fn file_bytes(&self, path: &VirtualPath) -> Result<Option<&[u8]>, CaptureError> {
         match self.entry(path)? {
             RepositoryEntry::File { content, .. } => Ok(Some(content.bytes())),
+            RepositoryEntry::FileTail { .. } => Err(CaptureError::TailOnlyCapture(path.clone())),
             RepositoryEntry::Absent | RepositoryEntry::Directory { .. } => Ok(None),
             RepositoryEntry::Symlink { .. } | RepositoryEntry::Unsupported { .. } => {
                 Err(CaptureError::UnsafeCapturedOccupant(path.clone()))
@@ -968,31 +1050,30 @@ impl RepositoryImage {
         &self.linked_worktree
     }
 
-    /// Whether a later capture preserves every fact already present in `prior`.
-    ///
-    /// Capture expansion may add paths and evidence, but it must not silently
-    /// replace facts that pure derivation has already consumed. A changed root
-    /// layout or any changed/removed entry, listing, pinned result, or linked
-    /// worktree result requires the caller to restart derivation from the newer
-    /// image.
-    pub(crate) fn has_stable_overlap(&self, prior: &Self) -> bool {
-        self.layout == prior.layout
-            && prior
-                .entries
-                .iter()
-                .all(|(path, evidence)| self.entries.get(path) == Some(evidence))
-            && prior
-                .listings
-                .iter()
-                .all(|(path, evidence)| self.listings.get(path) == Some(evidence))
-            && prior
-                .pinned
-                .iter()
-                .all(|(request, evidence)| self.pinned.get(request) == Some(evidence))
-            && prior
-                .linked_worktree
-                .iter()
-                .all(|(path, evidence)| self.linked_worktree.get(path) == Some(evidence))
+    /// What this image read that `spec` requests the same way, for a capture
+    /// of `spec` to keep rather than read again.
+    pub(crate) fn into_answers(self, spec: &CaptureSpec) -> CapturedAnswers {
+        let Self {
+            spec: read,
+            entries,
+            listings,
+            pinned,
+            linked_worktree,
+            ..
+        } = self;
+        let same = |path: &VirtualPath| read.is_advisory(path) == spec.is_advisory(path);
+        CapturedAnswers {
+            entries: entries
+                .into_iter()
+                .filter(|(path, _)| same(path) && read.read_mode(path) == spec.read_mode(path))
+                .collect(),
+            listings: listings
+                .into_iter()
+                .filter(|(path, _)| same(path))
+                .collect(),
+            pinned,
+            linked_worktree,
+        }
     }
 }
 
@@ -1001,6 +1082,7 @@ fn validate_entry(path: &VirtualPath, entry: &RepositoryEntry) -> Result<(), Cap
         // Captured bytes carry the identity derived from them at construction.
         RepositoryEntry::Absent
         | RepositoryEntry::File { .. }
+        | RepositoryEntry::FileTail { .. }
         | RepositoryEntry::Symlink { .. } => Ok(()),
         RepositoryEntry::Directory { identity, .. } => identity.validate(),
         RepositoryEntry::Unsupported {
@@ -1067,6 +1149,7 @@ fn captured_byte_count(
         .values()
         .filter_map(|entry| match entry {
             RepositoryEntry::File { content, .. } => Some(content.bytes().len() as u64),
+            RepositoryEntry::FileTail { tail, .. } => Some(tail.tail().len() as u64),
             RepositoryEntry::Symlink { target, .. } => Some(target.bytes().len() as u64),
             RepositoryEntry::Absent
             | RepositoryEntry::Directory { .. }
@@ -1249,7 +1332,7 @@ impl TargetClaim {
 /// (identity + payload), and an occupant unsafe for mutation — the kinds the plan
 /// delta vocabulary enumerates. A later publication boundary verifies this
 /// preimage against the live occupant before applying the action.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum ExpectedPreimage {
     /// Path must remain absent.
     Absent,
@@ -1257,6 +1340,13 @@ pub enum ExpectedPreimage {
     File {
         /// Exact entry identity (object, content hash, byte size).
         identity: EntryIdentity,
+        /// Normalized file mode.
+        mode: FileMode,
+    },
+    /// An ordinary file with exact length, tail, and mode.
+    FileTail {
+        /// Exact length and bounded tail.
+        tail: EventLogTail,
         /// Normalized file mode.
         mode: FileMode,
     },
@@ -1296,6 +1386,10 @@ impl ExpectedPreimage {
                 identity: content.identity().clone(),
                 mode: *mode,
             },
+            RepositoryEntry::FileTail { tail, mode } => Self::FileTail {
+                tail: tail.clone(),
+                mode: *mode,
+            },
             RepositoryEntry::Directory { identity, mode } => Self::Directory {
                 identity: identity.clone(),
                 mode: *mode,
@@ -1317,10 +1411,10 @@ impl ExpectedPreimage {
         }
     }
 
-    /// Exact identity when the preimage expects an occupant (`None` for absent).
+    /// Exact identity when the preimage expects an occupant read whole.
     pub fn identity(&self) -> Option<&EntryIdentity> {
         match self {
-            Self::Absent => None,
+            Self::Absent | Self::FileTail { .. } => None,
             Self::File { identity, .. }
             | Self::Directory { identity, .. }
             | Self::Symlink { identity, .. }
@@ -1570,7 +1664,10 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
             ..
         }
         | RepositoryAction::AppendEvents {
-            expected: ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
+            expected:
+                ExpectedPreimage::Absent
+                | ExpectedPreimage::File { .. }
+                | ExpectedPreimage::FileTail { .. },
             ..
         }
         | RepositoryAction::SetMode {
@@ -1658,14 +1755,12 @@ pub enum CaptureError {
     ByteBudgetExceeded { actual: u64, maximum: u64 },
     #[error("capture path {0:?} exceeds the depth budget")]
     DepthBudgetExceeded(VirtualPath),
-    #[error("capture spec contains the same path in fixed and discovered sets")]
-    DuplicateCapturePath,
-    #[error("advisory capture path was not included in the capture read set")]
-    AdvisoryPathNotCaptured,
-    #[error("phase-one fixed capture requires a Data path, got {0:?}")]
-    PhaseOneRequiresDataPath(VirtualPath),
     #[error("capture did not provide requested path {0:?}")]
     IncompleteCapture(VirtualPath),
+    #[error("capture read only the length and tail of {0:?}")]
+    TailOnlyCapture(VirtualPath),
+    #[error("a tail of a {length}-byte file must hold its last min(length, window) bytes")]
+    InvalidTail { length: u64 },
     #[error("capture provided unrequested path {0:?}")]
     UnexpectedCapturedPath(VirtualPath),
     #[error("capture did not provide requested listing {0:?}")]
@@ -1770,7 +1865,7 @@ mod tests {
         let path = VirtualPath::data("index.json").unwrap();
         let dir = VirtualPath::data("issues").unwrap();
         let spec = {
-            let mut spec = CaptureSpec::phase_one(
+            let mut spec = CaptureSpec::new(
                 [path.clone()],
                 CaptureBudget {
                     max_listings: 2,
@@ -1821,87 +1916,10 @@ mod tests {
     }
 
     #[test]
-    fn test_capture_overlap_rejects_changed_prior_evidence() {
-        let baseline = image(1, 2);
-        assert!(baseline.has_stable_overlap(&baseline));
-        assert!(!image(2, 2).has_stable_overlap(&baseline));
-        assert!(!image(1, 3).has_stable_overlap(&baseline));
-
-        let request = ("HEAD".to_owned(), "README.md".to_owned());
-        let mut with_external = baseline.clone();
-        with_external
-            .spec
-            .discover_pinned(request.0.clone(), request.1.clone())
-            .unwrap();
-        with_external.pinned.insert(
-            request.clone(),
-            PinnedDocumentEvidence::new(
-                &request.0,
-                &request.1,
-                PinnedSourceClass::GitUnavailable,
-                RepositoryTargetKind::Missing,
-                None,
-                None,
-                None,
-                None,
-                Some("first failure".into()),
-            )
-            .unwrap(),
-        );
-        let linked = VirtualPath::data("linked.toml").unwrap();
-        with_external
-            .spec
-            .discover_linked_worktree(linked.clone())
-            .unwrap();
-        with_external.linked_worktree.insert(
-            linked.clone(),
-            LinkedWorktreeEvidence::new(
-                linked.clone(),
-                LinkedWorktreeSourceClass::Absent,
-                None,
-                None,
-            )
-            .unwrap(),
-        );
-
-        let mut changed_pinned = with_external.clone();
-        changed_pinned.pinned.insert(
-            request.clone(),
-            PinnedDocumentEvidence::new(
-                &request.0,
-                &request.1,
-                PinnedSourceClass::GitUnavailable,
-                RepositoryTargetKind::Missing,
-                None,
-                None,
-                None,
-                None,
-                Some("second failure".into()),
-            )
-            .unwrap(),
-        );
-        assert!(!changed_pinned.has_stable_overlap(&with_external));
-
-        let mut changed_linked = with_external.clone();
-        let bytes = b"changed".to_vec();
-        changed_linked.linked_worktree.insert(
-            linked.clone(),
-            LinkedWorktreeEvidence::new(
-                linked,
-                LinkedWorktreeSourceClass::MainWorktree,
-                Some(EntryIdentity::for_bytes("linked", &bytes).unwrap()),
-                Some(bytes),
-            )
-            .unwrap(),
-        );
-        assert!(!changed_linked.has_stable_overlap(&with_external));
-    }
-
-    #[test]
     fn test_close_rejects_every_unrequested_evidence_map() {
         let requested = VirtualPath::data("index.json").unwrap();
         let extra = VirtualPath::data("extra.json").unwrap();
-        let spec = CaptureSpec::phase_one(
+        let spec = CaptureSpec::new(
             [requested.clone()],
             CaptureBudget {
                 max_listings: 2,
@@ -1987,7 +2005,7 @@ mod tests {
     fn test_close_requires_requested_linked_evidence() {
         let requested = VirtualPath::data("index.json").unwrap();
         let linked_path = VirtualPath::data("config.toml").unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [requested.clone()],
             CaptureBudget {
                 max_listings: 0,
@@ -2015,7 +2033,7 @@ mod tests {
         let directory = VirtualPath::data("issues").unwrap();
         let mut listing = ListingFingerprint::new(BTreeMap::new()).unwrap();
         listing.sha256 = "0".repeat(64);
-        let mut listing_spec = CaptureSpec::phase_one(
+        let mut listing_spec = CaptureSpec::new(
             [],
             CaptureBudget {
                 max_listings: 1,
@@ -2078,7 +2096,7 @@ mod tests {
                 ))
             })
             .collect::<Result<BTreeMap<_, _>, CaptureError>>()?;
-        let mut spec = CaptureSpec::phase_one(entries.keys().cloned(), budget)?;
+        let mut spec = CaptureSpec::new(entries.keys().cloned(), budget)?;
         spec.discover_listing(path.clone())?;
         RepositoryImage::close(
             layout(),
@@ -2106,7 +2124,7 @@ mod tests {
         let path = VirtualPath::data("index.json").unwrap();
         let bytes = b"captured payload".to_vec();
         let close = |max_bytes: u64| {
-            let spec = CaptureSpec::phase_one(
+            let spec = CaptureSpec::new(
                 [path.clone()],
                 CaptureBudget {
                     max_listings: 0,
@@ -2148,7 +2166,7 @@ mod tests {
             max_bytes: 1024,
             max_depth: 4,
         };
-        let mut spec = CaptureSpec::phase_one([], budget).unwrap();
+        let mut spec = CaptureSpec::new([], budget).unwrap();
         spec.discover_listing(VirtualPath::data("issues").unwrap())
             .unwrap();
 
@@ -2186,7 +2204,7 @@ mod tests {
         let root = VirtualPath::data("").unwrap();
         let issues = VirtualPath::data("issues").unwrap();
         let identity = EntryIdentity::for_bytes("issues", b"directory").unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [],
             CaptureBudget {
                 max_listings: 2,
@@ -2254,7 +2272,7 @@ mod tests {
     #[test]
     fn test_capture_spec_failed_discovery_is_transactional() {
         let fixed = VirtualPath::data("index.json").unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [fixed.clone()],
             CaptureBudget {
                 max_listings: 0,
@@ -2268,25 +2286,6 @@ mod tests {
             Err(CaptureError::DepthBudgetExceeded(_))
         ));
         assert_eq!(spec.paths().collect::<Vec<_>>(), vec![&fixed]);
-    }
-
-    #[test]
-    fn test_phase_one_requires_data_fixed_paths() {
-        let budget = CaptureBudget {
-            max_listings: 2,
-            max_bytes: 64,
-            max_depth: 4,
-        };
-        // A Worktree path in the phase-one fixed set is rejected: only Data
-        // declaration roots are read in phase one; Worktree paths enter phase two.
-        assert!(matches!(
-            CaptureSpec::phase_one([VirtualPath::worktree("docs/plan.md").unwrap()], budget),
-            Err(CaptureError::PhaseOneRequiresDataPath(_))
-        ));
-        // A Data fixed path is accepted.
-        assert!(
-            CaptureSpec::phase_one([VirtualPath::data("config.toml").unwrap()], budget).is_ok()
-        );
     }
 
     #[test]
@@ -2611,10 +2610,10 @@ mod tests {
     }
 
     #[test]
-    fn test_capture_spec_phase_two_closes_discovered_paths() {
+    fn test_capture_spec_closes_discovered_paths() {
         let fixed = VirtualPath::data("config.toml").unwrap();
         let discovered = VirtualPath::worktree("docs/plan.md").unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [fixed.clone()],
             CaptureBudget {
                 max_listings: 1,

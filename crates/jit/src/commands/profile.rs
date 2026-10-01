@@ -1027,20 +1027,14 @@ impl CommandExecutor<JsonFileStorage> {
         with_mutation_session(self.storage(), layout, "profile package tree", |session| {
             // The destination's whole subtree must be read before the delta is
             // derived, because a file it holds that the tree no longer declares
-            // is one a republication removes. A listing names its children and
-            // an entry says which of them are directories, so the declaration is
-            // expanded against each freshly captured image until it stops
-            // growing; the session revalidates every path it settles on, so a
-            // file appearing beneath the destination meanwhile is a retryable
-            // conflict rather than content that survives.
-            let mut spec = capture.capture_spec(budget)?;
-            let image = loop {
-                let Some(image) = capture_or_retry(session.capture(spec.clone()))? else {
-                    return Ok(SessionStep::Retry);
-                };
-                if !capture.expand_destination_closure(&image, &mut spec)? {
-                    break image;
-                }
+            // is one a republication removes.
+            let Some(image) = super::capture_discovering(
+                session,
+                capture.capture_spec(budget)?,
+                |image, spec| Ok(capture.expand_destination_closure(image, spec)?),
+            )?
+            else {
+                return Ok(SessionStep::Retry);
             };
             if placement == TreePlacement::RequireAbsent
                 && !matches!(image.entry(destination)?, RepositoryEntry::Absent)
@@ -2124,11 +2118,11 @@ impl CommandExecutor<JsonFileStorage> {
         {
             expanded_paths.push(VirtualPath::SCHEMAS);
         }
-        let base =
-            match self.capture_proposed_base(session, &BTreeMap::new(), &expanded_paths, None)? {
-                None => return Ok(None),
-                Some(base) => base,
-            };
+        let Some(base) =
+            self.capture_proposed_base(session, &BTreeMap::new(), &expanded_paths, Some(base))?
+        else {
+            return Ok(None);
+        };
         let inputs =
             profile_selection_inputs(packages, resolved, base.layout(), contribution_context)?;
         let preview = derive_materialization(
@@ -2148,9 +2142,10 @@ impl CommandExecutor<JsonFileStorage> {
                 .map(|action| action.path().clone()),
         );
         let overrides = super::validation_overlay(preview.image(), preview.delta())?;
-        let probe = match self.capture_proposed_base(session, &overrides, &extra_paths, None)? {
-            None => return Ok(None),
-            Some(base) => base,
+        let Some(probe) =
+            self.capture_proposed_base(session, &overrides, &extra_paths, Some(base))?
+        else {
+            return Ok(None);
         };
         let inputs =
             profile_selection_inputs(packages, resolved, probe.layout(), contribution_context)?;
@@ -2199,7 +2194,7 @@ impl CommandExecutor<JsonFileStorage> {
         with_mutation_session(self.storage(), &layout, "profile record read", |session| {
             // One record is the whole named-path reading, so it shares the
             // inventory reader's shape-only budget.
-            let Some(image) = capture_or_retry(session.capture(CaptureSpec::phase_one(
+            let Some(image) = capture_or_retry(session.capture(CaptureSpec::new(
                 [record_path.clone()],
                 record_capture_budget(),
             )?))?
@@ -2383,27 +2378,11 @@ fn applied_record_depth() -> usize {
     VirtualPath::PROFILES.relative().depth().saturating_add(1)
 }
 
-/// Bounds for the listing-only capture that learns how many records there are.
-///
-/// This capture declares no path, so it reads no payload: the only bytes it can
-/// charge are the names its one listing holds. Those names are the record
-/// inventory the whole reading is about, and a bound that refused them would
-/// refuse the inventory itself. The growth available here is therefore bounded
-/// by what it is: one listing, at the depth records are published at. No payload
-/// multiple appears, because no payload is read.
-fn record_listing_capture_budget() -> CaptureBudget {
-    CaptureBudget {
-        max_listings: 1,
-        max_bytes: u64::MAX,
-        max_depth: applied_record_depth(),
-    }
-}
-
 /// Bounds for reading named applied-profile records.
 ///
 /// One record per applied profile is read at the exact path its one listing
 /// names, or at the exact canonical path an id constructs for the single-record
-/// reader. Like [`record_listing_capture_budget`], this performs no discovery:
+/// reader. This performs no discovery from payload:
 /// arbitrary record bytes cannot add a path or listing to the capture. Records
 /// carry adopter-supplied resolved variables, so the package model cannot bound
 /// their payload size; named-path bytes are therefore unbounded. Shape remains
@@ -2524,50 +2503,36 @@ pub(super) fn capture_applied_records(
 /// listing is re-read in the same capture, so a record set that moved is
 /// reported as movement rather than answered over two states.
 ///
-/// The reading is two captures because the listing supplies the record ids the
-/// second capture names. The first declares no path at all, so it reads no
-/// payload and charges only the names its listing holds. The second performs no
-/// discovery either: its records come from those ids and every additional path
-/// comes from `also`, so its named-path payload bytes are unbounded while its
-/// one listing and construction-derived maximum depth bind shape. A record set
-/// that moved between them is caught where it always was — the second capture
-/// re-reads the listing, and a record inventory that disagrees with the first
-/// restarts the attempt rather than being answered over two states.
+/// The listing supplies the record ids, so the records join the round once it
+/// is read; every additional path comes from `also`, so the round's named-path
+/// payload bytes are unbounded while its one listing and construction-derived
+/// maximum depth bind shape.
 fn capture_applied_records_covering(
     session: &mut (dyn RepositoryMutationSession + '_),
     profiles_dir: &VirtualPath,
     also: impl IntoIterator<Item = VirtualPath>,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
     let also = also.into_iter().collect::<Vec<_>>();
-    let mut listing = CaptureSpec::phase_one([], record_listing_capture_budget())?;
-    listing.discover_listing(profiles_dir.clone())?;
-    let Some(listed) = capture_or_retry(session.capture(listing))? else {
-        return Ok(None);
-    };
-    let recorded = recorded_profile_ids(&listed, profiles_dir)?;
-
-    let mut spec = CaptureSpec::phase_one([], claim_capture_budget(&also))?;
+    let mut spec = CaptureSpec::new(also.iter().cloned(), claim_capture_budget(&also))?;
     spec.discover_listing(profiles_dir.clone())?;
-    spec.discover_paths(
-        recorded
-            .iter()
-            .map(|id| applied_record_path(id))
-            .collect::<Result<Vec<_>>>()?,
-    )?;
-    spec.discover_paths(also)?;
-    let Some(image) = capture_or_retry(session.capture(spec))? else {
+    let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+        Ok(spec.discover_paths(
+            recorded_profile_ids(image, profiles_dir)?
+                .iter()
+                .map(|id| applied_record_path(id))
+                .collect::<Result<Vec<_>>>()?,
+        )?)
+    })?
+    else {
         return Ok(None);
     };
-    if recorded_profile_ids(&image, profiles_dir)? != recorded {
-        return Ok(None);
-    }
+    let recorded = recorded_profile_ids(&image, profiles_dir)?;
     Ok(Some((image, recorded)))
 }
 
 /// Bounds for applied records plus the exact claimed target paths in `also`.
 ///
-/// This is the same no-discovery case as [`record_listing_capture_budget`] and
-/// [`record_capture_budget`]. The one record listing supplies every record id;
+/// This is the same no-discovery case as [`record_capture_budget`]. The one record listing supplies every record id;
 /// parsed records supply every claimed target; arbitrary payload bytes supply
 /// neither paths nor listings. Claimed content may be template-expanded beyond
 /// its package sources, so the package model cannot bound it and named-path
@@ -3101,13 +3066,8 @@ mod tests {
             .expect("one profile entry")
     }
 
-    struct RecaptureRaceSession {
-        inner: Box<dyn RepositoryMutationSession>,
-        captures: usize,
-        config_path: std::path::PathBuf,
-    }
-
-    struct FinalClosureRaceSession {
+    /// Declares a projection over a new source once the first round has read.
+    struct ClosureRaceSession {
         inner: Box<dyn RepositoryMutationSession>,
         captures: usize,
         config_path: std::path::PathBuf,
@@ -3162,7 +3122,7 @@ mod tests {
         }
     }
 
-    impl RepositoryMutationSession for RecaptureRaceSession {
+    impl RepositoryMutationSession for ClosureRaceSession {
         fn layout(&self) -> &crate::repository_state::RepositoryLayout {
             self.inner.layout()
         }
@@ -3175,37 +3135,9 @@ mod tests {
             &mut self,
             spec: CaptureSpec,
         ) -> std::result::Result<RepositoryImage, RepositoryStateStoreError> {
+            let image = self.inner.capture(spec)?;
             self.captures += 1;
-            if self.captures == 4 {
-                fs::write(&self.config_path, b"not = [valid").unwrap();
-            }
-            self.inner.capture(spec)
-        }
-
-        fn apply(
-            &mut self,
-            plan: &MaterializationPlan,
-        ) -> std::result::Result<crate::storage::RepositoryApplyOutcome, RepositoryStateStoreError>
-        {
-            self.inner.apply(plan)
-        }
-    }
-
-    impl RepositoryMutationSession for FinalClosureRaceSession {
-        fn layout(&self) -> &crate::repository_state::RepositoryLayout {
-            self.inner.layout()
-        }
-
-        fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
-            self.inner.recovery_report()
-        }
-
-        fn capture(
-            &mut self,
-            spec: CaptureSpec,
-        ) -> std::result::Result<RepositoryImage, RepositoryStateStoreError> {
-            self.captures += 1;
-            if self.captures == 7 {
+            if self.captures == 1 {
                 let mut config = fs::read_to_string(&self.config_path).unwrap();
                 config.push_str(
                     "\n[item_kinds.race]\nsection = \"race\"\nid-pattern = \"R-[0-9]+\"\n\
@@ -3217,7 +3149,15 @@ mod tests {
                 fs::write(&self.config_path, config).unwrap();
                 fs::write(&self.source_path, "## Race\n\n- **R-1** — recaptured\n").unwrap();
             }
-            self.inner.capture(spec)
+            Ok(image)
+        }
+
+        fn extend(
+            &mut self,
+            image: RepositoryImage,
+            spec: CaptureSpec,
+        ) -> std::result::Result<RepositoryImage, RepositoryStateStoreError> {
+            self.inner.extend(image, spec)
         }
 
         fn apply(
@@ -5360,25 +5300,7 @@ template = true
     }
 
     #[test]
-    fn test_profile_preparation_rederives_from_recaptured_repository() {
-        let (temp, _storage, executor, package) = fixture();
-        let layout = executor.require_layout().unwrap();
-        let inner = executor.storage().open_mutation_session(layout).unwrap();
-        let mut session = RecaptureRaceSession {
-            inner,
-            captures: 0,
-            config_path: temp.path().join(".jit/config.toml"),
-        };
-
-        let result = executor.prepare_profile(&mut session, &package, &MutationContext::preview());
-
-        assert!(result.is_err());
-        assert!(!temp.path().join("docs/profile.txt").exists());
-        assert!(!temp.path().join(".jit/profiles").exists());
-    }
-
-    #[test]
-    fn test_profile_preparation_retries_when_final_proposed_closure_expands() {
+    fn test_profile_preparation_reads_a_changed_closure_in_its_next_round() {
         let temp = crate::test_utils::profiled_repository_fixture("jit-default", "packages", None)
             .unwrap();
         // The verified repository already carries the workflow package's
@@ -5394,22 +5316,21 @@ template = true
             .with_layout(discover_repository_layout(temp.path(), storage.root()).unwrap());
         let layout = executor.require_layout().unwrap();
         let inner = executor.storage().open_mutation_session(layout).unwrap();
-        let mut session = FinalClosureRaceSession {
+        let mut session = ClosureRaceSession {
             inner,
             captures: 0,
             config_path: temp.path().join(".jit/config.toml"),
             source_path: temp.path().join("RACE.md"),
         };
 
-        let first = executor
+        executor
             .prepare_profile(&mut session, &package, &MutationContext::preview())
             .unwrap();
-        assert!(first.is_none(), "an expanded final closure must retry");
 
         let (plan, _) = executor
             .prepare_profile(&mut session, &package, &MutationContext::preview())
             .unwrap()
-            .expect("the repeated capture includes the new source");
+            .expect("the next round prepares over the changed closure");
         assert!(plan
             .image()
             .capture_spec()
@@ -8654,8 +8575,8 @@ target = "docs/guide.md"
         let budget = claim_capture_budget(std::slice::from_ref(&target));
         assert_eq!(
             budget.max_bytes,
-            record_listing_capture_budget().max_bytes,
-            "named target payloads have the listing capture's unbounded ceiling"
+            record_capture_budget().max_bytes,
+            "named target payloads have the record reading's unbounded ceiling"
         );
         assert_eq!(budget.max_listings, 1);
         assert_eq!(budget.max_depth, target.relative().depth());
@@ -8668,8 +8589,8 @@ target = "docs/guide.md"
         let budget = record_capture_budget();
         assert_eq!(
             budget.max_bytes,
-            record_listing_capture_budget().max_bytes,
-            "named record payloads have the listing capture's unbounded ceiling"
+            u64::MAX,
+            "named record payloads are unbounded"
         );
         assert_eq!(budget.max_listings, 1);
         assert_eq!(
@@ -8774,22 +8695,6 @@ target = "docs/guide.md"
         );
     }
 
-    /// The capture that learns how many records there are reads no payload, so
-    /// nothing it charges is a payload it could be refused for.
-    ///
-    /// A byte bound stated over the listing would be a bound on the very
-    /// inventory it exists to discover, so what bounds it is its shape: one
-    /// listing, at the depth records are published at.
-    #[test]
-    fn test_record_listing_capture_budget_bounds_the_listing_rather_than_a_payload() {
-        let budget = record_listing_capture_budget();
-
-        assert_eq!(budget.max_listings, 1);
-        assert_eq!(budget.max_bytes, u64::MAX);
-        assert_eq!(budget.max_depth, record_capture_budget().max_depth);
-        assert_eq!(budget.max_bytes, record_capture_budget().max_bytes);
-    }
-
     /// The reading the agreement check actually asks for — the record listing,
     /// one record per recorded profile, and a claimed target as deep as a
     /// manifest may declare one — is a reading its budget admits.
@@ -8819,7 +8724,7 @@ target = "docs/guide.md"
         let deepest_claim = VirtualPath::from_root(RepositoryRootClass::Worktree, deep(0))
             .expect("a worktree target");
         let undeclared = VirtualPath::worktree("not/claimed.txt").unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [],
             claim_capture_budget(std::slice::from_ref(&deepest_claim)),
         )

@@ -668,6 +668,19 @@ fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
     out
 }
 
+/// The captured event log's length and the bytes after its last newline, from
+/// a whole or a tail read. An unterminated final line longer than the tail
+/// window is judged on the window's bytes.
+fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
+    let (length, end) = match image.entry(&VirtualPath::EVENTS)? {
+        RepositoryEntry::FileTail { tail, .. } => (tail.length(), tail.tail()),
+        _ => captured_file_bytes(image, &VirtualPath::EVENTS)?
+            .map_or((0, &[][..]), |log| (log.len() as u64, log)),
+    };
+    let final_line = end.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
+    Ok((length, final_line))
+}
+
 /// Read the captured bytes of a `Data(...)` file entry, or `None` when absent.
 fn captured_file_bytes<'a>(
     image: &'a RepositoryImage,
@@ -1221,8 +1234,7 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
-    let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
+    let (length, final_line) = captured_log_end(image)?;
     // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
     // a malformed, unterminated partial line only when the line IMMEDIATELY following
     // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
@@ -1269,7 +1281,7 @@ fn compose_event_action(
     Ok(Some(RepositoryAction::AppendEvents {
         owner: OWNER.to_string(),
         expected: expected_of(image, &VirtualPath::EVENTS)?,
-        offset: log.len() as u64,
+        offset: length,
         bytes: compose_events(final_line, &lines),
     }))
 }
@@ -1444,7 +1456,7 @@ mod tests {
     /// Build an image over a fixed set of `Data(...)` entries.
     fn image_with(entries: Vec<(VirtualPath, RepositoryEntry)>) -> RepositoryImage {
         let paths: Vec<VirtualPath> = entries.iter().map(|(path, _)| path.clone()).collect();
-        let spec = CaptureSpec::phase_one(paths, budget()).unwrap();
+        let spec = CaptureSpec::new(paths, budget()).unwrap();
         RepositoryImage::close(
             layout(),
             spec,
@@ -1788,6 +1800,55 @@ mod tests {
         assert!(
             context.ids.sampled_seed().is_none(),
             "a no-op under an override must not draw the production random seed"
+        );
+    }
+
+    /// An append over a log read as its tail lands at the log's length and
+    /// expects that tail, with no whole-log digest behind it.
+    #[test]
+    fn test_event_append_over_a_tail_read_offsets_at_its_length_and_expects_the_tail() {
+        let log = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+        let tail = crate::repository_state::EventLogTail::of_bytes(&log);
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        let entry = RepositoryEntry::FileTail {
+            tail: tail.clone(),
+            mode: FileMode::Regular,
+        };
+        let image = RepositoryImage::close(
+            layout(),
+            spec,
+            BTreeMap::from([(VirtualPath::EVENTS, entry)]),
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap();
+
+        let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
+            .unwrap()
+            .expect("a non-empty audit append composes an action");
+
+        let RepositoryAction::AppendEvents {
+            offset,
+            expected,
+            bytes,
+            ..
+        } = action
+        else {
+            unreachable!("an audit append appends to the event log");
+        };
+        assert_eq!(offset, log.len() as u64);
+        assert_eq!(
+            expected,
+            ExpectedPreimage::FileTail {
+                tail,
+                mode: FileMode::Regular
+            }
+        );
+        assert!(
+            !bytes.starts_with(b"\n"),
+            "a terminated log needs no separator"
         );
     }
 

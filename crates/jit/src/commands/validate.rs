@@ -127,18 +127,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     }
 
     /// Capture the bounded whole-repository validation image through the recovered
-    /// session (plan §2 two-phase capture, D14).
-    ///
-    /// Phase one reads the engine registries, the repository index, and the event
-    /// log; phase two adds the complete validation closure
-    /// ([`validate_capture_closure`](crate::repository_state::validate_capture_closure)):
-    /// every issue record and the complete issues listing, referenced rule schemas,
-    /// and every projection and item-kind source. Phase three adds every issue's
-    /// document and pinned-document evidence plus each derived plan-document path,
-    /// enumerated from the captured issue records — the command boundary owns the
-    /// planning-node resolution the pure closure cannot express. A read-set change
-    /// under the held session yields a typed retryable conflict, so the capture
-    /// repeats both phases rather than grafting into a stale image.
+    /// session, in the one round
+    /// [`capture_proposed_base_inner`](Self::capture_proposed_base_inner) reads.
     fn capture_validation_image(&self) -> Result<crate::repository_state::RepositoryImage> {
         self.capture_validation_image_with(&std::collections::BTreeMap::new())
     }
@@ -177,8 +167,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         )
     }
 
-    /// One bounded two-phase capture attempt of the whole-repository validation
-    /// base under an already-held session.
+    /// One bounded capture round of the whole-repository validation base under an
+    /// already-held session.
     ///
     /// Returns the captured PRE-overlay base (the caller applies any overlay for
     /// validation and reads it for its own delta), `Ok(None)` on a retryable
@@ -186,9 +176,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// the proposed declarations (so a proposed init/profile state captures what
     /// its passes read); `extra_paths` discovers additional delta targets (init
     /// schema files, profile assets, directories, provenance) into the base so a
-    /// subsequent `apply` finds each action's captured preimage. Sharing one held
-    /// session lets a caller capture the base and apply its delta under the same
-    /// guard without a second, deadlock-prone session.
+    /// subsequent `apply` finds each action's captured preimage; `start` is an
+    /// image this session's round has already read, which the base grows from.
+    /// Sharing one held session lets a caller capture the base and apply its
+    /// delta under the same guard without a second, deadlock-prone session.
     pub(crate) fn capture_proposed_base(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
@@ -197,14 +188,15 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&str>,
+        start: Option<crate::repository_state::RepositoryImage>,
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         self.capture_proposed_base_inner(
             session,
+            start,
             overrides,
             extra_paths,
             &[],
-            precheck_target,
+            None,
             DocumentCapture::All,
             false,
         )
@@ -225,6 +217,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
+            None,
             &std::collections::BTreeMap::new(),
             extra_paths,
             &[],
@@ -248,34 +241,32 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
-        let fixed = || vec![VirtualPath::CONFIG, VirtualPath::INDEX];
-        let Some(registries) = capture_or_retry(
-            session.capture(CaptureSpec::phase_one(fixed(), MUTATION_CAPTURE_BUDGET)?),
-        )?
+        let normalized = requested.to_lowercase().replace('-', "");
+        let mut candidates = Vec::new();
+        let spec = CaptureSpec::new(
+            [VirtualPath::CONFIG, VirtualPath::INDEX],
+            MUTATION_CAPTURE_BUDGET,
+        )?;
+        let Some(image) = super::capture_discovering(session, spec, |image, spec| {
+            let index_bytes = image
+                .file_bytes(&VirtualPath::INDEX)?
+                .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
+            candidates = crate::storage::json::parse_repository_index(index_bytes)?
+                .all_ids
+                .into_iter()
+                .filter(|id| {
+                    id == requested || id.to_lowercase().replace('-', "").starts_with(&normalized)
+                })
+                .collect();
+            Ok(spec.discover_paths(
+                candidates
+                    .iter()
+                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                    .collect::<Result<Vec<_>, _>>()?,
+            )?)
+        })?
         else {
             return Ok(None);
-        };
-        let index_bytes = registries
-            .file_bytes(&VirtualPath::INDEX)?
-            .ok_or_else(|| anyhow!("captured image has no .jit/index.json"))?;
-        let normalized = requested.to_lowercase().replace('-', "");
-        let candidates = crate::storage::json::parse_repository_index(index_bytes)?
-            .all_ids
-            .into_iter()
-            .filter(|id| {
-                id == requested || id.to_lowercase().replace('-', "").starts_with(&normalized)
-            })
-            .collect::<Vec<_>>();
-        let mut spec = CaptureSpec::phase_one(fixed(), MUTATION_CAPTURE_BUDGET)?;
-        spec.discover_paths(
-            candidates
-                .iter()
-                .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                .collect::<std::result::Result<Vec<_>, _>>()?,
-        )?;
-        let image = match capture_or_retry(session.capture(spec))? {
-            Some(image) if image.has_stable_overlap(&registries) => image,
-            Some(_) | None => return Ok(None),
         };
         let effective =
             |image: &crate::repository_state::RepositoryImage,
@@ -296,6 +287,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<crate::repository_state::RepositoryImage>> {
         self.capture_proposed_base_inner(
             session,
+            None,
             &std::collections::BTreeMap::new(),
             &[],
             &[],
@@ -306,35 +298,20 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         .map(|captured| captured.map(|(image, _)| image))
     }
 
-    /// The whole-repository validation base plus a complete listing of each
-    /// path in `extra_listings`.
+    /// One capture round of the base, from `start` when the caller has read
+    /// part of it already.
     ///
-    /// Derived-state repair lists `.jit/profiles/` because the applied-profile
-    /// records it holds are the repository's own statement of which profile
-    /// packages, if any, repair needs; an exact-path closure cannot express a
-    /// question whose answer is the directory's occupants.
-    fn capture_proposed_base_with_listings(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        extra_paths: &[crate::repository_state::VirtualPath],
-        extra_listings: &[crate::repository_state::VirtualPath],
-    ) -> Result<Option<crate::repository_state::RepositoryImage>> {
-        self.capture_proposed_base_inner(
-            session,
-            &std::collections::BTreeMap::new(),
-            extra_paths,
-            extra_listings,
-            None,
-            DocumentCapture::All,
-            false,
-        )
-        .map(|captured| captured.map(|(image, _)| image))
-    }
-
+    /// The round reads the registries, the event log (as its length and tail
+    /// for a mutation), the profile records,
+    /// and the caller's paths and listings; then the validation closure those
+    /// registries plan; then what the captured issues name: the documents
+    /// `documents` admits, and a precheck target's prompt files and gate-run
+    /// results.
     #[allow(clippy::too_many_arguments)]
     fn capture_proposed_base_inner(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
+        start: Option<crate::repository_state::RepositoryImage>,
         overrides: &std::collections::BTreeMap<
             crate::repository_state::VirtualPath,
             Option<Vec<u8>>,
@@ -346,7 +323,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
-            validate_capture_closure, CaptureBudget, CaptureSpec, VirtualPath,
+            validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
 
         // An archive citation scan may enumerate every directory below its
@@ -361,190 +338,129 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             },
             ..MUTATION_CAPTURE_BUDGET
         };
-        // Phase one reads what plans the closure; the event log joins the image
-        // from phase two on, since nothing in closure planning reads it.
-        let planning_registries = || {
-            vec![
-                VirtualPath::CONFIG,
-                VirtualPath::INVARIANTS,
-                VirtualPath::RULES,
-                VirtualPath::GATES,
-                VirtualPath::TEMPLATES,
-                VirtualPath::INDEX,
-            ]
+        let base = |spec: &mut CaptureSpec| -> Result<()> {
+            spec.discover_paths(
+                [
+                    VirtualPath::CONFIG,
+                    VirtualPath::INVARIANTS,
+                    VirtualPath::RULES,
+                    VirtualPath::GATES,
+                    VirtualPath::TEMPLATES,
+                    VirtualPath::INDEX,
+                ]
+                .into_iter()
+                .chain(extra_paths.iter().cloned()),
+            )?;
+            // A mutation appends to the log, so it reads the log's length and
+            // tail; validation parses it, so it reads it whole.
+            match documents {
+                DocumentCapture::PlanOnly => spec.discover_tail(VirtualPath::EVENTS)?,
+                _ => spec.discover_paths([VirtualPath::EVENTS])?,
+            }
+            Ok(spec.discover_listings(
+                extra_listings
+                    .iter()
+                    .cloned()
+                    .chain([VirtualPath::PROFILES]),
+            )?)
         };
         // Effective bytes at a repo-relative path: the override (create/replace or
         // proposed absence) when present, otherwise the captured base bytes.
-        let effective = |image: &crate::repository_state::RepositoryImage,
-                         repo_rel: &str|
-         -> Result<Option<Vec<u8>>> {
+        let effective = |image: &RepositoryImage, repo_rel: &str| -> Result<Option<Vec<u8>>> {
             let vpath = image.layout().classify_repository_relative(repo_rel)?;
             match overrides.get(&vpath) {
                 Some(value) => Ok(value.clone()),
                 None => super::image_repo_bytes(image, repo_rel),
             }
         };
-        let Some(image_one) = capture_or_retry(
-            session.capture(CaptureSpec::phase_one(planning_registries(), budget)?),
-        )?
-        else {
-            return Ok(None);
-        };
-        // Closure planning is best-effort: a malformed registry cannot fail the
-        // capture, because validation itself is the authority that reports it.
-        // A bad config/index/rules yields a conservative closure (its projection,
-        // item-kind, issue, and schema entries drop out), and the subsequent
-        // `validate_repository` pass surfaces the parse error as a finding.
-        let config = effective_config(&image_one, &effective)
-            .unwrap_or_else(|_| empty_materialization_config());
-        let all_ids = effective_index_ids(&image_one, &effective).unwrap_or_default();
-        let rules_text = effective(&image_one, ".jit/rules.toml")?
-            .map(String::from_utf8)
-            .transpose()?;
-        let schema_rules = rules_text.as_deref().filter(|content| {
-            crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
-        });
-        let closure =
-            validate_capture_closure(image_one.layout(), &config, &all_ids, schema_rules)?;
-
-        let mut spec = CaptureSpec::phase_one(planning_registries(), budget)?;
-        spec.discover_paths([VirtualPath::EVENTS])?;
-        spec.discover_paths(closure.paths)?;
-        for listing in &closure.listings {
-            spec.discover_listing(listing.clone())?;
-        }
-        // Profile composition needs the per-package target provenance to tell a
-        // package occupant from repository-authored content. The profile directory
-        // is listed for every captured image, and its records are added to the
-        // exact phase-three read set from that one listing.
-        let profiles_dir = VirtualPath::PROFILES;
-        spec.discover_listing(profiles_dir)?;
-        let mut phase_three = spec.clone();
-        let image_two = match capture_or_retry(session.capture(spec))? {
-            Some(image) if image.has_stable_overlap(&image_one) => image,
-            Some(_) | None => return Ok(None),
-        };
-        if let Some(listing) = image_two.listing_fingerprints().get(&VirtualPath::PROFILES) {
-            phase_three.discover_paths(
-                listing
-                    .children()
-                    .keys()
-                    .map(|name| VirtualPath::data(format!("profiles/{name}")))
-                    .collect::<Result<Vec<_>, _>>()?,
-            )?;
-        }
-
-        // A mutation derives from exactly these issues, so they are parsed once,
-        // with the strict reader, and handed back with the image; a repository
-        // without an index yet has none. Validation parses the overlaid set
-        // leniently and reports defects as findings.
-        let issues = if documents == DocumentCapture::PlanOnly
-            && image_two.file_bytes(&VirtualPath::INDEX)?.is_some()
-        {
-            super::captured_active_issues(&image_two)?
-        } else {
-            effective_issues(&image_two, &all_ids, &effective)?
-        };
-        let mut full_config = config.clone();
-        full_config.templates = effective_templates(&image_two, &config, &effective)?;
-        let precheck = match precheck_target {
-            Some(raw_target) => {
-                let target = super::resolve_issue_from_capture(&issues, raw_target)?;
-                let issue = issues
-                    .iter()
-                    .find(|issue| issue.id == target)
-                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
-                let gates = match effective(&image_two, ".jit/gates.toml")? {
-                    Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
-                    None => crate::declarations::GateRegistry::default(),
-                };
-                Some((issue, gates))
-            }
-            None => None,
-        };
-        let documents = match &precheck {
-            Some((issue, gates))
-                if issue
-                    .gates_required
-                    .iter()
-                    .filter_map(|key| gates.gates.get(key))
-                    .any(|gate| {
-                        gate.stage == crate::declarations::GateStage::Precheck
-                            && super::is_broad_builtin_precheck(gate)
-                    }) =>
-            {
-                DocumentCapture::All
-            }
-            _ => documents,
-        };
-        let (worktree_docs, pinned) = document_capture_closure(&issues, &full_config, documents)?;
-        phase_three.discover_paths(worktree_docs)?;
+        let mut issues = None::<Vec<Issue>>;
         let mut capture_precheck_history = false;
-        if let Some((issue, gates)) = precheck {
-            capture_precheck_history = issue
-                .gates_required
-                .iter()
-                .filter_map(|key| gates.gates.get(key))
-                .any(|gate| {
-                    gate.stage == crate::declarations::GateStage::Precheck
-                        && gate.mode == crate::declarations::GateMode::Auto
-                        && gate
-                            .checker
-                            .as_ref()
-                            .is_some_and(super::checker_consumes_run_history)
-                });
-            let prompt_paths = issue
-                .gates_required
-                .iter()
-                .filter_map(|key| gates.gates.get(key))
-                .filter(|gate| {
-                    gate.stage == crate::declarations::GateStage::Precheck
-                        && gate.mode == crate::declarations::GateMode::Auto
-                })
-                .filter_map(|gate| gate.checker.as_ref())
-                .filter_map(|checker| match checker {
-                    crate::declarations::GateChecker::Exec {
-                        pass_context: true,
-                        prompt_file: Some(path),
-                        ..
-                    } => Some(path),
-                    _ => None,
-                });
-            phase_three.discover_paths(
-                prompt_paths
-                    .map(|path| {
-                        image_two
-                            .layout()
-                            .classify_repository_relative(path)
-                            .map_err(|_| {
-                                anyhow!("prompt_file '{}' resolves outside the repository", path)
-                            })
-                    })
-                    .collect::<Result<Vec<_>>>()?,
-            )?;
-            if capture_precheck_history {
-                let gate_runs = VirtualPath::GATE_RUNS;
-                phase_three.discover_paths([gate_runs.clone()])?;
-                phase_three.discover_listing(gate_runs)?;
+        let mut discover = |image: &RepositoryImage, spec: &mut CaptureSpec| -> Result<()> {
+            base(spec)?;
+            if spec != image.capture_spec() {
+                return Ok(());
             }
-        }
-        phase_three.discover_paths(extra_paths.iter().cloned())?;
-        for listing in extra_listings {
-            phase_three.discover_listing(listing.clone())?;
-        }
-        for (revision, path) in pinned {
-            phase_three.discover_pinned(revision, path)?;
-        }
-        let image_three = match capture_or_retry(session.capture(phase_three.clone()))? {
-            Some(base) if base.has_stable_overlap(&image_two) => base,
-            Some(_) | None => return Ok(None),
+            if let Some(listing) = image.listing_fingerprints().get(&VirtualPath::PROFILES) {
+                spec.discover_paths(
+                    listing
+                        .children()
+                        .keys()
+                        .map(|name| VirtualPath::data(format!("profiles/{name}")))
+                        .collect::<Result<Vec<_>, _>>()?,
+                )?;
+            }
+            // Closure planning is best-effort: a malformed registry cannot fail
+            // the capture, because validation itself is the authority that
+            // reports it. A bad config/index/rules yields a conservative closure
+            // (its projection, item-kind, issue, and schema entries drop out),
+            // and the subsequent `validate_repository` pass surfaces the parse
+            // error as a finding.
+            let config = effective_config(image, &effective)
+                .unwrap_or_else(|_| empty_materialization_config());
+            let all_ids = effective_index_ids(image, &effective).unwrap_or_default();
+            let rules_text = effective(image, ".jit/rules.toml")?
+                .map(String::from_utf8)
+                .transpose()?;
+            let schema_rules = rules_text.as_deref().filter(|content| {
+                crate::declarations::rules::RuleSet::schema_requests(content).is_ok()
+            });
+            let closure =
+                validate_capture_closure(image.layout(), &config, &all_ids, schema_rules)?;
+            let read = image.capture_spec();
+            let closure_read = closure.paths.iter().all(|path| read.contains_path(path))
+                && closure
+                    .listings
+                    .iter()
+                    .all(|listing| read.listings().contains(listing));
+            // The base already reads the log in the mode this capture needs.
+            spec.discover_paths(
+                closure
+                    .paths
+                    .into_iter()
+                    .filter(|path| *path != VirtualPath::EVENTS),
+            )?;
+            spec.discover_listings(closure.listings)?;
+            if !closure_read {
+                return Ok(());
+            }
+            if issues.is_none() {
+                // A mutation derives from exactly these issues, so they are
+                // parsed once, with the strict reader, and handed back with the
+                // image; a repository without an index yet has none. Validation
+                // parses the overlaid set leniently and reports defects as
+                // findings.
+                let parsed = if documents == DocumentCapture::PlanOnly
+                    && image.file_bytes(&VirtualPath::INDEX)?.is_some()
+                {
+                    super::captured_active_issues(image)?
+                } else {
+                    effective_issues(image, &all_ids, &effective)?
+                };
+                capture_precheck_history = discover_issue_closure(
+                    image,
+                    spec,
+                    &parsed,
+                    &config,
+                    &effective,
+                    precheck_target,
+                    documents,
+                )?;
+                issues = Some(parsed);
+            }
+            if capture_precheck_history {
+                super::discover_gate_run_results(image, spec)?;
+            }
+            Ok(())
         };
-        let image = if capture_precheck_history {
-            super::capture_gate_run_results(session, image_three)?
-        } else {
-            Some(image_three)
+        let image = match start {
+            Some(image) => super::grow_discovering(session, image, &mut discover)?,
+            None => {
+                let mut spec = CaptureSpec::new([], budget)?;
+                base(&mut spec)?;
+                super::capture_discovering(session, spec, &mut discover)?
+            }
         };
-        Ok(image.map(|image| (image, issues)))
+        Ok(image.zip(issues))
     }
 
     /// Capture the validation image and return the full whole-repository report.
@@ -749,8 +665,19 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     .map(|(record_path, _)| Ok(record_path.clone())),
             )
             .collect::<Result<Vec<_>>>()?;
-        let Some(image) =
-            self.capture_proposed_base_with_listings(session, &profile_paths, listings)?
+        // The whole-repository base plus the profile records' listing: the
+        // records are the repository's own statement of which packages repair
+        // needs, a question an exact-path closure cannot express.
+        let Some((image, _)) = self.capture_proposed_base_inner(
+            session,
+            None,
+            &std::collections::BTreeMap::new(),
+            &profile_paths,
+            listings,
+            None,
+            DocumentCapture::All,
+            false,
+        )?
         else {
             return Ok(None);
         };
@@ -1217,7 +1144,7 @@ fn effective_issues(
 }
 
 /// Parse the (possibly overlaid) template registry, needed to derive plan-document
-/// paths for the phase-three document closure.
+/// paths for the document closure.
 ///
 /// Best-effort like the rest of closure planning: a malformed `templates.toml`
 /// yields an empty registry (no plan-document paths), and the subsequent
@@ -1243,7 +1170,88 @@ fn effective_templates(
     })
 }
 
-/// The phase-three document closure: working-tree document/plan paths to capture,
+/// Add what the captured `issues` name to `spec`: the documents `documents`
+/// admits, all of them when a precheck target's gate validates the whole
+/// repository, and that target's precheck prompt files.
+///
+/// Returns whether a precheck gate consumes the gate-run history, which the
+/// round then reads as well.
+fn discover_issue_closure(
+    image: &crate::repository_state::RepositoryImage,
+    spec: &mut crate::repository_state::CaptureSpec,
+    issues: &[Issue],
+    config: &JitConfig,
+    effective: &Effective<'_>,
+    precheck_target: Option<&str>,
+    documents: DocumentCapture,
+) -> Result<bool> {
+    use crate::declarations::{GateChecker, GateMode, GateStage};
+
+    let mut full_config = config.clone();
+    full_config.templates = effective_templates(image, config, effective)?;
+    let precheck = match precheck_target {
+        Some(raw_target) => {
+            let target = super::resolve_issue_from_capture(issues, raw_target)?;
+            let issue = issues
+                .iter()
+                .find(|issue| issue.id == target)
+                .ok_or_else(|| crate::storage::IssueNotFoundError::new(&target))?;
+            let gates = match effective(image, ".jit/gates.toml")? {
+                Some(bytes) => crate::declarations::parse_gate_registry(&bytes)?,
+                None => crate::declarations::GateRegistry::default(),
+            };
+            issue
+                .gates_required
+                .iter()
+                .filter_map(|key| gates.gates.get(key))
+                .filter(|gate| gate.stage == GateStage::Precheck)
+                .cloned()
+                .collect()
+        }
+        None => Vec::new(),
+    };
+    // A broad precheck validates the whole repository, so it reads what
+    // validation reads.
+    let documents = match precheck.iter().any(super::is_broad_builtin_precheck) {
+        true => {
+            spec.discover_paths([crate::repository_state::VirtualPath::EVENTS])?;
+            DocumentCapture::All
+        }
+        false => documents,
+    };
+    let (worktree_docs, pinned) = document_capture_closure(issues, &full_config, documents)?;
+    spec.discover_paths(worktree_docs)?;
+    for (revision, path) in pinned {
+        spec.discover_pinned(revision, path)?;
+    }
+    let automated = || {
+        precheck
+            .iter()
+            .filter(|gate| gate.mode == GateMode::Auto)
+            .filter_map(|gate| gate.checker.as_ref())
+    };
+    spec.discover_paths(
+        automated()
+            .filter_map(|checker| match checker {
+                GateChecker::Exec {
+                    pass_context: true,
+                    prompt_file: Some(path),
+                    ..
+                } => Some(path),
+                _ => None,
+            })
+            .map(|path| {
+                image
+                    .layout()
+                    .classify_repository_relative(path)
+                    .map_err(|_| anyhow!("prompt_file '{}' resolves outside the repository", path))
+            })
+            .collect::<Result<Vec<_>>>()?,
+    )?;
+    Ok(automated().any(super::checker_consumes_run_history))
+}
+
+/// The document closure: working-tree document/plan paths to capture,
 /// plus pinned-document `(revision, path)` evidence requests.
 type DocumentClosure = (
     Vec<crate::repository_state::VirtualPath>,
@@ -1288,7 +1296,7 @@ enum DocumentCapture {
     None,
 }
 
-/// Enumerate the phase-three document and plan-document capture closure that
+/// Enumerate the document and plan-document capture closure that
 /// `documents` admits.
 ///
 /// Returns every working-tree document path to capture and every pinned-document
@@ -4587,5 +4595,118 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
+    }
+
+    /// A session counting the capture rounds it opens.
+    struct RoundCounter(Box<dyn crate::storage::RepositoryMutationSession>, usize);
+
+    mod round_counter {
+        use super::RoundCounter;
+        use crate::repository_state::{CaptureSpec, MaterializationPlan, RepositoryImage};
+        use crate::storage::{RepositoryApplyOutcome, RepositoryStateStoreError as Error};
+
+        impl crate::storage::RepositoryMutationSession for RoundCounter {
+            fn layout(&self) -> &crate::repository_state::RepositoryLayout {
+                self.0.layout()
+            }
+
+            fn recovery_report(&self) -> &crate::storage::RecoveryDispatchReport {
+                self.0.recovery_report()
+            }
+
+            fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, Error> {
+                self.1 += 1;
+                self.0.capture(spec)
+            }
+
+            fn extend(
+                &mut self,
+                image: RepositoryImage,
+                spec: CaptureSpec,
+            ) -> Result<RepositoryImage, Error> {
+                self.0.extend(image, spec)
+            }
+
+            fn apply(
+                &mut self,
+                plan: &MaterializationPlan,
+            ) -> Result<RepositoryApplyOutcome, Error> {
+                self.0.apply(plan)
+            }
+        }
+    }
+
+    /// An executor holding two issues, the first's id, and a counter over a
+    /// fresh session.
+    fn counted_session() -> (
+        CommandExecutor<crate::storage::InMemoryStorage>,
+        String,
+        RoundCounter,
+    ) {
+        use crate::commands::test_helpers::{seed_issue, setup};
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let issues = ["Target", "Other"]
+            .map(|title| crate::domain::types::fixture_issue(title.to_string(), String::new()));
+        let target_id = issues[0].id.clone();
+        issues
+            .into_iter()
+            .for_each(|issue| seed_issue(executor.storage(), issue));
+        let layout = executor.require_layout().unwrap();
+        let session = executor.storage().open_mutation_session(layout).unwrap();
+        (executor, target_id, RoundCounter(session, 0))
+    }
+
+    /// The base grows through the session's one round: what the registries
+    /// name is read beside them, never in a round of its own.
+    #[test]
+    fn test_capture_mutation_base_reads_in_one_round() {
+        let (executor, target_id, mut counter) = counted_session();
+
+        let base = executor
+            .capture_mutation_base(&mut counter, &[], Some(&target_id))
+            .unwrap()
+            .expect("a settled capture");
+
+        assert_eq!(base.issues.len(), 2);
+        assert_eq!(counter.1, 1);
+    }
+
+    /// A mutation reads the log it appends to as its length and tail, while
+    /// validation, which parses it, reads it whole.
+    #[test]
+    fn test_capture_mutation_base_reads_the_event_log_as_its_tail() {
+        use crate::repository_state::{ReadMode, VirtualPath};
+
+        let (executor, _, mut counter) = counted_session();
+
+        let mutation = executor
+            .capture_mutation_base(&mut counter, &[], None)
+            .unwrap()
+            .expect("a settled capture")
+            .image;
+        let validation = executor
+            .capture_proposed_base(&mut counter, &std::collections::BTreeMap::new(), &[], None)
+            .unwrap()
+            .expect("a settled capture");
+
+        let mode = |image: &crate::repository_state::RepositoryImage| {
+            image.capture_spec().read_mode(&VirtualPath::EVENTS)
+        };
+        assert_eq!(mode(&mutation), Some(ReadMode::Tail));
+        assert_eq!(mode(&validation), Some(ReadMode::Whole));
+    }
+
+    #[test]
+    fn test_capture_mutation_preflight_reads_in_one_round() {
+        let (executor, target_id, mut counter) = counted_session();
+
+        executor
+            .capture_mutation_preflight(&mut counter, &target_id[..8])
+            .unwrap()
+            .expect("a settled capture");
+
+        assert_eq!(counter.1, 1);
     }
 }

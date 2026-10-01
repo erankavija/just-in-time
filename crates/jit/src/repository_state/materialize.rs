@@ -92,19 +92,19 @@ pub(crate) fn assemble_config_from_declarations(
     Ok(declarations.materialization_config(invariants))
 }
 
-/// Enumerate the phase-two capture closure for `jit project render`.
+/// Enumerate the capture closure for `jit project render`.
 ///
-/// Given the phase-one configuration and the selected projection names (an empty
+/// Given the captured configuration and the selected projection names (an empty
 /// slice selects every declared projection), this returns every additional
 /// canonical path the render must capture so it reads only image-projected
 /// content: the four engine registries (`config.toml`, `invariants.toml`,
 /// `rules.toml`, `gates.toml`), each selected projection's documentation target
 /// (read for region-mode splicing), each projected kind's declared source, and —
-/// when the phase-one `rules.toml` bytes are supplied — the schema files the
+/// when the captured `rules.toml` bytes are supplied — the schema files the
 /// effective rule set references (needed to parse the effective rules the
 /// full-style rule/gate view renders). The caller feeds these to
-/// [`CaptureSpec::discover_paths`](super::CaptureSpec::discover_paths) after phase
-/// one; the resulting closure is what `derive_project_render` reads from.
+/// [`CaptureSpec::discover_paths`](super::CaptureSpec::discover_paths) once the
+/// registries are read; the resulting closure is what `derive_project_render` reads from.
 ///
 /// This planner enumerates exactly the paths
 /// [`compose_configured_projections`] and the effective-rule assembly read, so a
@@ -174,11 +174,10 @@ pub fn render_capture_closure(
     Ok(paths)
 }
 
-/// The complete phase-two capture closure for whole-repository validation.
+/// The complete capture closure for whole-repository validation.
 ///
 /// The exact bounded set the validation pipeline reads from the captured image,
-/// so validation touches no live filesystem path outside the closure (plan §2
-/// two-phase capture, D14). [`paths`](ValidationCaptureClosure::paths) enumerates
+/// so validation touches no live filesystem path outside the closure. [`paths`](ValidationCaptureClosure::paths) enumerates
 /// exact files; [`listings`](ValidationCaptureClosure::listings) enumerates the
 /// complete directory listings validation reconciles against the index.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -189,10 +188,10 @@ pub struct ValidationCaptureClosure {
     pub listings: Vec<VirtualPath>,
 }
 
-/// Enumerate the phase-two validation closure from the phase-one declarations.
+/// Enumerate the validation closure from the captured declarations.
 ///
-/// Given the phase-one configuration, the index's `all_ids`, and (when present)
-/// the phase-one `rules.toml` bytes, this returns every additional canonical path
+/// Given the captured configuration, the index's `all_ids`, and (when present)
+/// the captured `rules.toml` bytes, this returns every additional canonical path
 /// and listing whole-repository validation reads so it consumes only
 /// image-projected content: the engine registries (`config.toml`,
 /// `invariants.toml`, `rules.toml`, `gates.toml`, `templates.toml`), the
@@ -708,8 +707,6 @@ kind = "advisory"
     /// everything else Worktree). A `None` value captures the path as absent.
     fn image(files: &[(&str, Option<&str>)]) -> RepositoryImage {
         let layout = layout();
-        let mut data_paths = Vec::new();
-        let mut worktree_paths = Vec::new();
         let mut entries = BTreeMap::new();
         for (repo_rel, contents) in files {
             let vpath = layout.classify_repository_relative(repo_rel).unwrap();
@@ -720,14 +717,6 @@ kind = "advisory"
                 },
                 None => RepositoryEntry::Absent,
             };
-            match vpath.root_class() {
-                crate::repository_state::RepositoryRootClass::Data => {
-                    data_paths.push(vpath.clone())
-                }
-                crate::repository_state::RepositoryRootClass::Worktree => {
-                    worktree_paths.push(vpath.clone())
-                }
-            }
             entries.insert(vpath, entry);
         }
         let budget = CaptureBudget {
@@ -735,10 +724,7 @@ kind = "advisory"
             max_bytes: 1 << 20,
             max_depth: 8,
         };
-        // Data declaration roots enter phase one; worktree targets are phase-two
-        // discovered, matching the two-phase capture contract.
-        let mut spec = CaptureSpec::phase_one(data_paths, budget).unwrap();
-        spec.discover_paths(worktree_paths).unwrap();
+        let spec = CaptureSpec::new(entries.keys().cloned(), budget).unwrap();
         RepositoryImage::close(
             layout,
             spec,
@@ -751,12 +737,8 @@ kind = "advisory"
     }
 
     fn absent_image(paths: Vec<VirtualPath>) -> RepositoryImage {
-        let (data_paths, worktree_paths): (Vec<_>, Vec<_>) =
-            paths.iter().cloned().partition(|path| {
-                path.root_class() == crate::repository_state::RepositoryRootClass::Data
-            });
-        let mut spec = CaptureSpec::phase_one(
-            data_paths,
+        let spec = CaptureSpec::new(
+            paths.iter().cloned(),
             CaptureBudget {
                 max_listings: 0,
                 max_bytes: 1 << 20,
@@ -764,7 +746,6 @@ kind = "advisory"
             },
         )
         .unwrap();
-        spec.discover_paths(worktree_paths).unwrap();
         RepositoryImage::close(
             layout(),
             spec,

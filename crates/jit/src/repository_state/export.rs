@@ -3,8 +3,8 @@
 use super::{
     CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationIntent,
     MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, RepositorySeed,
-    RepositorySeedKind, RootRelativePath, SeedError, VirtualPath,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind,
+    RootRelativePath, SeedError, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
@@ -102,16 +102,7 @@ impl RepositoryExportIntent {
                 paths.insert(tree_path(&self.target, relative)?);
             }
         }
-        let fixed = paths
-            .iter()
-            .filter(|path| path.root_class() == RepositoryRootClass::Data)
-            .cloned();
-        let mut spec = CaptureSpec::phase_one(fixed, budget)?;
-        spec.discover_paths(
-            paths
-                .into_iter()
-                .filter(|path| path.root_class() == RepositoryRootClass::Worktree),
-        )?;
+        let mut spec = CaptureSpec::new(paths, budget)?;
         spec.discover_listing(parent)?;
         Ok(spec)
     }

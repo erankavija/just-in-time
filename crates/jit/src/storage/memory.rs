@@ -778,6 +778,7 @@ impl InMemoryStorage {
                 RepositoryEntry::Directory { .. } => Self::gate_run_directory_id(vpath),
                 RepositoryEntry::Absent
                 | RepositoryEntry::File { .. }
+                | RepositoryEntry::FileTail { .. }
                 | RepositoryEntry::Symlink { .. }
                 | RepositoryEntry::Unsupported { .. } => None,
             })

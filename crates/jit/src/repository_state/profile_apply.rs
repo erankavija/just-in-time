@@ -3615,7 +3615,7 @@ mod tests {
         ];
         requested.extend(records.iter().map(|(_, path, _)| path.clone()));
         requested.extend(targets.iter().map(|(target, _, _)| target.clone()));
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             requested,
             CaptureBudget {
                 max_listings: 1,
@@ -4715,7 +4715,7 @@ mod tests {
         .unwrap();
         let config =
             b"[namespaces.adopted]\ndescription = \"Repository definition.\"\nunique = false\n";
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [VirtualPath::CONFIG],
             CaptureBudget {
                 max_listings: 0,
@@ -4874,7 +4874,7 @@ mod tests {
             super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        let mut spec = CaptureSpec::phase_one(
+        let mut spec = CaptureSpec::new(
             [path.clone()],
             CaptureBudget {
                 max_listings: 0,
@@ -4920,10 +4920,12 @@ mod tests {
             super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .expect("layout is valid");
-        // Phase one is seeded from the data root, so the registry is always in
-        // the closure and every other captured path is discovered onto it.
-        let mut spec = CaptureSpec::phase_one(
-            [VirtualPath::CONFIG],
+        // The registry is always in the closure.
+        let captured = std::iter::once(VirtualPath::CONFIG)
+            .chain(captured.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        let spec = CaptureSpec::new(
+            captured.iter().cloned(),
             CaptureBudget {
                 max_listings: 0,
                 max_bytes: 64 * 1024,
@@ -4931,11 +4933,6 @@ mod tests {
             },
         )
         .expect("capture spec is valid");
-        spec.discover_paths(captured.to_vec())
-            .expect("captured paths are discoverable");
-        let captured = std::iter::once(VirtualPath::CONFIG)
-            .chain(captured.iter().cloned())
-            .collect::<BTreeSet<_>>();
         let entries = captured
             .iter()
             .map(|path| {

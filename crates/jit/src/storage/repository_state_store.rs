@@ -6,11 +6,12 @@
 //! record's home is inside the root that does not exist yet.
 
 use crate::repository_state::{
-    CaptureError, CaptureSpec, CapturedBytes, EntryIdentity, ExpectedPreimage, FileMode,
-    LinkedWorktreeEvidence, LinkedWorktreeSourceClass, ListingFingerprint, MaterializationPlan,
-    PinnedDocumentEvidence, PinnedSourceClass, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
-    RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, EntryIdentity, EventLogTail,
+    ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
+    ListingFingerprint, MaterializationPlan, PinnedDocumentEvidence, PinnedSourceClass, ReadMode,
+    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence, RootRelativePath,
+    VirtualPath, EVENT_LOG_TAIL_WINDOW,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
@@ -205,6 +206,13 @@ pub trait RepositoryMutationSession {
     fn recovery_report(&self) -> &RecoveryDispatchReport;
     /// Capture one complete bounded image after recovery has converged.
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError>;
+    /// Grow `image` to `spec`, reading only the requests `image` does not
+    /// already answer the same way; what it read is kept, never re-read.
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError>;
     /// Publish one complete semantic plan, refused if the files it writes moved.
     fn apply(
         &mut self,
@@ -532,17 +540,15 @@ impl RepositoryMutationSession for JsonMutationSession {
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
-        revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        let worktree_paths = self.storage.configured_worktree_paths()?;
-        let image = capture_capability_image(
-            &self.layout,
-            &self.roots,
-            &worktree_paths,
-            &self.storage,
-            spec,
-        )?;
-        self.captured = Some(image.clone());
-        Ok(image)
+        self.capture_over(CapturedAnswers::default(), spec)
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(image.into_answers(&spec), spec)
     }
 
     fn apply(
@@ -585,6 +591,25 @@ impl RepositoryMutationSession for JsonMutationSession {
 }
 
 impl JsonMutationSession {
+    fn capture_over(
+        &mut self,
+        prior: CapturedAnswers,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        revalidate_layout_capabilities(&self.layout, &self.roots)?;
+        let worktree_paths = self.storage.configured_worktree_paths()?;
+        let image = capture_capability_image(
+            &self.layout,
+            &self.roots,
+            &worktree_paths,
+            &self.storage,
+            spec,
+            prior,
+        )?;
+        self.captured = Some(image.clone());
+        Ok(image)
+    }
+
     /// Publish `delta` as one redo record: derived from the delta, refused if
     /// its write set moved, made durable, applied, and removed.
     fn publish_through_record(
@@ -682,10 +707,15 @@ impl RepositoryMutationSession for MemoryMutationSession {
     }
 
     fn capture(&mut self, spec: CaptureSpec) -> Result<RepositoryImage, RepositoryStateStoreError> {
-        let state = self.storage.repository_state();
-        let image = capture_memory_image(&self.layout, &state, spec)?;
-        self.captured = Some(image.clone());
-        Ok(image)
+        self.capture_over(CapturedAnswers::default(), spec)
+    }
+
+    fn extend(
+        &mut self,
+        image: RepositoryImage,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        self.capture_over(image.into_answers(&spec), spec)
     }
 
     fn apply(
@@ -720,6 +750,18 @@ impl RepositoryMutationSession for MemoryMutationSession {
 }
 
 impl MemoryMutationSession {
+    fn capture_over(
+        &mut self,
+        prior: CapturedAnswers,
+        spec: CaptureSpec,
+    ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+        let state = self.storage.repository_state();
+        let image = capture_memory_image(&self.layout, &state, spec, prior)?;
+        drop(state);
+        self.captured = Some(image.clone());
+        Ok(image)
+    }
+
     /// The in-memory counterpart of [`JsonMutationSession::publish_through_record`],
     /// over the entry map.
     fn publish_through_record(
@@ -826,12 +868,6 @@ fn ensure_delta_is_captured(
     Ok(())
 }
 
-/// Bytes at the end of the event log the pre-commit check compares.
-///
-/// A byte window rather than the last complete line: the torn-tail protocol
-/// admits an incomplete final line, so the log's end is not a line boundary.
-pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
-
 /// Refuse a mutation whose write set moved after the mutation read it.
 ///
 /// Compares the live occupant of every path `record` makes a directory at, puts
@@ -857,8 +893,8 @@ pub fn ensure_write_set_unchanged(
     ensure_write_set_unchanged_against(
         captured,
         record,
-        &|path| inspect_capability_entry(captured.layout(), roots, path),
-        &|| live_event_log_tail(roots, &VirtualPath::EVENTS),
+        &|path| inspect_capability_entry(captured.layout(), roots, path, ReadMode::Whole),
+        &|| live_event_log_tail(captured.layout(), roots),
     )
 }
 
@@ -910,15 +946,16 @@ fn ensure_write_set_unchanged_against(
     if !touches_event_log {
         return Ok(());
     }
-    match captured.entry(&VirtualPath::EVENTS)? {
-        // An ordinary captured log is the only state carrying a tail to compare;
-        // any other occupant is compared like any other write target.
-        RepositoryEntry::File { content, .. } => (live_log_tail()?
-            == Some(EventLogTail::of_bytes(content.bytes())))
+    // An ordinary captured log is the only state carrying a tail to compare;
+    // any other occupant is compared like any other write target.
+    let tail = match captured.entry(&VirtualPath::EVENTS)? {
+        RepositoryEntry::File { content, .. } => EventLogTail::of_bytes(content.bytes()),
+        RepositoryEntry::FileTail { tail, .. } => tail.clone(),
+        _ => return ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
+    };
+    (live_log_tail()? == Some(tail))
         .then_some(())
-        .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS)),
-        _ => ensure_target_unchanged(captured, &VirtualPath::EVENTS, live),
-    }
+        .ok_or_else(|| retryable_conflict(&VirtualPath::EVENTS))
 }
 
 /// Compare one write target's live occupant with the captured one, byte for byte.
@@ -1035,49 +1072,17 @@ fn retryable_conflict(path: &VirtualPath) -> RepositoryStateStoreError {
     }
 }
 
-/// An event log's exact length with its last `min(length, window)` bytes.
-#[derive(Debug, PartialEq, Eq)]
-struct EventLogTail {
-    length: u64,
-    tail: Vec<u8>,
-}
-
-impl EventLogTail {
-    fn of_bytes(bytes: &[u8]) -> Self {
-        let window = usize::try_from(EVENT_LOG_TAIL_WINDOW).unwrap_or(usize::MAX);
-        Self {
-            length: bytes.len() as u64,
-            tail: bytes[bytes.len().saturating_sub(window)..].to_vec(),
-        }
-    }
-}
-
 /// Read the live log's length and tail, or `None` when no ordinary file is there.
 fn live_event_log_tail(
+    layout: &RepositoryLayout,
     roots: &CapabilityRoots,
-    path: &VirtualPath,
 ) -> Result<Option<EventLogTail>, RepositoryStateStoreError> {
-    let Some(root) = roots.root(path.root_class()) else {
-        return Ok(None);
-    };
-    let Some((parent, leaf)) = open_capability_parent(root, path.relative().as_path())? else {
-        return Ok(None);
-    };
-    match parent.symlink_metadata(&leaf) {
-        Ok(metadata) if metadata.is_file() => (),
-        Ok(_) => return Ok(None),
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.into()),
-    }
-    let mut options = OpenOptions::new();
-    options.read(true);
-    options._cap_fs_ext_follow(FollowSymlinks::No);
-    let mut file = parent.open_with(&leaf, &options)?;
-    let length = file.metadata()?.len();
-    let mut tail = Vec::new();
-    file.seek(SeekFrom::Start(length - length.min(EVENT_LOG_TAIL_WINDOW)))?;
-    file.read_to_end(&mut tail)?;
-    Ok(Some(EventLogTail { length, tail }))
+    Ok(
+        match inspect_capability_entry(layout, roots, &VirtualPath::EVENTS, ReadMode::Tail)? {
+            RepositoryEntry::FileTail { tail, .. } => Some(tail),
+            _ => None,
+        },
+    )
 }
 
 /// Normalize a Git diagnostic into a stable, control-free unavailable reason.
@@ -1107,11 +1112,16 @@ fn capture_capability_image(
     worktree_paths: &crate::storage::WorktreePaths,
     storage: &JsonFileStorage,
     spec: CaptureSpec,
+    mut prior: CapturedAnswers,
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
     let entries = spec
         .paths()
         .map(|path| {
-            let entry = match inspect_capability_entry(layout, roots, path) {
+            if let Some(entry) = prior.entries.remove(path) {
+                return Ok((path.clone(), entry));
+            }
+            let mode = spec.read_mode(path).unwrap_or(ReadMode::Whole);
+            let entry = match inspect_capability_entry(layout, roots, path, mode) {
                 Ok(entry) => entry,
                 Err(error) if spec.is_advisory(path) && is_advisory_permission_denied(&error) => {
                     advisory_unreadable_entry(path)?
@@ -1125,18 +1135,35 @@ fn capture_capability_image(
         .listings()
         .iter()
         .map(|path| {
-            Ok((
-                path.clone(),
-                inspect_capability_listing(layout, roots, path, spec.is_advisory(path), &entries)?,
-            ))
+            let listing = match prior.listings.remove(path) {
+                Some(listing) => listing,
+                None => inspect_capability_listing(
+                    layout,
+                    roots,
+                    path,
+                    spec.is_advisory(path),
+                    &entries,
+                )?,
+            };
+            Ok((path.clone(), listing))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), spec.pinned());
+    let unanswered = spec
+        .pinned()
+        .iter()
+        .filter(|request| !prior.pinned.contains_key(*request))
+        .cloned()
+        .collect();
+    let pinned_reads = storage.inspect_pinned_targets(layout.worktree_root(), &unanswered);
     let mut evidence_cache = storage.pinned_evidence_cache();
     let pinned = spec
         .pinned()
         .iter()
         .map(|(revision, path)| {
+            let request = (revision.clone(), path.clone());
+            if let Some(evidence) = prior.pinned.remove(&request) {
+                return Ok((request, evidence));
+            }
             let read = pinned_reads
                 .get(&(revision.clone(), path.clone()))
                 .ok_or_else(|| {
@@ -1206,10 +1233,11 @@ fn capture_capability_image(
         .linked_worktree()
         .iter()
         .map(|path| {
-            Ok((
-                path.clone(),
-                capture_linked_evidence(layout, roots, worktree_paths, path)?,
-            ))
+            let evidence = match prior.linked_worktree.remove(path) {
+                Some(evidence) => evidence,
+                None => capture_linked_evidence(layout, roots, worktree_paths, path)?,
+            };
+            Ok((path.clone(), evidence))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     RepositoryImage::close(layout.clone(), spec, entries, listings, pinned, linked)
@@ -1220,24 +1248,31 @@ fn capture_memory_image(
     layout: &RepositoryLayout,
     state: &MemoryRepositoryState,
     spec: CaptureSpec,
+    mut prior: CapturedAnswers,
 ) -> Result<RepositoryImage, RepositoryStateStoreError> {
+    let read = |path: &VirtualPath| match (state.entries.get(path), spec.read_mode(path)) {
+        (Some(RepositoryEntry::File { content, mode }), Some(ReadMode::Tail)) => {
+            RepositoryEntry::FileTail {
+                tail: EventLogTail::of_bytes(content.bytes()),
+                mode: *mode,
+            }
+        }
+        (entry, _) => entry.cloned().unwrap_or(RepositoryEntry::Absent),
+    };
     let entries = spec
         .paths()
         .map(|path| {
-            (
-                path.clone(),
-                state
-                    .entries
-                    .get(path)
-                    .cloned()
-                    .unwrap_or(RepositoryEntry::Absent),
-            )
+            let entry = prior.entries.remove(path);
+            (path.clone(), entry.unwrap_or_else(|| read(path)))
         })
         .collect::<BTreeMap<_, _>>();
     let listings = spec
         .listings()
         .iter()
-        .map(|path| memory_listing(layout, state, path).map(|listing| (path.clone(), listing)))
+        .map(|path| match prior.listings.remove(path) {
+            Some(listing) => Ok((path.clone(), listing)),
+            None => memory_listing(layout, state, path).map(|listing| (path.clone(), listing)),
+        })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let pinned = spec
         .pinned()
@@ -1430,6 +1465,7 @@ fn inspect_capability_entry(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
+    mode: ReadMode,
 ) -> Result<RepositoryEntry, RepositoryStateStoreError> {
     layout.ensure_canonical(path)?;
     let Some(root) = roots.root(path.root_class()) else {
@@ -1444,7 +1480,7 @@ fn inspect_capability_entry(
         // failure: a not-yet-created nested path captures as a clean absence.
         return Ok(RepositoryEntry::Absent);
     };
-    inspect_capability_leaf(&parent, &leaf)
+    inspect_capability_leaf(&parent, &leaf, mode)
 }
 
 fn advisory_unreadable_entry(
@@ -1470,7 +1506,7 @@ fn inspect_capability_listing(
     advisory: bool,
     captured: &BTreeMap<VirtualPath, RepositoryEntry>,
 ) -> Result<ListingFingerprint, RepositoryStateStoreError> {
-    let entry = inspect_capability_entry(layout, roots, path)?;
+    let entry = inspect_capability_entry(layout, roots, path, ReadMode::Whole)?;
     let RepositoryEntry::Directory { identity, .. } = entry else {
         return match entry {
             RepositoryEntry::Absent => ListingFingerprint::for_absent().map_err(Into::into),
@@ -1511,9 +1547,9 @@ fn inspect_capability_listing(
             .into_string()
             .map_err(|_| RepositoryStateStoreError::UnsafeTarget("non-UTF-8 entry".into()))?;
         let child = layout.classify_and_canonicalize(physical_directory.join(&name))?;
-        let identity = match captured.get(&child) {
-            Some(entry) => entry.identity().cloned(),
-            None => match inspect_capability_entry(layout, roots, &child) {
+        let identity = match captured.get(&child).and_then(RepositoryEntry::identity) {
+            Some(identity) => Some(identity.clone()),
+            None => match inspect_capability_entry(layout, roots, &child, ReadMode::Whole) {
                 Ok(entry) => entry.identity().cloned(),
                 Err(error) if advisory && is_advisory_permission_denied(&error) => {
                     advisory_unreadable_entry(&child)?.identity().cloned()
@@ -1530,6 +1566,7 @@ fn inspect_capability_listing(
 fn inspect_capability_leaf(
     parent: &Dir,
     leaf: &str,
+    read: ReadMode,
 ) -> Result<RepositoryEntry, RepositoryStateStoreError> {
     let metadata = match parent.symlink_metadata(leaf) {
         Ok(metadata) => metadata,
@@ -1552,6 +1589,20 @@ fn inspect_capability_leaf(
         options.read(true);
         options._cap_fs_ext_follow(FollowSymlinks::No);
         let mut file = parent.open_with(leaf, &options)?;
+        if read == ReadMode::Tail {
+            let length = file.metadata()?.len();
+            let window = length.min(EVENT_LOG_TAIL_WINDOW);
+            let mut tail = Vec::new();
+            file.seek(SeekFrom::Start(length - window))?;
+            file.take(window).read_to_end(&mut tail)?;
+            // A file that shrank under the read leaves a short tail.
+            let tail = EventLogTail::new(length, tail)
+                .map_err(|_| RepositoryStateStoreError::RetryableConflict { path: leaf.into() })?;
+            return Ok(RepositoryEntry::FileTail {
+                tail,
+                mode: normalized_mode(&metadata),
+            });
+        }
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
         let metadata = file.metadata()?;
@@ -1607,7 +1658,7 @@ fn capture_linked_evidence(
     worktree_paths: &crate::storage::WorktreePaths,
     path: &VirtualPath,
 ) -> Result<LinkedWorktreeEvidence, RepositoryStateStoreError> {
-    match inspect_capability_entry(layout, roots, path)? {
+    match inspect_capability_entry(layout, roots, path, ReadMode::Whole)? {
         RepositoryEntry::File { content, .. } => {
             return LinkedWorktreeEvidence::new(
                 path.clone(),
@@ -1660,7 +1711,7 @@ fn capture_linked_evidence(
     ) {
         if let Ok(main_layout) = discover_repository_layout(main_root, &main_data) {
             let (main_roots, _, _) = CapabilityRoots::open(&main_layout)?;
-            match inspect_capability_entry(&main_layout, &main_roots, path)? {
+            match inspect_capability_entry(&main_layout, &main_roots, path, ReadMode::Whole)? {
                 RepositoryEntry::File { content, .. } => {
                     return LinkedWorktreeEvidence::new(
                         path.clone(),
