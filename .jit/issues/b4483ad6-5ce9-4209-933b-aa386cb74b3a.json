@@ -57,7 +57,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-01T10:23:41.657946279Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
   "labels": [
     "type:task",
@@ -76,5 +82,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Positioned event-log append",
-  "updated_at": "2026-10-01T09:10:19.804027705Z"
+  "updated_at": "2026-10-01T10:23:41.657946279Z"
 }
