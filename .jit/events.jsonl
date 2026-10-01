@@ -16174,3 +16174,4 @@
 {"gate_key":"cargo-ci","id":"f2d38f52-f80d-4d39-b174-05a48155f6fa","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T19:55:56.811938831Z","type":"gate_failed","updated_by":"auto:executor"}
 {"gate_key":"docs-mechanical","id":"b3ff26ae-ed22-48fc-a65c-4717584fd24c","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T19:56:27.925251784Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"1a795fe2-13d0-4646-865e-ef99c0275949","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T19:59:27.938024118Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"holistic-review","id":"ab3b15cb-46ed-4a3b-98a2-6e236dd3ac53","issue_id":"e590fa91-6164-4d62-bab2-a7ad5cbc42fb","timestamp":"2026-10-01T20:02:45.499862834Z","type":"gate_failed","updated_by":"auto:executor"}

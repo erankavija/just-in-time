@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c4b3aacbcdec57a9cb36a88f1900c9ec920711f6",
+  "completed_at": "2026-10-01T20:02:45.275724850Z",
+  "duration_ms": 196165,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": ".jit/gate-runs/98c1b674-b10b-45b7-b448-c2b9634e8a36/result.json",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/e590fa91/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 is unmet because the recorded cargo-ci run failed with six timed-out default-suite tests."
+      }
+    ],
+    "summary": "The current cargo-ci evidence fails the story's required default-suite criterion.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "99e93a10-7c31-4260-88f1-daa1a0314071",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T19:59:29.109828764Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10347 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f90c-f0ee-7301-abdb-9ece02d00ca2\n--------\nuser\n--- 10334 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — high, blocking:** REQ-05 is unmet. The current recorded `cargo-ci` run failed: 4,705/4,711 tests passed and six timed out. It therefore does not substantiate a passing default suite, despite the earlier self-attested successful run.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The current cargo-ci evidence fails the story's required default-suite criterion.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 is unmet because the recorded cargo-ci run failed with six timed-out default-suite tests.\",\"file\":\".jit/gate-runs/98c1b674-b10b-45b7-b448-c2b9634e8a36/result.json\",\"references\":[\"@/issue/e590fa91/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
