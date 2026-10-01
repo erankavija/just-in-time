@@ -60,6 +60,11 @@
       "status": "passed",
       "updated_at": "2026-10-01T13:44:30.918818078Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-01T13:48:27.259890465Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
@@ -77,5 +82,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan hash retirement",
-  "updated_at": "2026-10-01T13:44:30.918818078Z"
+  "updated_at": "2026-10-01T13:48:27.259890465Z"
 }

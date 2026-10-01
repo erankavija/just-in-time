@@ -1,0 +1,53 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6565e691ac927238c2d16cb63b0f3e76677cf187",
+  "completed_at": "2026-10-01T13:48:26.944427601Z",
+  "duration_ms": 235141,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/package_tree.rs",
+        "id": "F1",
+        "line": 228,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-17",
+          "@/invariant/canonical-cutover",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "high",
+        "summary": "Package-tree public rustdoc claims retired seed and plan-hash failure modes that the current error type no longer exposes."
+      },
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/storage/repository_state_store_tests.rs",
+        "id": "F2",
+        "line": 381,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "Two cross-backend test names still claim an own-hash result although they now verify image ownership and action counts."
+      }
+    ],
+    "summary": "Live package-tree rustdoc still advertises retired seed and plan-hash failures.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ec72359b-67dd-4dcd-8639-74b751b1cdf9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6760a907-580a-4724-bea4-b33143b09403",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T13:44:31.802925712Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 10970 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f7b5-a82e-7792-aca9-c481f2e12d27\n--------\nuser\n--- 10957 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: d3250d8c7, f15f12307, f25b82b17, 7d06ab02a, 6565e691a (`jit:ec72359b`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T13:44:06Z); code-review pending\nTruncation recovery: re-read merge patches by individual path groups; narrowed identifier, regression-seed, API, and back-end conformance searches\n\n1. F1 — blocking, issue-impact (high): [`package_tree.rs:228`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/package_tree.rs:228) still documents “seed, and plan-hash failures” under `PackageTreeCaptureError`, though those error variants were removed at lines 71–94. This leaves a live public contract describing retired behavior.\n\n2. F2 — advisory, issue-impact (low): [`repository_state_store_tests.rs:381`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/repository_state_store_tests.rs:381) and line 416 retain `returns_own_hash` test names after their assertions switched to image ownership and action counts. Rename them to describe the current scenario.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Live package-tree rustdoc still advertises retired seed and plan-hash failures.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Package-tree public rustdoc claims retired seed and plan-hash failure modes that the current error type no longer exposes.\",\"file\":\"crates/jit/src/repository_state/package_tree.rs\",\"line\":228,\"references\":[\"@/charter/D-17\",\"@/invariant/canonical-cutover\",\"@/invariant/essential-code-prose\"]},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Two cross-backend test names still claim an own-hash result although they now verify image ownership and action counts.\",\"file\":\"crates/jit/src/storage/repository_state_store_tests.rs\",\"line\":381}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
