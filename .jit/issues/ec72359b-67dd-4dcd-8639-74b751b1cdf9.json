@@ -58,7 +58,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-01T13:44:30.918818078Z",
+      "updated_at": "2026-10-01T15:22:48.157065498Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -82,5 +82,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Plan hash retirement",
-  "updated_at": "2026-10-01T13:48:27.259890465Z"
+  "updated_at": "2026-10-01T15:22:48.157065498Z"
 }
