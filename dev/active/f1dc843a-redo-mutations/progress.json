@@ -1566,6 +1566,12 @@
       "policy": "Watch disk space: compilation artifacts must not fill the disk, while task throughput stays high.",
       "actions_session_7": "Before wave 16 dispatch the disk was 93% used (64 GB free). The cache pool held 81 GB, 71 GB of it stale rustc incremental sessions merged from several worktrees and hardlinked into every new worktree. Removed the pool incremental dir and the four fresh worktrees incremental dirs (rustc rebuilds only the jit crate itself incrementally; dependency artifacts in deps/ stay warm), plus Aug-12 leftovers target/b883f916-*, target/jit-metadata-stability-*, target/flycheck0. Result 145 GB free (84%).",
       "practice": "Dispatch prompts forbid extra target dirs and --release builds. After each reclaim, delete .agents/cache-pool/target/debug/incremental (harvest merges stale sessions newest-wins). Check df before each dispatch; act below 80 GB free."
+    },
+    {
+      "id": "POL-06",
+      "decided_by": "user",
+      "wave": 16,
+      "policy": "Do not get stuck on the suite-duration budget: on a contended host, evaluate cargo-ci with BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170 records an over-threshold suite clock instead of failing). Every other step and budget still blocks. Record each run's suite-clock under POL-04."
     }
   ],
   "session": 7,
@@ -1998,6 +2004,6 @@
       }
     ],
     "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
-    "decision": "Defer cargo-ci for merged 51eb1aa6 and 3d9150d7 to a quiet host window rather than burn contended runs."
+    "decision": "Superseded by POL-06: evaluate cargo-ci with BUSY_HOST_OVERRIDE=1 on a contended host."
   }
 }
