@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "726a53b84a20447b6ea7cab7e0150ec77a22cd2b",
+  "completed_at": "2026-10-01T22:58:35.450699985Z",
+  "duration_ms": 158376,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The delivered redo-record documentation accurately reflects the current publication and recovery behavior; no issue-impact findings remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "7594d69f-d5bb-4fe6-a3ea-31ee2d41dd93",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:55:57.074691818Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution covered the epic plus its 51 delivered DAG descendants: 512 individually inspected tagged commits. Tags were unavailable for `99a12b66` and `df3e10fb`, so their planning/breakdown intent was used as fallback. The prior application-order finding is fixed: docs now match delete-before-event-append. The combined redo-record documentation is accurate and discoverable.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered redo-record documentation accurately reflects the current publication and recovery behavior; no issue-impact findings remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
