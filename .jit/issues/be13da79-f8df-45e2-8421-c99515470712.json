@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T19:20:16.826156879Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
@@ -10,6 +11,7 @@
   ],
   "description": "The materialization architecture note describes record publication in place of the sections describing the kernel, its journal, and its recovery.\n\n## Background\n\nThe note is the contributor-facing description of repository-state materialization. It is accurate today and obsolete the moment the mechanism changes: it names the kernel, the journal, and the recovery module in its layer map and its diagrams, describes the two-phase capture specification and its budgets, describes the expected-preimage check and the plan hash, describes the mutation-session contract down to composing the exact event-log content, and carries a session-open recovery section with an apply-time re-capture and a sequence diagram. Its closing pointer sends a new contributor to three files that will not exist.\n\nThe note is in the repository's permanent documentation set, so it is maintained. The archived copies under the archive root are pinned.\n\n## Success Criteria\n\n- [hard] REQ-01: The layer map, the pipeline description, and the diagrams name the redo record and its application at session open.\n- [hard] REQ-02: The capture description states one read pass with its budgets, and names no capture phase or overlap-stability check.\n- [hard] REQ-03: The commit description states the write-scoped comparison, the synced record, the apply order, and idempotent re-application.\n- [hard] REQ-04: The closing reading order points at files that exist after the change.\n- [hard] REQ-05: The pure-producer and repair-derivation sections are preserved where they remain accurate.\n- [hard] REQ-06: The core-system-design note and the architecture-pitfalls study state the same mechanism.\n\n## Notes\n\nArchived work products are pinned to the revision that produced them and stay as they are.\n",
   "documents": [],
+  "first_ready_at": "2026-10-01T19:20:16.555326223Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical"
@@ -27,7 +29,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T19:20:16.826156879Z"
 }
