@@ -83,7 +83,13 @@
     "docs-mechanical",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-01T19:55:56.811938831Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
   "labels": [
     "type:story",
@@ -99,5 +105,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T19:53:11.590500203Z"
+  "updated_at": "2026-10-01T19:55:56.811938831Z"
 }
