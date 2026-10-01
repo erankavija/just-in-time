@@ -158,10 +158,12 @@ fn is_package_model(source: &str) -> bool {
 
 /// An applied-record inventory authority lists the profile directory and
 /// returns the records that listing names. Known-path readers do neither: they
-/// receive a path from a caller and only decode that one record.
+/// receive a path from a caller and only decode that one record. The image's
+/// `directory_listings()` accessor marks the listing read, since it is the one
+/// way a producer learns which record names exist.
 fn is_applied_record_inventory_reader(source: &str) -> bool {
     source.contains("Result<Vec<(VirtualPath, AppliedProfileRecord)>")
-        && source.contains("listing_fingerprints()")
+        && source.contains("directory_listings()")
 }
 
 /// Reject a predecessor declaration rather than its harmless mentions in tests,
@@ -1301,8 +1303,8 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
             "applied-record inventory reader",
             "repository_state/profile_apply.rs",
             is_applied_record_inventory_reader,
-            "fn applied_profile_records() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
-            "fn collect_installed_provenance() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { listing_fingerprints(); }",
+            "fn applied_profile_records() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { directory_listings(); }",
+            "fn collect_installed_provenance() -> Result<Vec<(VirtualPath, AppliedProfileRecord)>> { directory_listings(); }",
         ),
     ] {
         let duplicate = assert_canonical_authority(

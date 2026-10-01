@@ -165,7 +165,7 @@ fn finalize_export_payload(
 ) -> Result<MaterializationPlan, RepositoryExportError> {
     base.layout().ensure_canonical(target)?;
     let parent = immediate_parent(target)?;
-    if !base.listing_fingerprints().contains_key(&parent) {
+    if !base.directory_listings().contains_key(&parent) {
         return Err(CaptureError::UndiscoveredRepositoryPath(parent).into());
     }
     if !matches!(base.entry(&parent)?, RepositoryEntry::Directory { .. }) {
@@ -305,7 +305,7 @@ fn normalize_absolute(path: PathBuf) -> Result<PathBuf, RepositoryLayoutError> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CapturedBytes, EntryIdentity, ListingFingerprint, RepositoryRootEvidence,
+        CapturedBytes, DirectoryListing, EntryIdentity, RepositoryRootEvidence,
     };
 
     fn layout() -> RepositoryLayout {
@@ -331,7 +331,6 @@ mod tests {
             })
             .unwrap();
         let parent = immediate_parent(&target).unwrap();
-        let parent_identity = identity("parent", b"directory");
         RepositoryImage::close(
             layout,
             spec,
@@ -340,15 +339,12 @@ mod tests {
                 (
                     parent.clone(),
                     RepositoryEntry::Directory {
-                        identity: parent_identity.clone(),
+                        identity: identity("parent", b"directory"),
                         mode: FileMode::Regular,
                     },
                 ),
             ]),
-            BTreeMap::from([(
-                parent,
-                ListingFingerprint::for_directory(parent_identity, BTreeMap::new()).unwrap(),
-            )]),
+            BTreeMap::from([(parent, DirectoryListing::default())]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -459,13 +455,12 @@ mod tests {
         );
         assert_eq!(spec.listings(), &BTreeSet::from([parent.clone()]));
 
-        let parent_identity = identity("parent", b"directory");
         let entries = captured
             .into_iter()
             .map(|path| {
                 let entry = if path == parent {
                     RepositoryEntry::Directory {
-                        identity: parent_identity.clone(),
+                        identity: identity("parent", b"directory"),
                         mode: FileMode::Regular,
                     }
                 } else {
@@ -478,10 +473,7 @@ mod tests {
             layout(),
             spec,
             entries,
-            BTreeMap::from([(
-                parent,
-                ListingFingerprint::for_directory(parent_identity, BTreeMap::new()).unwrap(),
-            )]),
+            BTreeMap::from([(parent, DirectoryListing::default())]),
             BTreeMap::new(),
             BTreeMap::new(),
         )

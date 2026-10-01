@@ -74,7 +74,9 @@ fn test_json_apply_admits_an_advisory_listing_that_became_readable() {
 
     let mut session = storage.open_mutation_session(layout).unwrap();
     let unreadable = session.capture(spec()).unwrap();
-    assert!(unreadable.listing_fingerprints()[&secret_path].is_advisory_unreadable());
+    assert!(unreadable.directory_listings()[&secret_path]
+        .names()
+        .is_empty());
     std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o700)).unwrap();
 
     session.apply(&test_plan(&unreadable, &delta)).unwrap();
@@ -1084,7 +1086,7 @@ fn test_conformance_listing_over_file_errors_on_both_backends() {
     };
 
     // A complete-listing request over a regular file is an error on both
-    // backends, never a fabricated directory fingerprint.
+    // backends, never a fabricated directory listing.
     let json = JsonFileStorage::new(&data);
     let mut json_session = json.open_mutation_session(layout.clone()).unwrap();
     assert!(json_session.capture(spec()).is_err());
@@ -1128,8 +1130,8 @@ fn test_conformance_worktree_root_listing_canonicalizes_nested_data_child() {
     let memory_image = memory_session.capture(spec()).unwrap();
 
     for image in [&json_image, &memory_image] {
-        let listing = &image.listing_fingerprints()[&VirtualPath::worktree("").unwrap()];
-        assert!(listing.children().contains_key(".jit"));
+        let listing = &image.directory_listings()[&VirtualPath::worktree("").unwrap()];
+        assert!(listing.names().contains(".jit"));
     }
 }
 
@@ -1156,32 +1158,6 @@ fn test_json_session_opens_beneath_non_utf8_ancestor() {
         image.entry(&VirtualPath::data("").unwrap()).unwrap(),
         RepositoryEntry::Directory { .. }
     ));
-}
-
-/// A file captured both as an exact path and as a listed child carries one
-/// identity in the image.
-#[test]
-fn test_capture_listing_child_shares_the_identity_of_its_captured_path() {
-    let worktree = TempDir::new().unwrap();
-    let data = worktree.path().join(".jit");
-    std::fs::create_dir_all(data.join("issues")).unwrap();
-    std::fs::write(data.join("issues").join("a.json"), b"{}").unwrap();
-    let layout = discover_repository_layout(worktree.path(), &data).unwrap();
-    let path = VirtualPath::data("issues/a.json").unwrap();
-    let mut spec = CaptureSpec::new([path.clone()], budget()).unwrap();
-    spec.discover_listing(VirtualPath::data("issues").unwrap())
-        .unwrap();
-
-    let json = JsonFileStorage::new(&data);
-    let image = json
-        .open_mutation_session(layout)
-        .unwrap()
-        .capture(spec)
-        .unwrap();
-
-    let listed =
-        &image.listing_fingerprints()[&VirtualPath::data("issues").unwrap()].children()["a.json"];
-    assert_eq!(Some(listed), image.entry(&path).unwrap().identity());
 }
 
 /// Replaces a file's bytes behind a session's back.

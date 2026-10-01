@@ -525,12 +525,12 @@ pub(crate) fn captured_gate_run_result_paths(
     image: &RepositoryImage,
 ) -> Result<Option<Vec<VirtualPath>>, RepositoryLayoutError> {
     let root = VirtualPath::GATE_RUNS;
-    let Some(listing) = image.listing_fingerprints().get(&root) else {
+    let Some(listing) = image.directory_listings().get(&root) else {
         return Ok(None);
     };
     listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter_map(|run_id| {
             let child = VirtualPath::data(format!("gate-runs/{run_id}")).ok()?;
             matches!(

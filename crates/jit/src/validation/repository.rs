@@ -382,10 +382,10 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .collect::<Result<Vec<_>>>()?;
     // The complete `.jit/issues` listing is captured into the image; reconcile the
     // JSON issue files it contains against the index ids exactly as the recursive
-    // filesystem walk did, but from the closed listing fingerprint.
+    // filesystem walk did, but from the captured listing.
     let issues_dir = crate::repository_state::VirtualPath::ISSUES;
     let listing = image
-        .listing_fingerprints()
+        .directory_listings()
         .get(&issues_dir)
         .ok_or_else(|| anyhow!("captured image is missing the .jit/issues listing"))?;
     let expected: BTreeSet<String> = index
@@ -394,8 +394,8 @@ fn load_records(read: &ReadBytes<'_>, image: &RepositoryImage) -> Result<Records
         .map(|id| format!("{id}.json"))
         .collect();
     let actual: BTreeSet<String> = listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .cloned()
         .collect();

@@ -2618,12 +2618,12 @@ pub fn applied_profile_records(
 fn applied_profile_record_paths(
     base: &RepositoryImage,
 ) -> Result<Vec<VirtualPath>, RepositoryStateError> {
-    let Some(listing) = base.listing_fingerprints().get(&VirtualPath::PROFILES) else {
+    let Some(listing) = base.directory_listings().get(&VirtualPath::PROFILES) else {
         return Ok(Vec::new());
     };
     listing
-        .children()
-        .keys()
+        .names()
+        .iter()
         .filter(|name| name.ends_with(".json"))
         .map(|name| VirtualPath::data(format!("profiles/{name}")).map_err(Into::into))
         .collect()
@@ -3548,7 +3548,7 @@ fn existing_file_mode(
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, ListingFingerprint,
+        CaptureBudget, CaptureSpec, CapturedBytes, DirectoryListing, EntryIdentity,
         RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::{BTreeMap, BTreeSet};
@@ -3671,13 +3671,7 @@ mod tests {
         );
         let listings = BTreeMap::from([(
             profiles,
-            ListingFingerprint::new(
-                records
-                    .iter()
-                    .map(|(name, _, content)| (name.clone(), content.identity().clone()))
-                    .collect(),
-            )
-            .unwrap(),
+            DirectoryListing::new(records.iter().map(|(name, _, _)| name.clone())).unwrap(),
         )]);
         (
             RepositoryImage::close(

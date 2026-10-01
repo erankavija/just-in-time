@@ -81,7 +81,7 @@ all planning. It is built by `RepositoryImage::close` from a `CaptureSpec`
 `max_bytes`, `max_depth`), so capture cannot walk an unbounded tree. The image
 holds, per canonical path, a `RepositoryEntry` — `File` (with bytes, `FileMode`,
 and an `EntryIdentity`), `FileTail` (a path the spec reads as its length and
-bounded tail), `Directory`, or `Absent` — plus `ListingFingerprint`s and
+bounded tail), `Directory`, or `Absent` — plus `DirectoryListing`s (child names) and
 pinned/linked-worktree evidence.
 
 A mutation captures in one round. What it reads first names what it reads

@@ -321,128 +321,25 @@ impl RepositoryTargetKind {
     }
 }
 
-/// Fingerprint of one complete non-recursive directory listing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ListingFingerprint {
-    /// Exact identity of the listed directory; `None` represents absence.
-    container: Option<EntryIdentity>,
-    /// Sorted child name to exact child identity; `None` is not representable.
-    children: BTreeMap<String, EntryIdentity>,
-    /// True when an advisory scan could identify the directory but could not
-    /// enumerate it due to permission denial.
-    advisory_unreadable: bool,
-    /// SHA-256 of the boundary's canonical listing serialization.
-    sha256: String,
-}
+/// Child names of one complete non-recursive directory listing; an absent or
+/// advisory-unreadable directory lists none.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct DirectoryListing(BTreeSet<String>);
 
-impl ListingFingerprint {
-    /// Construct a deterministic fingerprint.
-    pub fn new(children: BTreeMap<String, EntryIdentity>) -> Result<Self, CaptureError> {
-        Self::with_container(None, children, false)
+impl DirectoryListing {
+    /// A listing of `names`, each of which must be one path component.
+    pub fn new(names: impl IntoIterator<Item = String>) -> Result<Self, CaptureError> {
+        names
+            .into_iter()
+            .map(|name| validate_listing_name(&name).map(|()| name))
+            .collect::<Result<_, _>>()
+            .map(Self)
     }
 
-    /// Construct a fingerprint for one present directory and its complete children.
-    pub fn for_directory(
-        container: EntryIdentity,
-        children: BTreeMap<String, EntryIdentity>,
-    ) -> Result<Self, CaptureError> {
-        Self::with_container(Some(container), children, false)
-    }
-
-    /// Construct a fingerprint for an absent listing root.
-    pub fn for_absent() -> Result<Self, CaptureError> {
-        Self::with_container(None, BTreeMap::new(), false)
-    }
-
-    /// Capture an advisory scan directory whose metadata was readable but whose
-    /// children could not be enumerated due to permission denial.
-    pub fn for_advisory_unreadable(container: EntryIdentity) -> Result<Self, CaptureError> {
-        Self::with_container(Some(container), BTreeMap::new(), true)
-    }
-
-    fn with_container(
-        container: Option<EntryIdentity>,
-        children: BTreeMap<String, EntryIdentity>,
-        advisory_unreadable: bool,
-    ) -> Result<Self, CaptureError> {
-        if let Some(identity) = &container {
-            identity.validate()?;
-        }
-        for (name, identity) in &children {
-            validate_listing_name(name)?;
-            identity.validate()?;
-        }
-        let mut hasher = Sha256::new();
-        match &container {
-            Some(identity) => {
-                hash_field(&mut hasher, b"directory");
-                hash_field(&mut hasher, identity.object.as_bytes());
-                hash_field(&mut hasher, identity.sha256.as_bytes());
-                hash_field(&mut hasher, &identity.byte_size.to_be_bytes());
-            }
-            None => hash_field(&mut hasher, b"absent"),
-        }
-        hash_field(
-            &mut hasher,
-            if advisory_unreadable {
-                b"advisory-unreadable"
-            } else {
-                b"complete"
-            },
-        );
-        for (name, identity) in &children {
-            hash_field(&mut hasher, name.as_bytes());
-            hash_field(&mut hasher, identity.object.as_bytes());
-            hash_field(&mut hasher, identity.sha256.as_bytes());
-            hash_field(&mut hasher, &identity.byte_size.to_be_bytes());
-        }
-        Ok(Self {
-            container,
-            children,
-            advisory_unreadable,
-            sha256: format!("{:x}", hasher.finalize()),
-        })
-    }
-
-    /// Sorted child identities used to derive this fingerprint.
-    pub fn children(&self) -> &BTreeMap<String, EntryIdentity> {
-        &self.children
-    }
-
-    /// Whether this listing intentionally omits an unreadable advisory subtree.
-    pub fn is_advisory_unreadable(&self) -> bool {
-        self.advisory_unreadable
-    }
-
-    /// Exact listed-directory identity, or `None` when it was absent.
-    pub fn container(&self) -> Option<&EntryIdentity> {
-        self.container.as_ref()
-    }
-
-    /// Deterministic digest of the complete listing.
-    pub fn sha256(&self) -> &str {
-        &self.sha256
-    }
-
-    fn validate(&self) -> Result<(), CaptureError> {
-        if let Some(identity) = &self.container {
-            identity.validate()?;
-        }
-        for (name, identity) in &self.children {
-            validate_listing_name(name)?;
-            identity.validate()?;
-        }
-        if Self::with_container(
-            self.container.clone(),
-            self.children.clone(),
-            self.advisory_unreadable,
-        )?
-        .sha256
-            != self.sha256
-        {
-            return Err(CaptureError::ListingFingerprintMismatch);
-        }
-        Ok(())
+    /// Sorted child names.
+    pub fn names(&self) -> &BTreeSet<String> {
+        &self.0
     }
 }
 
@@ -923,7 +820,7 @@ impl CaptureSpec {
 #[derive(Debug, Default)]
 pub(crate) struct CapturedAnswers {
     pub(crate) entries: BTreeMap<VirtualPath, RepositoryEntry>,
-    pub(crate) listings: BTreeMap<VirtualPath, ListingFingerprint>,
+    pub(crate) listings: BTreeMap<VirtualPath, DirectoryListing>,
     pub(crate) pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
     pub(crate) linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 }
@@ -934,7 +831,7 @@ pub struct RepositoryImage {
     layout: RepositoryLayout,
     spec: CaptureSpec,
     entries: BTreeMap<VirtualPath, RepositoryEntry>,
-    listings: BTreeMap<VirtualPath, ListingFingerprint>,
+    listings: BTreeMap<VirtualPath, DirectoryListing>,
     pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
     linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 }
@@ -945,7 +842,7 @@ impl RepositoryImage {
         layout: RepositoryLayout,
         spec: CaptureSpec,
         entries: BTreeMap<VirtualPath, RepositoryEntry>,
-        listings: BTreeMap<VirtualPath, ListingFingerprint>,
+        listings: BTreeMap<VirtualPath, DirectoryListing>,
         pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
         linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
     ) -> Result<Self, CaptureError> {
@@ -971,12 +868,11 @@ impl RepositoryImage {
                 return Err(CaptureError::IncompleteCapture(path.clone()));
             }
         }
-        for (path, listing) in &listings {
+        for path in listings.keys() {
             layout.ensure_canonical(path)?;
             if !spec.listings.contains(path) {
                 return Err(CaptureError::UnexpectedListing(path.clone()));
             }
-            listing.validate()?;
         }
         for path in spec.listings() {
             layout.ensure_canonical(path)?;
@@ -991,8 +887,8 @@ impl RepositoryImage {
             .iter()
             .flat_map(|(parent, listing)| {
                 listing
-                    .children()
-                    .keys()
+                    .names()
+                    .iter()
                     .map(move |name| (parent, name.as_str()))
             })
             .try_fold(0_u64, |bytes, (parent, name)| {
@@ -1057,8 +953,8 @@ impl RepositoryImage {
         &self.entries
     }
 
-    /// Every complete-listing fingerprint in canonical order.
-    pub fn listing_fingerprints(&self) -> &BTreeMap<VirtualPath, ListingFingerprint> {
+    /// Every complete directory listing in canonical order.
+    pub fn directory_listings(&self) -> &BTreeMap<VirtualPath, DirectoryListing> {
         &self.listings
     }
 
@@ -1633,11 +1529,6 @@ fn serialize_content_digest<S: serde::Serializer>(
     (format!("{:x}", Sha256::digest(bytes)), bytes.len()).serialize(serializer)
 }
 
-fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
-    hasher.update((bytes.len() as u64).to_be_bytes());
-    hasher.update(bytes);
-}
-
 /// Capture closure failure.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CaptureError {
@@ -1689,8 +1580,6 @@ pub enum CaptureError {
     InvalidCapturedEntry { path: VirtualPath, reason: String },
     #[error("directory listing child name '{0}' is invalid")]
     InvalidListingName(String),
-    #[error("directory listing fingerprint does not match its children")]
-    ListingFingerprintMismatch,
     #[error("pure producer requested undiscovered path {0:?}")]
     UndiscoveredRepositoryPath(VirtualPath),
     #[error("captured path {0:?} has a symlink or unsupported occupant")]
@@ -1742,41 +1631,24 @@ mod tests {
         .unwrap()
     }
 
-    fn image(seed_byte: u8, listing_byte: u8) -> RepositoryImage {
+    fn image() -> RepositoryImage {
         let path = VirtualPath::data("index.json").unwrap();
-        let dir = VirtualPath::data("issues").unwrap();
-        let spec = {
-            let mut spec = CaptureSpec::new(
-                [path.clone()],
-                CaptureBudget {
-                    max_listings: 2,
-                    max_bytes: 64,
-                    max_depth: 4,
-                },
-            )
-            .unwrap();
-            spec.discover_listing(dir.clone()).unwrap();
-            spec
+        let budget = CaptureBudget {
+            max_listings: 0,
+            max_bytes: 64,
+            max_depth: 4,
         };
-        let bytes = vec![seed_byte];
         RepositoryImage::close(
             layout(),
-            spec,
+            CaptureSpec::new([path.clone()], budget).unwrap(),
             BTreeMap::from([(
                 path,
                 RepositoryEntry::File {
-                    content: CapturedBytes::new("index", bytes).unwrap(),
+                    content: CapturedBytes::new("index", vec![1]).unwrap(),
                     mode: FileMode::Regular,
                 },
             )]),
-            BTreeMap::from([(
-                dir,
-                ListingFingerprint::new(BTreeMap::from([(
-                    "one.json".into(),
-                    EntryIdentity::for_bytes("issue", &[listing_byte]).unwrap(),
-                )]))
-                .unwrap(),
-            )]),
+            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -1785,7 +1657,7 @@ mod tests {
 
     #[test]
     fn test_capture_rejects_undiscovered_repository_read() {
-        let mut captured = image(1, 2);
+        let mut captured = image();
         let unrequested = VirtualPath::data("config.toml").unwrap();
         captured
             .entries
@@ -1830,7 +1702,7 @@ mod tests {
                 layout(),
                 spec.clone(),
                 entries.clone(),
-                BTreeMap::from([(extra.clone(), ListingFingerprint::new(BTreeMap::new()).unwrap())]),
+                BTreeMap::from([(extra.clone(), DirectoryListing::default())]),
                 BTreeMap::new(),
                 BTreeMap::new(),
             ),
@@ -1909,51 +1781,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_close_revalidates_listing_fingerprint() {
-        let directory = VirtualPath::data("issues").unwrap();
-        let mut listing = ListingFingerprint::new(BTreeMap::new()).unwrap();
-        listing.sha256 = "0".repeat(64);
-        let mut listing_spec = CaptureSpec::new(
-            [],
-            CaptureBudget {
-                max_listings: 1,
-                max_bytes: 0,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        listing_spec.discover_listing(directory.clone()).unwrap();
-        assert!(matches!(
-            RepositoryImage::close(
-                layout(),
-                listing_spec,
-                BTreeMap::new(),
-                BTreeMap::from([(directory, listing)]),
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
-            Err(CaptureError::ListingFingerprintMismatch)
-        ));
-    }
-
-    #[test]
-    fn test_listing_fingerprint_distinguishes_complete_empty_from_advisory_unreadable() {
-        let identity = EntryIdentity::for_bytes("scan-root", b"directory").unwrap();
-        let complete =
-            ListingFingerprint::for_directory(identity.clone(), BTreeMap::new()).unwrap();
-        let unreadable = ListingFingerprint::for_advisory_unreadable(identity).unwrap();
-
-        assert!(!complete.is_advisory_unreadable());
-        assert!(unreadable.is_advisory_unreadable());
-        assert_ne!(complete.sha256(), unreadable.sha256());
-        assert_ne!(complete, unreadable);
-        assert_ne!(
-            serde_json::to_value(&complete).unwrap(),
-            serde_json::to_value(&unreadable).unwrap()
-        );
-    }
-
     fn close_listing(
         path: &str,
         children: &[&str],
@@ -1961,10 +1788,7 @@ mod tests {
         budget: CaptureBudget,
     ) -> Result<RepositoryImage, CaptureError> {
         let path = VirtualPath::data(path)?;
-        let identities = children
-            .iter()
-            .map(|name| Ok(((*name).to_owned(), EntryIdentity::for_bytes(*name, b"")?)))
-            .collect::<Result<BTreeMap<_, _>, CaptureError>>()?;
+        let listing = DirectoryListing::new(children.iter().map(|name| (*name).to_owned()))?;
         let entries = exact
             .iter()
             .map(|name| {
@@ -1983,7 +1807,7 @@ mod tests {
             layout(),
             spec,
             entries,
-            BTreeMap::from([(path, ListingFingerprint::new(identities)?)]),
+            BTreeMap::from([(path, listing)]),
             BTreeMap::new(),
             BTreeMap::new(),
         )
@@ -2095,7 +1919,6 @@ mod tests {
     fn test_close_admits_a_listed_child_that_is_a_requested_listing_root() {
         let root = VirtualPath::data("").unwrap();
         let issues = VirtualPath::data("issues").unwrap();
-        let identity = EntryIdentity::for_bytes("issues", b"directory").unwrap();
         let mut spec = CaptureSpec::new(
             [],
             CaptureBudget {
@@ -2113,15 +1936,8 @@ mod tests {
             spec,
             BTreeMap::new(),
             BTreeMap::from([
-                (
-                    root,
-                    ListingFingerprint::new(BTreeMap::from([("issues".into(), identity.clone())]))
-                        .unwrap(),
-                ),
-                (
-                    issues,
-                    ListingFingerprint::for_directory(identity, BTreeMap::new()).unwrap(),
-                ),
+                (root, DirectoryListing::new(["issues".into()]).unwrap()),
+                (issues, DirectoryListing::default()),
             ]),
             BTreeMap::new(),
             BTreeMap::new(),
@@ -2440,10 +2256,7 @@ mod tests {
             Err(CaptureError::InvalidEntryIdentity(_))
         ));
         assert!(matches!(
-            ListingFingerprint::new(BTreeMap::from([(
-                "../escape".into(),
-                EntryIdentity::for_bytes("entry", b"bytes").unwrap(),
-            )])),
+            DirectoryListing::new(["../escape".into()]),
             Err(CaptureError::InvalidListingName(_))
         ));
         assert!(matches!(
