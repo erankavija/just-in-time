@@ -14,8 +14,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-01T19:37:54.542453257Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T19:44:30.266350209Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -39,5 +39,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove the unqualified satisfies coverage form",
-  "updated_at": "2026-10-01T19:42:37.562152592Z"
+  "updated_at": "2026-10-01T19:44:30.266350209Z"
 }
