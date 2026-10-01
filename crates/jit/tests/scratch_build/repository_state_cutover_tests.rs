@@ -11,12 +11,51 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+/// A `cfg` attribute that compiles its item only into test builds.
+fn is_test_only_cfg(line: &str) -> bool {
+    let line = line.trim_start();
+    line.strip_prefix("#[cfg(")
+        .or_else(|| line.strip_prefix("#![cfg("))
+        .is_some_and(|predicate| !predicate.starts_with("not(") && predicate.contains("test"))
+}
+
+/// The text a non-test build compiles from `source`, or `None` for a file only
+/// tests compile.
+///
+/// An item behind a test-only `cfg` is dropped through the line closing it at
+/// its own indentation, which rustfmt guarantees.
+fn production_text(source: &str) -> Option<String> {
+    if source
+        .lines()
+        .any(|line| line.trim_start().starts_with("#![") && is_test_only_cfg(line))
+    {
+        return None;
+    }
+    let indentation = |line: &str| line.len() - line.trim_start().len();
+    let mut lines = source.lines();
+    let mut compiled = String::new();
+    while let Some(line) = lines.next() {
+        if is_test_only_cfg(line) {
+            let item = lines
+                .by_ref()
+                .find(|item| !item.trim_start().starts_with("#["));
+            if item.is_some_and(|item| !item.trim_end().ends_with([';', '}'])) {
+                // Advances past the line closing the item.
+                lines.by_ref().any(|closing| {
+                    indentation(closing) == indentation(line)
+                        && closing.trim_start().starts_with(['}', ')', ']'])
+                });
+            }
+        } else {
+            compiled.push_str(line);
+            compiled.push('\n');
+        }
+    }
+    Some(compiled)
+}
+
 fn production_source(path: &Path) -> String {
-    let source = std::fs::read_to_string(path).unwrap();
-    source
-        .split_once("\n#[cfg(test)]\nmod ")
-        .map_or(source.as_str(), |(production, _)| production)
-        .to_string()
+    production_text(&std::fs::read_to_string(path).unwrap()).unwrap_or_default()
 }
 
 fn definition_owners(root: &Path, definition: &str) -> Vec<PathBuf> {
@@ -526,50 +565,6 @@ fn contains_cargo_manifest(root: &Path) -> bool {
     })
 }
 
-/// A `cfg` attribute that compiles its item only into test builds.
-fn is_test_only_cfg(line: &str) -> bool {
-    let line = line.trim_start();
-    line.strip_prefix("#[cfg(")
-        .or_else(|| line.strip_prefix("#![cfg("))
-        .is_some_and(|predicate| !predicate.starts_with("not(") && predicate.contains("test"))
-}
-
-/// The text a non-test build compiles from `source`, or `None` for a file only
-/// tests compile.
-///
-/// An item behind a test-only `cfg` is dropped through the line closing it at
-/// its own indentation, which rustfmt guarantees. Comment lines are dropped, so
-/// prose naming a shape is not read as code using it.
-fn compiled_text(source: &str) -> Option<String> {
-    if source
-        .lines()
-        .any(|line| line.trim_start().starts_with("#![") && is_test_only_cfg(line))
-    {
-        return None;
-    }
-    let indentation = |line: &str| line.len() - line.trim_start().len();
-    let mut lines = source.lines();
-    let mut compiled = String::new();
-    while let Some(line) = lines.next() {
-        if is_test_only_cfg(line) {
-            let item = lines
-                .by_ref()
-                .find(|item| !item.trim_start().starts_with("#["));
-            if item.is_some_and(|item| !item.trim_end().ends_with([';', '}'])) {
-                // Advances past the line closing the item.
-                lines.by_ref().any(|closing| {
-                    indentation(closing) == indentation(line)
-                        && closing.trim_start().starts_with(['}', ')', ']'])
-                });
-            }
-        } else if !line.trim_start().starts_with("//") {
-            compiled.push_str(line);
-            compiled.push('\n');
-        }
-    }
-    Some(compiled)
-}
-
 /// `item` with its leading visibility removed.
 fn without_visibility(item: &str) -> &str {
     let item = item.trim_start();
@@ -588,10 +583,10 @@ fn declared_module(line: &str) -> Option<&str> {
         .strip_suffix(';')
 }
 
-/// `file` and every module file it declares, each with its [`compiled_text`];
+/// `file` and every module file it declares, each with its [`production_text`];
 /// a module a non-test build leaves out contributes nothing.
 fn compiled_modules(file: &Path) -> Vec<(PathBuf, String)> {
-    let Some(text) = compiled_text(&std::fs::read_to_string(file).unwrap()) else {
+    let Some(text) = production_text(&std::fs::read_to_string(file).unwrap()) else {
         return Vec::new();
     };
     let directory = match file.file_name().and_then(|name| name.to_str()) {
@@ -737,8 +732,8 @@ fn function_bodies(source: &str) -> Vec<&str> {
         .collect()
 }
 
-/// The sources holding a function that both reaches the repository's roots and
-/// mutates the filesystem.
+/// The sources holding a function whose code, comments aside, both reaches the
+/// repository's roots and mutates the filesystem.
 fn repository_state_writers<'a>(
     sources: impl IntoIterator<Item = (&'a Path, &'a str)>,
 ) -> BTreeSet<PathBuf> {
@@ -746,12 +741,17 @@ fn repository_state_writers<'a>(
         .into_iter()
         .filter(|(_, source)| {
             function_bodies(source).into_iter().any(|function| {
+                let code = function
+                    .lines()
+                    .filter(|line| !line.trim_start().starts_with("//"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
                 REPOSITORY_ROOT_ADDRESSES
                     .iter()
-                    .any(|address| function.contains(address))
+                    .any(|address| code.contains(address))
                     && FILESYSTEM_MUTATIONS
                         .iter()
-                        .any(|mutation| function.contains(mutation))
+                        .any(|mutation| code.contains(mutation))
             })
         })
         .map(|(path, _)| path.to_path_buf())
@@ -865,7 +865,7 @@ fn test_repository_state_writer_scan_flags_direct_writers_and_skips_what_no_buil
             false,
         ),
     ] {
-        let compiled = compiled_text(fragment).unwrap();
+        let compiled = production_text(fragment).unwrap();
         let path = Path::new("commands/fragment.rs");
         assert_eq!(
             repository_state_writers([(path, compiled.as_str())]).contains(path),
@@ -874,7 +874,7 @@ fn test_repository_state_writer_scan_flags_direct_writers_and_skips_what_no_buil
         );
     }
     assert_eq!(
-        compiled_text("#![cfg(any(test, feature = \"test-support\"))]\nfn seed() {}\n"),
+        production_text("#![cfg(any(test, feature = \"test-support\"))]\nfn seed() {}\n"),
         None
     );
 
