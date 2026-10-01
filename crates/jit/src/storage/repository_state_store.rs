@@ -11,7 +11,7 @@ use crate::repository_state::{
     ListingFingerprint, MaterializationPlan, PinnedDocumentEvidence, PinnedSourceClass, ReadMode,
     RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
     RepositoryLayoutError, RepositoryRootClass, RepositoryRootEvidence, RootRelativePath,
-    VirtualPath, EVENT_LOG_TAIL_WINDOW,
+    VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
@@ -1588,11 +1588,13 @@ fn inspect_capability_leaf(
         let mut file = parent.open_with(leaf, &options)?;
         if read == ReadMode::Tail {
             let length = file.metadata()?.len();
-            let window = length.min(EVENT_LOG_TAIL_WINDOW);
-            let mut tail = Vec::new();
-            file.seek(SeekFrom::Start(length - window))?;
-            file.take(window).read_to_end(&mut tail)?;
-            // A file that shrank under the read leaves a short tail.
+            let tail = EventLogTail::read_tail(length, |start, len| {
+                let mut bytes = Vec::new();
+                file.seek(SeekFrom::Start(start))?;
+                (&mut file).take(len).read_to_end(&mut bytes)?;
+                Ok::<_, std::io::Error>(bytes)
+            })?;
+            // A file that changed length under the read leaves a short tail.
             let tail = EventLogTail::new(length, tail)
                 .map_err(|_| RepositoryStateStoreError::RetryableConflict { path: leaf.into() })?;
             return Ok(RepositoryEntry::FileTail {

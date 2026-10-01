@@ -173,7 +173,8 @@ before the seam changes.
 
 The live bytes of every path the mutation writes or deletes, other than the event log, are
 compared with the bytes it read; the event log is compared as its length plus its last
-`min(len, 4096)` bytes, as bytes rather than as complete lines (OD-4). While the log is
+`min(len, 4096)` bytes, as bytes rather than as complete lines (OD-4), reaching back to the
+start of an unterminated final line the window cuts (`@/issue/c88822a5/decision/D-1`). While the log is
 still a put path, the byte comparison leaves it out. Any difference is a
 retryable conflict naming the path that moved, raised before anything durable is written. A
 file the mutation read but does not write is left out — the accepted cost D-17 names.

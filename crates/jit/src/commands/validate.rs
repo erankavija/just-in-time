@@ -323,8 +323,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         archive_scan: bool,
     ) -> Result<Option<(crate::repository_state::RepositoryImage, Vec<Issue>)>> {
         use crate::repository_state::{
-            validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryEntry, RepositoryImage,
-            VirtualPath,
+            validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
 
         // An archive citation scan may enumerate every directory below its
@@ -380,13 +379,6 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             base(spec)?;
             if spec != image.capture_spec() {
                 return Ok(());
-            }
-            // A tail that cannot hold the log's final line cannot say whether it
-            // is torn, so the round reads that log whole.
-            if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
-                if tail.final_line().is_none() {
-                    spec.discover_paths([VirtualPath::EVENTS])?;
-                }
             }
             if let Some(listing) = image.listing_fingerprints().get(&VirtualPath::PROFILES) {
                 spec.discover_paths(
@@ -4666,17 +4658,14 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(counter.1, 1);
     }
 
-    /// A log whose unterminated final line starts before the tail window is
-    /// read whole, in the same round; a terminated one stays a tail.
+    /// The base reads the log as a tail in its one round, even when the
+    /// unterminated final line is longer than the tail window.
     #[test]
-    fn test_capture_mutation_base_reads_a_log_whole_only_when_its_tail_misses_the_final_line() {
+    fn test_capture_mutation_base_reads_the_log_as_a_tail_whatever_its_final_line() {
         use crate::repository_state::{ReadMode, VirtualPath};
 
         let long = "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
-        for (log, expected) in [
-            (format!("{long}\n"), ReadMode::Tail),
-            (format!("{{}}\n{long}"), ReadMode::Whole),
-        ] {
+        for log in [format!("{long}\n"), format!("{{}}\n{long}")] {
             let (executor, _, mut counter) = counted_session();
             executor.storage().add_data_file("events.jsonl", &log);
 
@@ -4687,7 +4676,7 @@ description = \"Full Rust CI pipeline must pass.\"
                 .image;
 
             let mode = image.capture_spec().read_mode(&VirtualPath::EVENTS);
-            assert_eq!(mode, Some(expected));
+            assert_eq!(mode, Some(ReadMode::Tail));
             assert_eq!(counter.1, 1);
         }
     }

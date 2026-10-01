@@ -634,7 +634,7 @@ fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
 ///
 /// # Errors
 ///
-/// [`CaptureError::TailOnlyCapture`] for a tail whose window starts inside the
+/// [`CaptureError::TailOnlyCapture`] for a tail that holds only part of the
 /// final line, which cannot say whether that line is torn.
 fn captured_log_end(image: &RepositoryImage) -> Result<(u64, &[u8]), MutationError> {
     if let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS)? {
@@ -1814,8 +1814,10 @@ mod tests {
     /// line is torn, so the composer refuses it rather than guess.
     #[test]
     fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
-        let log = vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize];
-        let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
+        let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW;
+        let partial =
+            crate::repository_state::EventLogTail::new(2 * window, vec![b'x'; window as usize]);
+        let image = tail_image(partial.unwrap());
 
         assert!(matches!(
             finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),
