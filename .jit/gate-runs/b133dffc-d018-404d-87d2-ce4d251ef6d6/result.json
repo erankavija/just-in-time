@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ba4d32ee8780647971aa9fd263e517a44db11169",
+  "completed_at": "2026-10-01T16:25:42.353162389Z",
+  "duration_ms": 202280,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 548,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "Broad prechecks can be recorded stable after an issue-linked document or its pinned/linked evidence changes because post-check recapture omits that evidence from comparison."
+      }
+    ],
+    "summary": "Broad precheck stability no longer detects issue-document evidence drift.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8454236c-c254-419c-826e-0b8da050711f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b133dffc-d018-404d-87d2-ce4d251ef6d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T16:22:20.072861428Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8604 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f846-210a-7972-9e2d-610c3dbeb0ff\n--------\nuser\n--- 8591 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: dfd377f23, 641402705, ba4d32ee8 (jit:8454236c)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/issue/8454236c/requirement/REQ-05 and REQ-06 (issue description); @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-01T16:17:53Z)\nTruncation recovery: narrowed reads of the linked plan, each attributed patch, capture paths, and precheck evidence paths\n1. [blocking][issue-impact][high] Broad prechecks can now be recorded as stable after an issue-linked document or its pinned/linked evidence changes. The initial precheck correctly uses `capture_proposed_base` to capture validation documents, but the post-check mutation recaptures only the mutation base. `PrecheckEvidence::matches` filters out document paths absent from that base and no longer compares pinned or linked evidence, so the change is invisible. Previously, the broad-precheck path retained this evidence. Add a movement test and preserve comparison of the validation capture’s document evidence. `crates/jit/src/commands/mod.rs:548` [`@/invariant/derived-state-coherence`]\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Broad precheck stability no longer detects issue-document evidence drift.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Broad prechecks can be recorded stable after an issue-linked document or its pinned/linked evidence changes because post-check recapture omits that evidence from comparison.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":548,\"references\":[\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
