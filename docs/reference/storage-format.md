@@ -104,8 +104,11 @@ other file through the temp-file and rename pattern (`@/inv/atomic-writes`),
 removes the listed paths, extends the event log, and ends by removing the
 record.
 
-A session that opens over a leftover record applies it before serving the
-command. Application is idempotent, so an interrupted application converges on
+A command that changes the repository, and `jit recover`, opens a mutation
+session, and a session that opens over a leftover record applies it before
+serving the command. A read-only command opens no mutation session: it reads the
+files as they stand, which until the record is applied may be the state before
+the mutation or partly applied. Application is idempotent, so an interrupted application converges on
 the same state when repeated. A leftover record that does not parse, including
 one whose own write was interrupted, is refused: the session open fails with an
 error naming the record. Repository discovery recognizes a pending record as

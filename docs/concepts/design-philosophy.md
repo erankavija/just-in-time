@@ -70,8 +70,8 @@ AI agents are increasingly capable of complex software tasks, but existing tools
 change as one redo record, syncs it under the data root's scratch directory, and
 only then writes live files — each replacement through a temporary file in the
 target directory followed by a rename, so readers never observe a partial write.
-An interrupted mutation leaves the record behind, and the next session applies it
-forward rather than unwinding it. Advisory locks coordinate the operations that
+An interrupted mutation leaves the record behind, and the next mutation session
+applies it forward rather than unwinding it. Advisory locks coordinate the operations that
 need shared access; an atomic rename alone does not serialize competing writers.
 
 **Clear Exit Codes:** UNIX-standard exit codes enable bash error handling: `jit ... || handle_error`

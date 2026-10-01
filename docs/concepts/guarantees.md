@@ -437,8 +437,9 @@ JIT is designed to handle failures gracefully without data loss or corruption.
 
 Where the crash falls relative to the commit point decides the outcome. Before
 the record is durable, no live file has been written and the mutation simply did
-not happen. After it, the record survives the crash and the next session applies
-it:
+not happen. After it, the record survives the crash and the next command that opens a
+mutation session applies it
+([Publication and Recovery](../reference/storage-format.md#publication-and-recovery)):
 
 ```bash
 # After an interrupted mutation:
