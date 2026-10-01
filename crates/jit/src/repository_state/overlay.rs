@@ -17,7 +17,7 @@
 
 use super::RepositoryAction;
 use super::{
-    CaptureError, CapturedBytes, FileMode, ListingFingerprint, RepositoryEntry, RepositoryImage,
+    CaptureError, CapturedBytes, DirectoryListing, FileMode, RepositoryEntry, RepositoryImage,
     RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
 use std::collections::BTreeMap;
@@ -57,7 +57,7 @@ pub fn apply_overlay(
     let layout = base.layout().clone();
     let mut spec = base.capture_spec().clone();
     let mut entries = base.entries().clone();
-    let mut listings = base.listing_fingerprints().clone();
+    let mut listings = base.directory_listings().clone();
     let pinned = base.pinned_evidence().clone();
     let linked = base.linked_worktree_evidence().clone();
 
@@ -66,19 +66,13 @@ pub fn apply_overlay(
         // Extend the closed read-set so `entry(path)` resolves through the returned
         // image; a path outside base ∪ overrides stays undiscovered.
         spec.discover_paths([path.clone()])?;
-        let (entry, child_identity) = match value {
-            Some(bytes) => {
-                let content = CapturedBytes::new(OVERLAY_OBJECT, bytes)?;
-                let identity = content.identity().clone();
-                (
-                    RepositoryEntry::File {
-                        content,
-                        mode: FileMode::Regular,
-                    },
-                    Some(identity),
-                )
-            }
-            None => (RepositoryEntry::Absent, None),
+        let present = value.is_some();
+        let entry = match value {
+            Some(bytes) => RepositoryEntry::File {
+                content: CapturedBytes::new(OVERLAY_OBJECT, bytes)?,
+                mode: FileMode::Regular,
+            },
+            None => RepositoryEntry::Absent,
         };
         entries.insert(path.clone(), entry);
 
@@ -86,22 +80,12 @@ pub fn apply_overlay(
         // one. A directory validation never lists is simply left unchanged.
         if let Some((parent, name)) = parent_and_name(&path) {
             if let Some(listing) = listings.get(&parent) {
-                let mut children = listing.children().clone();
-                match child_identity {
-                    Some(identity) => {
-                        children.insert(name, identity);
-                    }
-                    None => {
-                        children.remove(&name);
-                    }
-                }
-                let updated = match listing.container() {
-                    Some(container) => {
-                        ListingFingerprint::for_directory(container.clone(), children)?
-                    }
-                    None => ListingFingerprint::new(children)?,
+                let mut names = listing.names().clone();
+                match present {
+                    true => names.insert(name),
+                    false => names.remove(&name),
                 };
-                listings.insert(parent, updated);
+                listings.insert(parent, DirectoryListing::new(names)?);
             }
         }
     }
@@ -165,8 +149,7 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, ExpectedPreimage, RepositoryLayout,
-        RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, ExpectedPreimage, RepositoryLayout, RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -209,18 +192,8 @@ mod tests {
         if let Some(names) = issues_listing {
             let dir = VirtualPath::data("issues").unwrap();
             spec.discover_listing(dir.clone()).unwrap();
-            let mut children = BTreeMap::new();
-            for name in names {
-                children.insert(
-                    (*name).to_string(),
-                    EntryIdentity::for_bytes("child", name.as_bytes()).unwrap(),
-                );
-            }
-            let container = EntryIdentity::for_bytes("dir", b"issues").unwrap();
-            listings.insert(
-                dir,
-                ListingFingerprint::for_directory(container, children).unwrap(),
-            );
+            let names = names.iter().map(|name| (*name).to_string());
+            listings.insert(dir, DirectoryListing::new(names).unwrap());
         }
         RepositoryImage::close(
             layout(),
@@ -296,8 +269,8 @@ mod tests {
         )
         .unwrap();
         let dir = VirtualPath::data("issues").unwrap();
-        let children = overlaid.listing_fingerprints()[&dir].children();
-        assert!(children.contains_key("b.json"));
-        assert!(!children.contains_key("a.json"));
+        let names = overlaid.directory_listings()[&dir].names();
+        assert!(names.contains("b.json"));
+        assert!(!names.contains("a.json"));
     }
 }
