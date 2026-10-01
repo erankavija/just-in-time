@@ -653,12 +653,12 @@ pub fn prefix_has_torn_tail(prefix: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(final_line).is_err()
 }
 
-/// Compose the exact `events.jsonl` bytes: preserve every prefix byte, add one
-/// separator newline only when a non-empty prefix lacks one, then append each
+/// Compose the bytes appended at the captured log length: add one separator
+/// newline only when the log ends in an unterminated `final_line`, then append each
 /// event line with exactly one trailing newline.
-fn compose_events(prefix: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
-    let mut out = prefix.to_vec();
-    if !out.is_empty() && !out.ends_with(b"\n") {
+fn compose_events(final_line: &[u8], lines: &[Vec<u8>]) -> Vec<u8> {
+    let mut out = Vec::new();
+    if !final_line.is_empty() {
         out.push(b'\n');
     }
     for line in lines {
@@ -1197,11 +1197,11 @@ fn dispatch_annotation_event(context: &MutationContext, ordinal: usize) -> Optio
 }
 
 /// Compose the audit-log append action for a set of pending events over the
-/// captured `events.jsonl` prefix: admit the record the context's dispatch annotation
+/// captured `events.jsonl` length: admit the record the context's dispatch annotation
 /// contributes, order them canonically, assign identifiers (via the context, in the
 /// caller's frozen allocation order), stamp the single mutation timestamp, certify a
 /// torn tail (a profile lifecycle marker is required, and the certifier is composed
-/// immediately after the torn partial), and produce the exact bytes. Returns `None`
+/// immediately after the torn partial), and produce the appended bytes. Returns `None`
 /// when there are no events. This is the event pass of [`finalize`], factored out so
 /// [`finalize_audit_append`] can reuse the one torn-tail authority — and so the
 /// annotation record reaches both paths from one place.
@@ -1221,13 +1221,13 @@ fn compose_event_action(
     if let Some(record) = dispatch_annotation_event(context, pending_events.len()) {
         pending_events.push(record);
     }
-    let path = VirtualPath::EVENTS;
-    let prefix = captured_file_bytes(image, &path)?.unwrap_or(&[]).to_vec();
+    let log = captured_file_bytes(image, &VirtualPath::EVENTS)?.unwrap_or_default();
+    let final_line = log.rsplit(|byte| *byte == b'\n').next().unwrap_or_default();
     // The finalizer owns torn-tail evidence. The reader (parse_known_events) accepts
     // a malformed, unterminated partial line only when the line IMMEDIATELY following
     // it is a profile lifecycle `{ isolated_torn_tail: true }` certifier. Detect this
     // before sampling time or allocating identifiers.
-    let torn_tail = prefix_has_torn_tail(&prefix);
+    let torn_tail = prefix_has_torn_tail(final_line);
     let has_marker = pending_events
         .iter()
         .any(|pending| matches!(pending.event, Event::ProfileLifecycle { .. }));
@@ -1266,13 +1266,11 @@ fn compose_event_action(
         .iter()
         .map(|pending| serialize_event(&pending.event))
         .collect::<Result<Vec<_>, _>>()?;
-    let bytes = compose_events(&prefix, &lines);
-    Ok(Some(RepositoryAction::WriteFile {
-        path: path.clone(),
+    Ok(Some(RepositoryAction::AppendEvents {
         owner: OWNER.to_string(),
-        expected: expected_of(image, &path)?,
-        bytes,
-        mode: FileMode::Regular,
+        expected: expected_of(image, &VirtualPath::EVENTS)?,
+        offset: log.len() as u64,
+        bytes: compose_events(final_line, &lines),
     }))
 }
 
@@ -1612,21 +1610,9 @@ mod tests {
         ])
     }
 
-    /// The exact bytes a delta appends to the event log, from its single
-    /// `events.jsonl` write.
+    /// The exact bytes a delta appends to the event log.
     fn appended_event_bytes(delta: &RepositoryDelta) -> Option<Vec<u8>> {
-        let mut writes = delta.actions().iter().filter_map(|action| match action {
-            RepositoryAction::WriteFile { path, bytes, .. } if path == &VirtualPath::EVENTS => {
-                Some(bytes.clone())
-            }
-            _ => None,
-        });
-        let first = writes.next();
-        assert!(
-            writes.next().is_none(),
-            "one mutation appends its events through one action"
-        );
-        first
+        delta.appended_event_bytes().map(<[u8]>::to_vec)
     }
 
     /// The events a delta appends, as the event-log reader recovers them.
@@ -1817,8 +1803,8 @@ mod tests {
         )
         .unwrap()
         .expect("a non-empty audit append composes an action");
-        let RepositoryAction::WriteFile { bytes, .. } = &action else {
-            unreachable!("an audit append writes the event log");
+        let RepositoryAction::AppendEvents { bytes, .. } = &action else {
+            unreachable!("an audit append appends to the event log");
         };
         let events =
             crate::domain::parse_known_events(std::str::from_utf8(bytes).unwrap()).unwrap();
@@ -2427,18 +2413,66 @@ mod tests {
         assert!(!prefix_has_torn_tail(b"{\"a\":1}"));
     }
 
+    /// The finalizer's event-log action over `image`: its offset and bytes.
+    fn event_append(image: &RepositoryImage, intents: &[MutationIntent]) -> (u64, Vec<u8>) {
+        let plan = finalize(&layout(), image, &ctx(), intents).unwrap();
+        plan.delta()
+            .actions()
+            .iter()
+            .find_map(|action| match action {
+                RepositoryAction::AppendEvents { offset, bytes, .. } => {
+                    Some((*offset, bytes.clone()))
+                }
+                _ => None,
+            })
+            .expect("the mutation appends its events")
+    }
+
     #[test]
-    fn test_compose_events_inserts_single_separator() {
-        assert_eq!(compose_events(b"", &[b"line".to_vec()]), b"line\n");
-        assert_eq!(
-            compose_events(b"prev\n", &[b"line".to_vec()]),
-            b"prev\nline\n"
-        );
-        // A non-empty prefix lacking a newline gets exactly one separator.
-        assert_eq!(
-            compose_events(b"prev", &[b"line".to_vec()]),
-            b"prev\nline\n"
-        );
+    fn test_finalize_appends_at_the_captured_log_length_reading_as_the_whole_log_composition() {
+        let prior = serialize_event(&Event::GateDefinitionCreated {
+            id: "e0".into(),
+            timestamp: fixed_instant(),
+            gate_key: "prior".into(),
+        })
+        .unwrap();
+        let terminated = [prior.as_slice(), b"\n"].concat();
+        let record = MutationIntent::RecordEvent {
+            phase: 0,
+            event: Box::new(Event::GateDefinitionCreated {
+                id: String::new(),
+                timestamp: sentinel_time(),
+                gate_key: "cargo-ci".into(),
+            }),
+        };
+        for log in [Vec::new(), terminated, prior.clone()] {
+            let image = image_with(vec![(VirtualPath::EVENTS, file_entry(&log))]);
+            let (offset, appended) = event_append(&image, std::slice::from_ref(&record));
+
+            assert_eq!(
+                offset,
+                log.len() as u64,
+                "the offset is the captured length"
+            );
+            let unterminated = !log.is_empty() && !log.ends_with(b"\n");
+            assert_eq!(
+                appended.first() == Some(&b'\n'),
+                unterminated,
+                "exactly an unterminated final line earns a leading separator"
+            );
+            let whole = [log.as_slice(), &appended].concat();
+            let read =
+                crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).unwrap();
+            let prior_events =
+                crate::domain::parse_known_events(std::str::from_utf8(&log).unwrap()).unwrap();
+            let new_events =
+                crate::domain::parse_known_events(std::str::from_utf8(&appended).unwrap()).unwrap();
+            assert_eq!(
+                read,
+                [prior_events, new_events].concat(),
+                "the log read after the append is the captured events then the appended ones"
+            );
+        }
     }
 
     fn profile_lifecycle_marker() -> Event {
@@ -2457,10 +2491,11 @@ mod tests {
         }
     }
 
+    const TORN_LOG: &[u8] = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti";
+
     /// A captured events.jsonl whose final line is a malformed, unterminated tail.
     fn torn_tail_image() -> RepositoryImage {
-        let torn = b"{\"type\":\"issue_completed\",\"id\":\"e0\",\"issue_id\":\"i\",\"timestamp\":\"2020-01-01T00:00:00Z\"}\n{\"parti".to_vec();
-        image_with(vec![(VirtualPath::EVENTS, file_entry(&torn))])
+        image_with(vec![(VirtualPath::EVENTS, file_entry(TORN_LOG))])
     }
 
     #[test]
@@ -2487,53 +2522,32 @@ mod tests {
     }
 
     #[test]
-    fn test_finalize_certifier_over_torn_tail_round_trips_through_reader() {
-        // A batch containing the aggregate ProfileLifecycle marker composes it
-        // immediately after the torn partial line, so the reader accepts the whole log.
-        let image = torn_tail_image();
-        let delta = finalize(
-            &layout(),
-            &image,
-            &ctx(),
+    fn test_finalize_certifier_over_torn_tail_is_the_first_appended_line() {
+        let (offset, appended) = event_append(
+            &torn_tail_image(),
             &[MutationIntent::RecordEvent {
                 phase: 0,
                 event: Box::new(profile_lifecycle_marker()),
             }],
-        )
-        .unwrap();
-        let action = delta
-            .delta()
-            .actions()
-            .iter()
-            .find(|action| action.path() == &VirtualPath::EVENTS)
-            .expect("events.jsonl write present");
-        let RepositoryAction::WriteFile { bytes, .. } = action else {
-            panic!("expected events write");
-        };
-        let text = std::str::from_utf8(bytes).unwrap();
-        // The certifier record immediately follows the torn partial line; JSON
-        // object key order is not part of the event-log contract.
-        let certifier_follows_tail = text.lines().collect::<Vec<_>>().windows(2).any(|lines| {
-            lines[0] == "{\"parti"
-                && serde_json::from_str::<Event>(lines[1]).is_ok_and(|event| {
-                    matches!(
-                        event,
-                        Event::ProfileLifecycle {
-                            isolated_torn_tail: true,
-                            ..
-                        }
-                    )
-                })
-        });
-        assert!(certifier_follows_tail);
-        // The reader accepts the composed log and recovers the marker.
-        let events = crate::domain::parse_known_events(text).unwrap();
-        assert!(events.iter().any(|event| matches!(
-            event,
+        );
+
+        assert_eq!(offset, TORN_LOG.len() as u64);
+        let first_line = std::str::from_utf8(&appended)
+            .unwrap()
+            .strip_prefix('\n')
+            .and_then(|text| text.lines().next())
+            .expect("a separator ends the torn partial, then the certifier follows");
+        assert!(matches!(
+            serde_json::from_str::<Event>(first_line).unwrap(),
             Event::ProfileLifecycle {
                 isolated_torn_tail: true,
                 ..
             }
-        )));
+        ));
+        let whole = [TORN_LOG, &appended].concat();
+        assert!(
+            crate::domain::parse_known_events(std::str::from_utf8(&whole).unwrap()).is_ok(),
+            "the reader accepts the certified log"
+        );
     }
 }

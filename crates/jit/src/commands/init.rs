@@ -235,6 +235,7 @@ impl CommandExecutor<JsonFileStorage> {
                     probe = expanded;
                 }
                 let delta_overlay = super::validation_overlay(
+                    &probe,
                     derive_materialization(
                         &probe,
                         MaterializationRequest::Initialize {
@@ -243,7 +244,7 @@ impl CommandExecutor<JsonFileStorage> {
                         },
                     )?
                     .delta(),
-                );
+                )?;
 
                 // Re-capture the base with the exact write set so the validation closure
                 // and the delta's preimages come from one coherent image, then finalize,
@@ -281,7 +282,8 @@ impl CommandExecutor<JsonFileStorage> {
                 // it cannot complete.
                 crate::profile::ensure_publishable_targets(&plan)
                     .map_err(crate::repository_state::RepositoryStateError::from)?;
-                let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+                let proposed =
+                    apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
                 let validation = crate::validation::repository::validate_repository(&proposed)
                     .map_err(init_validation_error)?;
                 if validation.rule_report.has_errors() {

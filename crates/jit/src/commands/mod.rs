@@ -1868,26 +1868,18 @@ fn image_repo_bytes(
     Ok(image.file_bytes(&vpath)?.map(<[u8]>::to_vec))
 }
 
-/// Project a finalized delta to the file-overlay validation reads: each written
-/// file's bytes and each deleted file's absence, ignoring directory and mode
-/// actions. This is the exact proposed repository state — only what the delta
-/// writes — used by init/profile to validate their proposed state under one
-/// coherent captured image.
+/// Project a delta finalized over `image` to the file-overlay validation reads
+/// ([`crate::repository_state::action_overrides`]). This is the exact proposed
+/// repository state — only what the delta writes — used by init/profile to
+/// validate their proposed state under one coherent captured image.
 pub(crate) fn validation_overlay(
+    image: &crate::repository_state::RepositoryImage,
     delta: &crate::repository_state::RepositoryDelta,
-) -> std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>> {
-    use crate::repository_state::RepositoryAction;
-    delta
-        .actions()
-        .iter()
-        .filter_map(|action| match action {
-            RepositoryAction::WriteFile { path, bytes, .. } => {
-                Some((path.clone(), Some(bytes.clone())))
-            }
-            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
-            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
-        })
-        .collect()
+) -> Result<std::collections::BTreeMap<crate::repository_state::VirtualPath, Option<Vec<u8>>>> {
+    Ok(crate::repository_state::action_overrides(
+        image,
+        delta.actions(),
+    )?)
 }
 
 /// Parse the active issue set from the captured index and issue records.
@@ -3623,19 +3615,7 @@ mod tests {
     }
 
     fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> Vec<u8> {
-        plan.delta()
-            .actions()
-            .iter()
-            .find_map(|action| match action {
-                crate::repository_state::RepositoryAction::WriteFile { path, bytes, .. }
-                    if path
-                        == &crate::repository_state::VirtualPath::data("events.jsonl").unwrap() =>
-                {
-                    Some(bytes.clone())
-                }
-                _ => None,
-            })
-            .unwrap()
+        plan.delta().appended_event_bytes().unwrap().to_vec()
     }
 
     fn manual_gate_registry(key: &str) -> crate::declarations::GateRegistry {

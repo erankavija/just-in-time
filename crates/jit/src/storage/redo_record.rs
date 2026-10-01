@@ -134,8 +134,8 @@ impl RedoRecord {
     ///
     /// The header is compact JSON, so it holds no raw newline and the first
     /// newline ends it. Content stays raw rather than encoded, because a put
-    /// carries whole files — the non-UTF-8 assets a profile publishes, and,
-    /// while the event log is still a put, the whole log. Equal records
+    /// carries whole files, among them the non-UTF-8 assets a profile
+    /// publishes. Equal records
     /// serialize to equal bytes and nothing process-local is written, so the
     /// record one process wrote is the record another parses.
     ///

@@ -1897,8 +1897,8 @@ impl CommandExecutor<JsonFileStorage> {
                         .collect::<Result<Vec<_>>>()?,
                 )));
             }
-            let proposed = apply_overlay(plan.image(), super::validation_overlay(plan.delta()))
-                .map_err(anyhow::Error::from)?;
+            let overrides = super::validation_overlay(plan.image(), plan.delta())?;
+            let proposed = apply_overlay(plan.image(), overrides).map_err(anyhow::Error::from)?;
             let validation = crate::validation::repository::validate_repository(&proposed)
                 .map_err(ProfileApplyError::from)?;
             if validation.rule_report.has_errors() {
@@ -2147,7 +2147,7 @@ impl CommandExecutor<JsonFileStorage> {
                 .iter()
                 .map(|action| action.path().clone()),
         );
-        let overrides = super::validation_overlay(preview.delta());
+        let overrides = super::validation_overlay(preview.image(), preview.delta())?;
         let probe = match self.capture_proposed_base(session, &overrides, &extra_paths, None)? {
             None => return Ok(None),
             Some(base) => base,

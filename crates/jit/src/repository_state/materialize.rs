@@ -1837,17 +1837,18 @@ kind = "advisory"
         )
         .unwrap();
 
-        let actual: std::collections::BTreeSet<VirtualPath> =
-            plan.delta()
-                .actions()
-                .iter()
-                .filter_map(|action| match action {
-                    RepositoryAction::WriteFile { path, .. }
-                    | RepositoryAction::SetMode { path, .. } => Some(path.clone()),
-                    RepositoryAction::CreateDirectory { .. }
-                    | RepositoryAction::DeleteFile { .. } => None,
-                })
-                .collect();
+        let actual: std::collections::BTreeSet<VirtualPath> = plan
+            .delta()
+            .actions()
+            .iter()
+            .filter_map(|action| match action {
+                RepositoryAction::WriteFile { path, .. }
+                | RepositoryAction::SetMode { path, .. } => Some(path.clone()),
+                RepositoryAction::CreateDirectory { .. }
+                | RepositoryAction::DeleteFile { .. }
+                | RepositoryAction::AppendEvents { .. } => None,
+            })
+            .collect();
         let expected =
             repair_target_paths(&img, declarations(&cfg, &g, &r), vec![profile_claims]).unwrap();
 

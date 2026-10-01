@@ -700,7 +700,7 @@ fn put_entry(state: &mut MemoryRepositoryState, put: &PutFile) -> Result<(), Red
 /// The log is truncated to the offset plus their length, so a log a previous
 /// application already extended converges rather than carrying its residue
 /// behind the appended bytes.
-fn append_events(
+pub(in crate::storage) fn append_events(
     state: &mut MemoryRepositoryState,
     append: &EventAppend,
 ) -> Result<(), RedoApplyError> {

@@ -341,7 +341,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             )?;
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
             let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed(), &seed)?;
-            let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+            let proposed = apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
             let validation = crate::validation::repository::validate_repository(&proposed)?;
             if validation.rule_report.has_errors() {
                 anyhow::bail!(

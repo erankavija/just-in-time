@@ -1032,7 +1032,7 @@ mod tests {
             },
         )
         .unwrap();
-        overrides.extend(crate::commands::validation_overlay(plan.delta()));
+        overrides.extend(crate::commands::validation_overlay(plan.image(), plan.delta()).unwrap());
         let image = executor.capture_validation_image_with(&overrides).unwrap();
         validate_repository(&image)
     }

@@ -97,9 +97,12 @@ syncs them, and renames onto the target. Keeping both paths in one directory
 makes the rename a same-filesystem operation, so readers never observe a
 partially written replacement (`crates/jit/src/storage/atomic_write.rs`).
 
-`events.jsonl` travels in the record like any other file: a mutation that
-records events carries the log's complete new bytes as one replacement, applied
-by the same temp-file-and-rename. The record is applied under the repository
+`events.jsonl` grows by a positioned append instead: a mutation that records
+events carries the log length it captured together with the bytes to write
+there, and applying the record writes those bytes in place at that offset, so
+re-applying it leaves the same log. When the captured log ends in an
+unterminated line, the appended bytes begin with the separating newline. The
+record is applied under the repository
 write lock and `.events.lock`; event readers take the same lock shared
 (`crates/jit/src/storage/json.rs`).
 

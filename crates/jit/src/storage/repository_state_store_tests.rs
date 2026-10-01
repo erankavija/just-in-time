@@ -2166,19 +2166,7 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_hash() {
     let retry = finalize(&layout, &image, &context, &intents).unwrap();
     assert_eq!(first, retry, "a retry reuses the complete plan hash");
 
-    let event_bytes = first
-        .delta()
-        .actions()
-        .iter()
-        .find_map(|action| match action {
-            RepositoryAction::WriteFile { path, bytes, .. }
-                if path == &VirtualPath::data("events.jsonl").unwrap() =>
-            {
-                Some(bytes)
-            }
-            _ => None,
-        })
-        .unwrap();
+    let event_bytes = first.delta().appended_event_bytes().unwrap();
     let events =
         crate::domain::parse_known_events(std::str::from_utf8(event_bytes).unwrap()).unwrap();
     let Event::IssueClaimed { id: event_id, .. } = &events[0] else {
@@ -2305,12 +2293,11 @@ fn test_conformance_gate_run_and_provenance_bytes_match_across_backends() {
                     gate_bytes.clone(),
                     FileMode::Regular,
                 ),
-                RepositoryAction::write_file(
-                    events.clone(),
+                RepositoryAction::append_events(
                     "provenance",
                     ExpectedPreimage::Absent,
+                    0,
                     event_line.clone(),
-                    FileMode::Regular,
                 ),
             ],
         )
@@ -3001,6 +2988,37 @@ fn test_redo_record_for_carries_only_a_directory_no_other_action_lies_beneath() 
         record.make_directories(),
         [empty],
         "the record carries a directory its own put already creates"
+    );
+}
+
+#[test]
+fn test_redo_record_for_carries_the_event_log_change_as_its_offset_and_appended_bytes() {
+    let fixture = WriteSetFixture::new(&[("events.jsonl", seeded_log())]);
+    let image = fixture.capture([VirtualPath::EVENTS]);
+    let offset = seeded_log().len() as u64;
+    let delta = RepositoryDelta::new(
+        &fixture.layout,
+        vec![RepositoryAction::append_events(
+            "p0",
+            ExpectedPreimage::of(image.entry(&VirtualPath::EVENTS).unwrap()),
+            offset,
+            b"{\"tag\":\"next\"}\n".to_vec(),
+        )],
+    )
+    .unwrap();
+
+    let record = redo_record_for(&image, delta.actions().iter()).unwrap();
+
+    assert_eq!(
+        record.event_append(),
+        Some(&EventAppend {
+            offset,
+            bytes: b"{\"tag\":\"next\"}\n".to_vec(),
+        })
+    );
+    assert!(
+        record.puts().is_empty(),
+        "the appended bytes are the only log bytes the record writes"
     );
 }
 

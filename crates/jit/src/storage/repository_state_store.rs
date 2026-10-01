@@ -14,9 +14,9 @@ use crate::repository_state::{
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
-use crate::storage::memory::MemoryRepositoryState;
+use crate::storage::memory::{append_events, MemoryRepositoryState};
 use crate::storage::{
-    FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, MemoryRedoApplier,
+    EventAppend, FileLocker, InMemoryStorage, IssueStore, JsonFileStorage, MemoryRedoApplier,
     MutationInterruptionInjector, MutationPoint, PutFile, RedoApplier, RedoApplyError, RedoRecord,
     RepoWriteGuard, SessionRedoInterruptions, RECORD_FILE_NAME, RECORD_SCRATCH_DIR,
 };
@@ -992,14 +992,25 @@ fn redo_record_for<'a>(
             _ => None,
         })
         .collect::<Result<Vec<_>, RepositoryStateStoreError>>()?;
+    let event_append = actions.clone().find_map(event_append_of);
     let deletes = actions
         .filter_map(|action| match action {
             RepositoryAction::DeleteFile { path, .. } => Some(path.clone()),
             _ => None,
         })
         .collect();
-    RedoRecord::new(make_directories, puts, deletes, None)
+    RedoRecord::new(make_directories, puts, deletes, event_append)
         .map_err(|source| RepositoryStateStoreError::Other(source.into()))
+}
+
+fn event_append_of(action: &RepositoryAction) -> Option<EventAppend> {
+    match action {
+        RepositoryAction::AppendEvents { offset, bytes, .. } => Some(EventAppend {
+            offset: *offset,
+            bytes: bytes.clone(),
+        }),
+        _ => None,
+    }
 }
 
 /// The put that carries `path`'s captured bytes under `mode`.
@@ -1407,6 +1418,9 @@ fn apply_memory_action(
         RepositoryAction::DeleteFile { path, .. } => {
             state.entries.remove(path);
         }
+        RepositoryAction::AppendEvents { .. } => event_append_of(action)
+            .map_or(Ok(()), |append| append_events(state, &append))
+            .map_err(|source| RepositoryStateStoreError::RedoApply(Box::new(source)))?,
     }
     state.data_root_exists |= action.path().root_class() == RepositoryRootClass::Data;
     Ok(())

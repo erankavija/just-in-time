@@ -1329,6 +1329,8 @@ impl ExpectedPreimage {
     }
 }
 
+static EVENT_LOG: VirtualPath = VirtualPath::EVENTS;
+
 /// One exact repository-state action.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum RepositoryAction {
@@ -1360,6 +1362,14 @@ pub enum RepositoryAction {
         path: VirtualPath,
         owner: String,
         expected: ExpectedPreimage,
+    },
+    /// Write `bytes` into the event log at `offset`, the length its capture read.
+    AppendEvents {
+        owner: String,
+        expected: ExpectedPreimage,
+        offset: u64,
+        #[serde(serialize_with = "serialize_content_digest")]
+        bytes: Vec<u8>,
     },
 }
 
@@ -1422,6 +1432,21 @@ impl RepositoryAction {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn append_events(
+        owner: impl Into<String>,
+        expected: ExpectedPreimage,
+        offset: u64,
+        bytes: Vec<u8>,
+    ) -> Self {
+        Self::AppendEvents {
+            owner: owner.into(),
+            expected,
+            offset,
+            bytes,
+        }
+    }
+
     /// Canonical target path.
     pub fn path(&self) -> &VirtualPath {
         match self {
@@ -1429,6 +1454,7 @@ impl RepositoryAction {
             | Self::WriteFile { path, .. }
             | Self::SetMode { path, .. }
             | Self::DeleteFile { path, .. } => path,
+            Self::AppendEvents { .. } => &EVENT_LOG,
         }
     }
 
@@ -1438,7 +1464,8 @@ impl RepositoryAction {
             Self::CreateDirectory { owner, .. }
             | Self::WriteFile { owner, .. }
             | Self::SetMode { owner, .. }
-            | Self::DeleteFile { owner, .. } => owner,
+            | Self::DeleteFile { owner, .. }
+            | Self::AppendEvents { owner, .. } => owner,
         }
     }
 
@@ -1448,7 +1475,8 @@ impl RepositoryAction {
             Self::CreateDirectory { expected, .. }
             | Self::WriteFile { expected, .. }
             | Self::SetMode { expected, .. }
-            | Self::DeleteFile { expected, .. } => expected,
+            | Self::DeleteFile { expected, .. }
+            | Self::AppendEvents { expected, .. } => expected,
         }
     }
 }
@@ -1517,21 +1545,13 @@ impl RepositoryDelta {
 }
 
 fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
-    let (owner, expected) = match action {
-        RepositoryAction::CreateDirectory {
-            owner, expected, ..
-        }
-        | RepositoryAction::WriteFile {
-            owner, expected, ..
-        }
-        | RepositoryAction::SetMode {
-            owner, expected, ..
-        }
-        | RepositoryAction::DeleteFile {
-            owner, expected, ..
-        } => (owner, expected),
-    };
+    let (owner, expected) = (action.owner(), action.expected());
     validate_owner(owner)?;
+    if *action.path() == EVENT_LOG && !matches!(action, RepositoryAction::AppendEvents { .. }) {
+        return Err(DeltaError::InvalidAction(
+            "the event log changes only by a positioned append".into(),
+        ));
+    }
     if super::path::is_bootstrap_lock(action.path()) {
         return Err(DeltaError::EngineControlTarget(action.path().clone()));
     }
@@ -1549,6 +1569,10 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
             expected: ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
             ..
         }
+        | RepositoryAction::AppendEvents {
+            expected: ExpectedPreimage::Absent | ExpectedPreimage::File { .. },
+            ..
+        }
         | RepositoryAction::SetMode {
             expected: ExpectedPreimage::File { .. },
             ..
@@ -1560,9 +1584,9 @@ fn validate_action(action: &RepositoryAction) -> Result<(), DeltaError> {
         RepositoryAction::CreateDirectory { .. } => Err(DeltaError::InvalidAction(
             "directory creation requires an absent preimage".into(),
         )),
-        RepositoryAction::WriteFile { .. } => Err(DeltaError::InvalidAction(
-            "file write requires an absent or file preimage".into(),
-        )),
+        RepositoryAction::WriteFile { .. } | RepositoryAction::AppendEvents { .. } => Err(
+            DeltaError::InvalidAction("file write requires an absent or file preimage".into()),
+        ),
         RepositoryAction::SetMode { .. } => Err(DeltaError::InvalidAction(
             "mode changes require a file preimage".into(),
         )),
@@ -1722,6 +1746,16 @@ pub struct PlanHashError(#[from] serde_json::Error);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    impl RepositoryDelta {
+        /// The bytes the delta appends to the event log, if it appends any.
+        pub(crate) fn appended_event_bytes(&self) -> Option<&[u8]> {
+            self.actions.iter().find_map(|action| match action {
+                RepositoryAction::AppendEvents { bytes, .. } => Some(bytes.as_slice()),
+                _ => None,
+            })
+        }
+    }
     use crate::repository_state::RepositoryRootEvidence;
 
     fn layout() -> RepositoryLayout {
@@ -2379,6 +2413,46 @@ mod tests {
                 bytes: b"ordinary".to_vec(),
                 mode: FileMode::Regular,
             }],
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_delta_refuses_every_event_log_action_but_a_positioned_append() {
+        let log = VirtualPath::EVENTS;
+        let file = ExpectedPreimage::File {
+            identity: EntryIdentity::for_bytes("42:2", b"log").unwrap(),
+            mode: FileMode::Regular,
+        };
+        let refused = [
+            RepositoryAction::write_file(
+                log.clone(),
+                "write",
+                file.clone(),
+                b"rewritten".to_vec(),
+                FileMode::Regular,
+            ),
+            RepositoryAction::delete_file(log.clone(), "delete", file.clone()),
+            RepositoryAction::set_mode(log.clone(), "mode", file.clone(), FileMode::Executable),
+            RepositoryAction::create_directory(log, "create", ExpectedPreimage::Absent),
+        ];
+        for action in refused {
+            assert!(
+                matches!(
+                    RepositoryDelta::new(&layout(), vec![action.clone()]),
+                    Err(DeltaError::InvalidAction(_))
+                ),
+                "{action:?} must not reach the event log",
+            );
+        }
+        assert!(RepositoryDelta::new(
+            &layout(),
+            vec![RepositoryAction::append_events(
+                "append",
+                file,
+                3,
+                b"line\n".to_vec()
+            )],
         )
         .is_ok());
     }
