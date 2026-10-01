@@ -664,24 +664,9 @@ fn workspace_compiled_sources() -> Vec<(PathBuf, String)> {
         .collect()
 }
 
-/// Naming one of these reaches the repository's roots: the canonical identity
-/// of a repository path, the capabilities a session opens over the roots, or a
-/// root accessor and the paths joined onto a root.
-const REPOSITORY_ROOT_ADDRESSES: [&str; 9] = [
-    "VirtualPath",
-    "RepositoryRootClass",
-    "RepositoryAction",
-    "CapabilityRoots",
-    "data_root()",
-    "worktree_root()",
-    ".root()",
-    "data_root.join(",
-    "worktree_root.join(",
-];
-
 /// Calls that create, replace, rename, truncate, or remove a filesystem entry,
 /// by path or through an open directory handle.
-const FILESYSTEM_MUTATIONS: [&str; 26] = [
+const FILESYSTEM_MUTATIONS: [&str; 22] = [
     "fs::write(",
     "fs::rename(",
     "fs::create_dir",
@@ -704,10 +689,6 @@ const FILESYSTEM_MUTATIONS: [&str; 26] = [
     ".set_permissions(",
     ".persist(",
     "renameat",
-    "rename_noreplace_cap(",
-    "write_file_atomic",
-    "write_file_synced",
-    "create_file_synced",
 ];
 
 /// The publishers allowed to write repository state, each found by the
@@ -728,6 +709,66 @@ const REPOSITORY_STATE_PUBLISHERS: [(&str, &str); 3] = [
         "an absent data root cannot be created through the record, whose home is a scratch \
          directory inside that root; it is staged beside it and published by a no-replace \
          rename instead",
+    ),
+];
+
+/// Writes whose target lies outside repository state, each class recognised by
+/// the shape that fixes its target: any one of its markers in the writing
+/// function's code.
+const NON_REPOSITORY_WRITES: [(&str, &[&str], &str); 9] = [
+    (
+        "advisory lock",
+        &[
+            "lock_exclusive",
+            "lock_shared",
+            "Fs4FileExt::unlock",
+            "\"lock.meta\"",
+            "== \"lock\"",
+        ],
+        "a lock file and its metadata coordinate writers and carry no repository data",
+    ),
+    (
+        "claims control plane",
+        &["shared_jit"],
+        "leases live under the git common directory, shared by every worktree and outside \
+         each one's roots",
+    ),
+    (
+        "temporary debris",
+        &["find_temp_files("],
+        "an orphaned `.tmp` file is the leftover of a write that never published",
+    ),
+    (
+        "server process state",
+        &["pid_file_path(", "log_file"],
+        "the pid file and server log are machine-local files the storage format names",
+    ),
+    (
+        "worktree identity",
+        &["WorktreeIdentity"],
+        "the identity file is machine-local and names one checkout, not repository content",
+    ),
+    (
+        "user configuration",
+        &["UserConfigRoot"],
+        "it lives in the user's configuration directory, outside every repository",
+    ),
+    (
+        "git hooks",
+        &["git_dir"],
+        "hooks live in the git directory, which no repository root contains",
+    ),
+    (
+        "export",
+        &["ExternalExportPath", "tempfile::"],
+        "an export destination is proven outside both roots before it is typed, and a \
+         snapshot is staged in a private temporary directory",
+    ),
+    (
+        "build script",
+        &["\"cargo:"],
+        "a build script runs at compile time against the source checkout, before any \
+         repository exists",
     ),
 ];
 
@@ -754,46 +795,134 @@ fn function_bodies(source: &str) -> Vec<&str> {
         .collect()
 }
 
-/// The sources holding a function whose code, comments aside, both reaches the
-/// repository's roots and mutates the filesystem.
-fn repository_state_writers<'a>(
-    sources: impl IntoIterator<Item = (&'a Path, &'a str)>,
-) -> BTreeSet<PathBuf> {
+/// One production function: where it lives, its name, whether it is visible
+/// beyond its own module tree, and its code with comment lines set aside.
+struct ProductionFunction {
+    module: PathBuf,
+    name: String,
+    is_exported: bool,
+    code: String,
+}
+
+fn production_functions(sources: &[(PathBuf, String)]) -> Vec<ProductionFunction> {
     sources
-        .into_iter()
-        .filter(|(_, source)| {
-            function_bodies(source).into_iter().any(|function| {
-                let code = function
-                    .lines()
-                    .filter(|line| !line.trim_start().starts_with("//"))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                REPOSITORY_ROOT_ADDRESSES
-                    .iter()
-                    .any(|address| code.contains(address))
-                    && FILESYSTEM_MUTATIONS
-                        .iter()
-                        .any(|mutation| code.contains(mutation))
+        .iter()
+        .flat_map(|(module, source)| {
+            function_bodies(source).into_iter().map(|function| {
+                let signature = function.lines().next().unwrap_or_default().trim_start();
+                let name = signature
+                    .split_once("fn ")
+                    .map_or("", |(_, rest)| rest)
+                    .split(|character: char| !(character.is_alphanumeric() || character == '_'))
+                    .next()
+                    .unwrap_or_default();
+                ProductionFunction {
+                    module: module.clone(),
+                    name: name.to_string(),
+                    is_exported: signature.starts_with("pub fn ")
+                        || signature.starts_with("pub(crate) "),
+                    code: function
+                        .lines()
+                        .filter(|line| !line.trim_start().starts_with("//"))
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                }
             })
         })
-        .map(|(path, _)| path.to_path_buf())
         .collect()
 }
 
+/// Whether `code` names `function` other than by defining it.
+fn names_function(code: &str, function: &str) -> bool {
+    let is_identifier = |character: char| character.is_alphanumeric() || character == '_';
+    code.match_indices(function).any(|(start, _)| {
+        let before = &code[..start];
+        let after = &code[start + function.len()..];
+        !before.ends_with(is_identifier)
+            && !after.starts_with(is_identifier)
+            && !before.ends_with("fn ")
+    })
+}
+
+/// What the writer scan found: the functions writing an unclassified target,
+/// and the publishers and classes that matched a write.
+#[derive(Debug, Default)]
+struct WriterScan {
+    unclassified: BTreeSet<String>,
+    publishers_seen: BTreeSet<PathBuf>,
+    classes_seen: BTreeSet<&'static str>,
+}
+
+/// Classify every function that mutates the filesystem.
+///
+/// A write inside a publisher is the sanctioned route, and calling a publisher
+/// is going through it. Any other writer must match a
+/// [`NON_REPOSITORY_WRITES`] class. A writer no class matches and that its own
+/// module tree confines — a private helper or a storage-private primitive —
+/// hands the question to its callers: each function naming it is a writer in
+/// turn, wherever its path came from. An exported writer no class matches is
+/// unclassified.
+fn scan_filesystem_writers(
+    functions: &[ProductionFunction],
+    publishers: &BTreeSet<PathBuf>,
+) -> WriterScan {
+    let mut scan = WriterScan::default();
+    let mut classified = BTreeSet::new();
+    let mut delegated = Vec::<String>::new();
+    loop {
+        let writers = functions
+            .iter()
+            .enumerate()
+            .filter(|(index, function)| {
+                !classified.contains(index)
+                    && (FILESYSTEM_MUTATIONS
+                        .iter()
+                        .any(|mutation| function.code.contains(mutation))
+                        || delegated
+                            .iter()
+                            .any(|helper| names_function(&function.code, helper)))
+            })
+            .collect::<Vec<_>>();
+        if writers.is_empty() {
+            return scan;
+        }
+        for (index, function) in writers {
+            classified.insert(index);
+            let class = NON_REPOSITORY_WRITES.iter().find(|(_, markers, _)| {
+                markers.iter().any(|marker| function.code.contains(marker))
+            });
+            match (publishers.contains(&function.module), class) {
+                (true, _) => {
+                    scan.publishers_seen.insert(function.module.clone());
+                }
+                (false, Some((class, _, _))) => {
+                    scan.classes_seen.insert(class);
+                }
+                (false, None) if !function.is_exported => delegated.push(function.name.clone()),
+                (false, None) => {
+                    scan.unclassified.insert(format!(
+                        "{}::{}",
+                        function.module.display(),
+                        function.name
+                    ));
+                }
+            }
+        }
+    }
+}
+
 /// The source owning each [`REPOSITORY_STATE_PUBLISHERS`] definition.
-fn repository_state_publishers(
-    sources: &[(PathBuf, String)],
-) -> Result<BTreeMap<PathBuf, &'static str>, String> {
+fn repository_state_publishers(sources: &[(PathBuf, String)]) -> Result<BTreeSet<PathBuf>, String> {
     REPOSITORY_STATE_PUBLISHERS
         .iter()
-        .map(|(definition, reason)| {
+        .map(|(definition, _)| {
             let owners = sources
                 .iter()
                 .filter(|(_, source)| source.contains(definition))
                 .map(|(path, _)| path.clone())
                 .collect::<Vec<_>>();
             match owners.as_slice() {
-                [owner] => Ok((owner.clone(), *reason)),
+                [owner] => Ok(owner.clone()),
                 _ => Err(format!(
                     "`{definition}` is defined in {owners:?} rather than in exactly one source"
                 )),
@@ -803,27 +932,30 @@ fn repository_state_publishers(
 }
 
 fn assert_only_named_publishers_write_repository_state(
-    writers: &BTreeSet<PathBuf>,
-    publishers: &BTreeMap<PathBuf, &str>,
+    scan: &WriterScan,
+    publishers: &BTreeSet<PathBuf>,
 ) -> Result<(), String> {
-    let unseen = publishers
-        .iter()
-        .filter(|(publisher, _)| !writers.contains(*publisher))
+    let unseen_publishers = publishers
+        .difference(&scan.publishers_seen)
         .collect::<Vec<_>>();
-    if !unseen.is_empty() {
+    let unseen_classes = NON_REPOSITORY_WRITES
+        .iter()
+        .map(|(class, _, _)| *class)
+        .filter(|class| !scan.classes_seen.contains(class))
+        .collect::<Vec<_>>();
+    if !unseen_publishers.is_empty() || !unseen_classes.is_empty() {
         return Err(format!(
-            "the scan no longer sees these publishers write repository state: {unseen:?}; \
-             the absence of any other writer establishes nothing until it does"
+            "the scan no longer sees publishers {unseen_publishers:?} or classes \
+             {unseen_classes:?} write, so what it classifies establishes nothing until it \
+             does"
         ));
     }
-    let direct = writers
-        .iter()
-        .filter(|writer| !publishers.contains_key(*writer))
-        .collect::<Vec<_>>();
-    direct.is_empty().then_some(()).ok_or_else(|| {
+    scan.unclassified.is_empty().then_some(()).ok_or_else(|| {
         format!(
-            "repository state written directly in {direct:?}; a mutation reaches the \
-             repository's roots only through its session's redo record (`@/charter/D-17`)"
+            "filesystem writes to an unclassified target in {:?}; a mutation reaches the \
+             repository's roots only through its session's redo record (`@/charter/D-17`), \
+             and any other write names the non-repository class it belongs to",
+            scan.unclassified
         )
     })
 }
@@ -832,88 +964,89 @@ fn assert_only_named_publishers_write_repository_state(
 /// the absent-root publisher only where the record cannot exist yet.
 ///
 /// Repository state is what `docs/reference/storage-format.md` versions: the
-/// data root's contents and the worktree files a mutation publishes. The
-/// machine-local files it names, the `.git/jit/` control plane, user
-/// configuration, and exports to a caller-chosen path are not, and their
-/// writers address those targets by their own paths rather than by the
-/// repository's roots. A direct writer is therefore a function naming a root or
-/// a repository path's canonical identity beside a filesystem mutation, in any
-/// module a non-test build of the workspace compiles. `std::fs` is public to
-/// every crate, so no visibility rule can close this; a root handed to a helper
-/// as a bare path or handle is beyond what a per-function text scan sees.
+/// data root's contents and the worktree files a mutation publishes. Every
+/// function a non-test build of the workspace compiles that mutates the
+/// filesystem is therefore either a publisher's, one whose target a
+/// [`NON_REPOSITORY_WRITES`] class places outside repository state, or a
+/// confined helper whose callers answer for it. Where a write's path came from
+/// does not matter: an unclassified writer fails. `std::fs` is public to every
+/// crate, so no visibility rule can close this.
 #[test]
 fn test_repository_state_is_written_only_by_the_redo_record_and_the_absent_root_publisher() {
     let sources = workspace_compiled_sources();
     let publishers =
         repository_state_publishers(&sources).unwrap_or_else(|error| panic!("{error}"));
-    let writers = repository_state_writers(
-        sources
-            .iter()
-            .map(|(path, source)| (path.as_path(), source.as_str())),
-    );
-    assert_only_named_publishers_write_repository_state(&writers, &publishers)
+    let scan = scan_filesystem_writers(&production_functions(&sources), &publishers);
+    assert_only_named_publishers_write_repository_state(&scan, &publishers)
         .unwrap_or_else(|error| panic!("{error}"));
 }
 
-/// Red-first proof for the writer scan: a direct writer is flagged whether it
-/// reaches a root by path or by capability, and neither an export, a test-only
-/// item, nor a comment is.
+/// Red-first proof for the writer scan: a helper writing a path it was handed
+/// is flagged at the first caller no class covers, whichever module calls it,
+/// and neither a classified write, a test-only item, nor a comment is.
 #[test]
-fn test_repository_state_writer_scan_flags_direct_writers_and_skips_what_no_build_publishes() {
-    for (fragment, is_writer) in [
-        (
-            "pub fn save_config(&self, text: &str) -> Result<()> {\n    \
-             std::fs::write(self.storage.root().join(\"config.toml\"), text)\n}\n",
-            true,
-        ),
-        (
-            "fn drop_issue(roots: &CapabilityRoots, path: &VirtualPath) {\n    \
-             roots.data().remove_file(path.relative()).unwrap();\n}\n",
-            true,
-        ),
-        (
-            "fn export(base: &Path, bytes: &[u8]) {\n    std::fs::write(base.join(\"issues\"), bytes).unwrap();\n}\n\
-             fn source(layout: &RepositoryLayout) -> PathBuf {\n    layout.data_root().to_path_buf()\n}\n",
-            false,
-        ),
-        (
-            "fn read() {}\n\n#[cfg(all(test, unix))]\nmod tests {\n    fn seed(layout: &RepositoryLayout) {\n        \
-             std::fs::write(layout.data_root().join(\"x\"), b\"\").unwrap();\n    }\n}\n",
-            false,
-        ),
-        (
-            "fn read(layout: &RepositoryLayout) {\n    \
-             // std::fs::write(layout.data_root().join(\"x\"), b\"\")\n}\n",
-            false,
-        ),
-    ] {
-        let compiled = production_text(fragment).unwrap();
-        let path = Path::new("commands/fragment.rs");
-        assert_eq!(
-            repository_state_writers([(path, compiled.as_str())]).contains(path),
-            is_writer,
-            "{fragment}"
-        );
-    }
+fn test_repository_state_writer_scan_flags_unclassified_writers_wherever_their_path_comes_from() {
+    let scan_fragments = |fragments: &[(&str, &str)]| {
+        let sources = fragments
+            .iter()
+            .map(|(module, fragment)| (PathBuf::from(module), production_text(fragment).unwrap()))
+            .collect::<Vec<_>>();
+        scan_filesystem_writers(&production_functions(&sources), &BTreeSet::new()).unclassified
+    };
+    let helper =
+        "fn put(path: &Path, bytes: &[u8]) {\n    std::fs::write(path, bytes).unwrap();\n}\n";
+    let caller = "pub fn save(layout: &RepositoryLayout) {\n    \
+                  put(&layout.data_root().join(\"index.json\"), b\"{}\");\n}\n";
+    assert_eq!(
+        scan_fragments(&[("commands/save.rs", &format!("{helper}{caller}"))]),
+        BTreeSet::from(["commands/save.rs::save".to_string()])
+    );
+    assert_eq!(
+        scan_fragments(&[
+            ("storage/put.rs", &format!("pub(crate) {helper}")),
+            ("commands/save.rs", caller),
+        ]),
+        BTreeSet::from(["storage/put.rs::put".to_string()])
+    );
+    assert_eq!(
+        scan_fragments(&[(
+            "storage/lock.rs",
+            "pub fn lock(path: &Path) {\n    std::fs::write(path.with_extension(\"lock.meta\"), b\"\").unwrap();\n    \
+             locker.lock_exclusive(path);\n}\n\n#[cfg(all(test, unix))]\nmod tests {\n    \
+             pub fn seed(path: &Path) {\n        std::fs::write(path, b\"\").unwrap();\n    }\n}\n\n\
+             pub fn read(path: &Path) {\n    // std::fs::write(path, b\"\")\n}\n",
+        )]),
+        BTreeSet::new()
+    );
     assert_eq!(
         production_text("#![cfg(any(test, feature = \"test-support\"))]\nfn seed() {}\n"),
         None
     );
 
     let record = PathBuf::from("storage/record.rs");
-    let publishers = BTreeMap::from([(record.clone(), "the record")]);
-    let command = PathBuf::from("commands/fragment.rs");
-    let direct = assert_only_named_publishers_write_repository_state(
-        &BTreeSet::from([record, command]),
+    let publishers = BTreeSet::from([record.clone()]);
+    let complete = WriterScan {
+        unclassified: BTreeSet::from(["commands/save.rs::save".to_string()]),
+        publishers_seen: publishers.clone(),
+        classes_seen: NON_REPOSITORY_WRITES
+            .iter()
+            .map(|(class, _, _)| *class)
+            .collect(),
+    };
+    let direct =
+        assert_only_named_publishers_write_repository_state(&complete, &publishers).unwrap_err();
+    assert!(
+        direct.contains("unclassified target in {\"commands/save.rs::save\"}"),
+        "{direct}"
+    );
+    let blind = assert_only_named_publishers_write_repository_state(
+        &WriterScan {
+            classes_seen: BTreeSet::new(),
+            ..complete
+        },
         &publishers,
     )
     .unwrap_err();
-    assert!(
-        direct.contains("repository state written directly in [\"commands/fragment.rs\"]"),
-        "{direct}"
-    );
-    let blind = assert_only_named_publishers_write_repository_state(&BTreeSet::new(), &publishers)
-        .unwrap_err();
     assert!(blind.contains("no longer sees"), "{blind}");
 }
 
