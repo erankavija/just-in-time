@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "02cffab0c35d009f5dcb0d0d2d05875dfdce304b",
+  "completed_at": "2026-10-01T10:49:31.549553622Z",
+  "duration_ms": 228804,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+        "id": "F1",
+        "line": 771,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3d9150d7/requirement/REQ-01",
+          "@/charter/D-17",
+          "@/invariant/convention-convergence"
+        ],
+        "severity": "high",
+        "summary": "The per-function text predicate misses a direct writer that receives a repository root or directory handle from another function."
+      }
+    ],
+    "summary": "The writer guard misses direct repository writes when a root is handed to a separate helper.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3d9150d7-e423-400f-903a-b9a7aec1ba7f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9999e2dd-a29d-4d48-8c77-12bbccd3032a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T10:45:42.744592491Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12073 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f712-0144-7330-be46-6b96d3446263\n--------\nuser\n--- 12060 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `70ae408f3`, `a458bfd1c`, `b44bfaff4`, `e61addcbb`, `8c0f2ca58`, `c57a7b0d`, `02cffab0c` (`jit:3d9150d7`); executable footprint is `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`\nPolicy sources: `AGENTS.md`\nResolved items: `@/issue/3d9150d7/requirement/REQ-01`, `REQ-05` (issue description); `@/charter/D-17` (`dev/vision/9db27a3a-charter.md`); `@/invariant/convention-convergence`, `essential-code-prose`, `orthogonal-tests` (`.jit/invariants.toml`)\nGate evidence: `cargo-ci` passed (exit 0, 2026-10-01T10:40:42Z); prior `code-review` failed (exit 1) and its auto-discovered-target finding is addressed\nTruncation recovery: reread bounded original, retarget, target-walk, merge, record, and current-guard regions; merge-parent deltas unrelated to the guard were excluded\n\n1. **[blocking][issue-impact]** The writer predicate only marks a file when a single function contains both a repository-root marker and a filesystem mutation. A direct writer can accept a bare `&Path`/directory handle and be called with `layout.data_root()` from another function; neither function then satisfies both text predicates, so the guard passes. The added guard explicitly acknowledges this blind spot at `repository_state_cutover_tests.rs:839-843`, leaving REQ-01 unmet. References: `@/issue/3d9150d7/requirement/REQ-01`, `@/charter/D-17`, `@/invariant/convention-convergence`. ([repository_state_cutover_tests.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:771))\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The writer guard misses direct repository writes when a root is handed to a separate helper.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The per-function text predicate misses a direct writer that receives a repository root or directory handle from another function.\",\"file\":\"crates/jit/tests/scratch_build/repository_state_cutover_tests.rs\",\"line\":771,\"references\":[\"@/issue/3d9150d7/requirement/REQ-01\",\"@/charter/D-17\",\"@/invariant/convention-convergence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
