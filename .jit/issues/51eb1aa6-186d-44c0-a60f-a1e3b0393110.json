@@ -64,6 +64,11 @@
       "updated_at": "2026-10-01T09:37:17.876251420Z",
       "updated_by": "auto:executor"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T09:40:02.220641884Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-10-01T09:32:29.783975733Z",
@@ -92,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Transaction fields leave the command output",
-  "updated_at": "2026-10-01T09:37:17.876251420Z"
+  "updated_at": "2026-10-01T09:40:02.220641884Z"
 }

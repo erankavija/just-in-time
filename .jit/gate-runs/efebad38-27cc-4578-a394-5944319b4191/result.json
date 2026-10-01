@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "882ef0c939f5631191e5d06c15f6942d28b132ff",
+  "completed_at": "2026-10-01T09:40:01.669101950Z",
+  "duration_ms": 162825,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Issue-attributable documentation accurately describes the removed profile fields and renamed recovery count.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "51eb1aa6-186d-44c0-a60f-a1e3b0393110",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "efebad38-27cc-4578-a394-5944319b4191",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T09:37:18.843786102Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf (maximum hierarchy level 4; no resolved children). I inspected the six reachable commits whose messages contain `jit:51eb1aa6` individually; the feature patch updated the three affected reference pages, while the merge, test, and gate-record patches added no further adopter documentation.\n\nThe current source removes the profile fields and emits `redo_records_applied`; the CLI, profiles, and worktree references accurately cover the resulting user-visible contract. No documentation impact defects found.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-attributable documentation accurately describes the removed profile fields and renamed recovery count.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}
