@@ -51,6 +51,7 @@
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
+  "first_ready_at": "2026-10-01T15:56:48.925372505Z",
   "gates_required": [
     "doc-review",
     "docs-mechanical",
@@ -71,7 +72,7 @@
     "enforces:@/invariant/single-source-prose"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "in_progress",
   "title": "Repository declarations state the redo record",
-  "updated_at": "2026-10-01T13:10:42.343277495Z"
+  "updated_at": "2026-10-01T15:56:50.537492689Z"
 }
