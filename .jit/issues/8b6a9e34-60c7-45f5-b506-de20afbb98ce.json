@@ -81,6 +81,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T22:23:03.519909717Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-10-01T22:21:34.967382684Z",
@@ -103,5 +108,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-10-01T22:21:34.967382684Z"
+  "updated_at": "2026-10-01T22:23:03.519909717Z"
 }
