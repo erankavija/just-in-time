@@ -7,8 +7,9 @@
 //!
 //! - **`label-coverage`** — every canonical criterion id declared in a source
 //!   issue's `## Success Criteria` section is satisfied by at least one related
-//!   child issue (via a derived `satisfies:<id>` label) in a configurable state.
-//! - **`label-reference`** — a `from`-namespace reference (e.g. `satisfies:REQ-01`)
+//!   child issue (via a `satisfies:<container-short-id>/<id>` label) in a
+//!   configurable state.
+//! - **`label-reference`** — a `from`-namespace reference (e.g. `implements:REQ-01`)
 //!   resolves to a `to`-namespace source (e.g. `req:REQ-01`) that is actually
 //!   declared somewhere in a configurable scope.
 //! - **`dependency-shape`** — issues matching a rule's selector must (or should)
@@ -2954,9 +2955,9 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_reference_resolves() {
-        let rule = reference_rule("from = \"satisfies\", to = \"req\"");
+        let rule = reference_rule("from = \"implements\", to = \"req\"");
         let source = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
-        let child = issue("child", &["satisfies:REQ-01"]);
+        let child = issue("child", &["implements:REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2971,9 +2972,9 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_reference_dangles() {
-        let rule = reference_rule("from = \"satisfies\", to = \"req\"");
+        let rule = reference_rule("from = \"implements\", to = \"req\"");
         let source = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
-        let child = issue("child", &["satisfies:REQ-99"]); // no req:REQ-99 anywhere
+        let child = issue("child", &["implements:REQ-99"]); // no req:REQ-99 anywhere
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -2990,10 +2991,10 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_reference_linked_scope_requires_edge() {
-        let rule = reference_rule("from = \"satisfies\", to = \"req\", scope = \"linked\"");
+        let rule = reference_rule("from = \"implements\", to = \"req\", scope = \"linked\"");
         // Declaring issue exists globally but is NOT linked to the child.
         let declarer = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
-        let child = issue("child", &["satisfies:REQ-01"]); // no dependency edge
+        let child = issue("child", &["implements:REQ-01"]); // no dependency edge
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3007,7 +3008,7 @@ source-of-truth = "markdown-first"
 
         // Now add the edge: the reference resolves.
         let declarer = typed_issue(&test_type(2), 2, &["req:REQ-01"]);
-        let mut child = issue("child", &["satisfies:REQ-01"]);
+        let mut child = issue("child", &["implements:REQ-01"]);
         child.dependencies = vec![declarer.id.clone()];
         let findings = evaluate_graph(
             &rules,
@@ -3022,11 +3023,11 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_reference_missing_key_is_config_error() {
-        let rule = reference_rule("from = \"satisfies\""); // missing `to`
+        let rule = reference_rule("from = \"implements\""); // missing `to`
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
-            &[issue("x", &["satisfies:REQ-01"])],
+            &[issue("x", &["implements:REQ-01"])],
             &crate::test_taxonomy::test_taxonomy().hierarchy_config(),
             ContentFormat::Markdown,
             fixed_now(),

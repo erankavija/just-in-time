@@ -41,7 +41,7 @@ use serde::Serialize;
 ///     description: String::new(),
 ///     priority: Priority::Normal,
 ///     gates: vec![],
-///     labels: vec!["satisfies:REQ-01".to_string()],
+///     labels: vec!["satisfies:0123abcd/REQ-01".to_string()],
 ///     deps: vec![],
 /// };
 /// let sink = BracketChild {
@@ -67,9 +67,9 @@ pub struct BracketChild {
     /// assigns these per task; the engine simply forwards them.
     pub gates: Vec<String>,
     /// Per-child labels to attach in addition to the container's inherited
-    /// membership labels — notably the `satisfies:<id>` labels that credit this
-    /// child against the container's `[hard]` criteria for the coverage-preview
-    /// check. The engine forwards them; the skill assigns coverage per task.
+    /// membership labels — notably the `satisfies:<container-short-id>/<id>`
+    /// labels that credit this child against the container's `[hard]` criteria
+    /// for the coverage-preview check. The engine forwards them; the skill assigns coverage per task.
     pub labels: Vec<String>,
     /// 0-based indices of sibling children this child depends on (the
     /// intra-subgraph edges).
@@ -396,7 +396,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let mut child_ids = Vec::with_capacity(n);
         for child in &children {
             // Inherited membership labels plus the child's own labels (e.g.
-            // satisfies:<id> coverage credits), de-duplicated.
+            // satisfies:<container-short-id>/<id> coverage credits), de-duplicated.
             let mut child_labels = membership.clone();
             for label in &child.labels {
                 if !child_labels.contains(label) {

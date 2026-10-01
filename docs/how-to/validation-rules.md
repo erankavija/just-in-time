@@ -218,7 +218,8 @@ the criteria, not authored independently:
 ```
 
 The epic carries `req:REQ-01`; a child that implements it carries
-`satisfies:REQ-01`. The full ruleset is in
+`satisfies:<epic-short-id>/REQ-01`, naming the epic whose criterion it credits.
+The full ruleset is in
 [`docs/examples/sdd/rules.toml`](../examples/sdd/rules.toml); the highlights:
 
 - **`require-section`** (local, enforced) — the epic must have a
@@ -237,15 +238,12 @@ The epic carries `req:REQ-01`; a child that implements it carries
   Criteria` prose. A `req:REQ-77` absent from the criteria is reported as a
   **stray** immediately at any lifecycle phase.
 - **`label-coverage`** (graph, at done, `enforce = true`) — every `[hard]`
-  criterion is satisfied by some `done` child carrying `satisfies:<id>`. Scoped
-  to `state = "done"` so planning is quiet; the done transition is blocked if any
-  `[hard]` criterion is uncovered.
-- **`label-reference`** (graph, `req` → `satisfies`, at done, `enforce = true`)
-  — every declared `req:<id>` is actually used by some `satisfies:<id>` child at
-  done. An unsatisfied `req:` label blocks the done transition.
-- **`label-reference`** (graph, `satisfies` → `req`, always-on, warn) — every
-  `satisfies:<id>` points at a declared `req:<id>` (reference integrity); a typo
-  surfaces as a warning at any state.
+  criterion is satisfied by some `done` child carrying
+  `satisfies:<epic-short-id>/<id>`. Scoped to `state = "done"` so planning is
+  quiet; the done transition is blocked if any `[hard]` criterion is uncovered.
+- **Item links** (built in) — the example config declares success criteria as
+  `requirement` items linked through `satisfies:`, so `jit validate` reports a
+  `satisfies:` label naming no declared criterion as a dangling item link.
 
 ### Lifecycle behavior
 
@@ -256,15 +254,13 @@ where coverage bites**:
   correct structure, matching `req:` labels, and children still in progress
   produces **zero error-severity graph findings** from `jit validate`. Only the
   stray-req check (`criteria-label-match`) fires immediately for fabricated ids.
-- The done transition runs coverage and derivation rules with `enforce = true`,
-  blocking (exit 4) if any `[hard]` criterion is uncovered or any `req:` is
-  unsatisfied.
+- The done transition runs the coverage rule with `enforce = true`, blocking
+  (exit 4) if any `[hard]` criterion is uncovered.
 - `--force` bypasses the block and logs a bypass event in the audit log.
 
-Two finding types are now textually distinct: a **stray req** (id not in the
-criteria prose, `sdd-req-matches-a-criterion`) versus an **unsatisfied req** (id
-is real, no child yet, `sdd-req-is-satisfied`). Together all five rules close the
-derivation loop so a `req:` label cannot float free of the canonical criteria.
+Two finding types are textually distinct: a **stray req** (id not in the
+criteria prose, `sdd-req-matches-a-criterion`) versus an **uncovered criterion**
+(id is real, no child yet, `sdd-hard-criteria-covered`).
 
 ## The engine is methodology-agnostic
 
@@ -329,19 +325,19 @@ assert = { criteria-to-check = {
 ```
 
 A criterion `REQ-01` is "checked" when the issue has `"verify:REQ-01"` in
-`gates_required` OR a label `"checks:REQ-01"`. Either mechanism alone satisfies
-the rule. An unmapped criterion yields a finding naming the criterion id and
-the expected gate or label:
+`gates_required` OR a label `"checks:<own-short-id>/REQ-01"` naming its own
+criterion. Either mechanism alone satisfies the rule. An unmapped criterion
+yields a finding naming the criterion id and the expected gate or label:
 
 ```
-criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01' or label 'checks:REQ-01'
+criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01' or label 'checks:<own-short-id>/REQ-01'
 ```
 
 When only one mechanism is configured the message names only that one:
 
 ```
 criterion 'REQ-01' has no verification: expected gate 'verify:REQ-01'
-criterion 'REQ-01' has no verification: expected label 'checks:REQ-01'
+criterion 'REQ-01' has no verification: expected label 'checks:<own-short-id>/REQ-01'
 ```
 
 The example ships a second (always-on, warn-only) variant of the rule that fires
@@ -357,7 +353,8 @@ of the two must be set (the loader rejects a rule with neither).
 research program using only research vocabulary. There is no "epic" or
 "milestone" anywhere in the ruleset. The two issue types are `type:goal` and
 `type:experiment`; the label namespaces are `hyp:` (declared hypotheses on a
-goal) and `tests:` (which hypothesis an experiment addresses).
+goal) and `tests:` (which goal hypothesis an experiment addresses, as
+`tests:<goal-short-id>/<id>`).
 
 A goal body has two required sections:
 
@@ -387,12 +384,12 @@ vocabulary:
   `hyp:H-99` not present in the body is reported immediately as stray.
 - **`label-coverage`** (graph, scoped `state = "done"`, `enforce = true`) — when
   a goal reaches done, every `[hard]` hypothesis must be tested by at least one
-  done experiment carrying `tests:<id>`. A goal in any state other than `done`
-  produces zero error findings because the rule does not match until the done
-  transition.
-- **`label-reference`** (graph, warn) — every `tests:<id>` on an experiment
-  resolves to a declared `hyp:<id>` on the linked goal. A typo surfaces as a
-  warning without blocking.
+  done experiment carrying `tests:<goal-short-id>/<id>`. A goal in any state
+  other than `done` produces zero error findings because the rule does not match
+  until the done transition.
+- **Item links** (built in) — the example config declares hypotheses as items
+  linked through `tests:`, so `jit validate` reports a `tests:` label naming no
+  declared hypothesis as a dangling item link.
 
 None of these is built into JIT. They are configuration over one engine.
 

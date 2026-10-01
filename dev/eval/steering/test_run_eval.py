@@ -213,11 +213,18 @@ class TestOracleSequencing(unittest.TestCase):
         self.assertIsNone(action.body)
         assert action.argv is not None
         self.assertEqual(action.argv[:2], ["issue", "create"])
-        self.assertIn("satisfies:REQ-01", action.argv)
+        self.assertIn(f"satisfies:{self.EPIC[:8]}/REQ-01", action.argv)
 
     def _child_create_hist(self) -> dict:
         return self._hist(
-            ["issue", "create", "--label", "satisfies:REQ-01", "--description", "x"],
+            [
+                "issue",
+                "create",
+                "--label",
+                f"satisfies:{self.EPIC[:8]}/REQ-01",
+                "--description",
+                "x",
+            ],
             stdout=f"Created issue: {self.CHILD}\n",
         )
 

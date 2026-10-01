@@ -90,8 +90,9 @@ of truth**, and labels are **derived** from it.
 - A `json-schema` rule validates that **structure**: non-empty Requirements
   (`REQ-N: ...`), Scenarios (`Given ... When ... Then ...`), and Success Criteria
   sections, with at least one `[hard]` criterion.
-- `req:<id>` (on the epic) and `satisfies:<id>` (on children) are derived from
-  those criteria — never an independent source.
+- `req:<id>` (on the epic) and `satisfies:<epic-short-id>/<id>` (on children)
+  are derived from those criteria — never an independent source. The qualified
+  credit names the epic it serves, so nested containers can reuse ids.
 
 ### Lifecycle-aware enforcement
 
@@ -110,24 +111,22 @@ children still in progress, produces **zero error-severity graph findings** from
 `jit validate`.
 
 **Done transition:**
-A `label-coverage` graph rule (`sdd-hard-criteria-covered`) and a `label-reference`
-graph rule (`sdd-req-is-satisfied`) are both scoped with
-`when = { type = "epic", state = "done" }` and carry `enforce = true`. They run
+A `label-coverage` graph rule (`sdd-hard-criteria-covered`) is scoped with
+`when = { type = "epic", state = "done" }` and carries `enforce = true`. It runs
 over the epic's dependency neighborhood (the epic plus, transitively, the children it depends on per the containment convention)
-when `--state done` is requested. An uncovered `[hard]` criterion or an unsatisfied
-`req:` label **blocks the transition** (exit 4, `TransitionBlockedError`); the
-epic stays in its current state. `--force` bypasses the block and records a bypass
-event in the audit log.
+when `--state done` is requested. An uncovered `[hard]` criterion **blocks the
+transition** (exit 4, `TransitionBlockedError`); the epic stays in its current
+state. `--force` bypasses the block and records a bypass event in the audit log.
 
-**Dangling `satisfies:` (always-on, warn):**
-A `label-reference` rule (`sdd-satisfies-references-a-req`) fires for any issue
-at any state whose `satisfies:<id>` label has no matching `req:<id>` declared in
-its linked graph — a typo surfaces immediately as a warning.
+**Dangling `satisfies:` (always-on):**
+The example config declares success criteria as `requirement` items linked
+through `satisfies:`, so `jit validate` reports a `satisfies:` label that names no
+declared criterion as a dangling item link.
 
-This split means two issues an agent can face are now textually and structurally
+This split means two issues an agent can face are textually and structurally
 separate: a *stray req* (id not in the criteria prose, caught immediately by
-`criteria-label-match`) versus an *unsatisfied req* (real id, no child yet, caught
-only at done by `label-reference`).
+`criteria-label-match`) versus an *uncovered criterion* (real id, no child yet,
+caught only at done by `label-coverage`).
 
 If JIT had hard-coded SDD, none of this would be inspectable or changeable. As
 configuration, a team can tune it (require `[aspirational]` coverage too, change

@@ -25,7 +25,12 @@ assert_rejects() {
   fi
 }
 
-"$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --required-source REQ-01 --required-criterion REQ-01 --plan "$fixtures/plan-stale.md" --deny-warnings
+"$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --required-source REQ-01 --required-criterion 0a1b2c3d/REQ-01 --plan "$fixtures/plan-stale.md" --deny-warnings
+# A credit scoped to another container leaves the required criterion uncovered.
+assert_rejects "satisfies coverage missing: 99999999/REQ-01" "$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --required-criterion 99999999/REQ-01 --plan "$fixtures/plan-stale.md"
+assert_rejects "must be qualified" "$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --required-criterion REQ-01 --plan "$fixtures/plan-stale.md"
+sed 's#satisfies:0a1b2c3d/REQ-01#satisfies:REQ-01#' "$fixtures/manifest-valid.json" > "$tmp_result"
+assert_rejects "unqualified label 'satisfies:REQ-01'" "$tool" validate "$tmp_result" --config "$config" --known-source REQ-01 --plan "$fixtures/plan-stale.md"
 "$tool" validate "$fixtures/manifest-landing-group.json" --config "$config" --known-source REQ-02 --required-source REQ-02 --plan "$fixtures/plan-stale.md" --deny-warnings --json > "$tmp_result"
 python3 -c 'import json,sys; result=json.load(open(sys.argv[1])); assert result["valid"] and result["advisories"]' "$tmp_result"
 ! "$tool" validate "$fixtures/manifest-valid.json" --config "$config" --known-source REQ-01 --required-source REQ-99 --plan "$fixtures/plan-stale.md"
