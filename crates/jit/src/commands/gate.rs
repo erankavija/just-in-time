@@ -1376,7 +1376,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("gate preset application", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(preflight) = self.capture_mutation_preflight(&mut *preflight, issue_id)?
+                let Some(preflight) =
+                    self.capture_mutation_preflight(&mut *preflight, issue_id, |_| false)?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };

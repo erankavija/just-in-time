@@ -2683,20 +2683,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("lifecycle mutation", || {
             let (expected_target, expected_precheck_required, precheck) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(light) =
-                    self.capture_mutation_preflight(preflight.as_mut(), request.issue_id())?
+                // Precheck gates run outside the repository lock, so a
+                // transition that runs them grows its preflight to the full base.
+                let Some(light) = self.capture_mutation_preflight(
+                    preflight.as_mut(),
+                    request.issue_id(),
+                    |target| lifecycle_requires_prechecks(&request, target),
+                )?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };
-                let should_precheck = lifecycle_requires_prechecks(&request, &light.target);
-                // Precheck gates run outside the repository lock, so only a
-                // transition that runs them reads its full base before the guard.
-                let precheck = if should_precheck {
-                    let Some(crate::commands::validate::MutationBase { image, issues }) = self
-                        .capture_mutation_base(preflight.as_mut(), &[], Some(request.issue_id()))?
-                    else {
-                        return Ok(AttemptOutcome::Retry);
-                    };
+                let should_precheck = light.issues.is_some();
+                let precheck = if let Some(issues) = light.issues {
+                    let image = light.image;
                     let issue = issues
                         .into_iter()
                         .find(|issue| issue.id == light.target.id)

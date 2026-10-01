@@ -583,7 +583,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         with_mutation_attempts("issue deletion", || {
             let (expected_target, expected_mode) = {
                 let mut preflight = self.storage.open_mutation_session(layout.clone())?;
-                let Some(preflight) = self.capture_mutation_preflight(preflight.as_mut(), id)?
+                let Some(preflight) =
+                    self.capture_mutation_preflight(preflight.as_mut(), id, |_| false)?
                 else {
                     return Ok(AttemptOutcome::Retry);
                 };

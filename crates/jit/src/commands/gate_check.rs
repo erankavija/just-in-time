@@ -705,82 +705,61 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|layout| layout.worktree_root().to_path_buf())
     }
 
-    fn bind_gate_target(
+    /// Capture what evaluating `gate_key` reads, in one round that first
+    /// binds `requested` to its issue, and return the image with the bound id.
+    fn capture_gate_evaluation_image(
         &self,
-        layout: &crate::repository_state::RepositoryLayout,
+        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         requested: &str,
-    ) -> Result<String>
+        gate_key: &str,
+        run_paths: &[crate::repository_state::VirtualPath],
+    ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
+        use crate::declarations::GateChecker;
+        use crate::repository_state::{CaptureSpec, VirtualPath};
+        use std::collections::BTreeMap;
 
         let normalized = requested.to_lowercase().replace('-', "");
         if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
             return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
         }
-        let budget = CaptureBudget {
-            max_listings: 256,
-            max_bytes: 512 * 1024 * 1024,
-            max_depth: 32,
-        };
-        with_mutation_session(&self.storage, layout, "gate target binding", |session| {
-            let mut candidates = Vec::new();
-            let spec = CaptureSpec::new([VirtualPath::INDEX], budget)?;
-            let Some(image) = super::capture_discovering(session, spec, |image, spec| {
-                candidates = captured_repository_index(image)?
-                    .all_ids
-                    .into_iter()
-                    .filter(|id| {
-                        if normalized.len() == 32 {
-                            id.as_str() == requested
-                        } else {
-                            id.to_lowercase().replace('-', "").starts_with(&normalized)
-                        }
-                    })
-                    .collect();
-                Ok(spec.discover_paths(
-                    candidates
-                        .iter()
-                        .map(|id| VirtualPath::data(format!("issues/{id}.json")))
-                        .collect::<std::result::Result<Vec<_>, _>>()?,
-                )?)
-            })?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let issues = candidates
-                .iter()
-                .map(|id| {
-                    captured_issue_record(&image, id)?
-                        .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
+        let mut candidates = Vec::new();
+        let spec = CaptureSpec::new(
+            [VirtualPath::INDEX],
+            super::validate::MUTATION_CAPTURE_BUDGET,
+        )?;
+        let Some(bound) = super::capture_discovering(session, spec, |image, spec| {
+            candidates = captured_repository_index(image)?
+                .all_ids
+                .into_iter()
+                .filter(|id| {
+                    if normalized.len() == 32 {
+                        id.as_str() == requested
+                    } else {
+                        id.to_lowercase().replace('-', "").starts_with(&normalized)
+                    }
                 })
-                .collect::<Result<Vec<_>>>()?;
-            Ok(SessionStep::Done(super::resolve_issue_from_capture(
-                &issues, requested,
-            )?))
-        })
-    }
-
-    fn capture_gate_evaluation_image(
-        &self,
-        session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        target_id: &str,
-        gate_key: &str,
-        run_paths: &[crate::repository_state::VirtualPath],
-    ) -> Result<Option<crate::repository_state::RepositoryImage>>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        use crate::declarations::GateChecker;
-        use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        use std::collections::BTreeMap;
-
-        let budget = CaptureBudget {
-            max_listings: 256,
-            max_bytes: 512 * 1024 * 1024,
-            max_depth: 32,
+                .collect();
+            Ok(spec.discover_paths(
+                candidates
+                    .iter()
+                    .map(|id| VirtualPath::data(format!("issues/{id}.json")))
+                    .collect::<std::result::Result<Vec<_>, _>>()?,
+            )?)
+        })?
+        else {
+            return Ok(None);
         };
+        let issues = candidates
+            .iter()
+            .map(|id| {
+                captured_issue_record(&bound, id)?
+                    .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let target_id = super::resolve_issue_from_capture(&issues, requested)?;
         let mut paths = vec![
             VirtualPath::INDEX,
             VirtualPath::data(format!("issues/{target_id}.json"))?,
@@ -789,11 +768,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             VirtualPath::GATE_RUNS,
         ];
         paths.extend(run_paths.iter().cloned());
-        let Some(initial) = capture_or_retry(session.capture(CaptureSpec::new(paths, budget)?))?
-        else {
+        let mut spec = bound.capture_spec().clone();
+        spec.discover_paths(paths)?;
+        let Some(initial) = capture_or_retry(session.extend(bound, spec))? else {
             return Ok(None);
         };
-        let issue = captured_bound_issue(&initial, target_id)?;
+        let issue = captured_bound_issue(&initial, &target_id)?;
         let registry = captured_gate_registry(&initial)?;
         let gate = required_automated_gate(&issue, &registry, gate_key)?;
         let checker = gate
@@ -801,10 +781,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .as_ref()
             .ok_or_else(|| anyhow!("Gate '{}' has no checker configured", gate_key))?;
         if checker_needs_validation_image(checker) {
-            return self.capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial));
+            return Ok(self
+                .capture_proposed_base(session, &BTreeMap::new(), run_paths, Some(initial))?
+                .map(|image| (image, target_id)));
         }
         let layout = initial.layout().clone();
-        super::grow_discovering(session, initial, |image, spec| {
+        let image = super::grow_discovering(session, initial, |image, spec| {
             spec.discover_paths(
                 issue
                     .dependencies
@@ -838,7 +820,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                 super::discover_gate_run_results(image, spec)?;
             }
             Ok(())
-        })
+        })?;
+        Ok(image.map(|image| (image, target_id)))
     }
 
     /// Check a single gate for an issue
@@ -886,7 +869,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
         let layout = self.require_layout()?;
-        let target_id = self.bind_gate_target(&layout, issue_id)?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.identifier_at(0);
         let result_path = crate::repository_state::gate_run_result_relative_path(&run_id)?;
@@ -899,12 +881,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             VirtualPath::data(run_dir)?,
             VirtualPath::data(result_path.as_path())?,
         ];
-        let (image, issue, issues, registry, runs, captured) =
+        let (target_id, image, issue, issues, registry, runs, captured) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
-                let Some(image) = self.capture_gate_evaluation_image(
+                let Some((image, target_id)) = self.capture_gate_evaluation_image(
                     session.as_mut(),
-                    &target_id,
+                    issue_id,
                     gate_key,
                     &run_paths,
                 )?
@@ -932,7 +914,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 };
                 let captured = captured_gate_evaluation(&image, &issue, gate_key, gate, &runs)?;
                 Ok(AttemptOutcome::Done((
-                    image, issue, issues, registry, runs, captured,
+                    target_id, image, issue, issues, registry, runs, captured,
                 )))
             })?;
 
@@ -965,7 +947,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         with_mutation_attempts("gate evaluation record", || {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
-            let Some(final_image) = self.capture_gate_evaluation_image(
+            let Some((final_image, _)) = self.capture_gate_evaluation_image(
                 session.as_mut(),
                 &target_id,
                 gate_key,
@@ -2646,7 +2628,8 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         let image = executor
             .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
             .unwrap()
-            .unwrap();
+            .unwrap()
+            .0;
         let issue = super::captured_bound_issue(&image, issue_id).unwrap();
         let registry = super::captured_gate_registry(&image).unwrap();
         let runs = if registry.gates[gate_key]
