@@ -1148,8 +1148,9 @@
     "ead8f86d": 2,
     "79252d23": 1,
     "42478e5d": 1,
-    "3d9150d7": 1,
-    "b4483ad6": 1
+    "3d9150d7": 2,
+    "b4483ad6": 1,
+    "c88822a5": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -1944,6 +1945,15 @@
       "subject": "Production rustdoc still names the retired mechanism in forms outside e346d387 sweep terms: bare \"recoverable transaction\" (cli.rs:394, repository_state/package_tree.rs:9, commands/config.rs:275 \"recovered mutation session\") and \"recovering kernel\" (commands/gate.rs:1964). e346d387 sweep term is \"one recoverable transaction\".",
       "owner": "e346d387 (wave 17) — brief at dispatch to cover these forms under its REQ-01 subject (doc comments describing publication by the retired mechanism).",
       "status": "assigned"
+    },
+    {
+      "id": "SP-28",
+      "session": 7,
+      "wave": 16,
+      "source": "3d9150d7 rework-2 worker report",
+      "subject": "repo_lock::acquire (lock parent) and worktree_identity (create_dir_all(.jit)) can create the data root .jit/ when absent — a second absent-root creation path beside the init root publisher named by 3d9150d7 REQ-02. The guard classifies them as lock/identity writes.",
+      "owner": "lead to assess at 3d9150d7 review against REQ-01/REQ-02; candidate POL-01 task",
+      "status": "open"
     }
   ],
   "checkpoint_reconciliation_fbd6c859": {
@@ -2027,6 +2037,7 @@
       }
     ],
     "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
-    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy."
+    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy.",
+    "held": "b4483ad6: all four gates passed (doc-review/code-review 0 findings) but held open until c88822a5 rework fixes the long-unterminated-final-line torn-tail misclassification, which breaks b4483ad6 REQ-03 behaviour on main."
   }
 }
