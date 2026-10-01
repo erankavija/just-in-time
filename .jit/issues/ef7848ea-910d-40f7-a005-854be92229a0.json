@@ -101,6 +101,7 @@
       "path": "dev/active/ef7848ea/checkpoint-evidence.md"
     }
   ],
+  "done_at": "2026-10-01T22:45:30.976375992Z",
   "first_ready_at": "2026-10-01T22:23:15.518009497Z",
   "gates_required": [
     "doc-review",
@@ -129,7 +130,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Mutation cost evidence",
-  "updated_at": "2026-10-01T22:45:19.713290585Z"
+  "updated_at": "2026-10-01T22:45:30.976375992Z"
 }
