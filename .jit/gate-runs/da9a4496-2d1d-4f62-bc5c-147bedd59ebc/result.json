@@ -1,0 +1,67 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1697c0430a31a03d865f9647d79a26d25fef118f",
+  "completed_at": "2026-10-01T22:35:03.554770134Z",
+  "duration_ms": 235094,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "scripts/cargo-ci.sh",
+        "id": "F1",
+        "line": 380,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ef7848ea/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A benchmark contract cites the missing provenance-removal evidence artifact, contradicting the checkpoint's claim that all such artifacts exist."
+      },
+      {
+        "disposition": "blocking",
+        "file": ".jit/issues/ef7848ea-910d-40f7-a005-854be92229a0.json",
+        "id": "F2",
+        "line": 40,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ef7848ea/REQ-02",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "Linked evidence metadata still resolves the migrated harness to a deleted bench.sh path and records a stale intake hash."
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/benchmarks/publication-cost-722878d4/README.md",
+        "id": "F3",
+        "line": 31,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/ef7848ea/REQ-01"
+        ],
+        "severity": "medium",
+        "summary": "The artifact's claim that no other work ran beside the measurements has no recorded process-isolation evidence."
+      }
+    ],
+    "summary": "REQ-02 is unmet because a benchmark contract cites a missing artifact, and the linked evidence manifest remains stale after the harness migration.",
+    "verdict": "fail"
+  },
+  "gate_key": "holistic-review",
+  "issue_id": "ef7848ea-910d-40f7-a005-854be92229a0",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "da9a4496-2d1d-4f62-bc5c-147bedd59ebc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T22:31:08.459818741Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4390 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f997-c711-7193-a824-a7aabbd2604b\n--------\nuser\n--- 4377 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking (high):** `scripts/cargo-ci.sh:380` cites `dev/benchmarks/provenance-removal-355565c2/README.md`, but that artifact is absent. This contradicts the checkpoint’s “all exist” claim and fails REQ-02’s requirement that benchmark contracts cite existing evidence artifacts.\n\n2. **F2 — blocking (medium):** The linked-document asset manifest remains half-migrated after the harness move: `.jit/issues/ef7848ea-910d-40f7-a005-854be92229a0.json:40` and `:57` resolve the evidence harness to deleted `dev/active/f1dc843a-redo-mutations/bench.sh`; its intake asset hash at `:32` also differs from the current file. The shipped harness exists at `scripts/benchmark-mutation-cost.sh`, but the linked evidence closure is stale.\n\n3. **F3 — advisory (medium):** `dev/benchmarks/publication-cost-722878d4/README.md:31` claims nothing else ran alongside measurements. The raw output records load averages and the harness waits for a threshold, but neither records nor verifies process isolation, so this measurement-condition claim is unsubstantiated.\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-02 is unmet because a benchmark contract cites a missing artifact, and the linked evidence manifest remains stale after the harness migration.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A benchmark contract cites the missing provenance-removal evidence artifact, contradicting the checkpoint's claim that all such artifacts exist.\",\"file\":\"scripts/cargo-ci.sh\",\"line\":380,\"references\":[\"@/issue/ef7848ea/REQ-02\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Linked evidence metadata still resolves the migrated harness to a deleted bench.sh path and records a stale intake hash.\",\"file\":\".jit/issues/ef7848ea-910d-40f7-a005-854be92229a0.json\",\"line\":40,\"references\":[\"@/issue/ef7848ea/REQ-02\",\"@/invariant/single-source-prose\"]},{\"id\":\"F3\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The artifact's claim that no other work ran beside the measurements has no recorded process-isolation evidence.\",\"file\":\"dev/benchmarks/publication-cost-722878d4/README.md\",\"line\":31,\"references\":[\"@/issue/ef7848ea/REQ-01\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
