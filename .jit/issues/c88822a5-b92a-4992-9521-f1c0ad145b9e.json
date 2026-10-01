@@ -15,6 +15,47 @@
       "format": "markdown",
       "label": "Whole-log read cost (REQ-03 amendment evidence)",
       "path": "dev/active/7226f00b/whole-log-read-cost.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
     }
   ],
   "first_ready_at": "2026-09-21T20:58:06.621376704Z",
@@ -36,7 +77,7 @@
     "per:@/charter/D-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Single-pass mutation capture",
-  "updated_at": "2026-09-21T20:58:06.621376704Z"
+  "updated_at": "2026-10-01T09:10:20.734148986Z"
 }

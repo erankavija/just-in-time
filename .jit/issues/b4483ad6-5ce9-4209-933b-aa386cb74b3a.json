@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T09:10:19.804027705Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "fbd6c859-e911-4266-8e2d-e3428f331ada"
   ],
   "description": "The finalizer emits the event-log change as an offset with its bytes, so publication writes the appended lines in place.\n\n## Background\n\nEvery mutation rewrites the event log as a whole-file replacement: the composer reads the captured prefix, composes prefix plus new lines, and emits one whole-file write. The log is several megabytes and grows with project history, so the cost of a mutation grows with it. The action vocabulary has no append operation, and the log has one writer, which makes this a contained change.\n\nThe offset is the captured file length rather than a line boundary. The composer inserts one separator newline when a non-empty prefix lacks one, so the appended bytes may begin with a newline. Torn-tail certification is preserved: a prefix not ending in a newline whose final line is invalid JSON still refuses non-certifying events, and the lifecycle certifier is still the line immediately following the torn partial, which under this encoding is the first line of the appended bytes.\n\nReaders are unaffected: the log is read whole under a shared lock, which is equally correct over an in-place append.\n\n## Success Criteria\n\n- [hard] REQ-01: A mutation's record carries the event-log change as an offset with the appended bytes.\n- [hard] REQ-02: The offset is the captured file length, and appended bytes beginning with a separator newline are preserved verbatim.\n- [hard] REQ-03: Torn-tail certification behaves as it does today: an uncertified torn tail refuses non-certifying events, and the certifier is the first appended line.\n- [hard] REQ-04: The appended bytes are the only log bytes a mutation writes.\n- [hard] REQ-05: Reading the log after a positioned append yields the same parsed events as reading it after a whole-file composition of the same content.\n- [hard] REQ-06: The adopter pages stating how the event log grows describe a positioned append at the captured length.\n- [hard] REQ-07: The change adds under 150 production lines.\n\n## Notes\n\nThe delta's action vocabulary is matched exhaustively at six sites, four of them inside the kernel module, so this encoding lands once that module is gone.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T20:58:06.332054494Z",
   "gates_required": [
     "cargo-ci",
@@ -31,7 +74,7 @@
     "enforces:@/invariant/event-log"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Positioned event-log append",
-  "updated_at": "2026-09-21T20:58:06.332054494Z"
+  "updated_at": "2026-10-01T09:10:19.804027705Z"
 }

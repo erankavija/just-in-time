@@ -1,12 +1,55 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-01T09:10:18.905182451Z",
   "context": {},
   "created_at": "2026-09-20T01:05:37.007130180Z",
   "dependencies": [
     "fbd6c859-e911-4266-8e2d-e3428f331ada"
   ],
   "description": "The profile and recover commands report the redo record: no plan hash, transaction identifier, or cleanup-pending flag, and a count of applied records, in one cutover across output, schema, bridge, and reference.\n\n## Background\n\nFour output surfaces name the mechanism being replaced. The plan hash is a digest over every captured entry, documented in the profile apply and upgrade output. The transaction identifier names a journal directory. The cleanup-pending flag warns that a control directory survived. The recover command emits a `transactions_recovered` key and a matching human line, fed by the session-open dispatch's count.\n\nNone has a referent under the redo record. A superseded representation is removed at cutover rather than re-derived under a new name, so no replacement identifier appears in place of the three profile fields; the recover count survives with the name of what it now counts.\n\nThe bridge that generates tool definitions from the command schema and the adopter reference both carry the fields. The release notes record the change, because it is adopter-visible.\n\n## Success Criteria\n\n- [hard] REQ-01: The profile apply, reconfigure, and upgrade machine-readable output carries no plan-hash, transaction-identifier, or cleanup-pending field.\n- [hard] REQ-02: The command schema declares none of the three fields, and the generated bridge tool definitions match the schema.\n- [hard] REQ-03: The command reference and the profiles reference describe the output without the three fields.\n- [hard] REQ-04: No replacement identifier appears in place of the three fields.\n- [hard] REQ-05: The recover command's machine-readable output and its rendered line name applied redo records, with the same meaning in both, and both adopter pages documenting the command agree on the name.\n- [hard] REQ-06: The release notes record the removal and the rename under the unreleased section.\n- [hard] REQ-07: Output-shape coverage asserts the fields' absence and the recover key's name at the serialization boundary.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-09-21T20:58:06.032425194Z",
   "gates_required": [
     "cargo-ci",
@@ -31,7 +74,7 @@
     "enforces:@/invariant/canonical-cutover"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Transaction fields leave the command output",
-  "updated_at": "2026-09-21T20:58:06.032425194Z"
+  "updated_at": "2026-10-01T09:10:18.905182451Z"
 }
