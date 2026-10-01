@@ -56,6 +56,11 @@
     "code-review"
   ],
   "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-01T10:45:37.825037408Z",
+      "updated_by": "auto:executor"
+    },
     "code-review": {
       "status": "failed",
       "updated_at": "2026-10-01T09:53:05.749614884Z",
@@ -75,5 +80,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication path source guards",
-  "updated_at": "2026-10-01T09:53:05.749614884Z"
+  "updated_at": "2026-10-01T10:45:37.825037408Z"
 }
