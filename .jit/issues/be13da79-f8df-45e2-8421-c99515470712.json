@@ -58,7 +58,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-01T19:25:57.047832623Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "be13da79-f8df-45e2-8421-c99515470712",
   "labels": [
     "type:task",
@@ -73,5 +79,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-10-01T19:20:24.065893664Z"
+  "updated_at": "2026-10-01T19:25:57.047832623Z"
 }
