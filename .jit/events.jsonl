@@ -15269,3 +15269,4 @@
 {"gate_key":"mcp-ci","id":"aa49a459-60bc-4792-a4de-2ddad2edce6b","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T09:32:32.666104296Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"code-review","id":"77139652-0398-474a-8ae1-9f14d936024e","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T09:37:17.876251420Z","type":"gate_passed","updated_by":"auto:executor"}
 {"gate_key":"doc-review","id":"659f4501-a89e-4a4d-9ac6-a99ffbe58f15","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T09:40:02.220641884Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"22251d58-c63f-4467-bbc7-3bf51fc5c8c9","issue_id":"51eb1aa6-186d-44c0-a60f-a1e3b0393110","timestamp":"2026-10-01T09:45:55.675742440Z","type":"gate_failed","updated_by":"auto:executor"}
