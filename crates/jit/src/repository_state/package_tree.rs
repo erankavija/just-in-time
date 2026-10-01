@@ -14,8 +14,9 @@
 //! files it declares — belongs to the caller.
 
 use super::{
-    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
+    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
+    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayoutError,
+    RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

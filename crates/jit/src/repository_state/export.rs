@@ -1,8 +1,9 @@
 //! Typed classification and pure finalization of repository export files.
 
 use super::{
-    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RootRelativePath, VirtualPath,
+    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan,
+    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout,
+    RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};

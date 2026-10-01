@@ -30,7 +30,9 @@ use crate::domain::{
 
 use super::default_rules::default_ruleset;
 use super::image::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, };
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta,
+    RepositoryEntry, RepositoryImage,
+};
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
@@ -496,7 +498,6 @@ impl InitializationScaffold {
         super::apply_overlay(base, desired_overrides(base, &self.desired_files()?)?)
             .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
-
 }
 
 /// Combine neutral initialization and an aggregate profile closure into one
@@ -539,12 +540,10 @@ fn derive_initialization_with_profiles(
         fold_rebased_action(base, &mut actions, &action)?;
     }
     let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
-    Ok(
-        MaterializationDerivation::new(delta)
-            .with_profile_targets(applications.profile_targets)
-            .with_profile_contributions(applications.profile_contributions)
-            .with_applied_profiles(applied_profiles),
-    )
+    Ok(MaterializationDerivation::new(delta)
+        .with_profile_targets(applications.profile_targets)
+        .with_profile_contributions(applications.profile_contributions)
+        .with_applied_profiles(applied_profiles))
 }
 
 /// Attribute neutral default-rule/schema repair to the first dependency-first
@@ -998,11 +997,9 @@ fn derive_profile_application_candidate(
     let mut all = directory_actions(base, &actions, &explicit)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
-    Ok(
-        MaterializationDerivation::new(delta)
-            .with_profile_targets(targets)
-            .with_profile_contributions(contributions),
-    )
+    Ok(MaterializationDerivation::new(delta)
+        .with_profile_targets(targets)
+        .with_profile_contributions(contributions))
 }
 
 /// Compose one profile selection and record its aggregate lifecycle outcome.
@@ -1072,12 +1069,10 @@ pub(super) fn derive_profile_applications(
         fold_rebased_action(base, &mut actions, &action)?;
     }
     let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
-    Ok(
-        MaterializationDerivation::new(delta)
-            .with_profile_targets(targets)
-            .with_profile_contributions(contributions)
-            .with_applied_profiles(applied_profiles),
-    )
+    Ok(MaterializationDerivation::new(delta)
+        .with_profile_targets(targets)
+        .with_profile_contributions(contributions)
+        .with_applied_profiles(applied_profiles))
 }
 
 /// Classify one profile's aggregate outcome from its prior provenance and the

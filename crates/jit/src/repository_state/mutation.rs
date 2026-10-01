@@ -15,8 +15,9 @@
 //! and the pure `repository_state` vocabulary.
 
 use super::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RootRelativePath, VirtualPath,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction,
+    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
+    RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{
@@ -127,6 +128,15 @@ impl IdAuthority {
                     seed
                 }
             },
+        }
+    }
+
+    /// The seed if already determined, without drawing the random source.
+    #[cfg(test)]
+    fn sampled_seed(&self) -> Option<[u8; 32]> {
+        match &self.seed {
+            SeedSource::Fixed(seed) => Some(*seed),
+            SeedSource::Lazy(cell) => cell.get(),
         }
     }
 
@@ -310,7 +320,6 @@ impl MutationContext {
         self.next_index.set(index + 1);
         self.ids.uuid_at(index)
     }
-
 }
 
 /// One repository-owned semantic mutation, free of identifiers and timestamps.
@@ -700,10 +709,7 @@ fn event_tail_reflects_claim(events: &[Event], issue_id: &str, agent: &Assignee)
 /// The single typed-to-byte finalizer for repository-owned records.
 ///
 /// Given the captured `image`, the reused `context`, and closed semantic
-/// `intents`, it produces one exact [`MaterializationPlan`]. Its semantic hash
-/// covers the complete captured image, the unchanged context seed, the closed
-/// intent representation, [`MaterializationIntent::SemanticMutation`], and the
-/// final delta. When no transition occurs the plan carries an empty delta having
+/// `intents`, it produces one exact [`MaterializationPlan`]. When no transition occurs the plan carries an empty delta having
 /// sampled neither an identifier nor the mutation timestamp, so a no-op emits no
 /// bytes. Identifiers are allocated in the frozen order — new issue ids first
 /// (creation order), gate-run/record ids next, event ids last after canonical
@@ -1526,11 +1532,6 @@ mod tests {
             serde_json::to_vec(retry.delta()).unwrap(),
             "delta bytes must be stable across reconstructed values"
         );
-        assert_eq!(
-            first.hash(),
-            retry.hash(),
-            "semantic plan hashes must be stable across retries"
-        );
     }
 
     /// The override fact a dispatch site installs when it lets an invocation
@@ -1975,7 +1976,6 @@ mod tests {
         };
         let first = finalize(&layout(), &image, &ctx(), std::slice::from_ref(&intent)).unwrap();
         let retry = finalize(&layout(), &image, &ctx(), &[intent]).unwrap();
-        assert_eq!(first.hash(), retry.hash());
         assert_eq!(first.delta(), retry.delta());
         let written = first
             .delta()

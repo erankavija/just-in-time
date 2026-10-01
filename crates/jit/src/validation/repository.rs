@@ -996,20 +996,11 @@ mod tests {
         .unwrap();
         let proposed = executor.capture_validation_image_with(&overrides).unwrap();
         let declarations = crate::repository_state::declarations_from_image(&proposed).unwrap();
-        let seed = crate::repository_state::RepositorySeed::new(
-            crate::repository_state::RepositorySeedKind::Command {
-                name: "validation test proposal".to_string(),
-            },
-            Default::default(),
-            Default::default(),
-        )
-        .unwrap();
         let plan = crate::repository_state::derive_materialization(
             &proposed,
             crate::repository_state::MaterializationRequest::RepairDerivedState {
                 declarations: declarations.borrowed(),
                 profiles: Vec::new(),
-                seed: &seed,
             },
         )
         .unwrap();

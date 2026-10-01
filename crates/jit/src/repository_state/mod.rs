@@ -58,9 +58,8 @@ pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
     EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass,
-    ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositoryTargetKind, TargetClaim,
+    ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction,
+    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryTargetKind, TargetClaim,
     EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
@@ -169,7 +168,7 @@ pub enum GateRegistryEditError {
     /// The typed edit's registry disagreed with the projection declarations.
     #[error("gate registry edit and projection declarations disagree")]
     DeclarationMismatch,
-    /// The record finalizer or seed derivation failed.
+    /// The record finalizer failed.
     #[error(transparent)]
     Mutation(#[from] MutationError),
     /// The edited registry could not be serialized canonically.
@@ -818,30 +817,21 @@ pub fn derive_materialization(
     let (derivation, projection_counts) = match request {
         MaterializationRequest::SemanticMutation { declarations } => {
             let delta = derive_semantic_mutation(image, &declarations)?;
-            (
-                MaterializationDerivation::new(delta),
-                Default::default(),
-            )
+            (MaterializationDerivation::new(delta), Default::default())
         }
         MaterializationRequest::RenderConfiguredProjections {
             declarations,
             selected,
         } => {
             let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
-            (
-                MaterializationDerivation::new(delta),
-                counts,
-            )
+            (MaterializationDerivation::new(delta), counts)
         }
         MaterializationRequest::RepairDerivedState {
             declarations,
             profiles,
         } => {
             let delta = derive_repair(image, &declarations, profiles)?;
-            (
-                MaterializationDerivation::new(delta),
-                Default::default(),
-            )
+            (MaterializationDerivation::new(delta), Default::default())
         }
         MaterializationRequest::Initialize { scaffold, context } => (
             initialize::derive_initialization(image, scaffold, context)?,
@@ -886,8 +876,7 @@ pub fn derive_materialization(
 /// that edited configuration, exactly as [`derive_semantic_mutation`] does. The
 /// authored `config.toml` write carries the captured base preimage, and every
 /// derived action its own base preimage, so `session.apply` revalidates against
-/// exactly what was captured; the whole set publishes under the existing
-/// [`MaterializationIntent::SemanticMutation`].
+/// exactly what was captured.
 ///
 /// This is a constrained, single-declaration entry invoking the closed complete
 /// producer set — `config.toml` only, never a generic authored-bytes seam. Other

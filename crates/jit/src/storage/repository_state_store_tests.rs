@@ -1,8 +1,5 @@
 use super::*;
-use crate::repository_state::{
-    plan_hash, CaptureBudget, MaterializationIntent, RepositoryAction, RepositorySeed,
-    RepositorySeedKind,
-};
+use crate::repository_state::{CaptureBudget, RepositoryAction};
 use crate::storage::memory::test_fixtures as memory_fixtures;
 use crate::storage::redo_apply::test_fixtures::{
     data_root as redo_root, record_relative_path, record_scratch_relative_path,
@@ -219,24 +216,9 @@ fn initialization_delta(layout: &RepositoryLayout) -> RepositoryDelta {
     .unwrap()
 }
 
-/// Close a hand-built test delta through the same complete semantic hash
-/// contract as production materialization plans.
+/// Close a hand-built test delta over its captured image.
 fn test_plan(image: &RepositoryImage, delta: &RepositoryDelta) -> MaterializationPlan {
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Command {
-            name: "repository-state-store-test".to_string(),
-        },
-        BTreeMap::new(),
-        BTreeMap::new(),
-    )
-    .unwrap();
-    MaterializationPlan::new(
-        image,
-        &seed,
-        &MaterializationIntent::SemanticMutation,
-        delta.clone(),
-    )
-    .unwrap()
+    MaterializationPlan::new(image, delta.clone())
 }
 
 /// A fresh-init delta that publishes one issue record plus the enclosing
@@ -427,7 +409,7 @@ fn test_json_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
     ));
     let plan_b = test_plan(&image_b, &delta);
     let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.transaction_hash, plan_b.hash());
+    assert_eq!(outcome.actions_applied, delta.actions().len());
 }
 
 #[test]
@@ -464,7 +446,7 @@ fn test_memory_plan_owns_exact_image_and_honest_plan_returns_own_hash() {
     ));
     let plan_b = test_plan(&image_b, &delta);
     let outcome = session.apply(&plan_b).unwrap();
-    assert_eq!(outcome.transaction_hash, plan_b.hash());
+    assert_eq!(outcome.actions_applied, delta.actions().len());
 }
 
 #[cfg(unix)]
@@ -1016,8 +998,7 @@ fn test_conformance_empty_delta_is_a_noop_on_both_backends() {
     let json_image = json_session.capture(spec()).unwrap();
     let json_outcome = json_session.apply(&test_plan(&json_image, &delta)).unwrap();
 
-    // An empty delta is a no-op with zero actions; each result still carries
-    // its complete captured-image plan hash. No residue is created.
+    // An empty delta is a no-op with zero actions; no residue is created.
     assert_eq!(memory_outcome.actions_applied, json_outcome.actions_applied);
     assert_eq!(json_outcome.actions_applied, 0);
     assert!(!data
@@ -2032,48 +2013,7 @@ fn test_conformance_claim_noop_samples_nothing_on_both_backends() {
 }
 
 #[test]
-fn test_conformance_claim_noop_transaction_hash_covers_context_seed() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "wt", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
-    )
-    .unwrap();
-    let id = "56565656-5656-4565-8565-565656565656";
-    let agent: Assignee = "agent:worker-1".parse().unwrap();
-    let issue = req01_issue(id, Some(agent.clone()));
-    let claim_event = Event::IssueClaimed {
-        id: "evt".into(),
-        issue_id: id.to_string(),
-        timestamp: req01_instant(),
-        assignee: agent.clone(),
-    };
-    let mut events = crate::repository_state::serialize_event(&claim_event).unwrap();
-    events.push(b'\n');
-    let intents = [MutationIntent::ClaimIssue {
-        issue_id: id.to_string(),
-        agent,
-    }];
-
-    let hashes = [[11u8; 32], [12u8; 32]].map(|seed| {
-        let memory = InMemoryStorage::new();
-        seed_memory_issue(&memory, id, &issue, &events);
-        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-        let image = session.capture(claim_spec(id)).unwrap();
-        let context = MutationContext::deterministic(seed, req01_instant());
-        let plan = finalize(&layout, &image, &context, &intents).unwrap();
-        assert!(plan.delta().actions().is_empty());
-        session.apply(&plan).unwrap().transaction_hash
-    });
-
-    assert_ne!(
-        hashes[0], hashes[1],
-        "the unchanged context seed identity must enter even a no-op plan hash"
-    );
-}
-
-#[test]
-fn test_conformance_identical_full_finalizer_plan_hash_matches_both_backends() {
+fn test_conformance_identical_full_finalizer_plan_matches_both_backends() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
     std::fs::create_dir(&data).unwrap();
@@ -2109,8 +2049,7 @@ fn test_conformance_identical_full_finalizer_plan_hash_matches_both_backends() {
     assert_eq!(json_plan, memory_plan);
     let json_outcome = json_session.apply(&json_plan).unwrap();
     let memory_outcome = memory_session.apply(&memory_plan).unwrap();
-    assert_eq!(json_outcome.transaction_hash, json_plan.hash());
-    assert_eq!(memory_outcome.transaction_hash, json_plan.hash());
+    assert_eq!(json_outcome, memory_outcome);
 }
 
 #[test]
@@ -2178,55 +2117,14 @@ fn test_conformance_reconstructed_issue_maps_match_across_backends() {
         serde_json::to_vec(json_plan.delta()).unwrap(),
         serde_json::to_vec(memory_plan.delta()).unwrap()
     );
-    assert_eq!(json_plan.hash(), memory_plan.hash());
+    assert_eq!(json_plan, memory_plan);
     let json_outcome = json_session.apply(&json_plan).unwrap();
     let memory_outcome = memory_session.apply(&memory_plan).unwrap();
-    assert_eq!(
-        json_outcome.transaction_hash,
-        memory_outcome.transaction_hash
-    );
+    assert_eq!(json_outcome, memory_outcome);
 }
 
 #[test]
-fn test_full_finalizer_hash_changes_with_captured_evidence() {
-    let temp = TempDir::new().unwrap();
-    let layout = RepositoryLayout::new(
-        RepositoryRootEvidence::new(temp.path(), "wt", true),
-        RepositoryRootEvidence::new(temp.path().join(".jit"), "data", true),
-    )
-    .unwrap();
-    let id = "57575757-5757-4575-8575-575757575757";
-    let agent: Assignee = "agent:worker-1".parse().unwrap();
-    let issue = req01_issue(id, Some(agent.clone()));
-    let intents = [MutationIntent::ClaimIssue {
-        issue_id: id.to_string(),
-        agent: agent.clone(),
-    }];
-
-    let hashes = ["evidence-a", "evidence-b"].map(|event_id| {
-        let event = Event::IssueClaimed {
-            id: event_id.to_string(),
-            issue_id: id.to_string(),
-            timestamp: req01_instant(),
-            assignee: agent.clone(),
-        };
-        let mut events = crate::repository_state::serialize_event(&event).unwrap();
-        events.push(b'\n');
-        let memory = InMemoryStorage::new();
-        seed_memory_issue(&memory, id, &issue, &events);
-        let mut session = memory.open_mutation_session(layout.clone()).unwrap();
-        let image = session.capture(claim_spec(id)).unwrap();
-        let context = MutationContext::deterministic([22u8; 32], req01_instant());
-        let plan = finalize(&layout, &image, &context, &intents).unwrap();
-        assert!(plan.delta().actions().is_empty());
-        plan.hash().to_string()
-    });
-
-    assert_ne!(hashes[0], hashes[1]);
-}
-
-#[test]
-fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_hash() {
+fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_plan() {
     let temp = TempDir::new().unwrap();
     let layout = RepositoryLayout::new(
         RepositoryRootEvidence::new(temp.path(), "wt", true),
@@ -2248,7 +2146,7 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_hash() {
 
     let first = finalize(&layout, &image, &context, &intents).unwrap();
     let retry = finalize(&layout, &image, &context, &intents).unwrap();
-    assert_eq!(first, retry, "a retry reuses the complete plan hash");
+    assert_eq!(first, retry, "a retry reuses the same plan");
 
     let event_bytes = first.delta().appended_event_bytes().unwrap();
     let events =
@@ -2260,22 +2158,10 @@ fn test_full_finalizer_allocated_ids_enter_delta_and_retry_reuses_hash() {
         event_id,
         &crate::repository_state::IdAuthority::from_seed([23u8; 32]).uuid_at(0)
     );
-    let seed = context.repository_seed(&intents).unwrap();
-    assert_eq!(
-        first.hash(),
-        plan_hash(
-            &image,
-            &seed,
-            &MaterializationIntent::SemanticMutation,
-            first.delta()
-        )
-        .unwrap(),
-        "the delta containing every allocated id is part of the hash"
-    );
 }
 
 #[test]
-fn test_conformance_empty_finalizer_noop_hash_matches_without_clock_sampling() {
+fn test_conformance_empty_finalizer_noop_plan_matches_without_clock_sampling() {
     struct PanicClock;
     impl MutationClock for PanicClock {
         fn now(&self) -> chrono::DateTime<chrono::Utc> {

@@ -2,9 +2,9 @@
 
 use super::mutation::finalize_delta;
 use super::{
-    ExpectedPreimage, FileMode, MaterializationPlan, MutationContext,
-    MutationError, MutationIntent, ProducerError, RepositoryAction, RepositoryDelta,
-    RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
+    ExpectedPreimage, FileMode, MaterializationPlan, MutationContext, MutationError,
+    MutationIntent, ProducerError, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryStateError, VirtualPath,
 };
 use crate::domain::artifact_execution::{ArchiveExecutionResult, ArchivePublication};
 use crate::domain::artifact_plan::{
