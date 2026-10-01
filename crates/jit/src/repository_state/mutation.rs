@@ -15,10 +15,8 @@
 //! and the pure `repository_state` vocabulary.
 
 use super::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationIntent,
-    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositorySeed, RepositorySeedKind,
-    RootRelativePath, SeedError, VirtualPath,
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RootRelativePath, VirtualPath,
 };
 use crate::declarations::GateRegistry;
 use crate::domain::{
@@ -29,7 +27,6 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::cell::Cell;
-use std::collections::BTreeMap;
 
 /// Injected wall-clock source for the single mutation timestamp.
 ///
@@ -130,17 +127,6 @@ impl IdAuthority {
                     seed
                 }
             },
-        }
-    }
-
-    /// The seed if already determined without drawing the random source: a fixed
-    /// seed, or a lazy seed already sampled by an allocation. `None` means no
-    /// identifier has been allocated, so no-op finalization can hash its plan
-    /// without forcing a sample.
-    fn sampled_seed(&self) -> Option<[u8; 32]> {
-        match &self.seed {
-            SeedSource::Fixed(seed) => Some(*seed),
-            SeedSource::Lazy(cell) => cell.get(),
         }
     }
 
@@ -325,34 +311,6 @@ impl MutationContext {
         self.ids.uuid_at(index)
     }
 
-    /// Close the identity seed and exact semantic intents into the typed seed
-    /// consumed by the repository plan-hash API. The seed enters the hash only
-    /// once it has been drawn — a fixed seed, or a production seed sampled by an
-    /// allocation in this finalize. A no-op allocates nothing, so its production
-    /// seed stays undrawn and is omitted, keeping no-op finalization free of any
-    /// identity or time sampling. Repeated finalization with this context reuses
-    /// its sampled seed, so equivalent plans hash identically on both backends.
-    pub(crate) fn repository_seed(
-        &self,
-        intents: &[MutationIntent],
-    ) -> Result<RepositorySeed, MutationError> {
-        let context_seed = self
-            .ids
-            .sampled_seed()
-            .map(|seed| seed.to_vec())
-            .unwrap_or_default();
-        RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "repository-state-mutation-v1".to_string(),
-            },
-            BTreeMap::new(),
-            BTreeMap::from([
-                ("context_seed".to_string(), context_seed),
-                ("intents".to_string(), canonical_json(intents, false)?),
-            ]),
-        )
-        .map_err(Into::into)
-    }
 }
 
 /// One repository-owned semantic mutation, free of identifiers and timestamps.
@@ -489,12 +447,6 @@ pub enum MutationError {
     /// An authored gate registry could not be serialized canonically.
     #[error(transparent)]
     GateDeclaration(#[from] crate::declarations::GateDeclarationError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
-    /// The complete semantic plan could not be hashed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
     /// A captured record could not be parsed.
     #[error("captured record at {path:?} is malformed: {reason}")]
     MalformedRecord {

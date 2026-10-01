@@ -14,10 +14,8 @@
 //! files it declares — belongs to the caller.
 
 use super::{
-    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationIntent,
-    MaterializationPlan, PlanHashError, RepositoryAction, RepositoryDelta, RepositoryEntry,
-    RepositoryImage, RepositoryLayoutError, RepositoryRootClass, RepositorySeed,
-    RepositorySeedKind, RootRelativePath, SeedError, VirtualPath,
+    CaptureBudget, CaptureError, CaptureSpec, ExpectedPreimage, FileMode, MaterializationPlan, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayoutError, RepositoryRootClass, RootRelativePath, VirtualPath,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -79,12 +77,6 @@ pub enum PackageTreeCaptureError {
     /// Delta normalization refused the produced actions.
     #[error(transparent)]
     Delta(#[from] super::DeltaError),
-    /// The complete plan could not be hashed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
     /// The destination names a repository root rather than a directory in it.
     #[error("package tree destination {0:?} is a repository root")]
     RootDestination(VirtualPath),

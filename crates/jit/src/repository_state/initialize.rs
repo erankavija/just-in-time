@@ -30,10 +30,7 @@ use crate::domain::{
 
 use super::default_rules::default_ruleset;
 use super::image::{
-    CaptureError, DeltaError, ExpectedPreimage, FileMode, MaterializationIntent, PlanHashError,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositorySeed,
-    RepositorySeedKind, SeedError,
-};
+    CaptureError, DeltaError, ExpectedPreimage, FileMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, };
 use super::mutation::{finalize_audit_append, fresh_index_bytes, MutationContext, MutationError};
 use super::path::{RepositoryLayoutError, RootRelativePath, VirtualPath};
 use super::rule_serialize::serialize_ruleset;
@@ -134,12 +131,6 @@ pub enum InitializationError {
     /// Path canonicalization failed.
     #[error(transparent)]
     Layout(#[from] RepositoryLayoutError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
-    /// The complete semantic plan could not be hashed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
     /// The finalizer could not compose the audit-log append.
     #[error(transparent)]
     Mutation(#[from] MutationError),
@@ -506,17 +497,6 @@ impl InitializationScaffold {
             .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
     }
 
-    fn seed(&self) -> Result<RepositorySeed, InitializationError> {
-        let facts = BTreeMap::from([(
-            "project".to_string(),
-            self.project_name.as_str().to_string(),
-        )]);
-        Ok(RepositorySeed::new(
-            RepositorySeedKind::Initialization,
-            facts,
-            BTreeMap::new(),
-        )?)
-    }
 }
 
 /// Combine neutral initialization and an aggregate profile closure into one
@@ -559,32 +539,8 @@ fn derive_initialization_with_profiles(
         fold_rebased_action(base, &mut actions, &action)?;
     }
     let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
-    let facts = BTreeMap::from([
-        (
-            "project".to_string(),
-            scaffold.project_name.as_str().to_string(),
-        ),
-        (
-            "profiles".to_string(),
-            profiles
-                .iter()
-                .map(|profile| profile.id.as_str())
-                .collect::<Vec<_>>()
-                .join(","),
-        ),
-    ]);
-    let payloads = profiles
-        .iter()
-        .map(|profile| {
-            (
-                format!("profile:{}", profile.id),
-                format!("{}:{}", profile.version, profile.package_hash).into_bytes(),
-            )
-        })
-        .collect();
-    let seed = RepositorySeed::new(RepositorySeedKind::Initialization, facts, payloads)?;
     Ok(
-        MaterializationDerivation::new(delta, seed, MaterializationIntent::InitializeRepository)
+        MaterializationDerivation::new(delta)
             .with_profile_targets(applications.profile_targets)
             .with_profile_contributions(applications.profile_contributions)
             .with_applied_profiles(applied_profiles),
@@ -660,11 +616,7 @@ pub(super) fn derive_initialization(
     let mut all = directory_actions(base, &actions, &scaffold.explicit_dirs()?)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
-    Ok(MaterializationDerivation::new(
-        delta,
-        scaffold.seed()?,
-        MaterializationIntent::InitializeRepository,
-    ))
+    Ok(MaterializationDerivation::new(delta))
 }
 
 fn desired_overrides(
@@ -1046,18 +998,8 @@ fn derive_profile_application_candidate(
     let mut all = directory_actions(base, &actions, &explicit)?;
     all.extend(actions);
     let delta = RepositoryDelta::new(base.layout(), all)?;
-    let facts = BTreeMap::from([("profile".to_string(), profile.id.to_string())]);
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Profile {
-            name: profile.id.to_string(),
-            version: profile.version.clone(),
-            package_hash: profile.package_hash.clone(),
-        },
-        facts,
-        BTreeMap::new(),
-    )?;
     Ok(
-        MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
+        MaterializationDerivation::new(delta)
             .with_profile_targets(targets)
             .with_profile_contributions(contributions),
     )
@@ -1130,32 +1072,8 @@ pub(super) fn derive_profile_applications(
         fold_rebased_action(base, &mut actions, &action)?;
     }
     let delta = RepositoryDelta::new(base.layout(), actions.into_values().collect())?;
-    let facts = BTreeMap::from([(
-        "profiles".to_string(),
-        profiles
-            .iter()
-            .map(|profile| profile.id.as_str())
-            .collect::<Vec<_>>()
-            .join(","),
-    )]);
-    let payloads = profiles
-        .iter()
-        .map(|profile| {
-            (
-                format!("profile:{}", profile.id),
-                format!("{}:{}", profile.version, profile.package_hash).into_bytes(),
-            )
-        })
-        .collect();
-    let seed = RepositorySeed::new(
-        RepositorySeedKind::Command {
-            name: "profile-application-selection".to_string(),
-        },
-        facts,
-        payloads,
-    )?;
     Ok(
-        MaterializationDerivation::new(delta, seed, MaterializationIntent::ApplyProfile)
+        MaterializationDerivation::new(delta)
             .with_profile_targets(targets)
             .with_profile_contributions(contributions)
             .with_applied_profiles(applied_profiles),

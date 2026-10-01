@@ -58,9 +58,9 @@ pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, EntryIdentity,
     EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    ListingFingerprint, MaterializationIntent, PinnedDocumentEvidence, PinnedSourceClass,
+    ListingFingerprint, PinnedDocumentEvidence, PinnedSourceClass,
     ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage,
-    RepositorySeed, RepositorySeedKind, RepositoryTargetKind, SeedError, TargetClaim,
+    RepositoryTargetKind, TargetClaim,
     EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
@@ -178,9 +178,6 @@ pub enum GateRegistryEditError {
     /// The proposed-state overlay could not be closed.
     #[error(transparent)]
     Overlay(#[from] OverlayError),
-    /// The closed semantic seed was invalid.
-    #[error(transparent)]
-    Seed(#[from] SeedError),
 }
 pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
@@ -649,22 +646,18 @@ pub(crate) struct ProfileContributionMaterialization {
     pub(crate) owners: std::collections::BTreeSet<ProfilePackageId>,
 }
 
-/// Complete producer output awaiting the shared plan-identity tail.
+/// Complete producer output awaiting the shared plan tail.
 struct MaterializationDerivation {
     delta: RepositoryDelta,
-    seed: RepositorySeed,
-    intent: MaterializationIntent,
     profile_targets: Vec<ProfileTargetMaterialization>,
     profile_contributions: Vec<ProfileContributionMaterialization>,
     applied_profiles: std::collections::BTreeSet<crate::profile::ProfileId>,
 }
 
 impl MaterializationDerivation {
-    fn new(delta: RepositoryDelta, seed: RepositorySeed, intent: MaterializationIntent) -> Self {
+    fn new(delta: RepositoryDelta) -> Self {
         Self {
             delta,
-            seed,
-            intent,
             profile_targets: Vec::new(),
             profile_contributions: Vec::new(),
             applied_profiles: std::collections::BTreeSet::new(),
@@ -775,15 +768,11 @@ pub enum MaterializationRequest<'a> {
     SemanticMutation {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
     },
     /// Render the selected configured projections (`None` selects all).
     RenderConfiguredProjections {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
         /// Declaration-scoped projection names.
         selected: Option<std::collections::BTreeSet<String>>,
     },
@@ -794,8 +783,6 @@ pub enum MaterializationRequest<'a> {
         /// Neutral claims for every installed profile whose exact package
         /// identity was proven from repository provenance.
         profiles: Vec<ProfileClaims>,
-        /// Closed semantic seed for this operation.
-        seed: &'a RepositorySeed,
     },
     /// Derive a fresh or missing-file repository scaffold.
     Initialize {
@@ -829,44 +816,30 @@ pub fn derive_materialization(
     request: MaterializationRequest<'_>,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     let (derivation, projection_counts) = match request {
-        MaterializationRequest::SemanticMutation { declarations, seed } => {
+        MaterializationRequest::SemanticMutation { declarations } => {
             let delta = derive_semantic_mutation(image, &declarations)?;
             (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::SemanticMutation,
-                ),
+                MaterializationDerivation::new(delta),
                 Default::default(),
             )
         }
         MaterializationRequest::RenderConfiguredProjections {
             declarations,
-            seed,
             selected,
         } => {
             let (delta, counts) = derive_project_render(image, &declarations, selected.as_ref())?;
             (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::RenderConfiguredProjections { selected },
-                ),
+                MaterializationDerivation::new(delta),
                 counts,
             )
         }
         MaterializationRequest::RepairDerivedState {
             declarations,
             profiles,
-            seed,
         } => {
             let delta = derive_repair(image, &declarations, profiles)?;
             (
-                MaterializationDerivation::new(
-                    delta,
-                    (*seed).clone(),
-                    MaterializationIntent::RepairDerivedState,
-                ),
+                MaterializationDerivation::new(delta),
                 Default::default(),
             )
         }
@@ -891,8 +864,6 @@ pub fn derive_materialization(
     };
     let MaterializationDerivation {
         delta,
-        seed,
-        intent,
         profile_targets,
         profile_contributions,
         applied_profiles,
@@ -925,7 +896,6 @@ pub fn finalize_config_edit(
     base: &RepositoryImage,
     edited_config_bytes: &[u8],
     declarations: RepositoryDeclarations<'_>,
-    seed: &RepositorySeed,
 ) -> Result<MaterializationPlan, RepositoryStateError> {
     // The edit must parse before any planning: a malformed config is a typed
     // planning error, not a published file.
@@ -967,9 +937,6 @@ pub enum RepositoryStateError {
     /// Delta normalization rejected an alias or duplicate target.
     #[error(transparent)]
     Delta(#[from] DeltaError),
-    /// Plan identity serialization failed.
-    #[error(transparent)]
-    PlanHash(#[from] PlanHashError),
     /// Managed-document composition rejected an ambiguous or malformed claim.
     #[error(transparent)]
     ManagedDocument(#[from] ManagedDocumentError),

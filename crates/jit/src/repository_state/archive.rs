@@ -2,7 +2,7 @@
 
 use super::mutation::finalize_delta;
 use super::{
-    ExpectedPreimage, FileMode, MaterializationIntent, MaterializationPlan, MutationContext,
+    ExpectedPreimage, FileMode, MaterializationPlan, MutationContext,
     MutationError, MutationIntent, ProducerError, RepositoryAction, RepositoryDelta,
     RepositoryEntry, RepositoryImage, RepositoryStateError, VirtualPath,
 };

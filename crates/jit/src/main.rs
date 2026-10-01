@@ -170,7 +170,6 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
             RepositoryStateError::Producer(_)
             | RepositoryStateError::Initialization(_)
             | RepositoryStateError::Delta(_)
-            | RepositoryStateError::PlanHash(_)
             | RepositoryStateError::Overlay(_) => ErrorCode::GenericError,
         };
     }

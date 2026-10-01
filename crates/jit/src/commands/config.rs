@@ -287,17 +287,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         use crate::repository_state::{
-            apply_overlay, finalize_config_edit, CaptureBudget, CaptureSpec, RepositorySeed,
-            RepositorySeedKind, VirtualPath,
+            apply_overlay, finalize_config_edit, CaptureBudget, CaptureSpec, VirtualPath,
         };
         let layout = self.require_layout()?;
-        let seed = RepositorySeed::new(
-            RepositorySeedKind::Command {
-                name: "config set".to_string(),
-            },
-            std::collections::BTreeMap::new(),
-            std::collections::BTreeMap::new(),
-        )?;
         let config_vpath = VirtualPath::CONFIG;
         let budget = CaptureBudget {
             max_listings: 0,
@@ -340,7 +332,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .collect::<std::collections::BTreeMap<_, _>>(),
             )?;
             let declarations = crate::repository_state::declarations_from_image(&overlaid)?;
-            let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed(), &seed)?;
+            let plan = finalize_config_edit(&base, &edited_bytes, declarations.borrowed())?;
             let proposed = apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
             let validation = crate::validation::repository::validate_repository(&proposed)?;
             if validation.rule_report.has_errors() {

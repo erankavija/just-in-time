@@ -1177,130 +1177,6 @@ fn captured_byte_count(
         .fold(0, u64::saturating_add)
 }
 
-/// Typed command/profile input included in a semantic plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct RepositorySeed {
-    /// Closed seed source and semantic operation identity.
-    kind: RepositorySeedKind,
-    /// Sorted typed scalar facts.
-    facts: BTreeMap<String, String>,
-    /// Sorted exact immutable payloads.
-    payloads: BTreeMap<String, Vec<u8>>,
-}
-
-impl RepositorySeed {
-    /// Construct typed semantic input with non-empty stable names.
-    pub fn new(
-        kind: RepositorySeedKind,
-        facts: BTreeMap<String, String>,
-        payloads: BTreeMap<String, Vec<u8>>,
-    ) -> Result<Self, SeedError> {
-        kind.validate()?;
-        for key in facts.keys().chain(payloads.keys()) {
-            validate_seed_text("key", key)?;
-        }
-        Ok(Self {
-            kind,
-            facts,
-            payloads,
-        })
-    }
-
-    /// Semantic source class.
-    pub fn kind(&self) -> &RepositorySeedKind {
-        &self.kind
-    }
-}
-
-/// Closed source class for semantic seed data.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RepositorySeedKind {
-    /// An ordinary command mutation.
-    Command {
-        /// Stable command semantic name.
-        name: String,
-    },
-    /// A fresh repository initialization.
-    Initialization,
-    /// A profile operation.
-    Profile {
-        /// Profile identity.
-        name: String,
-        /// Profile declaration version.
-        version: String,
-        /// Exact package identity.
-        package_hash: String,
-    },
-}
-
-impl RepositorySeedKind {
-    fn validate(&self) -> Result<(), SeedError> {
-        match self {
-            Self::Command { name } => validate_seed_text("command name", name),
-            Self::Initialization => Ok(()),
-            Self::Profile {
-                name,
-                version,
-                package_hash,
-            } => {
-                validate_seed_text("profile name", name)?;
-                validate_seed_text("profile version", version)?;
-                validate_seed_text("profile package hash", package_hash)
-            }
-        }
-    }
-}
-
-fn validate_seed_text(field: &'static str, value: &str) -> Result<(), SeedError> {
-    if value.is_empty() || value.chars().any(char::is_control) {
-        Err(SeedError::InvalidText { field })
-    } else {
-        Ok(())
-    }
-}
-
-/// Constrained complete materialization operation.
-///
-/// The render variant carries a `selected` name set that scopes WHICH declared
-/// projections are in scope for this operation, not WHICH producer families run.
-/// This is declaration scope, not an à-la-carte producer switch: each selected
-/// projection's output still derives completely from its own declared sources, so
-/// a `jit project render <name>` renders exactly that projection's target from its
-/// own closure and leaves sibling projections' targets untouched. Semantic-mutation
-/// and repair intents remain complete over every declared projection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MaterializationIntent {
-    /// Full derived-state rebuild after a semantic mutation.
-    SemanticMutation,
-    /// Render the configured projections in scope. `None` selects every declared
-    /// projection; `Some(set)` scopes the operation to exactly the named
-    /// projections (each rendered completely from its own declared sources).
-    RenderConfiguredProjections {
-        /// The declaration-scoped projection names, or `None` for all.
-        selected: Option<std::collections::BTreeSet<String>>,
-    },
-    /// Repair every explicitly owned derived-state drift finding.
-    RepairDerivedState,
-    /// Publish a fresh (or missing-file) repository scaffold, optionally with a
-    /// profile, as one complete delta.
-    InitializeRepository,
-    /// Apply a profile to an existing repository as one complete delta.
-    ApplyProfile,
-    /// Publish one explicitly selected repository-contained export file.
-    /// Finalized by
-    /// [`finalize_repository_export`](crate::repository_state::finalize_repository_export),
-    /// not the declaration-derived producer graph.
-    RepositoryExport,
-    /// Republish one whole package tree at a worktree destination from the
-    /// sources its manifest declares. Finalized by
-    /// [`finalize_package_tree_capture`](crate::repository_state::finalize_package_tree_capture),
-    /// not the declaration-derived producer graph: the content comes from a
-    /// package manifest rather than from this repository's declarations.
-    CapturePackageTree,
-}
-
 /// Stable ownership identity for a target claim.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub struct TargetClaim {
@@ -1719,6 +1595,11 @@ fn serialize_content_digest<S: serde::Serializer>(
     (format!("{:x}", Sha256::digest(bytes)), bytes.len()).serialize(serializer)
 }
 
+fn hash_field(hasher: &mut Sha256, bytes: &[u8]) {
+    hasher.update((bytes.len() as u64).to_be_bytes());
+    hasher.update(bytes);
+}
+
 /// Capture closure failure.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum CaptureError {
@@ -1798,14 +1679,6 @@ pub enum DeltaError {
     EngineControlTarget(VirtualPath),
     #[error("delta action is invalid: {0}")]
     InvalidAction(String),
-}
-
-/// Invalid typed semantic seed.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum SeedError {
-    /// A stable semantic identifier was empty or contained controls.
-    #[error("repository seed {field} is empty or contains control characters")]
-    InvalidText { field: &'static str },
 }
 
 #[cfg(test)]
@@ -2546,16 +2419,6 @@ mod tests {
                 None,
             ),
             Err(CaptureError::LinkedEvidenceRequiresDataPath(_))
-        ));
-        assert!(matches!(
-            RepositorySeed::new(
-                RepositorySeedKind::Command {
-                    name: String::new(),
-                },
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
-            Err(SeedError::InvalidText { .. })
         ));
 
         let path = VirtualPath::data("index.json").unwrap();
