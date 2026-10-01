@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 16,
+  "current_wave": 19,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -726,7 +726,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "in_progress — rework 2 merged (a592b3177/7ae26783e); code-review R3 failed F1/F2; ESC-17; rework 3 (counter reset) running"
+          "status": "done — session 8: rework 3 (owner reset) fixed precheck preflight and four other two-round paths; tests deduped/relocated per owner (ESC-17); all-lines net -24, production -28; cargo-ci + code-review passed 0 findings."
         }
       ]
     },
@@ -753,7 +753,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done — session 8 (opus), zero rework; all-lines -293, production -170."
         },
         {
           "id": "8454236c-c254-419c-826e-0b8da050711f",
@@ -764,7 +764,7 @@
             "cargo-ci",
             "code-review"
           ],
-          "status": "pending"
+          "status": "done — session 8 (opus); code-review F1 resolved by owner decision D-1 (ESC-19), lead doc edit d9db7d47b; all-lines -14, production -56."
         },
         {
           "id": "e346d387-eee8-4657-93eb-9b64621fd900",
@@ -794,7 +794,7 @@
             "docs-mechanical",
             "repo-validate"
           ],
-          "status": "pending"
+          "status": "done — session 8 (opus), zero rework; lead fixed storage-format.md application order (de4651b43)."
         },
         {
           "id": "91168745-1434-4cf8-9442-ab8d3e9135f8",
@@ -823,7 +823,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "in_progress — session 8 dispatch (opus)"
         }
       ]
     },
@@ -980,6 +980,11 @@
       "origin": "worker-ccea63de flagged redo_record.rs:197-199 as the source of the false 'skips the residue' claim; no criterion covered it (e346d387's REQ-01 names five retired mechanisms, not this).",
       "er_01": "Excluded from the REQ-06 redo-record subtotal.",
       "dag": "depends on 0938d99e; fbd6c859 depends on it."
+    },
+    {
+      "id": "adb5e9df",
+      "session": 8,
+      "note": "Not an epic child: parented under milestone 9db27a3a at owner request; driven alongside. Excluded from ER-01."
     }
   ],
   "escalations": [
@@ -1169,6 +1174,25 @@
       "situation": "gf2 project drove load to 60+; cargo-ci failed only suite-duration budget.",
       "decision": "Owner authorized BUSY_HOST_OVERRIDE=1 for this session (not standing).",
       "status": "resolved"
+    },
+    {
+      "id": "ESC-19",
+      "session": 8,
+      "wave": 17,
+      "issue": "8454236c",
+      "category": "6 / criteria conflict",
+      "situation": "code-review F1: whole-repository precheck post-check stability no longer sees issue-linked documents or pinned/linked evidence.",
+      "decision": "Owner accepted the narrowing; recorded @/issue/8454236c/decision/D-1; custom-gates.md states the scope.",
+      "status": "resolved"
+    },
+    {
+      "id": "ESC-20",
+      "session": 8,
+      "issue": "adb5e9df",
+      "category": "1/6 / out-of-epic work and capability gap",
+      "situation": "Owner asked the lead to parent gf2-filed adb5e9df under v1.0 (9db27a3a) and drive it. Qualified-only cutover left batch-create unable to credit same-manifest containers.",
+      "decision": "Owner added REQ-06 (manifest key substitution in qualified coverage labels) within adb5e9df, recorded as its D-1.",
+      "status": "resolved — worker implementing"
     }
   ],
   "rework_counts": {
@@ -1188,7 +1212,7 @@
     "42478e5d": 1,
     "3d9150d7": 2,
     "b4483ad6": 1,
-    "c88822a5": 0,
+    "c88822a5": 1,
     "ec72359b": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
