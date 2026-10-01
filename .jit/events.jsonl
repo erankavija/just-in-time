@@ -16208,3 +16208,4 @@
 {"gate_key":"code-review","id":"fefcbdcb-e4f0-40ce-b291-f3e0bee8c8da","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:47:37.404480849Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"2a8fa1df-510d-4a89-a0c6-b5efd909da25","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:47:47.944431578Z","to":"done","type":"issue_state_changed"}
 {"id":"82477bad-bde3-4da3-9749-07a52d46916e","issue_id":"dd1b984c-7ade-4967-ad6c-f75cf498ec63","timestamp":"2026-10-01T20:47:47.944431578Z","type":"issue_completed"}
+{"fields":["documents"],"id":"f740d30d-f7b7-4470-9cf1-de77fb2be373","issue_id":"8b6a9e34-60c7-45f5-b506-de20afbb98ce","timestamp":"2026-10-01T22:21:25.204128264Z","type":"issue_updated","updated_by":"doc-add"}
