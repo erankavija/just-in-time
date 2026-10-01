@@ -20,7 +20,8 @@
 #   * a child issue that implements the epic's REQ-01 carries
 #     `satisfies:<epic-short-id>/REQ-01`, naming the epic whose criterion it
 #     credits, so nested containers may reuse criterion ids without crediting
-#     each other;
+#     each other (a batch-create manifest that also creates a story credits it
+#     as `satisfies:{<story-key>.short_id}/<id>`);
 #   * the graph rules below CHECK the labels against the canonical criteria.
 #
 # THE PLAN-BEFORE-FAN-OUT BRACKET (the `plan` template declares it; engine stays agnostic):

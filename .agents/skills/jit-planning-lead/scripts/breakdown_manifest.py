@@ -34,6 +34,9 @@ WARNING_CODES = {
 }
 
 
+# A same-manifest container reference, resolved by batch-create: {<key>.short_id}.
+KEY_REFERENCE = re.compile(r"\{([^{}]+)\.short_id\}")
+
 def load(path):
     return json.loads(Path(path).read_text())
 
@@ -293,6 +296,9 @@ def validate(entries, terminal_types, type_levels, known_sources, required_sourc
             for credit in credits:
                 if "/" not in credit:
                     errors.append(f"{at} has unqualified label 'satisfies:{credit}'; use 'satisfies:<container-short-id>/{credit}'")
+                reference = KEY_REFERENCE.fullmatch(credit.split("/", 1)[0])
+                if reference and reference.group(1) not in key_set:
+                    errors.append(f"{at} label 'satisfies:{credit}' references unknown key '{reference.group(1)}'")
             satisfied.update(credit for credit in credits if "/" in credit)
         dependencies = entry.get("depends_on")
         if strings(dependencies):

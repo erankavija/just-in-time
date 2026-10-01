@@ -1263,7 +1263,7 @@ jit issue batch-create --from-json plan.json --dry-run --json
 | `description` | no       | `""`                 | Issue body                                         |
 | `type`        | no       | project default type | Applied as a `type:<t>` label                      |
 | `priority`    | no       | `normal`             | `low` / `normal` / `high` / `critical`             |
-| `labels`      | no       | `[]`                 | Each must be `namespace:value`                     |
+| `labels`      | no       | `[]`                 | Each must be `namespace:value`; see key references |
 | `gates`       | no       | `[]`                 | Each must be a registered gate key                 |
 | `depends_on`  | no       | `[]`                 | Symbolic `key`s of other entries in the same file  |
 | `planning`    | no       | —                    | Opaque authoring metadata; accepted but not stored or exported |
@@ -1278,6 +1278,26 @@ Example `plan.json`:
 ]
 ```
 
+**Key references in coverage labels.** A label in a namespace that credits an
+issue-scoped item — the `satisfies-namespace` of a `label-coverage` rule, the
+`check-namespace` of a `criteria-to-check` rule, or a link namespace of an
+issue-scope item kind — may name an entry of the same file in place of a short
+id, with the `{<key>.short_id}` token graph templates use for their container:
+
+```json
+[
+  { "key": "story", "title": "Login story", "type": "story",
+    "description": "## Success Criteria\n\n- [hard] REQ-01: users log in",
+    "depends_on": ["impl"] },
+  { "key": "impl", "title": "Implement login", "type": "task",
+    "labels": ["satisfies:{story.short_id}/REQ-01"] }
+]
+```
+
+Creation resolves the token to the created issue's short id
+(`satisfies:<story-short-id>/REQ-01`) through the same key map that wires
+`depends_on`. Labels in other namespaces are stored as written.
+
 **Pre-validation (ALL before any write).** The entire file is validated before
 a single issue is created. Validation collects EVERY problem (it does not stop
 at the first) and, on any failure, creates **zero** issues and exits with code
@@ -1285,6 +1305,7 @@ at the first) and, on any failure, creates **zero** issues and exits with code
 
 - duplicate `key`s,
 - `depends_on` references to keys not defined in the file,
+- `{<key>.short_id}` label references to keys not defined in the file,
 - cycles in the symbolic `depends_on` graph,
 - priority strings that do not parse,
 - `type` values not in the project's `[type_hierarchy]` (when one is configured),

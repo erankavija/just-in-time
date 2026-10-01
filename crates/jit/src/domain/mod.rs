@@ -33,6 +33,7 @@ pub mod event_catalog;
 pub mod event_log;
 pub mod gate_findings;
 pub mod item;
+pub mod key_reference;
 pub mod projection;
 pub mod queries;
 pub mod repository_inputs;

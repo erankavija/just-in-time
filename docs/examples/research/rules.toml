@@ -25,7 +25,8 @@
 #                     experimental protocol) and an `## Evidence` section
 #                     (observations and results). Experiments carry
 #                     `tests:<goal-short-id>/<id>` labels naming the goal
-#                     hypotheses they test. The goal lists its
+#                     hypotheses they test (`tests:{<goal-key>.short_id}/<id>`
+#                     in a batch-create manifest that also creates the goal). The goal lists its
 #                     experiments as dependencies (the parent-depends-on-children
 #                     containment used throughout this ruleset, wired by
 #                     `jit dep add <goal> <experiment>`), so each experiment

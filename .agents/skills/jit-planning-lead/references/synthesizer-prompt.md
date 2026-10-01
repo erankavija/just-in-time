@@ -13,7 +13,9 @@ Follow the canonical JSON schema and helper in this skill. Produce a bare array
 accepted directly by `jit issue batch-create`. Each entry contains every native
 field plus `planning`; its `description` is the complete final issue body. Use
 semantic keys, concrete membership/coverage labels and gates, and real dependency
-edges. `planning.source_refs` provides total criterion/design/finding coverage;
+edges. A coverage label names the container it credits:
+`satisfies:<C-short-id>/<id>` for `C`, `satisfies:{<key>.short_id}/<id>` for a
+container this manifest creates. `planning.source_refs` provides total criterion/design/finding coverage;
 `contract_refs` names contracts defined once in the plan. Mark each plan heading
 `plan-fixed` or `implementation-produced`; the latter has exactly one manifest
 producer named by `produces_contracts`, and every consumer depends transitively

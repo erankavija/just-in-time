@@ -175,6 +175,23 @@ pub fn coverage_credit_namespaces<'a>(
         .collect()
 }
 
+/// The namespaces whose labels credit an issue-scoped item: the
+/// [`coverage_credit_namespaces`] of `rules` plus the link namespaces of every
+/// issue-scope item kind.
+pub fn issue_credit_namespaces<'a>(
+    rules: impl IntoIterator<Item = &'a Rule>,
+    kinds: &[crate::domain::item::ItemKind],
+) -> std::collections::HashSet<String> {
+    let mut namespaces = coverage_credit_namespaces(rules);
+    namespaces.extend(
+        kinds
+            .iter()
+            .filter(|kind| !kind.kind_scope().is_project())
+            .flat_map(|kind| kind.link_namespaces().iter().cloned()),
+    );
+    namespaces
+}
+
 /// Prefix every `config-error` finding message carries, so a [`GraphFinding`]
 /// can be recognized as a config error structurally.
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
