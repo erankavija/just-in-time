@@ -291,7 +291,10 @@ pub(crate) fn validate_repository_with_materializations(
     }
 
     if let Some(records) = &records {
-        match collect_item_link_findings(read, &records.issues, &config)
+        let credit_namespaces = rules_loaded
+            .then(|| crate::validation::graph::coverage_credit_namespaces(&rules.rules))
+            .unwrap_or_default();
+        match collect_item_link_findings(read, &records.issues, &config, &credit_namespaces)
             .context("item-links validation pass")
         {
             Ok(item_findings) => {
@@ -762,9 +765,10 @@ fn collect_item_link_findings(
     read: &ReadBytes<'_>,
     issues: &[Issue],
     config: &JitConfig,
+    credit_namespaces: &HashSet<String>,
 ) -> Result<Vec<ReportedFinding>> {
     let kinds = resolve_item_kinds(config.item_kinds.as_ref())?;
-    if kinds.is_empty() {
+    if kinds.is_empty() && credit_namespaces.is_empty() {
         return Ok(Vec::new());
     }
     let repo_format = config
@@ -819,9 +823,13 @@ fn collect_item_link_findings(
             let Some((namespace, value)) = label.split_once(':') else {
                 continue;
             };
-            if let Some(message) =
-                unqualified_link_message(&issue.short_id(), namespace, value, &kinds)
-            {
+            if let Some(message) = unqualified_link_message(
+                &issue.short_id(),
+                namespace,
+                value,
+                &kinds,
+                credit_namespaces,
+            ) {
                 findings.push(ReportedFinding::new(
                     Some(issue.id.clone()),
                     &Finding {

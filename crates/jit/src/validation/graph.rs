@@ -149,6 +149,31 @@ fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str
         .is_some_and(|(scope, self_id)| scope == scope_short_id && self_id == id)
 }
 
+/// The label namespaces through which `rules` credit criteria: each active
+/// `label-coverage` rule's `satisfies-namespace` (default included) and each
+/// `criteria-to-check` rule's `check-namespace`.
+pub fn coverage_credit_namespaces<'a>(
+    rules: impl IntoIterator<Item = &'a Rule>,
+) -> std::collections::HashSet<String> {
+    rules
+        .into_iter()
+        .filter(|rule| rule.severity != Severity::Off)
+        .filter_map(|rule| match &rule.assert {
+            Assertion::LabelCoverage { config } => Some(
+                config
+                    .get("satisfies-namespace")
+                    .and_then(toml::Value::as_str)
+                    .unwrap_or(DEFAULT_SATISFIES_NAMESPACE)
+                    .to_string(),
+            ),
+            Assertion::CriteriaToCheck {
+                check_namespace, ..
+            } => check_namespace.clone(),
+            _ => None,
+        })
+        .collect()
+}
+
 /// Prefix every `config-error` finding message carries, so a [`GraphFinding`]
 /// can be recognized as a config error structurally.
 const CONFIG_ERROR_PREFIX: &str = "config error: ";
@@ -1968,6 +1993,42 @@ mod tests {
             "REQ-01",
             "abc12345"
         ));
+    }
+
+    #[test]
+    fn test_coverage_credit_namespaces_reads_active_crediting_rules() {
+        let set = RuleSet::parse(
+            r#"
+[[rules]]
+name = "default-ns"
+severity = "error"
+assert = { label-coverage = { } }
+
+[[rules]]
+name = "custom-ns"
+severity = "error"
+assert = { label-coverage = { satisfies-namespace = "tests" } }
+
+[[rules]]
+name = "checks"
+severity = "error"
+assert = { criteria-to-check = { check-namespace = "checks" } }
+
+[[rules]]
+name = "disabled"
+severity = "off"
+assert = { label-coverage = { satisfies-namespace = "off-ns" } }
+"#,
+            None,
+            [],
+        )
+        .unwrap();
+        let namespaces = coverage_credit_namespaces(&set.rules);
+        let expected: std::collections::HashSet<String> = ["satisfies", "tests", "checks"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        assert_eq!(namespaces, expected);
     }
 
     // --- label-coverage ----------------------------------------------------

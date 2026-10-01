@@ -668,7 +668,7 @@ pub enum Assertion {
         /// the issue has `"<gate_prefix><id>"` in `gates_required`.
         gate_prefix: Option<String>,
         /// Optional label namespace. A criterion `<id>` is "label-checked" when
-        /// the issue carries `"<check_namespace>:<id>"`.
+        /// the issue carries `"<check_namespace>:<own-short-id>/<id>"`.
         check_namespace: Option<String>,
     },
     /// Assert that each value in a label namespace is owned by at most one issue

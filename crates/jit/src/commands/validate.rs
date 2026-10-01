@@ -1634,9 +1634,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// resolver [`resolve_link_label`](crate::commands::CommandExecutor::resolve_link_label),
     /// so resolution logic is not forked. A candidate that fails to resolve yields
     /// one [`GraphFinding`] attributed to the owning issue, naming the dangling
-    /// qualified id. A link-namespace label with a bare self-id yields the
+    /// qualified id. A link-namespace or coverage-credit-namespace label with a
+    /// bare self-id yields the
     /// [`unqualified_link_message`](crate::domain::item::unqualified_link_message)
-    /// finding; a resolvable candidate and a non-link namespace yield nothing.
+    /// finding; a resolvable candidate and any other namespace yield nothing.
     ///
     /// The finding severity is [`Severity::Error`](crate::declarations::rules::Severity::Error)
     /// so a dangling link fails `jit validate`. The rule name is the constant
@@ -1654,6 +1655,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         // Derive the link-namespace set generically from the configured kinds — no
         // kind-name literal, just the namespaces each kind declares.
         let kinds = self.item_kinds()?;
+        // An unloadable rule set is reported by the rules pass; it credits nothing.
+        let credit_namespaces = self
+            .effective_rules()
+            .map(|set| crate::validation::graph::coverage_credit_namespaces(&set.rules))
+            .unwrap_or_default();
         let link_namespaces: BTreeSet<String> = kinds
             .iter()
             .flat_map(|kind| kind.link_namespaces().iter().cloned())
@@ -1670,6 +1676,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     namespace,
                     value,
                     &kinds,
+                    &credit_namespaces,
                 ) {
                     findings.push(GraphFinding::for_issue(
                         issue.id.clone(),
