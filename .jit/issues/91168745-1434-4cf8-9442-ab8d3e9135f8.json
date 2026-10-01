@@ -57,7 +57,13 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-01T15:34:06.682132868Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "91168745-1434-4cf8-9442-ab8d3e9135f8",
   "labels": [
     "type:task",
@@ -72,5 +78,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Generated storage-records reference matches the append encoding",
-  "updated_at": "2026-10-01T15:16:39.654393598Z"
+  "updated_at": "2026-10-01T15:34:06.682132868Z"
 }
