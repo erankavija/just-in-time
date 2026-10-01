@@ -1981,7 +1981,7 @@ fn composed_target_disposition(
 /// A target with no matching prior claim remains the ordinary first-application
 /// collision case. A matching claim takes the shared pure three-way path, so a
 /// changed package updates its own unchanged content while a concurrent edit is
-/// reported before the aggregate transaction publishes anything.
+/// reported before the aggregate selection publishes anything.
 ///
 /// The answer is a decision rather than a refusal: composition decides every
 /// asset it was asked about, so a selection carrying two conflicting targets

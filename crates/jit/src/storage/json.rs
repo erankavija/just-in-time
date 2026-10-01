@@ -3,7 +3,7 @@
 //! Issues, the index, and events are read from a `.jit/` directory; the gate
 //! registry is parsed from `.jit/gates.toml` through
 //! [`crate::storage::gate_store`]. Repository-owned changes are published as
-//! file-set transactions through [`RepositoryStateStore`]. The directory
+//! redo records through [`RepositoryStateStore`]. The directory
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::declarations::GateRegistry;
@@ -1591,7 +1591,7 @@ impl IssueStore for JsonFileStorage {
 }
 
 fn is_torn_event_prefix(line: &str, error: &serde_json::Error) -> bool {
-    // The canonical transaction finalizer isolates a non-newline tail before
+    // The canonical mutation finalizer isolates a non-newline tail before
     // publishing the next event. Before that retry it is still the final line. Such a record
     // is therefore recognizable as an object-shaped JSON prefix that fails
     // only because input ended. This admits a final torn append and every

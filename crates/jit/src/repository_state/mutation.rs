@@ -954,7 +954,7 @@ pub(super) fn finalize_delta(
     }
 
     // Pass 2d: issue deletions remove the captured record and move membership in
-    // the same transaction. Absence is an error, matching the old delete command
+    // the same delta. Absence is an error, matching the old delete command
     // contract without turning this into an idempotent or implicit operation.
     for intent in intents {
         if let MutationIntent::DeleteIssue { issue_id } = intent {
@@ -1044,7 +1044,7 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Pass 3: gate-run / other transaction-visible records get identifiers next,
+    // Pass 3: gate-run / other published records get identifiers next,
     // in (target, key) order — here keyed by (issue id, gate key).
     let mut gate_runs: Vec<&GateRunResult> = intents
         .iter()

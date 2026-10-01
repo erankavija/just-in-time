@@ -509,7 +509,7 @@ impl CommandSchema {
                 "ProfileAddResult",
             ),
             // Every profile lifecycle command publishes through one aggregate
-            // transaction and rehearses through one planner, so they answer in
+            // publication and rehearses through one planner, so they answer in
             // the same two shapes.
             "profile_apply" | "profile_reconfigure" | "profile_upgrade" => {
                 let union = json!({

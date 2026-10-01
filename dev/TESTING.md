@@ -395,7 +395,7 @@ comfortably under `MAX_TEST_SUITE_SECONDS` — see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
 for the exact measured margin. The tables below attribute cost, not risk: for every test whose
 measured cost is a direct consequence of the property it proves — a real subprocess, a
-real transaction round trip through the storage journal, real filesystem publication,
+real redo-record round trip through storage, real filesystem publication,
 genuine concurrency, or a property-based search over many generated cases — this names it,
 its warm cost, and the mechanism. A cost this attribution does not find a mechanism for
 belongs to a reducibility issue, not to this table.

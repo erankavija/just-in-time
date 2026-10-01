@@ -1,4 +1,4 @@
-//! Storage read interfaces and repository transaction boundary.
+//! Storage read interfaces and the repository-state publication boundary.
 //!
 //! [`IssueStore`] exposes typed reads plus lock/session lifecycle controls shared
 //! by file-backed and in-memory backends. Repository-owned publication goes only

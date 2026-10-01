@@ -428,7 +428,7 @@ fn test_init_json_gitattributes_has_no_stale_claims_jsonl_entry() {
     );
 }
 
-// A re-init runs the same session-backed init transaction as a fresh init
+// A re-init runs the same session-backed init publication as a fresh init
 // (jit:49adf23b increment 7 unified plain re-init onto `run_initialization`), so
 // it too claims the worktree `.gitattributes` merge driver. When the block is
 // already configured the claim is `Unchanged`, so a re-init reports

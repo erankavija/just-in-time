@@ -3206,7 +3206,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Create or refresh machine-local worktree identity after repository
     /// scaffold publication.
     ///
-    /// Called after the fresh repository transaction so optional Git host state
+    /// Called after the scaffold is published, so optional Git host state
     /// remains outside repository publication.
     pub fn initialize_worktree_identity(
         &self,

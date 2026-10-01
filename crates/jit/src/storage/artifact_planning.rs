@@ -186,7 +186,7 @@ pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
 
 /// Derive advisory citation text from regular files reached by declared roots.
 ///
-/// Both the ordinary preview boundary and the transactional archive boundary
+/// Both the ordinary preview boundary and the publishing archive boundary
 /// use this pure rule, keeping root normalization, containment, and UTF-8
 /// handling identical while their respective capture mechanisms establish the
 /// file-byte evidence.

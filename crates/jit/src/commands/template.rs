@@ -141,7 +141,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// This request value is explicit, but all repository declarations and issue
     /// records still come from one bounded captured image. Fresh application and
-    /// `--force` refresh both publish one typed transaction; a conflict recaptures
+    /// `--force` refresh both publish one redo record; a conflict recaptures
     /// and re-derives while preserving operation-scoped identifiers and time.
     pub fn apply_template_with(
         &self,

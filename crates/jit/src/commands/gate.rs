@@ -1255,7 +1255,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// ([`FieldEdit::Clear`]) reset to none/empty. The gate KEY is its identity
     /// and is never modified. The authored registry, its
     /// `gate_definition_updated` audit event, and configured derived projections
-    /// publish through one repository-state transaction; no per-issue
+    /// publish through one redo record; no per-issue
     /// `gates_status` is touched.
     ///
     /// Updating a key that is not in the registry is a typed

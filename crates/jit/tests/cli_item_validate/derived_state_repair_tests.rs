@@ -324,7 +324,7 @@ fn test_cli_validate_fix_preserves_permission_error_classification() {
 }
 
 #[test]
-fn test_cli_validate_fix_rejects_ambiguous_ownership_transactionally() {
+fn test_cli_validate_fix_rejects_ambiguous_ownership_without_writing() {
     let repo = profiled_repo();
     let rules_path = repo.path().join(".jit/rules.toml");
     let agents_path = repo.path().join("AGENTS.md");

@@ -1,4 +1,4 @@
-//! Transaction-boundary tests for graph-template application.
+//! Publication-boundary tests for graph-template application.
 //!
 //! Template expansion is finalized into one repository plan and submitted by one
 //! [`RepositoryMutationSession::apply`](jit::storage::RepositoryMutationSession::apply)

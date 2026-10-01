@@ -227,7 +227,7 @@ fn error_to_error_code(error: &anyhow::Error) -> ErrorCode {
         return ErrorCode::ParseError;
     }
 
-    // Check the complete source chain for I/O errors. Transaction/session
+    // Check the complete source chain for I/O errors. Session and publication
     // boundaries wrap the original I/O error without changing its exit class.
     if let Some(io_error) = error
         .chain()
@@ -2570,22 +2570,22 @@ fn run() -> Result<()> {
                 ),
                 *json,
             )?;
-            // Machine-local worktree identity (gitignored, not part of the
-            // repository transaction) is created after the scaffold is published.
+            // Machine-local worktree identity (gitignored, not repository state)
+            // is created after the scaffold is published.
             let (worktree_identity, init_warnings) =
                 executor.initialize_worktree_identity(&worktree_paths)?;
             for warning in &init_warnings {
                 output_ctx.print_warning(warning)?;
             }
 
-            // The worktree `.gitattributes` merge-driver claim is published as part
-            // of the init transaction itself (every init and re-init now); its typed
+            // The worktree `.gitattributes` merge-driver claim is part of the init
+            // plan itself (every init and re-init); its typed
             // outcome is reported here directly and drives the `--json`
             // created/modified path lists.
             let gitattributes_outcome = init_result.gitattributes;
 
-            // `.jit/rules.toml` (the operative ruleset) is scaffolded inside the
-            // init transaction when absent; the applied plan is the sole preimage
+            // `.jit/rules.toml` (the operative ruleset) is scaffolded by the init
+            // plan when absent; the applied plan is the sole preimage
             // authority for whether this run created it.
             let scaffolded = init_result
                 .created_paths

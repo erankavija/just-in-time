@@ -1,5 +1,5 @@
 //! Concurrent profile-lifecycle coverage over the real file-backed repository
-//! session and transaction boundary.
+//! session and publication boundary.
 
 use super::profile_publication_tests::{
     changed_profile_fixture, executor_with_interruptions, ordinary_executor, selector,

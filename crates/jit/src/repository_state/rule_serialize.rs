@@ -5,7 +5,7 @@
 //! renders an arbitrary in-memory [`RuleSet`] (typically the built-in
 //! [`default_ruleset`](crate::repository_state::default_ruleset)) into a
 //! complete, reloadable `rules.toml`. This module produces content only; the
-//! repository-state transaction owns publication.
+//! mutation session owns publication.
 //!
 //! # Why a custom renderer (no `Serialize` derive)
 //!
@@ -21,8 +21,8 @@
 //! defaults synthesize it; a loaded rule read it from a file). TOML cannot carry
 //! raw JSON Schema (DR §8.1), so the serializer returns each schema as
 //! `schemas/<sanitized-rule-name>.json` content and emits a matching
-//! `json-schema = "schemas/…"` reference. The repository-state transaction
-//! publishes those files alongside `rules.toml`.
+//! `json-schema = "schemas/…"` reference. The same publication carries
+//! those files alongside `rules.toml`.
 //!
 //! # Round-trip contract
 //!

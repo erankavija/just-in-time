@@ -2,7 +2,7 @@
 //!
 //! [`load_ruleset`] reads `rules.toml` and its referenced schemas from one live
 //! root. Mutation flows instead resolve bytes from a closed repository image and
-//! publish them through the repository-state transaction boundary.
+//! publish them through a mutation session.
 
 use crate::config::JitConfig;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
