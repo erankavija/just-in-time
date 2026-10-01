@@ -799,28 +799,6 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
     assert!(!apply_repo.path().join("docs/root-vars.txt").exists());
     assert!(!apply_repo.path().join("docs/dependency-vars.txt").exists());
 
-    let alternate = jit(
-        apply_repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            selector,
-            "--set",
-            "NAME=alternate",
-            "--set",
-            "TOKEN=dependency-value",
-            "--dry-run",
-            "--json",
-        ],
-    );
-    assert!(alternate.status.success(), "{alternate:?}");
-    assert_ne!(
-        preview["profiles"][0]["plan_hash"],
-        json(&alternate)["profiles"][0]["plan_hash"],
-        "resolved plan identity must cover resolved values"
-    );
-
     let applied = jit(
         apply_repo.path(),
         &[

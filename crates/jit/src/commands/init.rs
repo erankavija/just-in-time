@@ -48,8 +48,6 @@ fn init_profile_results(
         let mut result = (*source).clone();
         if !first {
             result.status = ProfileApplicationStatus::Unchanged;
-            result.transaction_id = None;
-            result.warnings.clear();
             result.targets.clear();
             result.contributions.clear();
         }
@@ -230,6 +228,7 @@ impl CommandExecutor<JsonFileStorage> {
                     probe = expanded;
                 }
                 let delta_overlay = super::validation_overlay(
+                    &probe,
                     derive_materialization(
                         &probe,
                         MaterializationRequest::Initialize {
@@ -238,7 +237,7 @@ impl CommandExecutor<JsonFileStorage> {
                         },
                     )?
                     .delta(),
-                );
+                )?;
 
                 // Grow the probe by the exact write set's validation closure, then
                 // finalize, validate, and publish under the same held session.
@@ -275,7 +274,8 @@ impl CommandExecutor<JsonFileStorage> {
                 // it cannot complete.
                 crate::profile::ensure_publishable_targets(&plan)
                     .map_err(crate::repository_state::RepositoryStateError::from)?;
-                let proposed = apply_overlay(&base, super::validation_overlay(plan.delta()))?;
+                let proposed =
+                    apply_overlay(&base, super::validation_overlay(&base, plan.delta())?)?;
                 let validation = crate::validation::repository::validate_repository(&proposed)
                     .map_err(init_validation_error)?;
                 if validation.rule_report.has_errors() {
@@ -443,15 +443,8 @@ fn init_response_paths(
             .actions()
             .iter()
             .find(|action| action.path() == &path)
-            .is_some_and(|action| {
-                matches!(
-                    action,
-                    RepositoryAction::WriteFile {
-                        expected: ExpectedPreimage::Absent,
-                        ..
-                    }
-                )
-            })
+            // Each of these paths is a file, so an absent preimage means it is created.
+            .is_some_and(|action| *action.expected() == ExpectedPreimage::Absent)
             .then(|| reported.to_string()))
     })
     .collect::<Result<Vec<_>>>()?

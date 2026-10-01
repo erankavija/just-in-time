@@ -623,6 +623,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     RepositoryAction::WriteFile { path, .. }
                     | RepositoryAction::DeleteFile { path, .. }
                     | RepositoryAction::SetMode { path, .. } => Some(path),
+                    RepositoryAction::AppendEvents { .. } => Some(action.path()),
                     RepositoryAction::CreateDirectory { .. } => None,
                 })
                 .collect::<std::collections::BTreeSet<_>>();

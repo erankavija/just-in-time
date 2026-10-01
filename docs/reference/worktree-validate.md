@@ -477,7 +477,7 @@ jit recover --json
 
 ```
 Recovery complete:
-  • Transactions recovered: 0
+  • Redo records applied: 0
   • Stale locks cleaned: 1
   • Index rebuilt: true
   • Expired leases evicted: 2

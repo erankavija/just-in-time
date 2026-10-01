@@ -222,15 +222,6 @@ fn property_keys(schema: &Value, definition: &str) -> BTreeSet<String> {
         .collect()
 }
 
-fn variant_property_keys(schema: &Value, definition: &str) -> BTreeSet<String> {
-    schema["definitions"][definition]["oneOf"][0]["properties"]
-        .as_object()
-        .unwrap_or_else(|| panic!("missing variant properties for schema definition {definition}"))
-        .keys()
-        .cloned()
-        .collect()
-}
-
 fn expected_keys(keys: &[&str]) -> BTreeSet<String> {
     keys.iter().map(|key| (*key).to_string()).collect()
 }
@@ -988,12 +979,9 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "contributions",
             "id",
             "origin",
-            "plan_hash",
             "status",
             "targets",
-            "transaction_id",
             "version",
-            "warnings",
         ])
     );
     assert_eq!(
@@ -1011,15 +999,10 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "contributions",
             "id",
             "origin",
-            "plan_hash",
             "status",
             "targets",
             "version",
         ])
-    );
-    assert_eq!(
-        variant_property_keys(apply_schema, "ProfileApplicationWarning"),
-        expected_keys(&["kind", "reason", "transaction_id"])
     );
     assert_eq!(
         property_keys(plan_schema, "ProfileTargetChange"),

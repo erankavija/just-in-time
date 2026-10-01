@@ -15,10 +15,12 @@
 //! Every captured parent-directory listing reflects the overlay's additions and
 //! removals so whole-repository validation sees one coherent proposed repository.
 
+use super::RepositoryAction;
 use super::{
     CaptureError, CapturedBytes, FileMode, ListingFingerprint, RepositoryEntry, RepositoryImage,
     RepositoryLayoutError, RepositoryRootClass, VirtualPath,
 };
+use std::collections::BTreeMap;
 
 /// A proposed-state overlay could not be closed into a coherent image.
 #[derive(Debug, thiserror::Error)]
@@ -109,6 +111,32 @@ pub fn apply_overlay(
     )?)
 }
 
+/// The overrides `actions` project to over `base`: written bytes, deletions'
+/// absence, and the event log as its append leaves it.
+pub fn action_overrides<'a>(
+    base: &RepositoryImage,
+    actions: impl IntoIterator<Item = &'a RepositoryAction>,
+) -> Result<BTreeMap<VirtualPath, Option<Vec<u8>>>, CaptureError> {
+    actions
+        .into_iter()
+        .filter_map(|action| match action {
+            RepositoryAction::WriteFile { path, bytes, .. } => {
+                Some(Ok((path.clone(), Some(bytes.clone()))))
+            }
+            RepositoryAction::DeleteFile { path, .. } => Some(Ok((path.clone(), None))),
+            RepositoryAction::AppendEvents { offset, bytes, .. } => {
+                Some(base.file_bytes(action.path()).map(|log| {
+                    let mut log = log.unwrap_or_default().to_vec();
+                    log.truncate(usize::try_from(*offset).unwrap_or(usize::MAX));
+                    log.extend_from_slice(bytes);
+                    (action.path().clone(), Some(log))
+                }))
+            }
+            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
+        })
+        .collect()
+}
+
 /// The canonical parent-directory path and child name for a non-root path, or
 /// `None` when `path` is a root itself (no parent listing to update).
 fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
@@ -127,7 +155,8 @@ fn parent_and_name(path: &VirtualPath) -> Option<(VirtualPath, String)> {
 mod tests {
     use super::*;
     use crate::repository_state::{
-        CaptureBudget, CaptureSpec, EntryIdentity, RepositoryLayout, RepositoryRootEvidence,
+        CaptureBudget, CaptureSpec, EntryIdentity, ExpectedPreimage, RepositoryLayout,
+        RepositoryRootEvidence,
     };
     use std::collections::BTreeMap;
 
@@ -202,6 +231,21 @@ mod tests {
         assert_eq!(
             overlaid.file_bytes(&vpath(".jit/config.toml")).unwrap(),
             Some(&b"new"[..])
+        );
+    }
+
+    #[test]
+    fn test_action_overrides_extend_the_captured_log_by_its_append() {
+        let base = base_image(&[(".jit/events.jsonl", "prior")], None);
+        let append = RepositoryAction::append_events(
+            "append",
+            ExpectedPreimage::of(base.entry(&VirtualPath::EVENTS).unwrap()),
+            5,
+            b"\nnext\n".to_vec(),
+        );
+        assert_eq!(
+            action_overrides(&base, [&append]).unwrap(),
+            BTreeMap::from([(VirtualPath::EVENTS, Some(b"prior\nnext\n".to_vec()))])
         );
     }
 

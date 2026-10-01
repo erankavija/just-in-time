@@ -190,7 +190,7 @@ pub enum GateRegistryEditError {
     #[error(transparent)]
     Seed(#[from] SeedError),
 }
-pub use overlay::{apply_overlay, OverlayError};
+pub use overlay::{action_overrides, apply_overlay, OverlayError};
 pub use path::{
     repository_relative_path, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
     RepositoryRootEvidence, RootRelativePath, VirtualPath, BOOTSTRAP_LOCK_FILE, RECORD_SCRATCH_DIR,
@@ -1261,12 +1261,7 @@ pub fn compare_materializations(
         .actions()
         .iter()
         .try_fold(Vec::new(), |mut drifts, action| {
-            let path = match action {
-                RepositoryAction::CreateDirectory { path, .. }
-                | RepositoryAction::WriteFile { path, .. }
-                | RepositoryAction::SetMode { path, .. }
-                | RepositoryAction::DeleteFile { path, .. } => path,
-            };
+            let path = action.path();
             let captured = image.entry(path)?;
             let drift = match (action, captured) {
                 (RepositoryAction::CreateDirectory { .. }, RepositoryEntry::Directory { .. }) => {
@@ -1283,6 +1278,7 @@ pub fn compare_materializations(
                     },
                 ) if actual.bytes() == bytes.as_slice() && actual_mode == mode => None,
                 (RepositoryAction::WriteFile { .. }, _) => Some(MaterializationDriftKind::Stale),
+                (RepositoryAction::AppendEvents { .. }, _) => Some(MaterializationDriftKind::Stale),
                 (
                     RepositoryAction::SetMode { mode, .. },
                     RepositoryEntry::File {

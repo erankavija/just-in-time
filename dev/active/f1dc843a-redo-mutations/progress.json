@@ -702,7 +702,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "ready — next"
+          "status": "done — all five gates passed on the merged tree, zero rework rounds; cargo-ci warm run under the session-7 busy-host override (suite-clock 33468 ms, load ~20); code-review re-run after the lead removed a stale test comment (0 findings). SP-26 branch deleted."
         },
         {
           "id": "b4483ad6-5ce9-4209-933b-aa386cb74b3a",
@@ -1137,7 +1137,8 @@
     "ccea63de": 1,
     "ead8f86d": 2,
     "79252d23": 1,
-    "42478e5d": 1
+    "42478e5d": 1,
+    "3d9150d7": 1
   },
   "started_at": "2026-09-20T06:25:44.651403+00:00",
   "process_findings": [
@@ -1558,9 +1559,17 @@
         "suite_clock_budget_ms": 30000
       },
       "note": "Observation carried alongside the waves, not a second measurement project. Known live risk: a worker's FIRST gate run in a freshly seeded worktree measured suite-clock 43.0/43.3 s and failed the budget; the same targets passed once settled (LD-7 signature, worse than the 31.8 s previously recorded)."
+    },
+    {
+      "id": "POL-05",
+      "decided_by": "user",
+      "wave": 16,
+      "policy": "Watch disk space: compilation artifacts must not fill the disk, while task throughput stays high.",
+      "actions_session_7": "Before wave 16 dispatch the disk was 93% used (64 GB free). The cache pool held 81 GB, 71 GB of it stale rustc incremental sessions merged from several worktrees and hardlinked into every new worktree. Removed the pool incremental dir and the four fresh worktrees incremental dirs (rustc rebuilds only the jit crate itself incrementally; dependency artifacts in deps/ stay warm), plus Aug-12 leftovers target/b883f916-*, target/jit-metadata-stability-*, target/flycheck0. Result 145 GB free (84%).",
+      "practice": "Dispatch prompts forbid extra target dirs and --release builds. After each reclaim, delete .agents/cache-pool/target/debug/incremental (harvest merges stale sessions newest-wins). Check df before each dispatch; act below 80 GB free."
     }
   ],
-  "session": 6,
+  "session": 7,
   "rework_counter_resets": [
     {
       "issue": "35544121",
@@ -1915,6 +1924,15 @@
       "criterion_subjects": "51eb1aa6 REQ-05 (recover's machine-readable output and rendered line)",
       "owner": "51eb1aa6 (wave 16), which rewrites both of recover's output branches; brief it to delete the unreachable one rather than rename it.",
       "raised_by": "worker-42478e5d, reported rather than changed"
+    },
+    {
+      "id": "SP-27",
+      "session": 7,
+      "wave": 16,
+      "source": "3d9150d7 worker report, verified by lead rg",
+      "subject": "Production rustdoc still names the retired mechanism in forms outside e346d387 sweep terms: bare \"recoverable transaction\" (cli.rs:394, repository_state/package_tree.rs:9, commands/config.rs:275 \"recovered mutation session\") and \"recovering kernel\" (commands/gate.rs:1964). e346d387 sweep term is \"one recoverable transaction\".",
+      "owner": "e346d387 (wave 17) — brief at dispatch to cover these forms under its REQ-01 subject (doc comments describing publication by the retired mechanism).",
+      "status": "assigned"
     }
   ],
   "checkpoint_reconciliation_fbd6c859": {
@@ -1945,5 +1963,50 @@
     ],
     "notable": "Transaction kernel retired (b0ee2dd6, net -4367 lines). Record vocabulary gained make-directory (OD-7 amended). jit recover reports a failed leftover record as recovery_failed (ESC-13). ccea63de carries owner decision @/issue/ccea63de/decision/D-1.",
     "epic_counts_at_close": "34 done, 4 ready (wave 16), 12 backlog including the epic"
+  },
+  "wave_16_dispatch": {
+    "dispatched_at": "2026-10-01T12:15+03:00",
+    "anchor": "1de043049",
+    "models": {
+      "b4483ad6": "opus",
+      "c88822a5": "opus",
+      "3d9150d7": "opus",
+      "51eb1aa6": "sonnet"
+    },
+    "sequencing_decision": "b4483ad6 and c88822a5 overlap in repository_state/mutation.rs and repository_state_store.rs: c88822a5 length-and-tail log capture presumes the composer prefix copy b4483ad6 deletes. Dispatched concurrently; b4483ad6 told to make the composer need only captured length and bytes after the last newline; c88822a5 told to deliver the phase collapse first and to merge main after b4483ad6 lands before switching the log capture (WAITING-FOR-b4483ad6 protocol)."
+  },
+  "wave_16_observations": {
+    "pol04": [
+      {
+        "issue": "51eb1aa6",
+        "run": "cold first execution after merge",
+        "suite_clock_ms": 71240,
+        "test_ms": 61863,
+        "doctest_ms": 9359,
+        "suite_build_ms": 135115,
+        "clippy_ms": 40753,
+        "load": "~18-25: two wave-16 workers building plus an unrelated gf2 project build",
+        "verdict": "budget only; 4708/4708 pass"
+      },
+      {
+        "issue": "51eb1aa6",
+        "run": "warm --force",
+        "suite_clock_ms": 50098,
+        "test_ms": 33632,
+        "doctest_ms": 16424,
+        "load": "~20",
+        "verdict": "budget only; contention"
+      },
+      {
+        "issue": "51eb1aa6",
+        "run": "BUSY_HOST_OVERRIDE warm",
+        "suite_clock_ms": 33468,
+        "test_ms": 20581,
+        "doctest_ms": 12847,
+        "verdict": "passed"
+      }
+    ],
+    "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
+    "decision": "User directed in session 7 not to get stuck on the suite-duration budget and to use BUSY_HOST_OVERRIDE=1 (scripts/rust-build-budget.sh:170) for the contended wave-16 cargo-ci runs. A per-session instruction, explicitly not a standing policy."
   }
 }

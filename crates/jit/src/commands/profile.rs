@@ -1897,8 +1897,8 @@ impl CommandExecutor<JsonFileStorage> {
                         .collect::<Result<Vec<_>>>()?,
                 )));
             }
-            let proposed = apply_overlay(plan.image(), super::validation_overlay(plan.delta()))
-                .map_err(anyhow::Error::from)?;
+            let overrides = super::validation_overlay(plan.image(), plan.delta())?;
+            let proposed = apply_overlay(plan.image(), overrides).map_err(anyhow::Error::from)?;
             let validation = crate::validation::repository::validate_repository(&proposed)
                 .map_err(ProfileApplyError::from)?;
             if validation.rule_report.has_errors() {
@@ -2147,7 +2147,7 @@ impl CommandExecutor<JsonFileStorage> {
                 .iter()
                 .map(|action| action.path().clone()),
         );
-        let overrides = super::validation_overlay(preview.delta());
+        let overrides = super::validation_overlay(preview.image(), preview.delta())?;
         let Some(probe) = self.grow_proposed_base(session, base, &overrides, &extra_paths)? else {
             return Ok(None);
         };
@@ -2903,15 +2903,11 @@ pub(super) fn applied_profile_result(
         &package.model().version,
         package_origin(package, layout)?,
     );
-    let changed = status == ProfileApplicationStatus::Applied;
     Ok(ProfileApplyResult {
         id: preview.id,
         version: preview.version,
         origin: preview.origin,
         status,
-        plan_hash: preview.plan_hash,
-        transaction_id: changed.then(|| plan.hash().to_string()),
-        warnings: Vec::new(),
         targets: preview.targets,
         contributions: preview.contributions,
     })
@@ -5495,10 +5491,6 @@ template = true
             .profiles
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Unchanged));
-        assert!(reapplied
-            .profiles
-            .iter()
-            .all(|profile| profile.transaction_id.is_none()));
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             events
@@ -6370,10 +6362,6 @@ template = true
             "{:?}",
             reapplied.profiles
         );
-        assert!(reapplied
-            .profiles
-            .iter()
-            .all(|profile| profile.transaction_id.is_none()));
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
             events
@@ -7658,17 +7646,9 @@ template = true
             repeat.targets
         );
         assert_eq!(
-            (
-                repeat.id.as_str(),
-                repeat.version.as_str(),
-                &repeat.plan_hash
-            ),
-            (
-                publishing.id.as_str(),
-                publishing.version.as_str(),
-                &publishing.plan_hash
-            ),
-            "a repeat still names its profile, its version, and the plan it came from"
+            (repeat.id.as_str(), repeat.version.as_str()),
+            (publishing.id.as_str(), publishing.version.as_str()),
+            "a repeat still names its profile and its version"
         );
     }
 

@@ -13,7 +13,7 @@
 //! [`ProfileApplicationInput`]; this module alone derives and compares their final
 //! bytes.
 //! Finalization derives the coupled default-rule/schema closure and composes the
-//! aggregate profile lifecycle line from the captured `events.jsonl` prefix (id,
+//! aggregate profile lifecycle line appended at the captured `events.jsonl` length (id,
 //! timestamp, and torn-tail handling are never command-owned). Every byte flows through
 //! `session.apply` here.
 
@@ -405,7 +405,7 @@ impl InitializationScaffold {
         }
         // The audit log is not a neutral scaffold file: the finalizer composes it
         // (an empty log for a plain init, an aggregate lifecycle append for a profiled
-        // one) from the captured prefix. See `derive_initialization`.
+        // one) at the captured length. See `derive_initialization`.
         Ok(files)
     }
 
@@ -426,8 +426,8 @@ impl InitializationScaffold {
             .into_iter()
             .map(|file| file.path)
             .collect();
-        // The finalizer composes `events.jsonl` from the captured prefix, so its
-        // path must be captured for the prior bytes and the action preimage.
+        // The finalizer appends to `events.jsonl` at its captured length, so its
+        // path must be captured for that length and the action preimage.
         paths.push(VirtualPath::EVENTS);
         for profile in self.profiles() {
             paths.push(profile.record_path.clone());
@@ -759,44 +759,17 @@ fn compose_existing_default_rules(
 /// precondition while preserving its exact desired effect and owner.
 fn rebase_action(
     base: &RepositoryImage,
-    action: RepositoryAction,
+    mut action: RepositoryAction,
 ) -> Result<RepositoryAction, InitializationError> {
-    let expected = ExpectedPreimage::of(base.entry(action.path())?);
-    Ok(match action {
-        RepositoryAction::CreateDirectory { path, owner, .. } => {
-            RepositoryAction::CreateDirectory {
-                path,
-                owner,
-                expected,
-            }
-        }
-        RepositoryAction::WriteFile {
-            path,
-            owner,
-            bytes,
-            mode,
-            ..
-        } => RepositoryAction::WriteFile {
-            path,
-            owner,
-            expected,
-            bytes,
-            mode,
-        },
-        RepositoryAction::SetMode {
-            path, owner, mode, ..
-        } => RepositoryAction::SetMode {
-            path,
-            owner,
-            expected,
-            mode,
-        },
-        RepositoryAction::DeleteFile { path, owner, .. } => RepositoryAction::DeleteFile {
-            path,
-            owner,
-            expected,
-        },
-    })
+    let rebased = ExpectedPreimage::of(base.entry(action.path())?);
+    match &mut action {
+        RepositoryAction::CreateDirectory { expected, .. }
+        | RepositoryAction::WriteFile { expected, .. }
+        | RepositoryAction::SetMode { expected, .. }
+        | RepositoryAction::DeleteFile { expected, .. }
+        | RepositoryAction::AppendEvents { expected, .. } => *expected = rebased,
+    }
+    Ok(action)
 }
 
 /// Project the byte-bearing effects of exact actions into the existing proposed
@@ -806,17 +779,10 @@ fn apply_action_overlay(
     base: &RepositoryImage,
     actions: &[RepositoryAction],
 ) -> Result<RepositoryImage, InitializationError> {
-    super::apply_overlay(
-        base,
-        actions.iter().filter_map(|action| match action {
-            RepositoryAction::WriteFile { path, bytes, .. } => {
-                Some((path.clone(), Some(bytes.clone())))
-            }
-            RepositoryAction::DeleteFile { path, .. } => Some((path.clone(), None)),
-            RepositoryAction::CreateDirectory { .. } | RepositoryAction::SetMode { .. } => None,
-        }),
-    )
-    .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
+    super::action_overrides(base, actions)
+        .map_err(super::OverlayError::from)
+        .and_then(|overrides| super::apply_overlay(base, overrides))
+        .map_err(|error| InitializationError::RuleMaterialization(error.to_string()))
 }
 
 /// Keep the final effect for one canonical target and derive its preimage from
@@ -869,12 +835,11 @@ fn fold_rebased_action(
 fn events_action(base: &RepositoryImage) -> Result<Option<RepositoryAction>, InitializationError> {
     let path = VirtualPath::EVENTS;
     match base.entry(&path)? {
-        RepositoryEntry::Absent => Ok(Some(RepositoryAction::WriteFile {
-            path,
+        RepositoryEntry::Absent => Ok(Some(RepositoryAction::AppendEvents {
             owner: SCAFFOLD_OWNER.to_string(),
             expected: ExpectedPreimage::Absent,
+            offset: 0,
             bytes: Vec::new(),
-            mode: FileMode::Regular,
         })),
         RepositoryEntry::File { .. } => Ok(None),
         _ => Err(InitializationError::UnexpectedOccupant { path }),

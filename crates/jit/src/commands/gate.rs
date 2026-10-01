@@ -2276,16 +2276,7 @@ style = "full"
                 .unwrap()
         };
         let event_bytes = |plan: &crate::repository_state::MaterializationPlan| {
-            plan.delta()
-                .actions()
-                .iter()
-                .find_map(|action| match action {
-                    crate::repository_state::RepositoryAction::WriteFile {
-                        path, bytes, ..
-                    } if path == &VirtualPath::data("events.jsonl").unwrap() => Some(bytes.clone()),
-                    _ => None,
-                })
-                .unwrap()
+            plan.delta().appended_event_bytes().unwrap().to_vec()
         };
 
         let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();

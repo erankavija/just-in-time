@@ -1872,9 +1872,7 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 mod tests {
     use super::*;
     use crate::domain::DocumentReference;
-    use crate::repository_state::{
-        finalize, CaptureSpec, MutationContext, RepositoryAction, VirtualPath,
-    };
+    use crate::repository_state::{finalize, CaptureSpec, MutationContext, VirtualPath};
     use crate::storage::{
         InMemoryStorage, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
@@ -1885,18 +1883,7 @@ mod tests {
     }
 
     fn event_bytes(plan: &crate::repository_state::MaterializationPlan) -> Vec<u8> {
-        plan.delta()
-            .actions()
-            .iter()
-            .find_map(|action| match action {
-                RepositoryAction::WriteFile { path, bytes, .. }
-                    if path == &VirtualPath::data("events.jsonl").unwrap() =>
-                {
-                    Some(bytes.clone())
-                }
-                _ => None,
-            })
-            .unwrap()
+        plan.delta().appended_event_bytes().unwrap().to_vec()
     }
 
     #[test]
