@@ -1,0 +1,52 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d0acc3d73f95480a4c50cecc94af13a3f22325cf",
+  "completed_at": "2026-10-01T15:22:15.990085468Z",
+  "duration_ms": 259560,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 2696,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c88822a5/requirement/REQ-01"
+        ],
+        "severity": "high",
+        "summary": "A lifecycle mutation requiring prechecks starts a second capture in its preflight, violating the one-round requirement."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c88822a5/requirement/REQ-07"
+        ],
+        "severity": "high",
+        "summary": "The attributable implementation patches add 1,861 lines and delete 1,823, so the change has a net addition rather than a net removal."
+      }
+    ],
+    "summary": "The precheck lifecycle path still has two preflight captures, and the attributable change has a net line addition.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e456f9b4-28a8-492f-80c3-301869a94d79",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T15:17:56.429235520Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 17195 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f80b-2c74-7851-8d1e-591d5cbd78b9\n--------\nuser\n--- 17182 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: jit:c88822a5 commits cd72a03ce, 5dbe781c6, 9dad92320, 826ee8e56, 44baf7815, ffd872301, e24c7eaec, a5b7346ac, 5c7f7e261, 25c4d50bb, 56f0d3d7c, c08991694, b2f5e2191, 84f3baa51, b5e975545, 2c76601b3, 960a9afcb, a87e2b0dc, d0acc3d73\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/issues/c88822a5-b92a-4992-9521-f1c0ad145b9e.json; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/c88822a5/requirement/REQ-01 through REQ-07 and @/issue/c88822a5/decision/D-1 (.jit/issues/c88822a5-b92a-4992-9521-f1c0ad145b9e.json); @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-01T15:16:39.493985991+00:00)\nTruncation recovery: narrowed reads to tagged patches and the capture, preflight, tail, and test paths; omitted historical gate records and unrelated merge-parent integrations outside the impact cone.\n\n1. **[blocking][issue-impact][high] F1:** A lifecycle mutation requiring prechecks captures `light` in preflight at `crates/jit/src/commands/mod.rs:2687`, then starts `capture_mutation_base` in that same preflight at line 2696. That helper explicitly starts from `None` at `crates/jit/src/commands/validate.rs:218`, so this path performs two capture rounds before the attempt rather than the required one. References: @/issue/c88822a5/requirement/REQ-01.\n\n2. **[blocking][issue-impact][high] F2:** The individually attributable non-merge implementation patches total 1,861 added and 1,823 deleted lines, a net addition of 38 lines. The tagged merge commits integrate those patches; they do not change the result. The change therefore does not remove more lines than it adds. References: @/issue/c88822a5/requirement/REQ-07.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The precheck lifecycle path still has two preflight captures, and the attributable change has a net line addition.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A lifecycle mutation requiring prechecks starts a second capture in its preflight, violating the one-round requirement.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":2696,\"references\":[\"@/issue/c88822a5/requirement/REQ-01\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The attributable implementation patches add 1,861 lines and delete 1,823, so the change has a net addition rather than a net removal.\",\"references\":[\"@/issue/c88822a5/requirement/REQ-07\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
