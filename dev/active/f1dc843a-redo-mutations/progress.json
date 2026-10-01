@@ -777,7 +777,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — dispatched early in session 7 (deps done)"
+          "status": "in_progress — session 8 fresh dispatch (session-7 worker made no edits)"
         }
       ]
     },
@@ -1597,7 +1597,7 @@
       "practice": "Dispatch prompts forbid extra target dirs and --release builds. After each reclaim, delete .agents/cache-pool/target/debug/incremental (harvest merges stale sessions newest-wins). Check df before each dispatch; act below 80 GB free."
     }
   ],
-  "session": 7,
+  "session": 8,
   "rework_counter_resets": [
     {
       "issue": "35544121",
@@ -2076,5 +2076,15 @@
       "@/issue/c88822a5/decision/D-1"
     ],
     "epic_counts_at_handoff": "37 done, 3 in_progress, 10 backlog"
+  },
+  "session_8_summary": {
+    "started": "2026-10-01T16:08+03:00",
+    "resume_findings": "All three session-7 workers dead at session start (last edits 14:44). Lead-preserve commits: c88822a5 b2f5e2191, ec72359b d3250d8c7; e346d387 had no edits. Host idle (load 0.08), disk 135 GB free.",
+    "busy_host_override": "Not used: host idle at session start (handoff-5 open question resolved by option B unless contention recurs).",
+    "dispatches": {
+      "c88822a5": "opus, continuation of rework 2 of 2 on preserved WIP (counter unchanged: the interrupted attempt was never reviewed)",
+      "ec72359b": "sonnet, continuation of first dispatch on preserved WIP",
+      "e346d387": "opus, fresh first dispatch, SP-27 forms assigned under REQ-01"
+    }
   }
 }
