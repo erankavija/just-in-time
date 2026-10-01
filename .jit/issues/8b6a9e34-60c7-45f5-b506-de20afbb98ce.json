@@ -75,6 +75,7 @@
       "path": "dev/benchmarks/rust-build-budgets/README.md"
     }
   ],
+  "done_at": "2026-10-01T22:23:15.394898939Z",
   "first_ready_at": "2026-10-01T20:16:12.845167299Z",
   "gates_required": [
     "doc-review",
@@ -106,7 +107,7 @@
     "satisfies:f1dc843a/REQ-06"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Testing guide publication-cost evidence",
-  "updated_at": "2026-10-01T22:23:03.519909717Z"
+  "updated_at": "2026-10-01T22:23:15.394898939Z"
 }
