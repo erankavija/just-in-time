@@ -58,6 +58,11 @@
       "status": "failed",
       "updated_at": "2026-10-01T20:31:39.196191681Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-01T20:34:53.986789551Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "dd1b984c-7ade-4967-ad6c-f75cf498ec63",
@@ -72,5 +77,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Lock and identity writes never create an absent data root",
-  "updated_at": "2026-10-01T20:31:39.196191681Z"
+  "updated_at": "2026-10-01T20:34:53.986789551Z"
 }
