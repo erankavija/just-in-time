@@ -15293,3 +15293,4 @@
 {"gate_key":"code-review","id":"e44653a9-b33d-4d07-b595-561b88f6af13","issue_id":"3d9150d7-e423-400f-903a-b9a7aec1ba7f","timestamp":"2026-10-01T11:13:28.124723781Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"71292d2a-4a74-445f-ae85-7a97243362e9","issue_id":"3d9150d7-e423-400f-903a-b9a7aec1ba7f","timestamp":"2026-10-01T11:13:45.398316447Z","to":"done","type":"issue_state_changed"}
 {"id":"97358ff5-631c-406a-860f-69472063ad28","issue_id":"3d9150d7-e423-400f-903a-b9a7aec1ba7f","timestamp":"2026-10-01T11:13:45.398316447Z","type":"issue_completed"}
+{"gate_key":"cargo-ci","id":"0591d2d3-f8cd-4ecb-b5b9-6e267d9ae69e","issue_id":"c88822a5-b92a-4992-9521-f1c0ad145b9e","timestamp":"2026-10-01T11:28:54.393958581Z","type":"gate_failed","updated_by":"auto:executor"}
