@@ -1923,6 +1923,15 @@
       "criterion_subjects": "51eb1aa6 REQ-05 (recover's machine-readable output and rendered line)",
       "owner": "51eb1aa6 (wave 16), which rewrites both of recover's output branches; brief it to delete the unreachable one rather than rename it.",
       "raised_by": "worker-42478e5d, reported rather than changed"
+    },
+    {
+      "id": "SP-27",
+      "session": 7,
+      "wave": 16,
+      "source": "3d9150d7 worker report, verified by lead rg",
+      "subject": "Production rustdoc still names the retired mechanism in forms outside e346d387 sweep terms: bare \"recoverable transaction\" (cli.rs:394, repository_state/package_tree.rs:9, commands/config.rs:275 \"recovered mutation session\") and \"recovering kernel\" (commands/gate.rs:1964). e346d387 sweep term is \"one recoverable transaction\".",
+      "owner": "e346d387 (wave 17) — brief at dispatch to cover these forms under its REQ-01 subject (doc comments describing publication by the retired mechanism).",
+      "status": "assigned"
     }
   ],
   "checkpoint_reconciliation_fbd6c859": {
@@ -1964,5 +1973,31 @@
       "51eb1aa6": "sonnet"
     },
     "sequencing_decision": "b4483ad6 and c88822a5 overlap in repository_state/mutation.rs and repository_state_store.rs: c88822a5 length-and-tail log capture presumes the composer prefix copy b4483ad6 deletes. Dispatched concurrently; b4483ad6 told to make the composer need only captured length and bytes after the last newline; c88822a5 told to deliver the phase collapse first and to merge main after b4483ad6 lands before switching the log capture (WAITING-FOR-b4483ad6 protocol)."
+  },
+  "wave_16_observations": {
+    "pol04": [
+      {
+        "issue": "51eb1aa6",
+        "run": "cold first execution after merge",
+        "suite_clock_ms": 71240,
+        "test_ms": 61863,
+        "doctest_ms": 9359,
+        "suite_build_ms": 135115,
+        "clippy_ms": 40753,
+        "load": "~18-25: two wave-16 workers building plus an unrelated gf2 project build",
+        "verdict": "budget only; 4708/4708 pass"
+      },
+      {
+        "issue": "51eb1aa6",
+        "run": "warm --force",
+        "suite_clock_ms": 50098,
+        "test_ms": 33632,
+        "doctest_ms": 16424,
+        "load": "~20",
+        "verdict": "budget only; contention"
+      }
+    ],
+    "flag": "suite-clock > 25 s on both runs; cause host contention, not the tree. Lead error: a warm-up used a guessed nextest profile name (ci) that does not exist, so it did nothing; the real command is cargo nextest run --workspace (scripts/cargo-ci.sh:452).",
+    "decision": "Defer cargo-ci for merged 51eb1aa6 and 3d9150d7 to a quiet host window rather than burn contended runs."
   }
 }
