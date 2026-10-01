@@ -69,8 +69,8 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-10-01T10:31:27.288036155Z",
+      "status": "passed",
+      "updated_at": "2026-10-01T11:02:57.005397243Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
@@ -97,5 +97,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Positioned event-log append",
-  "updated_at": "2026-10-01T11:01:49.862328399Z"
+  "updated_at": "2026-10-01T11:02:57.005397243Z"
 }
