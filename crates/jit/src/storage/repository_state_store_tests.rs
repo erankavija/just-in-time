@@ -1262,16 +1262,21 @@ fn test_conformance_extend_reads_only_what_the_image_lacks_on_both_backends() {
 }
 
 /// A tail read holds the file's length and its last window of bytes, reaching
-/// back to the newline before a final line that starts earlier, and a producer
-/// asking for the whole file fails typed.
+/// back to the newline before a final line that starts earlier (or to the
+/// file's start), and a producer asking for the whole file fails typed.
 #[test]
-fn test_conformance_tail_capture_holds_length_and_window_on_both_backends() {
+fn test_conformance_tail_capture_holds_length_and_final_line_on_both_backends() {
     let window = EVENT_LOG_TAIL_WINDOW as usize;
     let lines = (0..window * 2 + 7)
         .map(|byte| byte as u8)
         .collect::<Vec<_>>();
     let long_line = [vec![b'h'; window * 2], vec![b'\n'], vec![b'x'; window * 3]].concat();
-    for (log, kept) in [(lines, window), (long_line, window * 3 + 1)] {
+    let one_line = vec![b'x'; window * 2 + 1];
+    for (log, kept) in [
+        (lines, window),
+        (long_line, window * 3 + 1),
+        (one_line, window * 2 + 1),
+    ] {
         let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
         for (mut session, _) in sessions {
             let mut spec = CaptureSpec::new([], budget()).unwrap();
@@ -1303,7 +1308,14 @@ fn test_conformance_tail_capture_charges_the_read_back_to_the_byte_budget_on_bot
     for max_bytes in [kept, kept - 1] {
         let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
         for (mut session, _) in sessions {
-            let mut spec = CaptureSpec::new([], CaptureBudget { max_bytes, ..budget() }).unwrap();
+            let mut spec = CaptureSpec::new(
+                [],
+                CaptureBudget {
+                    max_bytes,
+                    ..budget()
+                },
+            )
+            .unwrap();
             spec.discover_tail(VirtualPath::EVENTS).unwrap();
 
             let result = session.capture(spec);
