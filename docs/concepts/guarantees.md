@@ -75,11 +75,11 @@ bytes and fsyncs the directory entries naming them, and only then writes a live
 file. The record's durable write is the mutation's commit point
 (`crates/jit/src/storage/redo_record.rs`).
 
-Applying it is one forward pass: make the directories, replace the files, extend
-the event log, remove the deleted paths, then remove the record. Every step
-tolerates being redone — a directory already present, a replacement that
-overwrites, an append written again at the same place, a removal whose target
-is already gone — so applying a record twice reaches the same state as applying
+Applying it is one forward pass: make the directories, replace the files,
+remove the deleted paths, extend the event log, then remove the record. Every
+step tolerates being redone — a directory already present, a replacement that
+overwrites, a removal whose target is already gone, an append written again at
+the same place — so applying a record twice reaches the same state as applying
 it once (`crates/jit/src/storage/redo_apply.rs`).
 
 **Converging forward:**
