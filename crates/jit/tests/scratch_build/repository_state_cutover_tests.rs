@@ -584,14 +584,15 @@ fn declared_module(line: &str) -> Option<&str> {
 }
 
 /// `file` and every module file it declares, each with its [`production_text`];
-/// a module a non-test build leaves out contributes nothing.
-fn compiled_modules(file: &Path) -> Vec<(PathBuf, String)> {
+/// a module a non-test build leaves out contributes nothing. A crate root, like
+/// a `mod.rs`, declares its modules beside itself.
+fn compiled_modules(file: &Path, is_crate_root: bool) -> Vec<(PathBuf, String)> {
     let Some(text) = production_text(&std::fs::read_to_string(file).unwrap()) else {
         return Vec::new();
     };
-    let directory = match file.file_name().and_then(|name| name.to_str()) {
-        Some("lib.rs" | "main.rs" | "mod.rs") => file.parent().unwrap().to_path_buf(),
-        _ => file.with_extension(""),
+    let directory = match is_crate_root || file.file_name().is_some_and(|name| name == "mod.rs") {
+        true => file.parent().unwrap().to_path_buf(),
+        false => file.with_extension(""),
     };
     let children = text
         .lines()
@@ -610,7 +611,7 @@ fn compiled_modules(file: &Path) -> Vec<(PathBuf, String)> {
                     file.display()
                 )
             });
-            compiled_modules(&child)
+            compiled_modules(&child, false)
         })
         .collect::<Vec<_>>();
     std::iter::once((file.to_path_buf(), text))
@@ -620,22 +621,43 @@ fn compiled_modules(file: &Path) -> Vec<(PathBuf, String)> {
 
 /// Every source file a non-test build of a workspace member compiles, once
 /// each, keyed by its workspace-relative path.
+///
+/// The roots are the targets Cargo itself resolves for each member — its
+/// library, every binary whether declared or discovered under `src/bin`, and
+/// its build script — so a target added by convention cannot fall outside the
+/// walk. Test, bench, and example targets ship nothing.
 fn workspace_compiled_sources() -> Vec<(PathBuf, String)> {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let manifest = std::fs::read_to_string(workspace.join("Cargo.toml")).unwrap();
-    let manifest = toml::from_str::<toml::Value>(&manifest).unwrap();
-    manifest["workspace"]["members"]
+    let output = std::process::Command::new(env!("CARGO"))
+        .args([
+            "metadata",
+            "--no-deps",
+            "--format-version",
+            "1",
+            "--offline",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .expect("cargo metadata runs");
+    assert!(
+        output.status.success(),
+        "cargo metadata failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let metadata = serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap();
+    let workspace = PathBuf::from(metadata["workspace_root"].as_str().unwrap());
+    metadata["packages"]
         .as_array()
-        .expect("the workspace manifest lists its members")
+        .expect("cargo metadata lists the workspace members")
         .iter()
-        .flat_map(|member| {
-            let source = workspace.join(member.as_str().unwrap()).join("src");
-            ["lib.rs", "main.rs"]
-                .into_iter()
-                .map(move |root| source.join(root))
+        .flat_map(|package| package["targets"].as_array().unwrap())
+        .filter(|target| {
+            target["kind"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|kind| !matches!(kind.as_str(), Some("test" | "bench" | "example")))
         })
-        .filter(|root| root.is_file())
-        .flat_map(|root| compiled_modules(&root))
+        .flat_map(|target| compiled_modules(Path::new(target["src_path"].as_str().unwrap()), true))
         .map(|(path, text)| (path.strip_prefix(&workspace).unwrap().to_path_buf(), text))
         .collect::<BTreeMap<_, _>>()
         .into_iter()
