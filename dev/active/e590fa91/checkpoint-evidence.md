@@ -2,7 +2,7 @@
 
 Story `story:superseded-design-retirement`; children 3d9150d7, 51eb1aa6, b4483ad6,
 c88822a5, ec72359b, 33f97287, 8454236c, e346d387, 816df12a, 91168745, be13da79.
-Construct map: [investigation §Claim 9](../f1dc843a-redo-mutations/investigation.md#claim-9--req-05-construct-mapping).
+Construct map: the epic investigation, §"Claim 9 — REQ-05 construct mapping" (`investigation.md` in the epic artifact directory).
 Commands run from the repository root at the HEAD this document is committed in.
 
 ## REQ-01 — the ten constructs, row by row
