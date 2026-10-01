@@ -1,7 +1,7 @@
 {
   "epic_id": "f1dc843a-06ef-42a1-9e8e-4e38e60168ef",
   "epic_short_id": "f1dc843a",
-  "current_wave": 19,
+  "current_wave": 22,
   "parallelism_cap": 4,
   "waves": [
     {
@@ -823,7 +823,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "in_progress — session 8 dispatch (opus)"
+          "status": "done — session 8 (opus), zero rework"
         }
       ]
     },
@@ -841,7 +841,7 @@
             "docs-mechanical",
             "holistic-review"
           ],
-          "status": "pending"
+          "status": "done — session 8 (opus); checkpoint closed SP-29 and the journal benchmark residue (delivering 8b6a9e34 REQ-02 early); holistic-review failed once on the load-timeout cargo-ci run only, passed 0 findings after warm rerun. Phase net -944 Rust lines (production -802)."
         }
       ]
     },
@@ -857,7 +857,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "done — session 8 (opus), zero rework. Changing label update 118/122 ms -> 49/49 ms (gf2/jit); 10x log 441 -> 50 ms (+2% vs 1x). Cumulative Rust -2507; ER-01 redo-record subtotal -2307 (dev/benchmarks/publication-cost-722878d4)."
         }
       ]
     },
@@ -873,7 +873,7 @@
             "doc-review",
             "docs-mechanical"
           ],
-          "status": "pending"
+          "status": "in_progress — session 8 dispatch (opus)"
         }
       ]
     },
@@ -1406,7 +1406,8 @@
         "1fce64b78 (POL-03 build-time commit, session 4, -139 Rust lines; carries no jit issue by POL-03's terms)"
       ],
       "note": "This does NOT soften REQ-06. The criterion is judged on its literal cumulative total. The subtotal is supplementary so a reviewer can see the mechanism claim independently. Session 4 added the POL-03 commit to the exclusion list: it is build-tooling work, carries no jit issue, and removes 139 Rust lines that would otherwise flatter REQ-06's literal total. 8559f529 is NOT excluded.",
-      "baseline_at_wave2": "+636 -32 = net +604"
+      "baseline_at_wave2": "+636 -32 = net +604",
+      "status": "discharged by 722878d4 (rust-balance.py)"
     },
     {
       "id": "ER-02",
