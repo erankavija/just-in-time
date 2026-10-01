@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "25c4d50bb9ed7b3378497f948569f99566f8c317",
+  "completed_at": "2026-10-01T11:34:44.274918678Z",
+  "duration_ms": 343366,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/validate.rs",
+        "id": "F1",
+        "line": 388,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/c88822a5/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "A long final event-log line promotes the mutation base from bounded-tail to whole-log capture."
+      }
+    ],
+    "summary": "Long final event-log lines force a whole-log reread, violating the required bounded-tail mutation capture.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c88822a5-b92a-4992-9521-f1c0ad145b9e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ae5ac19d-d04f-43ec-85db-0335335cad65",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T11:29:00.908766907Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 15330 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0f739-9a39-7352-abaf-5d09fc5b3cbc\n--------\nuser\n--- 15317 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: cd72a03c, 5dbe781c, 9dad9232, 826ee8e5, 44baf781, ffd87230, e24c7eae, a5b7346a, 5c7f7e26, 25c4d50b (all `jit:c88822a5`)\nPolicy sources: AGENTS.md (repository root, context supplied)\nResolved items: @/issue/c88822a5/requirement/REQ-01..07 (issue description); @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed, exit 1, 2026-10-01T11:24:05Z; prior code-review failed on F1\nTruncation recovery: narrowed reads of per-commit patches, capture flow, storage extension behavior, requirements, and gate record\n\n1. **[blocking][issue-impact][high]** The long-final-line rework promotes `events.jsonl` from a bounded-tail capture to a whole-file request at [validate.rs:388](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:388). `grow_discovering` then calls `extend`; because the read mode changed, [image.rs:1077](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/repository_state/image.rs:1077) discards the tail answer and rereads the entire log. The new test explicitly expects `ReadMode::Whole` for this case. This fixes the prior torn-tail misclassification but violates REQ-03’s required bounded-tail mutation base.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Long final event-log lines force a whole-log reread, violating the required bounded-tail mutation capture.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A long final event-log line promotes the mutation base from bounded-tail to whole-log capture.\",\"file\":\"crates/jit/src/commands/validate.rs\",\"line\":388,\"references\":[\"@/issue/c88822a5/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": false
+}
