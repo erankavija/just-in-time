@@ -129,7 +129,7 @@ const DEFAULT_ID_PATTERN: &str = "[A-Z][A-Z0-9]*-[0-9]+";
 ///   parse errors never credit.
 ///
 /// An unqualified `<namespace>:<id>` names no owner, so it credits nothing;
-/// validation reports it for migration (jit:adb5e9df).
+/// validation reports it for migration.
 fn label_credits_id(label: &str, namespace: &str, id: &str, scope_short_id: &str) -> bool {
     let Some(value) = label.strip_prefix(&format!("{namespace}:")) else {
         return false;
