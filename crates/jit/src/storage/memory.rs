@@ -26,7 +26,7 @@ use std::sync::{Arc, Mutex};
 ///
 /// Every repository-owned typed record — issues, the gate registry, the audit
 /// log, and gate-run results — is held solely as its canonical bytes in the
-/// aggregate [`MemoryRepositoryState`] image, the single store a recovered
+/// aggregate [`MemoryRepositoryState`] image, the single store a
 /// mutation session captures and applies. There is no parallel typed cache: a
 /// record read through [`IssueStore`] and one published by a session share one
 /// source of truth and round-trip through the identical canonical serializers.
@@ -38,7 +38,7 @@ pub struct InMemoryStorage {
     /// Outermost lock of every mutating path, shared by every clone. Process-local:
     /// this backend has no files, so there is no other process to exclude.
     repo_lock: Arc<RepoWriteLock>,
-    /// Canonical aggregate repository image used by recovered mutation sessions.
+    /// Canonical aggregate repository image used by mutation sessions.
     pub(crate) repository_state: Arc<Mutex<MemoryRepositoryState>>,
     /// Interruption seam for the session's own moments: its open, its
     /// pre-commit check, and the steps of its redo-record application.
@@ -400,7 +400,7 @@ impl InMemoryStorage {
 
     /// Model a `Directory` entry for every ancestor of `vpath` up to (but not
     /// including) the data root, so the aggregate image reflects the directory
-    /// tree a real repository carries. A recovered mutation session verifies that
+    /// tree a real repository carries. A mutation session verifies that
     /// each written file's parent directory exists — exactly as the file backend
     /// does against the on-disk tree — so an issue/gate-run write under a nested
     /// `Data(...)` path must find its parent modeled here.
@@ -1784,8 +1784,8 @@ mod record_tests {
         );
     }
 
-    /// A refusal partway through a record's operations does not roll back the
-    /// operations that already landed: redo-only convergence replays a record
+    /// A refusal partway through a record's operations leaves the
+    /// operations that already landed in place: redo-only convergence replays a record
     /// forward or not at all, never partially undoes it (`@/charter/D-17`).
     /// The earlier put and the refusing put must not overlap — one naming the
     /// other's path is rejected at construction — so the occupying directory
@@ -1816,7 +1816,7 @@ mod record_tests {
         assert_eq!(
             file_bytes(&storage, &data("index.json")).as_deref(),
             Some(b"published".as_slice()),
-            "the refusal rolled back a put that had already landed"
+            "the refusal undid a put that had already landed"
         );
         assert_eq!(
             semantic_state(&storage).2,

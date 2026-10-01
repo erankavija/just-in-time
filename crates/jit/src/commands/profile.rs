@@ -839,7 +839,7 @@ impl CommandExecutor<JsonFileStorage> {
     ///
     /// The output path is the caller's, and it is published no-replace through
     /// the same classification `jit snapshot export` uses — into the repository
-    /// through one recoverable transaction when it lands inside a repository
+    /// through one redo record when it lands inside a repository
     /// root, and through the shared external publisher when it does not. An
     /// occupied output path is refused either way.
     ///
@@ -991,7 +991,7 @@ impl CommandExecutor<JsonFileStorage> {
     ///
     /// Both routes that place a package tree in the worktree — capturing one
     /// from the repository files a manifest declares, and adding one from a
-    /// portable archive — publish through this one recoverable transaction, so
+    /// portable archive — publish here, through one redo record, so
     /// a package tree reaches a repository along exactly one path
     /// (`@/inv/convention-convergence`).
     ///
@@ -999,7 +999,7 @@ impl CommandExecutor<JsonFileStorage> {
     /// against the same captured image the plan is derived from rather than by
     /// a separate look at the filesystem. A required-absent destination that is
     /// occupied is refused here; one that becomes occupied afterwards is
-    /// refused by the transaction, because the plan creates it with an absent
+    /// refused at apply, because the plan creates it with an absent
     /// preimage.
     fn publish_package_tree(
         &self,
@@ -1827,7 +1827,7 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Publish the complete dependency-first unique closure through one
-    /// recovered session and one `session.apply` call at most.
+    /// mutation session and one `session.apply` call at most.
     pub(super) fn apply_profile_selection(
         &self,
         packages: &[ProfilePackage],
@@ -2187,7 +2187,7 @@ impl CommandExecutor<JsonFileStorage> {
     }
 
     /// Read the applied-profile record this repository holds for `id`, through
-    /// a recovered session capture.
+    /// a mutation session capture.
     fn read_applied_profile_record(&self, id: &str) -> Result<Option<AppliedProfileRecord>> {
         let record_path = applied_record_path(id)?;
         let layout = self.require_layout()?;
@@ -3065,8 +3065,8 @@ mod tests {
             .expect("one profile entry")
     }
 
-    /// Observe actual recoverable publications without coupling the test to
-    /// preparatory graph or capture sessions. This transaction-kernel edge runs
+    /// Observe actual publications without coupling the test to
+    /// preparatory graph or capture sessions. This apply edge runs
     /// once for each delta that reaches `session.apply`.
     struct PublicationCounter(AtomicUsize);
 
@@ -3089,7 +3089,7 @@ mod tests {
         }
     }
 
-    /// Fail one named session moment, then let the next recovered session run.
+    /// Fail one named session moment, then let the next mutation session run.
     struct FailOnce {
         point: MutationPoint,
         fired: AtomicBool,

@@ -310,7 +310,7 @@ pub enum Commands {
     ///
     /// Each `[projection.<name>]` config table projects an addressable item kind
     /// (or kinds) into a documentation target. `render` publishes every declared
-    /// projection, or a single named one, in one recoverable transaction; in
+    /// projection, or a single named one, in one redo record; in
     /// region mode only the delimited block changes. Targets and delimiters come
     /// only from config.
     #[command(subcommand)]
@@ -390,8 +390,8 @@ pub enum Commands {
         #[arg(long, value_name = "RULE")]
         rule: Option<String>,
 
-        /// Repair safe findings; provenance-proven derived-state repairs use one
-        /// recoverable transaction
+        /// Repair safe findings; provenance-proven derived-state repairs publish
+        /// through one redo record
         #[arg(long)]
         fix: bool,
 
@@ -613,7 +613,7 @@ pub enum ProjectCommands {
     /// Render declared documentation projections into their configured targets
     ///
     /// Publishes every `[projection.*]` table, or a single `--name`d one, through
-    /// one recoverable transaction.
+    /// one redo record.
     /// In region mode only the delimited block is rewritten; everything outside is
     /// byte-preserved. A missing target/source, an unknown kind, or an absent
     /// region marker is a typed error and nothing is written.
@@ -3063,7 +3063,7 @@ pub enum ProfileCommands {
         json: bool,
     },
 
-    /// Apply a profile package read from a repository location through one recoverable multi-target transaction
+    /// Apply a profile package read from a repository location through one multi-target redo record
     Apply {
         /// Select a recorded profile id or worktree package directory
         /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
@@ -3126,7 +3126,7 @@ pub enum ProfileCommands {
     /// Reads the manifest at the package directory, draws every live asset from
     /// the repository file its declaration targets and every other declared
     /// source from the package directory itself, and republishes the whole tree
-    /// at the destination through one recoverable transaction. A source the
+    /// at the destination through one redo record. A source the
     /// manifest no longer declares does not survive the republication.
     ///
     /// Both directories are worktree paths. A declared target that is a
@@ -3254,7 +3254,7 @@ pub enum ProfileCommands {
 }
 
 impl Commands {
-    /// Whether this invocation must run transaction recovery before repository
+    /// Whether this invocation must apply a leftover redo record before repository
     /// validation or command-service construction.
     ///
     /// These matches are deliberately exhaustive. Adding any CLI enum variant
@@ -3346,7 +3346,7 @@ impl ProfileCommands {
             Self::Apply { dry_run, .. }
             | Self::Reconfigure { dry_run, .. }
             | Self::Upgrade { dry_run, .. } => !*dry_run,
-            // Each of these publishes a repository transaction — a captured or
+            // Each of these publishes a redo record — a captured or
             // added package tree, or an archive written inside a repository
             // root — so they dispatch recovery like every other mutating
             // profile operation.

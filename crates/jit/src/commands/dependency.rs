@@ -238,7 +238,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The index is the sole discovery authority. The second phase captures every
     /// indexed record, the complete issues-directory listing, and the event log;
     /// semantic derivation reads only that closed image. A conflict restarts both
-    /// phases in a fresh recovered session while reusing one mutation context.
+    /// phases in a fresh mutation session while reusing one mutation context.
     fn publish_captured_dependency_mutation(
         &self,
         request: CapturedDependencyMutation,

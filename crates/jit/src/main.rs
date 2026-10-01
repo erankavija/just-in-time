@@ -2499,7 +2499,7 @@ fn run() -> Result<()> {
     let redo_records_applied = if requires_recovery_dispatch {
         if coordinates_claims_first {
             // Claim-aware mutation enters coordination first, then opens its own
-            // recovered repository session. This unretained startup open repairs
+            // mutation session. This unretained startup open repairs
             // residue before validation without inverting coordinator -> repository.
             let session = jit::storage::RepositoryStateStore::open_mutation_session(
                 &storage,
@@ -2552,11 +2552,11 @@ fn run() -> Result<()> {
             profile_result(executor.validate_profile_selection(&selectors), *json)?;
 
             // Every init and re-init — plain, profiled, or over an existing root —
-            // publishes through the recovered session: `run_initialization` fills
+            // publishes through one mutation session: `run_initialization` fills
             // only the missing neutral scaffold state (authored config/gates/rules
             // preserved), seeds `[project]` and `rules.toml` when absent, computes
             // the worktree `.gitattributes` merge-driver claim, and routes
-            // config/rules/schemas through one recoverable transaction. Unifying the
+            // config/rules/schemas through one redo record. Unifying the
             // plain re-init onto it asserts `.gitattributes` exactly like a fresh or
             // profiled init, closing the prior re-init gap.
             let init_result = profile_result(
@@ -7671,7 +7671,7 @@ fn run() -> Result<()> {
                 }
             } else {
                 // Standard whole-repo validation. Capture the bounded whole-repository
-                // image through the recovered session and validate it, so every pass
+                // image through a mutation session and validate it, so every pass
                 // reads image-projected content with no live `.jit` reopen. Capture (do
                 // NOT `?`-propagate) any integrity error so it can be rendered before
                 // the exit status is decided below.

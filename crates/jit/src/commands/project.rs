@@ -2,7 +2,7 @@
 //!
 //! One command renders every declared `[projection.<name>]` (or a single named
 //! one) into its configured documentation target. It is a thin boundary: it opens
-//! a recovered [`RepositoryStateStore`](crate::storage::RepositoryStateStore)
+//! a [`RepositoryStateStore`](crate::storage::RepositoryStateStore)
 //! session, captures the closed image the render reads from, delegates ALL body
 //! rendering and target composition to the pure
 //! [`repository_state`](crate::repository_state) producers, and owns no CLI
@@ -115,7 +115,7 @@ fn selected_projection_names(config: &JitConfig, name: Option<&str>) -> Result<V
 
 impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// Render every declared projection, or the single `name`d one, into its
-    /// configured documentation target through one recovered mutation session.
+    /// configured documentation target through one mutation session.
     ///
     /// With `name = Some(n)` an unknown projection name is an error, and with
     /// `name = None` every declared projection is rendered in name order (an absent

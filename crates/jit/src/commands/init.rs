@@ -73,7 +73,7 @@ pub struct FreshInitResult {
 impl CommandExecutor<JsonFileStorage> {
     /// Atomically complete neutral initialization and apply the selected profiles.
     ///
-    /// An absent data directory is published through the recovered session's
+    /// An absent data directory is published by the init publisher's
     /// staged-root machinery; an existing partial repository fills only its missing
     /// neutral scaffold state and the profile's changes in one delta.
     pub fn initialize_profiled_repository(
@@ -95,7 +95,7 @@ impl CommandExecutor<JsonFileStorage> {
         self.initialize_from_sources(repo_dir, selectors, options)
     }
 
-    /// Publish a fresh neutral or profiled repository through the recovered
+    /// Publish a fresh neutral or profiled repository through one mutation
     /// session.
     ///
     /// The neutral scaffold and any profile bytes are captured and validated over
@@ -144,7 +144,7 @@ impl CommandExecutor<JsonFileStorage> {
         self.run_initialization(repo_dir, selectors, &inputs)
     }
 
-    /// Capture the base under one recovered session, validate the proposed
+    /// Capture the base under one mutation session, validate the proposed
     /// scaffold/profile overlay, and publish the complete initialization delta.
     ///
     /// A selected profile is resolved into its complete dependency closure

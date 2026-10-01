@@ -5,9 +5,9 @@
 //! is whole: every declared file is written, and every file the captured image
 //! shows beneath the destination that the content does not declare is deleted
 //! in the same delta, so content the caller stopped declaring cannot survive
-//! into the next publication. The delta is published through the shared
-//! recoverable transaction like any other, so a failure leaves the destination
-//! as it was rather than losing what was there.
+//! into the next publication. The delta is published through one redo record
+//! like any other, so the destination ends either as it was or wholly
+//! republished, never partly.
 //!
 //! The tree's content is opaque here: this module knows paths, bytes, and
 //! modes. What decides that content — a package manifest and the repository

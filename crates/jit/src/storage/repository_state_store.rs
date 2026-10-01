@@ -1,4 +1,4 @@
-//! Recovered layout-aware repository capture and mutation sessions.
+//! Layout-aware repository capture and mutation sessions.
 //!
 //! Session orchestration lives here; an apply publishes through one redo record
 //! and an opening session applies the record a crash left. A delta creating an
@@ -196,7 +196,7 @@ impl Drop for LayoutReentry {
     }
 }
 
-/// Opaque recovered session retaining serialization through capture and apply.
+/// Opaque mutation session retaining serialization through capture and apply.
 pub trait RepositoryMutationSession {
     /// Canonical layout held by this session.
     fn layout(&self) -> &RepositoryLayout;
@@ -218,9 +218,10 @@ pub trait RepositoryMutationSession {
     ) -> Result<RepositoryApplyOutcome, RepositoryStateStoreError>;
 }
 
-/// Storage backend capable of one recovered capture/apply mutation boundary.
+/// Storage backend capable of one capture/apply mutation boundary.
 pub trait RepositoryStateStore {
-    /// Open a recovered session for exactly `layout`.
+    /// Open a mutation session for exactly `layout`, applying any leftover redo
+    /// record first.
     fn open_mutation_session(
         &self,
         layout: RepositoryLayout,

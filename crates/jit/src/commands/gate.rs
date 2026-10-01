@@ -1934,7 +1934,7 @@ enforce_leases = "off"
 
     /// REQ-05 (jit:7ca9a0dd): the manual attestation branch of gate evaluation
     /// publishes the attested gate status and its event as one plan through the
-    /// same recovering kernel the automated branch uses, so a persistence
+    /// same capture/apply path the automated branch uses, so a persistence
     /// failure reaches the caller as an error rather than a reported pass.
     #[test]
     fn test_pass_gate_manual_attestation_surfaces_persistence_failure() {
