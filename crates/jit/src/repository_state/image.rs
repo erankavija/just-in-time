@@ -148,7 +148,8 @@ pub const EVENT_LOG_TAIL_WINDOW: u64 = 4096;
 /// back to the newline before the final line when that line starts earlier.
 ///
 /// The tail is bounded by the final line, never by the file's history: it
-/// holds that line whole, so [`final_line`](Self::final_line) can judge it.
+/// holds that line whole, so [`final_line`](Self::final_line) can judge
+/// whether it is torn.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EventLogTail {
     length: u64,
@@ -158,16 +159,16 @@ pub struct EventLogTail {
 impl EventLogTail {
     /// The length and tail of `bytes`.
     pub fn of_bytes(bytes: &[u8]) -> Self {
-        let slice = |start: u64, len: u64| {
-            let (start, len) = (start as usize, len as usize);
-            Ok::<_, std::convert::Infallible>(bytes[start..start + len].to_vec())
-        };
-        let tail =
-            Self::read_tail(bytes.len() as u64, slice).unwrap_or_else(|never| match never {});
-        Self {
-            length: bytes.len() as u64,
-            tail,
-        }
+        let length = bytes.len() as u64;
+        let tail = Self::read_tail(length, |start, len| {
+            let range = usize::try_from(start)
+                .ok()
+                .zip(usize::try_from(start.saturating_add(len)).ok());
+            let read = range.and_then(|(start, end)| bytes.get(start..end));
+            Ok::<_, std::convert::Infallible>(read.unwrap_or_default().to_vec())
+        })
+        .unwrap_or_else(|never| match never {});
+        Self { length, tail }
     }
 
     /// The tail of a file `length` bytes long, through `read(start, len)`:
@@ -177,7 +178,7 @@ impl EventLogTail {
         length: u64,
         mut read: impl FnMut(u64, u64) -> Result<Vec<u8>, E>,
     ) -> Result<Vec<u8>, E> {
-        let mut start = length - length.min(EVENT_LOG_TAIL_WINDOW);
+        let mut start = length.saturating_sub(EVENT_LOG_TAIL_WINDOW);
         let mut tail = read(start, length - start)?;
         while start > 0 && !tail.contains(&b'\n') {
             let from = start.saturating_sub(EVENT_LOG_TAIL_WINDOW);
@@ -200,9 +201,12 @@ impl EventLogTail {
     /// or begins at the newline before a final line it holds whole.
     pub fn new(length: u64, tail: Vec<u8>) -> Result<Self, CaptureError> {
         let len = tail.len() as u64;
-        let window = length.min(EVENT_LOG_TAIL_WINDOW);
-        let line_bounded = tail.first() == Some(&b'\n') && !tail[1..].contains(&b'\n');
-        (len == window || (window < len && len <= length && (len == length || line_bounded)))
+        let line_bounded = match tail.split_first() {
+            Some((b'\n', line)) => !line.contains(&b'\n'),
+            _ => len == length && !tail.contains(&b'\n'),
+        };
+        (len == length.min(EVENT_LOG_TAIL_WINDOW)
+            || (EVENT_LOG_TAIL_WINDOW < len && len <= length && line_bounded))
             .then_some(Self { length, tail })
             .ok_or(CaptureError::InvalidTail { length })
     }
@@ -221,7 +225,7 @@ impl EventLogTail {
     /// only part of that line.
     pub fn final_line(&self) -> Option<&[u8]> {
         match self.tail.iter().rposition(|byte| *byte == b'\n') {
-            Some(newline) => Some(&self.tail[newline + 1..]),
+            Some(newline) => self.tail.get(newline + 1..),
             None => (self.tail.len() as u64 == self.length).then_some(&self.tail[..]),
         }
     }

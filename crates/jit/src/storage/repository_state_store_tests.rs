@@ -1293,6 +1293,34 @@ fn test_conformance_tail_capture_holds_length_and_window_on_both_backends() {
     }
 }
 
+/// The bytes a tail reads back to reach the final line's start count against
+/// the byte budget like any other captured bytes.
+#[test]
+fn test_conformance_tail_capture_charges_the_read_back_to_the_byte_budget_on_both_backends() {
+    let window = EVENT_LOG_TAIL_WINDOW as usize;
+    let log = [vec![b'h'; window], vec![b'\n'], vec![b'x'; window * 3]].concat();
+    let kept = window as u64 * 3 + 1;
+    for max_bytes in [kept, kept - 1] {
+        let (_worktree, sessions) = sessions_over(&[(VirtualPath::EVENTS, &log)]);
+        for (mut session, _) in sessions {
+            let mut spec = CaptureSpec::new([], CaptureBudget { max_bytes, ..budget() }).unwrap();
+            spec.discover_tail(VirtualPath::EVENTS).unwrap();
+
+            let result = session.capture(spec);
+
+            assert_eq!(
+                matches!(
+                    result,
+                    Err(RepositoryStateStoreError::Capture(
+                        CaptureError::ByteBudgetExceeded { actual, .. }
+                    )) if actual == kept
+                ),
+                max_bytes < kept
+            );
+        }
+    }
+}
+
 fn capture_listing_errors(
     children: &[(&str, &[u8])],
     budget: CaptureBudget,

@@ -4673,19 +4673,14 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(counter.1, 1);
     }
 
-    /// A log's tail reaches back to the start of an unterminated final line
-    /// longer than the window, in the same round, and no further.
+    /// The base reads the log as a tail in its one round, even when the
+    /// unterminated final line is longer than the tail window.
     #[test]
-    fn test_capture_mutation_base_reads_only_the_final_line_of_a_long_unterminated_log() {
-        use crate::repository_state::{RepositoryEntry, VirtualPath};
+    fn test_capture_mutation_base_reads_the_log_as_a_tail_whatever_its_final_line() {
+        use crate::repository_state::{ReadMode, VirtualPath};
 
-        let window = crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize;
-        let history = format!("{}\n", "h".repeat(2 * window));
-        let final_line = "x".repeat(2 * window);
-        for (log, kept) in [
-            (format!("{history}{}\n", "y".repeat(window)), window),
-            (format!("{history}{final_line}"), final_line.len() + 1),
-        ] {
+        let long = "x".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
+        for log in [format!("{long}\n"), format!("{{}}\n{long}")] {
             let (executor, _, mut counter) = counted_session();
             executor.storage().add_data_file("events.jsonl", &log);
 
@@ -4695,11 +4690,8 @@ description = \"Full Rust CI pipeline must pass.\"
                 .expect("a settled capture")
                 .image;
 
-            let RepositoryEntry::FileTail { tail, .. } = image.entry(&VirtualPath::EVENTS).unwrap()
-            else {
-                panic!("a mutation base reads the log as a tail");
-            };
-            assert_eq!(tail.tail(), &log.as_bytes()[log.len() - kept..]);
+            let mode = image.capture_spec().read_mode(&VirtualPath::EVENTS);
+            assert_eq!(mode, Some(ReadMode::Tail));
             assert_eq!(counter.1, 1);
         }
     }
