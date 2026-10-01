@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "cb318cccbb3b3fa2e4e1fe45547204747a63d39d",
+  "completed_at": "2026-10-01T19:59:27.490330520Z",
+  "duration_ms": 178674,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The delivered story and its 12 completed descendants leave an accurate, discoverable, and concise combined documentation contract.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "e590fa91-6164-4d62-bab2-a7ad5cbc42fb",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f1222714-e03b-4b93-9e4c-ae45a2c63124",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-01T19:56:28.815335971Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: the story is a level-3 container with 12 delivered direct task descendants. I inspected the 131 current-branch commits tagged for the story or those descendants individually with rename detection. Every included issue had tagged commits; no fallback attribution was needed.\n\nThe combined adopter documentation accurately describes redo-record publication, positioned event-log appends, recovery, generated record layout, and the revised profile/recover output. No retired terminology remains in the public documentation impact cone.\n\nFindings:\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The delivered story and its 12 completed descendants leave an accurate, discoverable, and concise combined documentation contract.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

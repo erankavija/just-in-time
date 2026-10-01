@@ -89,6 +89,11 @@
       "updated_at": "2026-10-01T19:55:56.811938831Z",
       "updated_by": "auto:executor"
     },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T19:59:27.938024118Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-10-01T19:56:27.925251784Z",
@@ -110,5 +115,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T19:56:27.925251784Z"
+  "updated_at": "2026-10-01T19:59:27.938024118Z"
 }
