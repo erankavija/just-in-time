@@ -66,6 +66,31 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/footprint.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "aa1f1ff8c2a7d664e15e85b908a0b07dcf18ed7874f7ea1149b109e6ab4e0624",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "../../active/f1dc843a-redo-mutations/bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1ff67454951e463917ee1d265eb265a73876bb3d0052810ee62d8d21afce6974",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "rust-balance.py",
+          "resolved_path": "dev/benchmarks/publication-cost-722878d4/rust-balance.py"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/benchmarks/publication-cost-722878d4/README.md"
     }
   ],
   "first_ready_at": "2026-10-01T20:07:18.790524283Z",
@@ -90,5 +115,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Publication cost evidence",
-  "updated_at": "2026-10-01T20:07:19.049107636Z"
+  "updated_at": "2026-10-01T20:15:01.671186909Z"
 }
