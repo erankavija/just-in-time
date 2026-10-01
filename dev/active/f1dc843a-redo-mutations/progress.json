@@ -1945,7 +1945,7 @@
       "criterion_subjects": "No issue criterion names it. b0ee2dd6 REQ-01/REQ-02 enumerate five constructs and four modules, none of which is this; epic REQ-05's enumeration does not name it either. @/inv/canonical-cutover names it generically as a superseded representation.",
       "raised_by": "worker-b0ee2dd6, flagged rather than deleted unasked — the correct call, since removing a reserved-path guard changes which worktree paths a mutation may target.",
       "bearing_on_wave_13": "ccea63de REQ-04 requires the storage-format page to carry no description of an external bootstrap control directory. The page and the code will then disagree about whether the name is reserved.",
-      "status": "open — lead to put it to the owner before wave 13's documentation work lands",
+      "status": "closed — b7c99dcb (verified session 8)",
       "renumbered_from": "SP-10 (collided with an earlier session's SP-10)"
     },
     {
@@ -2036,7 +2036,7 @@
       "source": "lead sweep after ec72359b",
       "subject": "\"repository transaction\" prose remains at commands/mod.rs:3194, storage/mod.rs:1, main.rs:2574 (outside e346d387 literal forms).",
       "owner": "e590fa91 checkpoint (superseded design retirement) — close before its gate",
-      "status": "open"
+      "status": "closed — e590fa91 b6b84dbbb"
     },
     {
       "id": "SP-30",
@@ -2168,5 +2168,38 @@
       "ec72359b": "sonnet, continuation of first dispatch on preserved WIP",
       "e346d387": "opus, fresh first dispatch, SP-27 forms assigned under REQ-01"
     }
+  },
+  "checkpoint_reconciliation_e590fa91": {
+    "session": 8,
+    "criteria": [
+      "REQ-01..REQ-06"
+    ],
+    "reconciled": [
+      {
+        "pitfall": "SP-29",
+        "subject_named_by": "REQ-03/REQ-04",
+        "resolution": "closed in checkpoint (b6b84dbbb): ~40 Rust prose sites, schema text, error variant rename"
+      },
+      {
+        "pitfall": "SP-19",
+        "subject_named_by": "REQ-01/REQ-04",
+        "resolution": "already closed by b7c99dcb (72afc1f23); verified no .jit-bootstrap reservation remains"
+      },
+      {
+        "pitfall": "journal benchmark residue (checkpoint worker)",
+        "subject_named_by": "REQ-04",
+        "resolution": "closed in checkpoint (27b5246e1): scripts/benchmark-transaction.sh retired and dev/TESTING.md citations removed; delivers 8b6a9e34 REQ-02 early"
+      },
+      {
+        "pitfall": "SP-30",
+        "subject_named_by": "none",
+        "resolution": "not named; completion report"
+      },
+      {
+        "pitfall": "SP-18/SP-20/SP-22/SP-23/SP-24/SP-07",
+        "subject_named_by": "none",
+        "resolution": "not named by e590fa91; completion report"
+      }
+    ]
   }
 }

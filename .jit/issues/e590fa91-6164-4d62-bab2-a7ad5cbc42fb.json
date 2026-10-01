@@ -51,6 +51,29 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../f1dc843a-redo-mutations/investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "evidence",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/e590fa91/checkpoint-evidence.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "evidence",
+      "label": null,
+      "path": "dev/active/e590fa91/phase-net.py"
     }
   ],
   "first_ready_at": "2026-10-01T19:27:40.600747356Z",
@@ -76,5 +99,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Superseded design retirement",
-  "updated_at": "2026-10-01T19:35:43.178438062Z"
+  "updated_at": "2026-10-01T19:53:11.590500203Z"
 }
