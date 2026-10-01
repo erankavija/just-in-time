@@ -268,10 +268,8 @@ there cannot describe the current build): a bounded count of integration-test ta
 a bounded total of unique active test-executable bytes. The third is derived from the measured
 nextest-plus-doctest suite duration, which `scripts/cargo-ci.sh` passes in as
 `--test-suite-ms`: the suite must finish under `MAX_TEST_SUITE_SECONDS`. All three
-constants are declared once, in the script's own header comment
-(`MAX_INTEGRATION_TARGETS`, `MAX_EXECUTABLE_BYTES`, `MAX_TEST_SUITE_SECONDS`); read them
-there rather than assuming any has changed. All three are derived from a measurement of
-this tree and a stated headroom rule in
+constants are declared once, in the script's header comment, and derived from a measurement
+of this tree and a stated headroom rule in
 [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md); see
 [dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
 for the measured margin this budget leaves on an idle and a contended host. "5. Inherent
@@ -279,18 +277,15 @@ Test Costs" below attributes what the measured suite duration is spent on.
 
 The measurement is taken over a target the `suite-build` step has already built and read
 into the page cache, so a fresh target directory and a warm one reach the same verdict and
-a duration failure is about the tree (jit:0708d692). Getting there took removing a hidden
-compilation from inside the clock: a nextest setup script selected its Cargo packages
-differently from the gate's build, which resolved a second feature-unification variant of
-the dependency graph and compiled it mid-suite. Anything the suite runs from inside the
-clock must therefore reuse the workspace build's resolution, which
-`scratch_build/build_profile_policy_tests.rs` asserts over the setup scripts
-`.config/nextest.toml` declares. What remains state-dependent is the suite's own per-target
-fixture construction, worth about 4 s on its first run in a target directory; see
+a duration failure is about the tree (jit:0708d692). Anything the suite runs inside the clock,
+including the setup scripts `.config/nextest.toml` declares, must reuse the workspace build's
+Cargo resolution, or it compiles a second feature-unification variant mid-suite;
+`scratch_build/build_profile_policy_tests.rs` asserts this. What remains state-dependent is
+the suite's own first-run fixture construction, whose margin the budgets README records; see
 [dev/benchmarks/cold-warm-verdict-0708d692/README.md](benchmarks/cold-warm-verdict-0708d692/README.md)
-for the cold and warm figures behind all of this. Note that re-measuring needs `--force`,
-since `jit gate evaluate` reuses a recorded verdict over unchanged declared inputs and
-`target/` is not one of them.
+for the cold and warm figures behind this paragraph. Re-measuring needs `--force`, since
+`jit gate evaluate` reuses a recorded verdict over unchanged declared inputs, `target/` not
+among them.
 
 A fourth budget — at most 10 GiB for the complete fresh validation target directory — is the
 acceptance threshold the benchmark protocol below validates against once per build-topology
@@ -323,11 +318,9 @@ harness that produces both.
   compiles once and exits with no later rebuild to amortize against — does not hold for the
   runs that dominate the repository's build cost. Every agent worktree run and every local
   re-check reruns the gate against a warm target directory, where one edited crate recompiles
-  instead of the workspace: 54.1 s against 25.3 s over the `clippy` and `suite-build` steps,
-  at no cost to a cold run. The derivation is under "Provenance" in
+  instead of the workspace, at no cost to a cold run. What it costs is disk, which the reclaim
+  path in the worktree dispatch protocol prunes. The measurements are under "Provenance" in
   [dev/benchmarks/rust-build-budgets/README.md](benchmarks/rust-build-budgets/README.md).
-  What it costs is disk — about 3.9 GB of incremental state per target directory, which the
-  reclaim path in the worktree dispatch protocol already prunes.
 - **Shared compiler cache** — when `sccache` is on `PATH`, `scripts/cargo-ci.sh` exports it as
   `RUSTC_WRAPPER` unless a wrapper is already set. Set `CARGO_CI_NO_SCCACHE=1` for a diagnostic
   run that must bypass the cache. Opting an existing target directory into a wrapper changes
@@ -388,12 +381,11 @@ test target or dependency feature:
 per-test duration, `warm_duration_ms`, for every test nextest ran in the default
 `cargo nextest run --workspace` invocation — 4,481 tests at revision `cb8d42c3`, cache
 state warm, one warmup run ahead of the measured run, `ceil(exec_time_seconds * 1000)`.
-Nothing in that profile is close to either enforced ceiling: the slowest single test,
-5,324 ms, sits well under the per-test bound in
-[`.config/nextest.toml`](../.config/nextest.toml), and the whole default run sits
-comfortably under `MAX_TEST_SUITE_SECONDS` — see
-[dev/benchmarks/suite-enforcement-4b7c06d0/README.md](benchmarks/suite-enforcement-4b7c06d0/README.md)
-for the exact measured margin. The tables below attribute cost, not risk: for every test whose
+It predates the redo-record cutover and is stale against the current suite: refresh it with
+`./scripts/profile-test-suite.sh` before adding a row below or changing a figure.
+Its slowest test sits well under the per-test bound in
+[`.config/nextest.toml`](../.config/nextest.toml); the budgets README above records the whole
+run's margin under `MAX_TEST_SUITE_SECONDS`. The tables below attribute cost, not risk: for every test whose
 measured cost is a direct consequence of the property it proves — a real subprocess, a
 real redo-record round trip through storage, real filesystem publication,
 genuine concurrency, or a property-based search over many generated cases — this names it,
@@ -463,7 +455,9 @@ Each of these spawns the compiled `jit` binary, once or several times in the sam
 report of the same drift), to pack, apply, validate, or repair a profile package on disk.
 `test_profile_pack_and_add_carry_a_package_at_the_model_limits` carries the packaging
 fixture at its model limits directly through the CLI; the rest of this table pays the same
-durable-publication machinery at smaller scale, often several times per test.
+durable-publication machinery at smaller scale, often several times per test. Publication
+cost at repository scale is measured by the redo-record harness [`bench.sh`](active/f1dc843a-redo-mutations/bench.sh);
+its committed run is [dev/benchmarks/publication-cost-722878d4/](benchmarks/publication-cost-722878d4/README.md).
 
 | Test | Warm (ms) |
 | --- | ---: |
@@ -515,7 +509,6 @@ repair correctness across every owned class of a real profile package.
 | `commands::init::tests::test_fresh_profile_init_publishes_complete_valid_repo_without_git` | 1,199 |
 | `commands::init::tests::test_reinit_profiled_over_existing_root_is_idempotent_unchanged` | 996 |
 | `commands::profile::tests::test_apply_workflow_profile_to_bare_repository_contributes_hierarchy_rules` | 909 |
-| `commands::profile::tests::test_profile_preparation_retries_when_final_proposed_closure_expands` | 892 |
 | `profile::package_archive::tests::test_pack_package_archive_stays_within_its_bounds_for_a_package_at_the_model_limits` | 529 |
 
 ### Genuine concurrency: real threads, timers, and watchers
@@ -581,7 +574,6 @@ the slowest of the group, which repeats a failing gate to exercise history compa
 | Test | Warm (ms) |
 | --- | ---: |
 | `commands::gate_check::tests::test_run_history_is_compacted_to_one_latest_run` | 1,848 |
-| `commands::gate_check::tests::test_check_gate_reexecutes_for_new_same_issue_run_but_not_unrelated_run` | 550 |
 | `commands::gate_check::tests::test_check_gate_run_history_keeps_only_latest_legacy_run` | 547 |
 | `commands::gate_check::tests::test_check_all_gates_respects_priority_order` | 541 |
 | `commands::gate_check::tests::test_check_all_gates_stable_sort_same_priority` | 537 |
