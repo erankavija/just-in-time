@@ -5,40 +5,44 @@
 This document gives a contributor a working mental model of the subsystem that
 turns a semantic mutation into durable repository bytes. It describes the code in
 `crates/jit/src/repository_state/` (the pure vocabulary and producers) and
-`crates/jit/src/storage/` (the session, kernel, journal, and recovery) as it
-exists in the tree. Read it before touching capture, planning, publication, or
-recovery.
+`crates/jit/src/storage/` (the session, the redo record, and its application) as
+it exists in the tree. Read it before touching capture, planning, publication, or
+recovery. The adopter-facing statement of the same mechanism is
+[Publication and Recovery](../../docs/reference/storage-format.md#publication-and-recovery).
 
 Repository data is plain git-versioned JSON with no external database
 (`@/charter/D-1`). Every semantic mutation derives its coupled materializations
-from one final repository view and publishes the resulting state recoverably
-(`@/inv/derived-state-coherence`).
+from one read of the repository and publishes through one synced redo record
+over the files it writes (`@/inv/derived-state-coherence`, `@/charter/D-17`).
 
 ---
 
 ## The pipeline in one sentence
 
-A command captures **one immutable repository view**, hands it to a **pure
-planning boundary** that derives an exact plan of file actions, and publishes that
-plan through **one recoverable publication mechanism**.
+A command captures **one immutable repository view** under the repository write
+lock, hands it to a **pure planning boundary** that derives an exact plan of file
+actions, and publishes that plan as **one redo record** that is synced, applied,
+and removed.
 
 ```mermaid
 flowchart LR
     A[Capture<br/>RepositoryImage] --> B[Plan<br/>MaterializationPlan]
-    B --> C[Publish<br/>FileTransactionKernel]
+    B --> C[Publish<br/>RedoRecord]
+    C --> D[Apply<br/>RedoApplier]
     C -. RetryableConflict .-> A
 ```
 
-The three stages are strictly separated:
+The stages are strictly separated:
 
 - **Capture and publish** perform filesystem I/O and live in `storage/`.
 - **Planning** is pure — it reads only the captured image and declared authority,
   performs no I/O, and imports no storage, command, validation, or profile
   modules (`repository_state/mod.rs` module contract).
 
-The arrow back from publish to capture is the conflict-retry edge: if the
-repository changed under the session between capture and apply, the store returns
-a typed `RetryableConflict` and the command re-captures.
+The arrow back from publish to capture is the conflict-retry edge: if a path the
+plan creates, writes, or removes changed since capture, the store returns a typed
+`RetryableConflict` before writing anything durable, and the command captures
+again in a fresh session.
 
 ### Layer map
 
@@ -48,10 +52,10 @@ flowchart TD
         MS["with_mutation_session / with_mutation_attempts<br/>capture_or_retry / classify_apply"]
     end
     subgraph store [storage/ &mdash; I/O]
-        SESS["RepositoryMutationSession<br/>(capture / apply)"]
-        KERN["FileTransactionKernel"]
-        JOUR["RepositoryTransactionJournal"]
-        REC["transaction_recovery"]
+        SESS["RepositoryMutationSession<br/>(open / capture / extend / apply)"]
+        REC["RedoRecord<br/>(commit = synced write)"]
+        APP["RedoApplier<br/>(apply, then remove record)"]
+        INIT["init_publish<br/>(absent data root)"]
     end
     subgraph pure [repository_state/ &mdash; pure]
         IMG["RepositoryImage"]
@@ -66,9 +70,10 @@ flowchart TD
     DERIVE --> PROD
     FIN --> PROD
     MS -->|apply plan| SESS
-    SESS --> KERN
-    KERN --> JOUR
-    KERN --> REC
+    SESS -->|open: leftover record| APP
+    SESS -->|apply: write set unchanged| REC
+    REC --> APP
+    SESS --> INIT
 ```
 
 ---
@@ -76,21 +81,32 @@ flowchart TD
 ## The captured repository view
 
 A `RepositoryImage` (`repository_state/image.rs`) is the single closed input to
-all planning. It is built by `RepositoryImage::close` from a `CaptureSpec`
-(`CaptureSpec::new`) bounded by a `CaptureBudget` (`max_listings`,
-`max_bytes`, `max_depth`), so capture cannot walk an unbounded tree. The image
-holds, per canonical path, a `RepositoryEntry` — `File` (with bytes, `FileMode`,
-and an `EntryIdentity`), `FileTail` (a path the spec reads as its length and
-bounded tail), `Directory`, or `Absent` — plus `DirectoryListing`s (child names) and
-pinned/linked-worktree evidence.
+all planning. `RepositoryImage::close` builds it from a `CaptureSpec` bounded by a
+`CaptureBudget` (`max_listings`, `max_bytes`, `max_depth`), so capture cannot walk
+an unbounded tree. The image holds, per canonical path, a `RepositoryEntry` —
+`File` (exact bytes and mode), `FileTail` (a path read as `ReadMode::Tail`),
+`Directory`, `Symlink` (never followed), `Unsupported`, or `Absent` — plus
+`DirectoryListing`s, which hold child names only, and pinned or linked-worktree
+evidence.
 
-A mutation captures in one round. What it reads first names what it reads
-next (the index names the issue files, the issues name their plan documents), so
-the session grows the image with `RepositoryMutationSession::extend`, which
-reads only the requests the image does not already hold; nothing is read twice,
-so no read is compared with an earlier one.
+A mutation reads the repository in one pass. What it reads first names what it
+reads next (the index names the issue files, the issues name the plan documents
+their transition rules read), so the session grows the image with
+`RepositoryMutationSession::extend`, which reads only the requests the image does
+not already hold. Nothing is read twice, so no read is compared with an earlier
+one. The command-layer entries are `capture_mutation_preflight` and
+`capture_mutation_base` over `capture_proposed_base_inner` (`commands/validate.rs`).
+A mutation captures only the plan documents its transition rules read;
+issue-linked documents and pinned or linked evidence are validation's reads
+(`@/issue/8454236c/decision/D-1`).
 
-Those three bound the one place a capture grows beyond what a caller declared:
+The event log is the one path a mutation reads as a tail: an `EventLogTail`
+(`EventLogTail::read_tail`) holds the log's exact length and its last bytes,
+reaching back to the start of the final line, so the read is bounded by that line
+and never by the log's history (`@/issue/c88822a5/decision/D-1`). Validation,
+which parses the log, reads it whole.
+
+The budgets bound the one place a capture grows beyond what a caller declared:
 expanding a complete listing names children nobody asked for, and `max_listings`
 bounds how many listings may be requested while `max_bytes` charges every listed
 child's name alongside the bytes read. `max_depth` bounds the shape of each
@@ -107,8 +123,8 @@ budget therefore documents what bounds its own declaration
 its declaration is the one that arrives from outside the repository).
 
 An `EntryIdentity` pairs a boundary-acquired no-follow object identity with the
-SHA-256 and byte size of the exact captured bytes. Identity is what lets a later
-apply prove the repository is byte-for-byte what planning saw.
+SHA-256 and byte size of the exact captured bytes; the write-scoped comparison at
+apply compares live entries with captured ones through it.
 
 Paths are addressed through `VirtualPath` over a `RepositoryLayout`, which
 classifies every target as `Data(...)` (data-root-relative, the `.jit` tree) or
@@ -125,9 +141,9 @@ filesystem (`materialize.rs` module contract).
 
 Planning converts semantic intent into a `MaterializationPlan`: an exact
 `RepositoryDelta` of normalized `RepositoryAction`s (`CreateDirectory`,
-`WriteFile`, `SetMode`, `DeleteFile`), and the captured image.
-Each action carries an `ExpectedPreimage` (`Absent`, `File`, `Directory`, …) so
-publication can verify the target against exactly what was captured.
+`WriteFile`, `SetMode`, `DeleteFile`, `AppendEvents`), and the captured image.
+Each action carries an `ExpectedPreimage` of its target as captured; apply refuses
+a plan whose preimages disagree with the session's image.
 
 ### One typed request enum, one shared tail
 
@@ -141,7 +157,8 @@ to enter planning:
 - `RepairDerivedState` — repair all declaration-owned derived state, including
   installed-profile targets.
 - `Initialize` — derive a fresh or missing-file repository scaffold.
-- `ApplyProfile` — derive one embedded profile application over an existing repo.
+- `ApplyProfileSelection` — derive one complete profile-selection application
+  over an existing repository.
 
 The match is deliberately closed: a caller cannot register a callback or select an
 individual producer family; adding a family means extending this function. Every
@@ -155,7 +172,7 @@ flowchart TD
     REQ -->|RenderConfiguredProjections| PR[derive_project_render]
     REQ -->|RepairDerivedState| RP[derive_repair]
     REQ -->|Initialize| IN[derive_initialization]
-    REQ -->|ApplyProfile| AP[derive_profile_application]
+    REQ -->|ApplyProfileSelection| AP[derive_profile_applications]
     SM --> TAIL
     PR --> TAIL
     RP --> TAIL
@@ -241,22 +258,23 @@ membership) are driven by the typed-to-byte finalizer in
 semantic `MutationIntent`s; the finalizer assigns identity and time and emits one
 exact plan.
 
-- `MutationIntent` is a closed enum of repository-owned mutations (`CreateIssue`,
-  `CreateIssueBatch`, `ClaimIssue`, `UpdateIssue`, `RepairIssueLifecycle`,
-  `EditGateRegistry`, `CreateGatePreset`, `DeleteIssue`, `RecordGateRun`,
-  `RecordEvent`). A new record class extends this enum.
+- `MutationIntent` is a closed enum of repository-owned mutations. A new record
+  class extends this enum.
 - `MutationContext` is created once per command operation, before its conflict
   retry loop. It holds an `IdAuthority` and a `MutationClock`. Both the identity
   seed and the single mutation timestamp are sampled lazily and once — the seed on
   the first identifier allocation, the timestamp on the first transition — so a
-  no-op mutation samples neither, and a retry after a re-capture reuses identical
-  record identities and times.
+  no-op mutation samples neither, and a retry reuses identical record identities
+  and times.
 - `finalize` (built on `finalize_delta`) allocates identifiers in a frozen order —
   new issue ids first, gate-run/record ids next, event ids last after canonical
-  event ordering — stamps the one timestamp on every transition, composes the exact
-  `events.jsonl` append (`@/inv/event-log`), and derives `index.json` membership
-  from the captured preimage. `finalize_audit_append` reuses the same torn-tail
-  authority for init/profile deltas that carry their own asset actions.
+  event ordering — stamps the one timestamp on every transition, emits the new
+  event lines as one `AppendEvents` action at the captured log length
+  (`@/inv/event-log`), and derives `index.json` membership from the captured
+  preimage. The captured tail is the finalizer's torn-tail evidence: it refuses to
+  append after an uncertified torn final line. `finalize_audit_append` reuses the
+  same torn-tail authority for init/profile deltas that carry their own asset
+  actions.
 
 The finalizer serializes every record canonically (`serialize_issue`,
 `serialize_event`, `serialize_gate_run`, `fresh_index_bytes`), so equivalent plans
@@ -273,161 +291,112 @@ drives its retry through these combinators rather than a hand-copied loop:
   open and release a preflight session, take a claims guard, and run a subprocess
   between attempts without inverting lock order.
 - `with_mutation_session` — the convenience for pure single-session sites: open one
-  fresh recovered session per attempt, hand it to the closure, and apply the
-  returned plan.
+  fresh session per attempt, hand it to the closure, and apply the returned plan.
 - `classify_apply` / `capture_or_retry` — the single interpreters of a
   `RetryableConflict` on apply and on capture, folding it into `AttemptOutcome` /
   `SessionStep` retry signals.
 
 ---
 
-## Capture and apply: the session
+## The session: open, capture, apply
 
 A `RepositoryStateStore` opens a `RepositoryMutationSession`
 (`storage/repository_state_store.rs`). The session is the I/O boundary the pure
 plan is published through:
 
-- `open_mutation_session` runs transaction recovery to convergence, then
-  re-discovers root capabilities (absent-root recovery may have published the data
-  root; prepared-root recovery may have removed it) and pins the kernel to fresh,
-  identity-bound directory handles.
-- `capture` revalidates the layout capabilities and returns a bounded
+- `open_mutation_session` takes the bootstrap locks, opens identity-bound root
+  capabilities, and reads a leftover redo record under the data root's scratch
+  directory (`tmp/redo.record`). With the repository write lock and the event-log
+  lock held, it applies that record before the session serves any capture. A
+  record that does not parse is refused with `UnreadableRedoRecord` over an
+  untouched repository. The repository write lock stays held for the session.
+- `capture` and `extend` revalidate the root capabilities and return the bounded
   `RepositoryImage`.
-- `apply` revalidates that the plan's image is the session's captured image, that
-  the delta is fully captured, then re-captures the read set under the held guard.
-  If the fresh capture differs from the plan's image it returns
-  `RetryableConflict { path }` naming the first divergence — nothing durable is
-  written. Otherwise it hands the delta to the kernel and returns a
-  `RepositoryApplyOutcome`.
+- `apply` checks that the plan's image is the session's captured image and that
+  every action's expected preimage matches it, then revalidates the root
+  capabilities. It derives the redo record from the delta (`redo_record_for`) and
+  runs `ensure_write_set_unchanged`: every path the record makes a directory at,
+  puts, or deletes is read live and compared with its captured entry, and the
+  event log is compared as its length and tail. A path the mutation read but does
+  not write is left out of the comparison. The first difference returns
+  `RetryableConflict { path }`, and nothing durable has been written. Otherwise
+  the record is committed and applied.
 
 ```mermaid
 sequenceDiagram
     participant C as command
     participant S as MutationSession
     participant P as repository_state (pure)
-    participant K as FileTransactionKernel
-    C->>S: open_mutation_session (recover, then pin roots)
-    C->>S: capture(spec)
+    participant R as RedoRecord / RedoApplier
+    C->>S: open_mutation_session
+    S->>R: apply leftover record, if any
+    C->>S: capture(spec) / extend(image, spec)
     S-->>C: RepositoryImage
     C->>P: derive_materialization / finalize
     P-->>C: MaterializationPlan (image + delta)
     C->>S: apply(plan)
-    S->>S: revalidate + re-capture read set
-    alt image unchanged
-        S->>K: execute_repository_delta(delta)
-        K-->>S: FileTransactionOutcome
+    S->>S: redo_record_for + ensure_write_set_unchanged
+    alt write set unchanged
+        S->>R: commit (synced write)
+        S->>R: apply, then remove record
         S-->>C: RepositoryApplyOutcome
-    else changed under session
+    else changed since capture
         S-->>C: RetryableConflict(path)
     end
 ```
 
 ---
 
-## The file-transaction kernel and journal
+## The redo record
 
-`FileTransactionKernel` (`storage/file_transaction.rs`) is capability-confined:
-it is rooted at already-open worktree and data-root directory handles and never
-consults an ambient path after construction. `execute_repository_delta` publishes
-one delta durably.
+A `RedoRecord` (`storage/redo_record.rs`) is one mutation's file changes: the
+directories it makes, the complete new bytes and mode of every file it puts, the
+paths it deletes, and one event append (bytes at the offset the capture read as
+the log's length). A mode change is a put of the captured bytes under the new
+mode. Operation paths are pairwise disjoint — no two operations name one path and
+none is an ancestor of another, the event append's implicit target included —
+checked identically by `RedoRecord::new` and `RedoRecord::parse`, so only a
+directory no other operation lies beneath is carried as a make-directory.
 
-### Journal, barriers, and decisions
+`RedoRecord::commit` writes the record in place under the scratch directory,
+syncs it and the directory, and refuses an occupied record path. The synced write
+is the mutation's commit point: before it the repository is unchanged; after it
+the record is the mutation.
 
-The durable wire format is a `RepositoryTransactionJournal`
-(`storage/transaction_journal.rs`), versioned and owner/layout-digest stamped.
-Each `RepositoryJournalAction` records its path, owner, `ExpectedPreimage`,
-`RepositoryFinalIdentity`, and its staging or backup control names. It carries no
-durable per-action progress state: recovery uses the recorded preimage and final
-identity to determine whether an action is still at its original endpoint, has
-been published, or needs to be restored. The transaction-wide
-`TransactionDecision` records the prepared phase and, after publication or
-reversal, the single terminal `Committed` or `RolledBack` decision.
+`RedoApplier` (`storage/redo_apply.rs`) applies a record in one forward pass:
 
-The kernel uses one discoverable initial record, one complete `Prepared` record
-before live mutation, and one terminal decision. The initial record is published
-after transaction control exists and before staging, so it makes the transaction
-discoverable with every action's preimage, planned final identity, and control
-names. When an absent data root needs a stage, its identity is recorded before
-payload staging; that root identity is recovery authority, not action progress.
+1. Make each directory, tolerating one already there.
+2. Put each file: write a synced `.tmp` stage beside the target, rename it into
+   place, and sync the parent (`@/inv/atomic-writes`).
+3. Delete each path, tolerating its absence.
+4. Write the event append at its offset (seek, write, truncate to offset plus
+   length, sync); positioned writing rather than append mode makes a repeated
+   write land in the same place.
+5. Remove the record.
 
-The protocol then proceeds as follows:
+Every step converges when repeated, so re-applying a record after an interruption
+at any point reaches the same state. The same pass serves a session's own apply
+and a session open over a leftover record. `MemoryRedoApplier` steps the same
+operations over the in-memory backend.
 
-- **Prepare** (`prepare_repository_actions`) — stage every action's content and,
-  for a replace or delete, copy the live target into a verified rollback backup.
-  Staging and backup are routed to the authority colocated with the target's
-  filesystem. Each distinct staging or backup directory is synchronized once at
-  the preparation barrier. The journal is then rewritten as one complete
-  `Prepared` record, with the identities of the staged objects, and synchronized
-  before any live mutation begins.
-- **Publish** (`publish_repository_actions`) — re-verify each target against its
-  recorded preimage, rebind the held capability to the live root immediately before
-  each irreversible mutation, and rename each staged object into place. The kernel
-  collects the distinct live parent directories changed by the phase and
-  synchronizes each once before the terminal decision. For an absent data root, it
-  also verifies the staged identities and atomically publishes the root before that
-  decision.
-- **Commit or roll back** — after forward publication and its barriers succeed,
-  write the terminal `Committed` decision. If publication fails, reverse actions
-  from their recorded identities and preimages. Once every restoration is verified,
-  write the terminal `RolledBack` decision; the marker is retained while only
-  transaction-control cleanup remains.
+### Absent data root
 
-File replacement uses the temp-file-plus-atomic-rename pattern, and new-file
-publication uses verified staging plus atomic no-replace publication
-(`rename_noreplace_cap`), so an occupied destination is never overwritten
-(`@/inv/atomic-writes`).
+The record's home is inside the data root, so a delta that creates an absent root
+publishes through `storage/init_publish.rs` instead: the new root is written into
+a synced sibling stage directory and published by a no-replace rename that refuses
+an occupied destination. Worktree targets of the same delta travel as a redo
+record committed inside the stage, so the rename carries the record into the
+published root and the next session open completes it if the process stops
+first.
 
-### Total journal-action extraction
+### Interruption seam
 
-Publication reads a journal action's staging and backup control-names through
-total extractors — `create_directory_stage_name`, `write_file_control_names`,
-`set_mode_control_names`, `delete_file_backup_name`, and
-`set_mode_final_file_identity`. A journal action whose kind does not match the
-semantic action at its index aborts with a typed
-`FileTransactionError::JournalActionMismatch` routed to control-only teardown,
-rather than panicking mid-publication. The publication path contains no
-`unreachable!`.
-
-### Absent-root staged publication
-
-When the selected data root does not yet exist and the delta carries a `Data`
-action, the kernel stages the whole `.jit` tree beside its parent and publishes it
-with a single atomic no-replace rename, after re-verifying every staged action
-against its recorded final identity while the stage is still mutable. A
-worktree-only delta over an absent root commits its worktree actions without
-materializing an empty `.jit`, keeping the JSON-file backend aligned with the
-in-memory backend, which marks the data root present only when a `Data` action
-lands.
-
-### Recovery
-
-Control lives at `ExternalBootstrap` (worktree `.jit-bootstrap/transactions`,
-used while the data root is absent) or `InternalRepository` (`tmp/transactions`
-under the data root). On session open, `recover_location` lists pending
-transaction ids and dispatches each to `recover_repository_transaction`. A
-partial control with no durable journal proves that live mutation was never
-reached and is removed. A `Prepared` journal is recovered by comparing each
-target with its recorded final identity and expected preimage, then restoring
-only what identity checks show was published. That reversal is idempotent, so a
-crash during rollback resumes from the same complete `Prepared` record rather
-than needing per-action journal updates.
-
-Rollback verifies each restoration against its recorded preimage, verifies the
-staged-root cleanup, and only then writes `RolledBack`. If recovery is interrupted
-after that terminal marker, the marker means that restoration is already verified
-and only residue cleanup remains; a later session performs the limited terminal-
-cleanup checks (including applicable data-root checks and owned-backup removal),
-skipping Worktree and absent-root Data preimage checks, without replaying actions.
-A `Committed` journal instead verifies its final identities and converges forward
-through cleanup. Recovery also skips a worktree-side companion (owned by internal
-recovery and the orphan sweep) and a foreign-owner external journal (another data
-root's residue under the shared bootstrap namespace).
-
-Every durability boundary and action edge is a stable `FailurePoint`
-(`storage/transaction_recovery.rs`), and a `TransactionFailureInjector` lets tests
-interrupt or race the kernel at each one; the production injector proceeds at every
-boundary. Recovery convergence before capture, plus the identity-bound re-open, is
-what makes the whole subsystem crash-safe rather than merely atomic per write.
+Tests interrupt a session through `MutationInterruptionInjector`
+(`storage/mutation_interruption.rs`), whose `MutationPoint`s are `SessionOpen`,
+`BeforeCommitCheck`, `BeforeRootPublication`, and `Redo(RedoPoint)`. `RedoPoint`
+names each step of a record's application, and both backends step the same points
+in the same order, so `storage/redo_conformance.rs` proves the interruption matrix
+once against both. The production injectors proceed at every point.
 
 ---
 
@@ -438,6 +407,7 @@ what makes the whole subsystem crash-safe rather than merely atomic per write.
 - The pure producers and projections: `repository_state/materialize.rs`,
   `repository_state/projection.rs`, `repository_state/rules_document.rs`.
 - The typed-to-byte record finalizer: `repository_state/mutation.rs`.
-- The session, capture, and apply: `storage/repository_state_store.rs`.
-- Durable publication, journal, and recovery: `storage/file_transaction.rs`,
-  `storage/transaction_journal.rs`, `storage/transaction_recovery.rs`.
+- The session, capture, and write-scoped comparison:
+  `storage/repository_state_store.rs`.
+- The redo record and its application: `storage/redo_record.rs`,
+  `storage/redo_apply.rs`; absent-root publication: `storage/init_publish.rs`.

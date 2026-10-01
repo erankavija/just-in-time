@@ -196,9 +196,10 @@ Phase 3: Orchestrator & External Integrations
 - Graph export (dot, mermaid)
 - Event queries and tail commands
 - **Storage abstraction**: trait-based backends behind `IssueStore`, with
-  `JsonFileStorage` and an in-memory implementation. Durable publication and
-  crash recovery run through the repository-state/materialization subsystem
-  documented in [repository-state-materialization.md](repository-state-materialization.md).
+  `JsonFileStorage` and an in-memory implementation. Each mutation publishes
+  through one synced redo record over the files it writes, and a session opening
+  over a leftover record applies it (`@/charter/D-17`); see
+  [repository-state-materialization.md](repository-state-materialization.md).
 - Bulk operations for batch updates
 - Automation integration: read CI artifacts to auto-pass gates
 - Pull-based agent mode (polling alternative)
