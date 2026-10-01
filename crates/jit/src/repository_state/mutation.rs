@@ -1809,27 +1809,33 @@ mod tests {
         );
     }
 
+    /// An image holding the event log as `tail`.
+    fn tail_image(tail: crate::repository_state::EventLogTail) -> RepositoryImage {
+        let mut spec = CaptureSpec::new([], budget()).unwrap();
+        spec.discover_tail(VirtualPath::EVENTS).unwrap();
+        let mode = FileMode::Regular;
+        let entries = BTreeMap::from([(
+            VirtualPath::EVENTS,
+            RepositoryEntry::FileTail { tail, mode },
+        )]);
+        RepositoryImage::close(
+            layout(),
+            spec,
+            entries,
+            BTreeMap::new(),
+            BTreeMap::new(),
+            BTreeMap::new(),
+        )
+        .unwrap()
+    }
+
     /// An append over a log read as its tail lands at the log's length and
     /// expects that tail, with no whole-log digest behind it.
     #[test]
     fn test_event_append_over_a_tail_read_offsets_at_its_length_and_expects_the_tail() {
         let log = b"{}\n".repeat(2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize);
         let tail = crate::repository_state::EventLogTail::of_bytes(&log);
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
-        let entry = RepositoryEntry::FileTail {
-            tail: tail.clone(),
-            mode: FileMode::Regular,
-        };
-        let image = RepositoryImage::close(
-            layout(),
-            spec,
-            BTreeMap::from([(VirtualPath::EVENTS, entry)]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = tail_image(tail.clone());
 
         let action = finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())])
             .unwrap()
@@ -1863,21 +1869,7 @@ mod tests {
     #[test]
     fn test_event_append_refuses_a_tail_that_does_not_hold_the_final_line() {
         let log = vec![b'x'; 2 * crate::repository_state::EVENT_LOG_TAIL_WINDOW as usize];
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_tail(VirtualPath::EVENTS).unwrap();
-        let entry = RepositoryEntry::FileTail {
-            tail: crate::repository_state::EventLogTail::of_bytes(&log),
-            mode: FileMode::Regular,
-        };
-        let image = RepositoryImage::close(
-            layout(),
-            spec,
-            BTreeMap::from([(VirtualPath::EVENTS, entry)]),
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap();
+        let image = tail_image(crate::repository_state::EventLogTail::of_bytes(&log));
 
         assert!(matches!(
             finalize_audit_append(&image, &ctx(), vec![(2, profile_lifecycle_marker())]),

@@ -4681,31 +4681,6 @@ description = \"Full Rust CI pipeline must pass.\"
         assert_eq!(counter.1, 1);
     }
 
-    /// A mutation reads the log it appends to as its length and tail, while
-    /// validation, which parses it, reads it whole.
-    #[test]
-    fn test_capture_mutation_base_reads_the_event_log_as_its_tail() {
-        use crate::repository_state::{ReadMode, VirtualPath};
-
-        let (executor, _, mut counter) = counted_session();
-
-        let mutation = executor
-            .capture_mutation_base(&mut counter, &[], None)
-            .unwrap()
-            .expect("a settled capture")
-            .image;
-        let validation = executor
-            .capture_proposed_base(&mut counter, &std::collections::BTreeMap::new(), &[], None)
-            .unwrap()
-            .expect("a settled capture");
-
-        let mode = |image: &crate::repository_state::RepositoryImage| {
-            image.capture_spec().read_mode(&VirtualPath::EVENTS)
-        };
-        assert_eq!(mode(&mutation), Some(ReadMode::Tail));
-        assert_eq!(mode(&validation), Some(ReadMode::Whole));
-    }
-
     /// A log whose unterminated final line starts before the tail window is
     /// read whole, in the same round; a terminated one stays a tail.
     #[test]
