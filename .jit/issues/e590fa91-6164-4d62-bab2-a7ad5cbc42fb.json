@@ -9,7 +9,49 @@
     "be13da79-f8df-45e2-8421-c99515470712"
   ],
   "description": "The phased capture, the listing fingerprints, the mutation document closure, the plan hash, the transaction fields in command output, and the whole-file event-log rewrite are gone, with every declaration and document that named the old design restated.\n\n## Background\n\nThe governing decision names ten constructs that go. Five of them — the rollback kernel, transaction backups, the staging directory, reverse actions, and worktree companions — leave with the kernel in the preceding phase. The five that remain are the apply-time revalidation of the whole read set, the plan hash over captured entries, the phased capture, the listing fingerprints, and the mutation document closure. Five of the ten name no construct under the name the criterion uses, so the check runs over a construct map rather than over a name search, and it runs here because only now is the whole set gone.\n\nTwo costs scaled with project history, and both fall here. Capture read and hashed the repository across six rounds; it becomes one round in the attempt and one in the preflight. The event log was rewritten whole on every mutation; the finalizer now emits the change as an offset with its bytes.\n\nThis is also where the repository's own declarations stop describing the old design. The invariant statements on atomic writes and derived-state coherence hold until the positioned append and the single-pass capture land. The contributor-facing architecture note and the Rust prose describing the retired machinery become false at the same moment, and the generated references follow their sources.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the ten constructs the governing decision names is absent from the workspace, checked against the construct map in the planning investigation rather than by a name search, and the completion evidence records the check construct by construct.\n- [hard] REQ-02: Creating an absent data root is the one publication path beside the redo record, named as an exception in a source guard that fails when a third appears.\n- [hard] REQ-03: No declaration, generated projection, command output, command schema, or generated bridge definition in the repository names a retired mechanism.\n- [hard] REQ-04: The contributor-facing material and the Rust prose describe one mechanism, and a reader following the architecture note's reading order reaches files that exist.\n- [hard] REQ-05: The workspace builds with no warnings, the suite passes with no test held out of the default run, and the integration-test target count is within its budget.\n- [hard] REQ-06: The phase's net effect on the workspace's Rust sources removes more lines than it adds, measured over its delivered children.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "gates_required": [
     "cargo-ci",
     "doc-review",
@@ -32,5 +74,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Superseded design retirement",
-  "updated_at": "2026-09-20T01:05:37.007130180Z"
+  "updated_at": "2026-10-01T19:20:24.174821983Z"
 }

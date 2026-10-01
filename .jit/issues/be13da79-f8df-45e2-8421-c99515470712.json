@@ -10,7 +10,49 @@
     "ec72359b-67dd-4dcd-8639-74b751b1cdf9"
   ],
   "description": "The materialization architecture note describes record publication in place of the sections describing the kernel, its journal, and its recovery.\n\n## Background\n\nThe note is the contributor-facing description of repository-state materialization. It is accurate today and obsolete the moment the mechanism changes: it names the kernel, the journal, and the recovery module in its layer map and its diagrams, describes the two-phase capture specification and its budgets, describes the expected-preimage check and the plan hash, describes the mutation-session contract down to composing the exact event-log content, and carries a session-open recovery section with an apply-time re-capture and a sequence diagram. Its closing pointer sends a new contributor to three files that will not exist.\n\nThe note is in the repository's permanent documentation set, so it is maintained. The archived copies under the archive root are pinned.\n\n## Success Criteria\n\n- [hard] REQ-01: The layer map, the pipeline description, and the diagrams name the redo record and its application at session open.\n- [hard] REQ-02: The capture description states one read pass with its budgets, and names no capture phase or overlap-stability check.\n- [hard] REQ-03: The commit description states the write-scoped comparison, the synced record, the apply order, and idempotent re-application.\n- [hard] REQ-04: The closing reading order points at files that exist after the change.\n- [hard] REQ-05: The pure-producer and repair-derivation sections are preserved where they remain accurate.\n- [hard] REQ-06: The core-system-design note and the architecture-pitfalls study state the same mechanism.\n\n## Notes\n\nArchived work products are pinned to the revision that produced them and stay as they are.\n",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "536101c8db28404278a0774e342913f5b5161beb21fc16782284869504d8bf2f",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "648682bb1169bfe1aeaa2aadf9cb9a4a2418f2126d24d8c5d0e79dbe78a0bbd7",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "bench.sh",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/bench.sh"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "8d89e0afdcdbb8691ae19d42ad41d4960c00ae06625f03e16ef09425b4056898",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bc12c1ce5081462dfa8ee61f15b493221b3acb9663bf9e4f413a4140e3e518ed",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "intake.md",
+          "resolved_path": "dev/active/f1dc843a-redo-mutations/intake.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f1dc843a-redo-mutations/plan.md"
+    }
+  ],
   "first_ready_at": "2026-10-01T19:20:16.555326223Z",
   "gates_required": [
     "doc-review",
@@ -31,5 +73,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-10-01T19:20:16.826156879Z"
+  "updated_at": "2026-10-01T19:20:24.065893664Z"
 }
