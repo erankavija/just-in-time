@@ -59,6 +59,11 @@
     "docs-mechanical"
   ],
   "gates_status": {
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-01T19:27:29.248702221Z",
+      "updated_by": "auto:executor"
+    },
     "docs-mechanical": {
       "status": "passed",
       "updated_at": "2026-10-01T19:25:57.047832623Z",
@@ -79,5 +84,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Architecture materialization note rewrite",
-  "updated_at": "2026-10-01T19:25:57.047832623Z"
+  "updated_at": "2026-10-01T19:27:29.248702221Z"
 }
