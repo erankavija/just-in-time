@@ -33,33 +33,24 @@ fn test_advisory_error_classification_only_accepts_permission_denied_io() {
         .all(|error| !is_advisory_permission_denied(error)));
 }
 
-#[cfg(unix)]
 /// A listing is captured evidence the mutation reads and never writes, so its
 /// movement leaves the mutation admissible — the cost `@/charter/D-17` names,
 /// stated here for the one kind of evidence the record cannot carry at all.
 #[test]
-fn test_json_apply_admits_an_advisory_listing_that_became_readable() {
-    use std::os::unix::fs::PermissionsExt as _;
-
+fn test_json_apply_admits_a_listing_that_changed_since_capture() {
     let worktree = TempDir::new().unwrap();
     let data = worktree.path().join(".jit");
-    let secret = worktree.path().join("notes/secret");
+    let notes = worktree.path().join("notes");
     std::fs::create_dir(&data).unwrap();
-    std::fs::create_dir_all(&secret).unwrap();
-    std::fs::write(secret.join("citation.md"), b"citation").unwrap();
-    std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o000)).unwrap();
+    std::fs::create_dir(&notes).unwrap();
+    std::fs::write(notes.join("first.md"), b"first").unwrap();
 
     let layout = discover_repository_layout(worktree.path(), &data).unwrap();
     let storage = JsonFileStorage::new(&data);
-    let secret_path = VirtualPath::worktree("notes/secret").unwrap();
+    let notes_path = VirtualPath::worktree("notes").unwrap();
     let published_path = VirtualPath::worktree("published.txt").unwrap();
-    let spec = || {
-        let mut spec = CaptureSpec::new([], budget()).unwrap();
-        spec.discover_advisory_paths([secret_path.clone()]).unwrap();
-        spec.discover_paths([published_path.clone()]).unwrap();
-        spec.discover_listing(secret_path.clone()).unwrap();
-        spec
-    };
+    let mut spec = CaptureSpec::new([published_path.clone()], budget()).unwrap();
+    spec.discover_listing(notes_path.clone()).unwrap();
     let delta = RepositoryDelta::new(
         &layout,
         vec![RepositoryAction::write_file(
@@ -73,13 +64,10 @@ fn test_json_apply_admits_an_advisory_listing_that_became_readable() {
     .unwrap();
 
     let mut session = storage.open_mutation_session(layout).unwrap();
-    let unreadable = session.capture(spec()).unwrap();
-    assert!(unreadable.directory_listings()[&secret_path]
-        .names()
-        .is_empty());
-    std::fs::set_permissions(&secret, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let captured = session.capture(spec).unwrap();
+    std::fs::write(notes.join("second.md"), b"second").unwrap();
 
-    session.apply(&test_plan(&unreadable, &delta)).unwrap();
+    session.apply(&test_plan(&captured, &delta)).unwrap();
 
     assert_eq!(
         std::fs::read(worktree.path().join("published.txt")).unwrap(),

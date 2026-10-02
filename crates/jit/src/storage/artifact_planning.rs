@@ -3,7 +3,7 @@
 use crate::domain::artifact_classifier::{
     artifact_archive_destination, classification_facts_from_evidence, contains_path,
     resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
-    ArtifactClassificationPolicy, CitationScanEvidence, EmbeddedArtifactOwner,
+    ArtifactClassificationPolicy, CitationScanEvidence, CitationScanner, EmbeddedArtifactOwner,
     ResolvedContainerDestination,
 };
 use crate::domain::artifact_discovery::{
@@ -20,6 +20,7 @@ use crate::storage::repository_state_store::{
 use crate::storage::{validate_repo_relative_path, IssueStore, PathReadError};
 use anyhow::{anyhow, Result};
 use cap_std::fs::Dir;
+use std::collections::BTreeSet;
 use std::io::{ErrorKind, Read};
 use std::path::Path;
 
@@ -129,7 +130,13 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
         evidence.insert(destination_root.to_string(), destination);
     }
     Ok(ArtifactClassificationFacts {
-        citations: collect_citation_scan_evidence(storage, &policy.citation_scan_roots)?,
+        citations: collect_citation_scan_evidence(
+            storage,
+            &policy.citation_scan_roots,
+            artifacts
+                .iter()
+                .map(|artifact| artifact.source().to_string()),
+        )?,
         ..classification_facts_from_evidence(
             target,
             destination_root,
@@ -141,13 +148,14 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
     })
 }
 
-/// Read the text of every file the declared citation scan roots reach.
+/// Scan every file the declared citation scan roots reach for citations of
+/// `sources`, holding one file's bytes at a time.
 ///
 /// A declared root that is absent, a path component that is a symbolic link, a
 /// permission-denied subtree, and a file whose bytes are not valid UTF-8 are
 /// skipped. Other I/O failures stay hard errors. A root naming one file
 /// contributes that file; a root naming a directory contributes every readable
-/// file beneath it.
+/// file beneath it; a root nested in another declared root is walked once.
 ///
 /// The walk is [`inspect_artifact_evidence`]'s recursive listing, which opens
 /// every component with the no-follow directory handles the rest of the planner
@@ -156,56 +164,38 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
 pub(crate) fn collect_citation_scan_evidence<S: IssueStore>(
     storage: &S,
     roots: &[String],
+    sources: impl IntoIterator<Item = String>,
 ) -> Result<CitationScanEvidence, PathReadError> {
-    let files = roots
-        .iter()
-        .map(|root| normalize_artifact_path(root))
-        .filter(|root| !root.is_empty())
-        .map(|root| {
-            match inspect_artifact_evidence_with_policy(
-                storage,
-                &root,
-                ArtifactListingScope::RecursiveFiles,
-                PermissionDeniedPolicy::Skip,
-            )? {
-                ArtifactEvidence::File(bytes) => Ok(vec![(root, bytes)]),
-                ArtifactEvidence::Directory { entries, .. } => entries
-                    .into_iter()
-                    .map(|entry| read_scanned_file(storage, entry))
-                    .filter_map(Result::transpose)
-                    .collect(),
-                _ => Ok(Vec::new()),
-            }
-        })
-        .collect::<Result<Vec<_>, PathReadError>>()?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
-    Ok(citation_scan_evidence_from_files(roots, files))
-}
-
-/// Derive advisory citation text from regular files reached by declared roots.
-///
-/// Both the ordinary preview boundary and the publishing archive boundary
-/// use this pure rule, keeping root normalization, containment, and UTF-8
-/// handling identical while their respective capture mechanisms establish the
-/// file-byte evidence.
-pub(crate) fn citation_scan_evidence_from_files(
-    roots: &[String],
-    files: impl IntoIterator<Item = (String, Vec<u8>)>,
-) -> CitationScanEvidence {
+    let scanner = CitationScanner::new(sources).map_err(other)?;
     let roots = roots
         .iter()
         .map(|root| normalize_artifact_path(root))
         .filter(|root| !root.is_empty())
-        .filter(|root| validate_repo_relative_path(root).is_ok())
-        .collect::<Vec<_>>();
-    files
-        .into_iter()
-        .map(|(path, bytes)| (normalize_artifact_path(&path), bytes))
-        .filter(|(path, _)| roots.iter().any(|root| contains_path(root, path)))
-        .filter_map(|(path, bytes)| String::from_utf8(bytes).ok().map(|text| (path, text)))
-        .collect()
+        .collect::<BTreeSet<_>>();
+    let mut evidence = CitationScanEvidence::new();
+    for root in roots.iter().filter(|root| {
+        !roots
+            .iter()
+            .any(|outer| outer != *root && contains_path(outer, root))
+    }) {
+        match inspect_artifact_evidence_with_policy(
+            storage,
+            root,
+            ArtifactListingScope::RecursiveFiles,
+            PermissionDeniedPolicy::Skip,
+        )? {
+            ArtifactEvidence::File(bytes) => scanner.scan(root, &bytes, &mut evidence),
+            ArtifactEvidence::Directory { entries, .. } => {
+                for entry in entries {
+                    if let Some((path, bytes)) = read_scanned_file(storage, entry)? {
+                        scanner.scan(&path, &bytes, &mut evidence);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(evidence)
 }
 
 /// Read one listed scan path, skipping everything that is not a regular file.

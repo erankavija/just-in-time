@@ -47,7 +47,7 @@ pub mod worktree_paths;
 
 // Re-export for convenience
 pub use artifact_discovery::{discover_archive_artifacts, ArtifactDiscoveryError};
-pub(crate) use artifact_planning::citation_scan_evidence_from_files;
+pub(crate) use artifact_planning::collect_citation_scan_evidence;
 pub use artifact_planning::{collect_artifact_classification_facts, resolve_container_destination};
 pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};

@@ -6,7 +6,7 @@ use crate::domain::artifact_classifier::{
     artifact_archive_destination, artifact_destination_root, classification_facts_from_evidence,
     classify_artifacts, preferred_container_destination_root,
     resolve_container_destination as derive_container_destination, ArtifactClassificationInventory,
-    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts, CitationScanEvidence,
+    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
 };
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
@@ -458,7 +458,6 @@ fn capture_directory_tree(
     session: &mut dyn RepositoryMutationSession,
     image: crate::repository_state::RepositoryImage,
     root: &str,
-    advisory: bool,
 ) -> Result<Option<crate::repository_state::RepositoryImage>> {
     use crate::repository_state::RepositoryEntry;
     let root_path = image_path(image.layout(), root)?;
@@ -481,10 +480,7 @@ fn capture_directory_tree(
             }
         }
         paths.retain(|path| !spec.contains_path(path));
-        match advisory {
-            true => spec.discover_advisory_paths(paths)?,
-            false => spec.discover_paths(paths)?,
-        }
+        spec.discover_paths(paths)?;
         Ok(spec.discover_listings(
             image
                 .entries()
@@ -495,53 +491,6 @@ fn capture_directory_tree(
                 .map(|(path, _)| path.clone()),
         )?)
     })
-}
-
-/// Capture and derive the advisory citation evidence for the configured scan
-/// roots. The execution plan consumes this same evidence as preview, so a run
-/// reports every stale moving-path citation it leaves for an adopter to edit.
-fn capture_citation_scan_evidence(
-    session: &mut dyn RepositoryMutationSession,
-    image: &mut crate::repository_state::RepositoryImage,
-    roots: &[String],
-) -> Result<Option<CitationScanEvidence>> {
-    let roots = roots
-        .iter()
-        .map(|root| normalize_artifact_path(root))
-        .filter(|root| !root.is_empty())
-        .filter(|root| validate_repo_relative_path(root).is_ok())
-        .collect::<BTreeSet<_>>();
-    for root in &roots {
-        match capture_directory_tree(session, image.clone(), root, true) {
-            Ok(Some(next)) => *image = next,
-            Ok(None) => return Ok(None),
-            Err(error) => return Err(error),
-        }
-    }
-
-    Ok(Some(crate::storage::citation_scan_evidence_from_files(
-        roots.iter().cloned().collect::<Vec<_>>().as_slice(),
-        image
-            .entries()
-            .iter()
-            .filter_map(|(path, entry)| {
-                let relative = image
-                    .layout()
-                    .resolve(path)
-                    .ok()?
-                    .strip_prefix(image.layout().worktree_root())
-                    .ok()?
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                match entry {
-                    crate::repository_state::RepositoryEntry::File { content, .. } => {
-                        Some((relative, content.bytes().to_vec()))
-                    }
-                    _ => None,
-                }
-            })
-            .collect::<Vec<_>>(),
-    )))
 }
 
 impl CommandExecutor<JsonFileStorage> {
@@ -829,7 +778,7 @@ impl CommandExecutor<JsonFileStorage> {
                 Some(ArtifactEvidence::Directory { .. })
             )
         {
-            let Some(next) = capture_directory_tree(session, image, &destination, false)? else {
+            let Some(next) = capture_directory_tree(session, image, &destination)? else {
                 return Ok(None);
             };
             image = next;
@@ -846,12 +795,16 @@ impl CommandExecutor<JsonFileStorage> {
             embedded,
             &evidence,
         )?;
-        let Some(citations) =
-            capture_citation_scan_evidence(session, &mut image, &policy.citation_scan_roots)?
-        else {
-            return Ok(None);
-        };
-        facts.citations = citations;
+        // Citation warnings are advisory and no write derives from them, so the
+        // scan reads the files directly, one at a time, rather than charging
+        // them to the guarded image and its capture budget.
+        facts.citations = crate::storage::collect_citation_scan_evidence(
+            &self.storage,
+            &policy.citation_scan_roots,
+            artifacts
+                .iter()
+                .map(|artifact| artifact.source().to_string()),
+        )?;
         apply_recorded_residue_identities(
             &mut facts.locations,
             &plan_target,
@@ -1107,6 +1060,79 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn test_execute_reports_preview_citations_without_capturing_the_scanned_files() {
+        use crate::storage::RepositoryStateStore as _;
+        let repo = TempDir::new().unwrap();
+        let storage = JsonFileStorage::new(repo.path().join(".jit"));
+        fs::create_dir_all(storage.root()).unwrap();
+        fs::write(
+            storage.root().join("config.toml"),
+            format!(
+                "{}\n[documentation]\ndevelopment_root = \"\"\nmanaged_paths = [\"fixtures\"]\npermanent_paths = []\narchive_root = \"archive\"\ncitation_scan_roots = [\"notes\"]\n",
+                test_taxonomy().config_fragment()
+            ),
+        )
+        .unwrap();
+        executor(&repo, storage.clone())
+            .initialize_fresh_repository(repo.path(), None)
+            .unwrap();
+        fs::create_dir_all(repo.path().join("fixtures")).unwrap();
+        fs::create_dir_all(repo.path().join("notes")).unwrap();
+        fs::write(repo.path().join("fixtures/root.md"), "# Root\n").unwrap();
+        fs::write(
+            repo.path().join("notes/cite.md"),
+            "See `fixtures/root.md`.\n",
+        )
+        .unwrap();
+        let mut issue = crate::domain::types::fixture_issue("Owner".into(), String::new());
+        issue.state = State::Done;
+        issue.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        seed_archive_issue_precondition(&storage, issue);
+        let executor = executor(&repo, storage);
+        let citations = |warnings: Vec<crate::domain::artifact_plan::PlanWarning>| {
+            warnings
+                .into_iter()
+                .filter(|warning| {
+                    warning.code == crate::domain::artifact_plan::WarningCode::MovingPathCitation
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let preview = executor
+            .preview_archive_document("fixtures/root.md")
+            .unwrap();
+        let mut session = executor
+            .storage
+            .open_mutation_session(executor.require_layout().unwrap())
+            .unwrap();
+        let (image, _) = executor
+            .capture_archive_plan(
+                session.as_mut(),
+                ArchiveTarget::Document("fixtures/root.md"),
+            )
+            .unwrap()
+            .expect("an uncontended capture converges");
+        drop(session);
+        let cited = image_path(image.layout(), "notes/cite.md").unwrap();
+        assert!(
+            !image.capture_spec().contains_path(&cited),
+            "the citing file stays out of the guarded image and its budget"
+        );
+        let previewed = citations(
+            preview
+                .artifacts()
+                .iter()
+                .flat_map(|artifact| artifact.warnings().iter().cloned())
+                .collect(),
+        );
+        assert!(!previewed.is_empty(), "the fixture cites the moving source");
+        let executed = executor
+            .execute_archive_document("fixtures/root.md")
+            .unwrap();
+        assert_eq!(citations(executed.warnings), previewed);
     }
 
     #[test]

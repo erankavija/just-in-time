@@ -349,10 +349,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             validate_capture_closure, CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath,
         };
 
-        // An archive citation scan may enumerate every directory below its
-        // declared roots, so it is allowed a listing per directory an archive of
-        // the admitted size can hold rather than the handful a registry scan
-        // needs.
+        // An archive rerun enumerates every directory below its existing
+        // container destination, so it is allowed a listing per directory an
+        // archive of the admitted size can hold rather than the handful a
+        // registry scan needs.
         let budget = CaptureBudget {
             max_listings: if archive_scan {
                 1 << 16
@@ -1229,7 +1229,7 @@ fn discover_issue_closure(
 pub(super) const MUTATION_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 256,
-        max_bytes: 512 * 1024 * 1024,
+        max_bytes: super::CAPTURE_MAX_BYTES,
         max_depth: 32,
     };
 

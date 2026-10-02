@@ -248,7 +248,7 @@ struct DerivedGatePresetApplication {
 const GATE_PRESET_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 64,
-        max_bytes: 512 * 1024 * 1024,
+        max_bytes: super::CAPTURE_MAX_BYTES,
         max_depth: 16,
     };
 

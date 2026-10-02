@@ -100,8 +100,8 @@ pub(crate) fn is_lock_timeout(error: &RepositoryStateStoreError) -> bool {
     )
 }
 
-/// Whether an advisory capture may replace this failure with unreadable
-/// evidence. Semantic capture failures and non-permission I/O stay hard.
+/// Whether an advisory read, such as the archive citation scan, may skip this
+/// failure. Semantic failures and non-permission I/O stay hard.
 pub(crate) fn is_advisory_permission_denied(error: &RepositoryStateStoreError) -> bool {
     matches!(
         error,
@@ -1117,14 +1117,10 @@ fn capture_capability_image(
                 return Ok((path.clone(), entry));
             }
             let mode = spec.read_mode(path).unwrap_or(ReadMode::Whole);
-            let entry = match inspect_capability_entry(layout, roots, path, mode) {
-                Ok(entry) => entry,
-                Err(error) if spec.is_advisory(path) && is_advisory_permission_denied(&error) => {
-                    advisory_unreadable_entry(path)?
-                }
-                Err(error) => return Err(error),
-            };
-            Ok((path.clone(), entry))
+            Ok((
+                path.clone(),
+                inspect_capability_entry(layout, roots, path, mode)?,
+            ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
     let listings = spec
@@ -1133,7 +1129,7 @@ fn capture_capability_image(
         .map(|path| {
             let listing = match prior.listings.remove(path) {
                 Some(listing) => listing,
-                None => inspect_capability_listing(layout, roots, path, spec.is_advisory(path))?,
+                None => inspect_capability_listing(layout, roots, path)?,
             };
             Ok((path.clone(), listing))
         })
@@ -1459,26 +1455,11 @@ fn inspect_capability_entry(
     inspect_capability_leaf(&parent, &leaf, mode)
 }
 
-fn advisory_unreadable_entry(
-    path: &VirtualPath,
-) -> Result<RepositoryEntry, RepositoryStateStoreError> {
-    Ok(RepositoryEntry::Unsupported {
-        identity: EntryIdentity::for_bytes(
-            format!("advisory-unreadable:{}", path.relative().as_str()),
-            b"",
-        )?,
-        reason: "advisory citation scan could not read this entry".into(),
-        mode: FileMode::Regular,
-    })
-}
-
-/// List the directory at `path`. An advisory directory whose children cannot be
-/// enumerated for lack of permission lists none.
+/// List the directory at `path`.
 fn inspect_capability_listing(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
     path: &VirtualPath,
-    advisory: bool,
 ) -> Result<DirectoryListing, RepositoryStateStoreError> {
     match inspect_capability_entry(layout, roots, path, ReadMode::Whole)? {
         RepositoryEntry::Directory { .. } => {}
@@ -1489,13 +1470,7 @@ fn inspect_capability_listing(
     let directory = if path.relative().is_root() {
         root.try_clone()?
     } else {
-        match open_descendant_dir_nofollow(root, path.relative().as_path()) {
-            Ok(directory) => directory,
-            Err(error) if advisory && is_advisory_permission_denied(&error) => {
-                return Ok(DirectoryListing::default())
-            }
-            Err(error) => return Err(error),
-        }
+        open_descendant_dir_nofollow(root, path.relative().as_path())?
     };
     let names = match directory.entries() {
         Ok(entries) => entries
@@ -1508,13 +1483,7 @@ fn inspect_capability_listing(
             .collect::<Result<Vec<_>, _>>(),
         Err(error) => Err(error.into()),
     };
-    match names {
-        Ok(names) => DirectoryListing::new(names).map_err(Into::into),
-        Err(error) if advisory && is_advisory_permission_denied(&error) => {
-            Ok(DirectoryListing::default())
-        }
-        Err(error) => Err(error),
-    }
+    DirectoryListing::new(names?).map_err(Into::into)
 }
 
 fn inspect_capability_leaf(

@@ -321,8 +321,8 @@ impl RepositoryTargetKind {
     }
 }
 
-/// Child names of one complete non-recursive directory listing; an absent or
-/// advisory-unreadable directory lists none.
+/// Child names of one complete non-recursive directory listing; an absent
+/// directory lists none.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 pub struct DirectoryListing(BTreeSet<String>);
@@ -625,7 +625,6 @@ pub struct CaptureSpec {
     paths: BTreeSet<VirtualPath>,
     /// The paths read as [`ReadMode::Tail`]; every other path is read whole.
     tails: BTreeSet<VirtualPath>,
-    advisory: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
     linked_worktree: BTreeSet<VirtualPath>,
@@ -641,7 +640,6 @@ impl CaptureSpec {
         let mut spec = Self {
             paths: BTreeSet::new(),
             tails: BTreeSet::new(),
-            advisory: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
             linked_worktree: BTreeSet::new(),
@@ -675,24 +673,6 @@ impl CaptureSpec {
         candidate.validate()?;
         *self = candidate;
         Ok(())
-    }
-
-    /// Add paths whose unreadable file bytes are advisory rather than fatal.
-    pub fn discover_advisory_paths(
-        &mut self,
-        paths: impl IntoIterator<Item = VirtualPath>,
-    ) -> Result<(), CaptureError> {
-        let paths = paths.into_iter().collect::<Vec<_>>();
-        let mut candidate = self.clone();
-        candidate.advisory.extend(paths.iter().cloned());
-        candidate.discover_paths(paths)?;
-        *self = candidate;
-        Ok(())
-    }
-
-    /// Whether an unreadable entry is advisory for this capture.
-    pub fn is_advisory(&self, path: &VirtualPath) -> bool {
-        self.advisory.contains(path)
     }
 
     /// Require a complete non-recursive listing.
@@ -1004,16 +984,12 @@ impl RepositoryImage {
             linked_worktree,
             ..
         } = self;
-        let same = |path: &VirtualPath| read.is_advisory(path) == spec.is_advisory(path);
         CapturedAnswers {
             entries: entries
                 .into_iter()
-                .filter(|(path, _)| same(path) && read.read_mode(path) == spec.read_mode(path))
+                .filter(|(path, _)| read.read_mode(path) == spec.read_mode(path))
                 .collect(),
-            listings: listings
-                .into_iter()
-                .filter(|(path, _)| same(path))
-                .collect(),
+            listings,
             pinned,
             linked_worktree,
         }

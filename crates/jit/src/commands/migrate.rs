@@ -45,7 +45,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let events_path = VirtualPath::EVENTS;
         let budget = CaptureBudget {
             max_listings: 1,
-            max_bytes: 512 * 1024 * 1024,
+            max_bytes: super::CAPTURE_MAX_BYTES,
             max_depth: 8,
         };
         // Operation-scoped so the repair and audit event keep one identity/time

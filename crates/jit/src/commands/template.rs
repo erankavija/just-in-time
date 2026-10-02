@@ -32,7 +32,7 @@ const APPLY_ACTOR: &str = "agent:apply";
 
 const TEMPLATE_CAPTURE_BUDGET: CaptureBudget = CaptureBudget {
     max_listings: 2,
-    max_bytes: 512 * 1024 * 1024,
+    max_bytes: super::CAPTURE_MAX_BYTES,
     max_depth: 16,
 };
 

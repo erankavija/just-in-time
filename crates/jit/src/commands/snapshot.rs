@@ -692,7 +692,7 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
         let destination = classify_repository_export(&layout, invocation_dir, &output_path)?;
         let budget = CaptureBudget {
             max_listings: 1,
-            max_bytes: 512 * 1024 * 1024,
+            max_bytes: super::CAPTURE_MAX_BYTES,
             max_depth: 128,
         };
 

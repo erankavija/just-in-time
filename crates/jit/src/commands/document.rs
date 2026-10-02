@@ -39,7 +39,7 @@ enum DocumentScanSource {
 const LINK_CHECK_CAPTURE_BUDGET: crate::repository_state::CaptureBudget =
     crate::repository_state::CaptureBudget {
         max_listings: 0,
-        max_bytes: 512 * 1024 * 1024,
+        max_bytes: super::CAPTURE_MAX_BYTES,
         max_depth: 32,
     };
 

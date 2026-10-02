@@ -100,7 +100,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let intent = RepositoryExportIntent::new(target, bytes.to_vec());
                 let budget = CaptureBudget {
                     max_listings: 1,
-                    max_bytes: 512 * 1024 * 1024,
+                    max_bytes: super::CAPTURE_MAX_BYTES,
                     max_depth: 128,
                 };
                 self.publish_repository_export(&layout, &intent, budget)

@@ -257,14 +257,83 @@ pub enum ContainerDestinationState {
     Symlink,
 }
 
-/// Text of the files the citation scan universe reached, keyed by normalized
-/// repository-relative citing path.
+/// Whole-path citations of candidate artifact sources in the citation scan
+/// universe, keyed by the cited source.
 ///
-/// Acquired at the storage and planning boundary, where the rest of the plan
-/// evidence is gathered, and read here to derive in-content citation warnings.
-/// A file the scan could not read as UTF-8 text is absent rather than
-/// represented, because the scan is advisory and a plan is produced without it.
-pub type CitationScanEvidence = BTreeMap<String, String>;
+/// Acquired at the storage and planning boundary by passing each scanned file
+/// through a [`CitationScanner`], and read here to derive in-content citation
+/// warnings. A file the scan could not read as UTF-8 text contributes nothing,
+/// because the scan is advisory and a plan is produced without it.
+pub type CitationScanEvidence = BTreeMap<String, BTreeSet<CitationLocation>>;
+
+/// Where a scanned file cites a source: its normalized repository-relative
+/// path, with the citation's 1-based line and character column.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct CitationLocation {
+    pub citing: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+/// Finds whole-path citations of a fixed set of candidate sources one file at
+/// a time, so a scan holds only the file it is reading.
+///
+/// One multi-pattern search per file selects the sources it mentions at all;
+/// only those are located line by line.
+pub struct CitationScanner {
+    sources: Vec<String>,
+    automaton: aho_corasick::AhoCorasick,
+}
+
+impl CitationScanner {
+    /// A scanner for `sources`; an empty source cites nothing and is dropped.
+    pub fn new(
+        sources: impl IntoIterator<Item = String>,
+    ) -> Result<Self, aho_corasick::BuildError> {
+        let sources = sources
+            .into_iter()
+            .filter(|source| !source.is_empty())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        Ok(Self {
+            automaton: aho_corasick::AhoCorasick::new(&sources)?,
+            sources,
+        })
+    }
+
+    /// Record every citation `bytes`, read from `citing`, makes of a candidate
+    /// source. Bytes that are not valid UTF-8 contribute nothing.
+    pub fn scan(&self, citing: &str, bytes: &[u8], evidence: &mut CitationScanEvidence) {
+        let Ok(text) = std::str::from_utf8(bytes) else {
+            return;
+        };
+        let mentioned = self
+            .automaton
+            .find_overlapping_iter(text)
+            .map(|found| found.pattern().as_usize())
+            .collect::<BTreeSet<_>>();
+        for source in mentioned.into_iter().map(|index| &self.sources[index]) {
+            let locations = text
+                .lines()
+                .enumerate()
+                .flat_map(|(index, line)| {
+                    citation_columns(line, source).map(move |column| CitationLocation {
+                        citing: citing.to_string(),
+                        line: index + 1,
+                        column,
+                    })
+                })
+                .collect::<Vec<_>>();
+            if !locations.is_empty() {
+                evidence
+                    .entry(source.clone())
+                    .or_default()
+                    .extend(locations);
+            }
+        }
+    }
+}
 
 /// All I/O-derived facts consumed by pure classification.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -275,7 +344,7 @@ pub struct ArtifactClassificationFacts {
     pub embedded_owners: Vec<EmbeddedArtifactOwner>,
     /// Marker/occupancy state for a container destination directory.
     pub container_destination: ContainerDestinationState,
-    /// Scanned file text backing in-content citation warnings. Empty when the
+    /// Scanned citations backing in-content citation warnings. Empty when the
     /// caller derives facts from a closed evidence snapshot instead of the
     /// planning boundary's scan, which leaves every other classification
     /// outcome unchanged.
@@ -1056,8 +1125,8 @@ fn cite_moving_path(
     entry.with_warnings(warnings)
 }
 
-/// One [`WarningCode::MovingPathCitation`] warning per citation of `source` in
-/// the text of a scanned file.
+/// One [`WarningCode::MovingPathCitation`] warning per scanned citation of
+/// `source`.
 ///
 /// Each warning names the citing file with the citation's 1-based line and
 /// column, spelled `<citing path>:<line>:<column>`. The position both locates a
@@ -1070,16 +1139,17 @@ fn moving_path_citation_warnings(
     citations: &CitationScanEvidence,
 ) -> Vec<PlanWarning> {
     citations
-        .iter()
-        .flat_map(|(citing, text)| {
-            text.lines().enumerate().flat_map(move |(index, line)| {
-                citation_columns(line, source).map(move |column| {
-                    PlanWarning::new(
-                        WarningCode::MovingPathCitation,
-                        Some(format!("{citing}:{}:{column}", index + 1)),
-                    )
-                })
-            })
+        .get(source)
+        .into_iter()
+        .flatten()
+        .map(|location| {
+            PlanWarning::new(
+                WarningCode::MovingPathCitation,
+                Some(format!(
+                    "{}:{}:{}",
+                    location.citing, location.line, location.column
+                )),
+            )
         })
         .collect()
 }
@@ -3693,18 +3763,22 @@ mod tests {
         ]
     }
 
-    fn citations(files: &[(&str, &str)]) -> CitationScanEvidence {
-        files
-            .iter()
-            .map(|(path, text)| ((*path).to_string(), (*text).to_string()))
-            .collect()
+    /// Citations of `sources` in `files`, scanned as the planning boundary does.
+    fn citations(sources: &[&str], files: &[(&str, &str)]) -> CitationScanEvidence {
+        let scanner = CitationScanner::new(sources.iter().map(|source| source.to_string()))
+            .expect("fixture sources build a scanner");
+        let mut evidence = CitationScanEvidence::new();
+        for (path, text) in files {
+            scanner.scan(path, text.as_bytes(), &mut evidence);
+        }
+        evidence
     }
 
     fn scanned_plan(owners: Vec<ArtifactOwner>, files: &[(&str, &str)]) -> ArtifactPlan {
         container(
             vec![explicit(CITED_SOURCE, owners)],
             ArtifactClassificationFacts {
-                citations: citations(files),
+                citations: citations(&[CITED_SOURCE], files),
                 ..present_source(CITED_SOURCE)
             },
         )
@@ -3816,7 +3890,7 @@ mod tests {
             policy,
             vec![explicit(source, vec![owner("i", State::Done, true)])],
             ArtifactClassificationFacts {
-                citations: citations(files),
+                citations: citations(&[source], files),
                 ..present_source(source)
             },
         )
@@ -3840,7 +3914,7 @@ mod tests {
                 .map(|source| explicit(source, vec![owner("i", State::Done, true)]))
                 .collect(),
             ArtifactClassificationFacts {
-                citations: citations(files),
+                citations: citations(sources, files),
                 ..locations(&present)
             },
         )
@@ -4155,6 +4229,37 @@ mod tests {
         assert!(located
             .iter()
             .all(|location| reads_back(&files, location, source)));
+    }
+
+    #[test]
+    fn test_citation_scanner_locates_each_source_as_a_scan_of_that_source_alone() {
+        // Nested and prefix-sharing sources overlap in the text, which a
+        // multi-pattern search must not let shadow one another.
+        let sources = [
+            CITED_SOURCE,
+            "dev/active",
+            "dev/active/plan.md.bak",
+            "dev/design/auth-design.md",
+        ];
+        let files = citation_fixture()
+            .into_iter()
+            .chain([(
+                "dev/notes.md",
+                "See dev/active and `dev/active/plan.md.bak` beside dev/active/plan.md.\n",
+            )])
+            .collect::<Vec<_>>();
+        let together = citations(&sources, &files);
+        for source in sources {
+            assert_eq!(
+                together.get(source),
+                citations(&[source], &files).get(source),
+                "{source} is located the same with or without the other sources"
+            );
+        }
+        assert!(
+            sources.iter().all(|source| together.contains_key(*source)),
+            "every fixture source is cited somewhere"
+        );
     }
 
     #[test]

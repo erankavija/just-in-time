@@ -231,6 +231,9 @@ pub fn with_dispatch_mutation_annotation<T>(
 /// copied as the literal `8`.
 const MUTATION_SESSION_RETRY_LIMIT: usize = 8;
 
+/// Byte ceiling on the repository image one command captures.
+pub(super) const CAPTURE_MAX_BYTES: u64 = 512 * 1024 * 1024;
+
 /// Terminal error for a mutation session that keeps losing its capture/apply
 /// race.
 ///
