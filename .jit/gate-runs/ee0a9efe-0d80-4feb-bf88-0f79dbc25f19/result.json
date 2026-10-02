@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "19320107144cb8562eeb00355b7183652a9f008b",
+  "completed_at": "2026-10-02T23:46:14.602721952Z",
+  "duration_ms": 310542,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed implementation satisfies the archive citation-scan criteria; the prior per-source rescan finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65059cd2-583f-4998-b84d-41d560e2bf1d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ee0a9efe-0d80-4feb-bf88-0f79dbc25f19",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-02T23:41:04.060430496Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 58d87a9df, c53e50205, 20822b0fa, 193201071\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-02T23:39:10Z); code-review failed (exit 1, 2026-10-02T23:35:11Z)\nTruncation recovery: re-read JIT-record patches with zero context and narrowed the dependency-source inspection after truncated output\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed implementation satisfies the archive citation-scan criteria; the prior per-source rescan finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

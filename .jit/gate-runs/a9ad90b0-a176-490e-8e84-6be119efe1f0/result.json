@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "19320107144cb8562eeb00355b7183652a9f008b",
+  "completed_at": "2026-10-02T23:41:03.654261389Z",
+  "duration_ms": 113224,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "5a18996e75d29ea460aefcc19ba34d30539162c6cd8091ea2203b2dbe297d19c",
+  "issue_id": "65059cd2-583f-4998-b84d-41d560e2bf1d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a9ad90b0-a176-490e-8e84-6be119efe1f0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-02T23:39:10.429558525Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 41474 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 41474 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 37888 ms, warmed 17 executables (2072887848 bytes) in 70 ms.\n  ✓ fmt: ok (1601 ms)\n  ✓ clippy: ok (31952 ms)\n  ✓ suite-build: built in 37888 ms, warmed 17 executables (2072887848 bytes) in 70 ms (37961 ms)\n  ✓ test: 4721 passed, 0 failed, 0 skipped (37062 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4395 ms)\n  ✓ suite-clock: 41474 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (80 ms)\n\n",
+  "tree_dirty": true
+}

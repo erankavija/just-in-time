@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "20822b0fa953e571a1d0546173f3bf217dffd0d3",
+  "completed_at": "2026-10-02T23:35:11.020284155Z",
+  "duration_ms": 150769,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/artifact_classifier.rs",
+        "id": "F1",
+        "line": 316,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "CitationScanner rescans the full text once for every mentioned candidate source after its Aho-Corasick pass."
+      }
+    ],
+    "summary": "Citation scanning still rescans each file once per mentioned candidate source.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "65059cd2-583f-4998-b84d-41d560e2bf1d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "2200bd4f-c9e2-41cd-8845-c41097199b61",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-02T23:32:40.250404915Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6487 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.157.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a0fef6-797d-71d3-a694-7efe615b94eb\n--------\nuser\n--- 6474 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 58d87a9df, c53e50205, 20822b0fa (`jit:65059cd2`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/canonical-cutover (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-17 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-02T23:32:11.987864733+00:00)\nTruncation recovery: bounded rereads of the scanner, archive capture path, storage scanner, tests, and governing registry entries\n\n1. [blocking][issue-impact] `CitationScanner::scan` runs Aho-Corasick once, but then iterates every mentioned source and traverses every line of the file again to call `citation_columns` ([artifact_classifier.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/artifact_classifier.rs:316)). A file citing N candidate sources is therefore rescanned N times after the initial pass, retaining the per-moving-artifact performance characteristic the issue explicitly requires removing.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Citation scanning still rescans each file once per mentioned candidate source.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"CitationScanner rescans the full text once for every mentioned candidate source after its Aho-Corasick pass.\",\"file\":\"crates/jit/src/domain/artifact_classifier.rs\",\"line\":316,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
