@@ -278,8 +278,13 @@ pub struct CitationLocation {
 /// Finds whole-path citations of a fixed set of candidate sources one file at
 /// a time, so a scan holds only the file it is reading.
 ///
-/// One multi-pattern search per file selects the sources it mentions at all;
-/// only those are located line by line.
+/// One overlapping multi-pattern search per file finds every occurrence of
+/// every source; each is then judged on its own line. Per source, occurrences
+/// are examined left to right, resuming past the end of each one examined.
+/// That loses no citation: an occurrence starting inside another is preceded
+/// by the cited path's own opening characters, which name path content, so
+/// [`is_whole_path_citation`] rejects it. Columns are counted in characters,
+/// so text in any script is located where its reader sees it.
 pub struct CitationScanner {
     sources: Vec<String>,
     automaton: aho_corasick::AhoCorasick,
@@ -308,29 +313,69 @@ impl CitationScanner {
         let Ok(text) = std::str::from_utf8(bytes) else {
             return;
         };
-        let mentioned = self
+        let mut occurrences = self
             .automaton
             .find_overlapping_iter(text)
-            .map(|found| found.pattern().as_usize())
-            .collect::<BTreeSet<_>>();
-        for source in mentioned.into_iter().map(|index| &self.sources[index]) {
-            let locations = text
-                .lines()
-                .enumerate()
-                .flat_map(|(index, line)| {
-                    citation_columns(line, source).map(move |column| CitationLocation {
-                        citing: citing.to_string(),
-                        line: index + 1,
-                        column,
-                    })
-                })
-                .collect::<Vec<_>>();
-            if !locations.is_empty() {
+            .map(|found| (found.start(), found.pattern().as_usize()))
+            .collect::<Vec<_>>();
+        occurrences.sort_unstable();
+        let mut examined_until = vec![0; self.sources.len()];
+        let mut line = TextLine::default();
+        for (offset, index) in occurrences {
+            let source = &self.sources[index];
+            if offset < examined_until[index] {
+                continue;
+            }
+            examined_until[index] = offset + source.len();
+            line.advance_to(text, offset);
+            let content = line.content(text);
+            let within = offset - line.start;
+            if within + source.len() <= content.len()
+                && is_whole_path_citation(content, within, source)
+            {
                 evidence
                     .entry(source.clone())
                     .or_default()
-                    .extend(locations);
+                    .insert(CitationLocation {
+                        citing: citing.to_string(),
+                        line: line.number,
+                        column: content[..within].chars().count() + 1,
+                    });
             }
+        }
+    }
+}
+
+/// The line holding the current scan position, advanced monotonically.
+///
+/// Lines split as [`str::lines`] splits them: at `\n`, with a `\r` before it
+/// belonging to the line ending rather than the content.
+#[derive(Default)]
+struct TextLine {
+    start: usize,
+    end: usize,
+    number: usize,
+}
+
+impl TextLine {
+    /// Move to the line holding byte `offset`, which never precedes this line.
+    fn advance_to(&mut self, text: &str, offset: usize) {
+        if self.number > 0 && offset <= self.end {
+            return;
+        }
+        let skipped = &text[self.start..offset];
+        self.number = self.number.max(1) + skipped.matches('\n').count();
+        self.start += skipped.rfind('\n').map_or(0, |last| last + 1);
+        self.end = text[self.start..]
+            .find('\n')
+            .map_or(text.len(), |end| self.start + end);
+    }
+
+    fn content<'a>(&self, text: &'a str) -> &'a str {
+        let line = &text[self.start..self.end];
+        match self.end < text.len() {
+            true => line.strip_suffix('\r').unwrap_or(line),
+            false => line,
         }
     }
 }
@@ -1152,25 +1197,6 @@ fn moving_path_citation_warnings(
             )
         })
         .collect()
-}
-
-/// The 1-based character column of every citation of `source` in `line`, in
-/// ascending order.
-///
-/// The column is counted in characters, so text in any script is located where
-/// its reader sees it. An empty `source` matches only empty text, which cites
-/// nothing.
-///
-/// The search resumes past the end of each occurrence it examines. That loses
-/// no citation: an occurrence starting inside another is preceded by the cited
-/// path's own opening characters, which name path content, so
-/// [`is_whole_path_citation`] rejects it.
-fn citation_columns<'a>(line: &'a str, source: &'a str) -> impl Iterator<Item = usize> + 'a {
-    line.match_indices(source)
-        .filter(move |(offset, matched)| {
-            !matched.is_empty() && is_whole_path_citation(line, *offset, source)
-        })
-        .map(move |(offset, _)| line[..offset].chars().count() + 1)
 }
 
 /// Whether the occurrence of `source` at byte `offset` in `line` cites that path
@@ -4259,6 +4285,22 @@ mod tests {
         assert!(
             sources.iter().all(|source| together.contains_key(*source)),
             "every fixture source is cited somewhere"
+        );
+    }
+
+    #[test]
+    fn test_citation_scanner_locates_citations_in_crlf_text_as_in_lf_text() {
+        let lf = "intro\nsee dev/active/plan.md\n\n`dev/active/plan.md` and dev/active/plan.md";
+        let crlf = lf.replace('\n', "\r\n");
+        let lf_citations = citations(&[CITED_SOURCE], &[("notes.md", lf)]);
+        assert_eq!(
+            lf_citations[CITED_SOURCE].len(),
+            3,
+            "the fixture cites three times"
+        );
+        assert_eq!(
+            citations(&[CITED_SOURCE], &[("notes.md", &crlf)]),
+            lf_citations
         );
     }
 
