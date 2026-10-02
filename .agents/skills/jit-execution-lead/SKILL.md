@@ -39,26 +39,20 @@ Before any orchestration, discover the project's expectations. This context info
    - Run `jit recover` to clean stale locks.
    - Read `.jit/config.toml` — extract `[type_hierarchy]`, `[documentation]`, `[validation]`, and `[namespaces]`.
 
-2. **Project conventions.** Read `AGENTS.md` (and any files it includes). Extract:
-   - Coding/writing style and conventions
-   - Build, test, and quality commands (if applicable)
-   - Architecture guidelines
-   - Documentation expectations and standards
+2. **Quality gates.** Run `jit gate list --json`. Learn every configured gate, what it checks, and whether it's automated or manual.
 
-3. **Quality gates.** Run `jit gate list --json`. Learn every configured gate, what it checks, and whether it's automated or manual.
-
-4. **Documentation config.** From `.jit/config.toml` `[documentation]`:
+3. **Documentation config.** From `.jit/config.toml` `[documentation]`:
    - `development_root` — where development docs live
    - `managed_paths` — paths the lead manages (design docs, studies, sessions)
    - `permanent_paths` — user-facing documentation paths
    - `archive_root` — where completed docs are archived
 
-5. **Type hierarchy.** From `.jit/config.toml` `[type_hierarchy]`:
+4. **Type hierarchy.** From `.jit/config.toml` `[type_hierarchy]`:
    - Map types to levels (e.g., milestone=1, epic=2, story=3, task=4)
    - Identify strategic types
    - Map types to membership label namespaces via `[type_hierarchy.label_associations]`
 
-6. **Planning bracket (if the ruleset uses it).** From `.jit/templates.toml`, the single source of truth for the bracket:
+5. **Planning bracket (if the ruleset uses it).** From `.jit/templates.toml`, the single source of truth for the bracket:
    - A container type is **breakable** iff some template's `applies_to` list includes it (e.g. `epic` for an SDD ruleset, `goal` for a research ruleset).
    - The bracket node types `P` and `B` are the template's `planning`- and `breakdown`-role node `type`s.
    - `P`'s plan-doc location is the planning node's `doc` field (an `{container.id}`-templated path, or inline body when absent).
@@ -189,6 +183,7 @@ For each issue in the wave, select the prompt template based on its classificati
 Fill each template with:
 - Full issue context from `jit issue show` (title, description, success criteria, linked docs)
 - The gates defined on the issue and the requirement that the work be sufficient to pass them
+- The return contract (`.agents/skills/jit-manage/references/return-contract.md`), appended verbatim
 - The worker constraints: never transition issue state, pass gates, or write `.jit/` — the lead owns all state changes. The one exception is `jit doc add` to link every durable artifact the worker produces (jit-manage invariant 8). Verify links in review (Section 7); add any the worker missed.
 
 ### Agent type
@@ -219,7 +214,7 @@ When a sub-agent's output fails review:
 2. **If under MAX_REWORK_ATTEMPTS:** Dispatch a rework agent.
    - Read `references/rework-prompt-template.md`.
    - Fill it with the review verdict (specific failures, file references, expected behavior).
-   - Prepend it to the original dispatch prompt.
+   - Prepend it to the original dispatch prompt, which keeps the return contract at its end.
    - Dispatch a new `general-purpose` agent with the combined prompt.
    - Increment `rework_counts[issue_id]` in the progress file.
    - When the rework agent completes, return to Section 7 for re-review.

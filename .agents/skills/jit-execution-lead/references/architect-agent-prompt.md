@@ -19,14 +19,11 @@ You are working as the architect on a team delivering an epic. Your task is to p
 
 ## Project Context
 
-### Conventions
-[PROJECT CONVENTIONS FROM AGENTS.md — paste the relevant sections]
-
 ### Documentation Configuration
 [FROM .jit/config.toml documentation section — doc paths, managed paths]
 
 ### Addressable context
-Cited concrete qualified addresses in the description and conventions above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
+Cited concrete qualified addresses in the description above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
 
 ## Instructions
 
@@ -67,3 +64,7 @@ Cited concrete qualified addresses in the description and conventions above are 
 - Do NOT mark the issue as done. The lead handles issue state transitions.
 - Do NOT modify other agents' work or files outside this issue's scope.
 - If you discover that the issue's scope is unclear or the success criteria are ambiguous, note this prominently in the "Risks and open questions" section rather than making assumptions.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: design path and commit SHA.

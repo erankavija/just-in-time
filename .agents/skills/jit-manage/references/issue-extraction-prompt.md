@@ -84,7 +84,7 @@ fences.
 
    **Optional: criterion-maturity tier markers.** If the project distinguishes
    between hard and aspirational criteria (see the project's
-   `code-review-prompt` or AGENTS.md for whether it does), prefix each
+   `code-review-prompt` for whether it does), prefix each
    criterion line with either `[hard]` (the default; fails the review if
    unmet) or `[aspirational]` (amendable in-loop if empirical evidence
    contradicts, as long as the aggregate contract holds). A marked criterion

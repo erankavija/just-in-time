@@ -26,7 +26,7 @@ Produce an assignment-simulation row for every finest-tier entry:
 | Key | One outcome | One bounded consumer family | Observable test boundary | Footprint credible | One focused cycle | No inner decomposition | No mixed deliverables | Result |
 |---|---|---|---|---|---|---|---|---|
 
-Fail any row that does not pass or any unresolved sizing warning. Judge every
+Report only failing rows. Fail any row that does not pass or any unresolved sizing warning. Judge every
 visible per-code override and fail vague or cross-cutting waivers. Also fail
 missing hierarchy/source universes, invented refs, tier-laundered leaves,
 malformed/duplicate contract headings, overlaps, gaps, wrong ordering, broken
@@ -34,5 +34,6 @@ intermediate states, unmitigated risks, or stale prior findings. Require the aut
 to replace defective contracts/tasks, remove superseded prose, regenerate, and
 rerun all checks.
 
-Report blocking findings with artifact/code citations and exact corrections, then
-end with exactly `VERDICT: PASS` or `VERDICT: FAIL`.
+Report blocking findings with artifact/code citations and exact corrections; omit
+passing checks and restated review scope. End with exactly `VERDICT: PASS` or
+`VERDICT: FAIL`.

@@ -6,7 +6,7 @@ Every escalation targets **the invoker** — the party that invoked this executi
 
 **Determination rule:** if the dispatch prompt identifies a parent lead to report escalations to, that parent is the invoker. Otherwise the invoker is the human, so a standalone run escalates to the human exactly as before.
 
-**Delivery:** standalone, raise the escalation interactively with the human (e.g. via `AskUserQuestion`). As a subagent, address the escalation prompt template to the parent lead and surface it in the final report; the parent decides whether to resolve it or raise it onward to the human.
+**Delivery:** standalone, raise the escalation interactively with the human (e.g. via `AskUserQuestion`). As a subagent, address the escalation prompt template to the parent lead and surface it under Needs decision in the return; the parent decides whether to resolve it or raise it onward to the human.
 
 ## Constants
 

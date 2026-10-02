@@ -10,7 +10,7 @@ Previous work on issue **[ISSUE_TITLE]** ([SHORT_ID]) failed the lead's quality 
 
 ### Required pre-commit audit (attempt [N] must include this)
 
-**Before editing any source**, run the following and include the raw output at the top of your final report. The lead cross-references this output against your resolution table; any omission is a rejection.
+**Before editing any source**, run the following. The lead reruns it and cross-references the output against your resolution table; any omitted match is a rejection.
 
 ```bash
 # 1. Enumerate every prior code-review failure for this issue
@@ -53,12 +53,11 @@ Cited concrete qualified addresses in the verdict and issue text are resolvable 
 
 - Fix only the listed issues. Unrelated changes will be flagged in re-review.
 - All gates on this issue must still pass after your changes.
-- If you believe a required change is incorrect or impossible, explain why clearly rather than silently ignoring it.
-- When done, confirm which items you addressed and how.
+- If you believe a required change is incorrect or impossible, state why under Needs decision rather than silently ignoring it.
 
 ### Resolution table (required — do not submit without completing)
 
-Before submitting, produce one row per finding **across all rounds plus every match from the pre-commit audit**. Submissions with any empty row, or any finding from a prior round without a closure cite, are rejected without re-review.
+The resolution table is the Outcome deliverable of your return, together with the commit SHA. Before submitting, produce one row per finding **across all rounds plus every match from the pre-commit audit**. Submissions with any empty row, or any finding from a prior round without a closure cite, are rejected without re-review.
 
 | # | Round | Source (reviewer / audit-step-1 / audit-step-3) | Finding (paste verbatim) | Resolution (file:line or commit SHA proving closure at HEAD) |
 |---|-------|--------------------------------------------------|--------------------------|---------------------------------------------------------------|
@@ -71,7 +70,7 @@ A prior-round finding without a closure cite at HEAD = regression. A design-doc 
 
 ### Mandatory workspace-wide sweeps
 
-Reviewers commonly flag one instance of a problem that actually exists in several files. Before filling the resolution table, run each of the following searches and paste the raw results. Fix **every** match — not just the one the reviewer cited.
+Reviewers commonly flag one instance of a problem that actually exists in several files. Before filling the resolution table, run each of the following searches. Fix **every** match — not just the one the reviewer cited.
 
 **Sweep 1 — Prior-findings cumulative.** Run the pre-commit audit block above. Every finding from every prior round must have a closure cite.
 

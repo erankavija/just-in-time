@@ -42,8 +42,8 @@ A markdown research doc with, per open question:
 1. Write to `research.md` inside the directory `jit doc dir <C-id> dev/active` resolves.
    Keep it **separate** from the plan doc.
 2. Link it to **P**: `jit doc add <P> <research-doc-path> --doc-type research`.
-3. Return a short summary: each question, the recommendation, and its provenance, so the
-   synthesizer and the decision log can consume it.
+3. Return per the contract below. Outcome deliverables: document path and one line per
+   question with its recommendation and provenance tag.
 
 ## Rules
 
@@ -51,3 +51,5 @@ A markdown research doc with, per open question:
   shape.
 - If a question cannot be resolved, say so and state the safest default plus the residual
   risk — that becomes a flagged risk in the plan, not a silent guess.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]

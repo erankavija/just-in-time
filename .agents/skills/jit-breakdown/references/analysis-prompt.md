@@ -53,5 +53,8 @@ several component families, three acceptance clusters, and implementation plus
 release are presumed oversized. A shared `landing_group` never combines tasks.
 
 Self-check unique/known keys, total source coverage, acyclicity, real parallelism,
-and blank-workspace roots. Return the manifest path and a short count summary;
-return no pasted manifest.
+and blank-workspace roots.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: manifest path and issue/edge counts.

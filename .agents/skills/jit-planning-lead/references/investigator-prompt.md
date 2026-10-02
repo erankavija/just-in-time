@@ -21,10 +21,6 @@ referenced artifact):
 **Decisions made so far** (verify their premises still hold):
 [DECISION_LOG_SO_FAR]
 
-## Project context
-
-[PROJECT_CONVENTIONS — relevant AGENTS.md sections, architecture/layer boundaries]
-
 ## Addressable context
 
 Cited concrete qualified addresses are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
@@ -34,8 +30,7 @@ Cited concrete qualified addresses are resolvable project knowledge, not opaque 
 Read the actual code, config, and docs. Use search aggressively. Write a structured
 findings report to the **repo-resident path the dispatch names**
 (`investigation.md`, inside the directory `jit doc dir <C-id> dev/active` resolves).
-The plan cites this report as grounding, so it is repo-resident. Return a short summary
-plus the path you wrote. The report contains:
+The plan cites this report as grounding, so it is repo-resident. The report contains:
 
 1. **Claim classification.** For every input claim, classify it against the code and cite
    `file:line`:
@@ -79,3 +74,8 @@ plus the path you wrote. The report contains:
 - Do not write the plan, do not edit code, do not change `.jit/` state.
 - If a claim cannot be verified from the code, say so explicitly — an unverifiable
   load-bearing claim is itself a finding for the decision log.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: report path and the claim count per classification. List each
+invalid-as-stated or unverifiable claim under Needs decision.

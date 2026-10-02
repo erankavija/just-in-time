@@ -41,6 +41,8 @@ For each sub-agent, compose a prompt using the template in [references/agent-pro
 - Any linked design doc paths
 - Task type: implementation, planning, or review
 
+End every dispatch prompt, including rework and ad-hoc prompts, with the return contract in `.agents/skills/jit-manage/references/return-contract.md`.
+
 ## Step 3: Post-flight — verify and integrate
 
 After all agents return:

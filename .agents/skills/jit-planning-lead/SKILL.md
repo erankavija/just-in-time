@@ -37,6 +37,8 @@ Read [interview-protocol.md](references/interview-protocol.md) when eliciting in
 
 ## 2. Investigate
 
+End every dispatch prompt, including rework and ad-hoc prompts, with the return contract in `.agents/skills/jit-manage/references/return-contract.md`.
+
 Dispatch the investigator with
 [investigator-prompt.md](references/investigator-prompt.md). It writes and links
 `investigation.md`, inside the directory `jit doc dir <C> dev/active` resolves, to

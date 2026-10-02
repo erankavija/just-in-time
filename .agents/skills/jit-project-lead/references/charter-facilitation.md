@@ -21,8 +21,8 @@ Pick one posture from the state at entry, before facilitating:
   derive from (few or no containers, issues, or code). The owner holds the vision
   in their head; the steward draws it out.
 - **Bootstrap from repository state** — project artifacts already exist: a
-  populated work graph (containers, issues), committed code, `AGENTS.md`, config,
-  and invariants. The vision is implicit in what has been built; the steward
+  populated work graph (containers, issues), committed code, config, and
+  invariants. The vision is implicit in what has been built; the steward
   derives a draft and the owner ratifies it.
 
 Read the entry state to choose: does the charter exist with a real vision, and do
@@ -54,8 +54,7 @@ The vision is unstated; facilitate it into being with the owner.
 
 Project artifacts already exist; derive a draft, then the owner ratifies it.
 
-1. **Derive a draft vision** from repository state: `AGENTS.md`, the strategic
-   container's description (`jit issue show <container-id>`), the done containers
+1. **Derive a draft vision** from repository state: the strategic container's description (`jit issue show <container-id>`), the done containers
    (`jit query strategic --json`), config (`.jit/`), and the domain invariants.
    Keep it to the two-to-five-sentence yardstick shape.
 2. **Mine candidate decisions** from the same state: consequential calls the

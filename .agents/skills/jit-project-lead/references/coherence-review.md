@@ -45,8 +45,7 @@ wave does not advance over a FAIL.
   `[type_hierarchy.label_associations][<parent-type>]`, carried by every direct
   child of `P`).
 - **`D`**: the delegation-boundary types, held from tier derivation.
-- **project conventions**: `AGENTS.md` at the repository root and the canonical
-  content standards (`.jit/reference/content-standards.md`), the
+- **project conventions**: the canonical content standards (`.jit/reference/content-standards.md`), the
   authority for naming, style, and document conventions across containers.
 
 ## Tier C1: Enumerate the accepted-sibling comparison set
@@ -115,8 +114,7 @@ Run these concrete checks, `K` against each `Ci` in `A`:
    document titles, and command/flag names for the same drift.
 
 2. **Conventions and style.** Does `K` follow the same conventions as the
-   accepted siblings and the project authorities? Read `AGENTS.md` and the content
-   standards, then confirm `K`'s artifacts match the register, structure, and
+   accepted siblings and the project authorities? Read the content standards, then confirm `K`'s artifacts match the register, structure, and
    invariant vocabulary the accepted siblings already established. FAIL on a
    convention `K` breaks that its siblings hold (heading structure, verdict/report
    shape, and the repository's configured label and assignee formats,

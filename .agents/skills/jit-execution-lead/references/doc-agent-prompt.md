@@ -19,14 +19,11 @@ You are working as a technical writer on a team delivering an epic. Your task is
 
 ## Project Context
 
-### Conventions
-[PROJECT CONVENTIONS FROM AGENTS.md — paste the relevant sections]
-
 ### Documentation Configuration
 [FROM .jit/config.toml documentation section — doc paths, managed paths, permanent paths]
 
 ### Addressable context
-Cited concrete qualified addresses in the description and conventions above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
+Cited concrete qualified addresses in the description above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
 
 ## Instructions
 
@@ -70,4 +67,8 @@ Cited concrete qualified addresses in the description and conventions above are 
 - Do NOT mark the issue as done. The lead handles issue state transitions.
 - Do NOT modify other agents' work or files outside this issue's scope.
 - Match the existing documentation style precisely. Consistency matters more than any individual stylistic preference.
-- If the implementation you're documenting appears incorrect or incomplete, note it in the doc (or as a comment to the lead) rather than silently documenting incorrect behavior.
+- If the implementation you're documenting appears incorrect or incomplete, note it in the doc or under Needs decision rather than silently documenting incorrect behavior.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: documentation paths and commit SHA.

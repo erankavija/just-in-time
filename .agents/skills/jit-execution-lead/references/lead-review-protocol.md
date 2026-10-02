@@ -102,7 +102,7 @@ This tier catches issues that per-issue gates and criteria cannot: problems that
 
 ### Cross-issue consistency
 - **Naming**: Are the same concepts named the same way across different agents' output? If agent A calls it `user_profile` and agent B calls it `account_data` for the same thing, that's a coherence failure.
-- **Style**: Does the output follow the same conventions as other completed work in this epic? Read the project's AGENTS.md for authoritative conventions.
+- **Style**: Does the output follow the same conventions as other completed work in this epic?
 - **Interfaces**: If this issue produces something that other issues consume (an API, a data structure, a document section), does it match what consumers expect?
 
 ### Integration fitness
@@ -140,7 +140,7 @@ The rework dispatch must explicitly direct the worker to read the **complete** r
 
 ## No-argue discipline
 
-When a reviewer cites a contract document (acceptance protocol, design doc, project AGENTS.md, any governance file) and says the artifact violates it, the lead has exactly two responses: (a) change the artifact to satisfy the contract literally, or (b) escalate. The lead may not soften the contract's reading by argument. Wording such as "non-blocking marker", "redundant witness", "two independent witnesses already satisfy criterion N", "the contract doesn't really require this for our case", or "the marker is diagnostic rather than blocking" indicates the lead is in argue mode and must stop — argue-mode rework rounds will fail the next review and the cycle is wasted. If the contract is genuinely wrong for the project's needs, amend the contract; if it's right, comply. There is no soft middle. This rule applies even when the reviewer's reading appears to overstate a literal-vs-spirit interpretation: the reviewer is a contract enforcer, not an obstacle to argue past.
+When a reviewer cites a contract document (acceptance protocol, design doc, any governance file) and says the artifact violates it, the lead has exactly two responses: (a) change the artifact to satisfy the contract literally, or (b) escalate. The lead may not soften the contract's reading by argument. Wording such as "non-blocking marker", "redundant witness", "two independent witnesses already satisfy criterion N", "the contract doesn't really require this for our case", or "the marker is diagnostic rather than blocking" indicates the lead is in argue mode and must stop — argue-mode rework rounds will fail the next review and the cycle is wasted. If the contract is genuinely wrong for the project's needs, amend the contract; if it's right, comply. There is no soft middle. This rule applies even when the reviewer's reading appears to overstate a literal-vs-spirit interpretation: the reviewer is a contract enforcer, not an obstacle to argue past.
 
 ## Recording the Verdict
 

@@ -19,14 +19,11 @@ You are working as a researcher on a team delivering an epic. Your task is to in
 
 ## Project Context
 
-### Conventions
-[PROJECT CONVENTIONS FROM AGENTS.md — paste the relevant sections]
-
 ### Documentation Configuration
 [FROM .jit/config.toml documentation section — doc paths, managed paths]
 
 ### Addressable context
-Cited concrete qualified addresses in the description and conventions above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
+Cited concrete qualified addresses in the description above are resolvable project knowledge, not opaque tokens. Resolve each with `jit item show <address>` before acting on it; chained `jit item show` calls in one shell invocation resolve several at once. Do not invent example addresses that the repository has not declared.
 
 ## Instructions
 
@@ -66,3 +63,7 @@ Cited concrete qualified addresses in the description and conventions above are 
 - Do NOT modify other agents' work or files outside this issue's scope.
 - Prefer depth over breadth. A thorough answer to the core question is more valuable than a shallow survey of tangentially related topics.
 - If the investigation reveals that the issue's assumptions are wrong or the question is based on a misunderstanding, say so clearly. This is a valuable finding.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: findings path and commit SHA.

@@ -247,7 +247,6 @@ Before implementation begins, verify and present all items:
 - [ ] Design doc has been read (or created) and approach is understood
 - [ ] All dependencies are `done` (re-check with `jit graph deps <id>`)
 - [ ] Required gates are known — list each with type (auto/manual)
-- [ ] Project coding conventions from AGENTS.md are understood
 
 Then **defer to the project's own conventions** for actual implementation.
 The skill does not prescribe implementation methodology — that is

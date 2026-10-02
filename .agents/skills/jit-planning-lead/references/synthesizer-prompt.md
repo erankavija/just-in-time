@@ -48,4 +48,8 @@ criteria as required sources, and warnings denied. A necessary exception names
 only the affected stable code in `terminal.warning_overrides`; its reason remains
 reviewer-visible. Never use `worker_sized_reason` as a global waiver. Then render
 write/check and run native batch-create dry-run. Fix failures before returning.
-Return only both paths, counts, and unresolved owner decisions.
+
+[RETURN CONTRACT — paste `.agents/skills/jit-manage/references/return-contract.md` verbatim]
+
+Outcome deliverables: both paths and issue/edge counts. Unresolved owner decisions go
+under Needs decision.
