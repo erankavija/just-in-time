@@ -16360,3 +16360,6 @@
 {"assignee":"agent:claude","id":"299ceef4-f4f0-449c-bc50-271def32862f","issue_id":"65059cd2-583f-4998-b84d-41d560e2bf1d","timestamp":"2026-10-02T22:12:19.445483673Z","type":"issue_claimed"}
 {"fields":["labels"],"id":"f9f12e03-cf2e-43fd-805e-780442612832","issue_id":"65059cd2-583f-4998-b84d-41d560e2bf1d","timestamp":"2026-10-02T22:15:06.122362137Z","type":"issue_updated","updated_by":"issue-update"}
 {"fields":["dependencies"],"id":"06618346-a679-4a28-a202-88d8e85ce82f","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-10-02T22:15:06.251303962Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["description"],"id":"201c1eb6-f79a-4fdd-9202-a73c06b131c4","issue_id":"65059cd2-583f-4998-b84d-41d560e2bf1d","timestamp":"2026-10-02T22:27:11.936729165Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"1130ac49-2b28-4e62-9c0e-8385eaa10033","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","priority":"high","timestamp":"2026-10-02T22:27:12.091377886Z","title":"Archive preview accepts a relative edge that execution's proposed layout cannot resolve","type":"issue_created"}
+{"fields":["dependencies"],"id":"00f48b01-66e2-452a-9b9c-2dcce5ebbbed","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-10-02T22:27:15.590591580Z","type":"issue_updated","updated_by":"dependency-add"}
