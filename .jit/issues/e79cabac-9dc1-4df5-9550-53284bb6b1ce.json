@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-10-02T23:47:10.465971667Z",
   "context": {},
   "created_at": "2026-10-02T22:27:12.091377886Z",
   "dependencies": [],
@@ -19,7 +20,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Archive preview accepts a relative edge that execution's proposed layout cannot resolve",
-  "updated_at": "2026-10-02T22:27:12.091377886Z"
+  "updated_at": "2026-10-02T23:47:10.465971667Z"
 }
