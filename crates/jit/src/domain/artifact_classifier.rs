@@ -1088,7 +1088,7 @@ fn classify_entry(
             {
                 true
             }
-            (ArtifactLocation::Missing, ArtifactLocation::Regular(_)) if explicit => true,
+            (ArtifactLocation::Missing, ArtifactLocation::Regular(_)) => true,
             (_, ArtifactLocation::Regular(_)) => {
                 blockers.push(PlanBlocker::new(
                     BlockerCode::DestinationConflict,
@@ -1102,7 +1102,7 @@ fn classify_entry(
         false
     };
 
-    if embedded_missing {
+    if embedded_missing && !already_archived {
         action = ArtifactAction::Retain;
     }
     if !blockers.is_empty() {
@@ -1441,7 +1441,10 @@ fn propagate_relative_destinations(
                 needs_destination.contains(*parent)
                     && edge.resolution_mode == EdgeResolutionMode::Relative
             })
-            .filter_map(|(_, edge)| present_target(edge, locations, paths))
+            .filter_map(|(_, edge)| {
+                present_target(edge, locations, paths)
+                    .or_else(|| archived_target(edge, locations, paths))
+            })
             .filter(|target| !policy.retains_outside_development_root(target))
             .filter(|target| !needs_destination.contains(*target))
             .cloned()
@@ -1493,6 +1496,24 @@ fn present_target<'a>(
         .get(target)
         .is_some_and(|fact| matches!(fact.source, ArtifactLocation::Missing));
     (!missing).then_some(target)
+}
+
+/// An inventoried edge target an earlier run already archived: gone from its
+/// source and present at its destination, where the edge must keep resolving.
+fn archived_target<'a>(
+    edge: &'a ArtifactEdge,
+    locations: &BTreeMap<String, ArtifactLocationFacts>,
+    paths: &'a BTreeSet<String>,
+) -> Option<&'a String> {
+    edge.target
+        .as_ref()
+        .filter(|target| paths.contains(*target))
+        .filter(|target| {
+            locations.get(*target).is_some_and(|fact| {
+                matches!(fact.source, ArtifactLocation::Missing)
+                    && matches!(fact.destination, ArtifactLocation::Regular(_))
+            })
+        })
 }
 
 fn select_direct_owners(

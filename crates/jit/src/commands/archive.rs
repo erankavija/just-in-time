@@ -11,8 +11,8 @@ use crate::domain::artifact_classifier::{
 };
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
-    ArtifactClosure, ArtifactClosureState, ArtifactEvidence, ArtifactEvidenceMap,
-    ArtifactListingScope,
+    recorded_archived_copies, ArtifactClosure, ArtifactClosureState, ArtifactEvidence,
+    ArtifactEvidenceMap, ArtifactListingScope,
 };
 use crate::domain::artifact_execution::ArchiveExecutionResult;
 use crate::domain::artifact_inventory::{
@@ -245,8 +245,14 @@ impl<S: IssueStore> CommandExecutor<S> {
         );
         let inventory =
             inventory_explicit_roots(&inventory_issues, &hierarchy, explicit_target, &pinned)?;
-        let (discovered, embedded_owners) =
-            discover_archive_artifacts(&self.storage, inventory, &issues, &policy)?;
+        let archive_events = self.storage.read_artifact_archive_events()?;
+        let (discovered, embedded_owners) = discover_archive_artifacts(
+            &self.storage,
+            inventory,
+            &issues,
+            &policy,
+            recorded_archived_copies(&archive_events, &target_for_layout),
+        )?;
         let plan_target = discovered.target;
         let artifacts = discovered.artifacts;
         let mut blockers = discovered.blockers;
@@ -281,7 +287,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             &policy,
             embedded_owners,
         )?;
-        let archive_events = self.storage.read_artifact_archive_events()?;
         apply_recorded_residue_identities(
             &mut facts.locations,
             &plan_target,
@@ -703,7 +708,9 @@ impl CommandExecutor<JsonFileStorage> {
             )
             .collect::<BTreeSet<_>>();
         let mut evidence = ArtifactEvidenceMap::new();
-        let mut state = ArtifactClosureState::new(roots);
+        let archive_events = crate::repository_state::captured_archive_events(&image)?;
+        let mut state = ArtifactClosureState::new(roots)
+            .with_archived_copies(recorded_archived_copies(&archive_events, &plan_target));
         let parsed = loop {
             match expand_artifact_closure(state, &evidence) {
                 ArtifactClosure::Complete(parsed) => break parsed,
@@ -806,7 +813,7 @@ impl CommandExecutor<JsonFileStorage> {
             &mut facts.locations,
             &plan_target,
             &destination,
-            &crate::repository_state::captured_archive_events(&image)?,
+            &archive_events,
         );
         let plan = classify_artifacts(
             ArtifactClassificationInventory::new(plan_target, artifacts, blockers)
@@ -2576,6 +2583,26 @@ mod tests {
         assert_eq!(container.archived_from, Some(State::Done));
         // The retirement transition is not re-emitted on the no-op rerun.
         assert_eq!(state_change_count(&executor, &id), 1);
+    }
+
+    #[test]
+    fn test_container_archival_rerun_keeps_a_copy_an_archived_document_still_cites() {
+        let (repo, executor, id) =
+            executable_container_repo(State::Done, "See [b](/fixtures/b.md).\n");
+        fs::write(repo.path().join("fixtures/b.md"), "# B\n").unwrap();
+        let mut container = executor.storage.load_issue(&id).unwrap();
+        container
+            .documents
+            .push(DocumentReference::new("fixtures/b.md".into()));
+        seed_archive_issue_precondition(&executor.storage, container);
+
+        let first = executor.execute_archive_container(&id).unwrap();
+        assert_eq!(first.deleted_sources, vec!["fixtures/root.md"]);
+        // The archived root still cites b at its source path, so b stays there
+        // through every rerun.
+        let rerun = executor.execute_archive_container(&id).unwrap();
+        assert!(!rerun.event_appended, "{:?}", rerun.deleted_sources);
+        assert!(repo.path().join("fixtures/b.md").exists());
     }
 
     #[test]

@@ -97,7 +97,7 @@ impl Repo {
             &PinnedRootEvidenceMap::new(),
         )
         .unwrap();
-        discover_archive_artifacts(&self.storage, inventory, &[], policy)
+        discover_archive_artifacts(&self.storage, inventory, &[], policy, Default::default())
             .unwrap()
             .0
     }
@@ -691,10 +691,15 @@ fn test_readable_pinned_root_is_historical_and_never_scanned_or_constrains_worki
     )
     .unwrap();
 
-    let discovered =
-        discover_archive_artifacts(&repo.storage, inventory, &issues, &unbounded_policy())
-            .unwrap()
-            .0;
+    let discovered = discover_archive_artifacts(
+        &repo.storage,
+        inventory,
+        &issues,
+        &unbounded_policy(),
+        Default::default(),
+    )
+    .unwrap()
+    .0;
     assert_eq!(discovered.artifacts.len(), 1);
     let historical = &discovered.artifacts[0];
     assert!(historical.version().is_pinned());
@@ -716,10 +721,15 @@ fn test_failed_pinned_read_stays_pinned_read_failed_without_working_tree_fallbac
     )
     .unwrap();
 
-    let discovered =
-        discover_archive_artifacts(&repo.storage, inventory, &issues, &unbounded_policy())
-            .unwrap()
-            .0;
+    let discovered = discover_archive_artifacts(
+        &repo.storage,
+        inventory,
+        &issues,
+        &unbounded_policy(),
+        Default::default(),
+    )
+    .unwrap()
+    .0;
     assert!(discovered.artifacts.is_empty());
     assert_eq!(discovered.blockers.len(), 1);
     assert_eq!(discovered.blockers[0].code, BlockerCode::PinnedReadFailed);

@@ -43,6 +43,7 @@ pub fn discover_archive_artifacts<S: IssueStore>(
     inventory: ExplicitRootInventory,
     issues: &[Issue],
     policy: &ArtifactClassificationPolicy,
+    archived_copies: BTreeMap<String, String>,
 ) -> Result<(ArtifactClassificationInventory, Vec<EmbeddedArtifactOwner>), ArtifactDiscoveryError> {
     let selected = inventory
         .artifacts()
@@ -55,16 +56,17 @@ pub fn discover_archive_artifacts<S: IssueStore>(
         .filter(|document| document.commit.is_none())
         .map(|document| crate::domain::artifact_plan::normalize_artifact_path(&document.path));
     let roots = selected.chain(owner_roots).collect::<BTreeSet<_>>();
-    let (evidence, parsed) = collect_closure_evidence(storage, roots)?;
+    let (evidence, parsed) = collect_closure_evidence(storage, roots, archived_copies)?;
     derive_archive_artifacts(inventory, issues, &evidence, &parsed, policy).map_err(Into::into)
 }
 
 fn collect_closure_evidence<S: IssueStore>(
     storage: &S,
     roots: BTreeSet<String>,
+    archived_copies: BTreeMap<String, String>,
 ) -> Result<(ArtifactEvidenceMap, BTreeMap<String, ParsedArtifact>), ArtifactDiscoveryError> {
     let mut evidence = ArtifactEvidenceMap::new();
-    let mut state = ArtifactClosureState::new(roots);
+    let mut state = ArtifactClosureState::new(roots).with_archived_copies(archived_copies);
     loop {
         let (paths, next) = match expand_artifact_closure(state, &evidence) {
             ArtifactClosure::Complete(parsed) => return Ok((evidence, parsed)),

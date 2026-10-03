@@ -83,6 +83,7 @@ pub struct DiscoveryGraph {
 pub struct ArtifactClosureState {
     graph: DiscoveryGraph,
     parsed: BTreeMap<String, ParsedArtifact>,
+    archived_copies: BTreeMap<String, String>,
 }
 
 impl ArtifactClosureState {
@@ -91,7 +92,19 @@ impl ArtifactClosureState {
         Self {
             graph: DiscoveryGraph::new(roots),
             parsed: BTreeMap::new(),
+            archived_copies: BTreeMap::new(),
         }
+    }
+
+    /// Name the copy an earlier archival of this target published for each
+    /// source, keyed by source.
+    ///
+    /// A source that archival then deleted is read through its copy, whose
+    /// bytes are the source's own, so its edges constrain a rerun exactly as
+    /// they did the run that archived it.
+    pub fn with_archived_copies(mut self, copies: BTreeMap<String, String>) -> Self {
+        self.archived_copies = copies;
+        self
     }
 
     /// Paths parsed so far, exposed to verify incremental reuse without instrumentation.
@@ -147,6 +160,34 @@ pub enum ArtifactListingScope {
 /// Archive-specific captured evidence keyed by normalized worktree path.
 pub type ArtifactEvidenceMap = BTreeMap<String, ArtifactEvidence>;
 
+/// The copy each source was published to by recorded archivals of `target`,
+/// keyed by normalized source; a later record supersedes an earlier one.
+pub fn recorded_archived_copies(
+    events: &[crate::domain::Event],
+    target: &crate::domain::artifact_plan::PlanTarget,
+) -> BTreeMap<String, String> {
+    events
+        .iter()
+        .filter_map(|event| match event {
+            crate::domain::Event::ArtifactArchiveExecuted {
+                target: recorded,
+                publications,
+                ..
+            } if recorded == target => Some(publications),
+            _ => None,
+        })
+        .flatten()
+        .filter_map(|publication| {
+            publication.source.as_deref().map(|source| {
+                (
+                    crate::domain::artifact_plan::normalize_artifact_path(source),
+                    crate::domain::artifact_plan::normalize_artifact_path(&publication.destination),
+                )
+            })
+        })
+        .collect()
+}
+
 /// Pure closure result: callers acquire only the paths still needed and retry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArtifactClosure {
@@ -193,11 +234,26 @@ pub fn expand_artifact_closure(
     evidence: &ArtifactEvidenceMap,
 ) -> ArtifactClosure {
     let mut needs = BTreeSet::new();
+    let mut revisit = BTreeSet::new();
     while let Some(path) = state.graph.next_path() {
-        match evidence.get(&path) {
+        let fact = match evidence.get(&path) {
+            Some(ArtifactEvidence::Missing) => match state.archived_copies.get(&path) {
+                Some(copy) => evidence.get(copy).or_else(|| {
+                    needs.insert(copy.clone());
+                    revisit.insert(path.clone());
+                    None
+                }),
+                None => Some(&ArtifactEvidence::Missing),
+            },
             None => {
-                needs.insert(path);
+                needs.insert(path.clone());
+                revisit.insert(path.clone());
+                None
             }
+            fact => fact,
+        };
+        match fact {
+            None => {}
             Some(ArtifactEvidence::File(bytes)) => {
                 let artifact = parse_artifact(&path, bytes);
                 artifact.references().iter().for_each(|reference| {
@@ -221,10 +277,7 @@ pub fn expand_artifact_closure(
     if needs.is_empty() {
         ArtifactClosure::Complete(state.parsed)
     } else {
-        needs
-            .iter()
-            .cloned()
-            .for_each(|path| state.graph.defer(path));
+        revisit.into_iter().for_each(|path| state.graph.defer(path));
         ArtifactClosure::Needs {
             paths: needs,
             state,
@@ -286,7 +339,16 @@ pub fn discover_archive_artifacts(
     let mut referencing = BTreeMap::<String, BTreeSet<String>>::new();
     let mut missing = BTreeSet::new();
     while let Some(path) = graph.next_path() {
-        match evidence.get(&path) {
+        // A source the closure parsed from its archived copy contributes its
+        // edges as the file it was, whatever bytes the branch below ignores.
+        const PARSED_FROM_COPY: ArtifactEvidence = ArtifactEvidence::File(Vec::new());
+        let fact = match evidence.get(&path) {
+            Some(ArtifactEvidence::Missing) if parsed_by_path.contains_key(&path) => {
+                Some(&PARSED_FROM_COPY)
+            }
+            fact => fact,
+        };
+        match fact {
             Some(ArtifactEvidence::Missing) => {
                 if explicit_paths.contains(&path) {
                     append_blocker(
