@@ -16391,3 +16391,7 @@
 {"gate_key":"cargo-ci","id":"d0851f9c-7fbb-471c-b773-c06ff1777fe7","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","timestamp":"2026-10-03T14:02:05.376638094Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"4a7aaea8-a849-489c-9a2f-7ce27dce0f4c","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","timestamp":"2026-10-03T14:02:11.152791950Z","to":"done","type":"issue_state_changed"}
 {"id":"1f72c075-68b6-4dc1-9292-cb67e60cfb57","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","timestamp":"2026-10-03T14:02:11.152791950Z","type":"issue_completed"}
+{"id":"89656a9f-d5ab-4fb9-a69f-6d1228f535ea","issue_id":"ba95a465-409c-463a-86b5-b38db90f4007","priority":"high","timestamp":"2026-10-03T14:04:50.168504850Z","title":"Archive aborts on a link target the layout cannot represent","type":"issue_created"}
+{"fields":["dependencies"],"id":"83321902-defa-46f4-a6b4-8a1a638d965b","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-10-03T14:04:57.989433520Z","type":"issue_updated","updated_by":"dependency-add"}
+{"from":"ready","id":"97a343cd-886f-492f-97aa-c4abf5b0d8b0","issue_id":"ba95a465-409c-463a-86b5-b38db90f4007","timestamp":"2026-10-03T14:04:58.114394930Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:claude","id":"ca092311-8583-460a-9ccc-925543d36ba7","issue_id":"ba95a465-409c-463a-86b5-b38db90f4007","timestamp":"2026-10-03T14:04:58.114394930Z","type":"issue_claimed"}

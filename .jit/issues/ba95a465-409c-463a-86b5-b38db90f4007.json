@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:claude",
+  "claimed_at": "2026-10-03T14:04:58.114394930Z",
+  "context": {},
+  "created_at": "2026-10-03T14:04:50.168504850Z",
+  "dependencies": [],
+  "description": "Archive preview and execution abort when a discovered link target is a path the repository layout cannot represent, such as one containing `:`.\n\n## Background\n\nArchive discovery follows local links from documents, including documents outside the plan that it reads to establish ownership. A rustdoc page under a built `target/doc` carries intra-doc hrefs such as `gf2_coding::dvb_t2_bicm_harness::box_muller_cos`. The layout's path type rejects `:`, backslashes and control characters. The evidence readers convert other invalid targets into invalid-path evidence, but this rejection surfaces as a hard error:\n\n```\nfailed to read artifact target/doc/gf2_sim/gf2_coding::dvb_t2_bicm_harness::box_muller_cos: Invalid path: path '...' is not lexically confined\n```\n\nOne such href anywhere in the reachable link closure makes the whole command fail.\n\n## Success Criteria\n\n- A link target the layout cannot represent yields invalid-path evidence in both the preview and the execution evidence readers; neither command fails with a path error.\n- Such a target inside the plan's walk is reported as a blocker on the plan; one reached only through the ownership closure does not affect the plan.\n- `jit archive container 6dc81018` previews successfully in a gf2 tree with a built `target/doc`.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-03T14:04:50.168504850Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ba95a465-409c-463a-86b5-b38db90f4007",
+  "labels": [
+    "component:core",
+    "epic:v1-release",
+    "milestone:v1.0",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "in_progress",
+  "title": "Archive aborts on a link target the layout cannot represent",
+  "updated_at": "2026-10-03T14:04:58.114394930Z"
+}
