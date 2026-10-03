@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "A rerun of a completed container archival is not a no-op: each rerun deletes a source that the first run deliberately kept as a copy, breaking links in archived documents.\n\n## Background\n\nThe first run copies an artifact, keeping its source, when another archived document cites it in a way that requires the source path to survive (a root-relative link, or a relative link from a document that itself stays at its source). On a rerun, the citing document has already moved: its source is gone and only its archived copy remains. Rediscovery does not read edges from that copy, so the constraint that kept the artifact's source disappears. The artifact is reclassified as a move and its source is deleted, which breaks the archived document's link. The next rerun cascades one level further.\n\nObserved on a scratch clone of gf2 with container `6dc81018`. Run 1 published 121 artifacts and deleted 48 sources. Run 2 deleted six more under `dev/benchmarks/tuning_profiles/`, including `2026-08-22-post-cutover-receipt-5.md`, which the archived `dev/active/eb9b324c/findings.md` cites root-relatively. Run 3 deleted `dev/active/fc976a80/findings.md`.\n\n## Success Criteria\n\n- Rerunning archive execution on a container whose archival completed appends no event, publishes nothing and deletes nothing.\n- An already-archived document's edges constrain classification on a rerun exactly as they did on the first run.\n- Archiving `6dc81018` on a scratch clone of gf2, then rerunning twice, leaves the tree byte-identical after the first run.\n",
   "documents": [],
+  "done_at": "2026-10-03T14:02:11.152791950Z",
   "first_ready_at": "2026-10-03T12:53:11.667907863Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-03T14:02:05.376638094Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-03T13:11:27.673405982Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f3c64bfc-a771-49d4-923a-45fc1c1e66c8",
   "labels": [
     "component:core",
@@ -20,7 +32,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive reruns delete sources the first run kept because archived documents' edges are not rediscovered",
-  "updated_at": "2026-10-03T12:58:55.100914851Z"
+  "updated_at": "2026-10-03T14:02:11.152791950Z"
 }

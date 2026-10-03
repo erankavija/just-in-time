@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6c7fffa13f7ab136f1e466316439798277ed5d58",
+  "completed_at": "2026-10-03T13:11:27.464503307Z",
+  "duration_ms": 118944,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact defects found in the attributed archive rerun change.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f3c64bfc-a771-49d4-923a-45fc1c1e66c8",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "400d36d5-5b70-4325-bab4-e9ddb4e4292c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-03T13:09:28.519828722Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 6c7fffa13 `fix(jit:f3c64bfc): rediscover an archived document's edges from its recorded copy`\nPolicy sources: AGENTS.md\nResolved items: @/invariant/derived-state-coherence (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/8e071e18/decision/D-14 (issue description)\nGate evidence: cargo-ci failed, exit 1 (disk-full in unrelated profile test); code-review pending\nTruncation recovery: narrowed reads of gate definitions, invariant sources, archive planning/discovery/classification/finalization, and rerun tests\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact defects found in the attributed archive rerun change.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
