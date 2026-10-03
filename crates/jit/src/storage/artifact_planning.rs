@@ -1,10 +1,10 @@
 //! No-follow filesystem evidence acquisition for pure archive planning.
 
 use crate::domain::artifact_classifier::{
-    artifact_archive_destination, classification_facts_from_evidence, contains_path,
-    resolve_container_destination as derive_container_destination, ArtifactClassificationFacts,
-    ArtifactClassificationPolicy, CitationScanEvidence, CitationScanner, EmbeddedArtifactOwner,
-    ResolvedContainerDestination,
+    classification_facts_from_evidence, contains_path,
+    resolve_container_destination as derive_container_destination, ArchiveLayout,
+    ArtifactClassificationFacts, ArtifactClassificationPolicy, CitationScanEvidence,
+    CitationScanner, EmbeddedArtifactOwner, ResolvedContainerDestination,
 };
 use crate::domain::artifact_discovery::{
     ArtifactEvidence, ArtifactEvidenceMap, ArtifactListingScope,
@@ -89,6 +89,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
     embedded_owners: Vec<EmbeddedArtifactOwner>,
 ) -> Result<ArtifactClassificationFacts> {
     let inspect_destinations = !policy.archive_root.is_empty();
+    let layout = ArchiveLayout::new(target, destination_root, policy, artifacts);
     let mut evidence = ArtifactEvidenceMap::new();
     for artifact in artifacts
         .iter()
@@ -100,9 +101,7 @@ pub fn collect_artifact_classification_facts<S: IssueStore>(
             inspect_artifact_evidence(storage, source, ArtifactListingScope::MetadataOnly)?,
         );
         if inspect_destinations {
-            if let Some(destination) =
-                artifact_archive_destination(target, destination_root, policy, source)
-            {
+            if let Some(destination) = layout.destination(source) {
                 evidence.insert(
                     destination.clone(),
                     inspect_artifact_evidence(

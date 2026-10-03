@@ -518,13 +518,13 @@ pub fn classification_facts_from_evidence(
     evidence: &ArtifactEvidenceMap,
 ) -> anyhow::Result<ArtifactClassificationFacts> {
     let inspect_destinations = !policy.archive_root.is_empty();
+    let layout = ArchiveLayout::new(target, destination_root, policy, artifacts);
     let locations = artifacts
         .iter()
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
         .map(|artifact| {
             let source = artifact.source();
-            let destination =
-                artifact_archive_destination(target, destination_root, policy, source);
+            let destination = layout.destination(source);
             Ok((
                 source.to_string(),
                 ArtifactLocationFacts {
@@ -616,12 +616,11 @@ fn container_destination_from_evidence(
         }
         ArtifactEvidence::Missing => {}
     }
+    let layout = ArchiveLayout::new(&target, destination_root, policy, artifacts);
     let accounted = artifacts
         .iter()
         .filter(|artifact| artifact.version() == &ArtifactVersion::WorkingTree)
-        .filter_map(|artifact| {
-            artifact_archive_destination(&target, destination_root, policy, artifact.source())
-        })
+        .filter_map(|artifact| layout.destination(artifact.source()))
         .collect::<BTreeSet<_>>();
     Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
         ContainerDestinationState::MarkerlessAccounted
@@ -733,21 +732,22 @@ pub fn classify_artifacts(
         &paths,
         &mut needs_destination,
     );
-    destination_source_conflicts(
+    let layout = ArchiveLayout::new(
         &inventory.target,
-        &needs_destination,
         &destination_root,
         &policy,
-    )
-    .into_values()
-    .filter(|sources| sources.len() > 1)
-    .flatten()
-    .for_each(|source| {
-        plan_blockers.push(PlanBlocker::new(
-            BlockerCode::DestinationConflict,
-            Some(source),
-        ));
-    });
+        &inventory.artifacts,
+    );
+    destination_source_conflicts(&layout, &needs_destination)
+        .into_values()
+        .filter(|sources| sources.len() > 1)
+        .flatten()
+        .for_each(|source| {
+            plan_blockers.push(PlanBlocker::new(
+                BlockerCode::DestinationConflict,
+                Some(source),
+            ));
+        });
     let edge_source_constraints = edge_source_constraints(
         &inventory.artifacts,
         &facts.locations,
@@ -769,11 +769,24 @@ pub fn classify_artifacts(
                 &needs_destination,
                 &edge_source_constraints,
                 &unpreservable_parents,
-                &destination_root,
+                &layout,
             )
             .map(|entry| cite_moving_path(entry, &facts.citations))
         })
         .collect::<Result<Vec<_>, PlanError>>()?;
+    // Execution refuses a layout this check rejects, so preview reports it as
+    // a blocker rather than as an eligible plan.
+    if let Err(violation) = validate_proposed_artifact_layout(&artifacts) {
+        use crate::repository_state::ProducerError;
+        plan_blockers.push(PlanBlocker::new(
+            BlockerCode::UnpreservableLayout,
+            match violation {
+                ProducerError::ProposedLayoutEdgeUnavailable { parent, .. } => Some(parent),
+                ProducerError::ProposedLayoutTargetAbsent { target } => Some(target),
+                _ => None,
+            },
+        ));
+    }
 
     ArtifactPlan::new(
         inventory.target,
@@ -791,15 +804,11 @@ pub fn classify_artifacts(
 /// emits one blocker naming each conflicting source, while ordinary occupied
 /// destination checks name the destination itself.
 fn destination_source_conflicts(
-    target: &PlanTarget,
+    layout: &ArchiveLayout<'_>,
     sources: &BTreeSet<String>,
-    destination_root: &str,
-    policy: &ArtifactClassificationPolicy,
 ) -> BTreeMap<String, Vec<String>> {
     sources.iter().fold(BTreeMap::new(), |mut grouped, source| {
-        if let Some(destination) =
-            artifact_archive_destination(target, destination_root, policy, source)
-        {
+        if let Some(destination) = layout.destination(source) {
             grouped
                 .entry(destination)
                 .or_insert_with(Vec::new)
@@ -823,12 +832,18 @@ fn destination_source_conflicts(
 pub fn validate_proposed_layout(
     plan: &ArtifactPlan,
 ) -> Result<(), crate::repository_state::ProducerError> {
-    let by_source = plan
-        .artifacts()
+    validate_proposed_artifact_layout(plan.artifacts())
+}
+
+/// [`validate_proposed_layout`] over a plan's classified artifacts.
+fn validate_proposed_artifact_layout(
+    artifacts: &[ArtifactPlanEntry],
+) -> Result<(), crate::repository_state::ProducerError> {
+    let by_source = artifacts
         .iter()
         .map(|artifact| (artifact.source(), artifact))
         .collect::<BTreeMap<_, _>>();
-    for parent in plan.artifacts() {
+    for parent in artifacts {
         for edge in parent
             .edges()
             .iter()
@@ -860,16 +875,18 @@ pub fn validate_proposed_layout(
             // `resolve_reference` in `artifact_discovery.rs`), but `available`
             // never carries one either, so matching the raw reference here
             // would reject every anchor- or query-bearing edge.
-            let reference_path = edge.reference.split(['?', '#']).next().unwrap_or_default();
             for parent_path in proposed_available_paths(parent) {
                 let resolved = match edge.resolution_mode {
                     EdgeResolutionMode::Relative => {
-                        let parent_dir = Path::new(&parent_path).parent().unwrap_or(Path::new(""));
-                        normalize_artifact_path(&parent_dir.join(reference_path).to_string_lossy())
+                        resolve_relative_reference(&parent_path, &edge.reference)
                     }
-                    EdgeResolutionMode::RootRelative => {
-                        normalize_artifact_path(reference_path.trim_start_matches('/'))
-                    }
+                    EdgeResolutionMode::RootRelative => normalize_artifact_path(
+                        edge.reference
+                            .split(['?', '#'])
+                            .next()
+                            .unwrap_or_default()
+                            .trim_start_matches('/'),
+                    ),
                     EdgeResolutionMode::External => continue,
                 };
                 if !available.contains(&resolved) {
@@ -917,7 +934,7 @@ fn classify_entry(
     needs_destination: &BTreeSet<String>,
     edge_source_constraints: &BTreeSet<String>,
     unpreservable_parents: &BTreeSet<String>,
-    destination_root: &str,
+    layout: &ArchiveLayout<'_>,
 ) -> Result<ArtifactPlanEntry, PlanError> {
     if entry.version().is_pinned() {
         let evidence = merge(entry.evidence(), [EvidenceCode::PinnedHistorical]);
@@ -993,7 +1010,8 @@ fn classify_entry(
         (false, _) => ArtifactAction::Retain,
     };
 
-    let mirror = artifact_archive_destination(target, destination_root, policy, &source)
+    let mirror = layout
+        .destination(&source)
         .unwrap_or_else(|| source.clone());
     let mut blockers = entry
         .blockers()
@@ -1659,45 +1677,108 @@ fn container_short_id(id: &str) -> String {
     id.chars().take(SHORT_ID_LENGTH).collect()
 }
 
-/// Place one repository-relative source beneath a target destination root.
+/// Where one plan publishes each repository-relative source beneath its
+/// destination root.
 ///
 /// Sources inside a configured development root retain only their path relative
-/// to that policy boundary. A container target also removes a matching
-/// `<issue-scoped-area>/<container>/` owner prefix: the destination root already
-/// records that ownership, while the exact configured area and artifact-relative
-/// suffix remain. Flat managed areas never participate. Document targets retain
-/// every source component beneath the development root because they have no
-/// container owner in their destination root.
+/// to that policy boundary, which preserves the relative layout among them.
+/// Flat managed areas never participate. Document targets retain every source
+/// component beneath the development root because they have no container owner
+/// in their destination root.
+///
+/// A container target also removes a matching `<issue-scoped-area>/<container>/`
+/// owner prefix, since the destination root already records that ownership —
+/// but only when every relative edge between inventoried artifacts still
+/// resolves afterwards. The removal moves the owner's artifacts relative to
+/// their siblings, and publication copies bytes unchanged, so an edge crossing
+/// the owner directory would break; such a plan keeps the owner directory.
 ///
 /// An empty development root represents the repository root. Sources outside a
-/// non-empty development root return `None` because classification retains them
-/// and must not assign a publication destination.
-pub(crate) fn artifact_archive_destination(
-    target: &PlanTarget,
-    destination_root: &str,
-    policy: &ArtifactClassificationPolicy,
-    source: &str,
-) -> Option<String> {
-    let development_root = &policy.development_root;
-    let source = normalize_artifact_path(source);
-    let relative = if development_root.is_empty() {
-        source.as_str()
-    } else if source == development_root.as_str() {
-        return Some(normalize_artifact_path(destination_root));
-    } else {
-        source.strip_prefix(&format!("{development_root}/"))?
-    };
-    let relative = if matches!(target, PlanTarget::Container { .. }) {
-        strip_matching_container_owner(
+/// non-empty development root have no destination because classification
+/// retains them.
+#[derive(Debug, Clone, Copy)]
+pub struct ArchiveLayout<'a> {
+    destination_root: &'a str,
+    policy: &'a ArtifactClassificationPolicy,
+    removes_owner: bool,
+}
+
+impl<'a> ArchiveLayout<'a> {
+    /// Decide the layout for `artifacts`, the plan's complete inventory.
+    pub fn new(
+        target: &'a PlanTarget,
+        destination_root: &'a str,
+        policy: &'a ArtifactClassificationPolicy,
+        artifacts: &[ArtifactPlanEntry],
+    ) -> Self {
+        let removing = Self {
             destination_root,
-            development_root,
-            &policy.issue_scoped_areas,
-            relative,
-        )
-    } else {
-        relative.to_string()
-    };
-    Some(join_path(destination_root, &relative))
+            policy,
+            removes_owner: matches!(target, PlanTarget::Container { .. }),
+        };
+        let inventoried = artifacts
+            .iter()
+            .map(ArtifactPlanEntry::source)
+            .collect::<BTreeSet<_>>();
+        let preserved = artifacts.iter().all(|parent| {
+            parent
+                .edges()
+                .iter()
+                .filter(|edge| {
+                    edge.kind == EdgeKind::Supported
+                        && edge.resolution_mode == EdgeResolutionMode::Relative
+                })
+                .filter_map(|edge| edge.target.as_deref().map(|target| (edge, target)))
+                .filter(|(_, target)| inventoried.contains(target))
+                .all(|(edge, target)| {
+                    match (
+                        removing.destination(parent.source()),
+                        removing.destination(target),
+                    ) {
+                        (Some(parent), Some(target)) => {
+                            resolve_relative_reference(&parent, &edge.reference) == target
+                        }
+                        _ => true,
+                    }
+                })
+        });
+        Self {
+            removes_owner: removing.removes_owner && preserved,
+            ..removing
+        }
+    }
+
+    /// The destination of `source`, or `None` outside the development root.
+    pub fn destination(&self, source: &str) -> Option<String> {
+        let development_root = &self.policy.development_root;
+        let source = normalize_artifact_path(source);
+        let relative = if development_root.is_empty() {
+            source.as_str()
+        } else if source == development_root.as_str() {
+            return Some(normalize_artifact_path(self.destination_root));
+        } else {
+            source.strip_prefix(&format!("{development_root}/"))?
+        };
+        let relative = if self.removes_owner {
+            strip_matching_container_owner(
+                self.destination_root,
+                development_root,
+                &self.policy.issue_scoped_areas,
+                relative,
+            )
+        } else {
+            relative.to_string()
+        };
+        Some(join_path(self.destination_root, &relative))
+    }
+}
+
+/// The repository path a relative `reference` written in the document at
+/// `parent` names, ignoring any query string or fragment.
+fn resolve_relative_reference(parent: &str, reference: &str) -> String {
+    let reference_path = reference.split(['?', '#']).next().unwrap_or_default();
+    let parent_dir = Path::new(parent).parent().unwrap_or(Path::new(""));
+    normalize_artifact_path(&parent_dir.join(reference_path).to_string_lossy())
 }
 
 /// Remove the redundant owner from one exact configured issue-scoped area.
@@ -1834,7 +1915,10 @@ mod tests {
         let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "archive");
 
         assert_eq!(
-            destination_source_conflicts(&target, &sources, "archive/container", &policy),
+            destination_source_conflicts(
+                &ArchiveLayout::new(&target, "archive/container", &policy, &[]),
+                &sources,
+            ),
             BTreeMap::from([(
                 "archive/container/active/plan.md".to_string(),
                 vec![
@@ -1846,7 +1930,7 @@ mod tests {
     }
 
     #[test]
-    fn test_artifact_archive_destination_strips_matching_owners_in_configured_issue_scoped_areas() {
+    fn test_archive_layout_destination_strips_matching_owners_in_configured_issue_scoped_areas() {
         let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive")
             .with_issue_scoped_areas(vec!["dev/active".into(), "dev/presentations".into()]);
         let cases = [
@@ -1862,22 +1946,23 @@ mod tests {
 
         cases.into_iter().for_each(|(source, expected)| {
             assert_eq!(
-                artifact_archive_destination(
+                ArchiveLayout::new(
                     &PlanTarget::Container {
                         id: CONTAINER.to_string(),
                     },
                     "dev/archive/abcdef12-platform",
                     &policy,
-                    source,
-                ),
+                    &[]
+                )
+                .destination(source),
                 Some(expected.to_string()),
             );
         });
     }
 
     #[test]
-    fn test_artifact_archive_destination_preserves_nonmatching_owner_directories_and_document_paths(
-    ) {
+    fn test_archive_layout_destination_preserves_nonmatching_owner_directories_and_document_paths()
+    {
         let container = PlanTarget::Container {
             id: CONTAINER.to_string(),
         };
@@ -1889,25 +1974,22 @@ mod tests {
         ] {
             let relative = source.strip_prefix("dev/").unwrap();
             assert_eq!(
-                artifact_archive_destination(
-                    &container,
-                    "dev/archive/abcdef12-platform",
-                    &policy,
-                    source,
-                ),
+                ArchiveLayout::new(&container, "dev/archive/abcdef12-platform", &policy, &[])
+                    .destination(source),
                 Some(format!("dev/archive/abcdef12-platform/{relative}")),
             );
         }
 
         assert_eq!(
-            artifact_archive_destination(
+            ArchiveLayout::new(
                 &PlanTarget::Document {
                     path: "dev/active/archive/plan.md".to_string(),
                 },
                 "dev/archive",
                 &policy,
-                "dev/active/archive/plan.md",
-            ),
+                &[]
+            )
+            .destination("dev/active/archive/plan.md"),
             Some("dev/archive/active/archive/plan.md".to_string()),
             "document archival must not interpret a matching directory as a container owner",
         );
@@ -1932,10 +2014,8 @@ mod tests {
 
         assert_eq!(
             destination_source_conflicts(
-                &target,
+                &ArchiveLayout::new(&target, "dev/archive/abcdef12-platform", &policy, &[]),
                 &sources,
-                "dev/archive/abcdef12-platform",
-                &policy,
             ),
             BTreeMap::from([(
                 "dev/archive/abcdef12-platform/team/active/plan.md".to_string(),
@@ -2052,9 +2132,142 @@ mod tests {
         );
     }
 
+    /// The relative reference a document at `parent` writes to reach `target`.
+    fn relative_reference(parent: &str, target: &str) -> String {
+        let parent_dir = parent.split('/').collect::<Vec<_>>();
+        let parent_dir = &parent_dir[..parent_dir.len() - 1];
+        let target = target.split('/').collect::<Vec<_>>();
+        let shared = parent_dir
+            .iter()
+            .zip(&target)
+            .take_while(|(left, right)| left == right)
+            .count();
+        std::iter::repeat_n("..", parent_dir.len() - shared)
+            .chain(target[shared..].iter().copied())
+            .collect::<Vec<_>>()
+            .join("/")
+    }
+
+    /// Classify a container plan over present `sources`, each owned inside the
+    /// subtree, with a relative edge for every `(parent, target)` pair.
+    fn plan_with_relative_edges(sources: &[&str], edges: &[(&str, &str)]) -> ArtifactPlan {
+        let present = sources
+            .iter()
+            .map(|source| {
+                (
+                    *source,
+                    ArtifactLocation::Regular(identity(source.as_bytes())),
+                    ArtifactLocation::Missing,
+                )
+            })
+            .collect::<Vec<_>>();
+        container(
+            sources
+                .iter()
+                .map(|source| {
+                    explicit(source, vec![owner("i", State::Done, true)]).with_edges(
+                        edges
+                            .iter()
+                            .filter(|(parent, _)| parent == source)
+                            .map(|(parent, target)| {
+                                edge(
+                                    &relative_reference(parent, target),
+                                    target,
+                                    EdgeResolutionMode::Relative,
+                                )
+                            })
+                            .collect(),
+                    )
+                })
+                .collect(),
+            locations(&present),
+        )
+    }
+
+    #[test]
+    fn test_classify_artifacts_keeps_the_owner_directory_when_collapsing_it_breaks_a_relative_edge()
+    {
+        let owned = "dev/active/abcdef12/classification.md";
+        let sibling = "dev/active/220cab0b/design.md";
+        let plan = plan_with_relative_edges(&[owned, sibling], &[(sibling, owned)]);
+
+        assert!(plan.eligible(), "{:?}", plan.blockers());
+        validate_proposed_layout(&plan).expect("an eligible plan's layout resolves");
+        assert_eq!(
+            entry(&plan, owned).destination(),
+            Some("dev/archive/abcdef12/active/abcdef12/classification.md")
+        );
+        // Without the crossing edge the owner directory collapses as usual.
+        let plan = plan_with_relative_edges(&[owned, sibling], &[]);
+        assert_eq!(
+            entry(&plan, owned).destination(),
+            Some("dev/archive/abcdef12/active/classification.md")
+        );
+    }
+
+    #[test]
+    fn test_classify_artifacts_blocks_a_plan_the_proposed_layout_check_rejects() {
+        let parent = "dev/active/abcdef12/plan.md";
+        let target = "dev/active/other/notes.md";
+        let present = [parent, target].map(|source| {
+            (
+                source,
+                ArtifactLocation::Regular(identity(source.as_bytes())),
+                ArtifactLocation::Missing,
+            )
+        });
+        // The reference does not reach the target it names from any layout.
+        let plan = container(
+            vec![
+                explicit(parent, vec![owner("i", State::Done, true)]).with_edges(vec![edge(
+                    "../elsewhere.md",
+                    target,
+                    EdgeResolutionMode::Relative,
+                )]),
+                explicit(target, vec![owner("i", State::Done, true)]),
+            ],
+            locations(&present),
+        );
+
+        assert!(validate_proposed_layout(&plan).is_err());
+        assert!(plan.blockers().contains(&PlanBlocker::new(
+            BlockerCode::UnpreservableLayout,
+            Some(parent),
+        )));
+        assert!(!plan.eligible());
+    }
+
     proptest! {
         #[test]
-        fn test_artifact_archive_destination_strips_any_configured_development_root(
+        fn test_classify_artifacts_eligible_plan_always_passes_the_proposed_layout_check(
+            chosen in prop::collection::btree_set(0usize..6, 1..=6),
+            edges in prop::collection::vec((0usize..6, 0usize..6), 0..8),
+        ) {
+            const POOL: [&str; 6] = [
+                "dev/active/abcdef12/plan.md",
+                "dev/active/abcdef12/sub/notes.md",
+                "dev/active/220cab0b/design.md",
+                "dev/active/220cab0b/deep/data.md",
+                "dev/active/notes.md",
+                "dev/active/abcdef12.md",
+            ];
+            let sources = chosen.iter().map(|index| POOL[*index]).collect::<Vec<_>>();
+            let edges = edges
+                .into_iter()
+                .filter(|(parent, target)| {
+                    parent != target && chosen.contains(parent) && chosen.contains(target)
+                })
+                .map(|(parent, target)| (POOL[parent], POOL[target]))
+                .collect::<Vec<_>>();
+            let plan = plan_with_relative_edges(&sources, &edges);
+            prop_assert!(plan.eligible(), "{:?}", plan.blockers());
+            prop_assert!(validate_proposed_layout(&plan).is_ok(), "{:?}", validate_proposed_layout(&plan));
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_archive_layout_destination_strips_any_configured_development_root(
             development_segments in prop::collection::vec("[a-z][a-z0-9-]{0,7}", 1..4),
             relative_segments in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
             archive_segments in prop::collection::vec("[a-z][a-z0-9-]{0,7}", 1..4),
@@ -2072,18 +2285,13 @@ mod tests {
             );
 
             prop_assert_eq!(
-                artifact_archive_destination(
-                    &PlanTarget::Document { path: source.clone() },
-                    &format!("./{destination_root}/"),
-                    &policy,
-                    &source,
-                ),
+                ArchiveLayout::new(&PlanTarget::Document { path: source.clone() }, &format!("./{destination_root}/"), &policy, &[]).destination(&source),
                 Some(format!("{destination_root}/{relative}")),
             );
         }
 
         #[test]
-        fn test_artifact_archive_destination_is_injective_for_normalized_relative_paths(
+        fn test_archive_layout_destination_is_injective_for_normalized_relative_paths(
             development_root in "[a-z][a-z0-9-]{0,7}",
             left in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
             right in prop::collection::vec("[a-z][a-z0-9.-]{0,9}", 1..6),
@@ -2100,8 +2308,8 @@ mod tests {
             );
 
             prop_assert_ne!(
-                artifact_archive_destination(&target, "archives/container", &policy, &format!("{development_root}/{left}")),
-                artifact_archive_destination(&target, "archives/container", &policy, &format!("{development_root}/{right}")),
+                ArchiveLayout::new(&target, "archives/container", &policy, &[]).destination(&format!("{development_root}/{left}")),
+                ArchiveLayout::new(&target, "archives/container", &policy, &[]).destination(&format!("{development_root}/{right}")),
             );
         }
     }
@@ -3202,12 +3410,13 @@ mod tests {
         );
         let artifact = entry(&plan, "dev/active/shared.md");
         assert_eq!(artifact.action(), ArtifactAction::Copy);
-        let mirror = artifact_archive_destination(
+        let mirror = ArchiveLayout::new(
             plan.target(),
             plan.destination_root(),
             &default_policy(),
-            "dev/active/shared.md",
+            &[],
         )
+        .destination("dev/active/shared.md")
         .unwrap();
         assert_eq!(
             artifact.reference_changes(),
@@ -3246,12 +3455,13 @@ mod tests {
         assert_eq!(artifact.action(), ArtifactAction::Copy);
         assert_eq!(
             artifact.destination(),
-            artifact_archive_destination(
+            ArchiveLayout::new(
                 plan.target(),
                 plan.destination_root(),
                 &destination_policy,
-                inside,
+                &[]
             )
+            .destination(inside)
             .as_deref()
         );
         assert!(artifact.evidence().contains(&EvidenceCode::PermanentPath));
@@ -4045,14 +4255,15 @@ mod tests {
     #[test]
     fn test_is_whole_path_citation_separates_the_cited_path_from_a_longer_path_around_it() {
         let policy = ArtifactClassificationPolicy::configured("dev", vec![], vec![], "dev/archive");
-        let canonical_destination = artifact_archive_destination(
+        let canonical_destination = ArchiveLayout::new(
             &PlanTarget::Document {
                 path: CITED_SOURCE.to_string(),
             },
             "dev/archive/abcdef12",
             &policy,
-            CITED_SOURCE,
+            &[],
         )
+        .destination(CITED_SOURCE)
         .unwrap();
         assert_eq!(canonical_destination, "dev/archive/abcdef12/active/plan.md");
         assert!(!canonical_destination.contains(CITED_SOURCE));

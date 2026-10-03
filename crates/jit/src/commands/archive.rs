@@ -3,10 +3,11 @@
 use super::CommandExecutor;
 use super::{capture_or_retry, with_mutation_session, SessionStep};
 use crate::domain::artifact_classifier::{
-    artifact_archive_destination, artifact_destination_root, classification_facts_from_evidence,
-    classify_artifacts, preferred_container_destination_root,
-    resolve_container_destination as derive_container_destination, ArtifactClassificationInventory,
-    ArtifactClassificationPolicy, ArtifactLocation, ArtifactLocationFacts,
+    artifact_destination_root, classification_facts_from_evidence, classify_artifacts,
+    preferred_container_destination_root,
+    resolve_container_destination as derive_container_destination, ArchiveLayout,
+    ArtifactClassificationInventory, ArtifactClassificationPolicy, ArtifactLocation,
+    ArtifactLocationFacts,
 };
 use crate::domain::artifact_discovery::{
     discover_archive_artifacts as derive_archive_artifacts, expand_artifact_closure,
@@ -743,16 +744,12 @@ impl CommandExecutor<JsonFileStorage> {
             }
         }
         let artifacts = discovered.artifacts;
+        let layout = ArchiveLayout::new(&plan_target, &destination, &policy, &artifacts);
         let mut paths = artifacts
             .iter()
             .filter(|a| !a.version().is_pinned())
             .flat_map(|a| {
-                std::iter::once(a.source().to_string()).chain(artifact_archive_destination(
-                    &plan_target,
-                    &destination,
-                    &policy,
-                    a.source(),
-                ))
+                std::iter::once(a.source().to_string()).chain(layout.destination(a.source()))
             })
             .collect::<BTreeSet<_>>();
         if matches!(plan_target, PlanTarget::Container { .. }) {
