@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc d78a68f9cd8801445a39acbbf7b778b5ce96b39bdfaea648455cc784cb80d6a2 # shrinks to chosen = {0, 4}, edges = []
+cc 9186ba9e80de9a05f11e006b8bef31cb241a4802d5a41c10955272d715e82b88 # shrinks to chosen = {1, 3}, shared = {3}, edges = [(3, 1)]

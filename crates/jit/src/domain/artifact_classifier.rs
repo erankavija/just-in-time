@@ -748,32 +748,51 @@ pub fn classify_artifacts(
                 Some(source),
             ));
         });
-    let edge_source_constraints = edge_source_constraints(
-        &inventory.artifacts,
-        &facts.locations,
-        &paths,
-        &needs_destination,
-    );
-
-    let artifacts = inventory
-        .artifacts
-        .into_iter()
-        .map(|entry| {
-            classify_entry(
-                entry,
-                &inventory.target,
-                &policy,
-                &facts.locations,
-                &embedded_owners,
-                document_all_terminal,
-                &needs_destination,
-                &edge_source_constraints,
-                &unpreservable_parents,
-                &layout,
-            )
-            .map(|entry| cite_moving_path(entry, &facts.citations))
-        })
-        .collect::<Result<Vec<_>, PlanError>>()?;
+    let mut source_constraints =
+        root_relative_targets(&inventory.artifacts, &facts.locations, &paths);
+    // A parent that stays at its source, copied or retained, keeps citing its
+    // relative targets there, so they stay too. Each pass can only add
+    // constraints, so the fixpoint is reached within one pass per artifact.
+    let artifacts = loop {
+        let classified = inventory
+            .artifacts
+            .iter()
+            .cloned()
+            .map(|entry| {
+                classify_entry(
+                    entry,
+                    &inventory.target,
+                    &policy,
+                    &facts.locations,
+                    &embedded_owners,
+                    document_all_terminal,
+                    &needs_destination,
+                    &source_constraints,
+                    &unpreservable_parents,
+                    &layout,
+                )
+            })
+            .collect::<Result<Vec<_>, PlanError>>()?;
+        let kept = classified
+            .iter()
+            .filter(|entry| entry.action() != ArtifactAction::Move)
+            .flat_map(|entry| entry.edges())
+            .filter(|edge| {
+                edge.kind == EdgeKind::Supported
+                    && edge.resolution_mode == EdgeResolutionMode::Relative
+            })
+            .filter_map(|edge| present_target(edge, &facts.locations, &paths))
+            .filter(|target| !source_constraints.contains(*target))
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if kept.is_empty() {
+            break classified
+                .into_iter()
+                .map(|entry| cite_moving_path(entry, &facts.citations))
+                .collect::<Vec<_>>();
+        }
+        source_constraints.extend(kept);
+    };
     // Execution refuses a layout this check rejects, so preview reports it as
     // a blocker rather than as an eligible plan.
     if let Err(violation) = validate_proposed_artifact_layout(&artifacts) {
@@ -932,7 +951,7 @@ fn classify_entry(
     embedded_owners: &BTreeMap<String, Vec<&EmbeddedArtifactOwner>>,
     document_all_terminal: bool,
     needs_destination: &BTreeSet<String>,
-    edge_source_constraints: &BTreeSet<String>,
+    source_constraints: &BTreeSet<String>,
     unpreservable_parents: &BTreeSet<String>,
     layout: &ArchiveLayout<'_>,
 ) -> Result<ArtifactPlanEntry, PlanError> {
@@ -1002,7 +1021,7 @@ fn classify_entry(
         || active_owner
         || unselected_unpinned
         || unmanaged_embedded
-        || edge_source_constraints.contains(&source)
+        || source_constraints.contains(&source)
         || !wants_destination;
     let mut action = match (wants_destination, needs_source) {
         (true, true) => ArtifactAction::Copy,
@@ -1434,18 +1453,16 @@ fn propagate_relative_destinations(
     }
 }
 
-fn edge_source_constraints(
+/// Targets of root-relative edges, which name the same source path from every
+/// parent location and so must stay there.
+fn root_relative_targets(
     artifacts: &[ArtifactPlanEntry],
     locations: &BTreeMap<String, ArtifactLocationFacts>,
     paths: &BTreeSet<String>,
-    needs_destination: &BTreeSet<String>,
 ) -> BTreeSet<String> {
     artifact_edges(artifacts)
         .into_iter()
-        .filter(|(parent, edge)| {
-            edge.resolution_mode == EdgeResolutionMode::RootRelative
-                || !needs_destination.contains(*parent)
-        })
+        .filter(|(_, edge)| edge.resolution_mode == EdgeResolutionMode::RootRelative)
         .filter_map(|(_, edge)| present_target(edge, locations, paths).cloned())
         .collect()
 }
@@ -2151,6 +2168,16 @@ mod tests {
     /// Classify a container plan over present `sources`, each owned inside the
     /// subtree, with a relative edge for every `(parent, target)` pair.
     fn plan_with_relative_edges(sources: &[&str], edges: &[(&str, &str)]) -> ArtifactPlan {
+        plan_with_owned_relative_edges(sources, &[], edges)
+    }
+
+    /// [`plan_with_relative_edges`], where each source in `shared` also has an
+    /// owner outside the subtree, so the plan copies it rather than moving it.
+    fn plan_with_owned_relative_edges(
+        sources: &[&str],
+        shared: &[&str],
+        edges: &[(&str, &str)],
+    ) -> ArtifactPlan {
         let present = sources
             .iter()
             .map(|source| {
@@ -2165,7 +2192,14 @@ mod tests {
             sources
                 .iter()
                 .map(|source| {
-                    explicit(source, vec![owner("i", State::Done, true)]).with_edges(
+                    let owners = std::iter::once(owner("i", State::Done, true))
+                        .chain(
+                            shared
+                                .contains(source)
+                                .then(|| owner("o", State::Done, false)),
+                        )
+                        .collect();
+                    explicit(source, owners).with_edges(
                         edges
                             .iter()
                             .filter(|(parent, _)| parent == source)
@@ -2241,6 +2275,7 @@ mod tests {
         #[test]
         fn test_classify_artifacts_eligible_plan_always_passes_the_proposed_layout_check(
             chosen in prop::collection::btree_set(0usize..6, 1..=6),
+            shared in prop::collection::btree_set(0usize..6, 0..=6),
             edges in prop::collection::vec((0usize..6, 0usize..6), 0..8),
         ) {
             const POOL: [&str; 6] = [
@@ -2259,7 +2294,11 @@ mod tests {
                 })
                 .map(|(parent, target)| (POOL[parent], POOL[target]))
                 .collect::<Vec<_>>();
-            let plan = plan_with_relative_edges(&sources, &edges);
+            let shared = shared
+                .intersection(&chosen)
+                .map(|index| POOL[*index])
+                .collect::<Vec<_>>();
+            let plan = plan_with_owned_relative_edges(&sources, &shared, &edges);
             prop_assert!(plan.eligible(), "{:?}", plan.blockers());
             prop_assert!(validate_proposed_layout(&plan).is_ok(), "{:?}", validate_proposed_layout(&plan));
         }
