@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "865cbcfce61c03eac5c1c4150828a8e588e04a35",
+  "completed_at": "2026-10-03T14:12:39.173950649Z",
+  "duration_ms": 156837,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed fix converts layout-unrepresentable link targets into invalid-path evidence in preview and execution paths, with a focused regression test.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ba95a465-409c-463a-86b5-b38db90f4007",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "45134d48-7d36-40c7-9b97-ff4443ddb7e2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-03T14:10:02.336508198Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 431d202ec, 865cbcfce\nPolicy sources: AGENTS.md\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-1 (dev/vision/9db27a3a-charter.md); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-03T14:09:37Z); code-review pending\nTruncation recovery: targeted individual diffs and bounded source reads for both attributed commits\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed fix converts layout-unrepresentable link targets into invalid-path evidence in preview and execution paths, with a focused regression test.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
