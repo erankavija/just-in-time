@@ -408,7 +408,9 @@ fn capture_artifact_evidence(
 ) -> Result<bool> {
     let paths = paths.into_iter().collect::<BTreeSet<_>>();
     for path in &paths {
-        if validate_repo_relative_path(path).is_err() {
+        if validate_repo_relative_path(path).is_err()
+            || crate::repository_state::RootRelativePath::parse(path).is_err()
+        {
             evidence.insert(path.clone(), ArtifactEvidence::InvalidPath);
         }
     }
@@ -2603,6 +2605,22 @@ mod tests {
         let rerun = executor.execute_archive_container(&id).unwrap();
         assert!(!rerun.event_appended, "{:?}", rerun.deleted_sources);
         assert!(repo.path().join("fixtures/b.md").exists());
+    }
+
+    #[test]
+    fn test_archive_reports_a_link_target_the_layout_cannot_represent_as_a_blocker() {
+        let (_repo, executor, id) =
+            executable_container_repo(State::Done, "See [item](my_module::item).\n");
+
+        let preview = executor.preview_archive_container(&id).unwrap();
+        assert!(preview
+            .artifacts()
+            .iter()
+            .flat_map(|artifact| artifact.blockers())
+            .any(|blocker| blocker.code == BlockerCode::RepositoryEscape));
+        // Execution reaches the same plan rather than failing on the path.
+        let error = executor.execute_archive_container(&id).unwrap_err();
+        assert!(error.to_string().contains("not eligible"), "{error}");
     }
 
     #[test]

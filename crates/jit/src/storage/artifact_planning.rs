@@ -269,6 +269,11 @@ fn inspect_artifact_evidence_with_policy<S: IssueStore>(
         return Ok(ArtifactEvidence::InvalidPath);
     }
     validate_repo_relative_path(path)?;
+    // A link can spell a target the layout cannot represent, such as one
+    // holding `:`; that is evidence about the link, not a read failure.
+    if RootRelativePath::parse(path).is_err() {
+        return Ok(ArtifactEvidence::InvalidPath);
+    }
     let layout = storage.repository_layout().map_err(PathReadError::Other)?;
     let root = open_absolute_dir_nofollow(layout.worktree_root()).map_err(other)?;
     inspect_artifact_from_root(&root, path, listing_scope, permission_denied)
