@@ -6,12 +6,24 @@
   "dependencies": [],
   "description": "Archive preview reports a container plan as eligible, but execution then refuses it: a copied document's relative link does not resolve in the proposed layout.\n\n## Background\n\nIn gf2, the container `6dc81018` previews as `eligible: true` with no blockers. Execution fails before writing anything:\n\n```\nsupported edge ../6dc81018-field-capability-dispatch/classification.md from dev/active/220cab0b/design.md resolves to dev/archive/6dc81018-field-capability-dispatch/active/6dc81018-field-capability-dispatch/classification.md in the proposed layout, not an available target location (dev/active/6dc81018-field-capability-dispatch/classification.md, dev/archive/6dc81018-field-capability-dispatch/active/classification.md)\n```\n\nThe container's own issue directory `dev/active/6dc81018-field-capability-dispatch/` collapses to `<destination>/active/`. A sibling issue directory such as `dev/active/220cab0b/` keeps its name under `<destination>/active/`. A copied document (here `design.md`, which has owners outside the subtree) keeps its relative link `../6dc81018-field-capability-dispatch/...`. That link resolves correctly from the source location but not from the archived copy's location. Preview's classification does not detect this, and execution's proposed-layout verification does.\n\n## Success Criteria\n\n- Preview and execution agree: a plan preview reports as eligible executes without a proposed-layout edge error, and a plan whose edge would not resolve is blocked in preview with a stated reason.\n- A relative edge from a relocated or copied document to an artifact whose destination collapses the container's issue directory resolves to that artifact's destination after execution.\n- `jit archive container 6dc81018 --execute` succeeds in the gf2 repository.\n",
   "documents": [],
+  "done_at": "2026-10-03T12:58:54.933649899Z",
   "first_ready_at": "2026-10-02T22:27:12.091377886Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-03T12:55:46.073203203Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-03T12:58:50.893745194Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "e79cabac-9dc1-4df5-9550-53284bb6b1ce",
   "labels": [
     "component:core",
@@ -20,7 +32,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Archive preview accepts a relative edge that execution's proposed layout cannot resolve",
-  "updated_at": "2026-10-02T23:47:10.465971667Z"
+  "updated_at": "2026-10-03T12:58:54.933649899Z"
 }

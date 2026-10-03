@@ -16374,3 +16374,12 @@
 {"id":"b749354b-4add-4f29-ad6c-5e03609ec69b","issue_id":"65059cd2-583f-4998-b84d-41d560e2bf1d","timestamp":"2026-10-02T23:47:05.306927702Z","type":"issue_completed"}
 {"from":"ready","id":"e98f2a8b-8a1b-43f6-8035-5c34448a48b2","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-02T23:47:10.465971667Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:claude","id":"1062a756-903b-4d95-96d8-d6a29fb1cd82","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-02T23:47:10.465971667Z","type":"issue_claimed"}
+{"id":"74b54b06-22aa-4779-afb3-83b7b2bccb35","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","priority":"high","timestamp":"2026-10-03T12:53:11.667907863Z","title":"Archive reruns delete sources the first run kept because archived documents' edges are not rediscovered","type":"issue_created"}
+{"fields":["dependencies"],"id":"3d876084-3394-4949-b307-21a5fc711be4","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","timestamp":"2026-10-03T12:53:15.989792872Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"def99e8d-c669-4f37-ab37-add3d010caba","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-03T12:55:09.742476742Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"de772232-f8d5-4171-8ce6-31e4d63a9dd0","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-03T12:55:46.073203203Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"10320ee8-9add-490d-83d8-291d90f8af42","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-03T12:58:50.893745194Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"adccf64f-38fa-4b14-a9c3-7d9a0cacd8b6","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-03T12:58:54.933649899Z","to":"done","type":"issue_state_changed"}
+{"id":"69ecec61-ea73-432f-8f2a-86f8fe7a685a","issue_id":"e79cabac-9dc1-4df5-9550-53284bb6b1ce","timestamp":"2026-10-03T12:58:54.933649899Z","type":"issue_completed"}
+{"from":"ready","id":"e600da1c-9d7e-4216-bab6-932bf89945e9","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","timestamp":"2026-10-03T12:58:55.100914851Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:claude","id":"87007820-089c-4e46-a08b-c28361997a45","issue_id":"f3c64bfc-a771-49d4-923a-45fc1c1e66c8","timestamp":"2026-10-03T12:58:55.100914851Z","type":"issue_claimed"}

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fa031049261ec18f215f502f4bbaddd8606fc2c2",
+  "completed_at": "2026-10-03T12:58:50.676686005Z",
+  "duration_ms": 180726,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable archive-layout change keeps preview and execution aligned and covers the relative-edge cases without unresolved issue-impact defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "e79cabac-9dc1-4df5-9550-53284bb6b1ce",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1eba5e64-9bed-4a51-bc89-2cf3035a5922",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-03T12:55:49.949990775Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 17d2b0a35, edbcd2579, 1109182a6 (`jit:e79cabac`)\nPolicy sources: AGENTS.md\nResolved items: @/gate/cargo-ci (.jit/gates.toml); @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/8e071e18/decision/D-14 (issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-03T12:55:22Z)\nTruncation recovery: narrowed policy discovery, per-commit patches, current classifier/consumer reads, registry sources, and the gf2 linked-document sample\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable archive-layout change keeps preview and execution aligned and covers the relative-edge cases without unresolved issue-impact defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
