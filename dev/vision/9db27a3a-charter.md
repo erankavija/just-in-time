@@ -15,7 +15,9 @@ configuration, never from baked-in assumptions. The release is coherent when an
 agent or human can operate the tracker end to end from its own documentation
 without reading its source. Every epic under this milestone is judged against that
 outcome; work that does not move the tracker toward a dependable, self-describing,
-agent-drivable v1.0 is out of scope, however useful in isolation.
+agent-drivable v1.0 is out of scope, however useful in isolation. Simplification is
+encouraged: a change that removes, unifies, or derives mechanism is preferred over
+one that adds it (D-18).
 
 ## Decision Log
 
@@ -26,16 +28,17 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 - D-5: A milestone-tier steward skill sits above the epic-level execution lead
 - D-6: Each item kind declares its own source of truth (markdown-first or registry-first)
 - D-7: Charter decisions are project-addressable items over the vision charter
-- D-8: Ship the complete profile lifecycle in v1.0, because an apply-only profile surface leaves an applied profile unrecoverable
+- D-8: Apply profile packages once and let git keep their history, with no ownership records to keep in sync
 - D-9: Remove redundant release surfaces without removing product capabilities
 - D-10: Support one Docker topology that serves the API and web UI from a repository mount
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
-- D-14: Gate the v1.0 tag on the completed profile lifecycle, core maintenance, and redo-record mutations
+- D-14: Gate the v1.0 tag on the completed upstream streams, including apply-once profiles and execution-lead friction removal
 - D-15: Fix scoped validation in core rather than weakening bracket evidence
 - D-16: Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 - D-17: Publish each mutation through one redo record over the files it writes, so its cost never scales with project history
+- D-18: Prefer removing, unifying, or deriving mechanism over adding it
 
 ## Decision Details
 
@@ -137,38 +140,52 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   rationale stays readable below them.
 - **Date:** 2026-07-07
 
-### D-8: The complete profile lifecycle ships in v1.0
+### D-8: Profiles apply once and git keeps their history
 
-- **Chosen:** v1.0 ships the whole profile lifecycle: offline packages
-  discovered from declared locations, composed by declared package-to-package
-  dependency and by semantic identity with shared ownership, resolved through
-  declared non-secret variables, published through one redo record (D-17)
-  carrying durable ownership records, and then reconfigured, upgraded,
-  captured, packed, exchanged, checked, and previewed. Two packages ship:
+- **Chosen:** v1.0 ships profile packages that are rendered into a repository
+  once. A package is an offline directory or a packed archive; two ship:
   `jit-default` carrying the domain vocabulary a repository needs to be usable,
-  and `jit-dogfood` carrying this project's workflow on top of it. Safe removal
-  and remote package registries remain deferred.
-- **Rejected:** Shipping the apply-only surface and deferring the rest of the
-  lifecycle to a post-1.0 epic, which is what this decision previously chose;
-  and dropping profiles from v1.0 entirely, which leaves the strongest
-  dogfooded workflow difficult for adopters to install.
-- **Reasoning:** The bounded apply-only surface is not a smaller version of the
-  lifecycle; it is a broken one. An adopter who edits a profile-owned file in
-  place — an ordinary act on their own repository — is reported as drifted, and
-  the owning package cannot be re-applied once its record exists. No sanctioned
-  sequence returns that repository to a valid state, so the deferred list was
-  not a set of conveniences but the recovery path itself. Shipping that as v1.0
-  would hand adopters a system where routine editing is unrecoverable. The
-  deferred capabilities therefore become release scope, and the release waits
-  for them.
-- **Consequences:** The v1.0 tag depends on the complete profile lifecycle
-  epic rather than on the profiles MVP alone (D-14). Because v1.0 has not
-  shipped, no released record format exists to stay compatible with, so the
-  lifecycle carries no migration boundary for a pre-release record shape
-  (`@/inv/canonical-cutover`); a repository holding one re-derives its package
-  through capture.
+  and `jit-dogfood` carrying this project's workflow on top of it. Applying
+  resolves the package's declared non-secret variables, composes packages in
+  declared dependency order with the dependent package winning a key both
+  declare, refuses two unrelated packages that declare one key differently, and
+  publishes the result through one redo record (D-17). From then on the
+  repository owns every value: editing it is always valid, and no ownership
+  record, fingerprint, or drift check exists. `jit profile diff` reports where
+  a repository differs from a package. Applying a newer version, or other
+  variable values, refuses while the files it writes carry uncommitted changes,
+  then writes the new rendering, and the adopter keeps local edits through git.
+  The profile operation's event records what was applied. Package authors edit
+  the manifest directly, and pack and add exchange packages. Remote package
+  registries remain deferred.
+- **Rejected:** The ownership lifecycle this decision chose from 2026-08-10:
+  durable ownership records with base fingerprints, three-way publication,
+  conflict and divergence classes with remedies, capture back into the owning
+  package, reconfigure, and upgrade. It kept two copies of every value in sync
+  and made routine acts fail: a newer package could not change a contributed
+  value the adopter never touched, and recovering from an in-place edit took a
+  capture and an apply that the reported remedy did not name together. Also
+  rejected: layering package defaults under repository overrides, which leaves
+  `.jit/` an incomplete description of the configuration agents read;
+  generating `.jit/` from packages, which makes editing `.jit/` an error; and
+  dropping profiles, which leaves the dogfooded workflow hard to install.
+- **Reasoning:** The 2026-08-10 reversal held that an apply-only surface was
+  broken because an edited profile-owned file was reported as drift with no way
+  back. That failure came from the ownership record, not from applying once:
+  without a record an edit is an ordinary change, and git already shows and
+  restores it. A newer package version then needs no merge engine in jit:
+  written over a committed tree, it leaves every difference in git's view, and
+  the adopter keeps what they changed. Core commands still work without git
+  (D-4); there, `jit profile diff` is the comparison to read before applying.
+- **Consequences:** The ownership machinery is deleted rather than repaired:
+  applied-profile records, claims and fingerprints, profile validation and its
+  checks inside `jit validate`, three-way publication, conflict remedies,
+  capture's reconciliation, reconfigure, and upgrade. No released record format
+  exists, so a repository holding applied-profile records drops them with no
+  migration boundary (`@/inv/canonical-cutover`). The v1.0 tag depends on this
+  change (D-14).
 - **Date:** 2026-07-14, amended 2026-07-31, reversed 2026-08-10, amended
-  2026-10-01
+  2026-10-01, reversed 2026-10-15
 
 ### D-9: Cut redundant release surfaces, not product capabilities
 
@@ -242,13 +259,16 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
 ### D-14: The v1.0 tag consumes the completed upstream delivery streams
 
 - **Chosen:** Keep the release boundary directly dependent on profiles MVP
-  `9b7b5f9c`, the complete profile lifecycle `c639cfb5`, and core maintenance
-  `6eb585bc`, and redo-record mutations `f1dc843a`. All reach a terminal state
-  before the `v1.0.0` tag is created; the release work consumes their delivered
-  contracts without changing or duplicating them. The lifecycle epic joined this
-  set when D-8 was reversed: the profile surface it completes is the one v1.0
-  ships. The mutation epic joined it with D-17, because a release whose
-  mutations slow down as project history grows is not dependable.
+  `9b7b5f9c`, the profile lifecycle `c639cfb5`, core maintenance `6eb585bc`,
+  redo-record mutations `f1dc843a`, and execution-lead friction removal
+  `3d9a0ce3`. All reach a terminal state before the `v1.0.0` tag is created;
+  the release work consumes their delivered contracts without changing or
+  duplicating them. The lifecycle epic joined this set when D-8 was reversed
+  on 2026-08-10. The mutation epic joined it with D-17, because a release whose
+  mutations slow down as project history grows is not dependable. The friction
+  epic joined it when D-8 was reversed on 2026-10-15: it replaces the ownership
+  lifecycle with apply-once profiles, and v1.0 ships that simpler surface
+  rather than the one it replaces.
 - **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
   to make the dependency terminal; keeping core maintenance intentionally open
   as a living epic; and copying either upstream stream's work into the release
@@ -258,7 +278,7 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   tagging requires the completed core fixes, the profile quickstart, and a
   profile lifecycle an adopter can recover from. A synthetic checkpoint would
   add lifecycle ceremony without changing that contract.
-- **Date:** 2026-07-15, amended 2026-08-10 and 2026-09-19
+- **Date:** 2026-07-15, amended 2026-08-10, 2026-09-19, and 2026-10-15
 
 ### D-15: Scoped bracket validation is a core-maintenance prerequisite
 
@@ -358,3 +378,26 @@ agent-drivable v1.0 is out of scope, however useful in isolation.
   external edit to a file a mutation read but does not write is not detected
   during that mutation; that makes one result stale, and corrupts nothing.
 - **Date:** 2026-09-19, amended 2026-10-01
+
+### D-18: Simplification is encouraged
+
+- **Chosen:** A change that removes, unifies, or derives mechanism is preferred
+  over one that adds it. When a defect, a friction report, or a feature request
+  can be met by deleting a command, record, flag, or configuration key, by
+  folding two mechanisms into one, or by deriving a fact the repository already
+  states, that is the solution to choose, and its plan names the code and
+  procedure it removes. Reversing or narrowing an earlier decision to reach a
+  simpler design is legitimate, and is recorded here as an amendment.
+- **Rejected:** Meeting each reported friction with a new feature, which grows
+  the surface an agent must learn with every fix; and keeping a mechanism
+  because an earlier decision chose it after the reasoning behind it stopped
+  holding.
+- **Reasoning:** The primary user is an agent operating the tracker from its
+  documentation (Vision), and every mechanism adds commands, records, and
+  failure modes that agent must learn and recover from. The friction a
+  downstream execution lead reported on 2026-10-15 came mostly from mechanisms
+  interacting: two gate-verdict reuse paths that disagreed about commits, and
+  profile ownership records kept in sync with the registries they described.
+  Before v1.0 no released format constrains deletion
+  (`@/inv/canonical-cutover`), so simplifying now is cheapest.
+- **Date:** 2026-10-15
