@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:36.870067202Z",
+  "dependencies": [],
+  "description": "Make the digest of a gate's declared inputs the only way a gate verdict is reused, removing the commit-based \"already passed at HEAD\" skip and the dirty-tree flag that jit's own tracker writes falsify.\n\n## Background\n\nTwo mechanisms avoid re-running an automated checker:\n\n1. A commit-based skip: an evaluation is skipped when the latest run passed at the current `HEAD` commit. Each run records `commit`, `branch` and `tree_dirty`; `tree_dirty` comes from `git status --porcelain` over the whole worktree.\n2. Digest reuse: a gate declaring `[gates.inputs]` digests those files' working-tree content and reuses any prior verdict over the same digest, across issues.\n\nThe commit-based skip breaks in normal use. Every gate evaluation writes the tracker's own files, so the next run records `tree_dirty: true`, and committing those files moves `HEAD`, so the next evaluation re-runs a ten-minute checker over an unchanged tree. An execution lead ends up alternating gate, commit, gate, and avoiding commits while a gate runs. Digest reuse already answers the same question exactly, independent of commits.\n\nDeclaring whole-repository inputs is also awkward: `.` is rejected as a root, so a checker that scans the whole repository must list every top-level entry, and a new top-level directory silently escapes the digest. A data root nested in the worktree is digested whenever a root covers it, so tracker writes change the digest unless every gate excludes it.\n\n## Success Criteria\n\n- [hard] REQ-01: An automated gate that declares no inputs executes its checker on every evaluation; no commit-based skip exists, and its `already_passed` output field is removed.\n- [hard] REQ-02: Gate-run records carry no dirty-tree field; nothing reads or writes it.\n- [hard] REQ-03: `.` is accepted as an input root and covers the whole worktree minus declared exclusions.\n- [hard] REQ-04: The input digest never includes a data root nested in the worktree, in the same way it never includes `.git`; tracker writes during an evaluation leave every digest unchanged.\n- [hard] REQ-05: `--force` executes the checker unconditionally, and its help text describes only digest reuse.\n- [hard] REQ-06: User documentation describes one reuse mechanism, and the net change removes more code than it adds.\n\n## Notes\n\n- Supersedes `ea2bb1f6` (refuse to re-run a passed gate without `--force`): with one reuse mechanism, re-evaluating unchanged inputs is free and `--force` remains the deliberate re-run.\n- A checker that reads git state (the `HEAD` tree or the index) rather than working-tree files is outside what a digest can see; the gate documentation states that inputs describe working-tree content.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:36.870067202Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "72d89161-39e7-4858-9f16-31deb4ff7505",
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Reuse gate verdicts only by declared-input digest",
+  "updated_at": "2026-10-15T11:05:36.870067202Z"
+}

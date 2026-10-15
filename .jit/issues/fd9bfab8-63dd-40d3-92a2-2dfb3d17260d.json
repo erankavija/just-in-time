@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:37.011897709Z",
+  "dependencies": [],
+  "description": "Let a checker report an infrastructure fault so that the run is recorded as an error rather than as a verdict on the repository.\n\n## Background\n\nA gate run's status already distinguishes `error` (the checker never reached a verdict: timeout, missing command) from `failed`. An exec checker, however, has no way to say \"I could not judge\": every nonzero exit becomes `failed`. Downstream, a stale build-cache server, a lost host lock and a review agent that produced no output were all recorded as gate failures, indistinguishable from findings, and a lead had to read each report to tell them apart. jit's own review checker (`contrib/gates/ai-review.sh`) exits 1 when the agent produces no output or its verdict cannot be parsed.\n\nExit status 75 (`EX_TEMPFAIL` in `sysexits.h`) is the conventional \"temporary failure, retry later\" code, and downstream wrappers already use it for \"this says nothing about the tree\".\n\nAn evaluation terminated before it records a run (for example a killed process) records nothing, which is correct: no verdict is fabricated. That behavior is undocumented.\n\n## Success Criteria\n\n- [hard] REQ-01: An exec checker that exits 75 produces a run with status `error`; the evaluation exits with the runner-error code and its JSON verdict is `error`.\n- [hard] REQ-02: Every other nonzero checker exit is recorded as `failed`, unchanged.\n- [hard] REQ-03: `contrib/gates/ai-review.sh` exits 75 when the review agent produces no output, its verdict cannot be parsed, or a required tool is missing, and 1 only for a review that found defects.\n- [hard] REQ-04: The gate documentation states the exit-75 convention and that an evaluation terminated before recording leaves no run.\n\n## Notes\n\n- Downstream profile packages that copy `ai-review.sh` (gf2 `sim-research`) adopt the change by re-copying it.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:37.011897709Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Record a checker infrastructure fault as an error",
+  "updated_at": "2026-10-15T11:05:37.011897709Z"
+}

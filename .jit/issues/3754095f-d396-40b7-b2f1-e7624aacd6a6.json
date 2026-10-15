@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:37.716806462Z",
+  "dependencies": [],
+  "description": "Replace emoji status markers in CLI human-readable output with words.\n\n## Background\n\nHuman-readable command output marks status with emoji and pictographs (for example ❌ ⚠ ✓ ✗ ✅ 🌐) in validation, gate, document and initialization output. They render inconsistently across terminals, add width ambiguity, and carry no information that the adjacent text does not. Configurable type icons are a separate, repository-declared feature and stay as they are.\n\n## Success Criteria\n\n- [hard] REQ-01: No command's human-readable status output contains an emoji or pictographic status marker; each is replaced by a word such as `error`, `warning` or `ok`, or removed where the text already states the status.\n- [hard] REQ-02: Type icons declared by a repository or defaulted by hierarchy level are unchanged.\n- [hard] REQ-03: One test fails when a pictographic status marker is reintroduced into CLI output outside the type-icon mechanism.\n- [hard] REQ-04: Documentation examples of command output match the new text.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:37.716806462Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
+  "labels": [
+    "type:task",
+    "component:cli",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Replace emoji status markers in CLI output with words",
+  "updated_at": "2026-10-15T11:05:37.716806462Z"
+}

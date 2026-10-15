@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:37.577670150Z",
+  "dependencies": [],
+  "description": "Study the authoring model for changing a declaration an applied profile owns, and recommend a single short path.\n\n## Background\n\nAdding an input table to one profile-owned gate in a downstream repository took five steps and two wrong turns:\n\n1. Editing the gate in the gate registry made validation fail: the applied profile no longer held the value it published.\n2. The remedy the error suggested, capturing the repository into the profile's own package directory, rewrote the gate's contribution as a single-line inline table and left the applied-profile record naming the old package hash, so validation then failed with a repository integrity error.\n3. Upgrading from the edited package alone was refused with \"defined differently by package sim-research\", naming the same package as both sides of the conflict.\n4. What worked was editing the registry and the package to identical values, bumping the package version, and upgrading.\n\nNothing in the registry marks which entries a profile owns, so the first step gives no warning.\n\n## Success Criteria\n\n- [hard] REQ-01: A design note states which side (repository or package) is the source when editing a profile-owned value, and the single command sequence for each supported edit.\n- [hard] REQ-02: The note accounts for each failure above, naming the behavior to remove or change, including the remedy text, the capture output format, the stale record after capture, and the self-conflict on upgrade.\n- [hard] REQ-03: The note recommends what to delete, and the implementation issues are filed from it after the maintainer's ruling.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:37.577670150Z",
+  "gates_required": [
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "e643ef66-8474-4d78-9986-670e0c7db465",
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Study the authoring path for profile-owned declarations",
+  "updated_at": "2026-10-15T11:05:37.577670150Z"
+}

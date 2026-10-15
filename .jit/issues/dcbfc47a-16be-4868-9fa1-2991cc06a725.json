@@ -1,0 +1,24 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:37.434994328Z",
+  "dependencies": [],
+  "description": "Decide how jit records that an issue awaits a decision from a human, so that the wait is visible to queries instead of living in a project progress file.\n\n## Background\n\nDownstream, two issues waiting on an invoker ruling stayed `in_progress`, with the question recorded only in a progress file. `query available`, `query blocked` and `issue status` showed nothing. A profile-declared label namespace was considered and judged too manual and error-prone. Other candidate shapes include a structured blocker record on the issue, a new lifecycle state, and an addressable question item that blocks until resolved. Each touches the domain-agnostic boundary and the lifecycle state machine differently.\n\n## Success Criteria\n\n- [hard] REQ-01: A design note compares at least the blocker-record, lifecycle-state and question-item shapes on code added or removed, effect on the lifecycle state machine, domain agnosticism, and the manual steps an agent performs to raise and clear a wait.\n- [hard] REQ-02: The note recommends one shape, or no change, with the reasoning, and is linked to this issue.\n- [hard] REQ-03: The decision is recorded for the maintainer's ruling before any implementation issue is filed.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:37.434994328Z",
+  "gates_required": [
+    "doc-review"
+  ],
+  "gates_status": {},
+  "id": "dcbfc47a-16be-4868-9fa1-2991cc06a725",
+  "labels": [
+    "type:task",
+    "component:core",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Decide how an issue records that it awaits a human decision",
+  "updated_at": "2026-10-15T11:05:37.434994328Z"
+}

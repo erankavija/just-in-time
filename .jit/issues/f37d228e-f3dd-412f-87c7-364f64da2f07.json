@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:37.153790887Z",
+  "dependencies": [],
+  "description": "Make document link checking exit successfully when it finds only warnings, so that it fails only on broken links.\n\n## Background\n\nLink checking has three exit statuses: 0 when every link is valid, 1 when a link is broken, and 2 when only warnings remain (for example a link to an existing file that is not itself a tracked document). Exit 2 stops `set -e` scripts and gates on findings that are advisory by definition, and downstream leads tracked every linked helper script as a document only to make the check pass.\n\n## Success Criteria\n\n- [hard] REQ-01: Link checking exits 0 when it finds warnings and no errors, and nonzero when any link is broken.\n- [hard] REQ-02: Warnings are still reported, in human-readable output and in the JSON result.\n- [hard] REQ-03: The exit-code reference documents the two outcomes.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:37.153790887Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f37d228e-f3dd-412f-87c7-364f64da2f07",
+  "labels": [
+    "type:task",
+    "component:cli",
+    "epic:lead-friction",
+    "milestone:v1.0"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Exit successfully from link checking on warnings alone",
+  "updated_at": "2026-10-15T11:05:37.153790887Z"
+}

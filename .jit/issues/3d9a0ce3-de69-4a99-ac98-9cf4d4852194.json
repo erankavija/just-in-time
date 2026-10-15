@@ -1,0 +1,35 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-15T11:05:36.732638299Z",
+  "dependencies": [
+    "3754095f-d396-40b7-b2f1-e7624aacd6a6",
+    "66986f88-b4fb-402a-9d2c-d643033c94a7",
+    "72d89161-39e7-4858-9f16-31deb4ff7505",
+    "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+    "da12ad66-7451-4700-9731-74a36c895bb9",
+    "dcbfc47a-16be-4868-9fa1-2991cc06a725",
+    "e643ef66-8474-4d78-9986-670e0c7db465",
+    "f37d228e-f3dd-412f-87c7-364f64da2f07",
+    "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d"
+  ],
+  "description": "Remove the friction an execution lead meets when gating, linking and configuring many issues, preferring changes that delete mechanism over changes that add it.\n\n## Background\n\nA downstream execution lead (gf2, epic `1a379447`, session 38, 2026-10-15) closed about 30 issues and reported where jit cost time or misled. Several reports were already solved by existing features the repository had not configured. The rest are real defects or missing simplifications. They cluster around three surfaces:\n\n- **Gates.** Two reuse mechanisms (a commit-based skip and a digest over declared inputs) coexist; the commit-based record calls the tree dirty because of jit's own tracker writes; checker infrastructure faults are recorded as verdicts.\n- **Documents.** Artifacts produced in linked worktrees need a tracker write after merge before they count as linked, and link checking fails on warnings.\n- **Configuration and output.** Changing one profile-owned gate field took five steps and a suggested remedy that worsened the state; CLI output uses emoji status markers; small inconsistencies in gate status and rejection.\n\nThe guiding direction for this work is to subtract first: each fix should shrink code, configuration or procedure.\n\n## Success Criteria\n\n- [hard] REQ-01: Gating several issues over unchanged checker inputs executes each checker once, whatever commits the tracker makes between evaluations.\n- [hard] REQ-02: Every gate-run record distinguishes a checker infrastructure fault from a verdict on the repository content.\n- [hard] REQ-03: An artifact produced in a linked worktree under its issue's artifact directory is linked to the issue after merge with no further tracker write.\n- [hard] REQ-04: The profile authoring model and the awaiting-human-decision model each have a recorded design decision.\n- [hard] REQ-05: CLI human-readable status output uses words, not emoji.\n\n## Notes\n\n- Source: gf2 friction report relayed 2026-10-15; gf2's configuration was fixed separately (declared `cargo-ci` inputs, profile `sim-research` 1.2.7).\n",
+  "documents": [],
+  "first_ready_at": "2026-10-15T11:05:36.732638299Z",
+  "gates_required": [
+    "repo-validate",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
+  "labels": [
+    "type:epic",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove execution-lead friction in gate, document and profile workflows",
+  "updated_at": "2026-10-15T11:05:38.353477091Z"
+}

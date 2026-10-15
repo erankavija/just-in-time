@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:claude",
+  "claimed_at": "2026-10-15T11:05:58.066719286Z",
   "context": {},
   "created_at": "2026-08-26T22:07:49.376417349Z",
   "dependencies": [],
@@ -12,10 +13,11 @@
   "labels": [
     "component:core",
     "milestone:v1.0",
-    "type:enhancement"
+    "type:enhancement",
+    "resolution:superseded-by-digest-reuse"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "rejected",
   "title": "Gate evaluate refuses to re-run a passed gate without --force",
-  "updated_at": "2026-08-26T22:07:49.376417349Z"
+  "updated_at": "2026-10-15T11:05:58.186939835Z"
 }
