@@ -22,7 +22,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 /// set, so the supplied rules are the operative set. A `config.toml` is created
 /// so the content-format / namespace lookups have a real (empty) config.
 fn executor_with_rules(rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", "");
     storage.add_data_file("rules.toml", rules_toml);

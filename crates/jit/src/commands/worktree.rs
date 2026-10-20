@@ -447,8 +447,8 @@ pub fn check_branch_divergence() -> Result<bool> {
 /// ```
 pub fn enforce_main_only_operations() -> Result<()> {
     // Skip enforcement in test environments
-    // Tests set JIT_TEST_MODE=1 to disable this check
-    if std::env::var("JIT_TEST_MODE").is_ok() {
+    // Test mode disables this check
+    if crate::test_mode::is_enabled() {
         return Ok(());
     }
 

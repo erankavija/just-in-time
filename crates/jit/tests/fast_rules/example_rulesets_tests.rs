@@ -609,7 +609,7 @@ mod sdd_lifecycle {
     /// Load the SDD example ruleset from disk and write it into an executor's
     /// in-memory storage root so the executor picks it up as the operative set.
     fn executor_with_sdd_example() -> CommandExecutor<InMemoryStorage> {
-        std::env::set_var("JIT_TEST_MODE", "1");
+        jit::test_mode::enable();
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();
@@ -1520,7 +1520,7 @@ mod research {
     /// rule only (local schema rules are omitted to keep the test self-contained;
     /// coverage is the graph rule under test here).
     fn research_coverage_executor() -> CommandExecutor<InMemoryStorage> {
-        std::env::set_var("JIT_TEST_MODE", "1");
+        jit::test_mode::enable();
         let storage = InMemoryStorage::new();
         std::fs::create_dir_all(storage.root()).unwrap();
         std::fs::write(storage.root().join("config.toml"), "").unwrap();

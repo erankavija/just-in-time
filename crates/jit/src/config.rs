@@ -2174,14 +2174,8 @@ impl MergedEventsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, MutexGuard};
+    use crate::test_utils::EnvGuard;
     use tempfile::TempDir;
-
-    static ENV_MUTEX: Mutex<()> = Mutex::new(());
-
-    fn env_lock() -> MutexGuard<'static, ()> {
-        ENV_MUTEX.lock().expect("environment test mutex poisoned")
-    }
 
     #[test]
     fn test_load_templates_when_config_absent() {
@@ -3192,12 +3186,11 @@ types = { task = 1 }
         // accepted exact lowercase, while the env-var path normalised with
         // to_lowercase() first.  Now both go through the same FromStr, so a
         // mixed-case env-var produces the same value as the lowercase TOML form.
-        let _guard = env_lock();
+        let mut env = EnvGuard::acquire();
 
         // Uppercase env var parsed via EffectiveConfig (env-var path).
-        std::env::set_var("JIT_WORKTREE_MODE", "AUTO");
+        env.set("JIT_WORKTREE_MODE", "AUTO");
         let via_env = ConfigLoader::new().build().worktree_mode().unwrap();
-        std::env::remove_var("JIT_WORKTREE_MODE");
 
         // Lowercase TOML form parsed directly (TOML path).
         let toml_cfg: JitConfig = toml::from_str("[worktree]\nmode = \"auto\"\n").unwrap();
@@ -3213,11 +3206,10 @@ types = { task = 1 }
     #[test]
     fn test_enforcement_mode_case_sensitivity_divergence_is_gone() {
         // Same divergence test for EnforcementMode / JIT_ENFORCE_LEASES.
-        let _guard = env_lock();
+        let mut env = EnvGuard::acquire();
 
-        std::env::set_var("JIT_ENFORCE_LEASES", "WARN");
+        env.set("JIT_ENFORCE_LEASES", "WARN");
         let via_env = ConfigLoader::new().build().enforcement_mode().unwrap();
-        std::env::remove_var("JIT_ENFORCE_LEASES");
 
         let toml_cfg: JitConfig =
             toml::from_str("[worktree]\nenforce_leases = \"warn\"\n").unwrap();
@@ -3867,7 +3859,7 @@ default_ttl_secs = 1200
 
     #[test]
     fn test_effective_config_worktree_mode() {
-        let _guard = env_lock();
+        let _env = EnvGuard::acquire();
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [worktree]
@@ -3891,34 +3883,31 @@ enforce_leases = "warn"
 
     #[test]
     fn test_env_override_worktree_mode() {
-        let _guard = env_lock();
-        std::env::set_var("JIT_WORKTREE_MODE", "off");
+        let mut env = EnvGuard::acquire();
+        env.set("JIT_WORKTREE_MODE", "off");
         let config = ConfigLoader::new().build();
         assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
-        std::env::remove_var("JIT_WORKTREE_MODE");
     }
 
     #[test]
     fn test_env_override_enforce_leases() {
-        let _guard = env_lock();
-        std::env::set_var("JIT_ENFORCE_LEASES", "warn");
+        let mut env = EnvGuard::acquire();
+        env.set("JIT_ENFORCE_LEASES", "warn");
         let config = ConfigLoader::new().build();
         assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
-        std::env::remove_var("JIT_ENFORCE_LEASES");
     }
 
     #[test]
     fn test_env_override_agent_id() {
-        let _guard = env_lock();
-        std::env::set_var("JIT_AGENT_ID", "agent:env-test");
+        let mut env = EnvGuard::acquire();
+        env.set("JIT_AGENT_ID", "agent:env-test");
         let config = ConfigLoader::new().build();
         assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
-        std::env::remove_var("JIT_AGENT_ID");
     }
 
     #[test]
     fn test_env_overrides_config_file() {
-        let _guard = env_lock();
+        let mut env = EnvGuard::acquire();
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [worktree]
@@ -3928,22 +3917,20 @@ enforce_leases = "strict"
         std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
 
         // Env var should override config file
-        std::env::set_var("JIT_WORKTREE_MODE", "off");
+        env.set("JIT_WORKTREE_MODE", "off");
         let config = ConfigLoader::new()
             .with_repo_config(temp_dir.path())
             .unwrap()
             .build();
         assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
-        std::env::remove_var("JIT_WORKTREE_MODE");
     }
 
     #[test]
     fn test_env_invalid_value_returns_error() {
-        let _guard = env_lock();
-        std::env::set_var("JIT_WORKTREE_MODE", "invalid");
+        let mut env = EnvGuard::acquire();
+        env.set("JIT_WORKTREE_MODE", "invalid");
         let config = ConfigLoader::new().build();
         assert!(config.worktree_mode().is_err());
-        std::env::remove_var("JIT_WORKTREE_MODE");
     }
 
     // ============================================================

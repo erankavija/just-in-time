@@ -18,7 +18,7 @@ use std::fs;
 use tempfile::TempDir;
 
 fn setup_repo(config_toml: &str) -> (TempDir, CommandExecutor<JsonFileStorage>) {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let jit_dir = temp.path().join(".jit");
     fs::create_dir(&jit_dir).unwrap();

@@ -913,17 +913,10 @@ mod tests {
         );
     }
 
-    /// Guards every test in this module that touches the process-global
-    /// `LISTEN_*` environment, mirroring the lock in crates/server's
-    /// `resolve_listener_tests` (jit:894337e2 / jit:c89133aa): two tests
-    /// mutating these variables in parallel steal each other's state
-    /// nondeterministically under the default parallel test runner.
-    static LISTEN_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_scrubs_inherited_listen_pid() {
-        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut env = crate::test_utils::EnvGuard::acquire();
 
         // Simulate a parent process environment that already carries a
         // foreign LISTEN_PID — e.g. jit itself was launched under a
@@ -932,13 +925,12 @@ mod tests {
         // so without an explicit removal this would reach the child
         // unchanged and cause listenfd to reject our LISTEN_FDS on a PID
         // mismatch, falling back to a re-bind (the race REQ-2 forbids).
-        std::env::set_var("LISTEN_PID", "1");
+        env.set("LISTEN_PID", "1");
 
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("true");
         let result = inherit_listener(&mut cmd, &listener);
 
-        std::env::remove_var("LISTEN_PID");
         result.unwrap();
 
         // `Command::get_envs` reports explicit overrides only: a `None`
@@ -975,13 +967,13 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_inherit_listener_child_never_sees_inherited_listen_pid() {
-        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mut env = crate::test_utils::EnvGuard::acquire();
 
         // End-to-end version of the assertion above: actually spawn a child
         // and inspect the environment it received, so the test fails if
         // `Command`'s override semantics ever change out from under the
         // `get_envs`-only assertion in the sibling test.
-        std::env::set_var("LISTEN_PID", "999999");
+        env.set("LISTEN_PID", "999999");
 
         let listener = find_available_port(0).unwrap();
         let mut cmd = std::process::Command::new("env");
@@ -991,7 +983,6 @@ mod tests {
                 .context("failed to spawn `env` to inspect child environment")
         });
 
-        std::env::remove_var("LISTEN_PID");
         let output = output.unwrap();
 
         let stdout = String::from_utf8_lossy(&output.stdout);

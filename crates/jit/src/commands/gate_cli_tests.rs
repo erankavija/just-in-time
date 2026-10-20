@@ -10,7 +10,7 @@ mod tests {
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
         // Disable worktree divergence checks in tests
-        std::env::set_var("JIT_TEST_MODE", "1");
+        crate::test_mode::enable();
 
         let storage = InMemoryStorage::new();
 

@@ -546,7 +546,7 @@ fn validate_integrity(
 /// claims live in `.git/jit`, not in the planned `.jit` byte set, so overlays
 /// delegate to the same coordination state without reopening repository storage.
 fn validate_machine_local_claims(repository_root: &Path) -> Result<()> {
-    if std::env::var("JIT_TEST_MODE").is_err() {
+    if !crate::test_mode::is_enabled() {
         let index_issues = crate::commands::validate_claims_index_at(repository_root)
             .unwrap_or_else(|error| vec![format!("Failed to validate claims index: {error}")]);
         if !index_issues.is_empty() {

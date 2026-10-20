@@ -39,7 +39,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 /// `.jit/rules.toml` holds `rules_toml`. `JIT_TEST_MODE` keeps lease checks from
 /// requiring a real worktree claim.
 fn executor(strictness: &str, rules_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     storage.add_data_file(
         "config.toml",

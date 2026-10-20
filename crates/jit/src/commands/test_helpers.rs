@@ -213,16 +213,3 @@ enforce_leases = "{}"
 pub fn setup() -> CommandExecutor<InMemoryStorage> {
     setup_with_enforcement("off")
 }
-
-/// Set the current agent ID via environment variable (for testing).
-///
-/// This allows tests to simulate a configured agent without requiring
-/// ~/.config/jit/agent.toml or CLI flags.
-pub fn set_test_agent(agent_id: &str) {
-    std::env::set_var("JIT_AGENT_ID", agent_id);
-}
-
-/// Clear the test agent ID.
-pub fn clear_test_agent() {
-    std::env::remove_var("JIT_AGENT_ID");
-}

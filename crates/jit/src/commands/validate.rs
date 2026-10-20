@@ -1903,7 +1903,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.validate_transitive_reduction(&graph, &issues)?;
 
         // Validate claims index (if worktree mode is active and not in test mode)
-        if std::env::var("JIT_TEST_MODE").is_err() {
+        if !crate::test_mode::is_enabled() {
             let index_issues = validate_claims_index_with_paths(self.require_worktree_paths()?)
                 .unwrap_or_else(|e| vec![format!("Failed to validate claims index: {}", e)]);
             if !index_issues.is_empty() {
@@ -4289,9 +4289,8 @@ description = \"Full Rust CI pipeline must pass.\"
         // namespace-registry local rule — is the validation failure.
         let exec = dangling_exec_with_namespaces(vec![target, node]);
 
-        std::env::set_var("JIT_TEST_MODE", "1");
+        crate::test_mode::enable();
         let err = exec.validate_silent().unwrap_err();
-        std::env::remove_var("JIT_TEST_MODE");
         let msg = err.to_string();
         assert!(
             msg.contains(DANGLING_LINK_RULE) && msg.contains("BOGUS"),

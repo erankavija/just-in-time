@@ -75,7 +75,7 @@ source-of-truth = "registry-first"
 /// Build an `InMemoryStorage` whose aggregate repository image carries
 /// `config.toml` and the given registry files.
 fn storage_with(config_toml: &str, registries: &[(&str, &str)]) -> InMemoryStorage {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     storage.add_data_file("config.toml", config_toml);
     for (name, content) in registries {

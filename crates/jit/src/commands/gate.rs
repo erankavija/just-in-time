@@ -1273,7 +1273,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// use jit::declarations::{GateMode, GateStage};
     /// use jit::InMemoryStorage;
     ///
-    /// std::env::set_var("JIT_TEST_MODE", "1"); // skip the main-history guard
+    /// jit::test_mode::enable(); // skip the main-history guard
     /// let storage = InMemoryStorage::new();
     /// storage.add_data_file("config.toml", "");
     /// let layout = storage.repository_layout();

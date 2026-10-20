@@ -19,7 +19,7 @@ use tempfile::TempDir;
 /// A project-defined preset lives under `.jit/config/gate-presets/`, which the
 /// in-memory harness does not model, so these cases run over a real store.
 fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let worktree = temp.path().join("worktree");
     std::fs::create_dir(&worktree).unwrap();
     let data_root = worktree.join(".jit");

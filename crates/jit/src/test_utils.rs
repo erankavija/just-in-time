@@ -15,6 +15,7 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::Read;
 #[cfg(unix)]
@@ -30,6 +31,9 @@ use tempfile::TempDir;
 /// alive runs its `Drop` implementation before the mutex guard is released,
 /// so the directory has already been restored when another test acquires it.
 static CURRENT_DIR_LOCK: Mutex<()> = Mutex::new(());
+
+/// Serializes tests that temporarily change the process environment.
+static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
 
 /// Serializes unit-test receipt-environment mutations with in-process fixture
 /// consumers. Nextest setup and its test consumers are separate processes, so
@@ -68,6 +72,59 @@ impl CurrentDirGuard {
 impl Drop for CurrentDirGuard {
     fn drop(&mut self) {
         let _ = std::env::set_current_dir(&self.original);
+    }
+}
+
+/// Change process environment variables for a scope and restore their prior
+/// values on drop.
+///
+/// This guard is intended for tests only. The process-wide lock keeps two
+/// guards from interleaving, so a test that holds one may call code reading the
+/// environment without observing another test's values. Guards do not nest.
+#[must_use = "dropping the guard restores the process environment"]
+pub struct EnvGuard {
+    saved: Vec<(OsString, Option<OsString>)>,
+    _lock: MutexGuard<'static, ()>,
+}
+
+impl EnvGuard {
+    /// Take the environment lock without changing any variable.
+    pub fn acquire() -> Self {
+        let lock = ENVIRONMENT_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Self {
+            saved: Vec::new(),
+            _lock: lock,
+        }
+    }
+
+    pub fn set(&mut self, name: impl AsRef<OsStr>, value: impl AsRef<OsStr>) -> &mut Self {
+        self.remember(name.as_ref());
+        std::env::set_var(name, value);
+        self
+    }
+
+    pub fn remove(&mut self, name: impl AsRef<OsStr>) -> &mut Self {
+        self.remember(name.as_ref());
+        std::env::remove_var(name);
+        self
+    }
+
+    fn remember(&mut self, name: &OsStr) {
+        self.saved
+            .push((name.to_os_string(), std::env::var_os(name)));
+    }
+}
+
+impl Drop for EnvGuard {
+    fn drop(&mut self) {
+        for (name, value) in self.saved.drain(..).rev() {
+            match value {
+                Some(value) => std::env::set_var(name, value),
+                None => std::env::remove_var(name),
+            }
+        }
     }
 }
 
@@ -1305,47 +1362,6 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Barrier};
 
-    struct EnvironmentRestore {
-        values: Vec<(String, Option<std::ffi::OsString>)>,
-    }
-
-    impl EnvironmentRestore {
-        fn set(values: impl IntoIterator<Item = (String, std::ffi::OsString)>) -> Self {
-            let values = values
-                .into_iter()
-                .map(|(name, value)| {
-                    let previous = std::env::var_os(&name);
-                    std::env::set_var(&name, value);
-                    (name, previous)
-                })
-                .collect();
-            Self { values }
-        }
-
-        fn remove(names: impl IntoIterator<Item = String>) -> Self {
-            let values = names
-                .into_iter()
-                .map(|name| {
-                    let previous = std::env::var_os(&name);
-                    std::env::remove_var(&name);
-                    (name, previous)
-                })
-                .collect();
-            Self { values }
-        }
-    }
-
-    impl Drop for EnvironmentRestore {
-        fn drop(&mut self) {
-            for (name, value) in self.values.drain(..) {
-                match value {
-                    Some(value) => std::env::set_var(name, value),
-                    None => std::env::remove_var(name),
-                }
-            }
-        }
-    }
-
     /// The shipped package that carries more than a manifest, which is the one
     /// whose capture actually draws content out of the checkout.
     ///
@@ -1665,6 +1681,7 @@ mod tests {
         let _lock = PROFILED_REPOSITORY_FIXTURE_ENV_LOCK
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut env = EnvGuard::acquire();
         let cache = TempDir::new().unwrap();
         let setup_artifact = cache.path().join("debug/jit");
         fs::create_dir_all(setup_artifact.parent().unwrap()).unwrap();
@@ -1674,22 +1691,14 @@ mod tests {
         let environment = receipt_environment_name(id).unwrap();
         let receipt =
             prepare_profiled_repository_fixture_receipt(id, expected_run, &setup_artifact).unwrap();
-        let _environment = EnvironmentRestore::set([
-            ("NEXTEST_RUN_ID".to_string(), "wrong-run".into()),
-            (
-                environment.to_string(),
-                receipt.path.clone().into_os_string(),
-            ),
-            (
-                format!("{environment}_SHA256"),
-                receipt.sha256.clone().into(),
-            ),
-        ]);
+        env.set("NEXTEST_RUN_ID", "wrong-run")
+            .set(environment, &receipt.path)
+            .set(format!("{environment}_SHA256"), &receipt.sha256);
 
         let wrong_run = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
         assert!(wrong_run.to_string().contains("does not belong"));
-        std::env::set_var("NEXTEST_RUN_ID", expected_run);
-        std::env::set_var(format!("{environment}_SHA256"), "0".repeat(64));
+        env.set("NEXTEST_RUN_ID", expected_run)
+            .set(format!("{environment}_SHA256"), "0".repeat(64));
         let wrong_digest = nextest_profiled_repository_fixture(id, "packages").unwrap_err();
         assert!(wrong_digest.to_string().contains("content mismatch"));
     }
@@ -1703,10 +1712,11 @@ mod tests {
         let default_target = workspace.path().join("default-target");
         let absolute_custom_target = TempDir::new().unwrap();
         let relative_custom_target = workspace.path().join("relative-custom-target");
-        let _misleading_environment = EnvironmentRestore::set([(
-            "CARGO_TARGET_DIR".to_string(),
-            "relative-to-a-different-process-directory".into(),
-        )]);
+        let mut env = EnvGuard::acquire();
+        env.set(
+            "CARGO_TARGET_DIR",
+            "relative-to-a-different-process-directory",
+        );
         let cases = [
             (default_target.join("debug/jit"), default_target.clone()),
             (
@@ -1812,7 +1822,8 @@ mod tests {
             repository_checkout(),
             "setup and consumer artifacts must have differing compile-time checkout provenance"
         );
-        let _target_directory = EnvironmentRestore::remove(["CARGO_TARGET_DIR".to_string()]);
+        let mut env = EnvGuard::acquire();
+        env.remove("CARGO_TARGET_DIR");
         let id = "jit-default";
         let run_id = "shared-runtime-target";
         let environment = receipt_environment_name(id).unwrap();
@@ -1828,17 +1839,9 @@ mod tests {
             "the setup receipt must be published beside its runtime artifact, not its source checkout"
         );
 
-        let _receipt_environment = EnvironmentRestore::set([
-            ("NEXTEST_RUN_ID".to_string(), run_id.into()),
-            (
-                environment.to_string(),
-                receipt.path.clone().into_os_string(),
-            ),
-            (
-                format!("{environment}_SHA256"),
-                receipt.sha256.clone().into(),
-            ),
-        ]);
+        env.set("NEXTEST_RUN_ID", run_id)
+            .set(environment, &receipt.path)
+            .set(format!("{environment}_SHA256"), &receipt.sha256);
         let entry =
             nextest_profiled_repository_fixture_for_artifact(id, "packages", &consumer_artifact)
                 .unwrap();

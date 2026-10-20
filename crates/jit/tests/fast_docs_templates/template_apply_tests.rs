@@ -940,7 +940,7 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // same-named registry gate. This is exercised over a real file-based
     // `JsonFileStorage`: the parse-error path lives in `PresetManager::new`, which the
     // in-memory `TestHarness` (a HashMap lookup) cannot reproduce.
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let storage = JsonFileStorage::new(temp.path());
     std::fs::write(storage.root().join("config.toml"), "").unwrap();

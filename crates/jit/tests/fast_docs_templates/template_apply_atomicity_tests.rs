@@ -389,7 +389,7 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
     store: PublicationProbeStore<S>,
     taxonomy: &TestTaxonomy,
 ) -> (CommandExecutor<PublicationProbeStore<S>>, String, String) {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     assert!(store.read_repo_file(".jit/config.toml").unwrap().is_some());
     let layout =
         jit::storage::discover_repository_layout(store.root().parent().unwrap(), store.root())

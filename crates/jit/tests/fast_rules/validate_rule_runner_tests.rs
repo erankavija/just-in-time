@@ -19,7 +19,7 @@ use jit::storage::{InMemoryStorage, IssueStore};
 /// Build a fresh in-memory store whose on-disk root (used only for `rules.toml`)
 /// holds the supplied rules file contents.
 fn store_with_rules(rules_toml: &str) -> InMemoryStorage {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("rules.toml"), rules_toml).unwrap();
