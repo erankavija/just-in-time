@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-3d9a0ce3",
+  "claimed_at": "2026-10-20T20:56:36.489823867Z",
   "context": {},
   "created_at": "2026-10-20T20:38:32.737832848Z",
   "dependencies": [
@@ -14,7 +15,22 @@
     "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d"
   ],
   "description": "Plan Remove execution-lead friction in gate, document and profile workflows (3d9a0ce3) against every hard success criterion, write the concise design at dev/active/3d9a0ce3-lead-friction/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "investigation",
+      "path": "dev/active/3d9a0ce3-lead-friction/investigation-profile.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "investigation",
+      "path": "dev/active/3d9a0ce3-lead-friction/investigation-children.md"
+    }
+  ],
   "gates_required": [
     "plan-review"
   ],
@@ -36,5 +52,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "planning: Remove execution-lead friction in gate, document and profile workflows",
-  "updated_at": "2026-10-20T20:38:32.737832848Z"
+  "updated_at": "2026-10-20T20:56:36.612033867Z"
 }
