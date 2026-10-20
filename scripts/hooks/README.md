@@ -18,8 +18,8 @@ This command automatically:
 ### pre-commit
 
 **Purpose:** Validates before commit:
-1. Global operations (.jit/config, gates/registry) require common history with main
-2. Structural issue edits require active, non-stale lease (in strict mode)
+1. Global operations (`.jit/config.toml`, `.jit/gates.toml`) require common history with main
+2. Edits to `.jit/issues/<uuid>.json` require an active, non-stale lease held by the committing agent (in strict mode)
 
 **Behavior by enforcement mode:**
 - `off`: Hook exits immediately (no checks)

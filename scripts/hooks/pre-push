@@ -43,14 +43,14 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
   
   # Get all changed .jit/issues files in this push
-  changed=$(git diff --name-only "$range" | grep -E '^\.?jit/issues/[^/]+/issue\.json$' || true)
+  changed=$(git diff --name-only "$range" | grep -E '^\.jit/issues/[^/]+\.json$' || true)
   
   if [ -z "$changed" ]; then
     continue
   fi
   
   # Extract unique issue IDs
-  issue_ids=$(echo "$changed" | sed -E 's#^\.?jit/issues/([^/]+)/.*#\1#' | sort -u)
+  issue_ids=$(echo "$changed" | xargs -n1 basename -s .json | sort -u)
   
   # Get current agent
   agent_id="${JIT_AGENT_ID:-}"
