@@ -1,0 +1,37 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T20:17:42.709764601Z",
+  "dependencies": [],
+  "description": "Plan Remove dead code and compatibility shims across the workspace (842b0ac6) against every hard success criterion, write the concise design at dev/active/842b0ac6-greenfield-cutover/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T20:17:42.709764601Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:17:42.709764601Z",
+      "updated_by": null
+    }
+  },
+  "id": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+  "labels": [
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "component:core",
+    "component:storage",
+    "component:validation",
+    "component:gates",
+    "component:cli",
+    "component:web",
+    "component:docs",
+    "per:@/charter/D-18",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Remove dead code and compatibility shims across the workspace",
+  "updated_at": "2026-10-20T20:17:42.709764601Z"
+}
