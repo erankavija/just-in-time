@@ -121,12 +121,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
     output.push_str("  rankdir=LR;\n");
     output.push_str("  node [shape=box, style=rounded];\n\n");
 
-    // Get all nodes from the graph
-    let mut all_nodes = Vec::new();
-
-    // Collect all nodes (this is a bit awkward, but we need to iterate all nodes)
-    // We'll use a helper to traverse the graph
-    collect_all_nodes(graph, &mut all_nodes);
+    let all_nodes = graph.nodes_by_id();
 
     // Add nodes with labels
     for issue in &all_nodes {
@@ -186,9 +181,7 @@ pub fn export_dot(graph: &DependencyGraph<Issue>) -> String {
 pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     let mut output = String::from("graph LR\n");
 
-    // Collect all nodes
-    let mut all_nodes = Vec::new();
-    collect_all_nodes(graph, &mut all_nodes);
+    let all_nodes = graph.nodes_by_id();
 
     // Add nodes with state styling
     for issue in &all_nodes {
@@ -240,8 +233,7 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
 /// orchestration loops. For complete node records use [`export_json_full`]
 /// (`--full`); the two share an identical `edges` list.
 pub fn export_json(graph: &DependencyGraph<Issue>) -> String {
-    let mut all_nodes = Vec::new();
-    collect_all_nodes(graph, &mut all_nodes);
+    let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportSummaryNode> = all_nodes
         .iter()
@@ -317,8 +309,7 @@ pub fn export_json_full(
     graph: &DependencyGraph<Issue>,
     resolution: &crate::graph::hierarchy::HierarchyResolution,
 ) -> String {
-    let mut all_nodes = Vec::new();
-    collect_all_nodes(graph, &mut all_nodes);
+    let all_nodes = graph.nodes_by_id();
 
     let nodes: Vec<GraphExportFullNode> = all_nodes
         .iter()
@@ -333,26 +324,6 @@ pub fn export_json_full(
         edges: build_export_edges(&all_nodes),
     };
     serde_json::to_string_pretty(&response).unwrap_or_else(|_| "{}".to_string())
-}
-
-// Helper function to collect all nodes from the graph
-// Since we don't have direct access to internal nodes, we build the set
-// by traversing from roots and collecting all dependents
-fn collect_all_nodes<'a>(graph: &DependencyGraph<'a, Issue>, nodes: &mut Vec<&'a Issue>) {
-    use std::collections::HashSet;
-
-    let roots = graph.get_roots();
-    let mut visited = HashSet::new();
-    let mut stack: Vec<&Issue> = roots.clone();
-
-    while let Some(node) = stack.pop() {
-        if visited.insert(node.id.clone()) {
-            nodes.push(node);
-            // Get all nodes that depend on this one
-            let dependents = graph.get_dependents(&node.id);
-            stack.extend(dependents);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -662,5 +633,69 @@ mod tests {
                 .map(String::from)
                 .collect();
         assert_eq!(export_resolution_keys, expected);
+    }
+
+    fn exported_ids(json: &str) -> std::collections::BTreeSet<String> {
+        serde_json::from_str::<serde_json::Value>(json).unwrap()["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n["id"].as_str().unwrap().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_export_json_scope_members_depending_only_on_outside_issues_all_appear() {
+        let outside = crate::domain::types::fixture_issue("Outside".into(), String::new());
+        let mut task = crate::domain::types::fixture_issue("Task".into(), String::new());
+        task.dependencies.push(outside.id.clone());
+        let mut epic = crate::domain::types::fixture_issue("Epic".into(), String::new());
+        epic.dependencies.push(task.id.clone());
+
+        let scope = vec![&task, &epic];
+        let graph = DependencyGraph::new(&scope);
+
+        let expected = [&task, &epic].map(|i| i.id.clone()).into_iter().collect();
+        assert_eq!(exported_ids(&export_json(&graph)), expected);
+    }
+
+    proptest::proptest! {
+        /// Node `i` depends only on nodes `< i`; `scope` selects any subset.
+        #[test]
+        fn prop_export_lists_exactly_the_selected_nodes_in_a_stable_order(
+            masks in proptest::collection::vec(0u32..128, 1..8),
+            scope_bits in 0u32..256,
+        ) {
+            let mut issues: Vec<Issue> = masks
+                .iter()
+                .map(|_| crate::domain::types::fixture_issue("N".into(), String::new()))
+                .collect();
+            let ids: Vec<String> = issues.iter().map(|i| i.id.clone()).collect();
+            for (index, mask) in masks.iter().enumerate() {
+                issues[index].dependencies = (0..index)
+                    .filter(|earlier| mask & (1 << earlier) != 0)
+                    .map(|earlier| ids[earlier].clone())
+                    .collect();
+            }
+            let selected: Vec<&Issue> = issues
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| scope_bits & (1 << index) != 0)
+                .map(|(_, issue)| issue)
+                .collect();
+            let expected: std::collections::BTreeSet<String> =
+                selected.iter().map(|i| i.id.clone()).collect();
+
+            let graph = DependencyGraph::new(&selected);
+            let json = export_json(&graph);
+            proptest::prop_assert_eq!(exported_ids(&json), expected);
+
+            let mut reversed = selected.clone();
+            reversed.reverse();
+            let rebuilt = DependencyGraph::new(&reversed);
+            proptest::prop_assert_eq!(&json, &export_json(&rebuilt));
+            proptest::prop_assert_eq!(export_dot(&graph), export_dot(&rebuilt));
+            proptest::prop_assert_eq!(export_mermaid(&graph), export_mermaid(&rebuilt));
+        }
     }
 }
