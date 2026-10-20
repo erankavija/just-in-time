@@ -1,0 +1,39 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T20:38:32.737832848Z",
+  "dependencies": [
+    "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Remove execution-lead friction in gate, document and profile workflows (3d9a0ce3) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:38:32.737832848Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:38:32.737832848Z",
+      "updated_by": null
+    }
+  },
+  "id": "a3437bab-d2b7-44cc-9ec5-347a0df971c5",
+  "labels": [
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-20",
+    "type:breakdown",
+    "brackets:3d9a0ce3"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Remove execution-lead friction in gate, document and profile workflows",
+  "updated_at": "2026-10-20T20:38:32.737832848Z"
+}
