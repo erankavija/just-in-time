@@ -16527,3 +16527,4 @@
 {"from":"ready","id":"60f9a3a9-ad2a-45ce-bc41-0c9bc8e6a89b","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-20T20:17:42.709764601Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"87560fc4-1169-459f-a247-994f489072ab","issue_id":"6792cc41-d648-45f1-a1f9-f19ddf2a0cae","timestamp":"2026-10-20T20:17:42.709764601Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"7bb9887a-8ed5-480f-8a27-77b846ff3b4c","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-20T20:17:42.709764601Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"cargo-ci","id":"23581443-5a8b-4660-8f42-d7d75ba0936c","issue_id":"cd2ed136-84ce-46c7-9741-b4d167ed540d","timestamp":"2026-10-20T20:21:36.823734959Z","type":"gate_failed","updated_by":"auto:executor"}
