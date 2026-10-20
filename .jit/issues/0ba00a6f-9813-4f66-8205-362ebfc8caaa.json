@@ -1,0 +1,35 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T20:38:39.166228363Z",
+  "dependencies": [
+    "a2546471-37d0-4822-8a6c-9090f3d71491"
+  ],
+  "description": "Plan Dispatch layering, executor surface, and build hygiene in crates/jit (df129d9e) against every hard success criterion, write the concise design at dev/active/df129d9e-rust-code-quality/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T20:38:39.166228363Z",
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:38:39.166228363Z",
+      "updated_by": null
+    }
+  },
+  "id": "0ba00a6f-9813-4f66-8205-362ebfc8caaa",
+  "labels": [
+    "milestone:v1.0",
+    "epic:rust-code-quality",
+    "component:cli",
+    "component:server",
+    "per:@/charter/D-20",
+    "per:@/charter/D-18",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "planning: Dispatch layering, executor surface, and build hygiene in crates/jit",
+  "updated_at": "2026-10-20T20:38:39.166228363Z"
+}
