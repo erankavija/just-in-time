@@ -20,7 +20,7 @@
           "title": "Reading active leases re-evicts the same expired lease on every call",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
+          "status": "merged, gates pending",
           "note": "same worker as d92f54aa (claim_coordinator.rs)"
         },
         {
@@ -29,7 +29,7 @@
           "title": "Remove the inert coordination timing keys",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
+          "status": "rework: first commit 7d2de1b95 implemented superseded scope; worker redirected again",
           "note": "same worker as d7d0d0db, committed after it; rescoped mid-wave by user decision (D-18) to delete the three coordination timing keys; worker redirected"
         },
         {
@@ -46,7 +46,7 @@
           "title": "Graph export lists every in-scope issue in a stable order",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged, gates pending"
         },
         {
           "id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
@@ -62,7 +62,7 @@
           "title": "Search passes regex and dash-leading queries to ripgrep as flags",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged, gates pending"
         },
         {
           "id": "514df7d3-caa6-40bb-9fba-d250e1bb756d",
@@ -70,7 +70,7 @@
           "title": "Guard current storage paths in the shipped pre-commit hook",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged, gates pending"
         },
         {
           "id": "6ff14f21-2150-4e48-9dc6-5c4e2f7ac2d1",
@@ -78,7 +78,7 @@
           "title": "Stop tests from unsetting JIT_TEST_MODE under parallel tests",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged, gates pending"
         },
         {
           "id": "d23c58c0-9f72-4ebf-bf22-df0df02cd4f9",
@@ -86,7 +86,7 @@
           "title": "Orphan-leaf validation checks type names instead of membership namespaces",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "merged, gates pending"
         }
       ]
     },
@@ -155,7 +155,19 @@
     }
   ],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    {
+      "from": "d7d0d0db worker",
+      "finding": "renew_lease and the lease-acquire paths drop an eviction when they bail before writing the claims index (same defect class as d7d0d0db, outside its criteria)",
+      "disposition": "open; not filed under this epic"
+    },
+    {
+      "from": "lead",
+      "finding": "cargo-ci budget step (30 s suite clock) and timing-sensitive tests fail under parallel-worker host load; gate results are meaningful only on a quiet host",
+      "disposition": "operational: evaluate gates after workers finish"
+    }
+  ],
   "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
-  "started_at": "2026-10-20T19:52:54+00:00"
+  "started_at": "2026-10-20T19:52:54+00:00",
+  "session_instructions": "User (2026-10-20): do not stop to ask questions; block issues needing user input in jit and record the question in the issue and handoff; send project-level escalations to steward session just-in-time-24 (milestone 9db27a3a); write handoff and tell the steward when nothing more can proceed; check workers every 30 min."
 }
