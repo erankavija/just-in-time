@@ -1604,7 +1604,7 @@ kind = "advisory"
     }
 
     /// `repair_target_paths` is the coverage authority for `derive_repair`'s own
-    /// action targets (@/charter/D-15 pattern: bind coverage to the planner's own
+    /// action targets (@/charter/D-20 pattern: bind coverage to the planner's own
     /// declaration, never a hand-written mirror). A fixture drifting the
     /// default-ruleset family (missing "team" membership + its schema) AND the
     /// configured-projection family (stale AGENTS.md region) in one image exercises

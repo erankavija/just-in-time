@@ -34,11 +34,13 @@ one that adds it (D-18).
 - D-11: Release v1.0 with no known dependency advisories and blocking security audits
 - D-12: Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - D-13: Give each adopter-facing fact one canonical documentation home
-- D-14: Gate the v1.0 tag on the completed upstream streams, including apply-once profiles and execution-lead friction removal
-- D-15: Fix scoped validation in core rather than weakening bracket evidence
+- D-14: Gate the v1.0 tag on every epic under the v1.0 milestone, as the dependency graph states it
 - D-16: Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 - D-17: Publish each mutation through one redo record over the files it writes, so its cost never scales with project history
 - D-18: Prefer removing, unifying, or deriving mechanism over adding it
+- D-19: Reads never scale with project history; the storage layout addresses per-key data directly
+- D-20: One computation per capability; previews, scoped views, and checkers are views over it
+- D-21: Reach git only through the git CLI, from one storage-owned module
 
 ## Decision Details
 
@@ -158,22 +160,20 @@ one that adds it (D-18).
   The profile operation's event records what was applied. Package authors edit
   the manifest directly, and pack and add exchange packages. Remote package
   registries remain deferred.
-- **Rejected:** The ownership lifecycle this decision chose from 2026-08-10:
-  durable ownership records with base fingerprints, three-way publication,
-  conflict and divergence classes with remedies, capture back into the owning
-  package, reconfigure, and upgrade. It kept two copies of every value in sync
-  and made routine acts fail: a newer package could not change a contributed
-  value the adopter never touched, and recovering from an in-place edit took a
-  capture and an apply that the reported remedy did not name together. Also
+- **Rejected:** An ownership lifecycle: durable ownership records with base
+  fingerprints, three-way publication, conflict and divergence classes with
+  remedies, capture back into the owning package, reconfigure, and upgrade. It
+  keeps two copies of every value in sync and makes routine acts fail: a newer
+  package cannot change a contributed value the adopter never touched, and
+  recovering from an in-place edit takes a capture and an apply together. Also
   rejected: layering package defaults under repository overrides, which leaves
   `.jit/` an incomplete description of the configuration agents read;
   generating `.jit/` from packages, which makes editing `.jit/` an error; and
   dropping profiles, which leaves the dogfooded workflow hard to install.
-- **Reasoning:** The 2026-08-10 reversal held that an apply-only surface was
-  broken because an edited profile-owned file was reported as drift with no way
-  back. That failure came from the ownership record, not from applying once:
-  without a record an edit is an ordinary change, and git already shows and
-  restores it. A newer package version then needs no merge engine in jit:
+- **Reasoning:** Drift reported on an edited profile-owned file comes from the
+  ownership record, not from applying once: without a record an edit is an
+  ordinary change, and git already shows and restores it. A newer package
+  version then needs no merge engine in jit:
   written over a committed tree, it leaves every difference in git's view, and
   the adopter keeps what they changed. Core commands still work without git
   (D-4); there, `jit profile diff` is the comparison to read before applying.
@@ -182,10 +182,8 @@ one that adds it (D-18).
   checks inside `jit validate`, three-way publication, conflict remedies,
   capture's reconciliation, reconfigure, and upgrade. No released record format
   exists, so a repository holding applied-profile records drops them with no
-  migration boundary (`@/inv/canonical-cutover`). The v1.0 tag depends on this
-  change (D-14).
-- **Date:** 2026-07-14, amended 2026-07-31, reversed 2026-08-10, amended
-  2026-10-01, reversed 2026-10-15
+  migration boundary (`@/inv/canonical-cutover`).
+- **Date:** 2026-07-14, revised 2026-10-15
 
 ### D-9: Cut redundant release surfaces, not product capabilities
 
@@ -256,48 +254,21 @@ one that adds it (D-18).
   enforces `@/inv/single-source-prose` across the public documentation surface.
 - **Date:** 2026-07-14
 
-### D-14: The v1.0 tag consumes the completed upstream delivery streams
+### D-14: The v1.0 tag consumes every v1.0 epic
 
-- **Chosen:** Keep the release boundary directly dependent on profiles MVP
-  `9b7b5f9c`, the profile lifecycle `c639cfb5`, core maintenance `6eb585bc`,
-  redo-record mutations `f1dc843a`, and execution-lead friction removal
-  `3d9a0ce3`. All reach a terminal state before the `v1.0.0` tag is created;
-  the release work consumes their delivered contracts without changing or
-  duplicating them. The lifecycle epic joined this set when D-8 was reversed
-  on 2026-08-10. The mutation epic joined it with D-17, because a release whose
-  mutations slow down as project history grows is not dependable. The friction
-  epic joined it when D-8 was reversed on 2026-10-15: it replaces the ownership
-  lifecycle with apply-once profiles, and v1.0 ships that simpler surface
-  rather than the one it replaces.
-- **Rejected:** Creating an intermediate v1.0 core-maintenance checkpoint only
-  to make the dependency terminal; keeping core maintenance intentionally open
-  as a living epic; and copying either upstream stream's work into the release
-  container, which creates competing ownership.
-- **Reasoning:** The existing DAG expresses the intended ordering. Planning and
-  independent release hardening can proceed while core maintenance finishes, but
-  tagging requires the completed core fixes, the profile quickstart, and a
-  profile lifecycle an adopter can recover from. A synthetic checkpoint would
-  add lifecycle ceremony without changing that contract.
-- **Date:** 2026-07-15, amended 2026-08-10, 2026-09-19, and 2026-10-15
-
-### D-15: Scoped bracket validation is a core-maintenance prerequisite
-
-- **Chosen:** Capture the scoped-validation defect under core maintenance and
-  fix it before production-readiness breakdown can pass. Scoped rules evaluate
-  only issues in the requested container subtree while resolving legitimate
-  pointers against the complete issue index; production planning retains the
-  failed coverage evidence and reruns the gate with the fixed engine.
-- **Rejected:** Removing the valid historical `brackets:2821e177` label,
-  inventing a cross-epic dependency, treating the coverage failure as a missing
-  production criterion, or bypassing the gate. Each alternative would corrupt
-  authoritative project data or weaken the plan-before-fan-out guarantee instead
-  of correcting the validator.
-- **Reasoning:** Global validation is clean, both referenced historical issues
-  exist, and the failure appears only under `jit validate --scope 8b05a612` when
-  an unrelated bracket is checked against a partial issue map. Fixing that
-  project-wide validation primitive belongs to the already-prioritized core
-  maintenance stream, consistent with D-3 and D-14.
-- **Date:** 2026-07-15
+- **Chosen:** The task that cuts the `v1.0.0` tag depends on every epic under
+  the v1.0 milestone, and each reaches a terminal state before the tag is
+  created. The dependency graph is the list; this entry names none. Release work
+  consumes the delivered contracts without changing or duplicating them.
+- **Rejected:** A hand-kept list of epics here, which goes stale as epics join
+  or close (`@/inv/single-source-prose`); intermediate checkpoints created only
+  to make a dependency terminal; and copying an upstream epic's work into the
+  release container, which creates competing ownership.
+- **Reasoning:** The DAG already expresses the ordering. Planning and release
+  hardening proceed while upstream epics finish, and the tag waits for all of
+  them, so v1.0 ships the simplified, consistent surface rather than the one
+  those epics replace.
+- **Date:** 2026-07-15, revised 2026-10-20
 
 ### D-16: One tag-triggered workflow publishes one GitHub release
 
@@ -351,13 +322,6 @@ one that adds it (D-18).
   of its own (a synced stage directory and a no-replace rename), because no
   `tmp/` exists before it, and writes the data root's `.gitignore` naming
   `tmp/`. The change leaves the storage layer with less code than it has now.
-- **Supersedes:** Decisions D11 (transaction guarantee) and D14 (capture
-  closure) of the transactional-materialization plan `cdc840ad`, archived under
-  `dev/archive/cdc840ad-repository-materialization/`. Their journaled rollback
-  kernel with backups, staging, reverse actions, and worktree companions, their
-  whole-read-set revalidation at apply, the plan hash over every captured entry,
-  and the phased capture with listing fingerprints and document closure are
-  removed rather than kept alongside the redo record.
 - **Rejected:** Keeping the rollback kernel and making its hashing cheaper, which
   still rewrites the whole event log on every mutation and keeps the code;
   independent atomic writes of the issue file and the event line, which let a
@@ -401,3 +365,46 @@ one that adds it (D-18).
   Before v1.0 no released format constrains deletion
   (`@/inv/canonical-cutover`), so simplifying now is cheapest.
 - **Date:** 2026-10-15
+
+### D-19: Reads never scale with project history
+
+- **Chosen:** The storage layout addresses per-key data directly: reading one
+  issue's state, gate results, or lease touches files sized by that key, never
+  the whole history. The event log, the claims log, and gate-run history are
+  append-only records, read only by commands that report history. The layout
+  changes to make this hold; no migration boundary exists before v1.0.
+- **Rejected:** Derived indexes over the current layout, which add files that
+  must stay coherent with their sources; and periodic compaction, which only
+  bounds cost between compactions.
+- **Reasoning:** D-17 made writes independent of history; reads are the
+  remaining cost an agent pays as a project ages. Restructuring removes the
+  scans instead of maintaining structures that hide them (D-18).
+- **Date:** 2026-10-20
+
+### D-20: One computation per capability
+
+- **Chosen:** Each capability is computed one way. Validation computes one
+  report over the captured repository and filters it for an issue, a scope, an
+  explanation, or a gate checker. A preview runs the same mutation session as
+  its operation, read-only. A rule, derivation, or parser exists once and every
+  caller goes through it.
+- **Rejected:** Scoped or preview variants that reimplement part of the full
+  computation for speed or convenience. They drift: preview and apply disagree,
+  and a per-issue view becomes slower than the whole report it approximates.
+- **Reasoning:** Consistency is proven once, against the one computation
+  (`@/inv/convention-convergence`), and every view inherits it.
+- **Date:** 2026-10-20
+
+### D-21: git through the CLI, from one storage-owned module
+
+- **Chosen:** Every git access goes through one storage-owned module that runs
+  the git CLI. The libgit2 binding is removed. Repository layout facts are
+  detected once per invocation and passed down. Core commands still work
+  without git (D-4).
+- **Rejected:** libgit2 everywhere, which keeps a large dependency, its
+  certificate loading on every read, and its advisory surface (D-11); and a
+  module hiding both backends, which keeps two mechanisms.
+- **Reasoning:** jit needs a handful of git facts per invocation. One spawn per
+  needed fact through the tool adopters already have is the smaller, uniformly
+  testable mechanism (D-18).
+- **Date:** 2026-10-20

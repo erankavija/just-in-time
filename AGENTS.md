@@ -113,11 +113,13 @@ The v1.0 vision charter's decision log is projected from `dev/vision/9db27a3a-ch
 - **D-11** — Release v1.0 with no known dependency advisories and blocking security audits
 - **D-12** — Keep the v1.0 MSRV on a current stable Rust release and enforce it in CI
 - **D-13** — Give each adopter-facing fact one canonical documentation home
-- **D-14** — Gate the v1.0 tag on the completed upstream streams, including apply-once profiles and execution-lead friction removal
-- **D-15** — Fix scoped validation in core rather than weakening bracket evidence
+- **D-14** — Gate the v1.0 tag on every epic under the v1.0 milestone, as the dependency graph states it
 - **D-16** — Ship v1.0 through one tag-triggered release workflow publishing one GitHub release
 - **D-17** — Publish each mutation through one redo record over the files it writes, so its cost never scales with project history
 - **D-18** — Prefer removing, unifying, or deriving mechanism over adding it
+- **D-19** — Reads never scale with project history; the storage layout addresses per-key data directly
+- **D-20** — One computation per capability; previews, scoped views, and checkers are views over it
+- **D-21** — Reach git only through the git CLI, from one storage-owned module
 <!-- jit:charter:end -->
 
 <!-- jit:dogfood-guidance:begin -->
