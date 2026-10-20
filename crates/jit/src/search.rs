@@ -127,9 +127,7 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         cmd.arg("--ignore-case");
     }
 
-    if options.regex {
-        cmd.arg("--regexp");
-    } else {
+    if !options.regex {
         cmd.arg("--fixed-strings");
     }
 
@@ -146,7 +144,9 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         cmd.arg("--glob").arg(pattern);
     }
 
-    cmd.arg(query)
+    // The pattern is the value of `--regexp=`, so a leading `-` is never read as a flag.
+    cmd.arg(format!("--regexp={query}"))
+        .arg("--")
         .arg(data_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
@@ -396,5 +396,65 @@ mod tests {
             any.downcast_ref::<SearchError>(),
             Some(SearchError::Failed(_))
         ));
+    }
+
+    fn corpus() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("a.json"),
+            "before\nFlag one\n--verbose here\n-flag there\nafter\n",
+        )
+        .unwrap();
+        dir
+    }
+
+    fn matched_lines(dir: &tempfile::TempDir, query: &str, options: SearchOptions) -> Vec<String> {
+        search(dir.path(), query, options)
+            .unwrap()
+            .into_iter()
+            .map(|r| r.line_text.trim().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn test_search_regex_matches_for_every_context_case_and_glob_combination() {
+        let dir = corpus();
+        for context_lines in [0, 1] {
+            for case_sensitive in [false, true] {
+                for globs in [vec![], vec!["*.json".to_string()]] {
+                    let options = SearchOptions {
+                        regex: true,
+                        context_lines,
+                        case_sensitive,
+                        file_patterns: globs.clone(),
+                        ..SearchOptions::default()
+                    };
+                    let query = if case_sensitive { "Flag o." } else { "flag o." };
+                    assert_eq!(
+                        matched_lines(&dir, query, options),
+                        ["Flag one"],
+                        "context={context_lines} case={case_sensitive} globs={globs:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_search_dash_leading_query_matches_as_text_in_literal_and_regex_modes() {
+        let dir = corpus();
+        for regex in [false, true] {
+            for (query, expected) in [("--verbose", "--verbose here"), ("-flag", "-flag there")] {
+                let options = SearchOptions {
+                    regex,
+                    ..SearchOptions::default()
+                };
+                assert_eq!(
+                    matched_lines(&dir, query, options),
+                    [expected],
+                    "regex={regex} query={query}"
+                );
+            }
+        }
     }
 }
