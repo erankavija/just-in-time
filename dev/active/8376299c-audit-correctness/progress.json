@@ -1,0 +1,155 @@
+{
+  "epic_id": "8376299c-f9e1-4b7b-be62-27af493f6969",
+  "epic_short_id": "8376299c",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "issues": [
+        {
+          "id": "2d10f1dd-64c6-4eaf-8e67-836ed80c23d9",
+          "short_id": "2d10f1dd",
+          "title": "Issue update and reject apply all requested changes atomically or none",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "d7d0d0db-05dd-4954-805a-3564cf7af4a6",
+          "short_id": "d7d0d0db",
+          "title": "Reading active leases re-evicts the same expired lease on every call",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "same worker as d92f54aa (claim_coordinator.rs)"
+        },
+        {
+          "id": "d92f54aa-761e-4049-b1aa-d5efc32f17c6",
+          "short_id": "d92f54aa",
+          "title": "Honour the configured stale threshold for indefinite claim leases",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "same worker as d7d0d0db, committed after it"
+        },
+        {
+          "id": "0fa1e09e-8014-413e-ad89-44ce5d535806",
+          "short_id": "0fa1e09e",
+          "title": "Server serves storage reads when started with a relative data directory",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "cd2ed136-84ce-46c7-9741-b4d167ed540d",
+          "short_id": "cd2ed136",
+          "title": "Graph export lists every in-scope issue in a stable order",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+          "short_id": "7d1bfe89",
+          "title": "Batch update filter panics on non-ASCII query text",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "34999aad-b3c6-4664-b80d-bf5a548f9200",
+          "short_id": "34999aad",
+          "title": "Search passes regex and dash-leading queries to ripgrep as flags",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "514df7d3-caa6-40bb-9fba-d250e1bb756d",
+          "short_id": "514df7d3",
+          "title": "Guard current storage paths in the shipped pre-commit hook",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "6ff14f21-2150-4e48-9dc6-5c4e2f7ac2d1",
+          "short_id": "6ff14f21",
+          "title": "Stop tests from unsetting JIT_TEST_MODE under parallel tests",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "d23c58c0-9f72-4ebf-bf22-df0df02cd4f9",
+          "short_id": "d23c58c0",
+          "title": "Orphan-leaf validation checks type names instead of membership namespaces",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "issues": [
+        {
+          "id": "bedf0962-dcb6-4c72-bd88-a4125e1a69d6",
+          "short_id": "bedf0962",
+          "title": "Config show misreports the lease enforcement mode that commands apply",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "after d92f54aa: config.rs/config_manager.rs"
+        },
+        {
+          "id": "05d1b34e-3174-411e-851b-86b5223a6841",
+          "short_id": "05d1b34e",
+          "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "after 2d10f1dd: commands/issue.rs"
+        },
+        {
+          "id": "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
+          "short_id": "aa423d02",
+          "title": "Apply the claim-next filter when choosing which issue to claim",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "after 2d10f1dd: commands/issue.rs, main.rs"
+        },
+        {
+          "id": "c0d0c8bf-679f-463b-87ca-25cae8945646",
+          "short_id": "c0d0c8bf",
+          "title": "Accept namespace wildcards in issue search label filters",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending",
+          "note": "after 34999aad: search paths"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "issues": [
+        {
+          "id": "16d63038-c08b-4d2d-9a77-1a75fe48ef20",
+          "short_id": "16d63038",
+          "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending",
+          "note": "after all others: touches many resolvers"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
+  "started_at": "2026-10-20T19:52:54+00:00"
+}

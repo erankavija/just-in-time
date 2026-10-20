@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-20T19:52:15.664998314Z",
   "context": {},
   "created_at": "2026-10-20T19:42:11.527194601Z",
   "dependencies": [],
@@ -20,7 +21,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Search passes regex and dash-leading queries to ripgrep as flags",
-  "updated_at": "2026-10-20T19:42:11.527194601Z"
+  "updated_at": "2026-10-20T19:52:15.664998314Z"
 }

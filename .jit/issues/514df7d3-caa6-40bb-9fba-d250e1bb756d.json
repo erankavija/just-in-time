@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-20T19:52:15.795826713Z",
   "context": {},
   "created_at": "2026-10-20T19:42:12.106939459Z",
   "dependencies": [],
@@ -20,7 +21,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Guard current storage paths in the shipped pre-commit hook",
-  "updated_at": "2026-10-20T19:42:12.106939459Z"
+  "updated_at": "2026-10-20T19:52:15.795826713Z"
 }
