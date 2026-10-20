@@ -26,11 +26,11 @@
         {
           "id": "d92f54aa-761e-4049-b1aa-d5efc32f17c6",
           "short_id": "d92f54aa",
-          "title": "Honour the configured stale threshold for indefinite claim leases",
+          "title": "Remove the inert coordination timing keys",
           "classification": "implementation",
           "model": "opus",
           "status": "pending",
-          "note": "same worker as d7d0d0db, committed after it"
+          "note": "same worker as d7d0d0db, committed after it; rescoped mid-wave by user decision (D-18) to delete the three coordination timing keys; worker redirected"
         },
         {
           "id": "0fa1e09e-8014-413e-ad89-44ce5d535806",
@@ -147,7 +147,13 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
+  "escalations": [
+    {
+      "issue": "d92f54aa",
+      "category": "issue scope change",
+      "resolution": "user (via invoking session) rescoped to key removal; lead applied title/criteria edit and redirected worker"
+    }
+  ],
   "rework_counts": {},
   "surfaced_pitfalls": [],
   "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
