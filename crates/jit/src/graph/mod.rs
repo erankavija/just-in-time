@@ -256,6 +256,13 @@ impl<'a, T: GraphNode> DependencyGraph<'a, T> {
         false
     }
 
+    /// Every node, sorted by id.
+    pub fn nodes_by_id(&self) -> Vec<&'a T> {
+        let mut nodes: Vec<&'a T> = self.nodes.values().copied().collect();
+        nodes.sort_unstable_by(|a, b| a.id().cmp(b.id()));
+        nodes
+    }
+
     /// Get all root nodes (nodes with no dependencies)
     pub fn get_roots(&self) -> Vec<&'a T> {
         self.nodes
