@@ -1,0 +1,35 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T20:35:51.260510554Z",
+  "dependencies": [
+    "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b"
+  ],
+  "description": "Plan Give every identity and closed vocabulary one semantic type (2195c98f) against every hard success criterion, write the concise design at dev/active/2195c98f-semantic-types/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
+  "documents": [],
+  "gates_required": [
+    "plan-review"
+  ],
+  "gates_status": {
+    "plan-review": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:35:51.260510554Z",
+      "updated_by": null
+    }
+  },
+  "id": "8aa53c43-e838-4f3e-995e-d5b0960ea1f9",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "component:core",
+    "component:storage",
+    "component:validation",
+    "component:gates",
+    "per:@/charter/D-18",
+    "type:planning"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "planning: Give every identity and closed vocabulary one semantic type",
+  "updated_at": "2026-10-20T20:35:51.260510554Z"
+}

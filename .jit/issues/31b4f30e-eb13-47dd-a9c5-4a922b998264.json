@@ -1,0 +1,42 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T20:35:51.260510554Z",
+  "dependencies": [
+    "8aa53c43-e838-4f3e-995e-d5b0960ea1f9"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Give every identity and closed vocabulary one semantic type (2195c98f) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:35:51.260510554Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-20T20:35:51.260510554Z",
+      "updated_by": null
+    }
+  },
+  "id": "31b4f30e-eb13-47dd-a9c5-4a922b998264",
+  "labels": [
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "component:core",
+    "component:storage",
+    "component:validation",
+    "component:gates",
+    "per:@/charter/D-18",
+    "type:breakdown",
+    "brackets:2195c98f"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Give every identity and closed vocabulary one semantic type",
+  "updated_at": "2026-10-20T20:35:51.260510554Z"
+}
