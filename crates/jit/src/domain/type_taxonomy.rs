@@ -443,7 +443,7 @@ pub fn validate_orphans(
     }
 
     // Check if it has any parent association labels
-    let has_parent_label = config.membership_namespaces().any(|(namespace, _)| {
+    let has_parent_label = config.membership_namespaces().any(|(_, namespace)| {
         issue
             .labels
             .iter()
@@ -784,6 +784,33 @@ mod tests {
 
         let issues = detect_validation_issues(&config, "01ABC", &labels);
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_validate_orphans_membership_namespace_differs_from_type_name() {
+        use super::validate_orphans;
+
+        let types = HashMap::from([("release".to_string(), 1), ("task".to_string(), 2)]);
+        let associations = HashMap::from([("release".to_string(), "milestone".to_string())]);
+        let config = HierarchyConfig::new(types, associations).unwrap();
+
+        let orphaned = |labels: &[&str]| {
+            let mut issue = crate::domain::types::fixture_issue("leaf".into(), String::new());
+            issue.labels = std::iter::once("type:task")
+                .chain(labels.iter().copied())
+                .map(String::from)
+                .collect();
+            !validate_orphans(&config, &issue).is_empty()
+        };
+
+        assert!(
+            !orphaned(&["milestone:v1"]),
+            "membership namespace must count as a parent"
+        );
+        assert!(
+            orphaned(&["release:v1"]),
+            "type name must not count as a parent"
+        );
     }
 
     // Note: Removed test_detect_invalid_hierarchy_dep - dependencies are not restricted by type
