@@ -307,6 +307,13 @@
       "summary": "Planning lead found an out-of-scope cutover shim (archive legacy short-id destination fallback) and stale git background in f4d9502a. Routed the shim to b697a3f7 REQ-20 (archive destination resolution has one form) and removed from f4d9502a the bullets 842b0ac6 REQ-01/REQ-18 delete.",
       "decision": "@/charter/D-20, @/charter/D-18",
       "date": "2026-10-20"
+    },
+    {
+      "container_short_id": "2195c98f",
+      "status": "resolved",
+      "date": "2026-10-20",
+      "decision": "@/charter/D-18, @/charter/D-20",
+      "summary": "Profile typing vs the 3d9a0ce3 rework. Chosen (b): 2195c98f REQ-09 narrows to the domain ProfileId. The ProfilePackageId deletion and semver typing move to 3d9a0ce3 (its REQ-14/REQ-15) and build on ProfileId. Rejected (a), gating 2195c98f's profile tasks on 3d9a0ce3: it serialises all eight wave-4 epics behind an unplanned epic. Rejected (c), typing now: churn against code the rework rewrites."
     }
   ],
   "notes": [
