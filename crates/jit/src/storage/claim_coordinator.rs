@@ -1203,9 +1203,11 @@ impl ClaimCoordinator {
             .locker
             .lock_exclusive_with_metadata(&lock_path, &self.agent_id)?;
 
-        // 2. Load index and evict expired leases
+        // 2. Load index, evict expired leases, and persist the eviction so the
+        //    next read does not log it again
         let mut index = self.load_claims_index()?;
         self.evict_expired(&mut index)?;
+        self.write_index_atomic(&index)?;
 
         // 3. Filter leases
         let mut leases: Vec<Lease> = index
@@ -2028,6 +2030,61 @@ mod tests {
         // Now try to claim - should evict expired and succeed
         let lease = coordinator.acquire_claim("issue-006", 600).unwrap();
         assert_eq!(lease.agent_id, "agent:test");
+    }
+
+    fn logged_operations(temp_dir: &TempDir) -> Vec<ClaimOp> {
+        fs::read_to_string(temp_dir.path().join(".git/jit/claims.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| {
+                serde_json::from_str::<ClaimLogEntry>(line)
+                    .unwrap()
+                    .operation
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_get_active_leases_persists_eviction_of_expired_lease_once() {
+        use crate::storage::clock::FixedClock;
+
+        let temp_dir = TempDir::new().unwrap();
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let expired = coordinator.acquire_claim("issue-expiring", 1).unwrap();
+        clock.set(base + Duration::seconds(2));
+
+        let reads = (0..3)
+            .map(|_| coordinator.get_active_leases(None, None).unwrap())
+            .collect::<Vec<_>>();
+
+        assert!(reads.iter().all(Vec::is_empty));
+        let evictions = logged_operations(&temp_dir)
+            .into_iter()
+            .filter(|op| {
+                matches!(op, ClaimOp::AutoEvict { lease_id, .. } if *lease_id == expired.lease_id)
+            })
+            .count();
+        assert_eq!(evictions, 1, "an expired lease is evicted exactly once");
+        assert!(coordinator
+            .load_claims_index()
+            .unwrap()
+            .find_lease_by_id(&expired.lease_id)
+            .is_none());
+    }
+
+    #[test]
+    fn test_get_active_leases_without_expired_leases_appends_nothing() {
+        let temp_dir = TempDir::new().unwrap();
+        let coordinator = setup_coordinator(&temp_dir);
+        coordinator.acquire_claim("issue-live", 600).unwrap();
+        let before = logged_operations(&temp_dir).len();
+
+        coordinator.get_active_leases(None, None).unwrap();
+        coordinator.get_active_leases(None, None).unwrap();
+
+        assert_eq!(logged_operations(&temp_dir).len(), before);
     }
 
     #[test]
