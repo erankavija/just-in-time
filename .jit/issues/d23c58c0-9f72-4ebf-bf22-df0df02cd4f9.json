@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T19:42:10.528634531Z",
+  "dependencies": [],
+  "description": "The orphan-leaf check compares a leaf issue's labels with the configured type names, not their membership label namespaces. It gives wrong results whenever a type's membership namespace differs from the type's name.\n\n## Background\n\n`HierarchyConfig::membership_namespaces()` yields `(type_name, namespace)` pairs from `label_associations` (`crates/jit/src/domain/type_taxonomy.rs:216-221`). `validate_orphans` destructures each pair as `(namespace, _)` (`crates/jit/src/domain/type_taxonomy.rs:445-450`). It binds the type name and discards the actual namespace. It then looks for labels prefixed `<type_name>:`.\n\nWhen every association maps a type to a namespace of the same name (e.g. `epic -> epic`), the bug is invisible. With an association such as `release -> milestone`:\n\n- a leaf labelled `milestone:v1` is reported as an orphaned leaf;\n- a leaf labelled `release:v1` (a namespace no association declares) passes as having a parent.\n\nReproduction: configure `[type_hierarchy.label_associations] release = \"milestone\"` with `release` above a leaf type, then create a leaf-type issue labelled `milestone:v1` and validate. The issue is reported as an orphaned leaf.\n\n## Success Criteria\n\n- [hard] REQ-01: A leaf-type issue that carries a label in any configured membership namespace raises no orphaned-leaf warning, including when that namespace differs from its associated type's name.\n- [hard] REQ-02: A leaf-type issue whose only label prefix matches a type name, not a configured membership namespace, raises an orphaned-leaf warning.\n- [hard] REQ-03: A regression test covers a type-to-namespace association whose names differ and asserts both outcomes above.\n\n## Notes\n\nThe pair order is documented on `membership_namespaces`. `detect_membership_issues` in the same file already reads it correctly as `(type_name, namespace)`.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T19:42:10.528634531Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d23c58c0-9f72-4ebf-bf22-df0df02cd4f9",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:validation",
+    "component:core",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Orphan-leaf validation checks type names instead of membership namespaces",
+  "updated_at": "2026-10-20T19:42:10.528634531Z"
+}

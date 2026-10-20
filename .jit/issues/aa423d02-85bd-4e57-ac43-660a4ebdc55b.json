@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T19:42:11.820240262Z",
+  "dependencies": [],
+  "description": "`issue claim-next --filter` is accepted but ignored, so a worker asking for a narrowed candidate set claims the highest-priority ready issue regardless of the filter. Agents that rely on the flag take work outside their scope, and malformed filters pass silently.\n\n## Background\n\n`CommandExecutor::claim_next` (`crates/jit/src/commands/issue.rs:737`) takes the filter as `_filter` and never reads it; it ranks `query_ready` by priority and claims the first candidate. The CLI declares `-f, --filter` with no help text (`crates/jit/src/cli.rs:1196`) and passes it through at `crates/jit/src/main.rs:4002`. `docs/concepts/core-model.md` (around lines 1172 and 1246) documents the flag as accepted but not applied.\n\nThe same boolean query language already drives `issue update --filter` through `QueryFilter::parse` (`crates/jit/src/query_engine/mod.rs`).\n\nReproduction in a fresh git repository with jit initialized:\n\n```bash\njit issue create \"Alpha\" --type task --priority critical   # then set state ready\njit issue create \"Beta\"  --type epic --priority low        # then set state ready\njit issue claim-next agent:w1 --filter 'label:type:epic' --json\n# claims Alpha (type:task), not Beta\njit issue claim-next agent:w2 --filter 'garbage %%%' --json\n# succeeds and claims Beta instead of rejecting the filter\n```\n\n## Success Criteria\n\n- [hard] REQ-01: `issue claim-next --filter <expr>` claims only a ready, unassigned, unblocked issue that matches `<expr>` in the query language `issue update --filter` accepts, choosing the highest-priority match.\n- [hard] REQ-02: When no ready issue matches the filter, the command fails with the not-found error and claims nothing, even if non-matching ready issues exist.\n- [hard] REQ-03: A filter that does not parse fails with an invalid-argument error before any issue is claimed.\n- [hard] REQ-04: `issue claim-next --help` describes the `--filter` argument and its syntax.\n- [hard] REQ-05: The documentation no longer describes `--filter` as ignored, and its claim-next examples show filtered claiming.\n- [hard] REQ-06: A regression test proves a filter excluding the highest-priority ready issue causes a lower-priority matching issue to be claimed.\n\n## Notes\n\nReuse the existing `QueryFilter` mechanism; a claim-specific filter syntax would duplicate it (`@/inv/convention-convergence`).",
+  "documents": [],
+  "first_ready_at": "2026-10-20T19:42:11.820240262Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Apply the claim-next filter when choosing which issue to claim",
+  "updated_at": "2026-10-20T19:42:11.820240262Z"
+}

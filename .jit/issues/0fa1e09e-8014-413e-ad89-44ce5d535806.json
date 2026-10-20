@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T19:42:11.096807925Z",
+  "dependencies": [],
+  "description": "`jit-server` started with a relative `--data-dir`, including the default `.jit`, starts normally but answers every storage-backed request with HTTP 500. The default local invocation is unusable, while the Docker image works only because it passes an absolute path.\n\n## Background\n\nServer startup (`crates/server/src/main.rs:68-75`) builds the repository layout with `discover_repository_layout`, which makes the data root absolute. It then constructs `JsonFileStorage` from the raw relative path (`crates/server/src/lib.rs:71`). `JsonFileStorage::configure_repository_layout` returns early when its root differs from the layout's data root (`crates/jit/src/storage/json.rs:1050`). The relative `.jit` never equals the absolute path, so no layout is bound. Every read then fails in `configured_layout` (`crates/jit/src/storage/json.rs:539-545`) with \"no repository layout configured for storage reads\".\n\nReproduction:\n\n```sh\ncd $(mktemp -d) && jit init && jit issue create --title Hello\njit-server --bind 127.0.0.1:38917 &\ncurl -s -w '%{http_code}' 127.0.0.1:38917/api/issues   # 500\n# same with --data-dir \"$PWD/.jit\": 200 with the issue list\n```\n\n## Success Criteria\n\n- [hard] REQ-01: `jit-server` started from a repository root with no `--data-dir` serves `/api/issues` with status 200 and the repository's issues.\n- [hard] REQ-02: A relative `--data-dir` that names a parent or sibling path (for example `../repo/.jit`) serves the same issues as the equivalent absolute path.\n- [hard] REQ-03: Storage and layout are built from one normalized data-root path, so a relative and an absolute spelling of the same directory bind the same layout.\n- [hard] REQ-04: A regression test starts the server's storage from a relative data directory and asserts that an issue read succeeds.\n\n## Notes\n\nThe file watcher (`crates/server/src/main.rs:91`) also receives the raw relative path. Pass it the same normalized path.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T19:42:11.096807925Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0fa1e09e-8014-413e-ad89-44ce5d535806",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:server",
+    "component:storage",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Server serves storage reads when started with a relative data directory",
+  "updated_at": "2026-10-20T19:42:11.096807925Z"
+}

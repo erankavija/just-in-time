@@ -1,0 +1,26 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T19:42:11.383740012Z",
+  "dependencies": [],
+  "description": "The boolean query filter lexer crashes the process when the query contains a non-ASCII character. Labels, assignees and values can be non-ASCII, so a batch update with such a filter aborts with a panic instead of running or reporting an error.\n\n## Background\n\n`jit issue update --filter <query>` parses its query with `Lexer` in `crates/jit/src/query_engine/lexer.rs`. The lexer keeps one cursor, `position`, but uses it under two units:\n\n- `current_char` (lexer.rs:170-172) reads `self.input.chars().nth(self.position).unwrap()`, so the cursor counts characters.\n- `is_at_end` (lexer.rs:178-180) compares the cursor with `self.input.len()`, which counts bytes.\n- `read_word` (lexer.rs:146-163) slices `&self.input[start..self.position]` by bytes.\n\nA multi-byte character makes the byte length exceed the character count. The lexer then reads past the last character and the `unwrap` panics, or it slices inside a character and the slice panics.\n\nReproduction in any initialised repository:\n\n```\n$ jit issue update --filter 'label:ä' --priority low\nthread 'main' panicked at crates/jit/src/query_engine/lexer.rs:171:47:\ncalled `Option::unwrap()` on a `None` value\n(exit 101)\n\n$ jit issue update --filter 'label:ä state:ready' --priority low\nthread 'main' panicked at crates/jit/src/query_engine/lexer.rs:161:22\n```\n\n## Success Criteria\n\n- [hard] REQ-01: Tokenizing a filter that contains multi-byte UTF-8 characters, in field values or anywhere else, returns tokens or a parse error and never panics.\n- [hard] REQ-02: A filter value with non-ASCII characters, such as `label:ä`, yields a filter token whose value is exactly the input text after the first colon.\n- [hard] REQ-03: A filter combining non-ASCII terms with operators and parentheses, such as `label:ä AND (state:ready OR priority:high)`, yields the same token sequence as its ASCII equivalent with the values substituted.\n- [hard] REQ-04: An invalid non-ASCII filter makes `jit issue update --filter` exit with an error status and an error message, not a panic exit.\n- [hard] REQ-05: A regression test covers lexing of non-ASCII filter input, including a value ending in a multi-byte character and a multi-byte character followed by more terms. A property-based test asserts that the lexer never panics on arbitrary UTF-8 input.\n\n## Notes\n\nOne fix is to make the cursor a byte offset and advance it by `ch.len_utf8()`. Another is to iterate with `char_indices`. Either way the cursor uses one unit throughout. `QueryParseError::UnexpectedChar` reports the cursor, so its position unit should be stated consistently.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T19:42:11.383740012Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:core",
+    "component:cli",
+    "type:bug"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Batch update filter panics on non-ASCII query text",
+  "updated_at": "2026-10-20T19:42:11.383740012Z"
+}

@@ -1,0 +1,25 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-20T19:42:12.393036292Z",
+  "dependencies": [],
+  "description": "A library unit test removes `JIT_TEST_MODE` from the process environment while other tests in the same binary depend on it being set. Under parallel execution this makes gate-definition tests flaky and depend on the developer's git state.\n\n## Background\n\n`test_validate_silent_fails_on_dangling_link` (`crates/jit/src/commands/validate.rs:4292-4294`) calls `std::env::set_var(\"JIT_TEST_MODE\", \"1\")`, runs validation and then calls `std::env::remove_var(\"JIT_TEST_MODE\")`. No lock or guard surrounds these calls.\n\nOther tests in the same `crates/jit` library test binary run in parallel threads. `crates/jit/src/commands/gate_cli_tests.rs:13` sets the variable once in `setup()` and then calls `define_gate`, `update_gate` and `remove_gate`. These call `enforce_main_only_operations` (`crates/jit/src/commands/worktree.rs:448-453`), which skips the main-history check only while `JIT_TEST_MODE` is set. When the removal lands between the set and the read, the gate test runs `git merge-base HEAD origin/main` in the process working directory. It then fails if the developer's branch has diverged from `origin/main`. The validation readers at `crates/jit/src/validation/repository.rs:549` and `crates/jit/src/commands/validate.rs:1906` also switch the claims-index check on and off with the same variable.\n\nChanging the environment while other threads read it is a data race on glibc. A second failure mode therefore exists alongside the logical flake.\n\nNo deterministic reproduction exists. The failure depends on thread scheduling and on the state of the checkout.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in the workspace removes or overwrites a process environment variable outside a scoped guard that serialises access and restores the prior value.\n- [hard] REQ-02: The dangling-link validation test observes its failure without changing the process environment.\n- [hard] REQ-03: Gate define, update and remove tests pass whatever the relation between the checkout's `HEAD` and `origin/main` is, when they run in parallel with the rest of the library test suite.\n- [hard] REQ-04: A regression test or check fails when a test sets or removes `JIT_TEST_MODE` without the shared guard.",
+  "documents": [],
+  "first_ready_at": "2026-10-20T19:42:12.393036292Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6ff14f21-2150-4e48-9dc6-5c4e2f7ac2d1",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:testing",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Stop tests from unsetting JIT_TEST_MODE under parallel tests",
+  "updated_at": "2026-10-20T19:42:12.393036292Z"
+}
