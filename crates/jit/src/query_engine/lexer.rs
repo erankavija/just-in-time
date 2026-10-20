@@ -64,6 +64,7 @@ pub enum Token {
 /// Lexer for tokenizing query strings
 pub struct Lexer<'a> {
     input: &'a str,
+    /// Byte offset into `input`, always on a character boundary.
     position: usize,
 }
 
@@ -88,22 +89,17 @@ impl<'a> Lexer<'a> {
     fn next_token(&mut self) -> Result<Option<Token>> {
         self.skip_whitespace();
 
-        if self.is_at_end() {
-            return Ok(None);
-        }
-
-        let ch = self.current_char();
-
-        match ch {
-            '(' => {
+        match self.peek_char() {
+            None => Ok(None),
+            Some('(') => {
                 self.advance();
                 Ok(Some(Token::LParen))
             }
-            ')' => {
+            Some(')') => {
                 self.advance();
                 Ok(Some(Token::RParen))
             }
-            _ => {
+            Some(_) => {
                 // Try to read a word
                 let word = self.read_word()?;
 
@@ -146,11 +142,10 @@ impl<'a> Lexer<'a> {
     fn read_word(&mut self) -> Result<String> {
         let start = self.position;
 
-        while !self.is_at_end() {
-            let ch = self.current_char();
-            if ch.is_whitespace() || ch == '(' || ch == ')' {
-                break;
-            }
+        while self
+            .peek_char()
+            .is_some_and(|ch| !ch.is_whitespace() && ch != '(' && ch != ')')
+        {
             self.advance();
         }
 
@@ -162,21 +157,17 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while !self.is_at_end() && self.current_char().is_whitespace() {
+        while self.peek_char().is_some_and(char::is_whitespace) {
             self.advance();
         }
     }
 
-    fn current_char(&self) -> char {
-        self.input.chars().nth(self.position).unwrap()
+    fn peek_char(&self) -> Option<char> {
+        self.input[self.position..].chars().next()
     }
 
     fn advance(&mut self) {
-        self.position += 1;
-    }
-
-    fn is_at_end(&self) -> bool {
-        self.position >= self.input.len()
+        self.position += self.peek_char().map_or(0, char::len_utf8);
     }
 }
 
@@ -356,5 +347,81 @@ mod tests {
         let tokens = Lexer::tokenize("  state:ready   AND   priority:high  ").unwrap();
         assert_eq!(tokens.len(), 3);
         // Whitespace should be ignored
+    }
+
+    fn filter(field: FilterField, value: &str) -> Token {
+        Token::Filter {
+            field,
+            value: value.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_tokenize_non_ascii_value_is_kept_verbatim() {
+        assert_eq!(
+            Lexer::tokenize("label:ä").unwrap(),
+            vec![filter(FilterField::Label, "ä")]
+        );
+        assert_eq!(
+            Lexer::tokenize("assignee:human:日本語").unwrap(),
+            vec![filter(FilterField::Assignee, "human:日本語")]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_multibyte_char_followed_by_more_terms() {
+        assert_eq!(
+            Lexer::tokenize("label:ä state:ready").unwrap(),
+            vec![
+                filter(FilterField::Label, "ä"),
+                filter(FilterField::State, "ready"),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_non_ascii_matches_ascii_equivalent_with_operators() {
+        let non_ascii = Lexer::tokenize("label:ä AND (state:ready OR assignee:é😀)").unwrap();
+        let ascii = Lexer::tokenize("label:a AND (state:ready OR assignee:b)").unwrap();
+        let substitute = |token: &Token| match token {
+            Token::Filter { field, value } => Token::Filter {
+                field: *field,
+                value: match value.as_str() {
+                    "ä" => "a",
+                    "é😀" => "b",
+                    other => other,
+                }
+                .to_string(),
+            },
+            other => other.clone(),
+        };
+        assert_eq!(non_ascii.iter().map(substitute).collect::<Vec<_>>(), ascii);
+    }
+
+    #[test]
+    fn test_tokenize_non_ascii_whitespace_separates_terms() {
+        assert_eq!(
+            Lexer::tokenize("label:ä\u{a0}blocked\u{3000}unassigned").unwrap(),
+            vec![
+                filter(FilterField::Label, "ä"),
+                Token::Blocked,
+                Token::Unassigned
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tokenize_non_ascii_field_is_unknown_field_error() {
+        assert_eq!(
+            Lexer::tokenize("é:x").unwrap_err(),
+            QueryParseError::UnknownField("é".to_string())
+        );
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn test_tokenize_never_panics_on_arbitrary_utf8(input in ".*") {
+            let _ = Lexer::tokenize(&input);
+        }
     }
 }
