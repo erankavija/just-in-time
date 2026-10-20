@@ -365,3 +365,27 @@ fn test_bulk_update_no_matches() {
     assert_eq!(json["summary"]["total_matched"].as_u64().unwrap(), 0);
     assert_eq!(json["summary"]["total_modified"].as_u64().unwrap(), 0);
 }
+
+#[test]
+fn test_bulk_update_invalid_non_ascii_filter_errors_without_panic() {
+    let temp = setup_test_repo();
+
+    for filter in ["ä:x", "label:ä state:", "é"] {
+        let output = Command::new(jit_binary())
+            .args(["issue", "update", "--filter", filter, "--priority", "low"])
+            .current_dir(temp.path())
+            .output()
+            .unwrap();
+
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            matches!(output.status.code(), Some(code) if code != 0 && code != 101),
+            "filter {filter:?} must fail with an error status, got {:?}; stderr: {stderr}",
+            output.status
+        );
+        assert!(
+            !stderr.contains("panicked") && !stderr.trim().is_empty(),
+            "filter {filter:?} must report an error message, not a panic; stderr: {stderr}"
+        );
+    }
+}
