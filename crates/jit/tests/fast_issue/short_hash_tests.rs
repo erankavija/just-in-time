@@ -228,7 +228,7 @@ fn test_cli_delete_with_short_hash() {
 /// Build a fresh in-memory storage fixture.
 fn make_storage() -> InMemoryStorage {
     // Disable worktree divergence checks in tests
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     InMemoryStorage::new()
 }
 

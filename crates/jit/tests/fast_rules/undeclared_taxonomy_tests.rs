@@ -18,7 +18,7 @@ use tempfile::TempDir;
 
 /// Initialize a repository whose `config.toml` is exactly `config_toml`.
 fn scaffold_declaring(config_toml: &str) -> (TempDir, std::path::PathBuf) {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let temp = TempDir::new().unwrap();
     let jit_dir = temp.path().join(".jit");
     fs::create_dir(&jit_dir).unwrap();

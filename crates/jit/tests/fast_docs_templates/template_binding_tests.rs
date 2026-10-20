@@ -105,7 +105,7 @@ applies_to  = ["epic"]
 /// complete; the bindings and bracket vocabulary still come entirely from the
 /// template registry.
 fn executor_with_templates(templates_toml: &str) -> CommandExecutor<InMemoryStorage> {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     crate::seed_memory_data_file(&storage, "config.toml", "");
     crate::seed_memory_data_file(&storage, "templates.toml", templates_toml);
@@ -290,7 +290,7 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
 /// so the CLI's auto-bind is unchanged where nothing is configured.
 #[test]
 fn test_container_anchor_defaults_without_a_templates_file() {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     let layout = storage.repository_layout();
     let executor = CommandExecutor::new(storage).with_layout(layout);

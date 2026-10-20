@@ -165,7 +165,7 @@ fn executor_with_rules_and_templates(
     rules_toml: &str,
     templates_toml: &str,
 ) -> CommandExecutor<InMemoryStorage> {
-    std::env::set_var("JIT_TEST_MODE", "1");
+    jit::test_mode::enable();
     let storage = InMemoryStorage::new();
     std::fs::create_dir_all(storage.root()).unwrap();
     std::fs::write(storage.root().join("templates.toml"), templates_toml).unwrap();
@@ -1119,7 +1119,7 @@ mod file_backed_external_plan {
     /// flat planning-config block: the doc location comes from the template registry).
     /// Returns the temp dir (kept alive = the repo root) and the executor.
     fn executor() -> (TempDir, CommandExecutor<JsonFileStorage>) {
-        std::env::set_var("JIT_TEST_MODE", "1");
+        jit::test_mode::enable();
         let repo = crate::setup_test_repo_with_taxonomy();
         let repo_root = repo.temp;
         let jit_dir = repo_root.path().join(".jit");

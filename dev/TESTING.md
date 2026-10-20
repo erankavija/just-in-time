@@ -120,7 +120,7 @@ impl TestHarness {
 impl Default for TestHarness { /* delegates to new() */ }
 ```
 
-`new()` initializes the storage and sets `JIT_TEST_MODE=1`. The helpers cover the common
+`new()` initializes the storage and enables test mode. The helpers cover the common
 shapes; anything else goes through `h.executor` (any command) or `h.storage` (direct
 `IssueStore` calls).
 
@@ -588,12 +588,16 @@ ran rather than what the sources appear to declare.
 
 ## Test Environment
 
-Two environment behaviors matter when writing tests:
+Three environment behaviors matter when writing tests:
 
-- **`JIT_TEST_MODE=1`** disables the git guards that global operations enforce in a live
+- **`JIT_TEST_MODE`** disables the git guards that global operations enforce in a live
   repository: the branch-drift check against main history (`enforce_main_only_operations`) and the
-  claims-index validation inside `jit validate`. `TestHarness::new()` sets it. Integration
-  tests that call these paths set it explicitly.
+  claims-index validation inside `jit validate`. In-process tests call
+  `jit::test_mode::enable()` (`TestHarness::new()` does), which never touches the process
+  environment; tests that spawn the binary pass the variable with `Command::env`.
+- **Process-wide state** (environment variables, working directory) is changed only through
+  `EnvGuard` and `CurrentDirGuard` in `test_utils.rs`, which serialise access and restore the
+  prior value. `scratch_build/process_state_policy_tests.rs` rejects any other call.
 - **Selected doc examples** in `crates/jit/src/` compile and run under `cargo test --doc`.
   Keep them for non-obvious workflows and material contracts, not as one-per-public-API
   coverage: each snippet carries a separate rustdoc compilation cost. When an example is

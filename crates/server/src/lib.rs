@@ -172,29 +172,26 @@ mod recovery_startup_tests {
 mod resolve_listener_tests {
     use super::*;
 
-    /// Serializes every test that reads or writes the `LISTEN_*` environment.
-    ///
-    /// The process environment is global, and `ListenFd::from_env` (inside
-    /// [`resolve_listener`]) CONSUMES it — listenfd removes `LISTEN_FDS` and
-    /// `LISTEN_PID` after reading them — so two tests interleaving on these
-    /// variables steal each other's state nondeterministically under the
-    /// default parallel test runner (observed live as both spurious `Bound`
-    /// and spurious `Inherited` outcomes, jit:894337e2 / jit:6eb585bc s4).
-    static LISTEN_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    use jit::test_utils::EnvGuard;
 
-    /// Remove every `LISTEN_*` variable so a test starts from a clean slate
-    /// even after a sibling's leftovers (listenfd does not remove
-    /// `LISTEN_FDS_FIRST_FD`).
-    fn scrub_listen_env() {
-        std::env::remove_var("LISTEN_FDS");
-        std::env::remove_var("LISTEN_FDS_FIRST_FD");
-        std::env::remove_var("LISTEN_PID");
+    /// Hold the environment guard for a test that reads or writes the
+    /// `LISTEN_*` environment, starting from a clean slate.
+    ///
+    /// `ListenFd::from_env` (inside [`resolve_listener`]) CONSUMES that
+    /// environment, so two tests interleaving on it steal each other's state
+    /// under the parallel test runner (jit:894337e2 / jit:6eb585bc s4).
+    /// `LISTEN_FDS_FIRST_FD` is cleared too, since listenfd does not remove it.
+    fn scrubbed_listen_env() -> EnvGuard {
+        let mut env = EnvGuard::acquire();
+        env.remove("LISTEN_FDS")
+            .remove("LISTEN_FDS_FIRST_FD")
+            .remove("LISTEN_PID");
+        env
     }
 
     #[test]
     fn test_resolve_listener_binds_when_no_fd_inherited() {
-        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        scrub_listen_env();
+        let _env = scrubbed_listen_env();
 
         // No LISTEN_FDS in the environment → the server binds the address
         // itself. `:0` asks the OS for a free ephemeral port, so this test
@@ -216,8 +213,7 @@ mod resolve_listener_tests {
     fn test_resolve_listener_adopts_inherited_fd() {
         use std::os::unix::io::AsRawFd;
 
-        let _guard = LISTEN_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        scrub_listen_env();
+        let mut env = scrubbed_listen_env();
 
         // Stand in for the parent: bind the real serving socket up front.
         let parent_bound = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -225,8 +221,8 @@ mod resolve_listener_tests {
         let fd = parent_bound.as_raw_fd();
 
         // Reproduce the environment the parent publishes for the child.
-        std::env::set_var("LISTEN_FDS", "1");
-        std::env::set_var("LISTEN_FDS_FIRST_FD", fd.to_string());
+        env.set("LISTEN_FDS", "1");
+        env.set("LISTEN_FDS_FIRST_FD", fd.to_string());
 
         let (listener, source) = resolve_listener("127.0.0.1:0").unwrap();
         assert_eq!(source, ListenerSource::Inherited);
@@ -239,7 +235,5 @@ mod resolve_listener_tests {
         // `take_tcp_listener` built a new owner over the same descriptor; leak
         // the original handle so its Drop does not close the fd twice.
         std::mem::forget(parent_bound);
-        // listenfd consumed LISTEN_FDS/LISTEN_PID; drop our leftover too.
-        scrub_listen_env();
     }
 }

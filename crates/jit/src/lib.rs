@@ -34,6 +34,7 @@ pub mod storage;
 // neither's vocabulary; nothing outside this crate writes a tar.
 pub(crate) mod tar_format;
 pub mod templates;
+pub mod test_mode;
 pub mod test_taxonomy;
 pub mod test_utils;
 pub mod type_icons;

@@ -35,7 +35,7 @@ impl TestHarness {
 
     fn from_storage(storage: InMemoryStorage) -> Self {
         // Disable worktree divergence checks in tests
-        std::env::set_var("JIT_TEST_MODE", "1");
+        jit::test_mode::enable();
 
         // Session-backed declaration mutations capture config from the same
         // aggregate image as gates/events; an empty file is the minimal valid
