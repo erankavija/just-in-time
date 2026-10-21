@@ -18,8 +18,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:47:29.854954447Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T07:11:09.859075885Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Accept namespace wildcards in issue search label filters",
-  "updated_at": "2026-10-21T07:06:52.597500238Z"
+  "updated_at": "2026-10-21T07:11:09.859075885Z"
 }

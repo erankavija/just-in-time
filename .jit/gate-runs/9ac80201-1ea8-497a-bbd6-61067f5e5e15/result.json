@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a9ddfffd0e37e8d8fd40985378a98103e34bbf86",
+  "completed_at": "2026-10-21T07:11:09.660911102Z",
+  "duration_ms": 256666,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the current attributable implementation; prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c0d0c8bf-679f-463b-87ca-25cae8945646",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9ac80201-1ea8-497a-bbd6-61067f5e5e15",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T07:06:52.994450081Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 91e6b1040, 2707c8924, 6dde15fc0, 86583a988, 80088964d (`jit:c0d0c8bf`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/c0d0c8bf/requirement/REQ-01–REQ-06 (markdown-first issue description); @/invariant/label-format, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T07:04:48Z; no diagnostic supplied); prior code-review failed (exit 1) with F1/F2, both addressed by the later attributed commit\nTruncation recovery: narrowed current label, search, domain-query, CLI, documentation, and test reads after truncated aggregate output\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the current attributable implementation; prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
