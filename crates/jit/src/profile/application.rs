@@ -106,24 +106,6 @@ impl SelectionObservation for ProfilePlanEntry {
     }
 }
 
-/// One profile exposed by `jit profile list`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileSummary {
-    /// Stable package identifier.
-    pub id: String,
-    /// Semantic package version.
-    pub version: String,
-    /// Where the resolved package's bytes were read from.
-    pub origin: ProfileOrigin,
-    /// Compatible JIT version requirement authored by the manifest.
-    pub jit: String,
-    /// Whether the stored values independently reproduce the package's exact provenance.
-    pub applied: bool,
-}
-
-/// Count-wrapped profile-list response.
-pub type ProfileListResult = ProfileCollection<ProfileSummary>;
-
 /// One complete package inspection entry.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ProfileShowEntry {
@@ -224,9 +206,8 @@ impl ProfileTargetChange {
 /// target decision uses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ProfileContributionChange {
-    /// Canonical semantic identity, spelled the way `jit profile validate`
-    /// names one: the registry it lives in, its declaration kind and target,
-    /// and its local name.
+    /// Canonical semantic identity: the registry it lives in, its declaration
+    /// kind and target, and its local name.
     pub identity: String,
     /// Planned operation.
     pub action: ProfileTargetAction,

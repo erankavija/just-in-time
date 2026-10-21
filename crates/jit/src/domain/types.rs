@@ -157,17 +157,10 @@ impl FromStr for State {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "backlog" => Ok(State::Backlog),
-            "open" => Ok(State::Backlog), // Backward compatibility alias
-            "ready" => Ok(State::Ready),
-            "in_progress" | "inprogress" => Ok(State::InProgress),
-            "gated" => Ok(State::Gated),
-            "done" => Ok(State::Done),
-            "rejected" => Ok(State::Rejected),
-            "archived" => Ok(State::Archived),
-            _ => Err(InvalidArgumentError::new(format!("Invalid state: {s}")).into()),
-        }
+        State::all()
+            .into_iter()
+            .find(|state| state.as_str() == s)
+            .ok_or_else(|| InvalidArgumentError::new(format!("Invalid state: {s}")).into())
     }
 }
 
@@ -2891,42 +2884,22 @@ mod tests {
         use std::str::FromStr;
 
         #[test]
-        fn test_state_from_str_valid_lowercase() {
-            assert_eq!(State::from_str("backlog").unwrap(), State::Backlog);
-            assert_eq!(State::from_str("ready").unwrap(), State::Ready);
-            assert_eq!(State::from_str("in_progress").unwrap(), State::InProgress);
-            assert_eq!(State::from_str("gated").unwrap(), State::Gated);
-            assert_eq!(State::from_str("done").unwrap(), State::Done);
-            assert_eq!(State::from_str("rejected").unwrap(), State::Rejected);
-            assert_eq!(State::from_str("archived").unwrap(), State::Archived);
-        }
-
-        #[test]
-        fn test_state_from_str_valid_uppercase() {
-            assert_eq!(State::from_str("BACKLOG").unwrap(), State::Backlog);
-            assert_eq!(State::from_str("READY").unwrap(), State::Ready);
-            assert_eq!(State::from_str("IN_PROGRESS").unwrap(), State::InProgress);
-        }
-
-        #[test]
-        fn test_state_from_str_valid_mixedcase() {
-            assert_eq!(State::from_str("Backlog").unwrap(), State::Backlog);
-            assert_eq!(State::from_str("Ready").unwrap(), State::Ready);
-        }
-
-        #[test]
-        fn test_state_from_str_aliases() {
-            // Backward compatibility alias
-            assert_eq!(State::from_str("open").unwrap(), State::Backlog);
-            // Alternative in_progress format
-            assert_eq!(State::from_str("inprogress").unwrap(), State::InProgress);
-        }
-
-        #[test]
-        fn test_state_from_str_invalid() {
-            assert!(State::from_str("invalid").is_err());
-            assert!(State::from_str("").is_err());
-            assert!(State::from_str("pending").is_err());
+        fn test_state_from_str_accepts_only_serde_tokens() {
+            for state in State::all() {
+                let token = serde_json::to_value(state).unwrap();
+                let token = token.as_str().unwrap();
+                assert_eq!(State::from_str(token).unwrap(), state);
+                for variant in [
+                    token.to_uppercase(),
+                    token[..1].to_uppercase() + &token[1..],
+                    format!(" {token}"),
+                ] {
+                    assert!(State::from_str(&variant).is_err(), "accepted {variant:?}");
+                }
+            }
+            for token in ["open", "inprogress", "invalid", "pending", ""] {
+                assert!(State::from_str(token).is_err(), "accepted {token:?}");
+            }
         }
 
         #[test]

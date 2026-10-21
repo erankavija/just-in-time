@@ -185,11 +185,11 @@ pub use path::{
     WORKTREE_IDENTITY_FILE,
 };
 pub use profile_apply::{
-    applied_profile_records, claimed_target_state, compose_resolved_contributions,
-    remedy_suggestions, AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
-    AppliedProfileClaimIdentity, AppliedProfileRecord, ClaimedTargetState,
-    CompleteProjectionConfig, ComposedContribution, Contribution, ContributionConflictOwner,
-    ContributionIdentity, ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
+    applied_profile_records, compose_resolved_contributions, remedy_suggestions,
+    AppliedClaimTarget, AppliedManagedRegionTarget, AppliedProfileClaim,
+    AppliedProfileClaimIdentity, AppliedProfileRecord, CompleteProjectionConfig,
+    ComposedContribution, Contribution, ContributionConflictOwner, ContributionIdentity,
+    ContributionIdentityTarget, ContributionOutcome, ContributionRegistry,
     ExistingContributionClaim, KeyedArrayTarget, MapEntryTarget, ProfileApplicationInput,
     ProfileAssetClaim, ProfileBaseFingerprint, ProfileClaims, ProfileConflictOccupant,
     ProfileContributionClaim, ProfilePackageId, ProfileRegionClaim, ProfileRemedy,

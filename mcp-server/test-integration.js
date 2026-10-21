@@ -402,12 +402,9 @@ async function main() {
         'jit_query_available',
         'jit_dep_add',
         'jit_gate_status-all',
-        'jit_profile_list',
         'jit_profile_show',
         'jit_profile_diff',
         'jit_profile_apply',
-        'jit_profile_reconfigure',
-        'jit_profile_upgrade',
       ]) {
         assert.ok(names.has(required), `missing core tool: ${required}`);
       }
@@ -595,7 +592,7 @@ async function main() {
       assert.ok(shown.labels.includes('type:task'));
     });
 
-    await runTest('profile tools list, inspect, dry-run, apply, and reach exact no-op', async () => {
+    await runTest('profile tools inspect, dry-run, and apply', async () => {
       const profileTester = new MCPTester();
       await profileTester.start();
       const profileCall = async (name, args = {}) => {
@@ -614,12 +611,6 @@ async function main() {
         const baseLocation = stagePackage(profileTester.testDir, 'packages/base', 'base');
         const workflowLocation = stagePackage(
           profileTester.testDir, 'packages/workflow', 'workflow', ['base']);
-
-        // Enumeration follows the repository's own applied-profile records, so
-        // a repository that has applied nothing names no profile.
-        const listed = await profileCall('jit_profile_list');
-        assert.strictEqual(listed.count, 0);
-        assert.deepStrictEqual(listed.profiles, []);
 
         const shown = await profileCall('jit_profile_show', {
           profile: [`path:${workflowLocation}`],
@@ -705,34 +696,6 @@ async function main() {
         });
         const orderedProfileIds = ordered.profiles.map(profile => profile.id);
         assert.deepStrictEqual(orderedProfileIds, ['alpha', 'alpha', 'beta']);
-        const allAppliedProfileIds = [
-          ...appliedProfileIds,
-          ...seededProfileIds,
-          ...orderedProfileIds,
-        ];
-
-        // The records the application wrote are what the repository now names:
-        // one per applied package, and no other.
-        const recorded = await profileCall('jit_profile_list');
-        assert.strictEqual(recorded.count, recorded.profiles.length);
-        const expectedRecordedIds = [...new Set(allAppliedProfileIds)].sort();
-        assert.deepStrictEqual(
-          recorded.profiles.map(profile => profile.id),
-          expectedRecordedIds,
-          'recorded profiles should contain each applied package exactly once'
-        );
-        const appliedOrigins = new Map(await Promise.all(
-          allAppliedProfileIds.map(async id => {
-            const resolved = await profileCall('jit_profile_show', {
-              profile: [`id:${id}`],
-            });
-            return [id, resolved.profiles[0].origin];
-          })
-        ));
-        for (const profile of recorded.profiles) {
-          assert.strictEqual(profile.applied, true);
-          assert.deepStrictEqual(profile.origin, appliedOrigins.get(profile.id));
-        }
       } finally {
         await profileTester.stop();
       }

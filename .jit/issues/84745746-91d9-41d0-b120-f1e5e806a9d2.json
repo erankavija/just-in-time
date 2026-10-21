@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T10:42:58.046848505Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,24 @@
   ],
   "description": "`validate_integrity_silent` and its three private helpers have no caller and re-implement integrity checks that repository validation already owns. One of them reaches git through libgit2 and resolves paths against the process working directory.\n\n## Background\n\n`validate_integrity_silent` (`crates/jit/src/commands/validate.rs:1835-1916`) has no caller. Its private helpers have no other caller:\n\n- `validate_document_references` (`validate.rs:2466-2545`).\n- `check_file_exists_in_git` (`validate.rs:2547-2561`).\n- `validate_transitive_reduction` (`validate.rs:2590-2638`).\n\nTogether they span about 245 lines. They duplicate the document, DAG and transitive-reduction checks in `validation/repository.rs:457-503` and the claims-index check at `:550`.\n\n`validate_document_references` opens a git2 repository on the selected worktree (`validate.rs:2470-2471`). Its working-tree fallback `Path::new(&doc.path).exists()` (`validate.rs:2521,2532`) resolves a repo-relative path against the process working directory. These helpers hold the file's only git2 use.\n\n`validate_claims_index_with_paths` stays, because `validate_claims_index_at` (`validate.rs:3045`) also calls it.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_integrity_silent`, `validate_document_references`, `check_file_exists_in_git` and `validate_transitive_reduction` no longer exist.\n- [hard] REQ-02: `commands/validate.rs` contains no `git2` use.\n- [hard] REQ-03: Repository validation's document, DAG, transitive-reduction and claims-index checks keep their existing tests and behaviour.\n\n## Notes\n\nDeletion only. No test asserting the functions' absence is added.\n",
   "documents": [],
+  "done_at": "2026-10-21T11:27:44.581516627Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:21:08.467079159Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:09:57.892142605Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "84745746-91d9-41d0-b120-f1e5e806a9d2",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:842b0ac6/REQ-01"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove the silent integrity validator",
-  "updated_at": "2026-10-21T10:42:58.101974143Z"
+  "updated_at": "2026-10-21T11:27:44.581516627Z"
 }

@@ -118,8 +118,8 @@ pub enum RuleConfigError {
         message: String,
     },
 
-    /// A `when` selector names a lifecycle state that is not one of the seven
-    /// valid `state_token` values. Caught at config load so a typo'd state
+    /// A `when` selector names a lifecycle state that is not one of the
+    /// canonical state tokens. Caught at config load so a typo'd state
     /// (which would otherwise silently never match) surfaces immediately.
     #[error(
         "rule '{rule}': invalid state '{value}' in 'when' selector; \
@@ -282,7 +282,7 @@ impl Selector {
                 .unwrap_or_default();
             reasons.push(format!(
                 "state predicate did not match (issue is '{}', wants '{}')",
-                state_token(issue.state),
+                issue.state.as_str(),
                 want
             ));
         }
@@ -334,52 +334,9 @@ impl Selector {
     }
 }
 
-/// Serde snake_case token for a lifecycle state, matching the selector grammar.
-fn state_token(state: crate::domain::State) -> &'static str {
-    use crate::domain::State;
-    match state {
-        State::Backlog => "backlog",
-        State::Ready => "ready",
-        State::InProgress => "in_progress",
-        State::Gated => "gated",
-        State::Done => "done",
-        State::Rejected => "rejected",
-        State::Archived => "archived",
-    }
-}
-
-/// The seven valid lifecycle-state tokens, in lifecycle order, that a `when`
-/// state predicate may name. Used both to validate authored predicates at load
-/// and to list the valid values in [`RuleConfigError::InvalidState`].
-const VALID_STATE_TOKENS: [&str; 7] = [
-    "backlog",
-    "ready",
-    "in_progress",
-    "gated",
-    "done",
-    "rejected",
-    "archived",
-];
-
-/// Map an authored state token to its [`State`] using the predicate whitelist.
-///
-/// Comparison is case-insensitive (e.g. `"Done"` maps to [`State::Done`]). This
-/// is the inverse of [`state_token`] over exactly [`VALID_STATE_TOKENS`]; unlike
-/// [`State::from_str`](std::str::FromStr) it does NOT accept extra aliases such
-/// as `open` or `inprogress`, preserving the predicate's historical accepted
-/// set. An unrecognized token yields `None` (reported by
-/// [`StatePredicate::validate`]).
-fn token_to_state(token: &str) -> Option<State> {
-    match token.to_lowercase().as_str() {
-        "backlog" => Some(State::Backlog),
-        "ready" => Some(State::Ready),
-        "in_progress" => Some(State::InProgress),
-        "gated" => Some(State::Gated),
-        "done" => Some(State::Done),
-        "rejected" => Some(State::Rejected),
-        "archived" => Some(State::Archived),
-        _ => None,
-    }
+/// Comma-separated canonical state tokens, for [`RuleConfigError::InvalidState`].
+fn valid_state_tokens() -> String {
+    State::all().map(State::as_str).join(", ")
 }
 
 /// A `when` state predicate: one or more lifecycle states a rule applies to.
@@ -395,9 +352,9 @@ fn token_to_state(token: &str) -> Option<State> {
 /// Matching is membership: [`StatePredicate::matches`] is true when the issue's
 /// state is one of the predicate's states. The authored tokens are parsed once,
 /// when the predicate is built, into a typed [`BTreeSet<State>`] (see
-/// [`token_to_state`]); `matches` is then a direct set lookup with no per-call
+/// [`State::from_str`](std::str::FromStr)); `matches` is then a direct set lookup with no per-call
 /// string round-trip. The authored strings are retained for diagnostics and
-/// validated against the seven valid tokens at config load via
+/// validated against the canonical tokens at config load via
 /// [`StatePredicate::validate`].
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(from = "AuthoredStates")]
@@ -438,7 +395,7 @@ impl StatePredicate {
     /// unrecognized tokens are retained in `authored` (for diagnostics) but
     /// omitted from the set, where [`StatePredicate::validate`] reports them.
     fn from_tokens(authored: Vec<String>) -> Self {
-        let states = authored.iter().filter_map(|t| token_to_state(t)).collect();
+        let states = authored.iter().filter_map(|t| t.parse().ok()).collect();
         StatePredicate { authored, states }
     }
 
@@ -469,8 +426,8 @@ impl StatePredicate {
         self.states.contains(&state)
     }
 
-    /// Validate that this predicate is non-empty and every token names one of
-    /// the seven valid lifecycle states.
+    /// Validate that this predicate is non-empty and every token names a
+    /// canonical lifecycle state.
     ///
     /// An empty list (`state = []`) is rejected because it silently never
     /// matches any issue — a rule scoped to zero states is always a config
@@ -484,15 +441,15 @@ impl StatePredicate {
             return Err(RuleConfigError::InvalidState {
                 rule: rule.to_string(),
                 value: "<empty list>".to_string(),
-                valid: VALID_STATE_TOKENS.join(", "),
+                valid: valid_state_tokens(),
             });
         }
         for token in &self.authored {
-            if token_to_state(token).is_none() {
+            if token.parse::<State>().is_err() {
                 return Err(RuleConfigError::InvalidState {
                     rule: rule.to_string(),
                     value: token.clone(),
-                    valid: VALID_STATE_TOKENS.join(", "),
+                    valid: valid_state_tokens(),
                 });
             }
         }
@@ -1767,7 +1724,7 @@ assert = { require-section = { heading = "Plan" } }
                     "value should indicate empty list, got: {value}"
                 );
                 // The valid list must name every legal token.
-                for token in VALID_STATE_TOKENS {
+                for token in State::all().map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"
@@ -1781,37 +1738,13 @@ assert = { require-section = { heading = "Plan" } }
     #[test]
     fn test_state_predicate_matches_typed_set_equals_token_set() {
         // The pre-parsed set membership must agree with the authored tokens for
-        // every lifecycle state (case-insensitively), preserving the prior
-        // round-trip behavior with no per-call string conversion.
-        let all = [
-            State::Backlog,
-            State::Ready,
-            State::InProgress,
-            State::Gated,
-            State::Done,
-            State::Rejected,
-            State::Archived,
-        ];
-        let pred = StatePredicate::list(["Ready", "in_progress", "DONE"]);
+        // every lifecycle state.
+        let all = State::all();
+        let pred = StatePredicate::list(["ready", "in_progress", "done"]);
         for state in all {
             let want = matches!(state, State::Ready | State::InProgress | State::Done);
             assert_eq!(pred.matches(state), want, "mismatch for {state:?}");
         }
-    }
-
-    #[test]
-    fn test_token_to_state_whitelist_excludes_from_str_aliases() {
-        // Every canonical token round-trips through the predicate whitelist...
-        for token in VALID_STATE_TOKENS {
-            let state = token_to_state(token).expect("canonical token must map");
-            assert_eq!(state_token(state), token);
-        }
-        // ...and case-insensitively.
-        assert_eq!(token_to_state("Done"), Some(State::Done));
-        // But the extra `State::from_str` aliases are NOT accepted here.
-        assert_eq!(token_to_state("open"), None);
-        assert_eq!(token_to_state("inprogress"), None);
-        assert_eq!(token_to_state("notastate"), None);
     }
 
     #[test]
@@ -1831,7 +1764,7 @@ assert = { label-coverage = { source = "req", child-state = "don" } }
                 assert_eq!(rule, "typo-child-state");
                 assert_eq!(value, "don");
                 // The valid list names every legal token.
-                for token in VALID_STATE_TOKENS {
+                for token in State::all().map(State::as_str) {
                     assert!(
                         valid.contains(token),
                         "valid list missing '{token}': {valid}"

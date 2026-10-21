@@ -140,13 +140,29 @@
           "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (opus)",
+          "status": "rework 1 (opus): code-review F1 short prefix rejected only after records are read (REQ-02)",
           "note": "after all others: touches many resolvers"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "b5faef84-fd5b-477d-be87-2cf020e93fa4",
+          "short_id": "b5faef84",
+          "title": "Search endpoint returns no issue matches for the default nested data directory",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "dispatched",
+          "note": "found by the REQ-02 release reproduction run; filed by the lead under the epic"
         }
       ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    "b5faef84"
+  ],
   "escalations": [
     {
       "issue": "d92f54aa",
@@ -162,13 +178,19 @@
       "issue": "bedf0962",
       "category": "cross-epic: config show misreports [coordination] claim limits",
       "resolution": "steward ruling B: folded into 842b0ac6 as REQ-26 with a task depending on bedf0962; bedf0962 merges on its own criteria"
+    },
+    {
+      "issue": "b5faef84",
+      "category": "scope addition (leaf bug)",
+      "resolution": "steward accepted under 8376299c; fix kept minimal because epic 0f8efc37 REQ-08 replaces server issue search; ask the steward before adding scope, even a leaf"
     }
   ],
   "rework_counts": {
     "7d1bfe89": 1,
     "bedf0962": 1,
     "05d1b34e": 1,
-    "c0d0c8bf": 1
+    "c0d0c8bf": 1,
+    "16d63038": 1
   },
   "surfaced_pitfalls": [
     {
@@ -202,7 +224,8 @@
     "Worker worktrees grow to ~17-23 GB each after a full cargo-ci; cap parallel workers by free disk.",
     "Main checkout is shared with other sessions: commit only this epic's paths (git add --pathspec-from-file), never git add .jit wholesale.",
     "Redirect messages to a running worker can be missed: w-d7d0d0db implemented d92f54aa's superseded scope despite a redirect; verify commit scope on return.",
-    "cargo-ci declares inputs, so jit gate evaluate reuses any prior run (even another lead's load-failed run) at the same input digest; rerun a budget/timeout-only failure with --force under the turnstile."
+    "cargo-ci declares inputs, so jit gate evaluate reuses any prior run (even another lead's load-failed run) at the same input digest; rerun a budget/timeout-only failure with --force under the turnstile.",
+    "Ask the steward before adding any issue to this epic, even a leaf bug (steward rule after b5faef84)."
   ],
-  "resource_policy": "Steward (binding, revised 2026-10-21): dispatch a new worker worktree only when df shows >=60 GB free; at most 2 live worker worktrees for this lead; remove each worktree as soon as its work merges; every full cargo-ci gate runs under `flock /tmp/jit-full-ci.lock`; budget-only failures under load are rerun under the lock. Never touch the July/August worktrees (agent-123efe74, 1fc8fec3, a122b9b3, bfd215fa, deb33646, efaec52f, steward-v1-readiness). Build turnstile (binding): FULL gates run as `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock <cmd>`; every other cargo build/test runs as `flock /tmp/jit-ci-turnstile.lock true && flock -s /tmp/jit-full-ci.lock <cmd>`; always CARGO_INCREMENTAL=0. If the budget still fails in a quiet window, record it; the steward holds a user item on budget-under-load. Budget ruling (steward, pending user decision): a budget failure on a quiet host (load < ~4, lock uncontended) is a real finding against the change that crossed 30 s; fix within the change (drop duplicate-property tests, move subprocess tests to harness, speed fixtures), never --force it; only load failures get --force; if a change cannot get under 30 s without losing coverage, block the issue with timings and continue."
+  "resource_policy": "Steward (binding, revised 2026-10-21): dispatch a new worker worktree only when df shows >=60 GB free; at most 2 live worker worktrees for this lead; remove each worktree as soon as its work merges; every full cargo-ci gate runs under `flock /tmp/jit-full-ci.lock`; budget-only failures under load are rerun under the lock. Never touch the July/August worktrees (agent-123efe74, 1fc8fec3, a122b9b3, bfd215fa, deb33646, efaec52f, steward-v1-readiness). Build turnstile (binding): FULL gates run as `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock <cmd>`; every other cargo build/test runs as `flock /tmp/jit-ci-turnstile.lock true && flock -s /tmp/jit-full-ci.lock <cmd>`; always CARGO_INCREMENTAL=0. If the budget still fails in a quiet window, record it; the steward holds a user item on budget-under-load. Budget ruling (steward, pending user decision): a budget failure on a quiet host (load < ~4, lock uncontended) is a real finding against the change that crossed 30 s; fix within the change (drop duplicate-property tests, move subprocess tests to harness, speed fixtures), never --force it; only load failures get --force; if a change cannot get under 30 s without losing coverage, block the issue with timings and continue. Merge rule (binding): every git merge into main or other source edit on main runs as `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock git merge ...`; tracker-only .jit writes are exempt. Conflict rule (binding): never resolve merge conflicts in main's checkout; merge main into the task branch in its worktree, resolve and test there, then clean-merge into main under the lock."
 }

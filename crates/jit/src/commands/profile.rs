@@ -1,21 +1,17 @@
 use super::{capture_or_retry, with_mutation_session, CommandExecutor, SessionStep};
 use crate::domain::ProfileLifecycleOperation;
+use crate::profile::profile_plan_entry;
 use crate::profile::{
     build_profile_claims_from_resolved, capture_package_tree, pack_captured_package_archive,
-    read_package_archive, resolve_package, resolve_package_from_record, CapturedContributionState,
-    CapturedPackageTree, EngineVersion, PackageCaptureError, ProfileAddEntry, ProfileAddResult,
+    read_package_archive, resolve_package, CapturedContributionState, CapturedPackageTree,
+    EngineVersion, PackageCaptureError, ProfileAddEntry, ProfileAddResult,
     ProfileApplicationStatus, ProfileApplyResult, ProfileCaptureEntry, ProfileCaptureResult,
     ProfileComposedApplyResult, ProfileContributionChange, ProfileGraphError, ProfileId,
-    ProfileListResult, ProfileOrigin, ProfilePackEntry, ProfilePackResult, ProfilePackage,
-    ProfilePackageError, ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult,
-    ProfileShowEntry, ProfileShowResult, ProfileSummary, ProfileTargetAction, ProfileTargetChange,
-    ProfileVariableAssignment, ProfileVariableName, RecordedValueAuthority, ResolvedProfileContent,
-    ResolvedProfileGraph, ResolvedVariables, SelectionObservation, VariableInputs,
+    ProfileOrigin, ProfilePackEntry, ProfilePackResult, ProfilePackage, ProfilePackageError,
+    ProfilePackageSource, ProfilePlanEntry, ProfilePlanResult, ProfileShowEntry, ProfileShowResult,
+    ProfileTargetAction, ProfileTargetChange, ProfileVariableAssignment, ProfileVariableName,
+    ResolvedProfileContent, ResolvedProfileGraph, SelectionObservation, VariableInputs,
     MAX_PROFILE_PACKAGE_ARCHIVE_BYTES,
-};
-use crate::profile::{
-    claimed_target_divergences, profile_plan_entry, unowned_target_divergences, ProfileAgreement,
-    ProfileAgreementResult, ProfileDivergence,
 };
 use crate::repository_state::{
     apply_overlay, classify_repository_export, derive_materialization,
@@ -29,7 +25,6 @@ use crate::repository_state::{
 use crate::storage::{JsonFileStorage, RepositoryMutationSession};
 use crate::validation::repository::RepositoryValidationFailure;
 use anyhow::Result;
-use semver::Version;
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
@@ -344,35 +339,6 @@ pub enum ProfileDependencyError {
 /// Profile application conflict detected before anything is published.
 #[derive(Debug, thiserror::Error)]
 pub enum ProfileApplyError {
-    /// Reconfiguration selected package bytes that no longer match the
-    /// installed package provenance.
-    #[error(
-        "profile '{id}' cannot be reconfigured because its installed package identity changed (installed version '{installed_version}' hash '{installed_hash}', found version '{found_version}' hash '{found_hash}')"
-    )]
-    ReconfigurationPackageChanged {
-        /// Stable profile identity.
-        id: String,
-        /// Version recorded when the package was installed.
-        installed_version: String,
-        /// Package digest recorded when the package was installed.
-        installed_hash: String,
-        /// Version currently supplied by the selected package.
-        found_version: String,
-        /// Package digest currently supplied by the selected package.
-        found_hash: String,
-    },
-    /// An upgrade replacement did not advance the installed semantic version.
-    #[error(
-        "profile '{id}' cannot be upgraded from version '{installed_version}' to non-newer version '{candidate_version}'"
-    )]
-    UpgradeVersionNotNewer {
-        /// Stable profile identity.
-        id: String,
-        /// Version recorded when the package was installed.
-        installed_version: String,
-        /// Replacement package version.
-        candidate_version: String,
-    },
     /// The installed record is not readable provenance for its own profile.
     #[error("installed profile record '{path}' is not a readable record for profile '{id}'")]
     InstalledRecordConflict {
@@ -601,114 +567,6 @@ impl CommandExecutor<JsonFileStorage> {
                 Ok(package)
             })
             .collect()
-    }
-
-    /// List the profiles this repository's own applied-profile records name.
-    ///
-    /// The `.jit/profiles/` listing is where a repository states which profiles
-    /// it carries, and each record's package is read from the location that
-    /// record names, so the answer describes this repository rather than the
-    /// running binary. A record whose package cannot be resolved fails the
-    /// enumeration ([`ProfileResolutionError`]) instead of dropping the profile
-    /// from the answer.
-    pub fn list_recorded_profiles(&self) -> Result<ProfileListResult> {
-        let layout = self.require_layout()?;
-        let profiles_dir = VirtualPath::PROFILES;
-        with_mutation_session(self.storage(), &layout, "profile enumeration", |session| {
-            let Some((image, recorded)) = capture_applied_records(session, &profiles_dir)? else {
-                return Ok(SessionStep::Retry);
-            };
-            let Some(profiles) = recorded
-                .iter()
-                .map(|id| recorded_summary(&image, id, &layout))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .collect::<Option<Vec<_>>>()
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            Ok(SessionStep::Done(ProfileListResult::new(profiles)))
-        })
-    }
-
-    /// Report whether every profile this repository records still agrees with
-    /// the package it came from and with the repository content it owns.
-    ///
-    /// The `.jit/profiles/` listing is the whole inventory, exactly as it is for
-    /// [`Self::list_recorded_profiles`], so a repository that has applied
-    /// nothing reports no profile. Each record is then judged by the one shared
-    /// comparison ([`recorded_profile_agreement`]): its package is read through
-    /// the location the record names, its identity is held against what that
-    /// package would record today, and each target it claims is held against the
-    /// value the record fingerprinted when it published it.
-    ///
-    /// The check writes nothing. Its captured image covers the records and every
-    /// target they claim, so a claim is compared against repository content read
-    /// under the same session guard that read the records.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the repository cannot be read — an unreadable
-    /// record, a claimed registry that is not a regular file, or a capture
-    /// failure. A profile that diverged is an answer, never an error.
-    pub fn validate_recorded_profiles(&self) -> Result<ProfileAgreementResult> {
-        let layout = self.require_layout()?;
-        let profiles_dir = VirtualPath::PROFILES;
-        with_mutation_session(self.storage(), &layout, "profile agreement", |session| {
-            let Some((records, recorded)) = capture_applied_records(session, &profiles_dir)? else {
-                return Ok(SessionStep::Retry);
-            };
-            let Some(claimed) = recorded
-                .iter()
-                .map(|id| recorded_claim_closure(&records, id, &layout))
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .collect::<Option<Vec<_>>>()
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            let claimed_paths = claimed
-                .iter()
-                .flat_map(|(_, paths)| paths.iter().cloned())
-                .collect::<Vec<_>>();
-            let Some((image, covered)) =
-                capture_applied_records_covering(session, &profiles_dir, claimed_paths)?
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            // The claim closure was planned from the record set the first
-            // capture saw; a concurrent application or removal restarts the
-            // attempt rather than judging over a stale inventory.
-            if covered != recorded {
-                return Ok(SessionStep::Retry);
-            }
-            // Every record is re-read from the image its claims are compared
-            // against, and a record that moved between the two captures
-            // restarts the attempt: judging the claims one record state named
-            // against the content another produced would report a divergence
-            // no single repository state ever held.
-            let Some(agreements) = claimed
-                .iter()
-                .map(|(planned, _)| {
-                    let record_path = applied_record_path(planned.id.as_str())?;
-                    let Some(record) =
-                        read_applied_record(&image, &record_path, planned.id.as_str())?
-                    else {
-                        return Ok(None);
-                    };
-                    if &record != planned {
-                        return Ok(None);
-                    }
-                    recorded_profile_agreement(&image, &record, &record_path, &layout).map(Some)
-                })
-                .collect::<Result<Vec<_>>>()?
-                .into_iter()
-                .collect::<Option<Vec<_>>>()
-            else {
-                return Ok(SessionStep::Retry);
-            };
-            Ok(SessionStep::Done(ProfileAgreementResult::new(agreements)))
-        })
     }
 
     /// Capture the package at `package_source` and publish the resulting tree
@@ -1422,190 +1280,6 @@ impl CommandExecutor<JsonFileStorage> {
         )
     }
 
-    /// Re-render already installed packages from their recorded values and
-    /// newly supplied inputs without changing package identity.
-    pub fn reconfigure_profiles_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
-    ) -> Result<ProfileComposedApplyResult> {
-        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
-            selectors,
-            options,
-            RecordedValueAuthority::Exact,
-        )?;
-        if selected.is_empty() {
-            return Ok(ProfileComposedApplyResult::new(Vec::new()));
-        }
-        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
-        let applied = self.apply_resolved_profile_selection(
-            &packages,
-            &resolved,
-            &contribution_context,
-            ProfileLifecycleOperation::Reconfigure,
-        )?;
-        selection_profile_results(applied.items, &selected)
-    }
-
-    /// Preview the exact reconfiguration aggregate without publishing files,
-    /// provenance, or an audit event.
-    pub fn plan_reconfigure_profiles_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
-        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
-            selectors,
-            options,
-            RecordedValueAuthority::Exact,
-        )?;
-        if selected.is_empty() {
-            return Ok(ProfilePlanResult::new(Vec::new()));
-        }
-        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
-        self.plan_resolved_profile_selection(
-            &selected,
-            &packages,
-            &resolved,
-            &contribution_context,
-            ProfileLifecycleOperation::Reconfigure,
-        )
-    }
-
-    /// Replace selected installed packages with newer package versions while
-    /// retaining stored values for declarations that survive the replacement.
-    pub fn upgrade_profiles_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
-    ) -> Result<ProfileComposedApplyResult> {
-        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
-            selectors,
-            options,
-            RecordedValueAuthority::Superseded,
-        )?;
-        if selected.is_empty() {
-            return Ok(ProfileComposedApplyResult::new(Vec::new()));
-        }
-        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
-        let applied = self.apply_resolved_profile_selection(
-            &packages,
-            &resolved,
-            &contribution_context,
-            ProfileLifecycleOperation::Upgrade,
-        )?;
-        selection_profile_results(applied.items, &selected)
-    }
-
-    /// Preview the exact upgrade aggregate without publishing files,
-    /// provenance, or an audit event.
-    pub fn plan_upgrade_profiles_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
-    ) -> Result<ProfilePlanResult> {
-        let (selected, packages, resolved) = self.lifecycle_selection_from_sources(
-            selectors,
-            options,
-            RecordedValueAuthority::Superseded,
-        )?;
-        if selected.is_empty() {
-            return Ok(ProfilePlanResult::new(Vec::new()));
-        }
-        let contribution_context = self.profile_contribution_candidates_from_resolved(&resolved)?;
-        self.plan_resolved_profile_selection(
-            &selected,
-            &packages,
-            &resolved,
-            &contribution_context,
-            ProfileLifecycleOperation::Upgrade,
-        )
-    }
-
-    /// Resolve and render one lifecycle selection from the records the
-    /// repository already holds.
-    ///
-    /// `authority` is the whole difference between the two commands. Under
-    /// [`RecordedValueAuthority::Exact`] every closure member must still be the
-    /// package its record describes, so a replay cannot switch identity. Under
-    /// [`RecordedValueAuthority::Superseded`] a selected member must be
-    /// installed and its replacement must advance the version, while a
-    /// dependency the closure reaches for the first time is resolved as an
-    /// ordinary first application.
-    ///
-    /// The graph is settled over every applied package that survives the
-    /// selection before any member is rendered, so a range or incompatibility
-    /// another profile depends on refuses the selection here rather than at the
-    /// publication this precedes.
-    fn lifecycle_selection_from_sources(
-        &self,
-        selectors: &[ProfileSelector],
-        options: &ProfileVariableOptions,
-        authority: RecordedValueAuthority,
-    ) -> Result<(
-        Vec<ProfilePackage>,
-        Vec<ProfilePackage>,
-        Vec<ResolvedProfileContent>,
-    )> {
-        let selected = self.resolve_profile_selectors(selectors)?;
-        if selected.is_empty() {
-            return Ok((selected, Vec::new(), Vec::new()));
-        }
-        let selected_ids = selected
-            .iter()
-            .map(|package| package.model().id.clone())
-            .collect::<BTreeSet<_>>();
-        let packages = self.resolve_profile_graph(&selected)?.selected_packages();
-        let inputs = load_profile_variable_inputs(
-            &packages,
-            options.values_file.as_deref(),
-            &options.assignments,
-        )?;
-        let resolved = packages
-            .iter()
-            .map(|package| {
-                let id = package.model().id.as_str();
-                let package_inputs = inputs.for_declarations(&package.model().variables);
-                let missing_record = || ProfileApplyError::InstalledRecordConflict {
-                    path: applied_record_path(id)
-                        .map(|path| path.repository_relative())
-                        .unwrap_or_else(|_| id.to_string()),
-                    id: id.to_string(),
-                };
-                match (self.read_applied_profile_record(id)?, authority) {
-                    (Some(record), RecordedValueAuthority::Exact) => {
-                        ensure_reconfiguration_package_identity(package, &record)?;
-                        resolve_package_from_record(
-                            package,
-                            &record.variables,
-                            &package_inputs,
-                            authority,
-                        )
-                        .map_err(Into::into)
-                    }
-                    (Some(record), RecordedValueAuthority::Superseded) => {
-                        ensure_upgrade_version_is_newer_when_replaced(package, &record)?;
-                        resolve_package_from_record(
-                            package,
-                            &record.variables,
-                            &package_inputs,
-                            authority,
-                        )
-                        .map_err(Into::into)
-                    }
-                    (None, RecordedValueAuthority::Exact) => Err(missing_record().into()),
-                    (None, RecordedValueAuthority::Superseded) => {
-                        if selected_ids.contains(&package.model().id) {
-                            return Err(missing_record().into());
-                        }
-                        resolve_package(package, &package_inputs).map_err(Into::into)
-                    }
-                }
-            })
-            .collect::<Result<Vec<_>>>()?;
-        Ok((selected, packages, resolved))
-    }
-
     /// Resolve the complete set of packages applying `package` applies, in the
     /// order it applies them.
     ///
@@ -2247,63 +1921,6 @@ fn insert_candidate_package(
     Ok(())
 }
 
-/// Refuse a reconfiguration that would replace package provenance instead of
-/// replaying the installed package with different values.
-fn ensure_reconfiguration_package_identity(
-    package: &ProfilePackage,
-    record: &AppliedProfileRecord,
-) -> Result<()> {
-    let metadata = package.model();
-    let unchanged_identity = record.id == metadata.id
-        && record.version == metadata.version
-        && record.compatible_jit == metadata.compatible_jit
-        && record.package_hash == package.hashes().package;
-    unchanged_identity.then_some(()).ok_or_else(|| {
-        ProfileApplyError::ReconfigurationPackageChanged {
-            id: metadata.id.to_string(),
-            installed_version: record.version.clone(),
-            installed_hash: record.package_hash.clone(),
-            found_version: metadata.version.clone(),
-            found_hash: package.hashes().package.clone(),
-        }
-        .into()
-    })
-}
-
-/// Require a changed replacement package to advance semantic version. An exact
-/// package replay is a valid no-op upgrade rehearsal or invocation.
-fn ensure_upgrade_version_is_newer_when_replaced(
-    package: &ProfilePackage,
-    record: &AppliedProfileRecord,
-) -> Result<()> {
-    let metadata = package.model();
-    if record.package_hash == package.hashes().package && record.version == metadata.version {
-        return Ok(());
-    }
-    let installed = Version::parse(&record.version).map_err(|_| {
-        anyhow::anyhow!(
-            "installed profile '{}' records invalid version '{}'",
-            record.id,
-            record.version
-        )
-    })?;
-    let candidate = Version::parse(&metadata.version).map_err(|_| {
-        anyhow::anyhow!(
-            "replacement profile '{}' declares invalid version '{}'",
-            metadata.id,
-            metadata.version
-        )
-    })?;
-    (candidate > installed).then_some(()).ok_or_else(|| {
-        ProfileApplyError::UpgradeVersionNotNewer {
-            id: metadata.id.to_string(),
-            installed_version: record.version.clone(),
-            candidate_version: metadata.version.clone(),
-        }
-        .into()
-    })
-}
-
 /// Stable source spelling used only to choose between byte-identical package
 /// copies. Package bytes and graph claims remain the semantic identity.
 fn package_source_key(package: &ProfilePackage) -> String {
@@ -2484,36 +2101,14 @@ pub(super) fn record_name_profile_id(name: &str) -> Option<&str> {
 /// concurrent application or removal — which the caller retries rather than
 /// answering over an inventory no single repository state ever held.
 ///
-/// Enumeration and derived-state repair both begin here, because a record is
-/// what names the location its package is read from: neither can resolve a
-/// package before reading the records.
+/// Derived-state repair begins here, because a record is what names the
+/// location its package is read from: it cannot resolve a package before
+/// reading the records.
 pub(super) fn capture_applied_records(
     session: &mut (dyn RepositoryMutationSession + '_),
     profiles_dir: &VirtualPath,
 ) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
-    capture_applied_records_covering(session, profiles_dir, [])
-}
-
-/// Read this repository's applied-profile records together with the exact
-/// paths in `also`.
-///
-/// The agreement check reads a record and then the repository content that
-/// record claims, and both readings must describe one repository state. Widening
-/// the record capture to cover the claimed targets is what makes that true: the
-/// listing is re-read in the same capture, so a record set that moved is
-/// reported as movement rather than answered over two states.
-///
-/// The listing supplies the record ids, so the records join the round once it
-/// is read; every additional path comes from `also`, so the round's named-path
-/// payload bytes are unbounded while its one listing and construction-derived
-/// maximum depth bind shape.
-fn capture_applied_records_covering(
-    session: &mut (dyn RepositoryMutationSession + '_),
-    profiles_dir: &VirtualPath,
-    also: impl IntoIterator<Item = VirtualPath>,
-) -> Result<Option<(RepositoryImage, BTreeSet<String>)>> {
-    let also = also.into_iter().collect::<Vec<_>>();
-    let mut spec = CaptureSpec::new(also.iter().cloned(), claim_capture_budget(&also))?;
+    let mut spec = CaptureSpec::new([], record_capture_budget())?;
     spec.discover_listing(profiles_dir.clone())?;
     let Some(image) = super::capture_discovering(session, spec, |image, spec| {
         Ok(spec.discover_paths(
@@ -2528,48 +2123,6 @@ fn capture_applied_records_covering(
     };
     let recorded = recorded_profile_ids(&image, profiles_dir)?;
     Ok(Some((image, recorded)))
-}
-
-/// Bounds for applied records plus the exact claimed target paths in `also`.
-///
-/// This is the same no-discovery case as [`record_capture_budget`]. The one record listing supplies every record id;
-/// parsed records supply every claimed target; arbitrary payload bytes supply
-/// neither paths nor listings. Claimed content may be template-expanded beyond
-/// its package sources, so the package model cannot bound it and named-path
-/// bytes are unbounded. Shape remains bounded to one listing and the greatest
-/// depth of the exact paths the capture will declare. [`CaptureSpec`] confines
-/// the read to those records and claims; an undeclared repository path is never
-/// admitted merely because the byte ceiling is unbounded.
-fn claim_capture_budget(also: &[VirtualPath]) -> CaptureBudget {
-    let record_budget = record_capture_budget();
-    CaptureBudget {
-        max_depth: also
-            .iter()
-            .map(|path| path.relative().depth())
-            .fold(record_budget.max_depth, usize::max),
-        ..record_budget
-    }
-}
-
-/// One record and every repository path its ownership claims name.
-///
-/// `Ok(None)` reports a record the listing named that the capture no longer
-/// holds, which the caller retries rather than answering without it.
-fn recorded_claim_closure(
-    records: &RepositoryImage,
-    id: &str,
-    layout: &RepositoryLayout,
-) -> Result<Option<(AppliedProfileRecord, Vec<VirtualPath>)>> {
-    let record_path = applied_record_path(id)?;
-    let Some(record) = read_applied_record(records, &record_path, id)? else {
-        return Ok(None);
-    };
-    let claimed = record
-        .claims
-        .iter()
-        .map(|claim| claim.identity.claimed_path(layout).map_err(Into::into))
-        .collect::<Result<Vec<_>>>()?;
-    Ok(Some((record, claimed)))
 }
 
 /// Profile ids the repository's own applied-profile records name.
@@ -2680,109 +2233,6 @@ fn is_unreadable_location(error: &anyhow::Error) -> bool {
                 }
             )
         })
-}
-
-/// Summarize one recorded profile from the package its record resolves to.
-///
-/// Every reported fact but `applied` comes from the resolved package, so the
-/// answer states what the recorded location holds now. `applied` is the
-/// comparison between the two, read from the same identity check every other
-/// caller applies ([`package_identity_divergence`]).
-///
-/// `Ok(None)` reports a record the listing named that the capture no longer
-/// holds, which the caller retries rather than reporting without it.
-fn recorded_summary(
-    image: &RepositoryImage,
-    id: &str,
-    layout: &RepositoryLayout,
-) -> Result<Option<ProfileSummary>> {
-    let record_path = applied_record_path(id)?;
-    let Some(record) = read_applied_record(image, &record_path, id)? else {
-        return Ok(None);
-    };
-    let package = recorded_package(&record, &record_path, layout)?;
-    let metadata = package.model();
-    Ok(Some(ProfileSummary {
-        id: metadata.id.to_string(),
-        version: metadata.version.clone(),
-        origin: package_origin(&package, layout)?,
-        jit: metadata.compatible_jit.clone(),
-        applied: package_identity_divergence(&package, &record, layout).is_none(),
-    }))
-}
-
-/// Whether the package at a record's recorded location is still the package
-/// that record identifies, as the divergence a disagreement produces.
-///
-/// The comparison is the stored record against the record this package would
-/// write today for the values the record carries ([`expected_record`]), so a
-/// package that was edited, replaced, or re-versioned in place disagrees while
-/// repository content the profile owns is deliberately not consulted.
-///
-/// A recorded value the package can no longer resolve is its own divergence:
-/// the identity cannot be derived at all, so reporting it as a changed identity
-/// would name a comparison that never happened.
-pub(super) fn package_identity_divergence(
-    package: &ProfilePackage,
-    record: &AppliedProfileRecord,
-    layout: &RepositoryLayout,
-) -> Option<ProfileDivergence> {
-    let expected = match expected_record(package, layout, &record.variables) {
-        Ok(expected) => expected,
-        Err(error) => {
-            return Some(ProfileDivergence::UnresolvedValues {
-                reason: format!("{error:#}"),
-            })
-        }
-    };
-    (!record.matches_package_provenance(&expected)).then(|| {
-        ProfileDivergence::ChangedPackageIdentity {
-            recorded_version: record.version.clone(),
-            recorded_package_hash: record.package_hash.clone(),
-            current_version: expected.version,
-            current_package_hash: expected.package_hash,
-        }
-    })
-}
-
-/// Whether one recorded profile still agrees with the package its record names
-/// and with the repository content that record claims.
-///
-/// This is the sole comparison behind the profile-scoped agreement check, so a
-/// profile is judged by one rule wherever it is judged. The owned targets are
-/// compared through the pure claim comparison ([`claimed_target_divergences`]).
-///
-/// The package is read through the location the record names, so a record whose
-/// package moved or was deleted reports that rather than an absent profile, and
-/// every target that record still claims is reported beside it as one nothing
-/// remains to compare against.
-pub(super) fn recorded_profile_agreement(
-    image: &RepositoryImage,
-    record: &AppliedProfileRecord,
-    record_path: &VirtualPath,
-    layout: &RepositoryLayout,
-) -> Result<ProfileAgreement> {
-    let divergences = match recorded_package(record, record_path, layout) {
-        // The resolver's own message already names the record, the location it
-        // names, and what the read failed on, so it is the reason verbatim
-        // rather than a re-walked context chain that restates each of them.
-        Err(error) => std::iter::once(ProfileDivergence::UnreadablePackage {
-            reason: error.to_string(),
-        })
-        .chain(unowned_target_divergences(record))
-        .collect(),
-        Ok(package) => package_identity_divergence(&package, record, layout)
-            .into_iter()
-            .chain(claimed_target_divergences(image, record)?)
-            .collect(),
-    };
-    Ok(ProfileAgreement::new(
-        record.id.as_str(),
-        record.version.as_str(),
-        record_path.repository_relative(),
-        record.origin.clone(),
-        divergences,
-    ))
 }
 
 /// The provenance origin a package's own bytes came through.
@@ -2903,35 +2353,6 @@ pub(super) fn applied_profile_result(
     })
 }
 
-/// The expected provenance record for a package read through this repository.
-///
-/// Resolved variables are validated against the current package without
-/// consulting ambient input. Ownership claims remain repository-state
-/// provenance rather than immutable package identity, so the package check
-/// deliberately excludes them.
-pub(super) fn expected_record(
-    package: &ProfilePackage,
-    layout: &RepositoryLayout,
-    variables: &ResolvedVariables,
-) -> Result<AppliedProfileRecord> {
-    let metadata = package.model();
-    let _resolved = resolve_package_from_record(
-        package,
-        variables,
-        &VariableInputs::default(),
-        RecordedValueAuthority::Exact,
-    )?;
-    Ok(AppliedProfileRecord::new(
-        metadata.id.clone(),
-        metadata.version.clone(),
-        metadata.compatible_jit.clone(),
-        package_origin(package, layout)?,
-        package.hashes().package.clone(),
-        variables.clone(),
-        BTreeSet::new(),
-    ))
-}
-
 /// Build one canonical aggregate input collection for a dependency-first
 /// selection.
 fn profile_selection_inputs(
@@ -3033,6 +2454,7 @@ pub(super) fn reject_reserved_application_targets<'a>(
 mod tests {
     use super::*;
     use crate::domain::{Event, ProfileLifecycleOperation, ProfileLifecycleStatus};
+    use crate::profile::ResolvedVariables;
     use crate::profile::{ProfileContributionChange, ProfilePlanStatus, ProfileTargetAction};
     use crate::repository_state::{
         Contribution, ContributionConflictOwner, ContributionIdentity, MapEntryTarget,
@@ -3370,37 +2792,6 @@ mod tests {
         ProfilePackage::from_directory(&tree).expect("a valid authored package tree")
     }
 
-    /// Profile id every lifecycle case below reconfigures or upgrades.
-    const LIFECYCLE_ID: &str = "lifecycle-package";
-
-    /// Worktree location the lifecycle package is staged and re-read at.
-    const LIFECYCLE_LOCATION: &str = "packages/lifecycle";
-
-    /// The lifecycle package at `version`, declaring one variable that reaches
-    /// one asset and leaves the other alone.
-    ///
-    /// Separating a target the variable feeds from a target it does not is what
-    /// makes "republish what the value affects" observable as distinct from
-    /// "republish everything this package owns".
-    fn lifecycle_package(temp: &TempDir, version: &str) -> ProfilePackage {
-        authored_manifest_package(
-            temp,
-            LIFECYCLE_LOCATION,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
-                 version = \"{version}\"\ncompatible-jit = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[asset]]\nsource = \"assets/templated.txt\"\n\
-                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
-                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
-            ),
-            &[
-                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
-                ("assets/fixed.txt", "no variable reaches this\n"),
-            ],
-        )
-    }
-
     /// Command options carrying repeated `--set NAME=VALUE` assignments.
     fn supplied_values(assignments: &[(&str, &str)]) -> ProfileVariableOptions {
         ProfileVariableOptions {
@@ -3415,41 +2806,6 @@ mod tests {
                 })
                 .collect(),
         }
-    }
-
-    /// Apply `package` through the ordinary command entry point.
-    fn apply_package(
-        executor: &CommandExecutor<JsonFileStorage>,
-        package: &ProfilePackage,
-        options: &ProfileVariableOptions,
-    ) -> ProfileComposedApplyResult {
-        executor
-            .apply_profile_from_sources(&[package_selector(package)], options)
-            .expect("the package applies")
-    }
-
-    /// Select an installed profile the way a lifecycle command addresses it:
-    /// through the record that names where its package is read from.
-    fn installed_selector(id: &str) -> Vec<ProfileSelector> {
-        vec![ProfileSelector::id(id).expect("a canonical profile id")]
-    }
-
-    /// The fingerprint a record carries for the asset it published at `target`.
-    ///
-    /// This is the base of the next three-way decision, so a target that was
-    /// left alone must carry the same one it carried before.
-    fn recorded_asset_fingerprint(record: &AppliedProfileRecord, target: &str) -> String {
-        record
-            .claims
-            .iter()
-            .find_map(|claim| match &claim.identity {
-                crate::repository_state::AppliedProfileClaimIdentity::Asset { target: claimed } => {
-                    (claimed.path.as_path() == Path::new(target))
-                        .then(|| claim.base_fingerprint.as_str().to_string())
-                }
-                _ => None,
-            })
-            .unwrap_or_else(|| panic!("the record claims an asset at {target}"))
     }
 
     /// Every file this repository holds, keyed by its path below the worktree.
@@ -3477,46 +2833,6 @@ mod tests {
         let mut files = BTreeMap::new();
         collect(temp.path(), temp.path(), &mut files);
         files
-    }
-
-    /// The lifecycle operation and per-profile statuses of the last audited
-    /// profile event.
-    fn last_lifecycle_event(
-        storage: &JsonFileStorage,
-    ) -> (
-        ProfileLifecycleOperation,
-        Vec<(String, ProfileLifecycleStatus)>,
-    ) {
-        storage
-            .read_events()
-            .expect("the audit log is readable")
-            .into_iter()
-            .filter_map(|event| match event {
-                Event::ProfileLifecycle {
-                    operation,
-                    profiles,
-                    ..
-                } => Some((
-                    operation,
-                    profiles
-                        .into_iter()
-                        .map(|profile| (profile.id.to_string(), profile.status))
-                        .collect(),
-                )),
-                _ => None,
-            })
-            .next_back()
-            .expect("a lifecycle mutation audits one profile event")
-    }
-
-    /// Number of profile lifecycle events this repository has audited.
-    fn lifecycle_event_count(storage: &JsonFileStorage) -> usize {
-        storage
-            .read_events()
-            .expect("the audit log is readable")
-            .into_iter()
-            .filter(|event| matches!(event, Event::ProfileLifecycle { .. }))
-            .count()
     }
 
     /// A package declaring `id`, publishing an asset target of its own, and
@@ -3686,22 +3002,6 @@ mod tests {
             .expect("the package contributes the namespace")
     }
 
-    /// Every divergence the profile check reports naming `subject`.
-    fn recorded_divergences_naming(
-        executor: &CommandExecutor<JsonFileStorage>,
-        subject: &str,
-    ) -> Vec<String> {
-        executor
-            .validate_recorded_profiles()
-            .expect("the profiles are readable")
-            .items
-            .into_iter()
-            .flat_map(|profile| profile.divergences.items)
-            .map(|divergence| divergence.message())
-            .filter(|message| message.contains(subject))
-            .collect()
-    }
-
     /// What the difference report says about the declaration named `subject`.
     fn reported_contribution_actions(
         entry: &ProfilePlanEntry,
@@ -3862,7 +3162,6 @@ placement = "append"
                 "installed profile record '.jit/profiles/{id}.json' is not a readable record for profile '{id}'"
             )
         );
-        assert!(executor.list_recorded_profiles().is_err());
         assert!(executor
             .show_profiles(std::slice::from_ref(&selector))
             .is_err());
@@ -4123,82 +3422,6 @@ placement = "append"
                 error.downcast_ref::<ProfileResolutionError>(),
                 Some(ProfileResolutionError::UnreadableLocation { location, .. })
                     if location.ends_with("vendor/absent")
-            ),
-            "{error:#}"
-        );
-    }
-
-    #[test]
-    fn test_list_recorded_profiles_names_no_profile_until_a_record_does() {
-        let (temp, _storage, executor, _package) = fixture();
-
-        let before = executor.list_recorded_profiles().unwrap();
-        assert!(before.items.is_empty());
-
-        let applied = package_read_from(&temp, "vendor/recorded");
-        executor.apply_profile_package(&applied).unwrap();
-
-        let after = executor.list_recorded_profiles().unwrap();
-        assert_eq!(
-            after
-                .items
-                .iter()
-                .map(|profile| profile.id.as_str())
-                .collect::<Vec<_>>(),
-            vec![fixture_id().as_str()]
-        );
-        assert_eq!(
-            after.items[0].origin,
-            ProfileOrigin::Directory(RootRelativePath::parse("vendor/recorded").unwrap())
-        );
-        assert!(after.items[0].applied);
-    }
-
-    #[test]
-    fn test_list_recorded_profiles_resolves_each_record_from_the_location_it_names() {
-        let (temp, _storage, executor, _package) = fixture();
-        let applied = package_read_from(&temp, "vendor/recorded");
-        executor.apply_profile_package(&applied).unwrap();
-        let recorded_version = stored_record(&temp).version;
-
-        // The package at the recorded location moves on without the repository.
-        // What enumeration reports is what reading that location now yields, so
-        // the new version is reported and the stored record no longer describes
-        // it.
-        let manifest = fs::read_to_string(temp.path().join("vendor/recorded/manifest.toml"))
-            .unwrap()
-            .replace(
-                &format!("version = \"{recorded_version}\""),
-                "version = \"2.0.0\"",
-            );
-        let rewritten = repackage(&temp, "vendor/recorded", "manifest.toml", &manifest);
-        assert_ne!(rewritten.model().version, recorded_version);
-
-        let listed = executor.list_recorded_profiles().unwrap();
-
-        assert_eq!(listed.count(), 1);
-        assert_eq!(listed.items[0].version, rewritten.model().version);
-        assert!(
-            !listed.items[0].applied,
-            "a record that no longer describes the package at its location is not applied state"
-        );
-    }
-
-    #[test]
-    fn test_list_recorded_profiles_reports_a_recorded_location_that_no_longer_resolves() {
-        let (temp, _storage, executor, _package) = fixture();
-        let applied = package_read_from(&temp, "vendor/recorded");
-        executor.apply_profile_package(&applied).unwrap();
-        fs::remove_dir_all(temp.path().join("vendor/recorded")).unwrap();
-
-        let error = executor.list_recorded_profiles().unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileResolutionError>(),
-                Some(ProfileResolutionError::UnresolvableRecordedLocation { record, location, .. })
-                    if record == ".jit/profiles/planner-asset-only.json"
-                        && location == "vendor/recorded"
             ),
             "{error:#}"
         );
@@ -6613,12 +5836,7 @@ template = true
             "the report states the target the package would publish: {entry:?}"
         );
         assert!(
-            executor
-                .list_recorded_profiles()
-                .expect("the recorded inventory is readable")
-                .items
-                .iter()
-                .all(|recorded| recorded.id != "unapplied"),
+            !temp.path().join(".jit/profiles/unapplied.json").exists(),
             "the report does not record the package it inspected"
         );
         assert_eq!(
@@ -6959,816 +6177,6 @@ template = true
                 )),
             "the departing owner stops claiming the declaration it no longer declares"
         );
-    }
-
-    #[test]
-    fn test_reconfigure_profiles_from_sources_republishes_only_the_targets_the_changed_value_feeds()
-    {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        let untouched = temp.path().join("docs/fixed.txt");
-        let untouched_before = fs::read(&untouched).unwrap();
-        let record_before = record_for(&temp, LIFECYCLE_ID);
-        let events_before = lifecycle_event_count(&storage);
-
-        let reconfigured = executor
-            .reconfigure_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            reconfigured.requested().unwrap().status,
-            ProfileApplicationStatus::Applied
-        );
-        assert!(
-            fs::read_to_string(temp.path().join("docs/templated.txt"))
-                .unwrap()
-                .contains("supplied"),
-            "the target the supplied value feeds carries that value"
-        );
-        assert_eq!(
-            fs::read(&untouched).unwrap(),
-            untouched_before,
-            "a target no supplied value reaches keeps its exact bytes"
-        );
-        let record_after = record_for(&temp, LIFECYCLE_ID);
-        assert_eq!(
-            recorded_asset_fingerprint(&record_after, "docs/fixed.txt"),
-            recorded_asset_fingerprint(&record_before, "docs/fixed.txt"),
-            "a target no supplied value reaches keeps the base its next decision reads"
-        );
-        assert_ne!(
-            recorded_asset_fingerprint(&record_after, "docs/templated.txt"),
-            recorded_asset_fingerprint(&record_before, "docs/templated.txt"),
-            "the republished target records the base it was published at"
-        );
-        assert_eq!(
-            record_after.package_hash, record_before.package_hash,
-            "reconfiguration replays the installed package rather than replacing it"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before + 1);
-    }
-
-    #[test]
-    fn test_reconfigure_profiles_from_sources_publishes_nothing_when_no_value_is_supplied() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let reconfigured = executor
-            .reconfigure_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            reconfigured.requested().unwrap().status,
-            ProfileApplicationStatus::Unchanged,
-            "replaying the record with nothing supplied changes nothing"
-        );
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a complete no-op writes no file"
-        );
-        assert_eq!(
-            lifecycle_event_count(&storage),
-            events_before,
-            "a complete no-op audits no lifecycle event"
-        );
-    }
-
-    #[test]
-    fn test_reconfigure_profiles_from_sources_reports_an_edited_target_as_a_conflict_without_publishing(
-    ) {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        fs::write(
-            temp.path().join("docs/templated.txt"),
-            "greeting=edited in place\n",
-        )
-        .unwrap();
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let error = executor
-            .reconfigure_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap_err();
-
-        let conflict = refused_target(&error);
-        assert_eq!(refused_path(conflict), "docs/templated.txt");
-        assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
-        let (base, current, candidate) = diverged_values(conflict);
-        assert_ne!(
-            current, base,
-            "the conflict reports current diverging from the recorded base"
-        );
-        assert_ne!(
-            current, candidate,
-            "the conflict reports current diverging from the resolved candidate"
-        );
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a conflicting decision publishes nothing"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before);
-    }
-
-    #[test]
-    fn test_upgrade_profiles_from_sources_updates_owned_targets_and_retains_shared_content() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let shared_body = "one body, two owners\n";
-        let alpha = authored_manifest_package(
-            &temp,
-            "packages/alpha",
-            "[profile]\nmanifest-version = 2\nid = \"alpha\"\nversion = \"1.0.0\"\n\
-             compatible-jit = \"*\"\n\n\
-             [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/alpha-own.txt\"\n\n\
-             [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n",
-            &[
-                ("assets/own.txt", "alpha own v1\n"),
-                ("assets/shared.txt", shared_body),
-            ],
-        );
-        let beta = authored_manifest_package(
-            &temp,
-            "packages/beta",
-            "[profile]\nmanifest-version = 2\nid = \"beta\"\nversion = \"1.0.0\"\n\
-             compatible-jit = \"*\"\n\n\
-             [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n",
-            &[("assets/shared.txt", shared_body)],
-        );
-        apply_package(&executor, &alpha, &supplied_values(&[]));
-        apply_package(&executor, &beta, &supplied_values(&[]));
-        authored_manifest_package(
-            &temp,
-            "packages/alpha",
-            "[profile]\nmanifest-version = 2\nid = \"alpha\"\nversion = \"2.0.0\"\n\
-             compatible-jit = \"*\"\n\n\
-             [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/alpha-own.txt\"\n",
-            &[("assets/own.txt", "alpha own v2\n")],
-        );
-
-        let upgraded = executor
-            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
-            .unwrap();
-
-        assert_eq!(
-            upgraded.requested().unwrap().status,
-            ProfileApplicationStatus::Applied
-        );
-        assert_eq!(
-            fs::read_to_string(temp.path().join("docs/alpha-own.txt")).unwrap(),
-            "alpha own v2\n",
-            "an unchanged target this package solely owns takes the new version's content"
-        );
-        assert_eq!(
-            fs::read_to_string(temp.path().join("docs/shared.txt")).unwrap(),
-            shared_body,
-            "content a surviving owner still claims outlives the owner that stopped claiming it"
-        );
-        assert_eq!(record_for(&temp, "alpha").version, "2.0.0");
-        assert_eq!(
-            record_for(&temp, "beta").version,
-            "1.0.0",
-            "upgrading one profile leaves every other applied record where it was"
-        );
-    }
-
-    #[test]
-    fn test_upgrade_profiles_from_sources_refuses_a_version_a_surviving_profile_depends_on() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let alpha = package_v2(&temp, "packages/alpha", "alpha", "1.0.0", "*", &[], &[]);
-        let beta = package_v2(
-            &temp,
-            "packages/beta",
-            "beta",
-            "1.0.0",
-            "*",
-            &[("alpha", "^1.0.0")],
-            &[],
-        );
-        apply_package(&executor, &alpha, &supplied_values(&[]));
-        apply_package(&executor, &beta, &supplied_values(&[]));
-        package_v2(&temp, "packages/alpha", "alpha", "2.0.0", "*", &[], &[]);
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let error = executor
-            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
-            .unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::DependencyVersionMismatch {
-                    package,
-                    dependency,
-                    found,
-                    ..
-                }) if package == "beta" && dependency == "alpha" && found == "2.0.0"
-            ),
-            "the range a surviving profile depends on refuses the replacement: {error:#}"
-        );
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a refused upgrade publishes nothing"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before);
-    }
-
-    #[test]
-    fn test_upgrade_profiles_from_sources_refuses_a_version_a_surviving_profile_declares_incompatible(
-    ) {
-        let (temp, storage, executor, _fixture) = fixture();
-        let alpha = package_v2(&temp, "packages/alpha", "alpha", "1.0.0", "*", &[], &[]);
-        let beta = package_v2(
-            &temp,
-            "packages/beta",
-            "beta",
-            "1.0.0",
-            "*",
-            &[],
-            &[("alpha", ">=2.0.0")],
-        );
-        apply_package(&executor, &alpha, &supplied_values(&[]));
-        apply_package(&executor, &beta, &supplied_values(&[]));
-        package_v2(&temp, "packages/alpha", "alpha", "2.0.0", "*", &[], &[]);
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let error = executor
-            .upgrade_profiles_from_sources(&installed_selector("alpha"), &supplied_values(&[]))
-            .unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileDependencyError>(),
-                Some(ProfileDependencyError::IncompatiblePackages {
-                    package,
-                    other,
-                    other_version,
-                    ..
-                }) if package == "beta" && other == "alpha" && other_version == "2.0.0"
-            ),
-            "an incompatibility a surviving profile declares refuses the replacement: {error:#}"
-        );
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a refused upgrade publishes nothing"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before);
-    }
-
-    #[test]
-    fn test_upgrade_profiles_from_sources_reports_a_divergent_target_as_a_conflict_without_publishing(
-    ) {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        fs::write(
-            temp.path().join("docs/fixed.txt"),
-            "edited by the adopter\n",
-        )
-        .unwrap();
-        authored_manifest_package(
-            &temp,
-            LIFECYCLE_LOCATION,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
-                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[asset]]\nsource = \"assets/templated.txt\"\n\
-                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
-                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
-            ),
-            &[
-                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
-                ("assets/fixed.txt", "the new version's fixed content\n"),
-            ],
-        );
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let error = executor
-            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
-            .unwrap_err();
-
-        let conflict = refused_target(&error);
-        assert_eq!(refused_path(conflict), "docs/fixed.txt");
-        assert_eq!(conflict.owner.as_str(), LIFECYCLE_ID);
-        let (base, current, candidate) = diverged_values(conflict);
-        assert_ne!(current, base);
-        assert_ne!(current, candidate);
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a conflicting upgrade publishes nothing"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before);
-    }
-
-    #[test]
-    fn test_upgrade_profiles_from_sources_carries_supplied_values_and_defaults_new_declarations() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(
-            &executor,
-            &package,
-            &supplied_values(&[("GREETING", "carried")]),
-        );
-        authored_manifest_package(
-            &temp,
-            LIFECYCLE_LOCATION,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
-                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[variable]]\nname = \"FAREWELL\"\ndefault = \"new default\"\n\n\
-                 [[asset]]\nsource = \"assets/templated.txt\"\n\
-                 target = \"docs/templated.txt\"\ntemplate = true\n"
-            ),
-            &[(
-                "assets/templated.txt",
-                "greeting={{jit:var:GREETING}} farewell={{jit:var:FAREWELL}}\n",
-            )],
-        );
-
-        executor
-            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
-            .unwrap();
-
-        assert_eq!(
-            fs::read_to_string(temp.path().join("docs/templated.txt")).unwrap(),
-            "greeting=carried farewell=new default\n",
-            "a stored supplied value survives the replacement while a newly declared \
-             variable takes the new package's default"
-        );
-    }
-
-    /// A package publishing one target of its own and one it shares with a
-    /// peer, both fed by the same declared variable.
-    fn shared_target_package(temp: &TempDir, id: &str, shared_body: &str) -> ProfilePackage {
-        authored_manifest_package(
-            temp,
-            &format!("packages/{id}"),
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[asset]]\nsource = \"assets/own.txt\"\n\
-                 target = \"docs/{id}-own.txt\"\ntemplate = true\n\n\
-                 [[asset]]\nsource = \"assets/shared.txt\"\ntarget = \"docs/shared.txt\"\n"
-            ),
-            &[
-                ("assets/own.txt", "greeting={{jit:var:GREETING}}\n"),
-                ("assets/shared.txt", shared_body),
-            ],
-        )
-    }
-
-    /// The repository-relative target paths one rehearsal entry reports.
-    fn planned_paths(planned: &ProfilePlanResult, id: &str) -> BTreeSet<String> {
-        planned
-            .items
-            .iter()
-            .find(|entry| entry.id == id)
-            .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
-            .targets
-            .iter()
-            .map(|target| target.path.clone())
-            .collect()
-    }
-
-    #[test]
-    fn test_plan_reconfigure_profiles_from_sources_scopes_each_entry_to_the_targets_its_profile_decides(
-    ) {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let shared_body = "one body, two owners\n";
-        let alpha = shared_target_package(&temp, "alpha", shared_body);
-        let beta = shared_target_package(&temp, "beta", shared_body);
-        apply_package(&executor, &alpha, &supplied_values(&[]));
-        apply_package(&executor, &beta, &supplied_values(&[]));
-
-        let planned = executor
-            .plan_reconfigure_profiles_from_sources(
-                &[
-                    ProfileSelector::id("alpha").unwrap(),
-                    ProfileSelector::id("beta").unwrap(),
-                ],
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            planned
-                .items
-                .iter()
-                .map(|entry| entry.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["alpha", "beta"]
-        );
-        let alpha_paths = planned_paths(&planned, "alpha");
-        let beta_paths = planned_paths(&planned, "beta");
-        assert!(
-            alpha_paths.contains("docs/alpha-own.txt")
-                && !alpha_paths.contains("docs/beta-own.txt"),
-            "an entry reports the targets its own profile decides: {alpha_paths:?}"
-        );
-        assert!(
-            beta_paths.contains("docs/beta-own.txt") && !beta_paths.contains("docs/alpha-own.txt"),
-            "an entry reports the targets its own profile decides: {beta_paths:?}"
-        );
-        assert!(
-            alpha_paths.contains("docs/shared.txt") && beta_paths.contains("docs/shared.txt"),
-            "a target both profiles contribute is decided by each, so neither entry drops it"
-        );
-    }
-
-    /// A root declaring `dependency`, one variable, and one templated target.
-    fn dependent_variable_package(temp: &TempDir, id: &str, dependency: &str) -> ProfilePackage {
-        authored_manifest_package(
-            temp,
-            &format!("packages/{id}"),
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n\
-                 [[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[asset]]\nsource = \"assets/own.txt\"\n\
-                 target = \"docs/{id}.txt\"\ntemplate = true\n"
-            ),
-            &[("assets/own.txt", "greeting={{jit:var:GREETING}}\n")],
-        )
-    }
-
-    /// A package publishing one static target and declaring no variable.
-    fn static_package(temp: &TempDir, id: &str) -> ProfilePackage {
-        authored_manifest_package(
-            temp,
-            &format!("packages/{id}"),
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n\
-                 [[asset]]\nsource = \"assets/own.txt\"\ntarget = \"docs/{id}.txt\"\n"
-            ),
-            &[("assets/own.txt", "no variable reaches this\n")],
-        )
-    }
-
-    /// The entry at `position`, which the occurrence order fixes.
-    fn entry_at(planned: &ProfilePlanResult, position: usize) -> &ProfilePlanEntry {
-        planned
-            .items
-            .get(position)
-            .unwrap_or_else(|| panic!("the rehearsal reports an entry at {position}"))
-    }
-
-    #[test]
-    fn test_plan_reconfigure_profiles_from_sources_answers_every_occurrence_shape_truthfully() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        static_package(&temp, "base");
-        let root = dependent_variable_package(&temp, "leaf", "base");
-        apply_package(&executor, &root, &supplied_values(&[]));
-
-        // One selection naming the same root twice, carrying a value only that
-        // root resolves: its dependency has nothing to publish, the first
-        // occurrence would publish, and the repeat observes that publication.
-        let planned = executor
-            .plan_reconfigure_profiles_from_sources(
-                &[
-                    ProfileSelector::id("leaf").unwrap(),
-                    ProfileSelector::id("leaf").unwrap(),
-                ],
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            planned
-                .items
-                .iter()
-                .map(|entry| entry.id.as_str())
-                .collect::<Vec<_>>(),
-            vec!["base", "leaf", "leaf"],
-            "closure members precede the roots, and each root occurrence is kept"
-        );
-
-        // A closure member with nothing to publish still reports the targets it
-        // decides, each decided unchanged.
-        let dependency = entry_at(&planned, 0);
-        assert_eq!(dependency.status, ProfilePlanStatus::Unchanged);
-        assert!(
-            dependency
-                .targets
-                .iter()
-                .all(|target| target.action == ProfileTargetAction::Unchanged),
-            "a profile that would publish nothing decides no change: {:?}",
-            dependency.targets
-        );
-        assert!(
-            dependency
-                .targets
-                .iter()
-                .any(|target| target.path == "docs/base.txt"),
-            "a closure member still answers for the targets it decides"
-        );
-
-        // The occurrence that carries the publication reports it.
-        let publishing = entry_at(&planned, 1);
-        assert_eq!(publishing.status, ProfilePlanStatus::WouldApply);
-        assert!(
-            publishing
-                .targets
-                .iter()
-                .any(|target| target.path == "docs/leaf.txt"
-                    && target.action != ProfileTargetAction::Unchanged),
-            "the first occurrence reports the change it would publish: {:?}",
-            publishing.targets
-        );
-
-        // The repeat observes that same publication and claims none of it.
-        let repeat = entry_at(&planned, 2);
-        assert_eq!(repeat.status, ProfilePlanStatus::Unchanged);
-        assert!(
-            repeat.targets.is_empty(),
-            "an observation that publishes nothing lists no target decision: {:?}",
-            repeat.targets
-        );
-        assert_eq!(
-            (repeat.id.as_str(), repeat.version.as_str()),
-            (publishing.id.as_str(), publishing.version.as_str()),
-            "a repeat still names its profile and its version"
-        );
-    }
-
-    #[test]
-    fn test_plan_reconfigure_profiles_from_sources_rehearses_every_profile_the_run_reports() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        let dependency = package_declaring(&temp, "packages/base", "base", &[]);
-        let root = package_declaring(&temp, "packages/leaf", "leaf", &["base"]);
-        apply_package(&executor, &root, &supplied_values(&[]));
-
-        let planned = executor
-            .plan_reconfigure_profiles_from_sources(
-                &installed_selector("leaf"),
-                &supplied_values(&[]),
-            )
-            .unwrap();
-        let published = executor
-            .reconfigure_profiles_from_sources(&installed_selector("leaf"), &supplied_values(&[]))
-            .unwrap();
-
-        assert_eq!(
-            planned
-                .items
-                .iter()
-                .map(|entry| entry.id.as_str())
-                .collect::<Vec<_>>(),
-            published
-                .items
-                .iter()
-                .map(|result| result.id.as_str())
-                .collect::<Vec<_>>(),
-            "a rehearsal reports the profiles its run reports, in that order"
-        );
-        assert!(
-            planned_paths(&planned, dependency.model().id.as_str()).contains("docs/base.txt"),
-            "a dependency the selection settles has its own decisions rehearsed"
-        );
-        assert!(
-            !planned_paths(&planned, root.model().id.as_str()).contains("docs/base.txt"),
-            "the root does not claim its dependency's decisions"
-        );
-    }
-
-    #[test]
-    fn test_plan_reconfigure_profiles_from_sources_reports_each_profile_status_independently() {
-        let (temp, _storage, executor, _fixture) = fixture();
-        // Only one of the two profiles declares the variable being supplied, so
-        // one has work to publish and the other cannot.
-        let variable = shared_target_package(&temp, "alpha", "one body, two owners\n");
-        let fixed = package_publishing(
-            &temp,
-            "packages/beta",
-            "beta",
-            "docs/beta-own.txt",
-            "no variable reaches this\n",
-        );
-        apply_package(&executor, &variable, &supplied_values(&[]));
-        apply_package(&executor, &fixed, &supplied_values(&[]));
-
-        let planned = executor
-            .plan_reconfigure_profiles_from_sources(
-                &[
-                    ProfileSelector::id("alpha").unwrap(),
-                    ProfileSelector::id("beta").unwrap(),
-                ],
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap();
-
-        let status_of = |id: &str| {
-            planned
-                .items
-                .iter()
-                .find(|entry| entry.id == id)
-                .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
-                .status
-        };
-        assert_eq!(
-            status_of("alpha"),
-            ProfilePlanStatus::WouldApply,
-            "the profile the supplied value reaches would publish"
-        );
-        assert_eq!(
-            status_of("beta"),
-            ProfilePlanStatus::Unchanged,
-            "a profile with nothing to publish is not reported as changing \
-             because a peer in the same selection would"
-        );
-        let unchanged_root = planned
-            .items
-            .iter()
-            .find(|entry| entry.id == "beta")
-            .expect("the rehearsal reports an entry for beta");
-        assert!(
-            !unchanged_root.targets.is_empty()
-                && unchanged_root
-                    .targets
-                    .iter()
-                    .all(|target| target.action == ProfileTargetAction::Unchanged),
-            "a first occurrence still answers for the targets it decides, each \
-             decided unchanged: {:?}",
-            unchanged_root.targets
-        );
-    }
-
-    #[test]
-    fn test_plan_reconfigure_profiles_from_sources_reports_the_decisions_the_run_publishes() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-        let options = supplied_values(&[("GREETING", "supplied")]);
-
-        let planned = executor
-            .plan_reconfigure_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &options)
-            .unwrap();
-
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a rehearsal writes no file and leaves every applied record byte-identical"
-        );
-        assert_eq!(
-            lifecycle_event_count(&storage),
-            events_before,
-            "a rehearsal audits nothing"
-        );
-        assert_eq!(planned.count(), planned.items.len());
-        assert_eq!(
-            planned.items[0].status,
-            ProfilePlanStatus::WouldApply,
-            "a rehearsal over changed values reports work to publish"
-        );
-
-        executor
-            .reconfigure_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &options)
-            .unwrap();
-
-        assert_planned_targets_match_published(&before, &repository_files(&temp), &planned);
-    }
-
-    #[test]
-    fn test_plan_upgrade_profiles_from_sources_reports_the_decisions_the_run_publishes() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        authored_manifest_package(
-            &temp,
-            LIFECYCLE_LOCATION,
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{LIFECYCLE_ID}\"\n\
-                 version = \"2.0.0\"\ncompatible-jit = \"*\"\n\n\
-                 [[variable]]\nname = \"GREETING\"\ndefault = \"authored\"\n\n\
-                 [[asset]]\nsource = \"assets/templated.txt\"\n\
-                 target = \"docs/templated.txt\"\ntemplate = true\n\n\
-                 [[asset]]\nsource = \"assets/fixed.txt\"\ntarget = \"docs/fixed.txt\"\n"
-            ),
-            &[
-                ("assets/templated.txt", "greeting={{jit:var:GREETING}}\n"),
-                ("assets/fixed.txt", "the new version's fixed content\n"),
-            ],
-        );
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let planned = executor
-            .plan_upgrade_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[]),
-            )
-            .unwrap();
-
-        assert_eq!(
-            repository_files(&temp),
-            before,
-            "a rehearsal writes no file and leaves every applied record byte-identical"
-        );
-        assert_eq!(lifecycle_event_count(&storage), events_before);
-        assert_eq!(planned.count(), planned.items.len());
-        assert_eq!(planned.items[0].status, ProfilePlanStatus::WouldApply);
-
-        executor
-            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
-            .unwrap();
-
-        assert_planned_targets_match_published(&before, &repository_files(&temp), &planned);
-    }
-
-    #[test]
-    fn test_profile_lifecycle_run_audits_one_event_naming_its_operation_and_profile_status() {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        let after_apply = lifecycle_event_count(&storage);
-
-        executor
-            .reconfigure_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap();
-
-        assert_eq!(lifecycle_event_count(&storage), after_apply + 1);
-        assert_eq!(
-            last_lifecycle_event(&storage),
-            (
-                ProfileLifecycleOperation::Reconfigure,
-                vec![(
-                    LIFECYCLE_ID.to_string(),
-                    ProfileLifecycleStatus::Reconfigured
-                )]
-            )
-        );
-
-        lifecycle_package(&temp, "2.0.0");
-        executor
-            .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
-            .unwrap();
-
-        assert_eq!(lifecycle_event_count(&storage), after_apply + 2);
-        assert_eq!(
-            last_lifecycle_event(&storage),
-            (
-                ProfileLifecycleOperation::Upgrade,
-                vec![(LIFECYCLE_ID.to_string(), ProfileLifecycleStatus::Upgraded)]
-            )
-        );
-    }
-
-    #[test]
-    fn test_reconfigure_profiles_from_sources_refuses_a_package_that_replaced_its_installed_identity(
-    ) {
-        let (temp, storage, executor, _fixture) = fixture();
-        let package = lifecycle_package(&temp, "1.0.0");
-        apply_package(&executor, &package, &supplied_values(&[]));
-        lifecycle_package(&temp, "2.0.0");
-        let before = repository_files(&temp);
-        let events_before = lifecycle_event_count(&storage);
-
-        let error = executor
-            .reconfigure_profiles_from_sources(
-                &installed_selector(LIFECYCLE_ID),
-                &supplied_values(&[("GREETING", "supplied")]),
-            )
-            .unwrap_err();
-
-        assert!(
-            matches!(
-                error.downcast_ref::<ProfileApplyError>(),
-                Some(ProfileApplyError::ReconfigurationPackageChanged { id, .. })
-                    if id == LIFECYCLE_ID
-            ),
-            "reconfiguration never switches package identity: {error:#}"
-        );
-        assert_eq!(repository_files(&temp), before);
-        assert_eq!(lifecycle_event_count(&storage), events_before);
     }
 
     /// A manifest declaring two live assets drawn from repository files, one
@@ -8124,15 +6532,11 @@ target = "docs/guide.md"
     }
 
     /// The whole loop an adopter walks: a contributed value changed in place,
-    /// captured into the package that published it, and re-applied. Both the
-    /// profile check and whole-repository validation then agree the repository
-    /// needs nothing.
+    /// captured into the package that published it, and re-applied.
     #[test]
-    fn test_apply_profile_package_agrees_after_a_capture_of_a_contribution_edited_in_place() {
+    fn test_apply_profile_package_reconciles_after_a_capture_of_a_contribution_edited_in_place() {
         let (temp, _storage, executor, _fixture) = fixture();
         let location = applied_then_edited_contribution(&temp, &executor);
-        assert!(!recorded_divergences_naming(&executor, REFRESH_NAMESPACE).is_empty());
-
         executor
             .capture_profile_package(
                 temp.path(),
@@ -8151,10 +6555,6 @@ target = "docs/guide.md"
             ProfileApplicationStatus::Applied,
             "re-applying the captured package reconciled nothing"
         );
-        assert_eq!(
-            recorded_divergences_naming(&executor, REFRESH_NAMESPACE),
-            Vec::<String>::new()
-        );
         // The registry keeps the adopter's value: the package agreed with the
         // repository rather than the repository being overwritten.
         assert!(fs::read_to_string(temp.path().join(".jit/config.toml"))
@@ -8162,11 +6562,10 @@ target = "docs/guide.md"
             .contains(ADOPTED_WORDING));
     }
 
-    /// A contributed value changed in place is one repository state, so the
-    /// report an adopter consults and the profile check say the same
-    /// declaration needs attention.
+    /// A contributed value changed in place is reported as a conflict, and the
+    /// publication refuses the same declaration.
     #[test]
-    fn test_diff_profiles_from_sources_agrees_with_the_profile_check_on_an_edited_contribution() {
+    fn test_diff_profiles_from_sources_reports_an_edited_contribution_as_a_conflict() {
         let (temp, _storage, executor, _fixture) = fixture();
         let location = applied_then_edited_contribution(&temp, &executor);
 
@@ -8185,13 +6584,9 @@ target = "docs/guide.md"
         assert_eq!(
             reported_contribution_actions(entry, REFRESH_NAMESPACE),
             vec![ProfileTargetAction::Conflict],
-            "the report called a declaration clean that the profile check fails on"
+            "the report called an edited declaration clean"
         );
         assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
-        assert_eq!(
-            recorded_divergences_naming(&executor, REFRESH_NAMESPACE).len(),
-            1
-        );
         // The refusal the report states is the refusal a publication makes.
         let refused = executor
             .apply_profile_package(
@@ -8426,21 +6821,6 @@ target = "docs/guide.md"
         );
     }
 
-    /// Agreement reads only the claimed targets named by applied records, so
-    /// their adopter-authored bytes are not a discovery dimension to bound.
-    #[test]
-    fn test_claim_capture_budget_does_not_limit_named_target_payloads() {
-        let target = VirtualPath::worktree("deeply/nested/claimed/target.txt").unwrap();
-        let budget = claim_capture_budget(std::slice::from_ref(&target));
-        assert_eq!(
-            budget.max_bytes,
-            record_capture_budget().max_bytes,
-            "named target payloads have the record reading's unbounded ceiling"
-        );
-        assert_eq!(budget.max_listings, 1);
-        assert_eq!(budget.max_depth, target.relative().depth());
-    }
-
     /// Applied records are exact paths named by their one listing, so adopter-
     /// supplied resolved values do not become a discovery dimension to bound.
     #[test]
@@ -8459,153 +6839,6 @@ target = "docs/guide.md"
                 .relative()
                 .depth(),
             "a record sits at the path the engine publishes it at"
-        );
-    }
-
-    /// A resolved variable is adopter input carried by the applied record, not
-    /// package content. A valid record may therefore be larger than its package
-    /// while remaining readable through every record-backed command.
-    #[test]
-    fn test_profile_agreement_reads_a_record_larger_than_the_package_model_budget() {
-        const ID: &str = "large-record";
-
-        let (temp, _storage, executor, _fixture) = fixture();
-        let package = authored_manifest_package(
-            &temp,
-            "packages/large-record",
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{ID}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n[[variable]]\nname = \"ADOPTER_VALUE\"\n\
-                 default = \"authored\"\n"
-            ),
-            &[],
-        );
-        let adopter_value = "v".repeat(crate::profile::MAX_PROFILE_PACKAGE_BYTES + 1);
-
-        apply_package(
-            &executor,
-            &package,
-            &supplied_values(&[("ADOPTER_VALUE", adopter_value.as_str())]),
-        );
-        assert!(
-            fs::metadata(temp.path().join(format!(".jit/profiles/{ID}.json")))
-                .expect("the applied record exists")
-                .len()
-                > crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
-            "the regression record must exceed any package-derived byte ceiling"
-        );
-
-        let resolved = executor
-            .resolve_profile_package(&ProfileSelector::id(ID).expect("a canonical profile id"))
-            .expect("the direct named-record reader accepts adopter-sized payloads");
-        assert_eq!(resolved.model().id.as_str(), ID);
-        let agreement = executor
-            .validate_recorded_profiles()
-            .expect("a named applied record remains readable regardless of its payload size");
-        assert!(
-            agreement.items[0].divergences.items.is_empty(),
-            "{agreement:?}"
-        );
-    }
-
-    /// Template expansion can make a claimed repository target larger than
-    /// both the package sources and the applied record that names it.
-    #[test]
-    fn test_profile_agreement_reads_a_claimed_target_larger_than_the_package_model_budget() {
-        const ID: &str = "large-target";
-        const TARGET: &str = "docs/expanded.txt";
-
-        let (temp, _storage, executor, _fixture) = fixture();
-        let package = authored_manifest_package(
-            &temp,
-            "packages/large-target",
-            &format!(
-                "[profile]\nmanifest-version = 2\nid = \"{ID}\"\nversion = \"1.0.0\"\n\
-                 compatible-jit = \"*\"\n\n[[variable]]\nname = \"EXPANSION\"\n\
-                 default = \"authored\"\n\n[[asset]]\nsource = \"assets/template.txt\"\n\
-                 target = \"{TARGET}\"\ntemplate = true\n"
-            ),
-            &[(
-                "assets/template.txt",
-                "{{jit:var:EXPANSION}}{{jit:var:EXPANSION}}{{jit:var:EXPANSION}}",
-            )],
-        );
-        let expansion = "x".repeat(crate::profile::MAX_PROFILE_PACKAGE_BYTES / 2);
-
-        apply_package(
-            &executor,
-            &package,
-            &supplied_values(&[("EXPANSION", expansion.as_str())]),
-        );
-        assert!(
-            fs::metadata(temp.path().join(TARGET))
-                .expect("the expanded target exists")
-                .len()
-                > crate::profile::MAX_PROFILE_PACKAGE_BYTES as u64,
-            "the regression target must exceed any package-derived byte ceiling"
-        );
-
-        let agreement = executor
-            .validate_recorded_profiles()
-            .expect("a named claimed target remains readable regardless of its payload size");
-        assert!(
-            agreement.items[0].divergences.items.is_empty(),
-            "{agreement:?}"
-        );
-    }
-
-    /// The reading the agreement check actually asks for — the record listing,
-    /// one record per recorded profile, and a claimed target as deep as a
-    /// manifest may declare one — is a reading its budget admits.
-    ///
-    /// This is the shape a bound stating a path depth refuses: a record claiming
-    /// a target the package model admits, left unreadable by the check that is
-    /// supposed to judge it.
-    #[test]
-    fn test_claim_capture_budget_admits_the_reading_the_agreement_check_asks_for() {
-        /// Directory levels a declared asset target may sit below, beyond what
-        /// a bound assuming a shallow repository would allow.
-        const DEPTH: usize = 64;
-        /// Profiles the repository under test records, beyond what a bound
-        /// stating a profile count would allow.
-        const RECORDED: usize = 100;
-
-        let deep = |profile: usize| {
-            RootRelativePath::parse(
-                (0..DEPTH)
-                    .map(|level| format!("d{level}/"))
-                    .chain(std::iter::once(format!("published-{profile}.txt")))
-                    .collect::<String>(),
-            )
-            .expect("a safe relative path")
-        };
-
-        let deepest_claim = VirtualPath::from_root(RepositoryRootClass::Worktree, deep(0))
-            .expect("a worktree target");
-        let undeclared = VirtualPath::worktree("not/claimed.txt").unwrap();
-        let mut spec = CaptureSpec::new(
-            [],
-            claim_capture_budget(std::slice::from_ref(&deepest_claim)),
-        )
-        .expect("the agreement capture begins with the records it discovers");
-        spec.discover_listing(VirtualPath::PROFILES)
-            .expect("the records are read through the listing that names them");
-        spec.discover_paths((0..RECORDED).flat_map(|profile| {
-            [
-                applied_record_path(&format!("workflow-{profile}"))
-                    .expect("a canonical record path"),
-                VirtualPath::from_root(RepositoryRootClass::Worktree, deep(profile))
-                    .expect("a worktree target"),
-            ]
-        }))
-        .expect("the agreement budget admits the claims a recorded repository can hold");
-        assert!(
-            spec.contains_path(&deepest_claim),
-            "the declared claimed target is in the capture"
-        );
-        assert!(
-            !spec.contains_path(&undeclared),
-            "an unbounded named-path payload budget must not widen path membership"
         );
     }
 

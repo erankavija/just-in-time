@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "40aaec18110192b240b41ca6709ea92b8e6b09a1",
+  "completed_at": "2026-10-21T11:12:36.507396659Z",
+  "duration_ms": 315715,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/mod.rs",
+        "id": "F1",
+        "line": 2580,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/semantic-types"
+        ],
+        "severity": "high",
+        "summary": "Field update, dependency, and template paths capture issue records before rejecting a too-short id prefix."
+      }
+    ],
+    "summary": "Short issue prefixes still trigger issue-record reads in several mutation commands.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "16d63038-c08b-4d2d-9a77-1a75fe48ef20",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ba305096-f0a4-47c3-8a28-ab3e8c126d42",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:07:20.791683584Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 22664 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e24-eddd-72d0-8165-ed52ef406129\n--------\nuser\n--- 22651 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: aecbd2f3d, fe22639f3, 1d8eca5b9 (jit:16d63038)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/semantic-types, @/invariant/convention-convergence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T11:06:11Z); code-review pending\nTruncation recovery: partitioned tagged patches by path; inspected focused current call sites and merge diff\n\n1. **F1 — blocking, issue-impact:** REQ-02 is still violated. Field updates capture and parse every issue before resolving `request.issue_id` ([commands/mod.rs:2580](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:2580)); dependency mutations do the same before resolving source/dependency ids ([dependency.rs:268](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/dependency.rs:268)); template application lists and captures all issue records before resolving its container id ([template.rs:390](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/template.rs:390)). A sub-four-character input can therefore read—and fail on—an issue record before returning `InvalidIdPrefixError`. Parse every supplied issue-id argument at the command boundary before capture, including dependency batches and template anchors. References: @/invariant/semantic-types.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Short issue prefixes still trigger issue-record reads in several mutation commands.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Field update, dependency, and template paths capture issue records before rejecting a too-short id prefix.\",\"file\":\"crates/jit/src/commands/mod.rs\",\"line\":2580,\"references\":[\"@/invariant/semantic-types\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

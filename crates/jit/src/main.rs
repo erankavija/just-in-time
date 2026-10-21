@@ -550,10 +550,9 @@ struct ProfileLifecycleInvocation<'a> {
 /// Dispatch one profile lifecycle command through its rehearsal or its
 /// publication.
 ///
-/// The three lifecycle commands differ only in which executor entry points they
-/// call and in the verb they name a changed profile with; selector parsing,
-/// rehearsal branching, error classification, and rendering are one contract
-/// over all of them.
+/// Selector parsing, rehearsal branching, error classification, and rendering
+/// are one contract over the executor entry points and changed-profile verb the
+/// caller supplies.
 fn run_profile_lifecycle<Plan, Apply>(
     executor: &CommandExecutor<JsonFileStorage>,
     invocation: ProfileLifecycleInvocation<'_>,
@@ -703,8 +702,7 @@ fn profile_target_action_label(action: jit::profile::ProfileTargetAction) -> &'s
 
 /// Render the difference report and terminate on an unpublishable decision.
 ///
-/// The report is the answer either way, exactly as the profile-agreement check
-/// is: a conflicting decision is stated in full before the process exits, and
+/// The report is the answer either way, a conflicting decision is stated in full before the process exits, and
 /// the exit status carries the repository-check contract — `0` when every
 /// participating profile can be published, [`ExitCode::ValidationFailed`] when
 /// one cannot. Nothing is written in either case.
@@ -760,68 +758,6 @@ fn print_profile_applications(
 fn profile_origin_label(origin: &jit::profile::ProfileOrigin) -> String {
     let jit::profile::ProfileOrigin::Directory(location) = origin;
     format!("directory {}", location.as_path().display())
-}
-
-/// Render the profile-agreement report and terminate on divergence.
-///
-/// The report is the answer either way: a diverged profile is reported in full
-/// before the process exits, so a caller reading `--json` gets the same envelope
-/// whether or not anything diverged, carried by the shared typed error shape
-/// when it did. The exit status is the repository-check contract — `0` when
-/// every recorded profile agrees, [`ExitCode::ValidationFailed`] when one did
-/// not — and nothing is written in either case.
-fn render_profile_agreement(
-    result: &jit::profile::ProfileAgreementResult,
-    json: bool,
-) -> Result<()> {
-    let diverged = result.diverged().count();
-    if json {
-        let details = serde_json::to_value(result)?;
-        if diverged == 0 {
-            let message = format!("{} recorded profile(s) agree", result.count());
-            let output = JsonOutput::success(details).with_message(message);
-            println!("{}", output.to_json_string()?);
-            return Ok(());
-        }
-        // Every fact `details` carries is the same typed report a plain-text
-        // divergence line names; the suggestions beside it are the distinct
-        // resolutions those divergences' remedies carry, naming capture only
-        // where a remedy allows it.
-        let message = format!(
-            "{diverged} of {} recorded profile(s) diverged",
-            result.count()
-        );
-        let output = JsonError::new(ErrorCode::ValidationFailed, message)
-            .with_details(details)
-            .with_suggestions(result.suggestions());
-        println!("{}", output.to_json_string()?);
-        std::process::exit(output.exit_code().code());
-    }
-
-    for profile in &result.items {
-        print_profile_heading(
-            &profile.id,
-            &profile.version,
-            &profile.origin,
-            if profile.agrees() {
-                "✓ agrees"
-            } else {
-                "✗ diverged"
-            },
-        );
-        for divergence in &profile.divergences.items {
-            println!("    {}", divergence.message());
-        }
-    }
-    if diverged == 0 {
-        println!("✓ {} recorded profile(s) agree", result.count());
-        return Ok(());
-    }
-    eprintln!(
-        "{diverged} of {} recorded profile(s) diverged",
-        result.count()
-    );
-    std::process::exit(jit::ExitCode::ValidationFailed.code());
 }
 
 fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T> {
@@ -2115,7 +2051,7 @@ fn run() -> Result<()> {
                 println!("{}", output.to_json_string()?);
             }
         }
-        Commands::Profile(ProfileCommands::List { .. } | ProfileCommands::Show { .. }) => {}
+        Commands::Profile(ProfileCommands::Show { .. }) => {}
         _ => {
             // Validate repository exists for all commands except init
             storage.validate()?;
@@ -2152,33 +2088,6 @@ fn run() -> Result<()> {
             // Already handled above
         }
         Commands::Profile(profile_cmd) => match profile_cmd {
-            ProfileCommands::List { json } => match executor.list_recorded_profiles() {
-                Ok(result) => {
-                    if json {
-                        let output = JsonOutput::success(&result);
-                        println!("{}", output.to_json_string()?);
-                    } else {
-                        for profile in result.items {
-                            print_profile_heading(
-                                &profile.id,
-                                &profile.version,
-                                &profile.origin,
-                                if profile.applied {
-                                    "applied"
-                                } else {
-                                    "not applied"
-                                },
-                            );
-                        }
-                    }
-                }
-                Err(error) if json => {
-                    let json_error = profile_json_error(&error)?;
-                    println!("{}", json_error.to_json_string()?);
-                    std::process::exit(json_error.exit_code().code());
-                }
-                Err(error) => return Err(error),
-            },
             ProfileCommands::Show { id, profile, json } => {
                 let selectors = parse_profile_show_selectors(id.as_deref(), &profile, json)?;
                 match executor.show_profiles(&selectors) {
@@ -2221,15 +2130,6 @@ fn run() -> Result<()> {
                     Err(error) => return Err(error),
                 }
             }
-            ProfileCommands::Validate { json } => match executor.validate_recorded_profiles() {
-                Ok(result) => render_profile_agreement(&result, json)?,
-                Err(error) if json => {
-                    let json_error = profile_json_error(&error)?;
-                    println!("{}", json_error.to_json_string()?);
-                    std::process::exit(json_error.exit_code().code());
-                }
-                Err(error) => return Err(error),
-            },
             ProfileCommands::Diff {
                 profile,
                 values_file,
@@ -2435,46 +2335,6 @@ fn run() -> Result<()> {
                     Err(error) => return Err(error),
                 }
             }
-            ProfileCommands::Reconfigure {
-                profile,
-                values_file,
-                set,
-                dry_run,
-                json,
-            } => run_profile_lifecycle(
-                &executor,
-                ProfileLifecycleInvocation {
-                    command: "profile reconfigure",
-                    changed_status: "reconfigured",
-                    profile: &profile,
-                    values_file,
-                    set: &set,
-                    dry_run,
-                    json,
-                },
-                CommandExecutor::plan_reconfigure_profiles_from_sources,
-                CommandExecutor::reconfigure_profiles_from_sources,
-            )?,
-            ProfileCommands::Upgrade {
-                profile,
-                values_file,
-                set,
-                dry_run,
-                json,
-            } => run_profile_lifecycle(
-                &executor,
-                ProfileLifecycleInvocation {
-                    command: "profile upgrade",
-                    changed_status: "upgraded",
-                    profile: &profile,
-                    values_file,
-                    set: &set,
-                    dry_run,
-                    json,
-                },
-                CommandExecutor::plan_upgrade_profiles_from_sources,
-                CommandExecutor::upgrade_profiles_from_sources,
-            )?,
         },
         Commands::Rdeps { .. } | Commands::List { .. } => {
             unreachable!("top-level rdeps/list are normalized to canonical commands above")

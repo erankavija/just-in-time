@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "36f7875961781595c795e54ebb30ce6ee2356d88",
+  "completed_at": "2026-10-21T11:20:13.836078672Z",
+  "duration_ms": 264759,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard criteria are met; latest cargo-ci and mcp-ci evidence passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "719a5501-d611-4a81-8728-1634a8c35b7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c639fc86-2358-44f3-aaa1-ac80ea537e7d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:15:49.076460889Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 3f271b6d7, 40aaec181, b3393b9ce (`jit:719a5501`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/719a5501/requirement/REQ-01..REQ-04 and @/issue/df129d9e/requirement/REQ-09, REQ-15, REQ-20 (issue descriptions); @/charter/D-18, D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (2026-10-21T11:07:20Z); mcp-ci passed, exit 0 (2026-10-21T11:15:39Z); prior code-review F1 is superseded by the newer MCP pass\nTruncation recovery: narrowed the truncated merge and record patches to affected paths; excluded gate-run artifacts as past records\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard criteria are met; latest cargo-ci and mcp-ci evidence passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

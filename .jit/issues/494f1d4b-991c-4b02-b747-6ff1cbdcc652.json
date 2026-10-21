@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:16:02.369572624Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
   "labels": [
     "epic:lead-friction",
@@ -25,5 +31,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Report load-only cargo-ci failures as infrastructure faults",
-  "updated_at": "2026-10-21T10:58:31.678140353Z"
+  "updated_at": "2026-10-21T11:16:02.369572624Z"
 }

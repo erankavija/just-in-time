@@ -438,12 +438,8 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
         .downcast_ref::<crate::errors::NotFoundError>()
         .is_some()
     {
-        return Ok(
-            command_json_error(error, ErrorCode::ProfileNotFound).with_suggestion(
-                "Select a package with --profile path:DIR, or run \
-                 'jit profile list --json' to see the profiles this repository records",
-            ),
-        );
+        return Ok(command_json_error(error, ErrorCode::ProfileNotFound)
+            .with_suggestion("Select a package with --profile path:DIR"));
     }
     if error
         .downcast_ref::<crate::profile::ProfileClaimError>()

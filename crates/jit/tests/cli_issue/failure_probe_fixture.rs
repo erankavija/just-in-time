@@ -623,12 +623,6 @@ impl FailureFixture {
                 fs::write(self.root().join(".jit/gates.toml"), "[[gates]")
                     .expect("write malformed gate registry");
             }
-            SetupStep::MalformedProfileRecord => {
-                let profiles = self.root().join(".jit/profiles");
-                fs::create_dir_all(&profiles).expect("create profile registry directory");
-                fs::write(profiles.join("jit-dogfood.json"), "{")
-                    .expect("write malformed profile record");
-            }
             SetupStep::MalformedServerPid => {
                 fs::write(self.root().join(".jit/server.pid.json"), "{")
                     .expect("write malformed server PID file");
@@ -778,7 +772,6 @@ enum SetupStep {
     MalformedConfig,
     MalformedEventsLog,
     MalformedGateRegistry,
-    MalformedProfileRecord,
     MalformedServerPid,
     MalformedClaimIndex,
     MalformedWorktreeIdentity,
@@ -815,7 +808,6 @@ impl SetupStep {
             "malformed-config-toml" => Ok(Self::MalformedConfig),
             "malformed-events-log" => Ok(Self::MalformedEventsLog),
             "malformed-gate-registry" => Ok(Self::MalformedGateRegistry),
-            "malformed-profile-record" => Ok(Self::MalformedProfileRecord),
             "malformed-server-pid-file" => Ok(Self::MalformedServerPid),
             "malformed-claim-index" => Ok(Self::MalformedClaimIndex),
             "malformed-worktree-identity" => Ok(Self::MalformedWorktreeIdentity),
@@ -861,7 +853,6 @@ impl SetupStep {
             | Self::MalformedConfig
             | Self::MalformedEventsLog
             | Self::MalformedGateRegistry
-            | Self::MalformedProfileRecord
             | Self::MalformedServerPid
             | Self::MalformedClaimIndex
             | Self::MalformedWorktreeIdentity

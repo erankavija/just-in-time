@@ -12,7 +12,7 @@
           "title": "Accept the worktree root as a gate input root",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 1 (docfix1): doc-review F1 custom-gates internal detail; code-review passed"
+          "status": "done"
         },
         {
           "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
@@ -20,7 +20,7 @@
           "title": "Record a checker infrastructure fault as an error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 (docfix1): doc-review F1 storage-records exit 75; code-review passed"
+          "status": "done (rework 2 by lead: storage-records/custom-gates duplicate)"
         },
         {
           "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
@@ -28,7 +28,7 @@
           "title": "Derive an issue's documents from its artifact directory",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 1 (docfix1): doc-review F1 doc show reference; code-review passed"
+          "status": "done"
         },
         {
           "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
@@ -36,7 +36,7 @@
           "title": "Remove profile checks from repository validation",
           "classification": "implementation",
           "model": "haiku",
-          "status": "rework 1 (opus, combined docfix1 worktree): code-review F1 stale validation-provenance prose"
+          "status": "done (rework 2 by lead: rustdoc)"
         },
         {
           "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
@@ -80,7 +80,7 @@
           "title": "Declare this repository's tree-wide gate inputs as the worktree root",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged by lead 92a565df5 + test fix 1096a1179; REQ-04 demo db922866->809e03c1 reused; repo-validate/code-review running"
         },
         {
           "id": "39710b3b-2b92-4fc1-bbc2-4c230577e350",
@@ -104,7 +104,7 @@
           "title": "Remove redundant explicit links inside artifact directories",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "done (lead data edit 47dcf8560)"
         },
         {
           "id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
@@ -112,7 +112,7 @@
           "title": "Gate status reports a manual attestation as never run",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched (opus) at 77cfcd1f4"
         },
         {
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
@@ -120,7 +120,7 @@
           "title": "Remove the record-reading profile subcommands",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged 77cfcd1f4 (conflict resolved on branch); cargo-ci passed; mcp-ci failed: gate judges installed binary (escalated); code-review running"
         },
         {
           "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
@@ -499,17 +499,27 @@
     {
       "topic": "df129d9e run-status renderer task requires removed '(already passed at HEAD)' output",
       "resolution": "reported to steward; pending"
+    },
+    {
+      "topic": "dogfood binary reinstall for 5a3a886f",
+      "resolution": "steward reinstalled from 582b1cc92"
+    },
+    {
+      "topic": "mcp-ci judges installed jit binary, not the tree",
+      "resolution": "pending steward (options: reinstall per CLI change, or build+PATH in checker)"
     }
   ],
   "surfaced_pitfalls": [
     "66986f88: JIT_ISSUE_DOCS for gates, `issue show`, and the issue JSON the web UI reads still list explicit links only; derived documents are invisible there. Reconcile against epic REQ-03 before the epic gate.",
     "ae2e3739: server.log and server.pid.json are not in the tracker-written set (the issue list omits them); a running server changes a `.` gate's digest. Relevant to 5a3a886f.",
     "d6bbe05f: docs/reference/profiles.md 'Derived state and managed regions' still describes validation over profile-owned targets; ae85c6ce rewrites it.",
-    "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root."
+    "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root.",
+    "materialize.rs: MaterializationRequest::RepairDerivedState.profiles, the derive_repair profile loop and AmbiguousOwnershipError::MultipleProfileClaims are dead after d6bbe05f; delete with records in 5179374d.",
+    "cli_warnings_integration_tests take ~6.3 s each alone and time out (20 s) under concurrency; recurring 'load' failures."
   ],
   "rework_counts": {
-    "d6bbe05f": 1,
-    "fd9bfab8": 1,
+    "d6bbe05f": 2,
+    "fd9bfab8": 2,
     "ae2e3739": 1,
     "66986f88": 1
   },

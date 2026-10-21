@@ -112,39 +112,6 @@ fn test_profile_lifecycle_completes_without_git() {
     assert_eq!(requested_profile(&lifecycle)["status"], "applied");
 
     let lifecycle_id_selector = id_selector(lifecycle_id);
-    let reconfigured = successful_lifecycle_json(
-        repo,
-        "reconfigure lifecycle package",
-        &[
-            "profile",
-            "reconfigure",
-            "--profile",
-            &lifecycle_id_selector,
-            "--set",
-            "GREETING=gitless",
-            "--json",
-        ],
-    );
-    assert_eq!(only_profile(&reconfigured)["status"], "applied");
-    assert_eq!(
-        fs::read_to_string(repo.join(format!("docs/{lifecycle_id}-templated.txt")))
-            .expect("read reconfigured target"),
-        "greeting=gitless\n"
-    );
-
-    write_lifecycle_package(repo, "packages/lifecycle", lifecycle_id, "2.0.0");
-    let upgraded = successful_lifecycle_json(
-        repo,
-        "upgrade lifecycle package",
-        &[
-            "profile",
-            "upgrade",
-            "--profile",
-            &lifecycle_id_selector,
-            "--json",
-        ],
-    );
-    assert_eq!(only_profile(&upgraded)["version"], "2.0.0");
 
     capture_sources(repo, "packages/capture-source");
     let captured = successful_lifecycle_json(
@@ -225,15 +192,5 @@ fn test_profile_lifecycle_completes_without_git() {
     assert_eq!(difference["count"], 1);
     assert_eq!(difference["profiles"][0]["id"], lifecycle_id);
 
-    let agreement = successful_lifecycle_json(
-        repo,
-        "check applied profiles",
-        &["profile", "validate", "--json"],
-    );
-    assert!(agreement["profiles"]
-        .as_array()
-        .expect("profile check reports profiles")
-        .iter()
-        .all(|profile| profile["divergences"] == serde_json::json!([])));
     successful_lifecycle_json(repo, "validate repository", &["validate", "--json"]);
 }

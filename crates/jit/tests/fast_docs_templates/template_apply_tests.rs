@@ -1128,8 +1128,8 @@ fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
         "a workspace source the checker compiles must be a declared input"
     );
     assert!(
-        !workspace.covers(".jit/gate-runs/some-run/result.json"),
-        "the tracker's own run records, rewritten by every evaluation, must be excluded"
+        workspace.covers(".config/nextest.toml"),
+        "the test-runner configuration the CI script reads must be a declared input"
     );
 
     assert!(
@@ -1140,7 +1140,8 @@ fn test_repo_gates_toml_declares_inputs_for_tree_scoped_gates_only() {
 
 /// REQ-02 (issue 32779829): the digest consults no ignore rule, so every
 /// generated tree a gate does not read leaves its inputs because this
-/// repository's registry says so. Each assertion below fails if the pattern
+/// repository's registry says so; tracker-written records leave every digest
+/// through the engine, not through a declaration. Each assertion below fails if the pattern
 /// that removes it is dropped, and the `excludes_directory` half is what keeps
 /// the walk from traversing what it would only discard.
 #[test]
@@ -1186,8 +1187,12 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
             "gate `{key}` must skip the agent worktrees rather than walk them"
         );
         assert!(
-            !declared.covers(".jit/gate-runs/some-run/result.json"),
-            "gate `{key}` must exclude the records every evaluation rewrites"
+            declared.excludes_directory(".agents/cache-pool"),
+            "gate `{key}` must skip the shared build-cache pool"
+        );
+        assert!(
+            declared.excludes_directory("target"),
+            "gate `{key}` must skip build output"
         );
         assert!(
             declared.covers(".agents/skills/jit-manage/SKILL.md"),
@@ -1195,12 +1200,15 @@ fn test_repo_gates_toml_excludes_generated_trees_by_declaration() {
         );
     }
 
-    // The secret scan reads every tracked file, records included; only
-    // generated trees `git ls-files` never lists are excluded.
-    let secrets = inputs("secret-detection");
-    assert!(secrets.covers(".jit/issues/some-issue.json"));
-    assert!(secrets.excludes_directory(".agents/worktrees"));
-    assert!(!secrets.covers("web/node_modules/react/index.js"));
+    // The secret scan reads every tracked file, records included, and records
+    // never enter a digest, so the gate declares no inputs and scans on every
+    // evaluation.
+    assert!(registry
+        .gates
+        .get("secret-detection")
+        .expect(".jit/gates.toml must declare the `secret-detection` gate")
+        .inputs
+        .is_none());
 }
 
 #[test]
