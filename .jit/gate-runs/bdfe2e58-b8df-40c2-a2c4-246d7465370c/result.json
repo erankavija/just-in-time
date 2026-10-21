@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "85482ab9a6335f77ad0500d2006caf40d32d335f",
+  "completed_at": "2026-10-21T16:20:10.676054352Z",
+  "duration_ms": 165288,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Leaf issue removes all documented inert configuration keys; no issue-impact documentation defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bdfe2e58-b8df-40c2-a2c4-246d7465370c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:17:25.387275929Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task (type `task`, no resolved children). Reviewed four reachable `jit:af9a5509` commits individually; merge patches duplicate their branch changes. Current source and adopter docs omit the removed keys and variable. The prior review had no unresolved blockers.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Leaf issue removes all documented inert configuration keys; no issue-impact documentation defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ac2c821fe4caeecfe7685d89be2850491b6cdcda",
+  "completed_at": "2026-10-21T16:17:23.406674973Z",
+  "duration_ms": 238245,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All removal criteria are met; the prior rustdoc advisory is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6e5ca9e2-a4ad-4eaf-8205-5e83c841afca",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:13:25.161537050Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e30502eb5, bc13fc9eb, 93baabed1, ac2c821fe (uncommitted `.jit` state excluded)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover and @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/842b0ac6/requirement/REQ-03 (parent issue description)\nGate evidence: cargo-ci passed (0, 2026-10-21T16:11:44Z); doc-review passed (0, 2026-10-21T16:00:52Z); docs-mechanical passed (0, 2026-10-21T16:03:04Z)\nTruncation recovery: recovered per-path patches and merge/follow-up diffs; narrowed current-tree scans to affected source, docs, profile, and steering paths; excluded archival/benchmark records outside the impact cone\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All removal criteria are met; the prior rustdoc advisory is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

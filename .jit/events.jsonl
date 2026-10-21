@@ -18280,3 +18280,6 @@
 {"gate_key":"docs-mechanical","id":"8f297827-7415-4daa-9612-022f93861082","issue_id":"af9a5509-51c2-4a3b-9881-b870603ab71c","timestamp":"2026-10-21T16:20:37.329857590Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"dda0ae20-931b-4fa9-af13-3be8c9177294","issue_id":"f37d228e-f3dd-412f-87c7-364f64da2f07","timestamp":"2026-10-21T16:20:37.447664955Z","to":"in_progress","type":"issue_state_changed"}
 {"assignee":"agent:worker","id":"0f1dfab6-79c8-4656-ae61-7f44b9762a1f","issue_id":"f37d228e-f3dd-412f-87c7-364f64da2f07","timestamp":"2026-10-21T16:20:37.447664955Z","type":"issue_claimed"}
+{"from":"ready","id":"ac8270e7-b0e2-4133-a275-32d37965e7a7","issue_id":"af9a5509-51c2-4a3b-9881-b870603ab71c","timestamp":"2026-10-21T16:20:53.389384095Z","to":"done","type":"issue_state_changed"}
+{"id":"4b21ef75-6c12-427b-9fe6-2edc51e5fb46","issue_id":"af9a5509-51c2-4a3b-9881-b870603ab71c","timestamp":"2026-10-21T16:20:53.389384095Z","type":"issue_completed"}
+{"from":"backlog","id":"fc1ddada-ca20-465a-b9d1-5ebdcb965a9e","issue_id":"459bb995-46f9-42d3-a83c-d50d406c0f80","timestamp":"2026-10-21T16:20:53.637855538Z","to":"ready","type":"issue_state_changed"}
