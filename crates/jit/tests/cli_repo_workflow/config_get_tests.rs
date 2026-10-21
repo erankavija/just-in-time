@@ -370,3 +370,37 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
     assert_eq!(parsed["value"], serde_json::json!({}));
 }
+
+// ---------------------------------------------------------------------------
+// `jit config show` renders the snapshot `jit config get` walks.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_show_json_data_equals_every_section_config_get_resolves() {
+    let temp = TempDir::new().unwrap();
+    assert!(jit_init(temp.path()).status.success());
+    fs::write(temp.path().join(".jit/config.toml"), FULL_CONFIG_TOML).unwrap();
+
+    let json_of = |args: &[&str]| -> serde_json::Value {
+        let out = Command::new(jit_binary())
+            .args(args)
+            .arg("--json")
+            .current_dir(temp.path())
+            .output()
+            .expect("failed to run jit");
+        assert!(out.status.success(), "{args:?} failed: {out:?}");
+        serde_json::from_slice(&out.stdout).expect("valid JSON output")
+    };
+
+    let shown = json_of(&["config", "show"]);
+    let sections = shown.as_object().expect("show output is an object");
+    assert!(sections.len() > 1);
+    // `message` is the response envelope's, not a configuration section.
+    for (section, value) in sections.iter().filter(|(key, _)| *key != "message") {
+        assert_eq!(
+            &json_of(&["config", "get", section])["value"],
+            value,
+            "section {section}"
+        );
+    }
+}

@@ -146,8 +146,9 @@ jit claim status
 ```
 
 **Policy limits apply:**
-- Max 2 indefinite leases per agent (configurable)
-- Max 10 indefinite leases per repository (configurable)
+- A per-agent and a per-repository cap on indefinite leases; the defaults are
+  listed in [Runtime Coordination Defaults](../reference/runtime-defaults.md)
+  and both are configurable
 
 Indefinite leases are marked **stale** after the built-in claim stale
 threshold ([Runtime Coordination Defaults](../reference/runtime-defaults.md))
@@ -238,8 +239,8 @@ enforce_leases = "strict"  # "strict" | "warn" | "off"
 write_policy = "allow"     # "refuse" (default) | "allow"
 
 [coordination]
-max_indefinite_leases_per_agent = 2
-max_indefinite_leases_per_repo = 10
+max_indefinite_leases_per_agent = 3
+max_indefinite_leases_per_repo = 12
 ```
 
 `enforce_leases` is the active repository policy for structural issue writes.

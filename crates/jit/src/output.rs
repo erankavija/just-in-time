@@ -2172,6 +2172,31 @@ pub fn render_config_get_value(value: &Value) -> String {
     }
 }
 
+/// Render an effective-configuration snapshot (the `jit config get` surface)
+/// as `[section]` blocks of `key = value` lines; a nested value renders as
+/// compact JSON.
+pub fn render_config_snapshot(snapshot: &Value) -> String {
+    let leaf = |v: &Value| match v {
+        Value::Object(_) | Value::Array(_) => v.to_string(),
+        scalar => render_config_get_value(scalar),
+    };
+    match snapshot {
+        Value::Object(sections) => sections
+            .iter()
+            .map(|(name, section)| match section {
+                Value::Object(fields) => fields
+                    .iter()
+                    .fold(format!("[{name}]\n"), |out, (key, value)| {
+                        format!("{out}  {key} = {}\n", leaf(value))
+                    }),
+                other => format!("{name} = {}\n", leaf(other)),
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        other => format!("{}\n", leaf(other)),
+    }
+}
+
 // ============================================================================
 // Lean Issue Update / Show Summary Responses
 // ============================================================================

@@ -446,5 +446,5 @@ value = "dev/presentations"
 # are read from the projected reference at `docs/reference/runtime-defaults.md`
 # rather than restated here:
 #   [coordination]
-#   max_indefinite_leases_per_agent = 2
-#   max_indefinite_leases_per_repo = 10
+#   max_indefinite_leases_per_agent = <see runtime-defaults.md>
+#   max_indefinite_leases_per_repo = <see runtime-defaults.md>
