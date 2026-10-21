@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T01:04:40.360810003Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T01:58:11.490326348Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T02:03:46.223959994Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0ec8b001-ef0b-49c8-82a9-536ca896996c",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Prune the uncalled output surface",
-  "updated_at": "2026-10-21T01:04:40.943054863Z"
+  "updated_at": "2026-10-21T02:03:46.223959994Z"
 }

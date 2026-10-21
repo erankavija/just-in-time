@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T01:04:42.689051679Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T02:04:05.657365771Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T02:08:07.156666032Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Trim git revision access to production queries",
-  "updated_at": "2026-10-21T01:04:43.537005396Z"
+  "updated_at": "2026-10-21T02:08:07.156666032Z"
 }

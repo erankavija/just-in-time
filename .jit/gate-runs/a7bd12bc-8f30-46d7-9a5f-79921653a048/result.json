@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "8a85bc870bb5798bb9919712f6b27e0a65e9f6da",
+  "completed_at": "2026-10-21T01:50:36.093258534Z",
+  "duration_ms": 790056,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "f8c4c7907691c188c67af7f7e4093a273b5d8c69e5af2019c0e7982bcda4e09c",
+  "issue_id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a7bd12bc-8f30-46d7-9a5f-79921653a048",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:37:26.037154594Z",
+  "status": "failed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nflock           4038223 WRITE* /run/user/1000/cargo-ci.lock\nflock           4038042 WRITE* /run/user/1000/cargo-ci.lock\nflock           4037739 WRITE* /run/user/1000/cargo-ci.lock\nflock           4034358 WRITE* /run/user/1000/cargo-ci.lock\nflock           4030009 WRITE* /run/user/1000/cargo-ci.lock\nflock           4017604 WRITE* /run/user/1000/cargo-ci.lock\nflock           4011929 WRITE* /run/user/1000/cargo-ci.lock\nflock           4011818 WRITE* /run/user/1000/cargo-ci.lock\nflock           4011415 WRITE  /run/user/1000/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 102242 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 102242 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 58365 ms, warmed 17 executables (2077098288 bytes) in 145 ms.\n  ✓ fmt: ok (2063 ms)\n  ✓ clippy: ok (37175 ms)\n  ✓ suite-build: built in 58365 ms, warmed 17 executables (2077098288 bytes) in 145 ms (58514 ms)\n  ✓ test: 4753 passed, 0 failed, 0 skipped (97725 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4499 ms)\n  ✓ suite-clock: 102242 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (7 ms)\n  ✗ budget: FAILED (exit 1) (80 ms)\n\n",
+  "tree_dirty": true
+}

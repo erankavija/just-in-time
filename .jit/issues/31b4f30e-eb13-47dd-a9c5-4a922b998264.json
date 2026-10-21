@@ -7,6 +7,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Give every identity and closed vocabulary one semantic type (2195c98f) into well-ordered implementation issues.",
   "documents": [],
+  "first_ready_at": "2026-10-21T05:31:44.097379039Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
@@ -36,7 +37,7 @@
     "brackets:2195c98f"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "breakdown: Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-20T20:35:51.260510554Z"
+  "updated_at": "2026-10-21T05:31:44.097379039Z"
 }

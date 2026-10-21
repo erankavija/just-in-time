@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8d9a5ad5ef12930b4e249476ced26f3ee40f6589",
+  "completed_at": "2026-10-21T01:56:56.573098001Z",
+  "duration_ms": 195048,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable Mermaid export derives canonical state classes and includes an owning coverage test for all hard criteria.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bc0bd663-859c-4d88-b46d-17a334f60784",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "b424a657-d6ac-4bbd-91cb-aab5211763f3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:53:41.524320969Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `jit:bc0bd663` commits `c165e36a8` (first-parent merge patch) and `686c588b1`; both yield the same `visualization.rs` change; uncommitted changes excluded\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `dev/vision/9db27a3a-charter.md`\nResolved items: `@/charter/D-18` (vision charter); `@/invariant/canonical-cutover`, `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests` (invariant registry); `@/issue/842b0ac6/requirement/REQ-12` (issue source); `@/gate/cargo-ci` (gate registry)\nGate evidence: `cargo-ci` passed (exit 0, 2026-10-21T01:53:41Z); `code-review` pending\nTruncation recovery: Re-read the merge’s first-parent path patch, item-source ranges, current implementation/test ranges, and gate status after a broad read truncated; excluded the merge’s unrelated second-parent history\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable Mermaid export derives canonical state classes and includes an owning coverage test for all hard criteria.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

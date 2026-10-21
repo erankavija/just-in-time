@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8d9a5ad5ef12930b4e249476ced26f3ee40f6589",
+  "completed_at": "2026-10-21T01:47:14.225806372Z",
+  "duration_ms": 284723,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All linked artifacts validate; prior blocking findings are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "8aa53c43-e838-4f3e-995e-d5b0960ea1f9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4d47427e-110c-4a3a-9c38-fc724047456b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:42:29.502653711Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All linked artifacts validate; prior blocking findings are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

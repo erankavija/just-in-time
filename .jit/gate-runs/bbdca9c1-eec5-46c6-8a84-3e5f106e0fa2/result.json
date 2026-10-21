@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8d9a5ad5ef12930b4e249476ced26f3ee40f6589",
+  "completed_at": "2026-10-21T02:03:46.033092328Z",
+  "duration_ms": 334269,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output.rs",
+        "id": "F1",
+        "line": 3574,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "medium",
+        "summary": "The ExitCode::ALL test iterates ALL itself, so it cannot detect a new enum variant omitted from that enumeration."
+      }
+    ],
+    "summary": "The added enumeration test cannot detect an omitted ExitCode variant.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "0ec8b001-ef0b-49c8-82a9-536ca896996c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bbdca9c1-eec5-46c6-8a84-3e5f106e0fa2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:58:11.763864422Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3654 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15c2e-2d4c-7f53-9fb5-af5676bc5216\n--------\nuser\n--- 3641 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 553e7c17e, 2fb6b59b0 (same three-path change)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-15 (issue record); @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending\nTruncation recovery: re-read affected output/schema ranges and call sites; excluded unrelated merge-parent differences\n\n1. **[blocking][issue-impact]** `test_exit_code_all_lists_every_variant_with_a_distinct_described_status` does not prove its claimed exhaustive property. It iterates `ExitCode::ALL` at [output.rs:3574](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/output.rs:3574), so a newly added enum variant omitted from `ALL` is never tested; the generated schema and reference would silently omit that status. Test every enum variant against `ALL` (or make the enumeration definition structurally exhaustive). References: `@/invariant/orthogonal-tests`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The added enumeration test cannot detect an omitted ExitCode variant.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The ExitCode::ALL test iterates ALL itself, so it cannot detect a new enum variant omitted from that enumeration.\",\"file\":\"crates/jit/src/output.rs\",\"line\":3574,\"references\":[\"@/invariant/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8d9a5ad5ef12930b4e249476ced26f3ee40f6589",
+  "completed_at": "2026-10-21T02:08:06.964538385Z",
+  "duration_ms": 241069,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met in the attributed footprint; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "09192d77-90a1-42b9-a2b7-e42e2f1ae441",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T02:04:05.894608090Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 23d490c7f, 8a85bc870 (identical first-parent footprint)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18, @/charter/D-4, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-18 (.jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci: passed (exit code none; 2026-10-21T02:04:05Z); code-review: pending, non-evidentiary\nTruncation recovery: recovered both implementation patches by file/line sections; inspected narrowed current resolver, tests, callers, and first-parent merge diff\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met in the attributed footprint; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
