@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:49:10.044364505Z",
+  "dependencies": [
+    "459bb995-46f9-42d3-a83c-d50d406c0f80",
+    "bedf0962-dcb6-4c72-bd88-a4125e1a69d6"
+  ],
+  "description": "Make `claim acquire` and `config show` read the coordination lease limits through one resolver, so the limits an operator sees are the limits writes enforce.\n\n## Background\n\nThe two `[coordination]` limits, `max_indefinite_leases_per_agent` and `max_indefinite_leases_per_repo`, are resolved in two places that disagree:\n\n- `config show` and `config get` read `MergedCoordinationConfig` (`crates/jit/src/config.rs:1988-2026`), which falls back from the repository layer to the user and system layers, and render it at `config.rs:1956-1957` and `main.rs:6756-6803`.\n- `claim acquire` builds a loader over the repository `.jit/config.toml` only (`crates/jit/src/commands/claim.rs:107-111`) and enforces `CoordinationConfig::max_indefinite_leases_per_*` (`config.rs:1345-1351`, used at `claim.rs:143-144`). A malformed repository config is swallowed there and the built-in defaults apply.\n\nA limit set in the user or system layer is therefore reported but never enforced. Lease enforcement mode had the same divergence; it now resolves through one resolver that both paths call, and lease policy comes from the repository alone. These limits follow the same rule.\n\n## Success Criteria\n\n- [hard] REQ-01: One resolver computes the effective lease limits, and both `claim acquire` and the config commands call it; no second resolution path for these limits remains.\n- [hard] REQ-02: The user and system configuration layers do not affect the lease limits; only the repository configuration and the built-in defaults do.\n- [hard] REQ-03: A regression test covers each configuration state (no `[coordination]` section, each limit set in the repository, a limit set only in the user or system layer) and asserts that the reported limits equal the enforced limits.\n- [hard] REQ-04: The configuration reference states one resolution rule for the lease limits, with no carve-out for execution paths that bypass the merged configuration.\n\n## Notes\n\nFollow the resolver shape that lease enforcement mode now uses rather than introducing a second pattern (`@/inv/convention-convergence`). A malformed repository configuration fails the claim the same way it fails the config commands instead of silently falling back to defaults.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T05:49:10.044364505Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "34361448-f21b-4efb-8437-2ee38ba584c6",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-20",
+    "component:core",
+    "component:cli",
+    "component:docs",
+    "satisfies:842b0ac6/REQ-26"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Resolve the coordination lease limits through one resolver",
+  "updated_at": "2026-10-21T05:49:14.228034890Z"
+}

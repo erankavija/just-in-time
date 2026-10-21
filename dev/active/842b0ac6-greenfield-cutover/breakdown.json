@@ -935,6 +935,53 @@
     }
   },
   {
+    "key": "unify-lease-limit-resolution",
+    "title": "Resolve the coordination lease limits through one resolver",
+    "description": "Make `claim acquire` and `config show` read the coordination lease limits through one resolver, so the limits an operator sees are the limits writes enforce.\n\n## Background\n\nThe two `[coordination]` limits, `max_indefinite_leases_per_agent` and `max_indefinite_leases_per_repo`, are resolved in two places that disagree:\n\n- `config show` and `config get` read `MergedCoordinationConfig` (`crates/jit/src/config.rs:1988-2026`), which falls back from the repository layer to the user and system layers, and render it at `config.rs:1956-1957` and `main.rs:6756-6803`.\n- `claim acquire` builds a loader over the repository `.jit/config.toml` only (`crates/jit/src/commands/claim.rs:107-111`) and enforces `CoordinationConfig::max_indefinite_leases_per_*` (`config.rs:1345-1351`, used at `claim.rs:143-144`). A malformed repository config is swallowed there and the built-in defaults apply.\n\nA limit set in the user or system layer is therefore reported but never enforced. Lease enforcement mode had the same divergence; it now resolves through one resolver that both paths call, and lease policy comes from the repository alone. These limits follow the same rule.\n\n## Success Criteria\n\n- [hard] REQ-01: One resolver computes the effective lease limits, and both `claim acquire` and the config commands call it; no second resolution path for these limits remains.\n- [hard] REQ-02: The user and system configuration layers do not affect the lease limits; only the repository configuration and the built-in defaults do.\n- [hard] REQ-03: A regression test covers each configuration state (no `[coordination]` section, each limit set in the repository, a limit set only in the user or system layer) and asserts that the reported limits equal the enforced limits.\n- [hard] REQ-04: The configuration reference states one resolution rule for the lease limits, with no carve-out for execution paths that bypass the merged configuration.\n\n## Notes\n\nFollow the resolver shape that lease enforcement mode now uses rather than introducing a second pattern (`@/inv/convention-convergence`). A malformed repository configuration fails the claim the same way it fails the config commands instead of silently falling back to defaults.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:greenfield-cutover",
+      "milestone:v1.0",
+      "per:@/charter/D-20",
+      "component:core",
+      "component:cli",
+      "component:docs",
+      "satisfies:842b0ac6/REQ-26"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [
+      "state-config-defaults-once"
+    ],
+    "planning": {
+      "outcome": "Reported and enforced coordination lease limits come from one repository-only resolver.",
+      "contract_refs": [
+        "removal-hygiene"
+      ],
+      "source_refs": [
+        "REQ-26"
+      ],
+      "terminal": {
+        "consumer_family": "lease limit readers",
+        "test_boundary": "claim acquire limit tests",
+        "worker_sized_reason": "One resolver replacing two read paths for two keys, plus one doc section.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/config.rs",
+            "crates/jit/src/commands/claim.rs",
+            "crates/jit/src/main.rs",
+            "docs/reference/configuration.md"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "single-domain-types-path",
     "title": "Import domain type items through the domain facade",
     "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase. The footprint lists the 39 files that name the path, measured by search at planning time; a file that gains such a path later is rewritten the same way.\n",
@@ -976,7 +1023,8 @@
       "single-file-lock-poll-loop",
       "remove-storage-cfg-twins",
       "remove-repository-state-cfg-twins",
-      "remove-orphan-web-module"
+      "remove-orphan-web-module",
+      "unify-lease-limit-resolution"
     ],
     "planning": {
       "outcome": "Items of domain/types.rs resolve through one compiler-enforced path, the domain facade.",

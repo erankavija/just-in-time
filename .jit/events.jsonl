@@ -17512,3 +17512,8 @@
 {"id":"de9cc4b3-5c70-4512-8a48-ce81c7754c50","issue_id":"756ec5ec-4cae-4e18-b67d-96c3a6d7ecd9","timestamp":"2026-10-21T05:48:46.722309360Z","type":"issue_completed"}
 {"from":"backlog","id":"d9ddd5cc-ec55-49ec-a62f-1d20a62bb26f","issue_id":"24268b05-2ab4-4864-87fe-e8ff35945191","timestamp":"2026-10-21T05:48:46.824184398Z","to":"ready","type":"issue_state_changed"}
 {"from":"backlog","id":"a3b39333-79aa-4e93-b6b2-e032929e69f9","issue_id":"afc2b698-34bb-43d1-b7e2-c859de8d8104","timestamp":"2026-10-21T05:48:46.899754968Z","to":"ready","type":"issue_state_changed"}
+{"fields":["description"],"id":"a849191e-0c04-4b6e-92e9-e16912b00dc2","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-21T05:49:04.388285774Z","type":"issue_updated","updated_by":"issue-update"}
+{"id":"b2b8eae4-3392-45d1-84b4-eb7fb6063efb","issue_id":"34361448-f21b-4efb-8437-2ee38ba584c6","priority":"high","timestamp":"2026-10-21T05:49:10.044364505Z","title":"Resolve the coordination lease limits through one resolver","type":"issue_created"}
+{"from":"ready","id":"7a6b0942-3982-4af1-a550-4f821c2ee957","issue_id":"34361448-f21b-4efb-8437-2ee38ba584c6","timestamp":"2026-10-21T05:49:14.228034890Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"e5cc69b1-b9df-4be9-8c47-a09652e29aa4","issue_id":"34361448-f21b-4efb-8437-2ee38ba584c6","timestamp":"2026-10-21T05:49:14.228034890Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"aea23e68-e9fc-4a8f-b152-78a8ad82a19f","issue_id":"b4929342-6c7c-4f35-8e18-c8cbb0ec526c","timestamp":"2026-10-21T05:49:14.534480756Z","type":"issue_updated","updated_by":"dependency-add"}
