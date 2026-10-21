@@ -81,7 +81,7 @@
           "short_id": "650e6a56",
           "title": "Express output-module count structs as ListEnvelope instantiations",
           "classification": "implementation",
-          "status": "in_progress (worker w-650e6a56, sonnet, worktree agent-650e6a56)"
+          "status": "done (code-review R1 failed on restating marker rustdoc; lead fix 79713c95a)"
         },
         {
           "key": "schema-omits-hidden",
@@ -711,15 +711,14 @@
     }
   ],
   "rework_counts": {
-    "719a5501": 0
+    "719a5501": 0,
+    "650e6a56": 1
   },
   "surfaced_pitfalls": [],
   "external_blockers": {
     "d8176fd3": [
-      "2d10f1dd",
-      "16d63038",
-      "3754095f",
-      "8673dc5e"
+      "3754095f (backlog, waits on f37d228e)",
+      "8673dc5e (in_progress)"
     ],
     "083c9a91": [
       "d759d606"
