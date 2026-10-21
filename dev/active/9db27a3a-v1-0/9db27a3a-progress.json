@@ -388,13 +388,18 @@
     "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces.",
     "2026-10-21: 842b0ac6 planning accepted (P 201634a8 and B 6792cc41 done; 38 tasks, 42 edges). Execution is assigned to just-in-time-7e, the same session that planned it, because no other session is free. The deviation from the fresh-lead rule is contained: the gated breakdown is fixed, and changes go through escalation and a new planning pass.",
     "2026-10-21: 3d9a0ce3 planned (both gates passed; 35 new tasks joined to 7 existing children; REQ-14/15 added). Execution was dispatched to a fresh background execution-lead subagent. A breakdown dep add transitively reduced bb03df0a: its direct edges to 5f71a48d and f4d9502a are gone, and both stay reachable through 3d9a0ce3.",
-    "2026-10-21: df129d9e planned (78 issues, 227 edges; both gates passed). Execution was dispatched to a fresh background execution-lead subagent."
+    "2026-10-21: df129d9e planned (78 issues, 227 edges; both gates passed). Execution was dispatched to a fresh background execution-lead subagent.",
+    "2026-10-21 ~04:45: resource emergency. Disk 97% (33 GB free), 22 worktrees at ~17-23 GB each, load 27-50, and cargo-ci budget failures under load. Steward resource policy issued to all leads: freeze new worktrees until >=100 GB free; leads reclaim their own merged worktrees; cap 2 live worktrees for just-in-time-05 and just-in-time-7e and 1 each for the 3d9a0ce3 and df129d9e leads (6 total); full cargo-ci runs serialised under `flock /tmp/jit-full-ci.lock`; budget-only failures under load are reruns, not findings. Candidate for the user: a durable host-level build scheduler or a shared build cache (project-wide infrastructure)."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
     {
       "date": "2026-10-21",
       "item": "Delete 19 stale 0-byte gitignored read-lock sidecars in the primary checkout. Command: find .jit/issues -maxdepth 1 -name '*.lock' -size 0 -delete. lsof showed no holders. A session's permission classifier blocked the deletion, so it is left to the user. It gates nothing."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Consider a durable host-level build policy for parallel agents: a shared target dir or sccache, serialised full test runs, and a worktree cap or disk guard in dispatch-worker-worktree.sh. Disk reached 97% with 22 agent worktrees of ~20 GB each. The steward issued an interim manual policy."
     }
   ]
 }
