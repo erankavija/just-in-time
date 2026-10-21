@@ -140,7 +140,7 @@
           "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 1 (opus): code-review F1 short prefix rejected only after records are read (REQ-02)",
+          "status": "rework 1 committed (0869274ef); follow-up for claim status/events query/server id filters in progress",
           "note": "after all others: touches many resolvers"
         }
       ]
@@ -154,7 +154,7 @@
           "title": "Search endpoint returns no issue matches for the default nested data directory",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched",
+          "status": "done",
           "note": "found by the REQ-02 release reproduction run; filed by the lead under the epic"
         }
       ]
