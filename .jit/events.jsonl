@@ -17968,3 +17968,6 @@
 {"id":"81c022c6-0e25-417f-9e91-13a7ef21f783","issue_id":"71b0af0e-4f1c-4f49-aa61-b0e052e98878","timestamp":"2026-10-21T11:38:39.755893176Z","type":"issue_completed"}
 {"assignee":"agent:jit-execution-lead","id":"321580c2-2243-40fb-a249-c67b39b1cac3","issue_id":"8397eb74-827c-46e5-9f59-7e67c534ed0e","timestamp":"2026-10-21T11:38:59.617217823Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"270b1963-1e60-4e79-b2ae-c5780fabd39f","issue_id":"8397eb74-827c-46e5-9f59-7e67c534ed0e","timestamp":"2026-10-21T11:38:59.673596856Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"2874ee87-e426-41df-ad76-c160428af2f2","issue_id":"28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3","timestamp":"2026-10-21T11:39:38.492198866Z","type":"issue_updated","updated_by":"doc-add"}
+{"fields":["documents"],"id":"f029e2c1-8d44-4e3c-b484-40ac3c29dbd7","issue_id":"28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3","timestamp":"2026-10-21T11:39:41.910665675Z","type":"issue_updated","updated_by":"doc-add"}
+{"gate_key":"cargo-ci","id":"3ec34829-c5be-4bae-8e9f-ec987ef7a44e","issue_id":"f7f01654-690c-4293-b72a-869f16e0fa6c","timestamp":"2026-10-21T11:39:57.381124169Z","type":"gate_failed","updated_by":"auto:executor"}
