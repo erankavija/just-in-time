@@ -8,12 +8,18 @@
   ],
   "description": "This repository's issue records drop explicit document links that add nothing once documents under an issue's artifact directory are derived: links to paths inside the owner's own directory that carry no type or label.\n\n## Background\n\nAn issue's derived documents are the files under its resolved artifact directory in each declared documentation area. A derived document carries no type and no label, so an explicit link remains the way to attach that metadata, and the way to attach a path outside the directory.\n\nA count over this repository found 11 of 542 explicit links pointing inside the owner's own canonical directory: 10 bare directory links and one file. Whether those links carry a type or label was not checked, so the set to remove may be smaller. One further link points inside another issue's directory and stays, as do the 530 links to paths outside any owner directory.\n\nThis is a one-time edit of repository data.\n\n## Success Criteria\n\n- [hard] REQ-01: No issue record holds an explicit document link without type and label whose path lies inside that issue's own artifact directory.\n- [hard] REQ-02: Links carrying a type or label, and links to paths outside the owner's directory, are unchanged.\n- [hard] REQ-03: The target of each removed link remains listed among the issue's documents as a derived document.\n- [hard] REQ-04: Repository validation passes after the edit.\n",
   "documents": [],
+  "done_at": "2026-10-21T11:08:53.017866113Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "code-review",
     "repo-validate"
   ],
   "gates_status": {
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:02:35.531810041Z",
+      "updated_by": "auto:executor"
+    },
     "repo-validate": {
       "status": "passed",
       "updated_at": "2026-10-21T10:58:20.797372133Z",
@@ -29,7 +35,7 @@
     "satisfies:3d9a0ce3/REQ-03"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove redundant explicit links inside artifact directories",
-  "updated_at": "2026-10-21T10:58:20.797372133Z"
+  "updated_at": "2026-10-21T11:08:53.017866113Z"
 }
