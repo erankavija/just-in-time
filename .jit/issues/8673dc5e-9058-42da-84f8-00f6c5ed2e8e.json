@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T00:59:07.473933141Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.857620164Z",
@@ -22,7 +22,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Gate status reports a manual attestation as never run",
-  "updated_at": "2026-10-21T10:45:29.021204753Z"
+  "updated_at": "2026-10-21T11:27:55.037699498Z"
 }
