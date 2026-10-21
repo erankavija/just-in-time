@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "56b89d9a-c2c9-4250-bd8f-e4bf059921d5"
+  ],
+  "description": "A profile dry run is a read-only run of the apply computation, including final validation, and returns the apply result type; the twin plan types, the twin status enums and the trait bridging them are removed.\n\n## Background\n\nPlan and apply report through parallel types in `crates/jit/src/profile/application.rs` (line numbers at the investigation baseline):\n\n- Result types: `ProfileApplyResult` (41) and `ProfilePlanEntry` (272).\n- Status enums: `ProfileApplicationStatus` (11) and `ProfilePlanStatus` (256).\n- The bridging trait `SelectionObservation` (80, implementations at 93 and 105).\n\nThe apply command's output schema is a hand-written `oneOf` over both (`crates/jit/src/schema.rs:514-530`). Both routes call the same preparation, but only apply runs final validation (`crates/jit/src/commands/profile.rs:1891-1900`), so a dry run can succeed where the apply fails.\n\nA preview runs the same mutation session as its operation, read-only (`@/charter/D-20`). One run over the profile selection takes a mode: publish, rehearse, or report. The existing refuse-or-report conflict response (`profile.rs:104`) already switches between apply and diff.\n\n## Success Criteria\n\n- [hard] REQ-01: Plan and apply return one result type with one status enum; the twin types and the bridging trait are gone.\n- [hard] REQ-02: A dry run fails exactly where the apply would, including on final validation findings, and publishes nothing.\n- [hard] REQ-03: The apply command's published output schema is derived from the result type, and the hand-written alternative schema is gone.\n- [hard] REQ-04: Human-readable plan and apply output both render from the one result type.\n- [hard] REQ-05: The MCP integration tests pass over the unified apply output.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "a5fbec12-fa6a-4684-994b-5fd0652471e3",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:3d9a0ce3/REQ-07",
+    "satisfies:3d9a0ce3/REQ-12"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Report profile plans through the apply result type",
+  "updated_at": "2026-10-21T01:06:58.361882571Z"
+}

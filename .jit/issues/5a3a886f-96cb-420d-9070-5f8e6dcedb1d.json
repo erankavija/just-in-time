@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "ae2e3739-f5f7-42be-8ae4-8ae3e1866800"
+  ],
+  "description": "This repository's tree-wide gates declare the worktree root as their one input root, excluding only generated or ignored trees, and the `secret-detection` gate stops reusing verdicts.\n\n## Background\n\nFive gates in this repository's gate registry (`.jit/gates.toml`) hand-keep the same 26-root list, about 130 root lines, plus about 60 exclude lines that remove tracker records from the digest: `cargo-ci` (`:54-96`), `cargo-ci-features` (`:122-164`), `docs-mechanical` (`:311-353`), `secret-detection` (`:568-606`) and `tests` (`:657-699`). The list already misses tracked inputs: `.config/nextest.toml` is read by the Rust CI script (`scripts/cargo-ci.sh:134-136`) but sits under no declared root, and the tracked empty `.index.lock` is uncovered. The git-ignored `.agents/cache-pool` (about 9.9 GB) lies under the `.agents` root and is walked on each tree-wide evaluation.\n\nThe engine now accepts `.` as a root and excludes the paths it writes during a mutation from each digest, so each list can collapse to the worktree root plus excludes for generated trees.\n\n`secret-detection` digests issue records on purpose: a secret pasted into an issue record must be scanned. Once tracker-written paths leave the digest, reusing its verdict would pass a record that gained a secret, so that gate declares no inputs and executes on each evaluation.\n\nThis is repository-local configuration; it changes no shipped default.\n\n## Success Criteria\n\n- [hard] REQ-01: `cargo-ci`, `cargo-ci-features`, `docs-mechanical` and `tests` each declare `.` as their only root, with excludes naming only generated or git-ignored trees such as `target/` and `.agents/cache-pool`.\n- [hard] REQ-02: `secret-detection` declares no inputs and executes on each evaluation.\n- [hard] REQ-03: No exclude in the gate registry names a tracker-written record path.\n- [hard] REQ-04: Evaluating one of the four tree-wide gates twice over unchanged inputs, with a tracker commit between the evaluations, reuses the first verdict.\n- [hard] REQ-05: A change to `.config/nextest.toml` changes the input digest of `cargo-ci`.\n- [hard] REQ-06: Repository validation passes over the edited registry.\n",
+  "documents": [],
+  "gates_required": [
+    "code-review",
+    "repo-validate"
+  ],
+  "gates_status": {},
+  "id": "5a3a886f-96cb-420d-9070-5f8e6dcedb1d",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:gates",
+    "per:@/charter/D-18",
+    "satisfies:3d9a0ce3/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Declare this repository's tree-wide gate inputs as the worktree root",
+  "updated_at": "2026-10-21T01:06:58.361882571Z"
+}

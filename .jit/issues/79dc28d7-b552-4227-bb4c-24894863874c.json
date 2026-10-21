@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "536a48ef-97bc-4f34-a813-54f70572b91e"
+  ],
+  "description": "The command reference, command grammar, content standards reference, MCP server readme and changelog describe the surviving profile surface: show, diff, apply, pack and add.\n\n## Background\n\nThe ownership lifecycle is gone (`@/charter/D-8`): the list, validate, reconfigure, upgrade and capture subcommands, the show command's applied field and target hashes, and conflict remedies. A selector is a bare package directory path; the `id:` and `path:` tags are gone. Plan and apply now report through one result type, and a package origin is a directory path.\n\nPages describing the removed surface (line numbers at the investigation baseline):\n\n- `docs/reference/cli-commands.md`: init `id:` 546-555, the profile preamble 631-648, list/show/validate 656-737, diff claims and remedy 751-766, apply `id:` 791-830, reconfigure/upgrade/capture 832-967, pack and add references to capture at 977, 1041 and 1044, validate provenance at 3463 and 3526.\n- `docs/reference/cli-command-grammar.md:86-89` and `docs/reference/jit-content-standards.md:12-13`.\n- `mcp-server/README.md:91-94`.\n- `CHANGELOG.md` [Unreleased] entries that describe the removed machinery (11-12, 114-150, 248-252, 291, 317-341, 354, 429-436, 653-663).\n\n## Success Criteria\n\n- [hard] REQ-01: The command reference describes show, diff, apply, pack and add only, with bare-path selectors and plan and apply output described as one result.\n- [hard] REQ-02: The command grammar and content standards references name no removed subcommand and no selector tag.\n- [hard] REQ-03: The MCP server readme lists no removed tool.\n- [hard] REQ-04: The changelog's unreleased section records the removal of the ownership lifecycle and its subcommands, and no unreleased entry still describes them as shipped.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "79dc28d7-b552-4227-bb4c-24894863874c",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:docs",
+    "per:@/charter/D-8",
+    "satisfies:3d9a0ce3/REQ-04"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Rewrite the profile command reference",
+  "updated_at": "2026-10-21T01:06:58.361882571Z"
+}

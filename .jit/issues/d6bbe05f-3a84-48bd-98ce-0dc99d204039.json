@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-10-21T01:07:37.895055663Z",
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "a3437bab-d2b7-44cc-9ec5-347a0df971c5"
+  ],
+  "description": "Repository validation stops checking profile ownership and stops repairing profile provenance, because charter decision D-8 deletes profile validation and its checks inside repository validation.\n\n## Background\n\nAfter D-8 an edit to a value a package contributed is an ordinary repository change, and git shows and restores it. Repository validation still carries the ownership machinery:\n\n- The `profile-ownership` rule (`collect_profile_ownership_findings` and `PROFILE_OWNERSHIP_RULE`, `crates/jit/src/validation/repository.rs:639-700`) reports divergence from an applied record. It produced the downstream report where editing a contributed gate field failed validation and the suggested remedy made the state worse.\n- Validation repair performs profile provenance repair from the record (`crates/jit/src/commands/validate.rs:650-1030`, with `with_profile_ownership_findings` at 745, record readers at 835-970, and the record list at 406).\n\nTests: `crates/jit/tests/fast_rules/derived_state_repair_tests.rs` (216, 365, 445-825) and `crates/jit/tests/cli_item_validate/derived_state_repair_tests.rs` (110, 226, 327, 378); `.config/nextest.toml:22` names tests in the validate command module that go. Another stream edits `validate.rs:1835-2640`, a disjoint region. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: Repository validation reports no `profile-ownership` rule and reads no applied-profile record or package.\n- [hard] REQ-02: Validation repair performs no profile provenance repair.\n- [hard] REQ-03: The removed rule's tests and the profile repair tests are deleted, and the test-runner configuration names no deleted test.\n- [hard] REQ-04: Validating a repository that never applied a profile yields the same findings as before.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T01:06:58.361882571Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:validation",
+    "per:@/charter/D-8",
+    "satisfies:3d9a0ce3/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove profile checks from repository validation",
+  "updated_at": "2026-10-21T01:07:38.117355998Z"
+}

@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "376afd01-749f-4644-bf3d-7164cafdeac7"
+  ],
+  "description": "`ProfileSelector` is replaced by the package directory path it holds, because a selector carries no tag.\n\n## Background\n\nA `--profile` selector is a bare package directory path, with no `id:` or `path:` tag (`@/charter/D-18`). `ProfileSelector` (`crates/jit/src/commands/profile.rs:120`) is left with one variant holding that path. It is read by `crates/jit/src/commands/init.rs`, `crates/jit/src/commands/mod.rs`, `crates/jit/src/commands/validate.rs`, `crates/jit/src/main.rs`, `crates/jit/src/test_utils.rs`, `crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs` and `crates/jit/tests/fast_rules/derived_state_repair_tests.rs`. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfileSelector` enum remains; each former use holds the package directory path.\n- [hard] REQ-02: Selector parsing, its error for a tagged argument, and selection behave as before, shown by the existing profile CLI tests.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "1eab392b-8008-4245-82f8-24ce07fa2781",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-18",
+    "satisfies:3d9a0ce3/REQ-09"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Make the profile selector a package path",
+  "updated_at": "2026-10-21T01:06:58.361882571Z"
+}

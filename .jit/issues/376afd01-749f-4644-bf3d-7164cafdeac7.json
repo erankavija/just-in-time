@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "04ece1e2-656b-456c-b434-5f5200fa1d3b"
+  ],
+  "description": "`ProfilePackageSource` is replaced by the directory path it wraps, because its only variant is `Directory`.\n\n## Background\n\n`ProfilePackageSource` (`crates/jit/src/profile/package.rs:45`) has one variant, `Directory(PathBuf)`, destructured irrefutably at `crates/jit/src/commands/profile.rs:1762,2310`. It is re-exported from `crates/jit/src/profile/mod.rs` and named in `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfilePackageSource` type remains; each former use holds the package directory path.\n- [hard] REQ-02: Package loading behaves as before for each caller, shown by the existing package tests.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "376afd01-749f-4644-bf3d-7164cafdeac7",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:core",
+    "per:@/charter/D-18",
+    "satisfies:3d9a0ce3/REQ-09"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Unwrap the single-variant package source enum",
+  "updated_at": "2026-10-21T01:06:58.361882571Z"
+}

@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "claimed_at": "2026-10-21T01:07:37.518883617Z",
+  "context": {},
+  "created_at": "2026-10-21T01:06:58.361882571Z",
+  "dependencies": [
+    "a3437bab-d2b7-44cc-9ec5-347a0df971c5"
+  ],
+  "description": "The release workflow and the package-content documentation check produce the shipped workflow package by packing its source directory, so neither depends on profile capture.\n\n## Background\n\nPackage authors edit a package manifest directly (`@/charter/D-8`), and pack turns a package directory into an archive. Two scripts still produce the package through capture, which rewrites a package from the repository:\n\n- The release workflow builds the release package with capture (`.github/workflows/release-artifacts.yml:122-140`).\n- The package-content documentation check runs capture and then shows the result (`scripts/docs-check-package-content.sh:141-151`). It is wired into the mechanical documentation checks (`scripts/docs-mechanical.sh:103`), and its self-test exercises that path (`scripts/docs-check-selftest.sh:43,84,100,420`).\n\nLine numbers are at the investigation baseline. Capture still exists while these scripts move; it is removed afterwards.\n\n## Success Criteria\n\n- [hard] REQ-01: The release workflow produces its package archive by packing the package directory, and no workflow step invokes capture.\n- [hard] REQ-02: The package-content documentation check verifies package content through pack without invoking capture.\n- [hard] REQ-03: The documentation-check self-test passes over the changed check.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T01:06:58.361882571Z",
+  "gates_required": [
+    "code-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
+  "labels": [
+    "type:task",
+    "epic:lead-friction",
+    "milestone:v1.0",
+    "component:release",
+    "per:@/charter/D-8",
+    "satisfies:3d9a0ce3/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Produce the shipped workflow package by packing its directory",
+  "updated_at": "2026-10-21T01:07:37.751787861Z"
+}
