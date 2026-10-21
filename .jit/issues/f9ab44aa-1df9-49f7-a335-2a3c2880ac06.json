@@ -13,7 +13,13 @@
     "code-review",
     "repo-validate"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:58:20.797372133Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f9ab44aa-1df9-49f7-a335-2a3c2880ac06",
   "labels": [
     "type:task",
@@ -25,5 +31,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Remove redundant explicit links inside artifact directories",
-  "updated_at": "2026-10-21T10:58:02.881267427Z"
+  "updated_at": "2026-10-21T10:58:20.797372133Z"
 }
