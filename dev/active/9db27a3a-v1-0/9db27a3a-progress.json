@@ -509,6 +509,12 @@
       "date": "2026-10-22",
       "decision": "@/inv/semantic-types",
       "summary": "Reconciliation after 459bb995: pure narrowings of 6add7ca6, 96bb0941, 42bcaa6e, 977d01d8 and 145b4d57 approved. 6add7ca6, 96bb0941 and 42bcaa6e also delete the hand-written as_token/Display that 459bb995 added (2195c98f REQ-10). Chosen (a): 42bcaa6e takes projection_render.rs and 977d01d8's REQ-02 so it lands green. Rejected (b): an interim compile bridge across epics."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "summary": "Chosen (a): all footprint-overlap edges from 2195c98f's retype tasks (0af95f14 onto about 8 c780514e terminals, plus the others) are wired. c780514e waves 1-2 are on 2195c98f's critical path, so the steward assigns c780514e execution immediately after its gates. Rejected (b), fixture edges only: rebase-conflict risk."
     }
   ],
   "notes": [
