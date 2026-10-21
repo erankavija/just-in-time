@@ -200,7 +200,7 @@
           "short_id": "842b0ac6",
           "title": "Remove dead code and compatibility shims across the workspace",
           "wave": 2,
-          "status": "planning"
+          "status": "executing"
         }
       ],
       "coherence_review": "not-run"
@@ -329,6 +329,12 @@
       "date": "2026-10-21",
       "decision": "@/charter/D-18",
       "summary": "Plan-review failed three times on REQ-07's clause that this checkout's .jit/issues/ holds no .lock files: one round required a leaf to own deleting them, the next ruled such a leaf out of footprint. Chosen: amend REQ-07 to drop the clause, since gitignored runtime residue is not repository content, and delete the 19 stale sidecars as housekeeping. The 'listing creates no file but the index lock' criterion prevents recurrence. Rejected: keeping a post-merge integrator leaf, which no worktree worker or reviewer can verify."
+    },
+    {
+      "container_short_id": "842b0ac6",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "Breakdown review advisory: 842b0ac6 became unreachable from the v1.0 tag task after 2195c98f's bracket moved its edge. Resolution: 2195c98f's breakdown re-homes the 842b0ac6 edge onto its root tasks (just-in-time-59 told). Close once bb03df0a reaches 842b0ac6 again and `jit query divergence` is clean."
     }
   ],
   "notes": [
@@ -339,7 +345,8 @@
     "Session rule from the user (2026-10-20): never ask the user mid-session; block issues needing user input and record the question for the next session; check workers every 30 min; write the handoff when only user-blocked work remains.",
     "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else.",
     "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up.",
-    "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces."
+    "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces.",
+    "2026-10-21: 842b0ac6 planning accepted (P 201634a8 and B 6792cc41 done; 38 tasks, 42 edges). Execution is assigned to just-in-time-7e, the same session that planned it, because no other session is free. The deviation from the fresh-lead rule is contained: the gated breakdown is fixed, and changes go through escalation and a new planning pass."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
