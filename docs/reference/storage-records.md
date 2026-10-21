@@ -125,7 +125,7 @@ a `null` one alike.
 | `issue_id` | always | Full id of the issue the run is about. An issue's runs are selected by matching this field across the run directories, so `gate-runs/` is flat rather than nested per issue. |
 | `commit` | `null` when unset | Git commit the checker was launched at, when the working directory is a git repository. Unset for a run that launched no checker: a verdict taken from an earlier run ran at no commit of its own, and `origin` names the run that carries one. |
 | `branch` | `null` when unset | Git branch the checker was launched on, under the same conditions as `commit`. |
-| `status` | always | The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an executed checker the exit status decides it, as [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines. |
+| `status` | always | The run's verdict: `passed`, `failed`, `error`, or `pending`. For an executed checker the exit status decides it, as [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines. |
 | `started_at` | always | RFC 3339 timestamp taken before the checker is launched. |
 | `completed_at` | `null` when unset | RFC 3339 timestamp taken once the checker has returned. |
 | `duration_ms` | `null` when unset | Wall-clock duration of the checker, in milliseconds. |

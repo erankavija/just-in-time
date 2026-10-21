@@ -271,19 +271,19 @@ fn test_status_history_invalid_status_json_error() {
     let id = create_issue(&temp, &["tests"]);
     run_gate(&temp, &id, "tests");
 
-    let out = jit()
-        .current_dir(temp.path())
-        .args([
-            "gate", "status", &id, "--all", "--status", "bogus", "--json",
-        ])
-        .assert()
-        .failure()
-        .get_output()
-        .stdout
-        .clone();
-    let json: serde_json::Value =
-        serde_json::from_slice(&out).expect("invalid --status must emit machine-readable JSON");
-    assert_eq!(json["error"]["code"], "INVALID_ARGUMENT");
+    for status in ["bogus", "skipped"] {
+        let out = jit()
+            .current_dir(temp.path())
+            .args(["gate", "status", &id, "--all", "--status", status, "--json"])
+            .assert()
+            .failure()
+            .get_output()
+            .stdout
+            .clone();
+        let json: serde_json::Value =
+            serde_json::from_slice(&out).expect("invalid --status must emit machine-readable JSON");
+        assert_eq!(json["error"]["code"], "INVALID_ARGUMENT", "{status}");
+    }
 }
 
 // ---------------------------------------------------------------------------

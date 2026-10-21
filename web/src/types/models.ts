@@ -26,7 +26,7 @@ export interface GateRunSummary {
   run_id: string;
   key: string;
   stage: 'precheck' | 'postcheck';
-  status: 'passed' | 'failed' | 'error' | 'pending' | 'skipped';
+  status: 'passed' | 'failed' | 'error' | 'pending';
   started_at: string;
   completed_at?: string;
   duration_ms?: number;
