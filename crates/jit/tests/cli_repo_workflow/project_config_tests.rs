@@ -219,7 +219,7 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
     assert_eq!(human.status.code(), Some(0));
     assert_eq!(
         String::from_utf8_lossy(&human.stdout),
-        "✓ Configuration is valid\n"
+        "Configuration is valid\n"
     );
 
     let json = Command::new(jit_binary())

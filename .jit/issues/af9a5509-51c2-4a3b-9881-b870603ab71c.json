@@ -8,6 +8,7 @@
   ],
   "description": "Four configuration surfaces are parsed and merged, yet no runtime command reads them: `worktree.mode` with `JIT_WORKTREE_MODE`, `[global_operations]`, `[locks]` and `[events]`. Only the configuration printers and checker reach them.\n\n## Background\n\nDeclarations in `crates/jit/src/config.rs`:\n\n- `JitConfig` fields `worktree` (`:54`), `global_operations` (`:58`), `locks` (`:60`), `events` (`:62`), and the config-absent literal (`:1510-1513`).\n- `WorktreeModeError` (`:1188-1196`), `WorktreeConfig.mode` (`:1217`), `WorktreeMode` (`:1226-1262`), `WorktreeConfig::worktree_mode` (`:1308-1310`).\n- `GlobalOperationsConfig` (`:1373-1391`), `LocksConfig` (`:1394-1410`), `EventsConfig` (`:1413-1429`), and their `Merged*` forms (`:2087-2172`).\n- `EffectiveConfig::worktree_mode` (`:1749-1781`) and `global_operations()`/`locks()`/`events()` (`:1848-1882`).\n\nThey have three readers:\n\n- `config show` (`main.rs:6804-6827`, `6834-6897`).\n- `config get`, through `EffectiveConfig::full_snapshot` (`config.rs:1958-2001`, rustdoc `:1884-1912`).\n- `config validate`, which checks `JIT_WORKTREE_MODE` (`main.rs:7006-7010`). Next to it, `main.rs:7016-7018` builds an effective config and discards it.\n\nOther sites: the section list in `commands/config.rs:488`; `edit_config_document` type heuristics (`commands/config.rs:187-200`) whose bool branch matches only these keys; the rustdoc at `config_manager.rs:19`.\n\nThe `config validate` exit-4 failure lever is `env:JIT_WORKTREE_MODE=definitely-not-a-mode` (`tests/cli_issue/failure_lever_registry.toml:129-136`, `command_exit_code_projection_tests.rs:510-522`). The `malformed-config-toml` setup kind already produces a post-dispatch invalid-config finding (`project_config_tests.rs:127-160`).\n\nDocumentation and adopter text that mention the keys: `docs/reference/configuration.md:29,582-590,651,667-670` (a \"Parsed compatibility fields\" section), `docs/reference/cli-commands.md:3970-3979,4003-4005`, `docs/how-to/multi-agent-coordination.md:257`, `docs/how-to/troubleshooting.md:424`, the `profiles/jit-default/manifest.toml:440-466` comment block, `dev/eval/steering/README.md:58` and `dev/eval/steering/run_eval.py:69`.\n\n## Success Criteria\n\n- [hard] REQ-01: `JitConfig` declares no `worktree.mode`, `[global_operations]`, `[locks]` or `[events]`, and no code reads `JIT_WORKTREE_MODE`.\n- [hard] REQ-02: `config show`, `config get` and `config validate` neither print nor check those keys or that variable.\n- [hard] REQ-03: The configuration reference, the CLI reference, the how-to guides, the `jit-default` profile comment block and the steering evaluation do not mention them.\n- [hard] REQ-04: The `config validate` exit-4 failure lever uses the `malformed-config-toml` setup kind, and the exit-code projection test passes with it.\n- [hard] REQ-05: `edit_config_document`'s type heuristics hold no branch that matches only a key this change removes.\n\n## Notes\n\nTests whose primary property is a removed key are deleted. Tests that mix removed and surviving keys keep the surviving assertions. `CHANGELOG.md:1027` is history and stays.\n",
   "documents": [],
+  "done_at": "2026-10-21T16:20:53.389384095Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
@@ -18,22 +19,22 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T15:58:39.869861913Z",
+      "updated_at": "2026-10-21T16:13:24.762873925Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "passed",
-      "updated_at": "2026-10-21T16:00:52.502918169Z",
+      "updated_at": "2026-10-21T16:17:23.610020197Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
       "status": "passed",
-      "updated_at": "2026-10-21T16:03:03.780354501Z",
+      "updated_at": "2026-10-21T16:20:10.878979183Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
       "status": "passed",
-      "updated_at": "2026-10-21T16:03:07.540692873Z",
+      "updated_at": "2026-10-21T16:20:37.329857590Z",
       "updated_by": "auto:executor"
     }
   },
@@ -49,7 +50,7 @@
     "satisfies:842b0ac6/REQ-03"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove inert configuration keys",
-  "updated_at": "2026-10-21T16:03:07.540692873Z"
+  "updated_at": "2026-10-21T16:20:53.389384095Z"
 }

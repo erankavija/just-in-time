@@ -212,7 +212,7 @@
           "title": "Remove the DocumentReference builder methods",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "d125490a-558d-41d6-bfe6-2270d6bf7cf4",
@@ -230,7 +230,7 @@
           "title": "Keep one agent configuration type",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "rework-dispatched"
         },
         {
           "id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
@@ -239,7 +239,7 @@
           "title": "Remove inert configuration keys",
           "classification": "implementation",
           "model": "opus",
-          "status": "lead-review-rework"
+          "status": "done"
         }
       ]
     },
@@ -281,7 +281,7 @@
           "title": "Remove source-scan tests for retired names",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "58282882-59d6-4e0c-b47b-f49a8ca11cc3",
@@ -431,7 +431,9 @@
     "0ec8b001": 1,
     "66bd4b5c": 0,
     "9aa54649": 1,
-    "af9a5509": 1
+    "af9a5509": 1,
+    "81e7cdc3": 1,
+    "5e846743": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",

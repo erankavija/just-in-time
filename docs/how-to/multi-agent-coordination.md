@@ -31,6 +31,7 @@ export JIT_AGENT_ID=agent:copilot-1
 mkdir -p ~/.config/jit
 echo '[agent]
 id = "agent:copilot-1"
+created_at = "2026-01-01T00:00:00Z"
 description = "Copilot session 1"' > ~/.config/jit/agent.toml
 ```
 
@@ -261,11 +262,11 @@ Claim timing has no configuration keys.
 ```toml
 [agent]
 id = "agent:my-agent"
+created_at = "2026-01-01T00:00:00Z"
 description = "My development agent"
 ```
 
-`[agent].id` is the active persistent identity source. The agent TTL field is
-parsed metadata; it does not override `jit claim acquire --ttl`.
+`[agent].id` is the active persistent identity source. Unknown keys fail to load.
 
 ### Environment Overrides
 

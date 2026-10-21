@@ -9,13 +9,30 @@
   ],
   "description": "`profile capture` and its contribution reconciliation are removed: package authors edit the manifest directly, and pack produces an archive from the package directory.\n\n## Background\n\nCharter decision D-8 deletes capture's reconciliation: the repository owns its values, and a package author edits the package manifest. Capture (`crates/jit/src/commands/profile.rs:744-854`) rewrites a package from the repository through the reconciliation in `crates/jit/src/profile/package_capture.rs` (`refresh_contributions` 439, `published_identities` 505, `read_registry` 558, `republished_manifest` 594, `write_contribution_values` 667, the `CapturedContribution*` types 101-130). That path rewrites a contribution as a single-line inline table and leaves package identity out of step, both reported by a downstream lead. No script or workflow invokes capture any longer.\n\nThe package tree reader (`capture_package_tree`) serves pack and add and stays.\n\nCapture's surfaces are its CLI variant (`crates/jit/src/cli.rs`), dispatch arm (`crates/jit/src/main.rs`), command-schema arm (`crates/jit/src/schema.rs`), MCP curated entry (`mcp-server/curated-tools.json`), and a failure-lever arm (`crates/jit/tests/cli_issue/failure_lever_registry.toml`, within 674-762) that the failure-probe coverage test checks against the command surface. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: The `profile capture` subcommand no longer parses and has no command-schema or MCP curated entry.\n- [hard] REQ-02: Capture's contribution reconciliation is gone from the package-capture module, and the package tree reader used by pack and add remains.\n- [hard] REQ-03: The failure-lever registry holds no capture arm, and the failure-probe coverage test passes.\n- [hard] REQ-04: Capture tests are deleted, and pack and add tests pass unchanged.\n",
   "documents": [],
+  "done_at": "2026-10-21T16:26:02.590003512Z",
   "first_ready_at": "2026-10-21T15:38:34.926294445Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:19:55.329833323Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:25:38.243944167Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:25:55.456016597Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2dd6b833-8f5d-484a-b412-158b74e3d7f5",
   "labels": [
     "type:task",
@@ -26,7 +43,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove profile capture",
-  "updated_at": "2026-10-21T15:50:39.332771702Z"
+  "updated_at": "2026-10-21T16:26:02.590003512Z"
 }

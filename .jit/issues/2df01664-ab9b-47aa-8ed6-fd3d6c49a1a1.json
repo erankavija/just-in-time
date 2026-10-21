@@ -11,6 +11,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/9876a23a-one-validation-report/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "c37aaee437656e9f60f38c1022d1edaeb9db4a5a007259130b2d207ea3c9a7f9",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/9876a23a-one-validation-report/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e242beed9e72cd89a30d77e03abd7db493d8dd5cb9ed6f77de0ac56febdbde47",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/9876a23a-one-validation-report/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "plan",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/9876a23a-one-validation-report/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown-manifest",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/9876a23a-one-validation-report/breakdown.json"
     }
   ],
   "first_ready_at": "2026-10-21T15:52:23.110152831Z",
@@ -38,5 +70,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-10-21T16:06:14.304712131Z"
+  "updated_at": "2026-10-21T16:32:55.824457329Z"
 }

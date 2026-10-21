@@ -1140,7 +1140,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 valid: true,
                 errors: Vec::new(),
                 warnings: Vec::new(),
-                exit_code: 0,
                 scope: scope.to_string(),
                 summary: crate::commands::LinkCheckSummary {
                     total_documents: 0,
@@ -1346,20 +1345,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let error_count = error_docs.len();
         let warning_count = warnings.len();
 
-        // Determine exit code
-        let exit_code = if !errors.is_empty() {
-            1 // Errors found
-        } else if !warnings.is_empty() {
-            2 // Only warnings
-        } else {
-            0 // All valid
-        };
-
         Ok(crate::commands::LinkCheckResult {
             valid: errors.is_empty(),
             errors,
             warnings,
-            exit_code,
             scope: scope.to_string(),
             summary: crate::commands::LinkCheckSummary {
                 total_documents: all_documents.len(),
@@ -1930,11 +1919,11 @@ fn check_asset_in_git(repo: &Option<git2::Repository>, path: &std::path::Path) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::DocumentReference;
     use crate::repository_state::{finalize, CaptureSpec, MutationContext, VirtualPath};
     use crate::storage::{
         InMemoryStorage, IssueStore, RepositoryStateStore, RepositoryStateStoreError,
     };
+    use crate::test_utils::document_reference;
     use std::collections::BTreeSet;
 
     fn capture_spec(paths: impl IntoIterator<Item = VirtualPath>) -> CaptureSpec {
@@ -1949,14 +1938,7 @@ mod tests {
     fn test_document_rescan_uses_image_and_identical_inventory_is_noop() {
         let storage = InMemoryStorage::new();
         let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
-        issue.documents.push(DocumentReference {
-            path: "docs/guide.md".into(),
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: Vec::new(),
-        });
+        issue.documents.push(document_reference("docs/guide.md"));
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         storage.add_worktree_file("docs/guide.md", "![logo](./logo.png)\n");
@@ -1987,14 +1969,7 @@ mod tests {
     fn test_document_add_retry_rederives_assets_and_preserves_unrelated_issue_changes() {
         let storage = InMemoryStorage::new();
         let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
-        issue.documents.push(DocumentReference {
-            path: "docs/other.md".into(),
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: Vec::new(),
-        });
+        issue.documents.push(document_reference("docs/other.md"));
         let id = issue.id.clone();
         crate::commands::test_helpers::seed_issue(&storage, issue);
         storage.add_worktree_file("docs/guide.md", "![old](./old.png)\n");
@@ -2106,16 +2081,9 @@ mod tests {
     fn test_document_remove_from_concurrent_image_preserves_other_fields() {
         let mut issue = crate::domain::types::fixture_issue("Docs".into(), String::new());
         issue.labels.push("owner:concurrent".into());
-        issue.documents.extend(
-            ["docs/remove.md", "docs/keep.md"].map(|path| DocumentReference {
-                path: path.into(),
-                commit: None,
-                label: None,
-                doc_type: None,
-                format: None,
-                assets: Vec::new(),
-            }),
-        );
+        issue
+            .documents
+            .extend(["docs/remove.md", "docs/keep.md"].map(document_reference));
 
         let derived = derive_document_remove(issue, "docs/remove.md").unwrap();
         let updated = derived

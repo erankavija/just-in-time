@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-21T16:24:44.471262087Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -7,12 +8,24 @@
   ],
   "description": "Several structural tests scan the source tree to assert that retired file paths, function names, event tags and a retired CLI verb are absent. Such a test names a property nobody can break by accident, and it outlives the cutover that motivated it.\n\n## Background\n\nIn `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`:\n\n- `test_cutover_has_no_known_predecessor_or_compatibility_module` (`:1283-1352`), with its only helper `contains_cargo_manifest` (`:562-569`).\n- The no-retired-selector-bypass test (`:1412-1427`) and the no-retired-profile-applied-event-contract test (`:1430-1438`).\n- Their only helpers: `assert_retired_lifecycle_entry_point_absent` (`:169-185`), `assert_retired_profile_applied_contract_absent` (`:186-224`), `generated_event_tags` (`:245-251`).\n- The retired-bypass and retired-event-contract cases in `test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes` (`:1555-1590`).\n\nThe tests at `:1084,1122,1355,1382,1446,1468,1759,1792,1819,1861`, and the helpers `production_sources` and `definition_owners`, assert current ownership or forbidden capabilities and stay.\n\nTwo CLI tests assert that retired verbs are absent:\n\n- `tests/cli_issue/command_alias_tests.rs:99` `test_retired_document_archive_has_no_alias_or_stub` asserts that a retired CLI verb is absent and that no migration hint names it.\n- `tests/cli_gate/gate_status_all_strict_test.rs:249` `test_removed_gate_aliases_fail_as_unknown_subcommand` asserts that `pass`, `pass-all`, `check` and `check-all` are absent.\n\n## Success Criteria\n\n- [hard] REQ-01: No test asserts the absence of a retired file path, function name, event tag or CLI verb.\n- [hard] REQ-02: The structural-guard self-test holds no retired-bypass or retired-event-contract case.\n- [hard] REQ-03: The ownership, authority and capability tests in the cutover suite still pass, and each asserts current ownership.\n\n## Notes\n\nOnly tests and their now-unused helpers are deleted.\n",
   "documents": [],
+  "done_at": "2026-10-21T16:38:30.330555317Z",
   "first_ready_at": "2026-10-21T05:48:46.899754968Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:34:22.819811519Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:38:11.504307594Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "afc2b698-34bb-43d1-b7e2-c859de8d8104",
   "labels": [
     "type:task",
@@ -23,7 +36,7 @@
     "satisfies:842b0ac6/REQ-13"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove source-scan tests for retired names",
-  "updated_at": "2026-10-21T05:48:46.899754968Z"
+  "updated_at": "2026-10-21T16:38:30.330555317Z"
 }

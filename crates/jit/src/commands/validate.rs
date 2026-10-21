@@ -80,12 +80,12 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     total_fixes
                 ));
             } else if total_fixes > 0 {
-                all_messages.push(format!("\n✓ Applied {} fixes", total_fixes));
+                all_messages.push(format!("\nApplied {} fixes", total_fixes));
                 // Re-run validation to verify fixes worked
                 self.validate_silent()?;
-                all_messages.push("✓ Repository is now valid".to_string());
+                all_messages.push("Repository is now valid".to_string());
             } else {
-                all_messages.push("\n✓ No fixes needed".to_string());
+                all_messages.push("\nNo fixes needed".to_string());
             }
 
             return Ok((total_fixes, all_messages));
@@ -630,7 +630,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                 .collect::<std::collections::BTreeSet<_>>();
             let messages = changed
                 .into_iter()
-                .map(|path| format!("✓ Repaired derived-state target {path:?}"))
+                .map(|path| format!("Repaired derived-state target {path:?}"))
                 .collect::<Vec<_>>();
             if messages.is_empty() {
                 return Ok(SessionStep::Done((0, Vec::new())));
@@ -1203,7 +1203,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     } else {
                         self.apply_type_fix(issue_id, old_type, new_type)?;
                         messages.push(format!(
-                            "✓ Replaced type '{}' with '{}' for issue {}",
+                            "Replaced type '{}' with '{}' for issue {}",
                             old_type, new_type, issue_id
                         ));
                     }

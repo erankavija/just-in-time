@@ -243,47 +243,6 @@ fn test_eval_alias_runs_checker_like_evaluate() {
         .stdout(predicate::str::contains("\"verdict\": \"pass\""));
 }
 
-// ===== REQ-01: retired verbs `pass`/`pass-all`/`check`/`check-all` are gone =====
-
-#[test]
-fn test_removed_gate_aliases_fail_as_unknown_subcommand() {
-    let temp = setup_repo();
-    define_auto_gate(&temp, "gate-a", "exit 0");
-    let id = create_issue(&temp, &["gate-a"]);
-
-    // `pass` and `check` no longer exist as gate subcommands: clap rejects
-    // them as unrecognized rather than resolving them as aliases of
-    // `evaluate` / `status`.
-    for removed in ["pass", "check"] {
-        let output = jit()
-            .current_dir(temp.path())
-            .args(["gate", removed, &id, "gate-a"])
-            .output()
-            .unwrap();
-        assert_eq!(output.status.code(), Some(2), "`gate {removed}` exit code");
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(&format!("unrecognized subcommand '{removed}'")),
-            "`gate {removed}` stderr: {stderr}"
-        );
-    }
-
-    // `pass-all` and `check-all` no longer exist either.
-    for removed in ["pass-all", "check-all"] {
-        let output = jit()
-            .current_dir(temp.path())
-            .args(["gate", removed, &id])
-            .output()
-            .unwrap();
-        assert_eq!(output.status.code(), Some(2), "`gate {removed}` exit code");
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(
-            stderr.contains(&format!("unrecognized subcommand '{removed}'")),
-            "`gate {removed}` stderr: {stderr}"
-        );
-    }
-}
-
 #[test]
 fn test_canonical_verbs_still_work_after_alias_removal() {
     let temp = setup_repo();

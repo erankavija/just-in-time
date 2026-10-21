@@ -1948,8 +1948,6 @@ pub struct LinkCheckResult {
     pub errors: Vec<serde_json::Value>,
     pub warnings: Vec<serde_json::Value>,
     #[serde(skip)]
-    pub exit_code: i32,
-    #[serde(skip)]
     pub scope: String,
     pub summary: LinkCheckSummary,
 }

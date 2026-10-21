@@ -2066,7 +2066,7 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::{document_reference, document_reference_at};
+    use crate::test_utils::{document_reference, document_reference_at, document_reference_typed};
 
     fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
         let mut issue = fixture_issue("Archived".to_string(), String::new());
@@ -2817,10 +2817,7 @@ mod tests {
         use std::path::PathBuf;
 
         let doc = DocumentReference {
-            path: "docs/design.md".to_string(),
-            commit: None,
             label: Some("Design Doc".to_string()),
-            doc_type: Some("design".to_string()),
             format: Some("markdown".to_string()),
             assets: vec![Asset {
                 original_path: "./logo.png".to_string(),
@@ -2830,6 +2827,7 @@ mod tests {
                 content_hash: Some("sha256:abc123".to_string()),
                 is_shared: false,
             }],
+            ..document_reference_typed("docs/design.md", "design")
         };
 
         assert_eq!(doc.format, Some("markdown".to_string()));
@@ -2843,10 +2841,7 @@ mod tests {
         use std::path::PathBuf;
 
         let doc = DocumentReference {
-            path: "docs/design.md".to_string(),
-            commit: None,
             label: Some("Design Doc".to_string()),
-            doc_type: Some("design".to_string()),
             format: Some("markdown".to_string()),
             assets: vec![Asset {
                 original_path: "./logo.png".to_string(),
@@ -2856,6 +2851,7 @@ mod tests {
                 content_hash: Some("sha256:abc123".to_string()),
                 is_shared: false,
             }],
+            ..document_reference_typed("docs/design.md", "design")
         };
 
         let json = serde_json::to_string(&doc).unwrap();
@@ -2893,10 +2889,7 @@ mod tests {
 
         // New JSON with format and assets
         let doc = DocumentReference {
-            path: "docs/design.md".to_string(),
-            commit: None,
             label: Some("Design".to_string()),
-            doc_type: Some("design".to_string()),
             format: Some("markdown".to_string()),
             assets: vec![
                 Asset {
@@ -2916,6 +2909,7 @@ mod tests {
                     is_shared: false,
                 },
             ],
+            ..document_reference_typed("docs/design.md", "design")
         };
 
         let json = serde_json::to_string_pretty(&doc).unwrap();
@@ -2936,12 +2930,8 @@ mod tests {
     #[test]
     fn test_document_reference_empty_assets() {
         let doc = DocumentReference {
-            path: "docs/notes.md".to_string(),
-            commit: None,
-            label: None,
-            doc_type: Some("notes".to_string()),
             format: Some("markdown".to_string()),
-            assets: vec![],
+            ..document_reference_typed("docs/notes.md", "notes")
         };
 
         let json = serde_json::to_string(&doc).unwrap();
