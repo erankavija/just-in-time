@@ -20,7 +20,6 @@ use jit::repository_state::RepositoryLayout;
 use jit::storage::{JsonFileStorage, RepositoryMutationSession, RepositoryStateStore};
 use listenfd::ListenFd;
 use std::net::TcpListener;
-use std::path::Path;
 
 /// Where the server's listening socket came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,11 +63,11 @@ pub fn resolve_listener(bind_addr: &str) -> Result<(TcpListener, ListenerSource)
 
 /// Apply any leftover redo record and validate a mutation-capable server
 /// repository before constructing any command executor or configuration cache.
+/// Storage is rooted at the layout's normalized data root.
 pub fn prepare_server_storage(
-    data_dir: impl AsRef<Path>,
     layout: RepositoryLayout,
 ) -> Result<(JsonFileStorage, Box<dyn RepositoryMutationSession>)> {
-    let storage = JsonFileStorage::new(data_dir);
+    let storage = JsonFileStorage::new(layout.data_root());
     let recovery_session = storage
         .open_mutation_session(layout)
         .context("Failed to open the repository session or apply its leftover redo record")?;
@@ -106,6 +105,53 @@ mod recovery_startup_tests {
         record(&bytes).commit(&data).unwrap();
     }
 
+    /// REQ-02, REQ-03, REQ-04: a relative spelling and the absolute one bind
+    /// the same layout, so reads through either serve the repository's issues.
+    #[test]
+    fn test_server_startup_serves_reads_from_relative_data_dir_spellings() {
+        use jit::storage::IssueStore;
+        use jit::test_utils::CurrentDirGuard;
+
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().canonicalize().unwrap();
+        let data = root.join("repo").join(".jit");
+        std::fs::create_dir_all(&data).unwrap();
+        let layout = jit::storage::discover_repository_layout(root.join("repo"), &data).unwrap();
+        let executor = CommandExecutor::new(JsonFileStorage::new(&data)).with_layout(layout);
+        executor
+            .initialize_fresh_repository(&root.join("repo"), None)
+            .expect("a repository the server can serve");
+        let (id, _) = executor
+            .create_issue(
+                "Hello".into(),
+                String::new(),
+                jit::Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .expect("an issue to serve");
+
+        let sibling = root.join("sibling");
+        std::fs::create_dir(&sibling).unwrap();
+        let _cwd = CurrentDirGuard::new(&sibling).unwrap();
+        for spelling in ["../repo/.jit", "../sibling/../repo/.jit"] {
+            let layout =
+                jit::storage::discover_repository_layout(root.join("repo"), spelling).unwrap();
+            let (storage, _session) =
+                prepare_server_storage(layout).expect("startup over a relative data directory");
+            let ids: Vec<_> = storage
+                .list_issues()
+                .expect("reads bind the layout")
+                .iter()
+                .map(|issue| issue.id.clone())
+                .collect();
+            assert!(ids.contains(&id), "{spelling} serves the repository issues");
+        }
+    }
+
     #[test]
     fn test_server_startup_applies_the_leftover_record_before_validation() {
         let temp = TempDir::new().unwrap();
@@ -126,7 +172,7 @@ mod recovery_startup_tests {
         let data = temp.path().join(".jit");
         let layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
         let (_storage, session) =
-            prepare_server_storage(&data, layout).expect("startup applies the record first");
+            prepare_server_storage(layout).expect("startup applies the record first");
 
         assert_eq!(session.recovery_report().recovered_count(), 1);
     }
@@ -156,8 +202,7 @@ mod recovery_startup_tests {
         .unwrap();
 
         let served_layout = jit::storage::discover_repository_layout(temp.path(), &data).unwrap();
-        let (_storage, session) =
-            prepare_server_storage(&data, served_layout).expect("startup recovery");
+        let (_storage, session) = prepare_server_storage(served_layout).expect("startup recovery");
 
         assert_eq!(
             session.recovery_report().recovered_count(),
