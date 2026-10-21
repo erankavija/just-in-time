@@ -1,7 +1,7 @@
 {
   "epic_id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
   "epic_short_id": "3d9a0ce3",
-  "current_wave": 1,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -20,7 +20,7 @@
           "title": "Record a checker infrastructure fault as an error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "done (rework 2 by lead: storage-records/custom-gates duplicate)"
+          "status": "done"
         },
         {
           "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
@@ -36,7 +36,7 @@
           "title": "Remove profile checks from repository validation",
           "classification": "implementation",
           "model": "haiku",
-          "status": "done (rework 2 by lead: rustdoc)"
+          "status": "done"
         },
         {
           "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
@@ -58,7 +58,7 @@
           "title": "Reuse gate verdicts only by declared-input digest",
           "classification": "implementation",
           "model": "opus",
-          "status": "done (merge 203c67fd2; cargo-ci forced rerun after load-only timeouts)"
+          "status": "done"
         },
         {
           "id": "f37d228e-f3dd-412f-87c7-364f64da2f07",
@@ -66,7 +66,7 @@
           "title": "Exit successfully from link checking on warnings alone",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ],
       "note": "1b: 72d89161 after ae2e3739 (gate_execution.rs); f37d228e after 66986f88 (link checker)"
@@ -104,7 +104,7 @@
           "title": "Remove redundant explicit links inside artifact directories",
           "classification": "implementation",
           "model": "haiku",
-          "status": "done (lead data edit 47dcf8560)"
+          "status": "done"
         },
         {
           "id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
@@ -112,7 +112,7 @@
           "title": "Gate status reports a manual attestation as never run",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 2 queued (last before escalation): code-review R2 concurrent automated runs ordering (same class as R1)"
+          "status": "done (rework 2 + steward-approved run_id conversion e2f2693d8)"
         },
         {
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
@@ -128,7 +128,7 @@
           "title": "Report load-only cargo-ci failures as infrastructure faults",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched (sonnet)"
         }
       ],
       "note": "24268b05 waits on 756ec5ec (842b0ac6)"
@@ -142,7 +142,7 @@
           "title": "Remove profile capture",
           "classification": "implementation",
           "model": "haiku",
-          "status": "dispatched (sonnet) at 8849930aa"
+          "status": "done"
         },
         {
           "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
@@ -150,7 +150,7 @@
           "title": "Replace emoji status markers in CLI output with words",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "da12ad66-7451-4700-9731-74a36c895bb9",
@@ -172,7 +172,7 @@
           "title": "Remove the profile selector tags",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "merged; cargo-ci passed; mcp-ci blocked by another epic's uncurated jit_migrate_lifecycle-timestamps (reported to steward); code-review failed only on mcp-ci"
         },
         {
           "id": "7f9268ed-4143-4e4b-ac50-200d0cf78d40",
@@ -507,6 +507,14 @@
     {
       "topic": "mcp-ci judges installed jit binary, not the tree",
       "resolution": "pending steward (options: reinstall per CLI change, or build+PATH in checker)"
+    },
+    {
+      "topic": "8673dc5e rework limit: legacy gates_status without run_id",
+      "resolution": "steward ruled option A; conversion tool run (2405+2+3 pointed, 210 attested runs published); committed e2f2693d8"
+    },
+    {
+      "topic": "mcp-ci red on main from another epic (jit_migrate_lifecycle-timestamps uncurated)",
+      "resolution": "reported to steward; pending"
     }
   ],
   "surfaced_pitfalls": [
@@ -517,7 +525,9 @@
     "materialize.rs: MaterializationRequest::RepairDerivedState.profiles, the derive_repair profile loop and AmbiguousOwnershipError::MultipleProfileClaims are dead after d6bbe05f; delete with records in 5179374d.",
     "cli_warnings_integration_tests take ~6.3 s each alone and time out (20 s) under concurrency; recurring 'load' failures.",
     "24268b05: ProfileResolution::RestoreRecordedPackage is dead; remove with remedies in f866d9d8 (noted in its lead notes).",
-    "8673dc5e: manual passes recorded before the change have no run record (accepted, greenfield); removing and re-adding a gate leaves old run records visible in latest-run (pre-existing, outside REQ-03 per lead)."
+    "8673dc5e: manual passes recorded before the change have no run record (accepted, greenfield); removing and re-adding a gate leaves old run records visible in latest-run (pre-existing, outside REQ-03 per lead).",
+    "1a989754: PROFILE_NOT_FOUND error code has no reachable route; an absent package dir returns PROFILE_ERROR exit 1. Candidate for 0f648627 (graph error merge) or a follow-up.",
+    "2dd6b833: repository_state/package_tree.rs republication machinery (TreeFileDisposition::Remove, expand_destination_closure) is unreachable now that add publishes only to an absent destination; candidate for 56b89d9a entrypoint pruning."
   ],
   "rework_counts": {
     "d6bbe05f": 2,
