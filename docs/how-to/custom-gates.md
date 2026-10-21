@@ -317,10 +317,18 @@ Follow these patterns when writing an `exec` checker.
 
 ### Exit Codes
 
-Gates use standard exit codes:
+A checker's exit status decides the recorded run:
 
 - **0** - Gate passed
-- **Non-zero** - Gate failed
+- **75** (`EX_TEMPFAIL`) - The checker could not judge (a stale cache server, a
+  lost lock, a reviewer that produced no output). jit records an `error` run, the
+  evaluation exits `10` with verdict `error`, and the next evaluation retries it.
+- **126, 127** - The command is not executable or not found; recorded as `error`.
+- **Any other non-zero** - Gate failed: a verdict on the repository.
+
+A timeout or a checker killed by a signal also records an `error` run. If the
+`jit` process itself is killed during an evaluation, no run is recorded and no
+verdict is fabricated.
 
 ```bash
 #!/bin/bash
@@ -332,7 +340,7 @@ if cargo test --quiet; then
   exit 0
 else
   echo "✗ Tests failed"
-  exit 1
+  exit 1   # a finding; use 75 when the checker itself could not run
 fi
 ```
 
@@ -426,7 +434,9 @@ the review agent to append this block after the human-readable findings list.
 Keep transport and repository policy separate. The `ai-review.sh` checker is a
 tool-agnostic wrapper. The reviewer emits human-readable findings, a structured
 findings block, and a terminal verdict. The wrapper transports the prompt and
-context and determines its checker exit code from the terminal verdict. jit
+context and determines its checker exit code from the terminal verdict: `0` for a pass,
+`1` for a review that found defects, and `75` when it could not judge (no agent
+output, an unparseable verdict, or a missing reviewer tool). jit
 parses and persists the structured findings block. A repository-specific prompt
 owns the inspection procedure but should not copy an engineering rubric or
 registry statement.
@@ -622,7 +632,7 @@ jit gate define ai-review \
   --timeout 120
 ```
 
-`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and determines the checker exit code from the terminal verdict; jit parses and persists the structured findings block from the checker output. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
+`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and determines the checker exit code from the terminal verdict (`0` pass, `1` defects found, `75` cannot judge); jit parses and persists the structured findings block from the checker output. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
 
 ### Prompt Library
 

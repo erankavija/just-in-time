@@ -106,18 +106,35 @@ fn test_verdict_fail_records_a_failure() {
     assert_eq!(exit_code, 1, "expected exit 1 (FAIL) but got {exit_code}");
 }
 
-// Sanity: no verdict line at all → failure.
+/// Exit status the wrapper uses when it could not judge (EX_TEMPFAIL).
+const CANNOT_JUDGE: i32 = 75;
+
 #[test]
-fn test_verdict_unparseable_records_a_failure() {
+fn test_verdict_unparseable_reports_cannot_judge() {
     let temp = TempDir::new().unwrap();
     let context = write_context_file(&temp);
     let agent = write_fake_agent(&temp, "Some prose with no verdict line.\n");
 
     let exit_code = run_script(&wrapper(), &context, agent.to_str().unwrap());
-    assert_ne!(
-        exit_code, 0,
-        "expected non-zero exit for unparseable verdict"
-    );
+    assert_eq!(exit_code, CANNOT_JUDGE);
+}
+
+#[test]
+fn test_agent_without_output_reports_cannot_judge() {
+    let temp = TempDir::new().unwrap();
+    let context = write_context_file(&temp);
+
+    let exit_code = run_script(&wrapper(), &context, "true");
+    assert_eq!(exit_code, CANNOT_JUDGE);
+}
+
+#[test]
+fn test_missing_reviewer_tool_reports_cannot_judge() {
+    let temp = TempDir::new().unwrap();
+    let context = write_context_file(&temp);
+
+    let exit_code = run_script(&wrapper(), &context, "jit-no-such-reviewer-xyz");
+    assert_eq!(exit_code, CANNOT_JUDGE);
 }
 
 #[test]
@@ -129,7 +146,11 @@ fn test_missing_prompt_fails_with_a_diagnostic() {
 
     let output = run_script_output(&wrapper(), &context, agent.to_str().unwrap());
 
-    assert_eq!(output.status.code(), Some(1), "missing prompt passed");
+    assert_eq!(
+        output.status.code(),
+        Some(CANNOT_JUDGE),
+        "missing prompt must be a cannot-judge fault"
+    );
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("No prompt defined"),
         "missing-prompt diagnostic absent"

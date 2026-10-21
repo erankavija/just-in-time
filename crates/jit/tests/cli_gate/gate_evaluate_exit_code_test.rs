@@ -3,7 +3,7 @@
 //! Matrix:
 //!   success             -> exit 0,  verdict "pass"
 //!   checker failure     -> exit 4,  verdict "fail"   (checker ran, non-zero exit)
-//!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code)
+//!   runner error        -> exit 10, verdict "error"  (checker killed, no exit code, or exit 75)
 //!   issue not found     -> exit 3,  no verdict
 //!   gate not required   -> exit 2,  no verdict
 //!   manual gate, no --by -> exit 2, no verdict (jit:1d59070d REQ-03)
@@ -155,6 +155,48 @@ fn test_gate_evaluate_command_not_found_exit_10_verdict_error() {
     let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(json["error"]["code"], "IO_ERROR");
     assert_eq!(json["error"]["details"]["verdict"], "error");
+}
+
+#[test]
+fn test_gate_evaluate_checker_exit_75_records_error_run() {
+    // EX_TEMPFAIL: the checker reports it could not judge.
+    let (temp, id) = setup_auto_gate_issue("exit 75");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(10));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["details"]["verdict"], "error");
+
+    let status = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "status", &id, "test-gate", "--json"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&status.stdout);
+    assert!(
+        text.contains("\"error\""),
+        "run not recorded as error: {text}"
+    );
+}
+
+#[test]
+fn test_gate_evaluate_other_nonzero_exit_stays_failed() {
+    let (temp, id) = setup_auto_gate_issue("exit 74");
+
+    let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+        .current_dir(temp.path())
+        .args(["gate", "evaluate", &id, "test-gate", "--json"])
+        .output()
+        .unwrap();
+
+    assert_eq!(output.status.code(), Some(4));
+    let json: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(json["error"]["details"]["verdict"], "fail");
 }
 
 #[test]
