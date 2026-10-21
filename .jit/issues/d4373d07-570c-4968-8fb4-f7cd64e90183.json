@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e"
+  ],
+  "description": "Moves foreground `jit serve` into `commands/serve.rs` as one operation that returns an outcome, so the CLI's serve path neither spawns processes itself nor calls `std::process::exit`.\n\n## Background\n\n`crates/jit/src/commands/serve.rs` owns the daemonizing start (`start_server` returning `ServeOutcome`), `stop_server` and `server_status`. Foreground mode (`jit serve --fg`) is assembled inline in the `Commands::Serve` arm of `crates/jit/src/main.rs`: it calls `read_pid_file` and `is_process_alive` to detect a running server, `find_available_port`, `find_server_binary` and `find_web_dir`, builds a `std::process::Command`, calls `spawn_with_listener`, blocks on `child.wait()`, prints a JSON or human result, and on a non-zero child calls `std::process::exit(foreground_exit_code(status.code()))`. The human banner (`Starting server on <url>`) is printed after the port is bound and before the wait.\n\n## Success Criteria\n\n- [hard] REQ-01: `commands::serve::run_foreground` performs the already-running check, port selection, binary and web-dir resolution, spawn and wait, and returns a `ForegroundOutcome` that distinguishes an already-running server (pid, port) from an exited child (port, child exit status).\n- [hard] REQ-02: The CLI serve path calls `run_foreground`, prints its banner through a callback or value the operation hands back before blocking, maps an exited child's status to the process exit code through `foreground_exit_code` without calling `std::process::exit` itself, and its human output, JSON payloads and exit codes are unchanged.\n- [hard] REQ-03: A unit test drives `run_foreground` with a stub server binary and shows the outcome carries the child's exit status (`test_run_foreground_reports_child_exit_status`); the existing serve suites pass unweakened.\n\n## Notes\n\n- Holding the retained mutation session across the wait deadlocks the child; the CLI keeps releasing it before calling the operation.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d4373d07-570c-4968-8fb4-f7cd64e90183",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:executor-surface",
+    "satisfies:df129d9e/REQ-19"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Foreground serve as a commands-layer operation",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

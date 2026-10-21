@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e"
+  ],
+  "description": "The human validation findings block, copied four times in `Commands::Validate` and once more in `config validate`, goes through one renderer in the output module.\n\n## Background\n\nThe `Commands::Validate` arm in `crates/jit/src/main.rs` (or its handler module once moved) prints a findings line `{marker} [{rule}] {message}` in four places: `--scope`, `--rule`, per-issue `validate <id>`, and the full repository run. They differ: `--scope` prints a pass line after warnings-only findings while `--rule` and per-issue print nothing; three of four write the failure summary to stderr; the repository variant prints its header before the findings, then `Warnings: N` and a divergence advisory. `ConfigCommands::Validate` has its own `Errors:` block with different markers. The machine-readable side is already shared through `render_validation_json`.\n\n## Success Criteria\n\n- [hard] REQ-01: One renderer in the output module prints a findings block (one line per finding with severity, rule and message, then a summary) in the majority form: no pass line after warnings-only findings, failure summary on stderr.\n- [hard] REQ-02: The four `validate` variants and `config validate` print findings only through that renderer; command-specific framing such as the repository header and divergence advisory stays with the command.\n- [hard] REQ-03: `validate --scope` with warnings only and `config validate` have tests stating their new human output.\n- [hard] REQ-04: One unit test owns the renderer's format; exit codes are unchanged, and the existing validation suites pass without weakened assertions.\n\n## Notes\n\nWhich exit code each validate variant returns is decided by its findings outcome, not by this renderer. 3754095f changes the severity markers from emoji to words first; the renderer uses those words. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9cc3056a-7147-4a9a-89bf-f0e6fd53806b",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "satisfies:df129d9e/REQ-21",
+    "satisfies:df129d9e/REQ-09"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "One output renderer for validation findings",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
+  ],
+  "description": "`jit version` is rendered inline in `run()` and typed in the schema only by the legacy table. This registers it as a library handler that runs before repository bootstrap.\n\n## Background\n\n`run()` in `crates/jit/src/main.rs` handles `Commands::Version` before repository discovery, building `JsonOutput::success(&info)` over `build_info::VersionInfo` in the arm. Its schema entry comes from the hand-kept `\"version\"` row of `get_output_schema_for_command` in `crates/jit/src/schema.rs`. Once that table is deleted, a leaf without a registered handler would have no typed response. Like `init`, the command must work outside a repository.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit version` is dispatched to a registered handler in `crates/jit/src/dispatch/` that runs without opening a repository, and `main.rs` keeps no arm body for it.\n- [hard] REQ-02: The handler returns `VersionInfo` (or an output-owned wrapper) as its registered response, and the schema takes the leaf's success schema from the registry.\n- [hard] REQ-03: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-04: Human and machine output of `jit version` are unchanged inside and outside a repository, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThe handler contract's dispatch and response registry are the mechanism; this task adds no new mechanism. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "f930acf2-0f03-4ca0-8ad8-97ddcc85f368",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:command-dispatch",
+    "satisfies:df129d9e/REQ-01",
+    "satisfies:df129d9e/REQ-02",
+    "satisfies:df129d9e/REQ-12",
+    "satisfies:df129d9e/REQ-13",
+    "satisfies:df129d9e/REQ-17",
+    "satisfies:df129d9e/REQ-18"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Version command moves to a library handler",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

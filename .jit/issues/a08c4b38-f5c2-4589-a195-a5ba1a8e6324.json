@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "0546fc82-435f-4d02-9af2-0dc22e301d60",
+    "0bc448fb-3c2e-42f9-a674-ce76c402a8a7",
+    "9ca31c64-f3ee-419b-b31c-2c883ae6132e",
+    "ef9897ab-87d9-4721-a607-801b5d866394",
+    "f9977efd-9626-4075-9cdb-d8f74dd9881d"
+  ],
+  "description": "Close the epic with a measured report: production lines of `crates/jit/src` before and after, per module, and the build-footprint budgets re-measured after the harness change.\n\n## Background\n\n`dev/active/df129d9e-rust-code-quality/line-count-baseline.md` records the before figures, their commit and the `scripts/production-lines.py` commands, in the default (survey-described) mode with the flagged mode beside it. Line-count reduction is evidence for this epic, not its pass condition: where a boundary fix and a smaller count disagree, the boundary wins, and the report records the delta. The integration harness moved into `jit`'s `test-support` surface, so the `bounded-rust-build-footprint` budgets (integration targets and active test-executable bytes, on the `rust-build-budget:` line of `scripts/rust-build-budget.sh`) must be re-measured. The last line before the change read `integration-targets=10/12 active-executables=14 bytes=1743471112/2147483648`.\n\n## Success Criteria\n\n- [hard] REQ-01: `dev/active/df129d9e-rust-code-quality/completion-report.md` tabulates production lines per top-level module of `crates/jit/src` at the baseline commit and at a named final commit, with per-module and total deltas, in the default mode as the REQ-10 evidence and the flagged mode beside it, produced by the same counter and commands as the baseline.\n- [hard] REQ-02: The report quotes a `rust-build-budget:` success line measured at the final commit, including the integration-target count, active-executable bytes and the `main.rs` line field, beside the pre-change line.\n- [hard] REQ-03: The report attributes the largest module deltas to this epic's work or to named concurrent issues.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
+  "documents": [],
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a08c4b38-f5c2-4589-a195-a5ba1a8e6324",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:build-hygiene",
+    "satisfies:df129d9e/REQ-07",
+    "satisfies:df129d9e/REQ-10"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Write the df129d9e completion report",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

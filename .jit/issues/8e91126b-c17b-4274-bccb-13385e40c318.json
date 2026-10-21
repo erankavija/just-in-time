@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
+  ],
+  "description": "`project render` substitutes its own fallback codes. This moves it to a library handler.\n\n## Background\n\n`run_project`/`run_project_inner` in `crates/jit/src/main.rs` substitute `VALIDATION_FAILED` or `PROJECT_COMMAND_FAILED` for failures and serialize `ProjectRenderResult` (`crates/jit/src/commands/project.rs`, which stores its own `count`) directly. `project render` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `project render` to a handler in `crates/jit/src/dispatch/project.rs`, and `main.rs` keeps neither `run_project` nor `run_project_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, projections are a `ListEnvelope` instantiation, `ProjectRenderResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a render failure reports its classified code on both paths instead of `PROJECT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "mcp-ci"
+  ],
+  "gates_status": {},
+  "id": "8e91126b-c17b-4274-bccb-13385e40c318",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:command-dispatch",
+    "satisfies:df129d9e/REQ-01",
+    "satisfies:df129d9e/REQ-02",
+    "satisfies:df129d9e/REQ-12",
+    "satisfies:df129d9e/REQ-13",
+    "satisfies:df129d9e/REQ-17",
+    "satisfies:df129d9e/REQ-18"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Project command moves to a library handler",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e"
+  ],
+  "description": "Human gate-run status lines — \"has not been run yet\" and \"Passed gate\" — go through one renderer in the output module instead of copies across gate arms.\n\n## Background\n\nIn `crates/jit/src/main.rs` (or the gate handler modules once moved), the message \"Gate '{k}' has not been run yet for issue {id}. Use 'jit gate evaluate' to run it.\" appears three times in `GateCommands::Status` (findings, flat and default views) and once in `GateCommands::StatusAll`. The pass line \"Passed gate '{k}' for issue {id}{suffix}\" appears in `GateCommands::Evaluate`, `EvaluateAll` and `EvaluateMany`; `EvaluateAll` and `EvaluateMany` mark a skipped re-run with the suffix \" (already passed at HEAD)\", while `Evaluate` prints a different sentence (\"already passed at HEAD for issue X, skipping (use --force to re-run)\"). `print_gate_run_details` and `render_gate_pass_error` are already shared.\n\n## Success Criteria\n\n- [hard] REQ-01: One renderer in the output module prints a gate's run status line for the never-run and passed (including already-passed-at-HEAD) cases.\n- [hard] REQ-02: `gate status` (all views), `gate status-all`, `gate evaluate`, `gate evaluate-all` and `gate evaluate-many` print those lines only through that renderer.\n- [hard] REQ-03: `gate evaluate` reports an already-passed gate with the majority \" (already passed at HEAD)\" form, and a test states that output.\n- [hard] REQ-04: One unit test owns the renderer's lines; other gate human output is unchanged and the gate suites pass without weakened assertions.\n\n## Notes\n\nThe `--json` \"not run\" output is outside this renderer. 8673dc5e changes how a manually attested gate is reported in `gate status`; the renderer starts from its result. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "9fa12e75-2632-4e68-8d67-b80caf78770d",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "satisfies:df129d9e/REQ-21",
+    "satisfies:df129d9e/REQ-09"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Render gate run status lines through one output renderer",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

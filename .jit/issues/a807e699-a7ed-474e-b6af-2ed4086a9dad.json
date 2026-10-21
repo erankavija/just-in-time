@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e"
+  ],
+  "description": "Moves the CLI's repository-opening prelude into one library function that returns a ready executor and its retained mutation session, so `main.rs` makes no storage or discovery call of its own.\n\n## Background\n\n`run()` in `crates/jit/src/main.rs` opens the repository inline before dispatch:\n\n- discovers the data root (`JIT_DATA_DIR`, `jit init`, `discover_recovery_jit_dir` for recovery-dispatched commands, `discover_jit_dir` otherwise, with a `<cwd>/.jit` fallback);\n- detects `WorktreePaths::detect_for_data_root` and takes the linked-checkout write decision;\n- constructs `JsonFileStorage::new`, calls `configure_worktree_paths` and `discover_repository_layout`;\n- opens the mutation session: an unretained `RepositoryStateStore::open_mutation_session` for claim-coordinating commands, `open_and_retain_mutation_session` otherwise, mapping a leftover-record failure under `jit recover` to a recovery failure;\n- builds `CommandExecutor::new(..).with_layout(..).with_worktree_paths(..)`;\n- calls `storage.validate()` for every command except `init` and `profile list`/`show`.\n\nThe server repeats part of this in `crates/server/src/main.rs`. Every step is library work, and its order is behaviour (the write-policy refusal precedes any lock or write; recovery precedes validation).\n\n## Success Criteria\n\n- [hard] REQ-01: A public library function takes the invocation facts the prelude reads (working directory, data-dir override, whether the command is init, recovery-dispatched, claim-coordinating or validation-exempt, and the write override) and returns the executor, the retained-session guard and the recovered-record count, performing the steps above in today's order.\n- [hard] REQ-02: `main.rs` opens the repository only through that function and makes no `JsonFileStorage`, `RepositoryStateStore`, discovery, worktree-path or `validate` call.\n- [hard] REQ-03: A test of the function (for example `test_open_repository_validates_except_for_exempt_commands`) shows the validation exemption and the retained session, and the existing startup, recovery, linked-checkout and init suites pass unweakened.\n\n## Notes\n\n- 0f8efc37 later adopts this function for the server; the server is unchanged here.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "a807e699-a7ed-474e-b6af-2ed4086a9dad",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:executor-surface",
+    "satisfies:df129d9e/REQ-19"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Library repository bootstrap for the CLI",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

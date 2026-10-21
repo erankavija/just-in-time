@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "1539da29-f445-430c-a238-8613da6ae904"
+  ],
+  "description": "Document path-read failures classify to codes that misdescribe them, so a status derived from the classification would be wrong. This gives each `PathReadError` variant its own code.\n\n## Background\n\n`PathReadError` (`crates/jit/src/storage/path_errors.rs`) has the variants `NotFound`, `CommitNotFound`, `InvalidPath`, `OutsideRepoRoot` and `Other`. The library classifier in `crates/jit/src/output/failure.rs` maps `NotFound` and `CommitNotFound` to `REPOSITORY_NOT_FOUND`, labelling a missing document as a missing repository, maps `InvalidPath` to `INVALID_ARGUMENT`, and maps `OutsideRepoRoot` to `GENERIC_ERROR` (exit 1). The HTTP server keeps its own map that answers 404 and 400 for these. For the server to derive its status from the classification, the classification itself must name these failures correctly.\n\n## Success Criteria\n\n- [hard] REQ-01: `OutsideRepoRoot` classifies to `INVALID_ARGUMENT` as `InvalidPath` already does, and `NotFound` and `CommitNotFound` classify to a document-not-found code in the not-found exit class; `Other` classifies by its inner error as today.\n- [hard] REQ-02: The document-not-found code is a member of the error-code vocabulary with a description, and the generated error-code reference lists it.\n- [hard] REQ-03: Library unit tests own each variant's classification, and a CLI test states the new code and exit status of `jit doc show` for a missing document and for a path outside the repository.\n- [hard] REQ-04: No other error's classification changes, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThis is a deliberate, user-visible exit-code change. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "22189592-0133-4465-b850-3f6ffff129b7",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:error-boundary",
+    "satisfies:df129d9e/REQ-13",
+    "satisfies:df129d9e/REQ-14",
+    "satisfies:df129d9e/REQ-09"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Classify document path-read failures by variant",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e"
+  ],
+  "description": "The archive execution summary, duplicated byte for byte in two archive arms, moves into one renderer beside the existing archive renderers.\n\n## Background\n\n`ArchiveCommands::Document` and `ArchiveCommands::Container` in `crates/jit/src/main.rs` (or the archive handler module once moved) each print the same block after executing an archive: an `Archive execution complete: …` line followed by `warning:` lines. The preview and candidates views already go through `output::render_archive_plan` and `render_archive_candidates`, so the execution view is the only archive view rendered inline.\n\n## Success Criteria\n\n- [hard] REQ-01: The output module exposes one archive execution renderer, beside `render_archive_plan`, that prints the completion line and warnings.\n- [hard] REQ-02: `archive document` and `archive container` print their execution summary only through it, and their human output is unchanged.\n- [hard] REQ-03: One unit test owns the renderer's output, and the archive CLI suites pass without assertion changes.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2e7e1348-869e-47dc-af07-29c21b40fdc0",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "story:output-contract",
+    "satisfies:df129d9e/REQ-21"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "One output renderer for archive execution summaries",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}

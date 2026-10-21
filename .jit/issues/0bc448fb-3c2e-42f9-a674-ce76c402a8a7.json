@@ -1,0 +1,52 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T01:17:17.724444903Z",
+  "dependencies": [
+    "06ee9b67-07c3-48ad-a938-179a83d12564",
+    "0fe46027-8a33-4dce-bc6f-76162d067fee",
+    "153c9851-dca1-40f3-838b-ee2790fb9318",
+    "182f4c03-2c8b-431c-9c1e-a208c234a525",
+    "1a4f2ebd-6041-4965-b15d-2411a6bdd9ec",
+    "20fc3b92-6ce6-48e1-9d51-9bd77956236e",
+    "24a982b7-d2e0-4bd2-bdd8-2cd4dbeacfd0",
+    "3cf69ecf-5ec1-4cb1-855f-100aa76f7520",
+    "3f816619-6163-46d4-8549-f988a3de65db",
+    "52110fb4-8fe5-4090-9f7e-5da7081953ac",
+    "66790c84-f39f-4004-ba9d-4ceb83a1e8d6",
+    "71f5296c-7de3-498b-b088-75a2f052014c",
+    "8c46fc85-284a-4491-aa5c-57a5b22f96db",
+    "8e91126b-c17b-4274-bccb-13385e40c318",
+    "8f297e60-a74e-4efa-bdcc-54659f9959a4",
+    "98cc2097-026d-4744-aeaa-82532910328e",
+    "b23b1bf3-e875-44aa-b879-4dc96c0b7caf",
+    "b23faa59-8451-4fc4-97b8-a139d1b210e6",
+    "b25c2e54-2614-4d87-b967-0f2cb25c37f9",
+    "c9103fcf-aa0c-4642-8531-5360f5fdd58d",
+    "cc4ea8a9-6f24-4dc2-ad6a-fccbe7d79be4",
+    "cd8e04cc-1f52-40a5-935a-b2b77a67240e",
+    "e5d618ee-a23a-4857-baa9-e0d5188b8614",
+    "f930acf2-0f03-4ca0-8ad8-97ddcc85f368"
+  ],
+  "description": "Closes the executor's public surface to its constructors and family facade accessors, making the shared kernel crate-private, so no consumer outside `crates/jit` can bypass a family facade.\n\n## Background\n\nWith every family reached through a facade (`CommandExecutor::issues()` returning `IssueOps<'_, S>`, and its peers), the kernel in `crates/jit/src/commands/mod.rs` is still public: `repository_layout`, `storage`, `rules`, `effective_rules`, `require_active_lease`, and the `pub config_manager: ConfigManager` field. The server reaches past the facades through them: `crates/server/src/routes.rs` calls `state.executor.storage()` to feed `jit::config_manager::get_hierarchy_config`, `repository_layout()`, and reads `.config_manager` at four sites (`get_namespaces` three times, `get_hierarchy_icons` once). Integration tests call `executor.storage()` in about 16 files.\n\n## Success Criteria\n\n- [hard] REQ-01: The public methods of `CommandExecutor` are its constructors (`new`, `with_layout`, `with_worktree_paths`) and the family accessors; kernel methods are `pub(crate)`, and `config_manager` is a private field.\n- [hard] REQ-02: The server's hierarchy-config, namespace, icon and layout reads go through facade methods, and it uses no kernel item; test-only access to storage is gated on `cfg(test)` or the `test-support` feature.\n- [hard] REQ-03: A source-policy test in `crates/jit/tests/scratch_build/` (`test_command_executor_public_surface_is_constructors_and_accessors`) scans the `impl CommandExecutor` blocks under `crates/jit/src/commands/` and fails when a `pub fn` there is neither a constructor nor returns a facade type, and the Rust workspace builds and passes its existing suites with no assertion weakened.\n\n## Notes\n\n- A compile-fail doctest is not used; the policy test is the observable check.\n- Server response shapes and statuses are unchanged.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0bc448fb-3c2e-42f9-a674-ce76c402a8a7",
+  "labels": [
+    "type:task",
+    "epic:rust-code-quality",
+    "milestone:v1.0",
+    "component:cli",
+    "component:server",
+    "story:executor-surface",
+    "satisfies:df129d9e/REQ-03"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Crate-private executor kernel",
+  "updated_at": "2026-10-21T01:17:17.724444903Z"
+}
