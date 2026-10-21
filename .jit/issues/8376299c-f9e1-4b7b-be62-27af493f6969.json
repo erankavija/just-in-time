@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-21T15:34:54.412994171Z",
   "context": {},
   "created_at": "2026-10-20T19:42:10.383077581Z",
   "dependencies": [
@@ -35,7 +36,13 @@
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:34:56.054517614Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8376299c-f9e1-4b7b-be62-27af493f6969",
   "labels": [
     "epic:audit-correctness",
@@ -44,7 +51,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-21T15:31:53.765731984Z"
+  "updated_at": "2026-10-21T15:34:56.054517614Z"
 }
