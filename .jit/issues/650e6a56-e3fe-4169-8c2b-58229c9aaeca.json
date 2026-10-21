@@ -14,7 +14,18 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:59:50.044557674Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:00:07.031513806Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "650e6a56-e3fe-4169-8c2b-58229c9aaeca",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Express output-module count structs as ListEnvelope instantiations",
-  "updated_at": "2026-10-21T15:35:10.319258605Z"
+  "updated_at": "2026-10-21T16:00:07.031513806Z"
 }

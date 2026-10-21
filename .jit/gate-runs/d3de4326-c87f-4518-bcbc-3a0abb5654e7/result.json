@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "28cedcc0459cf33e7c6001423b0bdca3551e748f",
+  "completed_at": "2026-10-21T16:00:52.297317037Z",
+  "duration_ms": 122120,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/config.rs",
+        "id": "F1",
+        "line": 233,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Config-set rustdoc still promises boolean parsing after the boolean heuristic was removed."
+      }
+    ],
+    "summary": "All hard removal criteria are met; one isolated stale rustdoc statement remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d3de4326-c87f-4518-bcbc-3a0abb5654e7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:58:50.177262327Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e30502eb5, bc13fc9eb (merge; no combined patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-03 (issue description); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0); doc-review pending; docs-mechanical pending\nTruncation recovery: reread config.rs patch in bounded ranges; narrowed current command, test, registry, and affected-term reads\n\n1. [advisory][issue-impact] `crates/jit/src/commands/config.rs:233` still says `enable_*`, `require_*`, and `auto_*` keys are parsed as booleans, but `edit_config_document` now only has numeric parsing and otherwise writes strings. Remove the obsolete boolean clause so the rustdoc matches REQ-05’s implementation. References: @/invariant/essential-code-prose\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard removal criteria are met; one isolated stale rustdoc statement remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Config-set rustdoc still promises boolean parsing after the boolean heuristic was removed.\",\"file\":\"crates/jit/src/commands/config.rs\",\"line\":233,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

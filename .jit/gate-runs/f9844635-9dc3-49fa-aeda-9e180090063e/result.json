@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "71ed9d4cebfb071fc4751faa846f5e2b61a8fc04",
+  "completed_at": "2026-10-21T16:03:03.534572240Z",
+  "duration_ms": 130714,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue accurately removes documentation for inert configuration keys; no issue-impact documentation defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f9844635-9dc3-49fa-aeda-9e180090063e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:00:52.820382997Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `af9a5509` is a leaf (`task`, maximum hierarchy level) with no resolved children. I inspected its two tagged commits individually; the merge commit repeats the implementation patch, so the effective footprint is the removal in `e30502e`. Current commands reject `worktree.mode` and `global_operations`, and affected adopter documentation no longer presents the removed settings.\n\nDocumentation impact: the reference, CLI examples, how-tos, and default-profile comments accurately remove the inert configuration surface without leaving a required migration or discoverability gap.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue accurately removes documentation for inert configuration keys; no issue-impact documentation defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

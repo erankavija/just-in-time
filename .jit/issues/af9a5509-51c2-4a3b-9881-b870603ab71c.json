@@ -15,7 +15,28 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:58:39.869861913Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:00:52.502918169Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:03:03.780354501Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:03:07.540692873Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
   "labels": [
     "type:task",
@@ -30,5 +51,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove inert configuration keys",
-  "updated_at": "2026-10-21T15:53:01.903999167Z"
+  "updated_at": "2026-10-21T16:03:07.540692873Z"
 }
