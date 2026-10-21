@@ -407,6 +407,10 @@
     {
       "date": "2026-10-21",
       "item": "Seven stale agent worktrees from July/August hold unmerged commits: agent-123efe74, agent-1fc8fec3, agent-a122b9b3, agent-bfd215fa, agent-deb33646, agent-efaec52f and steward-v1-readiness, under .agents/worktrees/. Decide whether to salvage or remove them. Disk is at 95%, and most usage is outside this project."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Review the df129d9e merge e84318f9 (task 9ca31c64, workspace lints). It reached main after the lead's own review and a workspace clippy pass, but before its cargo-ci and code-review gates ran; the harness flagged it as 'Merge Without Review'. The steward accepted it as a one-off and told the lead to fix any gate failure on a branch. Check the gate outcomes and the change (manifests plus #![deny(unsafe_code)] moved to [workspace.lints])."
     }
   ]
 }
