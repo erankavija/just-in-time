@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d6c5285b00430d3fb85a70d504b7f53b70f9a036",
+  "completed_at": "2026-10-21T15:36:16.909846891Z",
+  "duration_ms": 248044,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All six removal criteria are satisfied; prior documentation and MCP-CI blockers are resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24268b05-2ab4-4864-87fe-e8ff35945191",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d1d65681-3605-4759-871a-1bbe629c6d0f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:32:08.865336914Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 44722add8, 77cfcd1f, 1aa825fa, e6239911, a080f00e (`jit:24268b05`)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 and @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (parent issue); @/gate/mcp-ci (.jit/gates.toml); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable, 2026-10-21T11:27:34Z); mcp-ci passed (exit 0, 2026-10-21T11:37:45Z)\nTruncation recovery: Per-path commit diffs and targeted current-tree scans recovered core, tests, MCP, workflow, and documentation evidence.\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All six removal criteria are satisfied; prior documentation and MCP-CI blockers are resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
