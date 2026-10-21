@@ -71,7 +71,7 @@ let state = if issue.has_blocking_dependencies() {
 ## Code Style and Conventions
 
 ### Safety and Correctness
-- **No unsafe code**: The crate uses `#![deny(unsafe_code)]`
+- **No unsafe code**: `[workspace.lints.rust]` in the root `Cargo.toml` denies `unsafe_code`, and every crate inherits it
 - **Validate all inputs**: Check preconditions and return `Result` with descriptive errors
 - **Maintain invariants**: DAG property, atomic file operations, gate prerequisites
 - **Comprehensive documentation**: All public APIs must have doc comments with examples

@@ -8,6 +8,9 @@ authors.workspace = true
 description = "CLI-first issue tracker with dependency graphs and quality gates"
 default-run = "jit"
 
+[lints]
+workspace = true
+
 [lib]
 name = "jit"
 path = "src/lib.rs"

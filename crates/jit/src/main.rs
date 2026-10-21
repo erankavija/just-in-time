@@ -11,8 +11,6 @@
 //! - Priority-based issue management
 //! - Agent coordination support
 
-#![deny(unsafe_code)]
-
 // Binary-specific module (not in library)
 mod output_macros;
 

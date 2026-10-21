@@ -88,7 +88,7 @@ Test names follow `test_<function>_<scenario>` and describe the scenario in full
 ## Coding Conventions
 
 - **Functional style** — Prefer iterators/combinators over imperative loops, immutability over mutation, expression-oriented code over statements.
-- **No unsafe code** — `#![deny(unsafe_code)]` enforced.
+- **No unsafe code** — `unsafe_code = "deny"` in the root `Cargo.toml`'s `[workspace.lints.rust]`, inherited by every crate.
 - **Result-based errors** — `thiserror` custom types with descriptive messages. No panics in library code.
 - **Naming** — Verbs for actions (`add_dependency`, `claim_issue`), `is_`/`has_` for predicates (`is_blocked`, `has_passing_gates`).
 - **Comments and rustdoc** — Terse, and limited to what is essential to understand the code (`@/inv/essential-code-prose`): purpose and material contracts, including relevant errors and invariants. Add an example only when it clarifies non-obvious behavior; prefer one type- or module-level walkthrough over repetitive method examples.

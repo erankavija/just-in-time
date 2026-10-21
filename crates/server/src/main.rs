@@ -3,8 +3,6 @@
 //! Provides a web API for the Just-In-Time issue tracker, enabling web UI
 //! and external integrations to query and visualize issues.
 
-#![deny(unsafe_code)]
-
 #[cfg(feature = "embed-web")]
 mod embedded;
 mod routes;
