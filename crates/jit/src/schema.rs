@@ -477,17 +477,9 @@ impl CommandSchema {
             "status" => (Some(schema_to_value::<StatusResponse>()), "StatusResponse"),
 
             // Profile commands.
-            "profile_list" => (
-                Some(schema_to_value::<crate::profile::ProfileListResult>()),
-                "ProfileListResult",
-            ),
             "profile_show" => (
                 Some(schema_to_value::<crate::profile::ProfileShowResult>()),
                 "ProfileShowResult",
-            ),
-            "profile_validate" => (
-                Some(schema_to_value::<crate::profile::ProfileAgreementResult>()),
-                "ProfileAgreementResult",
             ),
             // The difference report is the decision a publication would act on,
             // so it answers in the preview shape the lifecycle rehearsals do,
@@ -509,10 +501,7 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfileAddResult>()),
                 "ProfileAddResult",
             ),
-            // Every profile lifecycle command publishes through one aggregate
-            // publication and rehearses through one planner, so they answer in
-            // the same two shapes.
-            "profile_apply" | "profile_reconfigure" | "profile_upgrade" => {
+            "profile_apply" => {
                 let union = json!({
                     "oneOf": [
                         schema_to_value::<crate::profile::ProfileComposedApplyResult>(),
@@ -520,7 +509,7 @@ impl CommandSchema {
                     ],
                     "description": "Normal execution returns ProfileComposedApplyResult, \
                         per aggregate selection observation. With --dry-run, returns the count-wrapped \
-                        ProfilePlanResult of non-mutating ProfilePlanEntry values. Every lifecycle \
+                        ProfilePlanResult of non-mutating ProfilePlanEntry values. Every \
                         rehearsal carries the entries its run reports: dependency-only closure \
                         members before the selected roots, then one entry per root occurrence. \
                         An entry that \

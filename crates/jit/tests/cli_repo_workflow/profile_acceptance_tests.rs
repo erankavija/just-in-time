@@ -749,18 +749,7 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         .contains("multi-target redo record"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
-        expected_keys(&[
-            "add",
-            "apply",
-            "capture",
-            "diff",
-            "list",
-            "pack",
-            "reconfigure",
-            "show",
-            "upgrade",
-            "validate",
-        ])
+        expected_keys(&["add", "apply", "capture", "diff", "pack", "show",])
     );
     // Capture authors a package rather than selecting an applied one, so it
     // takes the two directories it works between instead of the selector
@@ -783,45 +772,27 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
             "{command} exposes the inputs it works between"
         );
     }
-    // The three commands that change what a profile publishes take one input
-    // surface: an ordered selector stream, the same value channels, and the
+    // Apply takes an ordered selector stream, the value channels, and the
     // rehearsal that precedes publication.
-    for lifecycle in ["apply", "reconfigure", "upgrade"] {
-        assert_eq!(
-            commands[lifecycle]["args"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|argument| argument["name"].as_str().unwrap().to_string())
-                .collect::<BTreeSet<_>>(),
-            expected_keys(&[]),
-            "{lifecycle} takes its selection through flags"
-        );
-        assert_eq!(
-            commands[lifecycle]["flags"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|flag| flag["name"].as_str().unwrap().to_string())
-                .collect::<BTreeSet<_>>(),
-            expected_keys(&["dry-run", "json", "profile", "set", "values-file"]),
-            "{lifecycle} exposes one lifecycle input surface"
-        );
-    }
-
-    let list_schema = &commands["list"]["output"]["success_schema"];
     assert_eq!(
-        list_schema["properties"]
-            .as_object()
+        commands["apply"]["args"]
+            .as_array()
             .unwrap()
-            .keys()
-            .cloned()
+            .iter()
+            .map(|argument| argument["name"].as_str().unwrap().to_string())
             .collect::<BTreeSet<_>>(),
-        expected_keys(&["count", "profiles"])
+        expected_keys(&[]),
+        "apply takes its selection through flags"
     );
     assert_eq!(
-        property_keys(list_schema, "ProfileSummary"),
-        expected_keys(&["applied", "id", "jit", "origin", "version"])
+        commands["apply"]["flags"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|flag| flag["name"].as_str().unwrap().to_string())
+            .collect::<BTreeSet<_>>(),
+        expected_keys(&["dry-run", "json", "profile", "set", "values-file"]),
+        "apply exposes one lifecycle input surface"
     );
 
     let show_schema = &commands["show"]["output"]["success_schema"];
@@ -989,6 +960,12 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
         ),
         "release smoke must validate every aggregate profile observation"
     );
+    for removed in ["list", "validate", "reconfigure", "upgrade"] {
+        assert!(
+            !workflow.contains(&format!("jit profile {removed}")),
+            "release smoke must not invoke the removed `profile {removed}` subcommand"
+        );
+    }
     assert!(
         !workflow.contains("assert plan[\"status\"] == \"unchanged\", plan"),
         "release smoke must not read the removed top-level dry-run status"
@@ -1051,320 +1028,6 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
     );
     assert!(repo.path.join(".jit/profiles/jit-default.json").is_file());
     assert!(repo.path.join(".jit/profiles/jit-dogfood.json").is_file());
-}
-
-// ===========================================================================
-// jit:f2389b18 — `jit profile validate` checks the profiles this repository
-// records against the packages they came from and the content they own.
-// ===========================================================================
-
-/// The agreement report `jit profile validate --json` produced, beside the
-/// status it exited with.
-///
-/// The report is the answer whether or not anything diverged, so a divergent
-/// run's report is unwrapped from the shared typed error envelope rather than
-/// read as a different shape.
-fn profile_agreement(repo: &Path) -> (Option<i32>, Value) {
-    let output = jit_with_path(repo, &["profile", "validate", "--json"], None);
-    let parsed = parse_json(&output);
-    let report = parsed
-        .pointer("/error/details")
-        .cloned()
-        .unwrap_or_else(|| parsed.clone());
-    assert_eq!(
-        report["count"].as_u64().map(|count| count as usize),
-        report["profiles"].as_array().map(Vec::len),
-        "the report uses the count-wrapped list envelope: {parsed}"
-    );
-    (output.status.code(), report)
-}
-
-/// Every divergence the report carries for profile `id`, each as its kind
-/// beside the target it names when it names one.
-fn divergences(report: &Value, id: &str) -> Vec<(String, Option<String>)> {
-    report["profiles"]
-        .as_array()
-        .unwrap_or_else(|| panic!("the report carries a profile collection: {report}"))
-        .iter()
-        .find(|profile| profile["id"] == id)
-        .unwrap_or_else(|| panic!("the report names profile {id}: {report}"))["divergences"]
-        .as_array()
-        .unwrap_or_else(|| panic!("a profile entry carries its divergences: {report}"))
-        .iter()
-        .map(|divergence| {
-            (
-                divergence["kind"]
-                    .as_str()
-                    .expect("a divergence names its kind")
-                    .to_string(),
-                divergence["target"].as_str().map(str::to_string),
-            )
-        })
-        .collect()
-}
-
-/// A repository holding the asset-only fixture package at `packages/planner`,
-/// applied, with the target that package owns.
-fn repository_with_applied_planner() -> (TestRepo, PathBuf) {
-    const LOCATION: &str = "packages/planner";
-
-    let repo = TestRepo::new();
-    let directory =
-        jit::test_utils::copy_package_tree(&composition_package(), &repo.path.join(LOCATION));
-    let target = jit::profile::ProfilePackage::from_directory(&directory)
-        .expect("a valid package tree")
-        .model()
-        .assets
-        .first()
-        .expect("the fixture package declares one asset")
-        .target
-        .clone();
-    success_json(
-        &repo.path,
-        &["init", "--profile", &format!("path:{LOCATION}"), "--json"],
-    );
-    let target = repo.path.join(target);
-    (repo, target)
-}
-
-/// A repository that just applied a package agrees with it, and saying so
-/// leaves the repository byte-for-byte as it was (REQ-01, REQ-03).
-#[test]
-fn test_profile_validate_agrees_with_a_freshly_applied_package_without_writing() {
-    let (repo, _) = repository_with_applied_planner();
-    let before = snapshot_tree(&repo.path);
-    let events = normalized_events(&repo.path);
-
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(0), "an agreeing repository is a clean check");
-    assert_eq!(
-        report["count"], 1,
-        "the recorded profile is the whole inventory: {report}"
-    );
-    assert!(
-        divergences(&report, "planner-asset-only").is_empty(),
-        "{report}"
-    );
-    assert_eq!(
-        snapshot_tree(&repo.path),
-        before,
-        "the check writes nothing"
-    );
-    assert_eq!(normalized_events(&repo.path), events);
-}
-
-/// An owned target edited in place no longer holds what the profile published,
-/// and reporting that writes nothing (REQ-01, REQ-03).
-#[test]
-fn test_profile_validate_reports_an_owned_target_edited_in_place_without_writing() {
-    let (repo, target) = repository_with_applied_planner();
-    fs::write(&target, b"edited by hand\n").expect("edit the profile-owned target in place");
-    let before = snapshot_tree(&repo.path);
-    let events = normalized_events(&repo.path);
-
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(4), "a diverged profile fails the check");
-    assert_eq!(
-        divergences(&report, "planner-asset-only"),
-        vec![(
-            "changed_target".to_string(),
-            Some(
-                target
-                    .strip_prefix(&repo.path)
-                    .expect("the target is repository-relative")
-                    .to_string_lossy()
-                    .into_owned()
-            )
-        )],
-        "{report}"
-    );
-    assert_eq!(
-        snapshot_tree(&repo.path),
-        before,
-        "a divergent check writes nothing"
-    );
-    assert_eq!(normalized_events(&repo.path), events);
-}
-
-/// An ownership claim whose target is gone is reported rather than ignored
-/// (REQ-02).
-#[test]
-fn test_profile_validate_reports_an_ownership_claim_whose_target_no_longer_exists() {
-    let (repo, target) = repository_with_applied_planner();
-    fs::remove_file(&target).expect("delete the profile-owned target");
-
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(4));
-    assert!(
-        divergences(&report, "planner-asset-only")
-            .iter()
-            .any(|(kind, named)| kind == "absent_target"
-                && named.as_deref()
-                    == target
-                        .strip_prefix(&repo.path)
-                        .expect("the target is repository-relative")
-                        .to_str()),
-        "{report}"
-    );
-}
-
-/// A record whose package is gone reports the unreadable package and every
-/// target it still claims, rather than one standing for the other (REQ-01,
-/// REQ-02).
-#[test]
-fn test_profile_validate_reports_a_record_whose_package_is_no_longer_readable() {
-    let (repo, target) = repository_with_applied_planner();
-    fs::remove_dir_all(repo.path.join("packages/planner")).expect("delete the recorded package");
-
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(4));
-    let reported = divergences(&report, "planner-asset-only");
-    assert!(
-        reported
-            .iter()
-            .any(|(kind, _)| kind == "unreadable_package"),
-        "{report}"
-    );
-    assert!(
-        reported.iter().any(|(kind, named)| kind == "unowned_target"
-            && named.as_deref()
-                == target
-                    .strip_prefix(&repo.path)
-                    .expect("the target is repository-relative")
-                    .to_str()),
-        "the targets a vanished package still claims are reported: {report}"
-    );
-    // The target itself is untouched, so nothing but the missing package
-    // accounts for the report.
-    assert!(target.is_file());
-}
-
-/// A recorded location holding a different package than the record identifies
-/// is reported with both identities, read from the record and the package
-/// rather than pinned in the test (REQ-01).
-#[test]
-fn test_profile_validate_reports_a_package_that_no_longer_matches_the_recorded_identity() {
-    let (repo, _) = repository_with_applied_planner();
-    let manifest = repo.path.join("packages/planner/manifest.toml");
-    let authored = fs::read_to_string(&manifest).expect("read the recorded package manifest");
-    fs::write(
-        &manifest,
-        authored.replace("version = \"1.0.0\"", "version = \"2.0.0\""),
-    )
-    .expect("re-version the recorded package in place");
-
-    let recorded: Value = serde_json::from_slice(
-        &fs::read(repo.path.join(".jit/profiles/planner-asset-only.json"))
-            .expect("read the applied-profile record"),
-    )
-    .expect("the record parses");
-    let current = success_json(
-        &repo.path,
-        &[
-            "profile",
-            "show",
-            "--profile",
-            "path:packages/planner",
-            "--json",
-        ],
-    );
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(4));
-    let entry = report["profiles"]
-        .as_array()
-        .expect("a profile collection")
-        .iter()
-        .find(|profile| profile["id"] == "planner-asset-only")
-        .expect("the recorded profile is reported");
-    let reported = entry["divergences"]
-        .as_array()
-        .expect("divergences")
-        .iter()
-        .find(|divergence| divergence["kind"] == "changed_package_identity")
-        .unwrap_or_else(|| panic!("the changed identity is reported: {report}"));
-    assert_eq!(reported["recorded_version"], recorded["version"]);
-    assert_eq!(reported["recorded_package_hash"], recorded["package_hash"]);
-    assert_eq!(
-        reported["current_version"],
-        current["profiles"][0]["manifest"]["version"]
-    );
-    assert_eq!(
-        reported["current_package_hash"],
-        current["profiles"][0]["package_hash"]
-    );
-}
-
-/// The declarations and managed regions a package contributes are owned as
-/// precisely as its files: an edited registry declaration is named by its own
-/// semantic identity, a removed region by its document and region id, and each
-/// under the profile that published it rather than under the selection as a
-/// whole (REQ-01, REQ-02).
-#[test]
-fn test_profile_validate_names_the_owned_declaration_and_region_a_hand_edit_changed() {
-    let repo = TestRepo::new();
-    let location = crate::repository_package_at(&repo.path, "jit-dogfood");
-    success_json(
-        &repo.path,
-        &["init", "--profile", &format!("path:{location}"), "--json"],
-    );
-    assert_eq!(
-        profile_agreement(&repo.path).0,
-        Some(0),
-        "the repository this package just configured agrees with it, \
-         declarations, assets and regions alike"
-    );
-
-    // One owned registry declaration and one owned managed region, both changed
-    // the way an adopter would change them: in the repository file that carries
-    // them.
-    let config = repo.path.join(".jit/config.toml");
-    let authored = fs::read_to_string(&config).expect("read the contributed configuration");
-    fs::write(
-        &config,
-        authored.replace("development_root = \"", "development_root = \"edited/"),
-    )
-    .expect("edit an owned declaration in place");
-    let agents = repo.path.join("AGENTS.md");
-    let document = fs::read_to_string(&agents).expect("read the contributed document");
-    let (begin, end) = (
-        "<!-- jit:dogfood-guidance:begin -->",
-        "<!-- jit:dogfood-guidance:end -->",
-    );
-    let region_at = document.find(begin).expect("the region was published");
-    let region_to = document.find(end).expect("the region was published") + end.len();
-    fs::write(
-        &agents,
-        format!("{}{}", &document[..region_at], &document[region_to..]),
-    )
-    .expect("remove the owned region from the document");
-
-    let (status, report) = profile_agreement(&repo.path);
-
-    assert_eq!(status, Some(4));
-    // The scalar belongs to the package `jit-dogfood` depends on, and the region
-    // to `jit-dogfood` itself, so each divergence is reported under the record
-    // that claims it.
-    assert_eq!(
-        divergences(&report, "jit-default"),
-        vec![(
-            "changed_target".to_string(),
-            Some(".jit/config.toml:scalar:documentation-development-root".to_string())
-        )],
-        "the edited declaration is named by its own identity: {report}"
-    );
-    assert_eq!(
-        divergences(&report, "jit-dogfood"),
-        vec![(
-            "absent_target".to_string(),
-            Some("AGENTS.md#dogfood-guidance".to_string())
-        )],
-        "the removed region is named by its document and region id: {report}"
-    );
 }
 
 // ===========================================================================
