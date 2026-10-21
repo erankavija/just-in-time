@@ -4,7 +4,6 @@ use super::*;
 use crate::domain::type_taxonomy::{
     detect_validation_issues, generate_fixes, ValidationFix, ValidationIssue,
 };
-use crate::domain::SHORT_ID_LENGTH;
 use anyhow::Context;
 
 /// Rule name carried by every finding the built-in dangling-item-link pass emits
@@ -1501,108 +1500,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Run the repository-integrity checks ONLY, without evaluating declarative
-    /// graph rules.
-    ///
-    /// This is the structural half of [`CommandExecutor::validate_silent`]:
-    /// broken dependency references, invalid gate references, document
-    /// references, DAG acyclicity, isolated nodes, transitive reduction, and
-    /// claims-index consistency. Label validity and type-hierarchy checks are NO
-    /// LONGER here — they were migrated to default rules and are evaluated by the
-    /// local/graph rule engine in `validate_silent` (see the NOTE in that
-    /// method). It deliberately
-    /// excludes the `RuleScope::Graph` declarative rules so a caller can render those
-    /// as structured findings (e.g. whole-repo `jit validate --json`) and decide
-    /// the exit status AFTER output, rather than aborting before the rule report
-    /// is built.
-    ///
-    /// Returns `Ok(())` when the repository is structurally sound, or an `Err`
-    /// describing the first integrity violation found.
-    pub fn validate_integrity_silent(&self) -> Result<()> {
-        let issues = self.storage.list_issues()?;
-
-        // Build lookup map of valid issue IDs
-        let valid_ids: std::collections::HashSet<String> =
-            issues.iter().map(|i| i.id.clone()).collect();
-
-        // Check for broken dependency references
-        for issue in &issues {
-            for dep in &issue.dependencies {
-                if !valid_ids.contains(dep) {
-                    return Err(anyhow!(
-                        "Invalid dependency: issue '{}' depends on '{}' which does not exist",
-                        issue.id,
-                        dep
-                    ));
-                }
-            }
-        }
-
-        // Check for invalid gate references
-        let registry = self.storage.load_gate_registry()?;
-        for issue in &issues {
-            for gate_key in &issue.gates_required {
-                if !registry.gates.contains_key(gate_key) {
-                    return Err(anyhow!(
-                        "Gate '{}' required by issue '{}' is not defined in registry",
-                        gate_key,
-                        issue.id
-                    ));
-                }
-            }
-        }
-
-        // NOTE: label format, namespace registry, namespace value/pattern/
-        // unique/required, type-label requirement, and unknown-type detection are
-        // NO LONGER checked here. They are now default rules (see
-        // `repository_state::default_rules`) evaluated by `validate_silent` via
-        // `local_rules_error_message` (a0f0f342 migration).
-
-        // Validate document references (git integration)
-        self.validate_document_references(&issues)?;
-
-        // Validate DAG (no cycles)
-        let issue_refs: Vec<&Issue> = issues.iter().collect();
-        let graph = DependencyGraph::new(&issue_refs);
-        graph.validate_dag()?;
-
-        // Validate no isolated nodes (nodes outside the main DAG)
-        // Exception: A single issue in the repository is not considered isolated
-        if issues.len() > 1 {
-            let isolated = graph.get_isolated_nodes();
-            if !isolated.is_empty() {
-                let isolated_ids: Vec<String> = isolated
-                    .iter()
-                    .map(|i| format!("'{}' ({})", &i.id[..8.min(i.id.len())], i.title))
-                    .collect();
-                return Err(anyhow!(
-                    "Found {} isolated issue(s) not connected to the dependency graph:\n  {}\n\
-                     Isolated issues have no dependencies and are not dependencies of any other issue.\n\
-                     Either add dependencies with 'jit dep add' or delete these issues.",
-                    isolated.len(),
-                    isolated_ids.join("\n  ")
-                ));
-            }
-        }
-
-        // Validate transitive reduction (no redundant dependencies)
-        self.validate_transitive_reduction(&graph, &issues)?;
-
-        // Validate claims index (if worktree mode is active and not in test mode)
-        if !crate::test_mode::is_enabled() {
-            let index_issues = validate_claims_index_with_paths(self.require_worktree_paths()?)
-                .unwrap_or_else(|e| vec![format!("Failed to validate claims index: {}", e)]);
-            if !index_issues.is_empty() {
-                return Err(anyhow!(
-                    "Claims index validation failed:\n  {}",
-                    index_issues.join("\n  ")
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
     /// Evaluate every `RuleScope::Graph` rule from `.jit/rules.toml` over the supplied
     /// issue set, returning one
     /// [`GraphFinding`](crate::validation::graph::GraphFinding) per violation
@@ -2149,103 +2046,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    fn validate_document_references(&self, issues: &[Issue]) -> Result<()> {
-        use git2::Repository;
-
-        // Try to open git repository
-        let layout = self.require_layout()?;
-        let repo = match Repository::open(layout.worktree_root()) {
-            Ok(r) => r,
-            Err(_) => {
-                // If not a git repo, skip document validation
-                return Ok(());
-            }
-        };
-
-        // Check if repository has any commits (HEAD exists)
-        let has_commits = repo.head().is_ok();
-
-        for issue in issues {
-            for doc in &issue.documents {
-                // Validate commit hash if specified
-                if let Some(ref commit_hash) = doc.commit {
-                    // Use revparse to resolve short hashes
-                    let resolved_oid = repo
-                        .revparse_single(commit_hash)
-                        .and_then(|obj| obj.peel_to_commit())
-                        .map(|commit| commit.id());
-
-                    if resolved_oid.is_err() {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': commit '{}' not found for '{}'",
-                            issue.id,
-                            commit_hash,
-                            doc.path
-                        ));
-                    }
-
-                    // Validate file exists at the specified commit
-                    if self
-                        .check_file_exists_in_git(&repo, &doc.path, commit_hash)
-                        .is_err()
-                    {
-                        return Err(anyhow!(
-                            "Invalid document reference in issue '{}': file '{}' not found at commit {}",
-                            issue.id,
-                            doc.path,
-                            commit_hash
-                        ));
-                    }
-                } else {
-                    // No commit specified - check working tree or HEAD
-                    if has_commits {
-                        // Repository has commits - validate against HEAD, falling back to
-                        // working tree so that newly added (not yet committed) files pass.
-                        let in_git = self
-                            .check_file_exists_in_git(&repo, &doc.path, "HEAD")
-                            .is_ok();
-                        let in_working_tree = std::path::Path::new(&doc.path).exists();
-                        if !in_git && !in_working_tree {
-                            return Err(anyhow!(
-                                "Invalid document reference in issue '{}': file '{}' not found at HEAD or in working tree",
-                                issue.id,
-                                doc.path
-                            ));
-                        }
-                    } else {
-                        // Repository has no commits - check working tree only
-                        let path = std::path::Path::new(&doc.path);
-                        if !path.exists() {
-                            return Err(anyhow!(
-                                "Invalid document reference in issue '{}': file '{}' not found in working tree (repository has no commits yet)",
-                                issue.id,
-                                doc.path
-                            ));
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    fn check_file_exists_in_git(
-        &self,
-        repo: &git2::Repository,
-        path: &str,
-        reference: &str,
-    ) -> Result<()> {
-        let obj = repo.revparse_single(reference)?;
-        let commit = obj.peel_to_commit()?;
-        let tree = commit.tree()?;
-
-        // Try to find the file in the tree
-        tree.get_path(std::path::Path::new(path))?;
-
-        Ok(())
-    }
-
     pub fn get_status(&self) -> Result<StatusSummary> {
         let issues = self.storage.list_issues()?;
         let resolved = crate::domain::queries::build_issue_map(&issues);
@@ -2271,54 +2071,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             gated,
             total: issues.len(),
         })
-    }
-
-    /// Validate transitive reduction of dependency graph.
-    ///
-    /// Checks that no issue has redundant dependencies - dependencies that are
-    /// already reachable through other dependency paths.
-    fn validate_transitive_reduction(
-        &self,
-        graph: &DependencyGraph<Issue>,
-        issues: &[Issue],
-    ) -> Result<()> {
-        use std::collections::HashSet;
-
-        for issue in issues {
-            if issue.dependencies.is_empty() {
-                continue;
-            }
-
-            // Compute minimal dependency set
-            let reduced = graph.compute_transitive_reduction(&issue.id);
-            let reduced_set: HashSet<_> = reduced.iter().collect();
-
-            // Find redundant edges (in current but not in reduction)
-            for dep_id in &issue.dependencies {
-                if !reduced_set.contains(dep_id) {
-                    // This edge is redundant - find the transitive path
-                    let path = graph.find_shortest_path(&issue.id, dep_id);
-                    let path_str = if path.is_empty() {
-                        "unknown path".to_string()
-                    } else {
-                        path.iter()
-                            .map(|id| &id[..8.min(id.len())])
-                            .collect::<Vec<_>>()
-                            .join(" → ")
-                    };
-
-                    return Err(anyhow!(
-                        "Transitive reduction violation: Issue {} has redundant dependency on {} \
-                         (already reachable via: {}). Run 'jit validate --fix' to remove redundant edges.",
-                        issue.short_id(),
-                        dep_id.chars().take(SHORT_ID_LENGTH).collect::<String>(),
-                        path_str
-                    ));
-                }
-            }
-        }
-
-        Ok(())
     }
 
     /// Fix transitive reduction violations for all issues.
