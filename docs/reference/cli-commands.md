@@ -1969,7 +1969,10 @@ The unified gate-run inspection surface (inspection only, non-mutating). It
 offers four views over the stored run records: the latest
 run (default), prior runs (history), the raw report text (flat), and the
 structured findings (findings). All are read-only and reuse already-recorded
-runs; none executes a checker or mutates gate state. Unlike
+runs; none executes a checker or mutates gate state. A manual gate's
+attestation is a run record like a checker run: the latest-run and history
+views show it with its attestor (`by`), its time (`started_at`), and an
+`origin` of `{"derivation": "attested"}`. Unlike
 [`status-all`](#jit-gate-status-all), the singular `status` never exits nonzero
 on a pending or failed gate — it is pure inspection.
 
@@ -2143,7 +2146,7 @@ jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence with a new event and timestamp, including when the same attestor already passed the gate. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence — a gate-run record carrying the attestor and time, and a new event — including when the same attestor already passed the gate. Verdict reuse never applies to an attestation. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
@@ -2329,8 +2332,8 @@ jit issue update abc123 --remove-gate tests --remove-gate clippy
 `jit issue show <id> --json` emits a `gates` array — one entry per required
 gate, enriched from that gate's latest run. `status` is `pending`, `passed`, or
 `failed`; `last_run_at` and `exit_code` come from the gate's latest run and are
-both `null` when no run has been recorded (required-but-never-run, or a manual
-gate attested without a run).
+both `null` when no run has been recorded. A manual gate's attestation is a run
+with a `null` `exit_code`.
 
 ```bash
 # Show all gate information for issue

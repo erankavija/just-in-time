@@ -161,6 +161,38 @@ fn issue_mutation_capture_budget() -> crate::repository_state::CaptureBudget {
     }
 }
 
+/// The `gate-runs` directory and the paths the first `count` gate-run records
+/// `context` allocates are published at: what a mutation publishing those
+/// records must capture.
+///
+/// Gate-run records take the first identifiers a mutation allocates, so a
+/// mutation that also creates issues cannot use this.
+fn gate_run_record_paths(
+    context: &crate::repository_state::MutationContext,
+    count: usize,
+) -> Result<Vec<crate::repository_state::VirtualPath>> {
+    use crate::repository_state::VirtualPath;
+
+    let records = (0..count as u64)
+        .map(|index| {
+            let result = crate::repository_state::gate_run_result_relative_path(
+                &context.identifier_at(index),
+            )?;
+            let directory = result
+                .as_path()
+                .parent()
+                .ok_or_else(|| anyhow!("canonical gate-run result path has no parent"))?;
+            Ok([
+                VirtualPath::data(directory)?,
+                VirtualPath::data(result.as_path())?,
+            ])
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(std::iter::once(VirtualPath::GATE_RUNS)
+        .chain(records.into_iter().flatten())
+        .collect())
+}
+
 /// An annotation installed for as long as this guard lives.
 ///
 /// This is the mechanism behind the dispatch-scoped annotation: dropping the guard
@@ -480,6 +512,11 @@ impl CapturedIssueMutation {
             self,
             Self::AddGates { .. } | Self::SetManualGateStatus { .. }
         )
+    }
+
+    /// Whether the operation publishes a gate-run record: an attestation does.
+    fn records_gate_run(&self) -> bool {
+        matches!(self, Self::SetManualGateStatus { .. })
     }
 }
 
@@ -1568,12 +1605,20 @@ fn derive_captured_issue_mutation(
         issue,
         outcome,
         events,
+        gate_runs,
         changed,
     } = apply_captured_issue_mutation(issue, registry, request)?;
     let intents = if changed {
         std::iter::once(MutationIntent::UpdateIssue {
             issue: Box::new(issue),
         })
+        .chain(
+            gate_runs
+                .into_iter()
+                .map(|draft| MutationIntent::RecordGateRun {
+                    draft: Box::new(draft),
+                }),
+        )
         .chain(
             events
                 .into_iter()
@@ -1589,11 +1634,13 @@ fn derive_captured_issue_mutation(
     Ok(DerivedCapturedIssueMutation { outcome, intents })
 }
 
-/// One issue-local operation applied to a captured record, with its audit events.
+/// One issue-local operation applied to a captured record, with its audit events
+/// and the gate-run records it publishes.
 struct AppliedIssueMutation {
     issue: Issue,
     outcome: CapturedIssueMutationOutcome,
     events: Vec<(u8, Event)>,
+    gate_runs: Vec<crate::domain::GateRunResult>,
     changed: bool,
 }
 
@@ -1602,6 +1649,7 @@ fn apply_captured_issue_mutation(
     registry: &crate::declarations::GateRegistry,
     request: &CapturedIssueMutation,
 ) -> Result<AppliedIssueMutation> {
+    let mut gate_runs = Vec::new();
     let (outcome, events, changed) = match request {
         CapturedIssueMutation::Assign { assignee, .. } => {
             if issue.assignee.as_ref() == Some(assignee) {
@@ -1737,6 +1785,13 @@ fn apply_captured_issue_mutation(
                 }
                 GateStatus::Pending => unreachable!("validated manual gate evidence status"),
             };
+            gate_runs.push(crate::domain::GateRunResult::attestation(
+                &issue.id,
+                gate_key,
+                gate.stage,
+                *status,
+                by.as_ref(),
+            ));
             (
                 CapturedIssueMutationOutcome::Changed,
                 vec![(1, event)],
@@ -1748,6 +1803,7 @@ fn apply_captured_issue_mutation(
         issue,
         outcome,
         events,
+        gate_runs,
         changed,
     })
 }
@@ -2270,6 +2326,11 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let layout = self.require_layout()?;
         let context = production_mutation_context();
+        let run_paths = if request.records_gate_run() {
+            gate_run_record_paths(&context, 1)?
+        } else {
+            Vec::new()
+        };
         with_mutation_session(
             &self.storage,
             &layout,
@@ -2282,7 +2343,16 @@ impl<S: IssueStore> CommandExecutor<S> {
                 if request.captures_gate_registry() {
                     paths.insert(VirtualPath::GATES);
                 }
-                let spec = CaptureSpec::new(paths, issue_mutation_capture_budget())?;
+                paths.extend(run_paths.iter().cloned());
+                let base = issue_mutation_capture_budget();
+                let budget = crate::repository_state::CaptureBudget {
+                    max_depth: run_paths
+                        .iter()
+                        .map(|path| path.relative().depth())
+                        .fold(base.max_depth, usize::max),
+                    ..base
+                };
+                let spec = CaptureSpec::new(paths, budget)?;
                 let Some(image) = capture_or_retry(session.capture(spec))? else {
                     return Ok(SessionStep::Retry);
                 };
@@ -2840,24 +2910,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .as_ref()
                 .filter(|_| expected_precheck.is_some())
                 .is_some_and(|cached| cached.execution.error.is_some());
-            let mut precheck_run_paths = vec![crate::repository_state::VirtualPath::GATE_RUNS];
-            precheck_run_paths.extend(
-                (0..precheck_runs.len())
-                    .map(|index| {
-                        let id = context.identifier_at(index as u64);
-                        let result = crate::repository_state::gate_run_result_relative_path(&id)?;
-                        let directory = result.as_path().parent().ok_or_else(|| {
-                            anyhow!("canonical gate-run result path has no parent")
-                        })?;
-                        Ok([
-                            crate::repository_state::VirtualPath::data(directory)?,
-                            crate::repository_state::VirtualPath::data(result.as_path())?,
-                        ])
-                    })
-                    .collect::<Result<Vec<_>>>()?
-                    .into_iter()
-                    .flatten(),
-            );
+            let precheck_run_paths = gate_run_record_paths(&context, precheck_runs.len())?;
 
             let claims_guard = coordinate_claims
                 .then(|| claims_mutation_guard(self.require_worktree_paths()?))
@@ -3683,13 +3736,19 @@ mod tests {
         .unwrap()
     }
 
-    fn captured_gate_issue_spec(id: &str) -> crate::repository_state::CaptureSpec {
+    /// The capture of an issue mutation over `id` whose gate-run records
+    /// `context` allocates.
+    fn captured_gate_issue_spec(
+        id: &str,
+        context: &crate::repository_state::MutationContext,
+    ) -> crate::repository_state::CaptureSpec {
         use crate::repository_state::{CaptureBudget, CaptureSpec, VirtualPath};
-        let paths = std::collections::BTreeSet::from([
+        let mut paths = std::collections::BTreeSet::from([
             VirtualPath::data(format!("issues/{id}.json")).unwrap(),
             VirtualPath::data("events.jsonl").unwrap(),
             VirtualPath::data("gates.toml").unwrap(),
         ]);
+        paths.extend(gate_run_record_paths(context, 1).unwrap());
         CaptureSpec::new(
             paths,
             CaptureBudget {
@@ -3874,7 +3933,7 @@ mod tests {
             let first_context = MutationContext::deterministic([31; 32], first_time);
             let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
             let first_image = first_session
-                .capture(captured_gate_issue_spec(&id))
+                .capture(captured_gate_issue_spec(&id, &first_context))
                 .unwrap();
             let first = derive_captured_issue_mutation(
                 issue_from_image(&first_image, &id),
@@ -3899,7 +3958,7 @@ mod tests {
 
             let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
             let retry_image = retry_session
-                .capture(captured_gate_issue_spec(&id))
+                .capture(captured_gate_issue_spec(&id, &first_context))
                 .unwrap();
             let retry = derive_captured_issue_mutation(
                 issue_from_image(&retry_image, &id),
@@ -3926,7 +3985,7 @@ mod tests {
             let second_context = MutationContext::deterministic([32; 32], second_time);
             let mut second_session = storage.open_mutation_session(layout.clone()).unwrap();
             let second_image = second_session
-                .capture(captured_gate_issue_spec(&id))
+                .capture(captured_gate_issue_spec(&id, &second_context))
                 .unwrap();
             let second = derive_captured_issue_mutation(
                 issue_from_image(&second_image, &id),
@@ -3972,6 +4031,18 @@ mod tests {
             assert_eq!(*evidence[0].1, first_time);
             assert_eq!(*evidence[1].1, second_time);
             assert_ne!(evidence[0].0, evidence[1].0);
+            let mut attested_at = storage
+                .list_gate_runs_for_issue(&id)
+                .unwrap()
+                .into_iter()
+                .map(|run| run.started_at)
+                .collect::<Vec<_>>();
+            attested_at.sort();
+            assert_eq!(
+                attested_at,
+                vec![first_time, second_time],
+                "each attestation's run carries its own operation's time"
+            );
         }
     }
 
@@ -4037,7 +4108,7 @@ mod tests {
 
         let mut first_session = storage.open_mutation_session(layout.clone()).unwrap();
         let first_image = first_session
-            .capture(captured_gate_issue_spec(&id))
+            .capture(captured_gate_issue_spec(&id, &context))
             .unwrap();
         let first = derive_captured_issue_mutation(
             issue_from_image(&first_image, &id),
@@ -4055,7 +4126,7 @@ mod tests {
 
         let mut retry_session = storage.open_mutation_session(layout).unwrap();
         let retry_image = retry_session
-            .capture(captured_gate_issue_spec(&id))
+            .capture(captured_gate_issue_spec(&id, &context))
             .unwrap();
         let error = match derive_captured_issue_mutation(
             issue_from_image(&retry_image, &id),

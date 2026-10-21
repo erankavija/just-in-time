@@ -1096,6 +1096,13 @@ fn print_gate_run_details(result: &GateRunResult) {
     if let Some(source_run) = result.origin.source_run() {
         println!("  Verdict: taken from run {source_run} over the same declared inputs");
     }
+    if result.origin == jit::domain::GateVerdictOrigin::Attested {
+        println!(
+            "  Attested by {} at {}",
+            result.by.as_deref().unwrap_or("an unnamed attestor"),
+            result.started_at.to_rfc3339()
+        );
+    }
     if let Some(f) = &result.findings {
         println!(
             "  Findings: {} (verdict: {})",
@@ -4185,7 +4192,7 @@ fn run() -> Result<()> {
             GateCommands::StatusAll { id, full, json } => {
                 use jit::domain::GateStatus;
                 let output_ctx = OutputContext::new(quiet, json);
-                // Automated gate run detail (unchanged display source).
+                // Latest recorded run of each required gate.
                 let (results, _) = executor.get_last_gate_runs_for_issue(&id)?;
                 // Readiness across EVERY required gate (auto + manual).
                 let gate_statuses = executor.get_required_gate_statuses_for_issue(&id)?;
@@ -4252,14 +4259,14 @@ fn run() -> Result<()> {
                         .print_info(format!("No required gates to inspect for issue {}", id));
                 } else {
                     let _ = output_ctx.print_info(format!("Gate readiness for issue {}:", id));
-                    // Gate keys that have a recorded automated run to print in detail.
+                    // Gate keys that have a recorded run to print in detail.
                     let with_runs: std::collections::HashSet<&str> =
                         results.iter().map(|r| r.gate_key.as_str()).collect();
                     for result in &results {
                         print_gate_run_details(result);
                     }
-                    // Cover every required gate not shown above (manual gates and
-                    // pending auto gates) so a strict nonzero exit is explained.
+                    // Cover every required gate not shown above (gates without a
+                    // recorded run) so a strict nonzero exit is explained.
                     for (gate_key, status) in &gate_statuses {
                         if with_runs.contains(gate_key.as_str()) {
                             continue;

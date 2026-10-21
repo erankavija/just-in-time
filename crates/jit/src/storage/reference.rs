@@ -247,7 +247,9 @@ impl GateRunField {
                  ran the checker; `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}` \
                  means it carries the named earlier run's verdict, whose `inputs_digest` \
                  matched, without the checker running again. The report text behind a reused \
-                 verdict lives at the named run."
+                 verdict lives at the named run. `{\"derivation\": \"attested\"}` means the \
+                 run records a manual gate's attestation: `by` names the attestor and \
+                 `started_at` the time."
                     .to_string()
             }
             GateRunField::EvaluationStability => {

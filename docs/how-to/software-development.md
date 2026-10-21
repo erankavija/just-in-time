@@ -543,8 +543,8 @@ fi
 jit gate status-all $ISSUE_ID --json > gate-results.json || true
 
 # `.all_passed` is true only when every required gate is green. `.results` holds
-# recorded automated runs only, so filtering it would miss pending manual gates
-# and gates never evaluated; `.gates` lists every required gate with its status.
+# recorded runs only, so filtering it would miss gates never evaluated; `.gates`
+# lists every required gate with its status.
 if [ "$(jq -r '.all_passed' gate-results.json)" = "true" ]; then
   echo "✅ All required gates passed"
   exit 0

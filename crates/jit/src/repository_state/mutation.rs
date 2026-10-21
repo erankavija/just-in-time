@@ -401,7 +401,8 @@ pub enum MutationIntent {
         issue_id: String,
     },
     /// Record one gate-run artifact. The finalizer assigns `run_id` and preserves
-    /// external checker `started_at`/`completed_at` evidence verbatim.
+    /// external checker `started_at`/`completed_at` evidence verbatim; an
+    /// attestation, which ran no checker, is stamped with the mutation timestamp.
     RecordGateRun {
         /// Semantic gate-run result whose `run_id` is assigned by the finalizer.
         draft: Box<GateRunResult>,
@@ -1074,6 +1075,11 @@ pub(super) fn finalize_delta(
         let run_id = context.allocate();
         let mut result = draft.clone();
         result.run_id = run_id.clone();
+        if result.origin == crate::domain::GateVerdictOrigin::Attested {
+            let now = context.timestamp();
+            result.started_at = now;
+            result.completed_at = Some(now);
+        }
         let result_path = gate_run_result_relative_path(&run_id)?;
         let dir = VirtualPath::data(result_path.as_path().parent().ok_or_else(|| {
             RepositoryLayoutError::LexicalEscape(result_path.as_path().display().to_string())
