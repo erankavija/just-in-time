@@ -226,10 +226,7 @@ each lifecycle milestone. They are written **once**, at the transition:
   all three).
 
 Each field is **optional** and omitted from the JSON when unset (an issue that
-never reached the milestone, or one predating these fields). Backfill the fields
-for pre-existing issues from the event log with
-[`jit migrate lifecycle-timestamps`](cli-commands.md#jit-migrate-lifecycle-timestamps);
-issues whose event log carries no relevant transition stay unset.
+never reached the milestone, or one predating these fields).
 
 **Compatibility.** These three fields (like `content_format` before them) are
 **additive and optional**, and adding them keeps the repository at
@@ -247,12 +244,7 @@ issues whose event log carries no relevant transition stay unset.
   a full save that drops the keys it never parsed. A writer that has the fields
   always round-trips them.
 
-If a writer lacking these fields drops a lifecycle timestamp,
-[`jit migrate lifecycle-timestamps`](cli-commands.md#jit-migrate-lifecycle-timestamps)
-can reconstruct it **only when the event log records the corresponding
-transition**. A timestamp with no logged transition — notably `first_ready_at`
-for a dependency-free issue auto-promoted to `ready` at creation, which emits no
-state-change event — cannot be recovered and stays unset (as above).
+A lifecycle timestamp dropped by a writer lacking these fields stays unset.
 
 ## Configuration File
 
@@ -420,7 +412,7 @@ supports:
 
 - Binary support **≥** repository version: operates normally. An older
   repository is read as-is and keeps its marker; `jit` performs no implicit
-  migration. Data migrations are explicit and idempotent — see `jit migrate`.
+  migration.
 - Binary support **<** repository version: the binary refuses to operate and
   exits nonzero (exit code 10, external-dependency family) with a single-line
   error naming both the repository's format version and the version the binary
