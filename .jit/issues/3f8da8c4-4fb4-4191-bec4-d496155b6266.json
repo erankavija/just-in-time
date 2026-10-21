@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
+    "417be079-1de3-43e3-816a-03f4a70e2f63",
     "4ba18af4-dcf3-480d-a785-40dc4533349c",
     "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
     "d68150e2-d10c-4213-9056-9ce6b80f7d11"
@@ -30,5 +31,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Gate runs take commit and branch evidence from the module",
-  "updated_at": "2026-10-21T15:43:43.386302531Z"
+  "updated_at": "2026-10-21T15:43:55.243086543Z"
 }

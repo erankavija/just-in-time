@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
+    "63c11d08-054e-471a-9b0c-491c30b8d8a1",
     "b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54"
   ],
   "description": "Make `jit hooks install` write into the hooks directory of the repository the invocation selected, using the common directory the layout already holds, instead of walking up from the process working directory and parsing `.git` files itself.\n\n## Background\n\n- `install_hooks(git_dir: Option<PathBuf>)` (`crates/jit/src/commands/hooks.rs:25-68`) falls back to `find_git_dir` (`crates/jit/src/commands/hooks.rs:82-129`). That function walks up from `std::env::current_dir()`, honours `GIT_CEILING_DIRECTORIES`, and parses a `.git` file's `gitdir:` line to reach a linked checkout's common directory: a second, hand-written layout detection.\n- The CLI calls `install_hooks(None)` (`crates/jit/src/main.rs:6309`), and its unit tests pass `Some(..)` (`crates/jit/src/commands/hooks.rs:188`, `:220`, `:272`), while the CLI holds the invocation's `WorktreePaths`, whose `common_dir` is the common git directory of a primary or linked checkout.\n- The failure-lever registry expects `HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)` with exit 1 outside git (`crates/jit/tests/cli_issue/failure_lever_registry.toml:932`).\n- Kept as one change for a build reason: `find_git_dir` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `install_hooks` takes the git directory as a required argument, and its unit tests pass it directly. The CLI passes the invocation's common directory for a git checkout; outside one the command fails with the error the failure-lever registry expects.\n- [hard] REQ-02: `find_git_dir` and `test_find_git_dir` no longer exist.\n- [hard] REQ-03: A CLI test with `JIT_DATA_DIR` selecting a repository other than the process directory's installs the hooks into the selected repository's common directory. Against today's code they land in the process directory's repository, so the test fails.\n\n## Notes\n\n- Behaviour change: hooks follow the selected data root, as every other command does.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
@@ -27,5 +28,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Hook installation targets the selected repository's common directory",
-  "updated_at": "2026-10-21T15:43:46.502505648Z"
+  "updated_at": "2026-10-21T15:43:56.117451414Z"
 }
