@@ -7,6 +7,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Reach git through one storage-owned CLI module instead of libgit2 (f4d9502a) into well-ordered implementation issues.",
   "documents": [],
+  "first_ready_at": "2026-10-21T15:43:27.333985673Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
@@ -37,7 +38,7 @@
     "brackets:f4d9502a"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "breakdown: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T10:46:10.226099400Z"
+  "updated_at": "2026-10-21T15:43:27.333985673Z"
 }

@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [],
+  "description": "Install the git executable in the server image's runtime stage, so the containerized server keeps document history, diffs and reads at a commit once it reaches git through the CLI.\n\n## Background\n\n- The runtime stage installs `ca-certificates`, `ripgrep` and `wget` (`Dockerfile:32`) and no git. The server reads document history, diffs and documents at a commit through libgit2 linked into `jit-server`.\n- The static contract suite `test-vectors/container-image/test_image_contract.py` (`StaticImageContractTests`) asserts the runtime stage's shape, and CI runs it (`.github/workflows/docker.yml:42`).\n- The documented deployment maps the repository owner onto the container identity (`docs/how-to/deployment.md`), which git's repository ownership check requires.\n\n## Success Criteria\n\n- [hard] REQ-01: The runtime stage installs the distribution's `git` package without recommended packages.\n- [hard] REQ-02: A static contract test asserts that the runtime stage installs git, and fails against today's Dockerfile.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T15:43:27.849030738Z",
+  "gates_required": [
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "810e32d4-2922-4837-a100-58ab13ef0161",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:libgit2-removal",
+    "component:release",
+    "component:server",
+    "per:@/charter/D-21",
+    "per:@/charter/D-10",
+    "satisfies:f4d9502a/REQ-10"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Server image ships the git executable",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

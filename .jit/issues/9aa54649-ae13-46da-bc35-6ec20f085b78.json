@@ -13,7 +13,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:38:06.509944071Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T15:43:26.168154525Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9aa54649-ae13-46da-bc35-6ec20f085b78",
   "labels": [
     "type:task",
@@ -26,5 +37,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Require archived_from on archived issue records",
-  "updated_at": "2026-10-21T15:36:15.065281063Z"
+  "updated_at": "2026-10-21T15:43:26.168154525Z"
 }

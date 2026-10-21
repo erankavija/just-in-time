@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "6fdb2d53-bc92-424e-bc74-455f21f2cc26"
+  ],
+  "description": "Make the build-policy script fail when a built jit executable links libgit2 or OpenSSL, so the native dependency cannot return through another crate.\n\n## Background\n\n- `scripts/rust-build-budget.sh` runs after compilation in `scripts/cargo-ci.sh` and checks build profiles and dependency features from injectable inputs, each failure mode with a fixture test in `crates/jit/tests/scratch_build/rust_build_budget_checker_tests.rs` that needs no compilation (`scripts/rust-build-budget.sh:12`).\n- Nothing checks what the built executables link. Before libgit2's removal, the `jit` binary's dynamic section named `libgit2`, `libssl` and `libcrypto`.\n\n## Success Criteria\n\n- [hard] REQ-01: The script fails, naming the executable and the library, when a built `jit` or `jit-server` executable declares a dynamic dependency on `libgit2`, `libssl` or `libcrypto`. It fails closed (exit 2) when the tool it reads dynamic sections with is missing on an ELF host.\n- [hard] REQ-02: The dynamic-dependency listing is an injectable input, and fixture tests cover a clean listing and each banned library without compiling.\n- [hard] REQ-03: The check passes on the current tree.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "78cb05ed-83b0-4bbb-ae56-69176457a7f0",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:libgit2-removal",
+    "component:tooling",
+    "per:@/charter/D-21",
+    "enforces:@/invariant/bounded-rust-build-footprint",
+    "satisfies:f4d9502a/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Build-policy check rejects native git and OpenSSL linkage",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

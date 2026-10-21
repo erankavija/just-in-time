@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [],
+  "description": "Give tests one way to build a git repository through the git CLI and one counting stand-in for the git executable.\n\n## Background\n\n- `test_add_pinned_document_uses_pinned_document_and_asset_bytes` (`crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:253`) builds its commit through libgit2 (`git2::Repository::init` at `:259`, `git2::Signature` at `:272`), reaching the crate's normal `git2` dependency.\n- Two counting wrappers exist: `counted_git` (`crates/jit/tests/fast_docs_templates/git_revision_tests.rs:166-181`) and `capture_git_fixture` (`crates/jit/src/storage/repository_state_store_tests.rs:2585-2632`). Each writes a `#!/bin/sh` script that logs `$*` and runs `exec git \"$@\"`. Placed first on `PATH` under the name `git`, such a script would run itself, so a stand-in for the executable must run the real git by absolute path.\n- Shared test helpers live in the library's test-support surface, `jit::test_harness` (`crates/jit/src/test_harness.rs`), compiled under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:36`). The crate's own tests and every integration suite enable `test-support`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit::test_harness` offers a git repository fixture that initializes a repository through the git CLI with a repository-local user name and email, writes files, and commits them, returning the new commit's id.\n- [hard] REQ-02: `jit::test_harness` offers, on Unix, a counting stand-in for the git executable: a file named `git` in its own directory that records each invocation's arguments and then runs the real git, resolved to an absolute path when the stand-in is created. Each recorded invocation exposes its arguments with a leading `-C <dir>` pair removed, since the git module starts every process that way. A test can read the recorded invocations, pass the stand-in as an explicit program, or put its directory first on a child process's `PATH`.\n- [hard] REQ-03: Fixture tests show that the stand-in records each invocation's arguments in order, with and without a leading `-C <dir>` pair, and returns the real git's output and exit status, and that the repository fixture's commit id is the repository's `HEAD`.\n\n## Notes\n\n- The stand-in is `#[cfg(unix)]`, as both existing wrappers are.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T15:43:27.849030738Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7aafec83-b056-4047-9569-77c9373ba2d3",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:git-layout-once",
+    "component:testing",
+    "per:@/charter/D-21",
+    "enforces:@/invariant/shared-test-contracts",
+    "satisfies:f4d9502a/REQ-07"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Shared git repository and counting stand-in test fixtures",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

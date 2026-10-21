@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "81664a6a-958e-4e4d-9403-7b6210dc9d6c"
+  ],
+  "description": "Add the git module's one query for paths that differ from `HEAD`: modified, staged, deleted, renamed or untracked.\n\n## Background\n\n- Snapshot export decides whether a checkout is dirty with libgit2's `statuses(None)` (`crates/jit/src/commands/snapshot.rs:371`), whose default options also report ignored files.\n- Applying a profile must refuse while a path it writes carries uncommitted changes (`@/charter/D-8`), which needs the same query.\n- `git status --porcelain -z --untracked-files=all` lists changed and untracked paths, one per entry and excluding ignored files, in one process.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::dirty_paths()` starts one git process and returns the repository-relative paths that are modified, staged, deleted, renamed (both names) or untracked, excluding ignored files.\n- [hard] REQ-02: The behaviour suite covers each class, an ignored file, a clean tree and a path with spaces.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:libgit2-removal",
+    "component:storage",
+    "per:@/charter/D-21",
+    "satisfies:f4d9502a/REQ-10"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Dirty-path query in the git module",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

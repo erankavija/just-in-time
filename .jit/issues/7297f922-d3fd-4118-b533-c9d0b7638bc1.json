@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "07663984-071b-4aa1-963a-e6ec2791f8d8",
+    "d7cce445-436d-43d7-9ac9-7c21251b19fa"
+  ],
+  "description": "Prove, with a counting stand-in configured as the git executable, that `query available` and `issue show` start at most one git process in a primary checkout and in a linked checkout.\n\n## Background\n\n- Layout detection is one probe process per invocation, and issue reads use the checkout's own data root plus, in a linked checkout, the primary checkout's data root, with no git process.\n- `jit::test_harness` provides a counting stand-in: a `git` file in its own directory that records each invocation and runs the real git. Prepending that directory to the spawned `jit` process's `PATH` configures it as the git executable for that child only, so no process-wide state changes.\n- Before the probe collapsed to one process, both commands started three `git rev-parse` processes in a primary checkout; in a linked checkout they also started one `git show` per issue missing locally.\n- The `cli_repo_workflow` suite gathers its tests as modules listed in `crates/jit/tests/cli_repo_workflow/main.rs`, so a new module adds no test target (`@/inv/bounded-rust-build-footprint`).\n\n## Success Criteria\n\n- [hard] REQ-01: A `cli_repo_workflow` module runs `jit query available --json` and `jit issue show <id> --json` in a primary checkout with the stand-in first on `PATH`, and asserts that each records at most one git invocation.\n- [hard] REQ-02: The module runs both commands in a linked checkout for an issue that only the primary checkout's data root holds, and asserts that each reads the issue and records at most one git invocation.\n- [hard] REQ-03: A failing assertion prints the recorded invocations.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "7297f922-d3fd-4118-b533-c9d0b7638bc1",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:git-layout-once",
+    "component:testing",
+    "per:@/charter/D-21",
+    "enforces:@/invariant/orthogonal-tests",
+    "satisfies:f4d9502a/REQ-06",
+    "satisfies:f4d9502a/REQ-07"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "CLI test bounds the git processes of issue reads",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}
