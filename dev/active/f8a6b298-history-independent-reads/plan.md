@@ -119,7 +119,7 @@ A non-history command reaches the event log only through `CaptureSpec::discover_
 | lease-read-api | Storage offers one lock-free lease read path and one activeness rule | task | Storage offers one lease activeness predicate and three lock-free lease reads. | — | REQ-05, DEC-09, DEC-01 | touches 1 | — | — |
 | lease-reader-migration | Lock-free lease readers use the storage read path | task | Lock-free lease readers in the commands use the storage read path. | lease-read-api | REQ-05, DEC-09 | touches 4 | — | lease-read-api |
 | lease-lock-handle | A held lease lock loads, lists and applies lease changes | task | A held lease lock offers load, list and apply over the current claims store. | — | REQ-06, DEC-10, DEC-02 | touches 1 | — | lease-test-only-api-removal, lease-status-computed-stale |
-| lease-ops-through-lock | Lease operations run through the lease lock | task | Acquire, renew, heartbeat, force-evict and listing use the held lease lock. | lease-sequence | REQ-06, DEC-02, DEC-10 | touches 1 | — | lease-lock-handle |
+| lease-ops-through-lock | Lease operations run through the lease lock | task | Acquire, renew, heartbeat, force-evict and listing use the held lease lock. | lease-sequence, lease-read-api | REQ-06, DEC-02, DEC-10 | touches 1 | — | lease-lock-handle, lease-read-api |
 | lease-mutation-guard-through-lock | The repository-mutation lease check reads through the held lease lock | task | The repository-mutation lease check reads its targets through one held lease lock. | lease-sequence | REQ-05, REQ-06, DEC-10 | touches 2 | — | lease-lock-handle |
 | lease-recover-through-lock | Recovery evicts and reclaims leases through the lease lock | task | Recovery's lease passes run through the held lease lock. | lease-sequence | REQ-06, DEC-03 | touches 2 | — | lease-ops-through-lock |
 | lease-store-fixtures | CLI tests reach lease storage through one test helper | task | CLI tests reach lease storage only through one shared test helper. | — | REQ-05, DEC-09 | creates 1, touches 7 | — | lease-hooks-status |
@@ -248,6 +248,7 @@ flowchart LR
     N19 --> N22
     N16 --> N22
     N22 --> N23
+    N20 --> N23
     N22 --> N24
     N23 --> N25
     N17 --> N26
