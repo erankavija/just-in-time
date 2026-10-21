@@ -7,6 +7,7 @@
   ],
   "description": "Several small domain helpers have no caller: an item-kind scope parser with its error variant, a closed-state predicate, a label-namespace containment check and a not-in-git-repo error helper.\n\n## Background\n\n- `KindScope::parse` and `parse_for` (`crates/jit/src/domain/item.rs:404,409`) and `ItemError::InvalidScope` (`:473`) have no caller. `KindScope::PROJECT_TOKEN` (`:396`) is used only by `parse_for`. `KindScope::ISSUE_TOKEN` (`:394`) stays: production address parsing uses it (`item.rs:233,252,255,258`), and so does `qualified_id` (`:912`).\n- `State::is_closed` (`domain/types.rs:64`) has no caller.\n- `LabelNamespaces::contains` (`domain/types.rs:3376`, `allow(dead_code)`) has no caller.\n- `errors::not_in_git_repo` (`crates/jit/src/errors.rs:1065`) has one caller, its own test (`errors.rs:1280`).\n\n## Success Criteria\n\n- [hard] REQ-01: `KindScope::parse`, `KindScope::parse_for`, `ItemError::InvalidScope` and `KindScope::PROJECT_TOKEN` no longer exist, and `KindScope::ISSUE_TOKEN` keeps its production callers.\n- [hard] REQ-02: `State::is_closed` and `LabelNamespaces::contains` no longer exist.\n- [hard] REQ-03: `errors::not_in_git_repo` and its test no longer exist.\n\n## Notes\n\nBenchmark artifacts under `dev/benchmarks/` that name the deleted test are regenerated evidence and stay.\n",
   "documents": [],
+  "first_ready_at": "2026-10-21T15:36:13.482718725Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:842b0ac6/REQ-16"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove uncalled domain predicates and parsers",
-  "updated_at": "2026-10-21T00:54:09.217003678Z"
+  "updated_at": "2026-10-21T15:36:13.482718725Z"
 }

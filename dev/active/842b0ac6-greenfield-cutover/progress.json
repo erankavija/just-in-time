@@ -152,7 +152,7 @@
           "title": "Remove the skipped gate-run status",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "9aa54649-ae13-46da-bc35-6ec20f085b78",
@@ -161,7 +161,7 @@
           "title": "Require archived_from on archived issue records",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "awaiting-merge"
         },
         {
           "id": "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
@@ -188,7 +188,7 @@
           "title": "Parse lifecycle states from canonical tokens only",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-dispatched"
+          "status": "done"
         }
       ]
     },
@@ -423,7 +423,8 @@
       "raised": "2026-10-21",
       "to": "steward just-in-time-24",
       "detail": "R3 code-review: web-ui-architecture.md:42 legend calls Backlog 'Open' (REQ-05). Recommended: counter reset plus case-insensitive sweep rework.",
-      "resolution": "Steward approved option 1: counter reset once, sonnet rework with exhaustive case-insensitive sweep recorded in sweep-66bd4b5c.md; escalate before reworking if round 4 fails on this class."
+      "resolution": "Steward approved option 1: counter reset once, sonnet rework with exhaustive case-insensitive sweep recorded in sweep-66bd4b5c.md; escalate before reworking if round 4 fails on this class.",
+      "outcome": "Resolved: round 4 passed all gates (cargo-ci 24.4 s, code-review, mcp-ci)."
     }
   ],
   "rework_counts": {
@@ -437,7 +438,9 @@
     "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510).",
     "Suite clock is load-sensitive even at low start load: 66bd4b5c measured 34.2 s (start load 3.3), rerun 27.5 s while load rose to 16. Clocks after cutover deletions: 21.2 s (84745746), 27.6 s (71b0af0e).",
     "66bd4b5c code-review read 'every case variant' literally twice (R1, R2 same root cause); rework 2 requires exhaustive 2^k case enumeration. One more same-finding failure escalates (MAX_SAME_FINDING_REPEATS=3).",
-    "Intermittent 20 s fixture timeouts: fast_rules cli_warnings_integration_tests (4 tests) and test_utils profiled-repository fixture tests timed out at 72d4990c's first run (load ~5) and during 84745746's half-merge run; a forced rerun passed at load 15-20. Candidate for c780514e or a flakiness bug."
+    "Intermittent 20 s fixture timeouts: fast_rules cli_warnings_integration_tests (4 tests) and test_utils profiled-repository fixture tests timed out at 72d4990c's first run (load ~5) and during 84745746's half-merge run; a forced rerun passed at load 15-20. Candidate for c780514e or a flakiness bug.",
+    "66bd4b5c code-review advisory (low): StatePredicate comment at declarations/rules.rs:365 refers to a removed predicate whitelist.",
+    "66bd4b5c renamed the jit status JSON count field open -> backlog (breaking output change within REQ-05's class); MCP tests updated. Human output still prints Debug state names until 1622756a."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
