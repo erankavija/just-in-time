@@ -502,6 +502,13 @@
       "date": "2026-10-22",
       "decision": "@/charter/D-18, @/charter/D-20, @/inv/convention-convergence",
       "summary": "REQ-05: the dead bulk preview is deleted and the requirement reworded (rejected: a new --dry-run feature). REQ-10 and REQ-12: 'once per captured image'. REQ-17: lease records and the claims sequence counter, waiting on f8a6b298's 2f563673 and 53d19851. REQ-04 scope: every user-requested write, bulk update and dep add/rm included, checks the lease in-session (a stated behaviour change). Edges: b697a3f7 waits on fbb661f2, 0bd2c797, c3e3e2ff, e1a6c8c2, d9ba0029 and f8's archive-preview task; no df129d9e facade edges. Authorised: narrowing 977d01d8, 6add7ca6 and 96bb0941/42bcaa6e after 459bb995."
+    },
+    {
+      "container_short_id": "2195c98f",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "decision": "@/inv/semantic-types",
+      "summary": "Reconciliation after 459bb995: pure narrowings of 6add7ca6, 96bb0941, 42bcaa6e, 977d01d8 and 145b4d57 approved. 6add7ca6, 96bb0941 and 42bcaa6e also delete the hand-written as_token/Display that 459bb995 added (2195c98f REQ-10). Chosen (a): 42bcaa6e takes projection_render.rs and 977d01d8's REQ-02 so it lands green. Rejected (b): an interim compile bridge across epics."
     }
   ],
   "notes": [
