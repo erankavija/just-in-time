@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "9be9ec1cff6cb6c810aad4e74b6566226bba3320",
+  "completed_at": "2026-10-21T05:50:29.783176654Z",
+  "duration_ms": 207232,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped requirements are implemented and covered without attributable defects.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ccda3ac2-188f-4998-a46e-3993e2afac9e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T05:47:02.550180869Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2a4d2a6db; 76db712c5 (merge, same patch)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T05:45:54Z); code-review pending\nTruncation recovery: per-file implementation/docs/CLI diffs, first-parent merge diff, bounded current-source reads\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped requirements are implemented and covered without attributable defects.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

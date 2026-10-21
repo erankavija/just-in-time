@@ -16,6 +16,11 @@
       "status": "failed",
       "updated_at": "2026-10-21T05:46:14.085237049Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T05:50:30.109406059Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
@@ -29,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Apply the claim-next filter when choosing which issue to claim",
-  "updated_at": "2026-10-21T05:46:14.085237049Z"
+  "updated_at": "2026-10-21T05:50:30.109406059Z"
 }

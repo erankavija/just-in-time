@@ -17517,3 +17517,7 @@
 {"from":"ready","id":"7a6b0942-3982-4af1-a550-4f821c2ee957","issue_id":"34361448-f21b-4efb-8437-2ee38ba584c6","timestamp":"2026-10-21T05:49:14.228034890Z","to":"backlog","type":"issue_state_changed"}
 {"fields":["dependencies"],"id":"e5cc69b1-b9df-4be9-8c47-a09652e29aa4","issue_id":"34361448-f21b-4efb-8437-2ee38ba584c6","timestamp":"2026-10-21T05:49:14.228034890Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"aea23e68-e9fc-4a8f-b152-78a8ad82a19f","issue_id":"b4929342-6c7c-4f35-8e18-c8cbb0ec526c","timestamp":"2026-10-21T05:49:14.534480756Z","type":"issue_updated","updated_by":"dependency-add"}
+{"gate_key":"code-review","id":"ac2907ae-a3e7-437c-b580-663550a439bc","issue_id":"aa423d02-85bd-4e57-ac43-660a4ebdc55b","timestamp":"2026-10-21T05:50:30.109406059Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"dab77d24-ac93-4a17-a7d4-4aea9110e245","issue_id":"bc7eb715-9c7f-47ff-bbd6-5d63fee3f123","timestamp":"2026-10-21T05:50:37.640173358Z","type":"gate_passed","updated_by":"auto:executor"}
+{"fields":["documents"],"id":"d23ef965-a01e-4805-9727-03e31ef7ccdc","issue_id":"5e615dc2-5ca4-4a8c-b94a-dd8689894069","timestamp":"2026-10-21T05:51:50.583711901Z","type":"issue_updated","updated_by":"doc-add"}
+{"fields":["description"],"id":"f1f8f2a9-a460-46cf-84c5-6e055a3396e4","issue_id":"f8a6b298-e6b5-4d62-b73c-3f7b217c1a01","timestamp":"2026-10-21T05:52:00.637567448Z","type":"issue_updated","updated_by":"issue-update"}
