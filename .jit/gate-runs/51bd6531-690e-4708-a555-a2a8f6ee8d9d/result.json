@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "e84318f927b11ec6c9f44a90fe4d91124249d53e",
+  "completed_at": "2026-10-21T05:38:29.173729580Z",
+  "duration_ms": 260924,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "6c596538a7b17ab1f28536c13b0322f6a05b4e6b07e0331b78cb524698ab7036",
+  "issue_id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "51bd6531-690e-4708-a555-a2a8f6ee8d9d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T05:34:08.249607879Z",
+  "status": "failed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND            PID MODE   PATH\nflock           300449 WRITE* /run/user/1000/cargo-ci.lock\nflock           287970 WRITE* /run/user/1000/cargo-ci.lock\nflock           284744 WRITE* /run/user/1000/cargo-ci.lock\nflock           269394 WRITE* /run/user/1000/cargo-ci.lock\nflock           264702 WRITE  /run/user/1000/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 41136 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 41136 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 61203 ms, warmed 17 executables (2062784248 bytes) in 397 ms.\n  ✓ fmt: ok (1633 ms)\n  ✓ clippy: ok (28667 ms)\n  ✓ suite-build: built in 61203 ms, warmed 17 executables (2062784248 bytes) in 397 ms (61603 ms)\n  ✓ test: 4754 passed, 0 failed, 0 skipped (36545 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4575 ms)\n  ✓ suite-clock: 41136 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (7 ms)\n  ✗ budget: FAILED (exit 1) (80 ms)\n\n",
+  "tree_dirty": true
+}

@@ -157,6 +157,11 @@
       "issue": "2d10f1dd",
       "category": "criterion interpretation (REQ-02 transition_blocked event)",
       "resolution": "steward chose keep-event; REQ-02 amended (b15a23d64)"
+    },
+    {
+      "issue": "bedf0962",
+      "category": "cross-epic: config show misreports [coordination] claim limits",
+      "resolution": "steward ruling B: folded into 842b0ac6 as REQ-26 with a task depending on bedf0962; bedf0962 merges on its own criteria"
     }
   ],
   "rework_counts": {
@@ -172,6 +177,11 @@
       "from": "lead",
       "finding": "cargo-ci budget step (30 s suite clock) and timing-sensitive tests fail under parallel-worker host load; gate results are meaningful only on a quiet host",
       "disposition": "operational: evaluate gates after workers finish"
+    },
+    {
+      "from": "bedf0962 worker",
+      "finding": "config show reports [coordination] limits merged with user/system layers while claim acquire applies repo-only",
+      "disposition": "owned by 842b0ac6 REQ-26 (steward ruling)"
     }
   ],
   "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
