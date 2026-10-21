@@ -20,9 +20,9 @@
       "updated_by": null
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:38:39.166228363Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T01:18:25.727354493Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "27387b92-7cce-49dd-81e3-8b9fb5435b75",
@@ -39,5 +39,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "breakdown: Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-10-21T01:17:17.426401294Z"
+  "updated_at": "2026-10-21T01:18:25.727354493Z"
 }
