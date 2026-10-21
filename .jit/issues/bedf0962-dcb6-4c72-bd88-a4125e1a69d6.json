@@ -14,12 +14,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-10-21T06:07:35.588996425Z",
+      "updated_at": "2026-10-21T06:20:14.760241943Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T05:57:50.006227243Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:25:41.283794010Z",
       "updated_by": "auto:executor"
     }
   },
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Config show misreports the lease enforcement mode that commands apply",
-  "updated_at": "2026-10-21T06:07:35.588996425Z"
+  "updated_at": "2026-10-21T06:25:41.283794010Z"
 }
