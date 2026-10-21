@@ -39,7 +39,7 @@ fn spawn_ok_server() -> String {
 /// 3. Validate internal doc links resolve
 /// 4. Detect broken relative vs root-relative links
 /// 5. Scope filtering (all vs issue:ID)
-/// 6. Exit codes (0=valid, 1=errors, 2=warnings)
+/// 6. Exit codes (0=valid or warnings only, 1=errors)
 /// 7. JSON output support
 struct TestContext {
     #[allow(dead_code)]
@@ -280,11 +280,20 @@ fn test_risky_relative_links_warns() {
     ctx.run_jit(&["doc", "add", &issue_id, doc_path, "--label", "Test"])
         .success();
 
-    // Check links should warn with exit code 2
+    // Warnings alone are reported and do not fail the check.
     ctx.run_jit(&["doc", "check-links", "--scope", "all"])
-        .code(2)
+        .code(0)
         .stdout(predicate::str::contains("Warnings"))
         .stdout(predicate::str::contains("risky").or(predicate::str::contains("relative")));
+    let json: serde_json::Value = serde_json::from_slice(
+        &ctx.run_jit(&["doc", "check-links", "--scope", "all", "--json"])
+            .code(0)
+            .get_output()
+            .stdout,
+    )
+    .unwrap();
+    assert!(!json["warnings"].as_array().unwrap().is_empty());
+    assert!(json["errors"].as_array().unwrap().is_empty());
 }
 
 #[test]

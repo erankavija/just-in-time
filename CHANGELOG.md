@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **`jit doc check-links` exits `0` on warnings alone.** It exited `2` for
+  advisory findings, which stopped `set -e` scripts and gates. It now fails
+  (exit `1`) only on a broken link; warnings still appear in the output and
+  the JSON result.
+
 ### Removed
 
 - **Inert configuration keys.** `[worktree] mode`, the `JIT_WORKTREE_MODE`

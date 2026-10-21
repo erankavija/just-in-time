@@ -1011,14 +1011,8 @@ impl CommandSchema {
             row(
                 "doc check-links",
                 1,
-                "One or more documents have broken links.",
-                true,
-            ),
-            row(
-                "doc check-links",
-                2,
-                "Documents have only risky-link warnings; here 2 means warnings, \
-                 not a usage error.",
+                "One or more documents have broken links. Documents with only \
+                 risky-link warnings exit `0`: warnings are reported, never fatal.",
                 true,
             ),
             row(
@@ -1107,8 +1101,8 @@ pub fn render_exit_code_reference() -> String {
         "Most commands draw only from the global taxonomy above. The rows below \
          identify the codes a specific command family emits. An **exception** is \
          a code a completed run emits to signal findings, or a code whose meaning \
-         departs from the global entry (for example, `doc check-links` exits `2` \
-         for warnings, not a usage error). A `child` code marks a pass-through, \
+         departs from the global entry (for example, `doc check-links` exits `1` \
+         for broken links, not a generic error). A `child` code marks a pass-through, \
          where the command exits with a subprocess's own code. `*` marks a code \
          every command can reach: `0` on successful completion, and the failure \
          codes through the shared classifier.\n\n",
