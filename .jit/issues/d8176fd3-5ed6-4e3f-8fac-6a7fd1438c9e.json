@@ -3,7 +3,11 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
+    "16d63038-c08b-4d2d-9a77-1a75fe48ef20",
+    "2d10f1dd-64c6-4eaf-8e67-836ed80c23d9",
+    "3754095f-d396-40b7-b2f1-e7624aacd6a6",
     "719a5501-d611-4a81-8728-1634a8c35b7c",
+    "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
     "bc7eb715-9c7f-47ff-bbd6-5d63fee3f123"
   ],
   "description": "`--json` is declared 108 times and recovered from raw argv when an error leaves `run()`. This declares it once and threads the parsed mode to every consumer, including failure rendering.\n\n## Background\n\n`crates/jit/src/cli.rs` declares a `json: bool` field on every real leaf and on the bare `Commands::Query` parent; `Cli.quiet` is already `global = true`. Each arm of `run()` in `crates/jit/src/main.rs` extracts its own `json` and builds `OutputContext::new(quiet, json)`. `emit_top_level_json_error` scans `std::env::args()` for `--json` because an error propagated from `run()`, including repository discovery, `invocation_write_override` and `storage.validate()` failures raised before any arm runs, no longer carries the parsed flag. `reject_parent_query_filters` treats a parent-level `--json` as a misplaced filter, so `jit query --json available` exits 2 today. `graph export --json` reads the same field as export-format sugar. In tests, `reflected_json_arm_paths_from` in `crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs` derives the failure census from schema leaves whose `flags` contain `json`, and `test_schema_has_json_flags` in `crates/jit/tests/fast_docs_templates/schema_tests.rs` pins the per-command flags.\n\nThe shape: `Cli` declares `#[arg(long, global = true)] json` beside `quiet`; `OutputMode { json, quiet }` in the output module is built once from the parsed `Cli` and is the only source of the flag for arms and for failure rendering; `run()` hands the mode back to `main()` with its result.\n\n## Success Criteria\n\n- [hard] REQ-01: `Cli` declares `--json` once with `global = true`, and no subcommand in `cli.rs` declares a `json` field.\n- [hard] REQ-02: `OutputMode { json, quiet }` is built once from the parsed `Cli`, `run()` returns it with its result, and `emit_top_level_json_error` reads that mode; no code in `crates/jit/src` reads raw argv for `--json`.\n- [hard] REQ-03: `--json` is accepted after any command segment, and a test asserts that `jit query --json available` now succeeds with the list envelope where it exited 2 before.\n- [hard] REQ-04: The schema lists `json` once in `global_options` and in no leaf's `flags`; `test_schema_has_json_flags` asserts that global form, and the failure-probe census derives its arm set from executable leaves while still covering every arm it covered before.\n- [hard] REQ-05: Human output, success payloads and exit codes are otherwise unchanged, and the Rust and MCP suites pass without weakened assertions.\n\n## Notes\n\nThis is a mechanical sweep across every arm of `run()`; it changes no arm's behavior beyond where the flag is read. 2d10f1dd, 3754095f, 16d63038, 8673dc5e and f37d228e edit arms in the same file and land first.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -27,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "One global --json flag carried as OutputMode",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T01:18:01.743664674Z"
 }

@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
-  "dependencies": [],
+  "dependencies": [
+    "27387b92-7cce-49dd-81e3-8b9fb5435b75"
+  ],
   "description": "The MCP bridge requests machine output only from leaves that declare their own `json` flag, so it would silently receive human output once `--json` becomes one global CLI flag. This makes the injection follow the schema's `global_options` as well.\n\n## Background\n\n`buildCliArgs(cmdPath, args, cmdDef)` in `mcp-server/lib/cli-executor.js` computes `hasJsonFlag` from `cmdDef.flags` and appends `--json` only when it is true. `mcp-server/lib/tool-generator.js` turns every leaf flag into a tool input property, which is why `json` is a tool property today. The CLI schema printed by `jit --schema` lists globally accepted flags once in `global_options` (today `quiet`, `schema`, `help`, `version`) and keeps them out of each leaf's `flags`. The CLI is moving `--json` to a single `global = true` flag on `Cli`; after that no leaf carries `json`. Supporting both shapes lets the bridge keep working across the cutover.\n\n## Success Criteria\n\n- [hard] REQ-01: `buildCliArgs` appends exactly one `--json` when the leaf declares a `json` flag or the schema's `global_options` declares `json`, and appends none when neither does.\n- [hard] REQ-02: A global `json` option adds no `json` input property to generated tools, while leaf flags still map to tool properties as before.\n- [hard] REQ-03: Unit tests in `mcp-server/test-unit.js` exercise injection against a schema with per-leaf `json` flags and against one with only a global `json` option, and the existing injection and no-duplication tests pass unchanged.\n\n## Notes\n\nHow `global_options` reaches `buildCliArgs` (an argument or state held by the executor) is an implementation choice.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
@@ -21,7 +23,7 @@
     "satisfies:df129d9e/REQ-15"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "MCP bridge injects --json from the schema's global options",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T01:17:44.053543795Z"
 }

@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
-  "dependencies": [],
+  "dependencies": [
+    "27387b92-7cce-49dd-81e3-8b9fb5435b75"
+  ],
   "description": "Freeze the before figure for `crates/jit/src` production lines, counted the way the epic's Background describes, so the completion report states a reproducible delta.\n\n## Background\n\nThe epic's survey counts production lines excluding `#[cfg(test)]` blocks, test-only sibling modules, doc comments and blank lines. The planning investigation's counter, `dev/active/df129d9e-rust-code-quality/prodlines.py`, implements exactly that in its default mode, reporting per top-level module; at 21f9e563 it yields 66,372. The survey's stated figure of about 63,100 is reproduced only with `--strip-line-comments --test-support-as-test` (63,118), which also drops plain comments and `test-support`-gated code. The figure moves with every commit of this and concurrent epics, so the baseline must be pinned to a named commit taken before this epic first changes `crates/jit/src`.\n\n## Success Criteria\n\n- [hard] REQ-01: The counter is committed as `scripts/production-lines.py` with unchanged definitions and flags, so the reports and the budget script share one implementation; the planning copy stays as investigation evidence.\n- [hard] REQ-02: `dev/active/df129d9e-rust-code-quality/line-count-baseline.md` records per-module and total production lines in the default (survey-described) mode as the authoritative figures, with the flagged-mode figures beside them.\n- [hard] REQ-03: The document names the full commit SHA measured and the exact commands, and that commit precedes every commit of this epic that changes `crates/jit/src`.\n- [hard] REQ-04: Re-running the recorded commands at the recorded commit reproduces every figure.\n\n## Notes\n\n842b0ac6 deletes code concurrently, which is why the commit is pinned. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
   "documents": [],
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
@@ -20,7 +22,7 @@
     "satisfies:df129d9e/REQ-10"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Record the production-line baseline for crates/jit/src",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T01:17:40.729490652Z"
 }

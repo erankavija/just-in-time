@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
-  "dependencies": [],
+  "dependencies": [
+    "27387b92-7cce-49dd-81e3-8b9fb5435b75"
+  ],
   "description": "The zero-warning and no-unsafe bars move from the gate script and crate-root attributes into the Cargo manifests, so a bare `cargo clippy` reproduces them.\n\n## Background\n\nNo `[lints]` or `[workspace.lints]` table exists in `Cargo.toml`, `crates/jit/Cargo.toml` or `crates/server/Cargo.toml`, and the repository has no `clippy.toml`. The bar exists only as `-D warnings` inside `scripts/cargo-ci.sh`. `#![deny(unsafe_code)]` sits on four roots (`crates/jit/src/lib.rs`, `crates/jit/src/main.rs`, `crates/server/src/lib.rs`, `crates/server/src/main.rs`), so integration-test crates are not covered. A scratch-crate probe showed `[lints.rust] warnings = \"deny\"` makes `cargo clippy` fail on clippy warn-level lints and makes plain `cargo build`/`cargo test` fail on rustc warnings, so no separate clippy group is needed. The MSRV (1.97) supports workspace lint inheritance.\n\n## Success Criteria\n\n- [hard] REQ-01: The root `Cargo.toml` declares `[workspace.lints.rust]` with `warnings = \"deny\"` and `unsafe_code = \"deny\"`, and both `crates/jit/Cargo.toml` and `crates/server/Cargo.toml` declare `[lints] workspace = true`.\n- [hard] REQ-02: No `#![deny(unsafe_code)]` attribute remains in `crates/`, and prose that cites that attribute as the enforcement mechanism (`AGENTS.md`, `.github/copilot-instructions.md`, the comment in `crates/server/Cargo.toml`) names the workspace lint table instead.\n- [hard] REQ-03: `cargo clippy --workspace --all-targets` with no extra flags exits zero on the tree and non-zero when any target, integration tests included, introduces a warning.\n\n## Notes\n\nGitHub CI runs clippy with `--all-features`, unlike the gate; aligning the two is out of scope. Existing local `#[allow(...)]` attributes keep working. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
@@ -22,7 +24,7 @@
     "satisfies:df129d9e/REQ-06"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Encode the zero-warning bar in workspace lints",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T01:17:38.043383381Z"
 }
