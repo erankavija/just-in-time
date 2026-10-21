@@ -82,7 +82,7 @@ pub use gate_check::VerdictSource;
 pub use graph::{BatchExport, BoundaryEdge, GraphExportFormat};
 pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
-pub use issue::DescriptionUpdate;
+pub use issue::{DescriptionUpdate, IssueLocalUpdate};
 pub use item::{ItemListResult, ItemShowResult};
 pub use migrate::LifecycleBackfillResult;
 pub use profile::{
@@ -933,6 +933,42 @@ impl CapturedFieldUpdate {
         })
     }
 
+    /// The standalone gate and assignee operations a single-issue update
+    /// composes, in the order its CLI flags apply; bulk updates fold these
+    /// fields into their own `issue_updated` record instead.
+    fn issue_local_mutations(&self, issue_id: &str) -> Vec<CapturedIssueMutation> {
+        if self.bulk {
+            return Vec::new();
+        }
+        let issue_id = issue_id.to_string();
+        let assignment = if self.unassign {
+            Some(CapturedIssueMutation::Unassign {
+                issue_id: issue_id.clone(),
+            })
+        } else {
+            self.assignee
+                .clone()
+                .map(|assignee| CapturedIssueMutation::Assign {
+                    issue_id: issue_id.clone(),
+                    assignee,
+                })
+        };
+        [
+            (!self.add_gates.is_empty()).then(|| CapturedIssueMutation::AddGates {
+                issue_id: issue_id.clone(),
+                gate_keys: self.add_gates.clone(),
+            }),
+            (!self.remove_gates.is_empty()).then(|| CapturedIssueMutation::RemoveGates {
+                issue_id: issue_id.clone(),
+                gate_keys: self.remove_gates.clone(),
+            }),
+            assignment,
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
     fn label_edit(issue_id: String, label_edit: CapturedLabelEdit) -> Self {
         Self {
             issue_id,
@@ -1236,6 +1272,21 @@ fn derive_field_update(
 ) -> Result<DerivedFieldUpdate> {
     use crate::repository_state::MutationIntent;
 
+    // A single-issue update stages its gate and assignee changes through the
+    // standalone operations, so it records their events; the inline handling
+    // below then finds them already applied.
+    let (original, staged, mut events) = request
+        .issue_local_mutations(&original.id)
+        .iter()
+        .try_fold(
+            (original, false, Vec::new()),
+            |(issue, staged, mut events), mutation| {
+                let applied =
+                    apply_captured_issue_mutation(issue, &evidence.declarations.gates, mutation)?;
+                events.extend(applied.events);
+                Ok::<_, anyhow::Error>((applied.issue, staged || applied.changed, events))
+            },
+        )?;
     let mut issue = original.clone();
     if let Some(title) = &request.title {
         issue.title = title.clone();
@@ -1412,7 +1463,6 @@ fn derive_field_update(
     }
 
     let mut warnings = validation.warnings;
-    let mut events = Vec::new();
     if let Some(target) = target {
         match derive_state_transition(
             issue,
@@ -1450,7 +1500,7 @@ fn derive_field_update(
         }
     }
 
-    let changed = !changed_fields.is_empty() || issue.state != original.state;
+    let changed = staged || !changed_fields.is_empty() || issue.state != original.state;
     if issue.assignee != original.assignee {
         if let Some(assignee) = issue.assignee.clone() {
             events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
@@ -1502,12 +1552,50 @@ fn derive_field_update(
 /// issue. Keeping this pure makes the retry contract directly testable: every
 /// attempt receives the new image's record and cannot retain an ambient preimage.
 fn derive_captured_issue_mutation(
-    mut issue: Issue,
+    issue: Issue,
     registry: &crate::declarations::GateRegistry,
     request: &CapturedIssueMutation,
 ) -> Result<DerivedCapturedIssueMutation> {
     use crate::repository_state::MutationIntent;
 
+    let AppliedIssueMutation {
+        issue,
+        outcome,
+        events,
+        changed,
+    } = apply_captured_issue_mutation(issue, registry, request)?;
+    let intents = if changed {
+        std::iter::once(MutationIntent::UpdateIssue {
+            issue: Box::new(issue),
+        })
+        .chain(
+            events
+                .into_iter()
+                .map(|(phase, event)| MutationIntent::RecordEvent {
+                    phase,
+                    event: Box::new(event),
+                }),
+        )
+        .collect()
+    } else {
+        Vec::new()
+    };
+    Ok(DerivedCapturedIssueMutation { outcome, intents })
+}
+
+/// One issue-local operation applied to a captured record, with its audit events.
+struct AppliedIssueMutation {
+    issue: Issue,
+    outcome: CapturedIssueMutationOutcome,
+    events: Vec<(u8, Event)>,
+    changed: bool,
+}
+
+fn apply_captured_issue_mutation(
+    mut issue: Issue,
+    registry: &crate::declarations::GateRegistry,
+    request: &CapturedIssueMutation,
+) -> Result<AppliedIssueMutation> {
     let (outcome, events, changed) = match request {
         CapturedIssueMutation::Assign { assignee, .. } => {
             if issue.assignee.as_ref() == Some(assignee) {
@@ -1650,23 +1738,12 @@ fn derive_captured_issue_mutation(
             )
         }
     };
-    let intents = if changed {
-        std::iter::once(MutationIntent::UpdateIssue {
-            issue: Box::new(issue),
-        })
-        .chain(
-            events
-                .into_iter()
-                .map(|(phase, event)| MutationIntent::RecordEvent {
-                    phase,
-                    event: Box::new(event),
-                }),
-        )
-        .collect()
-    } else {
-        Vec::new()
-    };
-    Ok(DerivedCapturedIssueMutation { outcome, intents })
+    Ok(AppliedIssueMutation {
+        issue,
+        outcome,
+        events,
+        changed,
+    })
 }
 
 /// The unpassed gates of `issue` paired with their current status and registry
