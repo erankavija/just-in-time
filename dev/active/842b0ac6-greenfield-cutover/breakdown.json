@@ -237,7 +237,7 @@
   {
     "key": "state-config-defaults-once",
     "title": "State each configuration default once",
-    "description": "Every surviving configuration default is written in several places: a per-layer accessor, a merged accessor, two printers and the prose. Each default gets one named statement that every reader derives from.\n\n## Background\n\nThe remaining defaults and where each is stated:\n\n- `enforce_leases`: `Strict` at `crates/jit/src/config.rs:1317,1820,1966` and `main.rs:6807,6849`; `Off` when the section is absent at `config_manager.rs:111`; prose at `docs/reference/configuration.md:482`.\n- `max_indefinite_leases_per_agent = 2`: `config.rs:1364,2065`; prose at `configuration.md:560` and `profiles/jit-default/manifest.toml:453`.\n- `max_indefinite_leases_per_repo = 10`: `config.rs:1368,2084`; prose at `configuration.md:564` and `manifest.toml:454`.\n- `write_policy` is already one constant, `LinkedCheckoutWriteStance::DEFAULT`.\n\nOnly tests call the per-layer accessors (`config.rs:1335-1428`; tests at `:3508-3587`). Production uses the `Merged*` accessors (`config.rs:2009-2172`): `commands/claim.rs:112,143-144`, the printers, and `full_snapshot`. `config show` (`main.rs`) and `EffectiveConfig::full_snapshot` (`config.rs`) print the same merged view, each with its own `unwrap_or` defaults.\n\n`crates/jit/src/runtime_defaults.rs` already projects named defaults into `docs/reference/runtime-defaults.md` (`scripts/generate-runtime-defaults-reference.sh`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each surviving configuration default is one named constant, and no accessor, printer, loader or prose restates its value.\n- [hard] REQ-02: No per-layer default accessor remains. The effective configuration resolves each key through one layered lookup over the repository, user and system layers.\n- [hard] REQ-03: `config show` renders the same merged snapshot that `config get` returns.\n- [hard] REQ-04: The runtime-defaults reference projects the lease-limit defaults, and the configuration reference and the `jit-default` profile comment cite it in place of the numbers.\n- [hard] REQ-05: The `enforce_leases` value with no section present equals its declared default.\n\n## Notes\n\nConfiguration file I/O stays in `config.rs`; `main.rs` only renders.\n",
+    "description": "Every surviving configuration default is written in several places: a per-layer accessor, a merged accessor, two printers and the prose. Each default gets one named statement that every reader derives from.\n\n## Background\n\nThe remaining defaults and where each is stated:\n\n- `enforce_leases`: `Strict` at `crates/jit/src/config.rs:1317,1820,1966` and `main.rs:6807,6849`; prose at `docs/reference/configuration.md:482`.\n- `max_indefinite_leases_per_agent = 2`: `config.rs:1364,2065`; prose at `configuration.md:560` and `profiles/jit-default/manifest.toml:453`.\n- `max_indefinite_leases_per_repo = 10`: `config.rs:1368,2084`; prose at `configuration.md:564` and `manifest.toml:454`.\n- `write_policy` is already one constant, `LinkedCheckoutWriteStance::DEFAULT`.\n\nOnly tests call the per-layer accessors (`config.rs:1335-1428`; tests at `:3508-3587`). Production uses the `Merged*` accessors (`config.rs:2009-2172`): `commands/claim.rs:112,143-144`, the printers, and `full_snapshot`. `config show` (`main.rs`) and `EffectiveConfig::full_snapshot` (`config.rs`) print the same merged view, each with its own `unwrap_or` defaults.\n\n`crates/jit/src/runtime_defaults.rs` already projects named defaults into `docs/reference/runtime-defaults.md` (`scripts/generate-runtime-defaults-reference.sh`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each surviving configuration default is one named constant, and no accessor, printer, loader or prose restates its value.\n- [hard] REQ-02: No per-layer default accessor remains. The effective configuration resolves each key through one layered lookup over the repository, user and system layers.\n- [hard] REQ-03: `config show` renders the same merged snapshot that `config get` returns.\n- [hard] REQ-04: The runtime-defaults reference projects the lease-limit defaults, and the configuration reference and the `jit-default` profile comment cite it in place of the numbers.\n\n## Notes\n\nConfiguration file I/O stays in `config.rs`; `main.rs` only renders. How `enforce_leases` resolves when no section is present (`config_manager.rs:111`) is outside this change; this change gives its declared default one named constant.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -274,7 +274,6 @@
           "touches": [
             "crates/jit/src/config.rs",
             "crates/jit/src/main.rs",
-            "crates/jit/src/config_manager.rs",
             "crates/jit/src/runtime_defaults.rs",
             "docs/reference/runtime-defaults.md",
             "docs/reference/configuration.md",
@@ -325,7 +324,9 @@
             "crates/jit/src/main.rs",
             "crates/jit/src/commands/config.rs",
             "crates/jit/src/declarations/mod.rs",
-            "crates/jit/src/test_utils.rs"
+            "crates/jit/src/test_utils.rs",
+            "crates/jit/src/test_taxonomy.rs",
+            "crates/jit/src/repository_state/materialize.rs"
           ]
         }
       }
@@ -535,7 +536,7 @@
   {
     "key": "remove-lifecycle-backfill",
     "title": "Remove the lifecycle-timestamp backfill",
-    "description": "A one-off lifecycle-timestamp backfill still ships as a CLI command, a module, an event variant, a mutation intent and a derivation function. The derivation costs O(issues × events).\n\n## Background\n\nThe backfill surface:\n\n- CLI: `crates/jit/src/cli.rs:435-440,2310-2330,3265,3325,3765-3769,3870`; dispatch at `main.rs:23,7873-7895`.\n- `commands/migrate.rs` (148 lines), declared at `commands/mod.rs:48,87`.\n- `Event::LifecycleTimestampsBackfilled` (`domain/types.rs:1553-1568,1642,1674,1943-1949,2010`) and its catalog entries (`domain/event_catalog.rs:118-119,151,178,206,257-259,416,478,790`).\n- `MutationIntent::RepairIssueLifecycle` (`repository_state/mutation.rs:372-380,941-953,2400-2430`).\n- `derive_lifecycle_timestamps` and `LifecycleTimestamps` (`domain/queries.rs:10-100`, tests `:514-572`), which fold the whole event slice per issue (`migrate.rs:98`).\n\nTests: backfill tests at `tests/fast_issue/lifecycle_timestamps_tests.rs:220-479`. The write-point tests at `:1-69` stay; the module doc at `:1-7` names the backfill.\n\nOther consumers:\n\n- `mcp-server/curated-tools.json:73` excludes `jit_migrate_lifecycle-timestamps`. `mcp-server/test-unit.js:506-508` fails on a stale curated name.\n- `docs/reference/events.md:20,47`, generated from the event catalog.\n- `docs/reference/cli-commands.md:3904-3925`, `docs/reference/cli-command-grammar.md:27`, `docs/reference/storage-format.md:233-236,254-256,427` and `docs/concepts/guarantees.md:199-200`.\n\n`domain::parse_known_events` (`domain/event_log.rs:42-76`) deserializes only records whose type is in `EventTag::ALL` (`:66`) and skips other well-formed records. `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1831`) owns that property. This repository's `.jit/events.jsonl` holds one backfill record, at line 5417.\n\n## Success Criteria\n\n- [hard] REQ-01: The `migrate` command, `commands/migrate.rs`, `Event::LifecycleTimestampsBackfilled` with its tag, `MutationIntent::RepairIssueLifecycle`, `derive_lifecycle_timestamps` and `LifecycleTimestamps` no longer exist.\n- [hard] REQ-02: An event log holding a backfill record parses without error, through the existing retired-tag tolerance, and this repository's log loads under repository validation.\n- [hard] REQ-03: The generated events reference, the CLI references, the storage-format reference and the guarantees page do not describe the command or the event.\n- [hard] REQ-04: The MCP curated tool list names no migrate tool, and the MCP unit suite passes.\n- [hard] REQ-05: Backfill tests are deleted. Lifecycle write-point tests remain, and their module doc does not mention the backfill.\n\n## Notes\n\nNo parse-only variant and no new tolerance test are added; the existing JSON-storage test owns tolerance. This repository's event log is not rewritten. `CHANGELOG.md:944-945` is history and stays.\n",
+    "description": "A one-off lifecycle-timestamp backfill still ships as a CLI command, a module, an event variant, a mutation intent and a derivation function. The derivation costs O(issues × events).\n\n## Background\n\nThe backfill surface:\n\n- CLI: `crates/jit/src/cli.rs:435-440,2310-2330,3265,3325,3765-3769,3870`; dispatch at `main.rs:23,7873-7895`.\n- `commands/migrate.rs` (148 lines), declared at `commands/mod.rs:48,87`.\n- `Event::LifecycleTimestampsBackfilled` (`domain/types.rs:1553-1568,1642,1674,1943-1949,2010`) and its catalog entries (`domain/event_catalog.rs:118-119,151,178,206,257-259,416,478,790`).\n- `MutationIntent::RepairIssueLifecycle` (`repository_state/mutation.rs:372-380,941-953,2400-2430`).\n- `derive_lifecycle_timestamps` and `LifecycleTimestamps` (`domain/queries.rs:10-100`, tests `:514-572`), which fold the whole event slice per issue (`migrate.rs:98`).\n\nTests: backfill tests at `tests/fast_issue/lifecycle_timestamps_tests.rs:220-479`. The write-point tests at `:1-69` stay; the module doc at `:1-7` names the backfill. `tests/cli_repo_workflow/integration_test.rs:431` `test_migrate_lifecycle_timestamps_runs` runs the command, and `tests/cli_issue/failure_lever_registry.toml:924-925` declares a failure lever for it.\n\nOther consumers:\n\n- `mcp-server/curated-tools.json:73` excludes `jit_migrate_lifecycle-timestamps`. `mcp-server/test-unit.js:506-508` fails on a stale curated name.\n- `docs/reference/events.md:20,47`, generated from the event catalog.\n- `docs/reference/cli-commands.md:3904-3925`, `docs/reference/cli-command-grammar.md:27`, `docs/reference/storage-format.md:233-236,254-256,427` and `docs/concepts/guarantees.md:199-200`.\n\n`domain::parse_known_events` (`domain/event_log.rs:42-76`) deserializes only records whose type is in `EventTag::ALL` (`:66`) and skips other well-formed records. `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1831`) owns that property. This repository's `.jit/events.jsonl` holds one backfill record, at line 5417.\n\n## Success Criteria\n\n- [hard] REQ-01: The `migrate` command, `commands/migrate.rs`, `Event::LifecycleTimestampsBackfilled` with its tag, `MutationIntent::RepairIssueLifecycle`, `derive_lifecycle_timestamps` and `LifecycleTimestamps` no longer exist.\n- [hard] REQ-02: An event log holding a backfill record parses without error, through the existing retired-tag tolerance, and this repository's log loads under repository validation.\n- [hard] REQ-03: The generated events reference, the CLI references, the storage-format reference and the guarantees page do not describe the command or the event.\n- [hard] REQ-04: The MCP curated tool list names no migrate tool, and the MCP unit suite passes.\n- [hard] REQ-05: Backfill tests, the migrate integration test and the migrate failure lever are deleted. Lifecycle write-point tests remain, and their module doc does not mention the backfill.\n\n## Notes\n\nNo parse-only variant and no new tolerance test are added; the existing JSON-storage test owns tolerance. This repository's event log is not rewritten. `CHANGELOG.md:944-945` is history and stays.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -580,6 +581,8 @@
             "crates/jit/src/domain/queries.rs",
             "crates/jit/src/repository_state/mutation.rs",
             "crates/jit/tests/fast_issue/lifecycle_timestamps_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/integration_test.rs",
+            "crates/jit/tests/cli_issue/failure_lever_registry.toml",
             "mcp-server/curated-tools.json",
             "docs/reference/events.md",
             "docs/reference/cli-commands.md",
@@ -594,7 +597,7 @@
   {
     "key": "canonical-state-tokens",
     "title": "Parse lifecycle states from canonical tokens only",
-    "description": "`State::from_str` accepts the retired aliases `open` and `inprogress` and folds case. A second state parser in rule declarations keeps its own token table.\n\n## Background\n\n`State::from_str` (`crates/jit/src/domain/types.rs:160-164`) lowercases its input and accepts `open` and `inprogress`. Tests assert both behaviours (`types.rs:2915-2923,2929,2931`). Serde (`#[serde(rename_all = \"snake_case\")]`, `types.rs:16-19`) is already strict. `State::all()` (`:91`) and `State::as_str()` (`:71-89`) exist.\n\nParse sites through `State::from_str`: `main.rs:2013` (search `--state`), `:3174` (list and query `--state`), `:3585` (issue update), `:3707` (bulk update), and the query `state:` filter (`query_engine/parser.rs:187-191`).\n\n`declarations/rules.rs:372-383` `token_to_state` parses rule `when.state` and label-coverage `child-state`. It rejects the aliases but also lowercases. `query_engine/error.rs:12-13` `STATE_VALUES` is a hand-maintained list.\n\nProse naming the aliases: `query_engine/error.rs:8-11`, `declarations/rules.rs:368-370`, `dev/architecture/core-system-design.md:123`.\n\n## Success Criteria\n\n- [hard] REQ-01: `State::from_str` accepts exactly the snake_case tokens serde emits. It rejects `open`, `inprogress` and every case variant of a canonical token.\n- [hard] REQ-02: Rule declarations parse states through `State::from_str`, and no second state-token table remains.\n- [hard] REQ-03: The query language's list of state values derives from the state enumeration.\n- [hard] REQ-04: One owning unit test proves that every non-canonical token is rejected and every canonical token round-trips. The query parser's rejection error lists the canonical values.\n- [hard] REQ-05: No prose describes state aliases or case-insensitive state parsing.\n\n## Notes\n\nPriority parsing is out of scope.\n",
+    "description": "`State::from_str` accepts the retired aliases `open` and `inprogress` and folds case. A second state parser in rule declarations keeps its own token table.\n\n## Background\n\n`State::from_str` (`crates/jit/src/domain/types.rs:160-164`) lowercases its input and accepts `open` and `inprogress`. Tests assert both behaviours (`types.rs:2915-2923,2929,2931`). Serde (`#[serde(rename_all = \"snake_case\")]`, `types.rs:16-19`) is already strict. `State::all()` (`:91`) and `State::as_str()` (`:71-89`) exist.\n\nParse sites through `State::from_str`: `main.rs:2013` (search `--state`), `:3174` (list and query `--state`), `:3585` (issue update), `:3707` (bulk update), and the query `state:` filter (`query_engine/parser.rs:187-191`).\n\n`declarations/rules.rs:372-383` `token_to_state` parses rule `when.state` and label-coverage `child-state`. It rejects the aliases but also lowercases. `query_engine/error.rs:12-13` `STATE_VALUES` is a hand-maintained list.\n\nCLI tests that use the alias: `tests/cli_issue/quiet_mode_tests.rs:75` runs `issue update --state open` and asserts success. `tests/cli_query_graph/query_tests.rs:1392` runs `query -s open available` and asserts failure; it exists to prove that a parent filter is rejected, and with `open` invalid it would pass without reaching that rejection.\n\nProse naming the aliases: `query_engine/error.rs:8-11`, `declarations/rules.rs:368-370`, `dev/architecture/core-system-design.md:123`.\n\n## Success Criteria\n\n- [hard] REQ-01: `State::from_str` accepts exactly the snake_case tokens serde emits. It rejects `open`, `inprogress` and every case variant of a canonical token.\n- [hard] REQ-02: Rule declarations parse states through `State::from_str`, and no second state-token table remains.\n- [hard] REQ-03: The query language's list of state values derives from the state enumeration.\n- [hard] REQ-04: One owning unit test proves that every non-canonical token is rejected and every canonical token round-trips. The query parser's rejection error lists the canonical values.\n- [hard] REQ-05: No prose describes state aliases or case-insensitive state parsing.\n- [hard] REQ-06: CLI tests pass states as canonical tokens, and the query test for a rejected parent filter still fails on the parent filter itself.\n\n## Notes\n\nPriority parsing is out of scope.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -613,7 +616,7 @@
       "outcome": "Lifecycle states parse only from their exact serde tokens, through one parser.",
       "contract_refs": [
         "removal-hygiene",
-        "exact-token-vocabulary"
+        "lifecycle-state-tokens"
       ],
       "source_refs": [
         "REQ-09",
@@ -628,6 +631,8 @@
             "crates/jit/src/domain/types.rs",
             "crates/jit/src/declarations/rules.rs",
             "crates/jit/src/query_engine/error.rs",
+            "crates/jit/tests/cli_issue/quiet_mode_tests.rs",
+            "crates/jit/tests/cli_query_graph/query_tests.rs",
             "dev/architecture/core-system-design.md"
           ]
         }
@@ -637,7 +642,7 @@
   {
     "key": "route-test-gates-through-definition",
     "title": "Define test gates through the production definition path",
-    "description": "Tests define gates through `add_gate_definition`, a command method production never calls. It also builds automated gates without a checker, which the production path refuses.\n\n## Background\n\n`CommandExecutor::add_gate_definition` (`crates/jit/src/commands/gate.rs:1155-1191`) is reached only from tests: the harness wrapper `add_gate` (`tests/common/harness.rs:209-220`, about 21 sites in six files) and direct calls in `tests/fast_docs_templates/planning_preset_tests.rs:36`, `template_apply_atomicity_tests.rs:399` and `template_apply_tests.rs:955`.\n\nThe production definition path is `CommandExecutor::define_gate` (`gate.rs:1203-1250`), reached from `gate define`. It rejects an automated gate without a checker (`gate.rs:1222-1226`). Four test sites build that invalid gate through `add_gate_definition` with `auto = true` (`template_apply_tests.rs:119,704,955`, `template_apply_atomicity_tests.rs:399`). `GateChecker::RepositoryValidation` is the natural checker for them. The other callers pass `auto = false`, which maps to a manual gate with no checker.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::add_gate_definition` no longer exists.\n- [hard] REQ-02: The shared test harness's gate helper delegates to `define_gate` and takes a mode and an optional checker.\n- [hard] REQ-03: Tests that built an automated gate without a checker define it with the repository-validation checker.\n- [hard] REQ-04: Each affected test keeps the property it asserted.\n\n## Notes\n\nA shared gate-definition fixture is optional; if one is added, it lives in the shared test support.\n",
+    "description": "Tests define gates through `add_gate_definition`, a command method production never calls. It also builds automated gates without a checker, which the production path refuses.\n\n## Background\n\n`CommandExecutor::add_gate_definition` (`crates/jit/src/commands/gate.rs:1155-1191`) is reached only from tests: the harness wrapper `add_gate` (`tests/common/harness.rs:209-220`) and direct calls in `tests/fast_docs_templates/planning_preset_tests.rs:36`, `template_apply_atomicity_tests.rs:399` and `template_apply_tests.rs:955`.\n\nThe harness wrapper's callers are `tests/fast_issue/bulk_operations_tests.rs` (12 calls), `tests/fast_docs_templates/harness_demo.rs` (3), `tests/fast_docs_templates/batch_export_tests.rs` (2), `tests/fast_docs_templates/template_apply_tests.rs` (2) and `tests/fast_issue/test_no_coordinator.rs` (1).\n\nThe production definition path is `CommandExecutor::define_gate` (`gate.rs:1203-1250`), reached from `gate define`. It rejects an automated gate without a checker (`gate.rs:1222-1226`). Four test sites build that invalid gate through `add_gate_definition` with `auto = true` (`template_apply_tests.rs:119,704,955`, `template_apply_atomicity_tests.rs:399`). `GateChecker::RepositoryValidation` is the natural checker for them. The other callers pass `auto = false`, which maps to a manual gate with no checker.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::add_gate_definition` no longer exists.\n- [hard] REQ-02: The shared test harness's gate helper delegates to `define_gate` and takes a mode and an optional checker.\n- [hard] REQ-03: Tests that built an automated gate without a checker define it with the repository-validation checker.\n- [hard] REQ-04: Each affected test keeps the property it asserted.\n\n## Notes\n\nA shared gate-definition fixture is optional; if one is added, it lives in the shared test support.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -672,7 +677,11 @@
             "crates/jit/tests/common/harness.rs",
             "crates/jit/tests/fast_docs_templates/planning_preset_tests.rs",
             "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
-            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs"
+            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
+            "crates/jit/tests/fast_issue/bulk_operations_tests.rs",
+            "crates/jit/tests/fast_docs_templates/harness_demo.rs",
+            "crates/jit/tests/fast_docs_templates/batch_export_tests.rs",
+            "crates/jit/tests/fast_issue/test_no_coordinator.rs"
           ]
         }
       }
@@ -681,7 +690,7 @@
   {
     "key": "remove-gate-auto-fields",
     "title": "Remove the auto and example-integration gate fields",
-    "description": "Gate declarations carry `auto`, a deprecated mirror of `mode` kept only for round trips, and `example_integration`. A stale key in an adopter's `gates.toml` loads silently.\n\n## Background\n\n`crates/jit/src/declarations/gates.rs:187-192` calls both fields \"deprecated authored field preserved during round trips\". `GateDefinition` (`gates.rs:153`) has no `deny_unknown_fields`, and `serialize_gate_registry` (`gates.rs:236`) always writes `auto`.\n\n`auto` has no reader except the output mirror (`output.rs:2752`); automation reads `mode`. Writers derive it from `mode`: `gate_presets.rs:63-64`, `commands/gate.rs:635-636,1244-1245`.\n\n`example_integration` is wired to `gate define --example` (`cli.rs:1368-1370`, `main.rs:4225,4305`), printed by `gate show` (`main.rs:4525-4527`), emitted in JSON (`output.rs:2731,2753`) and documented at `docs/reference/cli-commands.md:1924`.\n\nAuthored data carrying `auto`:\n\n- 20 gates in `.jit/gates.toml`.\n- Six gate contributions in `profiles/jit-dogfood/manifest.toml:143-239`, which `profile/repository_package.rs` checks against the live registry.\n\nProjected reference: `docs/reference/gate-presets.md:18,62,75,88,102,116`, generated from `gate_presets/reference.rs:22-90,115` by `scripts/generate-gate-presets-reference.sh`. Other docs: `docs/how-to/adopt-planning-bracket.md:238,251,264`.\n\nTest literals that set the fields: `gate_check.rs` tests, `gate.rs` tests (`:1588-1777,2243`), `issue.rs:887,986,1045,1282`, `output.rs:2978,3948-3989`, `invariant.rs:99`, `repository_state/mod.rs:1471`, `rules_gates_projection.rs:245`, `gates.rs:391`, the TOML at `gate_store.rs:56,66`, and `tests/cli_item_validate/registry_json_tests.rs:84`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateDefinition` has no `auto` or `example_integration` field and rejects unknown fields, so a declaration carrying `auto` fails to load with an error naming it.\n- [hard] REQ-02: Automation is read from `mode` alone, and no writer, serializer, output mirror or preset emits `auto`.\n- [hard] REQ-03: `gate define --example`, the `gate show` example line and the JSON `example_integration` field no longer exist.\n- [hard] REQ-04: `.jit/gates.toml` and the `jit-dogfood` gate contributions carry no `auto` key, and the profile still matches the live registry.\n- [hard] REQ-05: The generated gate-presets reference shows no `auto` key, and the planning-bracket how-to and the CLI reference document neither field.\n\n## Notes\n\nThe `gate define --auto` CLI flag is sugar for `--mode auto`, not a declaration field, and stays.\n",
+    "description": "Gate declarations carry `auto`, a deprecated mirror of `mode` kept only for round trips, and `example_integration`. A stale key in an adopter's `gates.toml` loads silently.\n\n## Background\n\n`crates/jit/src/declarations/gates.rs:187-192` calls both fields \"deprecated authored field preserved during round trips\". `GateDefinition` (`gates.rs:153`) has no `deny_unknown_fields`, and `serialize_gate_registry` (`gates.rs:236`) always writes `auto`.\n\n`auto` has no reader except the output mirror (`output.rs:2752`); automation reads `mode`. Writers derive it from `mode`: `gate_presets.rs:63-64`, `commands/gate.rs:635-636,1244-1245`.\n\n`example_integration` is wired to `gate define --example` (`cli.rs:1368-1370`, `main.rs:4225,4305`), printed by `gate show` (`main.rs:4525-4527`), emitted in JSON (`output.rs:2731,2753`) and documented at `docs/reference/cli-commands.md:1924`.\n\nAuthored data carrying `auto`:\n\n- 20 gates in `.jit/gates.toml`.\n- Six gate contributions in `profiles/jit-dogfood/manifest.toml:143-239`, which `profile/repository_package.rs` checks against the live registry.\n\nProjected reference: `docs/reference/gate-presets.md:18,62,75,88,102,116`, generated from `gate_presets/reference.rs:22-90,115` by `scripts/generate-gate-presets-reference.sh`. Other docs: `docs/how-to/adopt-planning-bracket.md:238,251,264`.\n\nRust literals that set the fields: `commands/gate_check.rs` tests, `commands/gate.rs` tests (`:1588-1777,2243`), `commands/mod.rs:3528-3546,3675`, `commands/issue.rs:887,986,1045,1282`, `output.rs:2978,3948-3989`, `commands/invariant.rs:99`, `repository_state/mod.rs:1471`, `repository_state/rules_gates_projection.rs:245`, `declarations/gates.rs:391`, `tests/common/harness.rs:324` and `tests/fast_rules/project_render_harness_tests.rs:112`. `tests/cli_item_validate/registry_json_tests.rs:84,107` exercises `--example`.\n\nTOML gate fixtures carrying `auto = true`, which fail to load once `GateDefinition` is strict: `storage/gate_store.rs:56,66`, `tests/cli_gate/gate_update_test.rs:70`, `tests/cli_gate/gate_evaluate_all_test.rs:105`, `tests/cli_item_validate/validate_cli_rule_tests.rs:624`, `tests/cli_gate/bracket_coverage_gate_run_test.rs:130` and `.agents/skills/jit-planning-lead/evals/setup-test-repo.sh:75`.\n\nProse: `dev/architecture/core-system-design.md:61` describes `example_integration`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateDefinition` has no `auto` or `example_integration` field and rejects unknown fields, so a declaration carrying `auto` fails to load with an error naming it.\n- [hard] REQ-02: Automation is read from `mode` alone, and no writer, serializer, output mirror or preset emits `auto`.\n- [hard] REQ-03: `gate define --example`, the `gate show` example line and the JSON `example_integration` field no longer exist.\n- [hard] REQ-04: `.jit/gates.toml` and the `jit-dogfood` gate contributions carry no `auto` key, and the profile still matches the live registry.\n- [hard] REQ-05: The generated gate-presets reference shows no `auto` key, and the planning-bracket how-to, the CLI reference and the core system design note describe neither field.\n- [hard] REQ-06: No Rust literal, TOML fixture or evaluation setup script sets either field.\n\n## Notes\n\nThe `gate define --auto` CLI flag is sugar for `--mode auto`, not a declaration field, and stays.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -728,6 +737,20 @@
             "crates/jit/src/output.rs",
             "crates/jit/src/cli.rs",
             "crates/jit/src/main.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/invariant.rs",
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/repository_state/rules_gates_projection.rs",
+            "crates/jit/src/storage/gate_store.rs",
+            "crates/jit/tests/common/harness.rs",
+            "crates/jit/tests/fast_rules/project_render_harness_tests.rs",
+            "crates/jit/tests/cli_gate/gate_update_test.rs",
+            "crates/jit/tests/cli_gate/gate_evaluate_all_test.rs",
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+            "crates/jit/tests/cli_gate/bracket_coverage_gate_run_test.rs",
+            ".agents/skills/jit-planning-lead/evals/setup-test-repo.sh",
+            "dev/architecture/core-system-design.md",
             "crates/jit/tests/cli_item_validate/registry_json_tests.rs",
             ".jit/gates.toml",
             "profiles/jit-dogfood/manifest.toml",
@@ -742,7 +765,7 @@
   {
     "key": "require-archived-from",
     "title": "Require archived_from on archived issue records",
-    "description": "An archived issue record may omit `archived_from`, and revive logic keeps a fallback for that legacy shape. Every archived record in this repository carries the field.\n\n## Background\n\n- The `archived_from` field doc (`crates/jit/src/domain/types.rs:475-489`) names legacy records.\n- Revive keeps an explicit fallback: the `None` arm at `commands/mod.rs:1030-1045` warns \"archived before its pre-archive state was recorded\".\n- `effective_terminal_state` (`types.rs:120-126`) has no special branch, but its doc (`:113-115`) mentions legacy records.\n- All 41 archived records here carry the field, and no non-archived record does.\n- Writers: `commands/mod.rs:1212-1216` and `repository_state/archive.rs:208-211`.\n\nEvery issue load path goes through the derived `Deserialize` on `Issue` (`types.rs:411`): `storage/json.rs:132,920`, `storage/memory.rs:463,473`, `validation/repository.rs:377`. A plain required field cannot express the rule, because the field is absent on non-archived issues. The check therefore belongs at the decode boundary, through `serde(try_from)` or a hand `Deserialize`. Whether schemars 0.8 honours `serde(try_from)` for the `Issue` JSON-schema derive is unverified.\n\nTests that construct archived issues without the field include `commands/archive.rs:965,2572` and `domain/artifact_classifier.rs:1916,1923`.\n\n## Success Criteria\n\n- [hard] REQ-01: Decoding an archived issue record without `archived_from` fails with an error naming the field, on every load path.\n- [hard] REQ-02: Revive logic and `effective_terminal_state` hold no legacy-record branch, and their docs do not mention legacy records.\n- [hard] REQ-03: Tests construct archived issues with an origin state, and the issue JSON schema still describes `archived_from`.\n- [hard] REQ-04: One owning domain test proves the decode rejection.\n\n## Notes\n\nThe decode check stays pure and I/O-free in the domain layer.\n",
+    "description": "An archived issue record may omit `archived_from`, and revive logic keeps a fallback for that legacy shape. Every archived record in this repository carries the field.\n\n## Background\n\n- The `archived_from` field doc (`crates/jit/src/domain/types.rs:475-489`) names legacy records.\n- Revive keeps an explicit fallback: the `None` arm at `commands/mod.rs:1030-1045` warns \"archived before its pre-archive state was recorded\".\n- `effective_terminal_state` (`types.rs:120-126`) has no special branch, but its doc (`:113-115`) mentions legacy records.\n- All 41 archived records here carry the field, and no non-archived record does.\n- Writers: `commands/mod.rs:1212-1216` and `repository_state/archive.rs:208-211`.\n\nEvery issue load path goes through the derived `Deserialize` on `Issue` (`types.rs:411`): `storage/json.rs:132,920`, `storage/memory.rs:463,473`, `validation/repository.rs:377`. A plain required field cannot express the rule, because the field is absent on non-archived issues. The check therefore belongs at the decode boundary, through `serde(try_from)` or a hand `Deserialize`. schemars 0.8 ignores `serde(try_from)` (its `SERDE_KEYWORDS` in `schemars_derive-0.8.22/src/attr/schemars_to_serde.rs` omit it), so the derived `Issue` schema keeps describing the struct's own fields, `archived_from` included.\n\nTests that construct archived issues without the field:\n\n- `commands/archive.rs:965,2572` and `domain/artifact_classifier.rs:1916,1923`.\n- `tests/fast_issue/archived_semantics_tests.rs` builds legacy records on purpose (`save_legacy_archived` at `:30`; legacy dependency and revive tests at `:89,190`). Those legacy-record tests are deleted.\n- `tests/fast_docs_templates/harness_demo.rs:502` seeds an archived issue without the field, decoded by `InMemoryStorage` through `serde_json::from_slice::<Issue>` (`storage/memory.rs:463`). It is rewritten to carry an origin state.\n\n## Success Criteria\n\n- [hard] REQ-01: Decoding an archived issue record without `archived_from` fails with an error naming the field, on every load path.\n- [hard] REQ-02: Revive logic and `effective_terminal_state` hold no legacy-record branch, and their docs do not mention legacy records.\n- [hard] REQ-03: Tests construct archived issues with an origin state, and the issue JSON schema still describes `archived_from`.\n- [hard] REQ-04: One owning domain test proves the decode rejection.\n\n## Notes\n\nThe decode check stays pure and I/O-free in the domain layer.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -775,7 +798,9 @@
             "crates/jit/src/domain/types.rs",
             "crates/jit/src/commands/mod.rs",
             "crates/jit/src/commands/archive.rs",
-            "crates/jit/src/domain/artifact_classifier.rs"
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "crates/jit/tests/fast_issue/archived_semantics_tests.rs",
+            "crates/jit/tests/fast_docs_templates/harness_demo.rs"
           ]
         }
       }
@@ -803,7 +828,7 @@
       "outcome": "Mermaid export declares one class per lifecycle state, derived from the state enumeration.",
       "contract_refs": [
         "removal-hygiene",
-        "exact-token-vocabulary"
+        "lifecycle-state-tokens"
       ],
       "source_refs": [
         "REQ-12"
@@ -824,7 +849,7 @@
   {
     "key": "remove-retired-name-scans",
     "title": "Remove source-scan tests for retired names",
-    "description": "Several structural tests scan the source tree to assert that retired file paths, function names, event tags and a retired CLI verb are absent. Such a test names a property nobody can break by accident, and it outlives the cutover that motivated it.\n\n## Background\n\nIn `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`:\n\n- `test_cutover_has_no_known_predecessor_or_compatibility_module` (`:1283-1352`), with its only helper `contains_cargo_manifest` (`:562-569`).\n- The no-retired-selector-bypass test (`:1412-1427`) and the no-retired-profile-applied-event-contract test (`:1430-1438`).\n- Their only helpers: `assert_retired_lifecycle_entry_point_absent` (`:169-185`), `assert_retired_profile_applied_contract_absent` (`:186-224`), `generated_event_tags` (`:245-251`).\n- The retired-bypass and retired-event-contract cases in `test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes` (`:1555-1590`).\n\nThe tests at `:1084,1122,1355,1382,1446,1468,1759,1792,1819,1861`, and the helpers `production_sources` and `definition_owners`, assert current ownership or forbidden capabilities and stay.\n\n`tests/cli_issue/command_alias_tests.rs:99` `test_retired_document_archive_has_no_alias_or_stub` asserts that a retired CLI verb is absent and that no migration hint names it.\n\n## Success Criteria\n\n- [hard] REQ-01: No test asserts the absence of a retired file path, function name, event tag or CLI verb.\n- [hard] REQ-02: The structural-guard self-test holds no retired-bypass or retired-event-contract case.\n- [hard] REQ-03: The ownership, authority and capability tests in the cutover suite still pass, and each asserts current ownership.\n\n## Notes\n\nOnly tests and their now-unused helpers are deleted.\n",
+    "description": "Several structural tests scan the source tree to assert that retired file paths, function names, event tags and a retired CLI verb are absent. Such a test names a property nobody can break by accident, and it outlives the cutover that motivated it.\n\n## Background\n\nIn `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`:\n\n- `test_cutover_has_no_known_predecessor_or_compatibility_module` (`:1283-1352`), with its only helper `contains_cargo_manifest` (`:562-569`).\n- The no-retired-selector-bypass test (`:1412-1427`) and the no-retired-profile-applied-event-contract test (`:1430-1438`).\n- Their only helpers: `assert_retired_lifecycle_entry_point_absent` (`:169-185`), `assert_retired_profile_applied_contract_absent` (`:186-224`), `generated_event_tags` (`:245-251`).\n- The retired-bypass and retired-event-contract cases in `test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes` (`:1555-1590`).\n\nThe tests at `:1084,1122,1355,1382,1446,1468,1759,1792,1819,1861`, and the helpers `production_sources` and `definition_owners`, assert current ownership or forbidden capabilities and stay.\n\nTwo CLI tests assert that retired verbs are absent:\n\n- `tests/cli_issue/command_alias_tests.rs:99` `test_retired_document_archive_has_no_alias_or_stub` asserts that a retired CLI verb is absent and that no migration hint names it.\n- `tests/cli_gate/gate_status_all_strict_test.rs:249` `test_removed_gate_aliases_fail_as_unknown_subcommand` asserts that `pass`, `pass-all`, `check` and `check-all` are absent.\n\n## Success Criteria\n\n- [hard] REQ-01: No test asserts the absence of a retired file path, function name, event tag or CLI verb.\n- [hard] REQ-02: The structural-guard self-test holds no retired-bypass or retired-event-contract case.\n- [hard] REQ-03: The ownership, authority and capability tests in the cutover suite still pass, and each asserts current ownership.\n\n## Notes\n\nOnly tests and their now-unused helpers are deleted.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -853,11 +878,12 @@
       "terminal": {
         "consumer_family": "structural source-scan tests",
         "test_boundary": "scratch_build suite",
-        "worker_sized_reason": "Deletion of three tests, helpers, and one alias test.",
+        "worker_sized_reason": "Deletion of three scan tests, their helpers, and two verb tests.",
         "footprint": {
           "touches": [
             "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
-            "crates/jit/tests/cli_issue/command_alias_tests.rs"
+            "crates/jit/tests/cli_issue/command_alias_tests.rs",
+            "crates/jit/tests/cli_gate/gate_status_all_strict_test.rs"
           ]
         }
       }
@@ -866,7 +892,7 @@
   {
     "key": "single-domain-types-path",
     "title": "Import domain type items through the domain facade",
-    "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase.\n",
+    "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase. The footprint lists the 39 files that name the path, measured by search at planning time; a file that gains such a path later is rewritten the same way.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -881,14 +907,31 @@
       "code-review"
     ],
     "depends_on": [
-      "gate-reference-renderers",
+      "remove-bracket-breakdown",
+      "remove-silent-integrity-validator",
+      "keep-one-enforcement-drift",
+      "strict-config-toml-loading",
+      "strict-rule-declarations",
+      "unify-agent-configuration",
+      "remove-read-lock-sidecar-sweep",
       "remove-lifecycle-backfill",
-      "remove-small-domain-helpers",
       "require-archived-from",
-      "move-state-symbol-to-output",
-      "remove-reference-builders",
+      "derive-mermaid-state-classes",
+      "remove-retired-name-scans",
       "remove-taxonomy-dead-errors",
-      "collapse-container-destination-states"
+      "move-state-symbol-to-output",
+      "remove-small-domain-helpers",
+      "remove-reference-builders",
+      "remove-adapter-link-rewrite",
+      "trim-git-revision-access",
+      "drop-claim-type-parameter",
+      "unify-gate-not-required-error",
+      "collapse-container-destination-states",
+      "gate-reference-renderers",
+      "single-file-lock-poll-loop",
+      "remove-storage-cfg-twins",
+      "remove-repository-state-cfg-twins",
+      "remove-orphan-web-module"
     ],
     "planning": {
       "outcome": "Items of domain/types.rs resolve through one compiler-enforced path, the domain facade.",
@@ -906,9 +949,46 @@
         "worker_sized_reason": "Mechanical path rewrite of about 345 lines, no semantics.",
         "footprint": {
           "touches": [
-            "crates/jit/src/domain/mod.rs"
-          ],
-          "uncertainty": "About 40 files carry the rewritten path; the investigation's REQ-14 sweep owns the inventory."
+            "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/commands/claim.rs",
+            "crates/jit/src/commands/dependency.rs",
+            "crates/jit/src/commands/document.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/commands/gate.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/snapshot.rs",
+            "crates/jit/src/commands/template_expand.rs",
+            "crates/jit/src/commands/template.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/declarations/rules.rs",
+            "crates/jit/src/domain/artifact_classifier.rs",
+            "crates/jit/src/domain/artifact_conformance.rs",
+            "crates/jit/src/domain/artifact_directory.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/domain/projection.rs",
+            "crates/jit/src/domain/queries.rs",
+            "crates/jit/src/domain/store_divergence.rs",
+            "crates/jit/src/domain/types.rs",
+            "crates/jit/src/domain/type_taxonomy.rs",
+            "crates/jit/src/domain/mod.rs",
+            "crates/jit/src/graph/hierarchy.rs",
+            "crates/jit/src/graph/mod.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/repository_state/archive.rs",
+            "crates/jit/src/repository_state/default_rules.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/reference.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/validation/desugar.rs",
+            "crates/jit/src/validation/graph.rs",
+            "crates/jit/src/validation/local.rs",
+            "crates/jit/src/visualization.rs"
+          ]
         }
       }
     }
@@ -916,7 +996,7 @@
   {
     "key": "single-domain-module-paths",
     "title": "Remove the remaining domain re-export paths",
-    "description": "Besides the type facade, `domain/mod.rs` and the crate root re-export items of other modules, so many types have two or three import paths.\n\n## Background\n\n`crates/jit/src/domain/mod.rs` re-exports selected items of `gate_findings`, `store_divergence`, `repository_inputs`, `event_catalog`, `event_log` and `projection`. Callers split between the facade and the module path; for example, `repository_inputs` has 14 facade sites and 5 module-path sites. It also re-exports `crate::graph::{DependencyGraph, GraphError, GraphNode}` and `crate::labels` items \"for backward compatibility\" (`domain/mod.rs:74-80`). `item`, `graph` and `labels` are imported almost only by module path (39, 50 and 32 sites).\n\nThe crate root adds a third path: `crates/jit/src/lib.rs:45` (`Issue`, `Priority`, `State`), `:51-54` (`query_*`) and `:57` (`DependencyGraph`, `GraphError`, `GraphNode`). Consumers include `main.rs` (for example `jit::GraphError` at `:245-248,445,9105`), `visualization.rs`, and the tests `template_apply_tests.rs:1501-1502`, `transition_graph_enforcement_tests.rs`, `config_loading_tests.rs` and `local_rule_enforcement_tests.rs`. `tests/fast_issue/domain_queries_tests.rs:6` uses `jit::domain::*`.\n\nThe module doc (`domain/mod.rs:1-22`) lists `graph`, `validation` and `labels` as domain submodules; they are crate-root modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain/mod.rs` re-exports no item of a domain submodule other than `types`, nor any item of `graph` or `labels`, and those items are imported by module path.\n- [hard] REQ-02: The crate root re-exports no domain, graph or query item.\n- [hard] REQ-03: Each domain type is reachable by exactly one path.\n- [hard] REQ-04: The `domain/mod.rs` module doc lists only modules declared under `domain/`.\n\n## Notes\n\nBrace-group imports mixing items from several modules are split by hand.\n",
+    "description": "Besides the type facade, `domain/mod.rs` and the crate root re-export items of other modules, so many types have two or three import paths.\n\n## Background\n\n`crates/jit/src/domain/mod.rs` re-exports selected items of `gate_findings`, `store_divergence`, `repository_inputs`, `event_catalog`, `event_log` and `projection`. Callers split between the facade and the module path; for example, `repository_inputs` has 14 facade sites and 5 module-path sites. It also re-exports `crate::graph::{DependencyGraph, GraphError, GraphNode}` and `crate::labels` items \"for backward compatibility\" (`domain/mod.rs:74-80`). `item`, `graph` and `labels` are imported almost only by module path (39, 50 and 32 sites).\n\nThe crate root adds a third path: `crates/jit/src/lib.rs:45` (`Issue`, `Priority`, `State`), `:51-54` (`query_*`) and `:57` (`DependencyGraph`, `GraphError`, `GraphNode`). Consumers include `main.rs` (for example `jit::GraphError` at `:245-248,445,9105`), `visualization.rs`, and the tests `template_apply_tests.rs:1501-1502`, `transition_graph_enforcement_tests.rs`, `config_loading_tests.rs` and `local_rule_enforcement_tests.rs`. `tests/fast_issue/domain_queries_tests.rs:6` uses `jit::domain::*`.\n\nThe module doc (`domain/mod.rs:1-22`) lists `graph`, `validation` and `labels` as domain submodules; they are crate-root modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain/mod.rs` re-exports no item of a domain submodule other than `types`, nor any item of `graph` or `labels`, and those items are imported by module path.\n- [hard] REQ-02: The crate root re-exports no domain, graph or query item.\n- [hard] REQ-03: Each domain type is reachable by exactly one path.\n- [hard] REQ-04: The `domain/mod.rs` module doc lists only modules declared under `domain/`.\n\n## Notes\n\nBrace-group imports mixing items from several modules are split by hand. The footprint lists the 33 files that import a re-exported item through `domain` or the crate root, measured by search at planning time.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -946,14 +1026,42 @@
       "terminal": {
         "consumer_family": "domain submodule importers",
         "test_boundary": "workspace build",
-        "worker_sized_reason": "About eighty import sites across thirty files, path-only.",
+        "worker_sized_reason": "About eighty import sites across 33 files, path-only.",
         "footprint": {
           "touches": [
+            "crates/jit/src/commands/events.rs",
+            "crates/jit/src/commands/gate_check.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/domain/types.rs",
             "crates/jit/src/domain/mod.rs",
+            "crates/jit/src/errors.rs",
+            "crates/jit/src/gate_execution.rs",
+            "crates/jit/src/generated_artifacts.rs",
             "crates/jit/src/lib.rs",
             "crates/jit/src/main.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/repository_state/archive.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/src/storage/gate_runs.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/memory.rs",
+            "crates/jit/src/storage/mod.rs",
+            "crates/jit/src/storage/reference.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/validation/desugar.rs",
+            "crates/jit/src/validation/engine.rs",
+            "crates/jit/src/validation/graph.rs",
+            "crates/jit/src/validation/local.rs",
+            "crates/jit/src/validation/repository.rs",
             "crates/jit/src/visualization.rs",
-            "crates/jit/tests/fast_issue/domain_queries_tests.rs"
+            "crates/jit/tests/fast_docs_templates/content_parser_cross_format.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
+            "crates/jit/tests/fast_issue/domain_queries_tests.rs",
+            "crates/jit/tests/fast_rules/config_loading_tests.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
           ]
         }
       }
@@ -1138,7 +1246,7 @@
   {
     "key": "remove-small-domain-helpers",
     "title": "Remove uncalled domain predicates and parsers",
-    "description": "Several small domain helpers have no caller: an item-kind scope parser with its error variant, a closed-state predicate, a label-namespace containment check and a not-in-git-repo error helper.\n\n## Background\n\n- `KindScope::parse` and `parse_for` (`crates/jit/src/domain/item.rs:404,409`) and `ItemError::InvalidScope` (`:473`) have no caller. `KindScope::ISSUE_TOKEN` and `PROJECT_TOKEN` (`:394,396`) are used only by `parse_for`.\n- `State::is_closed` (`domain/types.rs:64`) has no caller.\n- `LabelNamespaces::contains` (`domain/types.rs:3376`, `allow(dead_code)`) has no caller.\n- `errors::not_in_git_repo` (`crates/jit/src/errors.rs:1065`) has one caller, its own test (`errors.rs:1280`).\n\n## Success Criteria\n\n- [hard] REQ-01: `KindScope::parse`, `KindScope::parse_for`, `ItemError::InvalidScope` and the two scope token constants no longer exist.\n- [hard] REQ-02: `State::is_closed` and `LabelNamespaces::contains` no longer exist.\n- [hard] REQ-03: `errors::not_in_git_repo` and its test no longer exist.\n\n## Notes\n\nBenchmark artifacts under `dev/benchmarks/` that name the deleted test are regenerated evidence and stay.\n",
+    "description": "Several small domain helpers have no caller: an item-kind scope parser with its error variant, a closed-state predicate, a label-namespace containment check and a not-in-git-repo error helper.\n\n## Background\n\n- `KindScope::parse` and `parse_for` (`crates/jit/src/domain/item.rs:404,409`) and `ItemError::InvalidScope` (`:473`) have no caller. `KindScope::PROJECT_TOKEN` (`:396`) is used only by `parse_for`. `KindScope::ISSUE_TOKEN` (`:394`) stays: production address parsing uses it (`item.rs:233,252,255,258`), and so does `qualified_id` (`:912`).\n- `State::is_closed` (`domain/types.rs:64`) has no caller.\n- `LabelNamespaces::contains` (`domain/types.rs:3376`, `allow(dead_code)`) has no caller.\n- `errors::not_in_git_repo` (`crates/jit/src/errors.rs:1065`) has one caller, its own test (`errors.rs:1280`).\n\n## Success Criteria\n\n- [hard] REQ-01: `KindScope::parse`, `KindScope::parse_for`, `ItemError::InvalidScope` and `KindScope::PROJECT_TOKEN` no longer exist, and `KindScope::ISSUE_TOKEN` keeps its production callers.\n- [hard] REQ-02: `State::is_closed` and `LabelNamespaces::contains` no longer exist.\n- [hard] REQ-03: `errors::not_in_git_repo` and its test no longer exist.\n\n## Notes\n\nBenchmark artifacts under `dev/benchmarks/` that name the deleted test are regenerated evidence and stay.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1180,7 +1288,7 @@
   {
     "key": "remove-reference-builders",
     "title": "Remove the DocumentReference builder methods",
-    "description": "`DocumentReference` carries six builder methods under `allow(dead_code)`. Production calls none of them, and tests construct references through them from 38 places.\n\n## Background\n\nThe builders sit at `crates/jit/src/domain/types.rs:848-899`, each under `allow(dead_code)`. `with_format` and `with_assets` have no caller; the `with_format` hits at `output.rs:253` and `artifact_discovery.rs:460` belong to `artifact_plan.rs:683`. `new`, `at_commit`, `with_label` and `with_type` are called only from tests, at 38 sites:\n\n- `commands/archive.rs` (14), `domain/types.rs` (10), `domain/projection.rs` (3), `repository_state/archive.rs` (2).\n- One each in `commands/gate_check.rs`, `declarations/rules.rs`, `domain/artifact_conformance.rs`, `gate_execution.rs` and `validation/local.rs`.\n- Integration tests `artifact_discovery_tests.rs`, `artifact_inventory_tests.rs` and `example_rulesets_tests.rs` (2).\n\nThe web `DocumentReference` TypeScript type mirrors the struct shape and is unaffected.\n\n## Success Criteria\n\n- [hard] REQ-01: `DocumentReference` has none of the six builder methods and no `allow(dead_code)`.\n- [hard] REQ-02: Tests construct references through one shared fixture, and no test file defines its own reference-building helper.\n- [hard] REQ-03: Each rewritten test asserts the property it asserted before.\n\n## Notes\n\nThe shared fixture lives in existing shared test support, reachable from both unit and integration tests.\n",
+    "description": "`DocumentReference` carries six builder methods under `allow(dead_code)`. Production calls none of them, and tests construct references through them from 38 places.\n\n## Background\n\nThe builders sit at `crates/jit/src/domain/types.rs:848-899`, each under `allow(dead_code)`. `with_format` and `with_assets` have no caller; the `with_format` hits at `output.rs:253` and `artifact_discovery.rs:460` belong to `artifact_plan.rs:683`. `new`, `at_commit`, `with_label` and `with_type` are called only from tests, at 38 sites:\n\n- `commands/archive.rs` (14), `domain/types.rs` (10), `domain/projection.rs` (3), `repository_state/archive.rs` (2).\n- One each in `commands/gate_check.rs`, `declarations/rules.rs`, `domain/artifact_conformance.rs`, `gate_execution.rs` and `validation/local.rs`.\n- Integration tests `tests/fast_docs_templates/artifact_discovery_tests.rs`, `tests/fast_docs_templates/artifact_inventory_tests.rs` and `tests/fast_rules/example_rulesets_tests.rs` (2).\n\nThe web `DocumentReference` TypeScript type mirrors the struct shape and is unaffected.\n\n## Success Criteria\n\n- [hard] REQ-01: `DocumentReference` has none of the six builder methods and no `allow(dead_code)`.\n- [hard] REQ-02: Tests construct references through one shared fixture, and no test file defines its own reference-building helper.\n- [hard] REQ-03: Each rewritten test asserts the property it asserted before.\n\n## Notes\n\nThe shared fixture lives in `crates/jit/src/test_utils.rs`, a public module that both unit and integration tests reach.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1219,9 +1327,12 @@
             "crates/jit/src/declarations/rules.rs",
             "crates/jit/src/domain/artifact_conformance.rs",
             "crates/jit/src/gate_execution.rs",
-            "crates/jit/src/validation/local.rs"
-          ],
-          "uncertainty": "The shared fixture's home is chosen against the existing test-support layout."
+            "crates/jit/src/validation/local.rs",
+            "crates/jit/src/test_utils.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_discovery_tests.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_inventory_tests.rs",
+            "crates/jit/tests/fast_rules/example_rulesets_tests.rs"
+          ]
         }
       }
     }
@@ -1563,7 +1674,7 @@
   {
     "key": "remove-storage-cfg-twins",
     "title": "Remove cfg twins in storage",
-    "description": "Storage defines one function twice under opposite `cfg` conditions and keeps stale `allow(dead_code)` attributes on public in-memory storage items.\n\n## Background\n\n`with_mutation_interruptions` exists as `#[cfg(feature = \"test-support\")] pub fn` (`crates/jit/src/storage/json.rs:453-462`) and as `#[cfg(not(feature = \"test-support\"))] #[allow(dead_code)] pub(crate) fn` (`:473-482`). The self dev-dependency at `crates/jit/Cargo.toml:103` enables `test-support` for every test build, so the second form is never needed. Every source caller is `cfg(test)`, and one integration test calls it (`tests/cli_repo_workflow/profile_publication_tests.rs:113`).\n\n`InMemoryStorage` and `InMemoryStorage::new` carry `allow(dead_code)` (`storage/memory.rs:34,68`). Both are public items of a public module (`storage/mod.rs:92`), so no lint fires without the attributes.\n\n## Success Criteria\n\n- [hard] REQ-01: `with_mutation_interruptions` in JSON storage has one definition, and storage holds no `cfg` twin of a function or re-export.\n- [hard] REQ-02: No public item in `storage/` carries `allow(dead_code)`.\n\n## Notes\n\nThe `pub(crate)` configuration-dependent allows at `memory.rs:121,155,171` mark code that is live in other build configurations, and they stay.\n",
+    "description": "Storage defines one function twice under opposite `cfg` conditions and keeps stale `allow(dead_code)` attributes on public in-memory storage items.\n\n## Background\n\n`with_mutation_interruptions` exists as `#[cfg(feature = \"test-support\")] pub fn` (`crates/jit/src/storage/json.rs:453-462`) and as `#[cfg(not(feature = \"test-support\"))] #[allow(dead_code)] pub(crate) fn` (`:473-482`). The self dev-dependency at `crates/jit/Cargo.toml:103` enables `test-support` for every test build, so the second form is never needed. Every source caller is `cfg(test)`, and one integration test calls it (`tests/cli_repo_workflow/profile_publication_tests.rs:113`).\n\n`InMemoryStorage` and `InMemoryStorage::new` carry `allow(dead_code)` (`storage/memory.rs:34,68`). Both are public items of a public module (`storage/mod.rs:92`), so no lint fires without the attributes.\n\n## Success Criteria\n\n- [hard] REQ-01: `with_mutation_interruptions` in JSON storage has one definition, and storage holds no function or re-export defined twice under opposite `test` or `test-support` conditions.\n- [hard] REQ-02: No public item in `storage/` carries `allow(dead_code)`.\n\n## Notes\n\nPlatform-conditional implementations stay, such as `cfg(unix)` and `cfg(not(unix))` pairs (`storage/redo_apply.rs:283,471`, `atomic_write.rs:125`, `lock_cleanup.rs:40`, `repository_state_store.rs:1573,1989,2017,2148`, `redo_record.rs:368`). The `pub(crate)` configuration-dependent allows at `memory.rs:121,155,171` mark code that is live in other build configurations, and they stay too.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1603,7 +1714,7 @@
   {
     "key": "remove-repository-state-cfg-twins",
     "title": "Remove cfg twins in repository_state",
-    "description": "`repository_state` re-exports items twice under opposite `cfg` conditions, and holds an uncalled scaffold and a test-only membership-diff function.\n\n## Background\n\n- `crates/jit/src/repository_state/mod.rs` holds `cfg` re-export twins at `:34-51` (membership diff), `:80-99` (capture closure) and `:214-230` (`serialize_ruleset`, `SchemaFile`, `SerializedRuleSet`). Consumers include `commands/validate.rs` and the integration tests `tests/fast_rules/derived_state_repair_tests.rs:3,147`. Public items in a public module raise no unused lint, so an unconditional `pub use` serves both.\n- `neutral_files` (`repository_state/initialize.rs:325-344`) has no caller.\n- `default_rule_membership_diff` (`repository_state/default_rules.rs:404-421`, `allow(dead_code)`) and `DefaultRuleMembershipDiff::is_empty` (`:336-344`) are called only by their own tests and a doctest. Production uses `default_rule_membership_diff_from_identities` (`:434`).\n\n## Success Criteria\n\n- [hard] REQ-01: `repository_state/mod.rs` re-exports each item once, unconditionally, with no `cfg` twin.\n- [hard] REQ-02: `neutral_files`, `default_rule_membership_diff` and `DefaultRuleMembershipDiff::is_empty` no longer exist.\n- [hard] REQ-03: No public item in `repository_state/` carries `allow(dead_code)`.\n\n## Notes\n\nThe `pub(crate)` allows at `repository_state/index.rs:100,118` mark code that is live in other build configurations, and they stay.\n",
+    "description": "`repository_state` re-exports items twice under opposite `cfg` conditions, and holds an uncalled scaffold and a test-only membership-diff function.\n\n## Background\n\n- `crates/jit/src/repository_state/mod.rs` holds `cfg` re-export twins at `:34-51` (membership diff), `:80-99` (capture closure) and `:214-230` (`serialize_ruleset`, `SchemaFile`, `SerializedRuleSet`). Consumers include `commands/validate.rs` and the integration tests `tests/fast_rules/derived_state_repair_tests.rs:3,147`. Public items in a public module raise no unused lint, so an unconditional `pub use` serves both.\n- `neutral_files` (`repository_state/initialize.rs:325-344`) has no caller.\n- `default_rule_membership_diff` (`repository_state/default_rules.rs:404-421`, `allow(dead_code)`) and `DefaultRuleMembershipDiff::is_empty` (`:336-344`) are called only by their own tests and a doctest. Production uses `default_rule_membership_diff_from_identities` (`:434`).\n\n## Success Criteria\n\n- [hard] REQ-01: `repository_state/mod.rs` re-exports each item once, unconditionally, with no twin under opposite `test` or `test-support` conditions.\n- [hard] REQ-02: `neutral_files`, `default_rule_membership_diff` and `DefaultRuleMembershipDiff::is_empty` no longer exist.\n- [hard] REQ-03: No public item in `repository_state/` carries `allow(dead_code)`.\n\n## Notes\n\nThe `pub(crate)` allows at `repository_state/index.rs:100,118` mark code that is live in other build configurations, and they stay.\n",
     "type": "task",
     "priority": "high",
     "labels": [
