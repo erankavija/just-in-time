@@ -291,37 +291,37 @@ async fn search_issues<S: IssueStore>(
         tracing::error!("Search has no repository layout: {:?}", error);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let search_under = |root: &std::path::Path, file_patterns: Vec<String>, max: usize| {
-        jit::search::search(
-            root,
-            &params.q,
-            SearchOptions {
-                case_sensitive: params.case_sensitive,
-                regex: params.regex,
-                max_results: Some(max),
-                file_patterns,
-                ..Default::default()
-            },
-        )
-        .map_err(|e| {
+    // An empty glob list would search every worktree file, so documents are searched only when linked.
+    let mut results = if document_paths.is_empty() {
+        Vec::new()
+    } else {
+        let options = SearchOptions {
+            case_sensitive: params.case_sensitive,
+            regex: params.regex,
+            max_results: Some(params.limit),
+            file_patterns: document_paths,
+            ..Default::default()
+        };
+        jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
             tracing::error!("Search failed: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
-        })
+        })?
     };
-
-    // Issue records live under the data root, hidden or not; an empty glob
-    // list would search every file, so documents are searched only when linked.
-    let mut results = search_under(
-        layout.data_root(),
-        vec!["issues/*.json".to_string()],
-        params.limit,
-    )?;
-    if !document_paths.is_empty() && results.len() < params.limit {
-        results.append(&mut search_under(
-            layout.worktree_root(),
-            document_paths,
-            params.limit - results.len(),
-        )?);
+    if results.len() < params.limit {
+        let remaining = params.limit - results.len();
+        let data_options = SearchOptions {
+            case_sensitive: params.case_sensitive,
+            regex: params.regex,
+            max_results: Some(remaining),
+            file_patterns: vec!["issues/*.json".to_string()],
+            ..Default::default()
+        };
+        let mut data_results = jit::search::search(layout.data_root(), &params.q, data_options)
+            .map_err(|e| {
+                tracing::error!("Data-root search failed: {:?}", e);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        results.append(&mut data_results);
     }
 
     let duration_ms = start.elapsed().as_millis();
