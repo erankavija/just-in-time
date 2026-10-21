@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a8bf89160c51b80e5301466df3c4a0dfc52f7d90",
+  "completed_at": "2026-10-21T12:09:29.700360996Z",
+  "duration_ms": 133132,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 1366,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8673dc5e/requirement/REQ-03",
+          "@/invariant/derived-state-coherence"
+        ],
+        "severity": "high",
+        "summary": "A retried manual attestation can overwrite readiness with an older retained timestamp while latest-run selects a previously published newer record, violating REQ-03."
+      }
+    ],
+    "summary": "Retried manual attestations can make latest-run and readiness disagree.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6bf63d3e-5bc0-4a80-a3d3-5798a0473d19",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T12:07:16.568284454Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7750 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e5b-cbde-7393-bffa-87a43a565236\n--------\nuser\n--- 7737 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0179a6820669609ed63faf2bcf3940de4246c8ec; a8bf89160c51b80e5301466df3c4a0dfc52f7d90\nPolicy sources: AGENTS.md\nResolved items: @/issue/8673dc5e/requirement/REQ-03 (issue description); @/invariant/derived-state-coherence (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T12:05:27Z); code-review pending\nTruncation recovery: recovered relevant evidence with commit/path-specific diffs and line-scoped source reads\n\n1. [blocking][issue-impact] Retried manual attestations can make latest-run disagree with readiness. The mutation context retains its sampled timestamp across retries (`crates/jit/src/commands/mod.rs:2315`, `crates/jit/src/repository_state/mutation.rs:1079`); a retry that publishes after another attestation can therefore write the current issue status with an older `started_at`. Latest-run selects the greatest timestamp (`crates/jit/src/commands/gate_check.rs:1366`), while readiness selects the last-published `gates_status` (`crates/jit/src/commands/gate_check.rs:1422`). Opposing attestations can consequently report different statuses, violating REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Retried manual attestations can make latest-run and readiness disagree.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A retried manual attestation can overwrite readiness with an older retained timestamp while latest-run selects a previously published newer record, violating REQ-03.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":1366,\"references\":[\"@/issue/8673dc5e/requirement/REQ-03\",\"@/invariant/derived-state-coherence\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

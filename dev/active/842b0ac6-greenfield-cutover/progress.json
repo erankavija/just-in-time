@@ -143,7 +143,7 @@
           "title": "Render state symbols in the output layer",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "c998dfd3-07a4-4f7c-ab5c-86c84867fc00",
@@ -436,7 +436,8 @@
     "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass.",
     "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510).",
     "Suite clock is load-sensitive even at low start load: 66bd4b5c measured 34.2 s (start load 3.3), rerun 27.5 s while load rose to 16. Clocks after cutover deletions: 21.2 s (84745746), 27.6 s (71b0af0e).",
-    "66bd4b5c code-review read 'every case variant' literally twice (R1, R2 same root cause); rework 2 requires exhaustive 2^k case enumeration. One more same-finding failure escalates (MAX_SAME_FINDING_REPEATS=3)."
+    "66bd4b5c code-review read 'every case variant' literally twice (R1, R2 same root cause); rework 2 requires exhaustive 2^k case enumeration. One more same-finding failure escalates (MAX_SAME_FINDING_REPEATS=3).",
+    "Intermittent 20 s fixture timeouts: fast_rules cli_warnings_integration_tests (4 tests) and test_utils profiled-repository fixture tests timed out at 72d4990c's first run (load ~5) and during 84745746's half-merge run; a forced rerun passed at load 15-20. Candidate for c780514e or a flakiness bug."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

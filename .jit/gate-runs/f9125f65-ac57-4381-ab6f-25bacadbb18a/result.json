@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "849b51c3bbf3363910bcf7cdc1298066cd3bf162",
+  "completed_at": "2026-10-21T12:03:57.928776927Z",
+  "duration_ms": 347643,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The final attributable implementation searches issue records from the data root and preserves the linked-document restriction with focused nested-data regression coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "b5faef84-fd5b-477d-be87-2cf020e93fa4",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f9125f65-ac57-4381-ab6f-25bacadbb18a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:58:10.285191572Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 206cb9de6, 6f837ff9c, d98b59261, e9779e829, 42c710f74, f7d401778, 0bee6591a (`jit:b5faef84`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1; unrelated test timeouts and suite-duration budget failure); prior code-review passed (exit 0)\nTruncation recovery: re-read the final follow-up and merge patches separately, plus current route, fixture, and search implementation; truncated progress and historical gate-output records were outside the behavior impact cone\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The final attributable implementation searches issue records from the data root and preserves the linked-document restriction with focused nested-data regression coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
