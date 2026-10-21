@@ -460,6 +460,19 @@
       "status": "resolved",
       "date": "2026-10-21",
       "summary": "Flaky 20 s timeouts (two test_utils profiled-fixture tests and four fast_rules cli_warnings tests) at load 5-9 cost reruns three times today. Folded into c780514e planning as an early task, independent of 2195c98f where possible. Forced reruns of these count as load-only meanwhile."
+    },
+    {
+      "container_short_id": "9876a23a",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/inv/convention-convergence",
+      "summary": "1) The REQ-13 task waits on df129d9e's 8b7f2973. 2) The REQ-14 task uses the existing readiness derivation and adds no new one; b697a3f7 REQ-01 converges later. 3) 525bd61a rejected as duplicate of REQ-14 (zero-fix case). 4) No edges from df129d9e's validation facade, handler and renderer to 9876a23a: wave 2 must not wait on wave 4, so the second lander adapts."
+    },
+    {
+      "container_short_id": "b697a3f7",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "When b697a3f7 is planned: its REQ-01 readiness derivation must also cover 9876a23a REQ-14's `validate --fix` single mutation (converging on the one derivation)."
     }
   ],
   "notes": [
