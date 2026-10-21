@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f84732b2f20de7fd86dcdd1b5f48b1189dd33a09",
+  "completed_at": "2026-10-21T12:23:31.534954006Z",
+  "duration_ms": 275673,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue hard criteria are satisfied; no unresolved issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c998dfd3-07a4-4f7c-ab5c-86c84867fc00",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "29b9fc02-5e90-42cf-bab1-ca8e3008ca4a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T12:18:55.861490556Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 982e346b7; f84732b2 (both `jit:c998dfd3`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/842b0ac6/requirement/REQ-16 (.jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T12:17:21.163771377+00:00); npm-ci pending; doc-review pending; docs-mechanical pending\nTruncation recovery: bounded re-reads by commit, merge parent, affected path, criterion, and status-reference pattern after broad output truncated\n\n1. No findings. The enum, parser, generated-reference source/projection, CLI reference, web union, and invalid-input test consistently remove the gate-run `skipped` status.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue hard criteria are satisfied; no unresolved issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T12:10:59.048229935Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,6 +8,7 @@
   ],
   "description": "`GateRunStatus::Skipped` is never produced by a gate run. It exists only as a filter value and in the published wire vocabulary.\n\n## Background\n\n`GateRunStatus::Skipped` (`crates/jit/src/domain/types.rs:1111`) is constructed only by the hand-written `--status` filter parser (`main.rs:1447`, message at `:1451`). It appears on these surfaces:\n\n- CLI help at `cli.rs:1734,1780`, which flows into the published CLI schema flag description and the `GateRunStatus` enum in the `status-all` output schema (JsonSchema derive).\n- The hand-written status list at `storage/reference.rs:215`, from which `docs/reference/storage-records.md:130` is generated (`scripts/generate-storage-records-reference.sh`).\n- `docs/reference/cli-commands.md:1997`.\n- The web `GateRunSummary.status` union (`web/src/types/models.ts:29`). `IssueDetail.tsx:552` renders unknown statuses as `·` and has no `skipped` branch.\n\nMCP tools read the schema at runtime (`mcp-server/lib/schema-loader.js`) and hold no copy.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateRunStatus` has no `Skipped` variant, and `gate status --status skipped` is rejected as invalid input.\n- [hard] REQ-02: CLI help, the output schema, the storage-records reference and its generator, and the CLI reference name no `skipped` gate-run status.\n- [hard] REQ-03: The web `GateRunSummary.status` union holds no `skipped` member.\n\n## Notes\n\nThe variant and every wire consumer change together, because the schema derives from the type.\n",
   "documents": [],
+  "done_at": "2026-10-21T15:31:59.075576677Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
@@ -16,7 +17,33 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:18:55.465675991Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:23:31.737115709Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:26:02.593093061Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:26:05.097124261Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:23:46.443391175Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c998dfd3-07a4-4f7c-ab5c-86c84867fc00",
   "labels": [
     "type:task",
@@ -30,7 +57,7 @@
     "satisfies:842b0ac6/REQ-16"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove the skipped gate-run status",
-  "updated_at": "2026-10-21T12:10:59.339552735Z"
+  "updated_at": "2026-10-21T15:31:59.075576677Z"
 }

@@ -14,7 +14,18 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:21:18.475256416Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:21:40.531753906Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "233f4a09-7764-470b-867f-c816b4b9589d",
   "labels": [
     "type:task",
@@ -28,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Omit clap-hidden commands and flags from the generated schema",
-  "updated_at": "2026-10-21T11:49:14.069628177Z"
+  "updated_at": "2026-10-21T12:21:40.531753906Z"
 }

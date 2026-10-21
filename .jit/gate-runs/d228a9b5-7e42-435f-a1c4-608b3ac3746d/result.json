@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a080f00e6c054835120036b97a978eb5094d7cc4",
+  "completed_at": "2026-10-21T12:26:02.388804778Z",
+  "duration_ms": 135655,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's documentation impact is complete, accurate, discoverable, and concise.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "c998dfd3-07a4-4f7c-ab5c-86c84867fc00",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d228a9b5-7e42-435f-a1c4-608b3ac3746d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T12:23:46.733444100Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `c998dfd3` is a leaf `task` (level 4; no resolved children). I inspected its two reachable `jit:c998dfd3` commits individually with rename detection; both represent the same eight-file patch. Uncommitted workflow data was excluded.\n\nThe CLI reference and generated storage-record reference accurately remove `skipped`; current source removes the enum variant and rejects it in the parser. No other adopter documentation update is required.\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's documentation impact is complete, accurate, discoverable, and concise.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

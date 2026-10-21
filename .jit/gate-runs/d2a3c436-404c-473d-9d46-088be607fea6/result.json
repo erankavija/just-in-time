@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8c33b0c4820fac895c6ed3b751051e6f5e5dcbaa",
+  "completed_at": "2026-10-21T12:15:05.620694745Z",
+  "duration_ms": 411676,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f4d9502a-git-cli-module/breakdown.json",
+        "id": "F1",
+        "line": 1183,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/orthogonal-tests",
+          "@/inv/canonical-cutover"
+        ],
+        "severity": "high",
+        "summary": "Split the oversized pinned-read migration leaf into focused primitive, storage-migration, and bridge/cutover tasks."
+      }
+    ],
+    "summary": "The pinned-read migration leaf is too large and mixes foundation, migration, bridge, deletion, and test work.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d2a3c436-404c-473d-9d46-088be607fea6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T12:08:13.943925245Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7130 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e5c-abfb-7f61-bb38-567a23c21a70\n--------\nuser\n--- 7117 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** `pinned-reads-into-module` is materially oversized: it combines a multi-operation module foundation, `JsonFileStorage` migration, compatibility-bridge creation, old-module deletion, and behaviour-suite relocation across eight paths. The existing resolver itself spans substantial parsing/process logic, so one worker cannot credibly implement and review this as one focused cycle. Split it into independently deliverable primitive/contract production, storage migration, and bridge/cutover tasks; update the producer and consumer dependencies accordingly. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f4d9502a-git-cli-module/breakdown.json:1183), [git_revision.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/git_revision.rs:123). `disposition: blocking`; `origin: issue-impact`.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The pinned-read migration leaf is too large and mixes foundation, migration, bridge, deletion, and test work.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Split the oversized pinned-read migration leaf into focused primitive, storage-migration, and bridge/cutover tasks.\",\"file\":\"dev/active/f4d9502a-git-cli-module/breakdown.json\",\"line\":1183,\"references\":[\"@/inv/orthogonal-tests\",\"@/inv/canonical-cutover\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
