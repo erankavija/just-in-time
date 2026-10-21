@@ -8,6 +8,7 @@
   ],
   "description": "The shared in-process integration harness moves from a per-target `#[path]` include into `jit`'s existing `test-support` library surface, so it compiles once.\n\n## Background\n\n`crates/jit/tests/common/harness.rs` (about 336 lines, `#![allow(dead_code)]` because each includer uses a subset) is pulled in by `#[path = \"../common/harness.rs\"] mod harness;` in four of the ten integration targets: `fast_docs_templates`, `fast_issue`, `fast_rules` and `cli_query_graph` (which uses only `seed_memory_issue`). Each target recompiles it. Everything it needs is already reachable through the `test-support` feature: `commands::test_helpers::memory_executor`, `test_mode::enable` and the public `InMemoryStorage` constructors. `crates/jit/Cargo.toml` enables `test-support` for every test build through its self dev-dependency, so code gated `cfg(any(test, feature = \"test-support\"))` is compiled once in the library build that every target links. `dev/TESTING.md` documents the `#[path]` convention.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness is a module of the `jit` library gated on `cfg(any(test, feature = \"test-support\"))`, beside the existing fixture homes, and carries no blanket `allow(dead_code)`.\n- [hard] REQ-02: No integration target declares a `#[path]` include of the harness, `crates/jit/tests/common/` no longer exists, and the four former includers reach the harness through `jit::` paths.\n- [hard] REQ-03: The integration-target count is unchanged and the four suites pass with their existing assertions.\n- [hard] REQ-04: `dev/TESTING.md` describes the harness at its new library location, with no remaining instruction to `#[path]`-include it.\n\n## Notes\n\nA new `jit-test-support` crate was rejected because it adds a build unit without adding a capability. The build-footprint budgets are re-measured when the epic closes. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-10-21T10:49:44.446556222Z",
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-10-21T10:47:56.918227765Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:49:38.549293338Z",
       "updated_by": "auto:executor"
     }
   },
@@ -30,7 +36,7 @@
     "satisfies:df129d9e/REQ-07"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Compile the integration harness once in jit's test-support surface",
-  "updated_at": "2026-10-21T10:47:56.918227765Z"
+  "updated_at": "2026-10-21T10:49:44.446556222Z"
 }
