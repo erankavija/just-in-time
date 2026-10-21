@@ -295,7 +295,7 @@ fn test_label_hierarchy_complete_workflow() {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("valid") || stdout.contains("✓") || stdout.contains("OK"),
+        stdout.contains("valid"),
         "Expected validation success message, got: {}",
         stdout
     );

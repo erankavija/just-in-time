@@ -1138,9 +1138,6 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
             ("├─ ", "│  ")
         };
 
-        // State symbol
-        let state_symbol = jit::output::state_symbol(node.state, node.archived_from);
-
         // Shared indicator
         let shared_marker = if node.shared.unwrap_or(false) {
             " (shared)"
@@ -1150,8 +1147,13 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
 
         // Print the node
         println!(
-            "{}{}{} {} - {}{}",
-            prefix, connector, state_symbol, node.short_id, node.title, shared_marker
+            "{}{}{} - {} [{}]{}",
+            prefix,
+            connector,
+            node.short_id,
+            node.title,
+            node.state.as_str(),
+            shared_marker
         );
 
         // Recursively print children
@@ -1345,12 +1347,12 @@ fn run_invariant_inner<S: IssueStore>(
                 let output = JsonOutput::success(&result).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else if result.findings.is_empty() {
-                output_ctx.print_data("✓ No enforcement drift".to_string())?;
+                output_ctx.print_data("No enforcement drift".to_string())?;
             } else {
                 for finding in &result.findings {
                     // Every finding is declared-but-unenforced (the sole drift
                     // direction); the message names that direction inline.
-                    println!("❌ {}", finding.message());
+                    println!("error: {}", finding.message());
                 }
                 eprintln!("Enforcement drift: {} finding(s)", result.count);
             }
@@ -1515,8 +1517,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         );
         for dep in &response.dependencies {
             println!(
-                "  {} {} - {} [{}]",
-                jit::output::state_symbol(dep.state, dep.archived_from),
+                "  {} - {} [{}]",
                 dep.short_id(),
                 dep.title,
                 format!("{:?}", dep.state).to_lowercase()
@@ -2338,7 +2339,7 @@ fn run() -> Result<()> {
 
                     // Print warnings to stderr
                     for warning in &warnings {
-                        eprintln!("⚠️  Warning: {}", warning);
+                        eprintln!("Warning: {}", warning);
                     }
 
                     let output_ctx = OutputContext::new(quiet, json);
@@ -2380,7 +2381,7 @@ fn run() -> Result<()> {
                                     && !(orphan && gf.finding.rule == "orphan-leaf")
                             }) {
                                 let _ =
-                                    output_ctx.print_warning(format!("\n⚠ {}", gf.finding.message));
+                                    output_ctx.print_warning(format!("\n{}", gf.finding.message));
                             }
                         }
                     }
@@ -2907,7 +2908,7 @@ fn run() -> Result<()> {
                             Ok((full_id, warnings)) => {
                                 // Print warnings to stderr
                                 for warning in &warnings {
-                                    eprintln!("⚠️  Warning: {}", warning);
+                                    eprintln!("Warning: {}", warning);
                                 }
 
                                 if json {
@@ -2978,27 +2979,27 @@ fn run() -> Result<()> {
                             // Human-readable output
                             if result.summary.total_modified > 0 {
                                 let _ = output_ctx.print_success(format!(
-                                    "✓ Modified {} issue(s)",
+                                    "Modified {} issue(s)",
                                     result.summary.total_modified
                                 ));
                             }
 
                             if !result.warnings.is_empty() {
-                                println!("\n⚠ Warnings ({} issue(s)):", result.warnings.len());
+                                println!("\nWarnings ({} issue(s)):", result.warnings.len());
                                 for (id, warning) in &result.warnings {
                                     println!("  • {}: {}", &id[..8.min(id.len())], warning);
                                 }
                             }
 
                             if !result.skipped.is_empty() {
-                                println!("\nℹ Skipped {} issue(s):", result.summary.total_skipped);
+                                println!("\nSkipped {} issue(s):", result.summary.total_skipped);
                                 for (id, reason) in &result.skipped {
                                     println!("  • {}: {}", &id[..8.min(id.len())], reason);
                                 }
                             }
 
                             if !result.errors.is_empty() {
-                                println!("\n✗ Failed {} issue(s):", result.summary.total_errors);
+                                println!("\nFailed {} issue(s):", result.summary.total_errors);
                                 for (id, error) in &result.errors {
                                     println!("  • {}: {}", &id[..8.min(id.len())], error);
                                 }
@@ -3302,7 +3303,7 @@ fn run() -> Result<()> {
             let (result, warnings) =
                 executor.apply_template(&template, &container, &bindings, force)?;
             for warning in &warnings {
-                eprintln!("⚠️  Warning: {}", warning);
+                eprintln!("Warning: {}", warning);
             }
             print_apply_result(&storage, &result, &container, quiet, json)?;
         }
@@ -3345,13 +3346,13 @@ fn run() -> Result<()> {
                                 }
                             }
                             if !result.already_exist.is_empty() {
-                                println!("ℹ Already exist ({}):", result.already_exist.len());
+                                println!("Already exist ({}):", result.already_exist.len());
                                 for dep in &result.already_exist {
                                     println!("  • {}", dep);
                                 }
                             }
                             if !result.skipped.is_empty() {
-                                println!("ℹ Skipped ({}):", result.skipped.len());
+                                println!("Skipped ({}):", result.skipped.len());
                                 for (dep, reason) in &result.skipped {
                                     println!("  • {}: {}", dep, reason);
                                 }
@@ -3418,7 +3419,7 @@ fn run() -> Result<()> {
                                 }
                             }
                             if !result.not_found.is_empty() {
-                                println!("ℹ Not found ({}):", result.not_found.len());
+                                println!("Not found ({}):", result.not_found.len());
                                 for dep in &result.not_found {
                                     println!("  • {}", dep);
                                 }
@@ -4263,7 +4264,7 @@ fn run() -> Result<()> {
                             }
                             if !result.already_exist.is_empty() {
                                 println!(
-                                    "ℹ Already required ({} gate(s)):",
+                                    "Already required ({} gate(s)):",
                                     result.already_exist.len()
                                 );
                                 for gate in &result.already_exist {
@@ -4728,7 +4729,7 @@ fn run() -> Result<()> {
                             for (id, result, warnings) in &results {
                                 // Print warnings for each issue
                                 for warning in warnings {
-                                    eprintln!("⚠️  Warning ({}): {}", id, warning);
+                                    eprintln!("Warning ({}): {}", id, warning);
                                 }
                                 println!("  {} - gates added: {}", id, result.added.join(", "));
                             }
@@ -5360,7 +5361,7 @@ fn run() -> Result<()> {
                             if !per_doc.is_empty() {
                                 output_ctx.print_data("\nPer-document assets:")?;
                                 for (asset, exists) in &per_doc {
-                                    let status = if *exists { "✓" } else { "✗" };
+                                    let status = if *exists { "ok" } else { "missing" };
                                     output_ctx.print_data(format!(
                                         "  {} {}",
                                         status, asset.original_path
@@ -5378,7 +5379,7 @@ fn run() -> Result<()> {
                             if !shared.is_empty() {
                                 output_ctx.print_data("\nShared assets:")?;
                                 for (asset, exists) in &shared {
-                                    let status = if *exists { "✓" } else { "✗" };
+                                    let status = if *exists { "ok" } else { "missing" };
                                     output_ctx.print_data(format!(
                                         "  {} {}",
                                         status, asset.original_path
@@ -5394,15 +5395,15 @@ fn run() -> Result<()> {
                                 output_ctx.print_data("\nExternal URLs:")?;
                                 for asset in &external {
                                     output_ctx
-                                        .print_data(format!("  🌐 {}", asset.original_path))?;
+                                        .print_data(format!("  remote {}", asset.original_path))?;
                                 }
                             }
 
                             if !missing.is_empty() {
-                                output_ctx.print_data("\n⚠ Missing assets:")?;
+                                output_ctx.print_data("\nMissing assets:")?;
                                 for asset in &missing {
                                     output_ctx
-                                        .print_data(format!("  ✗ {}", asset.original_path))?;
+                                        .print_data(format!("  missing {}", asset.original_path))?;
                                     if let Some(ref resolved) = asset.resolved_path {
                                         output_ctx.print_data(format!(
                                             "     Expected at: {}",
@@ -5452,7 +5453,7 @@ fn run() -> Result<()> {
 
                     if !result.errors.is_empty() {
                         output_ctx
-                            .print_data(format!("❌ Errors found ({}):", result.errors.len()))?;
+                            .print_data(format!("Errors found ({}):", result.errors.len()))?;
                         for error in &result.errors {
                             output_ctx.print_data(format!(
                                 "  {} ({}): {}",
@@ -5465,8 +5466,7 @@ fn run() -> Result<()> {
                     }
 
                     if !result.warnings.is_empty() {
-                        output_ctx
-                            .print_data(format!("⚠️  Warnings ({}):", result.warnings.len()))?;
+                        output_ctx.print_data(format!("Warnings ({}):", result.warnings.len()))?;
                         for warning in &result.warnings {
                             output_ctx.print_data(format!(
                                 "  {} ({}): {}",
@@ -5479,7 +5479,7 @@ fn run() -> Result<()> {
                     }
 
                     if result.errors.is_empty() && result.warnings.is_empty() {
-                        output_ctx.print_data("✅ All documents valid!")?;
+                        output_ctx.print_data("All documents valid")?;
                     }
 
                     output_ctx.print_data(format!(
@@ -6113,10 +6113,10 @@ fn run() -> Result<()> {
                 } else if has_errors {
                     println!("Errors:");
                     for err in &result.errors {
-                        println!("  ✗ {}", err);
+                        println!("  error: {}", err);
                     }
                 } else {
-                    println!("✓ Configuration is valid");
+                    println!("Configuration is valid");
                 }
 
                 // A source that failed to load or carried an invalid value is a
@@ -6173,7 +6173,7 @@ fn run() -> Result<()> {
                             if !result.installed.is_empty() {
                                 println!("\nInstalled:");
                                 for hook in &result.installed {
-                                    println!("  ✓ {}", hook);
+                                    println!("  {}", hook);
                                 }
                             }
                             if !result.skipped.is_empty() {
@@ -6429,12 +6429,16 @@ fn run() -> Result<()> {
                         exit_nonzero.then_some(ErrorCode::ValidationFailed),
                     )?;
                 } else if report.findings.is_empty() {
-                    println!("✓ Scope validation passed");
+                    println!("Scope validation passed");
                 } else {
                     for finding in &report.findings {
                         println!(
                             "{} [{}] {}",
-                            if finding.is_error() { "❌" } else { "⚠" },
+                            if finding.is_error() {
+                                "error"
+                            } else {
+                                "warning"
+                            },
                             finding.rule,
                             finding.message
                         );
@@ -6445,7 +6449,7 @@ fn run() -> Result<()> {
                             report.error_count()
                         );
                     } else {
-                        println!("✓ Scope validation passed");
+                        println!("Scope validation passed");
                     }
                 }
                 if exit_nonzero {
@@ -6477,12 +6481,16 @@ fn run() -> Result<()> {
                         exit_nonzero.then_some(ErrorCode::GenericError),
                     )?;
                 } else if report.findings.is_empty() {
-                    println!("✓ Rule validation passed");
+                    println!("Rule validation passed");
                 } else {
                     for finding in &report.findings {
                         println!(
                             "{} [{}] {}",
-                            if finding.is_error() { "❌" } else { "⚠" },
+                            if finding.is_error() {
+                                "error"
+                            } else {
+                                "warning"
+                            },
                             finding.rule,
                             finding.message
                         );
@@ -6589,12 +6597,16 @@ fn run() -> Result<()> {
                         exit_nonzero.then_some(ErrorCode::GenericError),
                     )?;
                 } else if report.findings.is_empty() {
-                    println!("✓ Issue validation passed");
+                    println!("Issue validation passed");
                 } else {
                     for finding in &report.findings {
                         println!(
                             "{} [{}] {}",
-                            if finding.is_error() { "❌" } else { "⚠" },
+                            if finding.is_error() {
+                                "error"
+                            } else {
+                                "warning"
+                            },
                             finding.rule,
                             finding.message
                         );
@@ -6617,7 +6629,7 @@ fn run() -> Result<()> {
                     match executor.validate_branch_drift() {
                         Ok(()) => {
                             if !json {
-                                println!("✓ Branch is up-to-date with origin/main");
+                                println!("Branch is up-to-date with origin/main");
                             }
                             validation_results.push(("branch_drift", true, String::new()));
                         }
@@ -6625,7 +6637,7 @@ fn run() -> Result<()> {
                             if json {
                                 validation_results.push(("branch_drift", false, e.to_string()));
                             } else {
-                                eprintln!("❌ Branch-drift validation failed:\n{}", e);
+                                eprintln!("error: Branch-drift validation failed:\n{}", e);
                                 std::process::exit(1);
                             }
                         }
@@ -6637,7 +6649,7 @@ fn run() -> Result<()> {
                         Ok(invalid_leases) => {
                             if invalid_leases.is_empty() {
                                 if !json {
-                                    println!("✓ All active leases are valid");
+                                    println!("All active leases are valid");
                                 }
                                 validation_results.push(("leases", true, String::new()));
                             } else {
@@ -6649,7 +6661,7 @@ fn run() -> Result<()> {
                                 if json {
                                     validation_results.push(("leases", false, message.clone()));
                                 } else {
-                                    eprintln!("❌ Lease validation failed:\n{}", message);
+                                    eprintln!("error: Lease validation failed:\n{}", message);
                                     std::process::exit(1);
                                 }
                             }
@@ -6658,7 +6670,7 @@ fn run() -> Result<()> {
                             if json {
                                 validation_results.push(("leases", false, format!("Error: {}", e)));
                             } else {
-                                eprintln!("❌ Lease validation error: {}", e);
+                                eprintln!("error: Lease validation error: {}", e);
                                 std::process::exit(1);
                             }
                         }
@@ -6839,15 +6851,15 @@ fn run() -> Result<()> {
                     if validation_failed {
                         if rules_failed {
                             println!(
-                                "❌ Repository validation failed with {} rule error(s)",
+                                "error: Repository validation failed with {} rule error(s)",
                                 rule_report.error_count()
                             );
                         }
                         if let Some(err) = &integrity_message {
-                            println!("❌ Repository integrity error: {}", err);
+                            println!("error: Repository integrity error: {}", err);
                         }
                     } else {
-                        println!("✓ Repository validation passed");
+                        println!("Repository validation passed");
                     }
 
                     // Every finding (errors AND warnings — including the built-in
@@ -6855,7 +6867,11 @@ fn run() -> Result<()> {
                     for finding in &rule_report.findings {
                         println!(
                             "{} [{}] {}",
-                            if finding.is_error() { "❌" } else { "⚠" },
+                            if finding.is_error() {
+                                "error"
+                            } else {
+                                "warning"
+                            },
                             finding.rule,
                             finding.message
                         );
@@ -6868,7 +6884,7 @@ fn run() -> Result<()> {
                     // Advisory only — does not affect the exit status.
                     if divergence_report.count() > 0 {
                         println!(
-                            "⚠ {} membership label(s) not backed by the DAG \
+                            "warning: {} membership label(s) not backed by the DAG \
                              (run `jit query divergence` for details)",
                             divergence_report.count()
                         );
@@ -7273,7 +7289,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Acquired lease: {}", lease_id);
+                            println!("Acquired lease: {}", lease_id);
                             println!("  Issue: {}", issue_id);
                             println!("  TTL: {} seconds", ttl);
                             let output_ctx = OutputContext::new(quiet, json);
@@ -7317,7 +7333,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Released lease: {}", released.lease_id);
+                            println!("Released lease: {}", released.lease_id);
                             println!("  Issue: {}", released.issue_id);
                             println!("  Previous owner: {}", released.previous_owner);
                             println!("  Released by: {}", released.actor);
@@ -7357,7 +7373,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Renewed lease: {}", lease_id);
+                            println!("Renewed lease: {}", lease_id);
                             println!("  Issue: {}", renewed_lease.issue_id);
                             println!("  Extended by: {} seconds", extension);
                             if let Some(expires_at) = renewed_lease.expires_at {
@@ -7395,7 +7411,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Heartbeat sent: {}", lease_id);
+                            println!("Heartbeat sent: {}", lease_id);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
                                 output_ctx.print_warning(warning)?;
@@ -7473,7 +7489,7 @@ fn run() -> Result<()> {
                                     // Show stale status
                                     if lease.stale {
                                         println!(
-                                            "  ⚠️  STALE: Lease marked stale (no heartbeat for {} minutes)",
+                                            "  STALE: Lease marked stale (no heartbeat for {} minutes)",
                                             since_beat.num_minutes()
                                         );
                                         println!(
@@ -7596,7 +7612,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            println!("✓ Force-evicted lease: {}", lease_id);
+                            println!("Force-evicted lease: {}", lease_id);
                             println!("  Reason: {}", reason);
                             let output_ctx = OutputContext::new(quiet, json);
                             for warning in &warnings {
@@ -7832,7 +7848,7 @@ fn run() -> Result<()> {
                     ));
                     println!("{}", output.to_json_string()?);
                 } else {
-                    println!("✓ Snapshot exported to: {}", result.path);
+                    println!("Snapshot exported to: {}", result.path);
                     println!("  {} issues", result.issue_count);
                     println!("  {} documents", result.document_count);
                     if let Some(size) = result.size_bytes {
