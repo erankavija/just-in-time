@@ -1,10 +1,12 @@
-dependencies = ["jit-default"]
-
 [profile]
-manifest-version = 1
+manifest-version = 2
 id = "jit-dogfood"
 version = "1.0.0"
-jit = ">=1.0.0, <2.0.0"
+compatible-jit = ">=1.0.0, <2.0.0"
+
+[[dependency]]
+id = "jit-default"
+version = "*"
 
 # Repository-neutral workflow taxonomy. `jit-default` supplies the shared
 # hierarchy and vocabulary; this profile adds bracket and task specialization.

@@ -134,8 +134,8 @@ fn authority_owners(root: &Path, is_authority: fn(&str) -> bool) -> Vec<PathBuf>
     )
 }
 
-/// A manifest wire authority both parses TOML and decides the versioned
-/// `manifest-version` representation that becomes `ProfilePackageModel`.
+/// A manifest wire authority parses TOML, checks its `manifest-version`
+/// discriminator, and maps the wire to `ProfilePackageModel`.
 fn is_manifest_decoder(source: &str) -> bool {
     source.contains("toml::from_str")
         && source.contains("manifest-version")

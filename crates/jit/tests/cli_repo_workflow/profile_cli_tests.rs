@@ -97,7 +97,7 @@ fn package_with_shared_namespace<'a>(
     fs::write(
         root.join("manifest.toml"),
         format!(
-            "[profile]\nmanifest-version = 1\nid = \"{id}\"\nversion = \"1.0.0\"\njit = \">=0.2.0, <2.0.0\"\n\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"shared\"\nvalue = {{ description = \"{description}\", unique = false }}\n"
+            "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n\n[[contribution]]\nkind = \"map-entry\"\ntarget = \"namespaces\"\nidentity = \"shared\"\nvalue = {{ description = \"{description}\", unique = false }}\n"
         ),
     )
     .unwrap();
@@ -175,9 +175,9 @@ fn write_variable_package(repo: &Path, location: &str, spec: VariablePackageSpec
 /// scenario is authored over the fixture rather than borrowed from one.
 fn declare_dependency(repo: &Path, location: &str, id: &str) {
     let manifest = repo.join(location).join("manifest.toml");
-    let declared = fs::read_to_string(&manifest).unwrap().replace(
-        "[profile]",
-        &format!("dependencies = [\"{id}\"]\n\n[profile]"),
+    let declared = format!(
+        "{}\n[[dependency]]\nid = \"{id}\"\nversion = \"*\"\n",
+        fs::read_to_string(&manifest).unwrap()
     );
     fs::write(&manifest, declared).unwrap();
 }
@@ -2141,7 +2141,7 @@ pub(super) fn capture_sources(repo: &Path, location: &str) -> String {
     fs::create_dir_all(root.join("assets/install")).unwrap();
     fs::write(
         root.join("manifest.toml"),
-        "[profile]\nmanifest-version = 1\nid = \"captured\"\nversion = \"1.0.0\"\njit = \">=0.2.0, <2.0.0\"\n\n[[live-source]]\nroot = \"docs\"\nexclude = []\n\n[[asset]]\nsource = \"assets/live/docs/guide.md\"\ntarget = \"docs/guide.md\"\n\n[[asset]]\nsource = \"assets/install/settings.toml\"\ntarget = \"settings.toml\"\n",
+        "[profile]\nmanifest-version = 2\nid = \"captured\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n\n[[live-source]]\nroot = \"docs\"\nexclude = []\n\n[[asset]]\nsource = \"assets/live/docs/guide.md\"\ntarget = \"docs/guide.md\"\n\n[[asset]]\nsource = \"assets/install/settings.toml\"\ntarget = \"settings.toml\"\n",
     )
     .unwrap();
     fs::write(

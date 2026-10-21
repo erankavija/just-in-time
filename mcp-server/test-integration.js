@@ -136,11 +136,12 @@ function stagePackage(repo, location, id, dependencies = []) {
   const root = join(repo, location);
   cpSync(PROFILE_PACKAGE_FIXTURE, root, { recursive: true });
   const manifestPath = join(root, 'manifest.toml');
-  const declared = dependencies.map(dependency => `"${dependency}"`).join(', ');
+  const declared = dependencies
+    .map(dependency => `\n[[dependency]]\nid = "${dependency}"\nversion = "*"\n`)
+    .join('');
   const manifest = readFileSync(manifestPath, 'utf8')
     .replace(/^id = ".*"$/m, `id = "${id}"`)
-    .replace('[profile]', `dependencies = [${declared}]\n\n[profile]`)
-    .replace(/^target = "docs\/.*"$/m, `target = "docs/${id}.txt"`);
+    .replace(/^target = "docs\/.*"$/m, `target = "docs/${id}.txt"`) + declared;
   writeFileSync(manifestPath, manifest);
   return location;
 }

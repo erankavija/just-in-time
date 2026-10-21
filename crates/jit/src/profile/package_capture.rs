@@ -868,10 +868,10 @@ mod tests {
     /// install-only asset and one region source the package itself carries.
     const SYNTHETIC_MANIFEST: &str = r#"
 [profile]
-manifest-version = 1
+manifest-version = 2
 id = "synthetic-capture"
 version = "1.0.0"
-jit = ">=1.0.0"
+compatible-jit = ">=1.0.0"
 
 [[live-source]]
 root = "bin"

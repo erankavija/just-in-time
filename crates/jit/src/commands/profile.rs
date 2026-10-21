@@ -3344,7 +3344,7 @@ mod tests {
             relative,
             crate::profile::MANIFEST_FILE_NAME,
             &format!(
-                "[profile]\nmanifest-version = 1\nid = \"{id}\"\nversion = \"2.0.0\"\njit = \">=0.2.0, <2.0.0\"\n"
+                "[profile]\nmanifest-version = 2\nid = \"{id}\"\nversion = \"2.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n"
             ),
         )
     }
@@ -7812,10 +7812,10 @@ template = true
     /// install-only asset and one region source the package itself carries.
     const CAPTURE_MANIFEST: &str = r#"
 [profile]
-manifest-version = 1
+manifest-version = 2
 id = "captured-workflow"
 version = "1.0.0"
-jit = ">=1.0.0"
+compatible-jit = ">=1.0.0"
 
 [[live-source]]
 root = "bin"
