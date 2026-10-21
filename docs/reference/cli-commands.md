@@ -1173,6 +1173,10 @@ a trailing newline, which keeps large bodies out of `argv` and away from shell
 quoting. An append separates the old and new text with exactly one blank line;
 appending to an empty description yields just the new text.
 
+**A single-issue update is all-or-nothing**: gate, assignee, and field changes
+publish as one mutation, so a refused part leaves every other requested change
+unapplied.
+
 ```bash
 jit issue update abc123 --state in_progress --assignee agent:worker-1
 jit issue update abc123 --description "New text"
@@ -1667,7 +1671,7 @@ jit issue reject $ISSUE --reason "wont-fix" --quiet
 - **Bypasses gates:** Can reject from any state, even with failing gates
 - **Closure outcome:** Records rejection without dependency or gate checks; do not
   treat it as an enforced no-return source state for later `issue update` calls
-- **Optional reason:** `--reason` flag adds `resolution:*` label
+- **Optional reason:** `--reason` adds a `resolution:*` label in the same mutation as the rejection, so a failure leaves neither
 - **Immediate:** No validation or gate checks
 
 **Common rejection reasons:**

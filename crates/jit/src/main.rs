@@ -3567,20 +3567,6 @@ fn run() -> Result<()> {
 
                     // Single issue mode
                     if let Some(id_str) = id {
-                        // Gate and assignee changes publish before the field update,
-                        // so only they need the full id up front; the field update
-                        // resolves `id_str` against the image it captures.
-                        let early_id = if !add_gate.is_empty()
-                            || !remove_gate.is_empty()
-                            || unassign
-                            || assignee.is_some()
-                        {
-                            Some(storage.resolve_issue_id(&id_str)?)
-                        } else {
-                            None
-                        };
-                        let requested_id = early_id.as_deref().unwrap_or(&id_str);
-
                         let prio = priority.map(|p| Priority::from_str(&p)).transpose()?;
                         let st = state.map(|s| State::from_str(&s)).transpose()?;
                         // Resolve the (mutually exclusive, clap-enforced) description
@@ -3611,38 +3597,8 @@ fn run() -> Result<()> {
                                 Some(s) => Some(Some(jit::domain::ContentFormat::from_str(s)?)),
                             };
 
-                        // Handle gate modifications first (before other updates)
-                        if !add_gate.is_empty() {
-                            let (_result, warnings) =
-                                executor.add_gates(requested_id, &add_gate)?;
-                            for warning in warnings {
-                                output_ctx.print_warning(&warning)?;
-                            }
-                        }
-
-                        if !remove_gate.is_empty() {
-                            let (_result, warnings) =
-                                executor.remove_gates(requested_id, &remove_gate)?;
-                            for warning in warnings {
-                                output_ctx.print_warning(&warning)?;
-                            }
-                        }
-
-                        // Handle assignee changes
-                        if unassign {
-                            let warnings = executor.unassign_issue(requested_id)?;
-                            for warning in warnings {
-                                output_ctx.print_warning(&warning)?;
-                            }
-                        } else if let Some(assignee_str) = assignee {
-                            let warnings = executor.assign_issue(requested_id, assignee_str)?;
-                            for warning in warnings {
-                                output_ctx.print_warning(&warning)?;
-                            }
-                        }
-
                         match executor.update_issue_resolved(
-                            requested_id,
+                            &id_str,
                             title,
                             description_update,
                             prio,
@@ -3651,6 +3607,12 @@ fn run() -> Result<()> {
                             remove_label,
                             content_format,
                             issue_type,
+                            jit::commands::IssueLocalUpdate {
+                                add_gates: add_gate,
+                                remove_gates: remove_gate,
+                                assignee,
+                                unassign,
+                            },
                             force,
                         ) {
                             Ok((full_id, warnings)) => {
@@ -3676,8 +3638,8 @@ fn run() -> Result<()> {
                             }
                             Err(e) => {
                                 // Branch selection is driven entirely by typed errors
-                                // (TransitionBlockedError, IssueNotFoundError, and a
-                                // lock timeout); the message text never selects a code.
+                                // (TransitionBlockedError, IssueNotFoundError, then the
+                                // shared classification); the message text never selects a code.
                                 let json_error = if let Some(blocked) =
                                     e.downcast_ref::<jit::errors::TransitionBlockedError>()
                                 {
@@ -3686,9 +3648,9 @@ fn run() -> Result<()> {
                                     .downcast_ref::<jit::storage::IssueNotFoundError>()
                                     .is_some()
                                 {
-                                    jit::output::JsonError::issue_not_found(requested_id)
+                                    jit::output::JsonError::issue_not_found(&id_str)
                                 } else {
-                                    command_json_error(&e, jit::output::ErrorCode::GenericError)
+                                    command_json_error(&e, error_to_error_code(&e))
                                 };
                                 handle_json_error!(json, e, json_error);
                             }
@@ -3941,24 +3903,10 @@ fn run() -> Result<()> {
                     }
                 }
                 IssueCommands::Reject { id, reason, json } => {
-                    use jit::domain::State;
-
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
 
-                    // Update state to rejected
-                    let mut all_warnings =
-                        executor.update_issue_state(&full_id, State::Rejected)?;
-
-                    // Add resolution label if reason provided
-                    if let Some(ref reason_value) = reason {
-                        let label = format!("resolution:{}", reason_value);
-                        let warnings = executor.add_label(&full_id, &label)?;
-                        all_warnings.extend(warnings);
-                    }
-
-                    // Print all warnings
-                    for warning in all_warnings {
+                    for warning in executor.reject_issue(&full_id, reason.as_deref())? {
                         output_ctx.print_warning(&warning)?;
                     }
 

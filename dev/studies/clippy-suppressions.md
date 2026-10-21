@@ -55,7 +55,7 @@ Clippy suggests `.iter_mut().enumerate()`, but this only provides mutable access
 
 **Locations:**
 - `crates/jit/src/commands/document.rs`: `read_document_content`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`
-- `crates/jit/src/commands/labels.rs`: `get_issue`, `add_label`
+- `crates/jit/src/commands/labels.rs`: `get_issue`
 - `crates/jit/src/domain/type_taxonomy.rs`: `ConfigError::DuplicateType`
 
 **Reason:** These are public API methods that form part of the library interface but are not currently called by the CLI binary itself.

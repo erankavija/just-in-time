@@ -27,6 +27,7 @@ mod issue_show_projection_test;
 mod issue_show_shape_test;
 mod issue_show_summary_test;
 mod issue_status_projection_tests;
+mod issue_update_atomicity_tests;
 mod issue_update_description_ops_tests;
 mod issue_update_lean_response_test;
 mod list_envelope_tests;

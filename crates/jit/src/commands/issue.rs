@@ -30,6 +30,16 @@ impl DescriptionUpdate {
     }
 }
 
+/// Gate and assignee changes an `issue update` applies, in this order, before
+/// its field changes. `unassign` takes precedence over `assignee`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct IssueLocalUpdate {
+    pub add_gates: Vec<String>,
+    pub remove_gates: Vec<String>,
+    pub assignee: Option<String>,
+    pub unassign: bool,
+}
+
 pub(super) fn blocking_dependencies(
     issue: &Issue,
     resolved_issues: &std::collections::HashMap<String, &Issue>,
@@ -472,13 +482,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             remove_labels,
             content_format,
             issue_type,
+            IssueLocalUpdate::default(),
             force,
         )
         .map(|(_, warnings)| warnings)
     }
 
-    /// [`Self::update_issue`], also returning the full id `id` resolved to in
-    /// the captured repository.
+    /// [`Self::update_issue`] combined with `local` gate and assignee changes,
+    /// published as one mutation: either every requested change applies or
+    /// none does. Also returns the full id `id` resolved to in the captured
+    /// repository.
     #[allow(clippy::too_many_arguments)]
     pub fn update_issue_resolved(
         &self,
@@ -491,11 +504,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         remove_labels: Vec<String>,
         content_format: Option<Option<crate::domain::ContentFormat>>,
         issue_type: Option<String>,
+        local: IssueLocalUpdate,
         force: bool,
     ) -> Result<(String, Vec<String>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let assignee = local
+            .assignee
+            .map(|assignee| assignee.parse::<crate::domain::Assignee>())
+            .transpose()?;
         let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
             issue_id: id.to_string(),
             title,
@@ -507,10 +525,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             label_edit: None,
             content_format,
             issue_type,
-            add_gates: Vec::new(),
-            remove_gates: Vec::new(),
-            assignee: None,
-            unassign: false,
+            add_gates: local.add_gates,
+            remove_gates: local.remove_gates,
+            assignee,
+            unassign: local.unassign,
             bulk: false,
             force,
             enforce_lease: true,
@@ -662,6 +680,25 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
 
         Ok(outcome.warnings)
+    }
+
+    /// Reject an issue, recording `reason` as its `resolution:` label in the
+    /// same mutation. Rejection bypasses rule enforcement, so label-rule
+    /// findings surface as warnings.
+    pub fn reject_issue(&self, id: &str, reason: Option<&str>) -> Result<Vec<String>>
+    where
+        S: crate::storage::RepositoryStateStore,
+    {
+        let Some(reason) = reason else {
+            return self.update_issue_state(id, State::Rejected);
+        };
+        let mut request = CapturedFieldUpdate::label_edit(
+            id.to_string(),
+            CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
+        );
+        request.state = Some(State::Rejected);
+        request.enforce_lease = true;
+        Ok(self.publish_captured_field_update(request)?.warnings)
     }
 
     /// Assign an issue to someone.
@@ -845,22 +882,24 @@ mod tests {
         }
     }
 
-    struct DeleteFailure(std::sync::Mutex<Option<MutationPoint>>);
+    struct PointFailure(std::sync::Mutex<Option<MutationPoint>>);
 
-    impl crate::storage::MutationInterruptionInjector for DeleteFailure {
+    impl crate::storage::MutationInterruptionInjector for PointFailure {
         fn check(&self, point: &MutationPoint) -> std::io::Result<()> {
             let mut selected = self.0.lock().unwrap();
             if selected.as_ref() == Some(point) {
                 selected.take();
-                return Err(std::io::Error::other("injected issue deletion failure"));
+                return Err(std::io::Error::other("injected mutation failure"));
             }
             Ok(())
         }
     }
 
     fn setup() -> CommandExecutor<InMemoryStorage> {
-        let storage = InMemoryStorage::new();
+        setup_over(InMemoryStorage::new())
+    }
 
+    fn setup_over(storage: InMemoryStorage) -> CommandExecutor<InMemoryStorage> {
         // Enforcement off, plus the type vocabulary these tests assert on: an
         // explicit `--type` is accepted or rejected against what this
         // configuration declares.
@@ -2075,7 +2114,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
     fn test_delete_issue_atomic_failure_recovers_old_graph() {
         use crate::storage::RepositoryStateStore;
 
-        let failures = std::sync::Arc::new(DeleteFailure(std::sync::Mutex::new(Some(
+        let failures = std::sync::Arc::new(PointFailure(std::sync::Mutex::new(Some(
             MutationPoint::BeforeCommitCheck,
         ))));
         let storage = InMemoryStorage::with_mutation_interruptions(failures);
@@ -2667,6 +2706,259 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
             issue.state,
             State::Ready,
             "Issue state should be Ready after manual transition"
+        );
+    }
+
+    fn seed_fixture_issue(executor: &CommandExecutor<InMemoryStorage>, issue: Issue) -> String {
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        id
+    }
+
+    fn issue_event_types(executor: &CommandExecutor<InMemoryStorage>, id: &str) -> Vec<String> {
+        let mut types = executor
+            .storage
+            .read_events()
+            .unwrap()
+            .iter()
+            .filter(|event| event.get_issue_id() == id)
+            .map(|event| event.get_type().to_string())
+            .collect::<Vec<_>>();
+        types.sort();
+        types
+    }
+
+    fn combined_update(
+        executor: &CommandExecutor<InMemoryStorage>,
+        id: &str,
+        local: IssueLocalUpdate,
+    ) -> Result<(String, Vec<String>)> {
+        executor.update_issue_resolved(
+            id,
+            None,
+            None,
+            Some(Priority::High),
+            None,
+            vec![],
+            vec![],
+            None,
+            None,
+            local,
+            false,
+        )
+    }
+
+    #[test]
+    fn test_update_issue_resolved_publishes_gate_assignee_and_field_changes_in_one_session() {
+        let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
+        let executor =
+            setup_over(InMemoryStorage::new().with_mutation_interruption_view(counter.clone()));
+        let id = seed_fixture_issue(
+            &executor,
+            crate::domain::types::fixture_issue("Combined".into(), String::new()),
+        );
+        let opened = counter.0.load(Ordering::SeqCst);
+
+        combined_update(
+            &executor,
+            &id,
+            IssueLocalUpdate {
+                add_gates: vec!["tests".into()],
+                assignee: Some("agent:w1".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
+        let issue = executor.storage.load_issue(&id).unwrap();
+        assert!(issue.gates_required.contains(&"tests".to_string()));
+        assert_eq!(
+            issue.assignee.map(|a| a.to_string()),
+            Some("agent:w1".into())
+        );
+        assert_eq!(issue.priority, Priority::High);
+    }
+
+    #[test]
+    fn test_update_issue_resolved_combined_update_matches_separate_steps() {
+        let assign = IssueLocalUpdate {
+            add_gates: vec!["tests".into()],
+            remove_gates: vec!["code-review".into()],
+            assignee: Some("agent:w1".into()),
+            unassign: false,
+        };
+        let unassign = IssueLocalUpdate {
+            assignee: None,
+            unassign: true,
+            ..assign.clone()
+        };
+        for local in [assign, unassign] {
+            let executor = setup();
+            let mut template = crate::domain::types::fixture_issue("Twin".into(), String::new());
+            template.gates_required = vec!["code-review".into()];
+            template.assignee = Some("agent:prior".parse().unwrap());
+            let separate = seed_fixture_issue(&executor, template.clone());
+            template.id = uuid::Uuid::new_v4().to_string();
+            let combined = seed_fixture_issue(&executor, template);
+
+            executor.add_gates(&separate, &local.add_gates).unwrap();
+            executor
+                .remove_gates(&separate, &local.remove_gates)
+                .unwrap();
+            match &local.assignee {
+                Some(assignee) => executor.assign_issue(&separate, assignee.clone()).map(drop),
+                None => executor.unassign_issue(&separate).map(drop),
+            }
+            .unwrap();
+            executor
+                .update_issue(
+                    &separate,
+                    None,
+                    None,
+                    Some(Priority::High),
+                    None,
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap();
+            combined_update(&executor, &combined, local).unwrap();
+
+            let observable = |id: &str| {
+                let issue = executor.storage.load_issue(id).unwrap();
+                let gates = issue
+                    .gates_status
+                    .iter()
+                    .map(|(key, gate)| (key.clone(), gate.status))
+                    .collect::<std::collections::BTreeMap<_, _>>();
+                (
+                    issue.state,
+                    issue.priority,
+                    issue.labels,
+                    issue.gates_required,
+                    gates,
+                    issue.assignee,
+                )
+            };
+            assert_eq!(observable(&combined), observable(&separate));
+            assert_eq!(
+                issue_event_types(&executor, &combined),
+                issue_event_types(&executor, &separate)
+            );
+        }
+    }
+
+    #[test]
+    fn test_reject_issue_with_reason_publishes_in_one_session() {
+        let counter = Arc::new(SessionOpenCounter(AtomicUsize::new(0)));
+        let executor =
+            setup_over(InMemoryStorage::new().with_mutation_interruption_view(counter.clone()));
+        let id = seed_fixture_issue(
+            &executor,
+            crate::domain::types::fixture_issue("Reject".into(), String::new()),
+        );
+        let opened = counter.0.load(Ordering::SeqCst);
+
+        executor.reject_issue(&id, Some("duplicate")).unwrap();
+
+        assert_eq!(counter.0.load(Ordering::SeqCst) - opened, 1);
+    }
+
+    #[test]
+    fn test_reject_issue_with_reason_records_state_events_and_resolution_label() {
+        let executor = setup();
+        let template = crate::domain::types::fixture_issue("Reject".into(), String::new());
+        let mut twin = template.clone();
+        twin.id = uuid::Uuid::new_v4().to_string();
+        let with_reason = seed_fixture_issue(&executor, template);
+        let state_only = seed_fixture_issue(&executor, twin);
+
+        executor
+            .reject_issue(&with_reason, Some("duplicate"))
+            .unwrap();
+        executor
+            .update_issue_state(&state_only, State::Rejected)
+            .unwrap();
+
+        let issue = executor.storage.load_issue(&with_reason).unwrap();
+        assert_eq!(issue.state, State::Rejected);
+        assert!(issue.labels.contains(&"resolution:duplicate".to_string()));
+        assert_eq!(
+            issue_event_types(&executor, &with_reason),
+            issue_event_types(&executor, &state_only),
+            "the resolution label records no event of its own"
+        );
+    }
+
+    #[test]
+    fn test_reject_issue_failed_publication_leaves_prior_state_without_label() {
+        let failures = Arc::new(PointFailure(std::sync::Mutex::new(Some(
+            MutationPoint::BeforeCommitCheck,
+        ))));
+        let storage = InMemoryStorage::with_mutation_interruptions(failures);
+        let recovered = storage.without_mutation_interruptions();
+        let executor = setup_over(storage);
+        let issue = crate::domain::types::fixture_issue("Reject".into(), String::new());
+        let prior = issue.state;
+        let id = seed_fixture_issue(&executor, issue);
+        let events_before = recovered.read_events().unwrap().len();
+
+        assert!(executor.reject_issue(&id, Some("duplicate")).is_err());
+
+        let issue = recovered.load_issue(&id).unwrap();
+        assert_eq!(issue.state, prior);
+        assert!(!issue
+            .labels
+            .iter()
+            .any(|label| label.starts_with("resolution:")));
+        assert_eq!(recovered.read_events().unwrap().len(), events_before);
+    }
+
+    #[test]
+    fn test_reject_issue_recaptures_after_concurrent_issue_change() {
+        let storage = InMemoryStorage::new();
+        let executor = setup_over(storage.clone());
+        let id = seed_fixture_issue(
+            &executor,
+            crate::domain::types::fixture_issue("Reject race".into(), String::new()),
+        );
+        let mut concurrent = storage.load_issue(&id).unwrap();
+        concurrent.labels.push("owner:concurrent".to_string());
+        let raced = crate::commands::test_helpers::with_apply_race(
+            storage,
+            crate::commands::test_helpers::SessionRaceAction::Save(Box::new(concurrent)),
+        );
+        let executor = crate::commands::test_helpers::memory_executor(raced.clone());
+
+        executor.reject_issue(&id, Some("done")).unwrap();
+
+        let issue = raced.load_issue(&id).unwrap();
+        assert_eq!(issue.state, State::Rejected);
+        assert!(issue.labels.iter().any(|label| label == "owner:concurrent"));
+        assert!(issue.labels.iter().any(|label| label == "resolution:done"));
+    }
+
+    #[test]
+    fn test_reject_issue_appends_resolution_label_unchecked() {
+        let executor = setup();
+        let id = seed_fixture_issue(
+            &executor,
+            crate::domain::types::fixture_issue("Reject twice".into(), String::new()),
+        );
+
+        executor.reject_issue(&id, Some("done")).unwrap();
+        executor.reject_issue(&id, Some("done")).unwrap();
+
+        let labels = executor.storage.load_issue(&id).unwrap().labels;
+        assert_eq!(
+            labels
+                .iter()
+                .filter(|label| label.as_str() == "resolution:done")
+                .count(),
+            2
         );
     }
 }
