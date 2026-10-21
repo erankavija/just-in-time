@@ -390,6 +390,13 @@
       "date": "2026-10-21",
       "decision": "@/charter/D-19, @/charter/D-18, @/inv/atomic-writes, @/inv/event-log",
       "summary": "REQ-05 amended (a): the indefinite-lease limit check reads current lease records only, never the claims log. Rejected (b), dropping the limits: capability removal for no gain. Rejected (c), a lease counter: adds mechanism. REQ-08 reworded: claim parses no event-log record, only the shared bounded end-of-log probe. IssueClaimed is emitted only on an assignee change, reversing 19e7298a REQ-02 as a plan decision. The one-time rewrite of existing gate runs and archives is an idempotent, count-verified task."
+    },
+    {
+      "container_short_id": "3d9a0ce3",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "3d9a0ce3 REQ-02",
+      "summary": "Chosen (A): a new task makes scripts/cargo-ci.sh exit 75 (infrastructure error, never reused) when every failing step is environment-sensitive (timeouts with no FAIL, or a suite-duration overrun). Mixed failures still exit 1. The new task depends on fd9bfab8. Rejected (B): reopening merged fd9bfab8. The bar is not loosened, because an error run never passes."
     }
   ],
   "notes": [
@@ -438,6 +445,10 @@
     {
       "date": "2026-10-21",
       "item": "The harness flagged df129d9e's execution-lead subagent with an 'Instruction Poisoning' warning (about 09:20). Steward check: no commit in the last 30 minutes changed .agents/, .claude/, CLAUDE.md, AGENTS.md or scripts except planned tasks (9ca31c64 workspace lints; d1ff2273 release workflow and docs-check script under 3d9a0ce3). The likely trigger is the lead relaying the steward's lock-convention instructions to its workers. Review the lead's transcript if you want certainty."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Review (informational): the steward approved a 3d9a0ce3 task changing scripts/cargo-ci.sh so that a run failing only on timeouts or the suite-duration budget exits 75 (recorded as a non-reusable infrastructure error) instead of 1 (a reusable failed verdict). It applies 3d9a0ce3 REQ-02. The durable budget-under-load question recorded earlier remains open."
     }
   ]
 }
