@@ -419,15 +419,14 @@ mod tests {
         crate::profile::wire::decode_manifest(
             format!(
                 "[profile]\n\
-             manifest-version = 1\n\
+             manifest-version = 2\n\
              id = \"example\"\n\
              version = \"1.0.0\"\n\
-             jit = \">=1.0.0\"\n\
+             compatible-jit = \">=1.0.0\"\n\
              {body}"
             )
             .as_bytes(),
         )
-        .map(|decoded| decoded.model)
         .map_err(|error| error.to_string())
     }
 

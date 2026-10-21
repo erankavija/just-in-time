@@ -465,7 +465,7 @@ def verify_profile_compatibility(
     """Check that the workflow profile package admits the derived version."""
     try:
         declared = nested_string(
-            read_toml(root / PROFILE_PACKAGE_MANIFEST), "profile", "jit"
+            read_toml(root / PROFILE_PACKAGE_MANIFEST), "profile", "compatible-jit"
         )
     except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
         findings.append(

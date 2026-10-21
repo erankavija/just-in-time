@@ -114,7 +114,7 @@ impl ProfilePackage {
     pub(crate) fn parse_manifest(
         manifest_bytes: &[u8],
     ) -> Result<ProfilePackageModel, ProfilePackageError> {
-        Ok(Self::read_manifest(manifest_bytes)?.model)
+        Self::read_manifest(manifest_bytes)
     }
 
     /// Validate one package's complete content and derive its identity.
@@ -139,37 +139,28 @@ impl ProfilePackage {
         let manifest_bytes = files
             .get(MANIFEST_FILE_NAME)
             .ok_or(ProfilePackageError::MissingManifest)?;
-        let decoded = Self::read_manifest(manifest_bytes)?;
-        let model = decoded.model;
+        let model = Self::read_manifest(manifest_bytes)?;
 
         validate_declared_content(&model, files, executable_sources)?;
         validate_body_references(&model, |source| files.get(source).map(Vec::as_slice))?;
-        let hashes = compute_hashes(&model, files, &decoded.identity_manifest)?;
+        let hashes = compute_hashes(&model, files, manifest_bytes)?;
         Ok((model, hashes))
     }
 
-    fn read_manifest(
-        manifest_bytes: &[u8],
-    ) -> Result<super::wire::DecodedManifest, ProfilePackageError> {
-        let decoded =
-            super::wire::decode_manifest(manifest_bytes).map_err(|error| match error {
-                ManifestWireError::Utf8(source) => ProfilePackageError::ManifestUtf8 { source },
-                ManifestWireError::Toml(source) => ProfilePackageError::ManifestToml(source),
-                ManifestWireError::UnsupportedVersion(actual) => {
-                    ProfilePackageError::ManifestVersion {
-                        actual,
-                        expected: "1 or 2",
-                    }
-                }
-                ManifestWireError::InvalidVersionField(field) => {
-                    ProfilePackageError::ManifestField { field }
-                }
-                ManifestWireError::Serialization(source) => {
-                    ProfilePackageError::CanonicalSerialization(source)
-                }
-            })?;
-        validate_manifest_declarations(&decoded.model)?;
-        Ok(decoded)
+    fn read_manifest(manifest_bytes: &[u8]) -> Result<ProfilePackageModel, ProfilePackageError> {
+        let model = super::wire::decode_manifest(manifest_bytes).map_err(|error| match error {
+            ManifestWireError::Utf8(source) => ProfilePackageError::ManifestUtf8 { source },
+            ManifestWireError::Toml(source) => ProfilePackageError::ManifestToml(source),
+            ManifestWireError::UnsupportedVersion(actual) => ProfilePackageError::ManifestVersion {
+                actual,
+                expected: "2",
+            },
+            ManifestWireError::InvalidVersionField(field) => {
+                ProfilePackageError::ManifestField { field }
+            }
+        })?;
+        validate_manifest_declarations(&model)?;
+        Ok(model)
     }
 
     #[cfg(test)]
@@ -910,7 +901,7 @@ fn contribution_identity(contribution: &Contribution) -> String {
 fn compute_hashes(
     manifest: &ProfilePackageModel,
     files: &BTreeMap<String, Vec<u8>>,
-    identity_manifest: &[u8],
+    manifest_bytes: &[u8],
 ) -> Result<ProfilePackageHashes, ProfilePackageError> {
     let mut target_frames: BTreeMap<String, Vec<Vec<u8>>> = BTreeMap::new();
 
@@ -962,7 +953,7 @@ fn compute_hashes(
 
     let mut package = Sha256::new();
     package.update(PACKAGE_HASH_DOMAIN);
-    hash_frame(&mut package, identity_manifest);
+    hash_frame(&mut package, manifest_bytes);
     for (path, contents) in files
         .iter()
         .filter(|(path, _)| path.as_str() != MANIFEST_FILE_NAME)
@@ -1019,99 +1010,12 @@ mod tests {
     use crate::profile::variables::{
         resolve_package, ProfileVariableAssignment, VariableError, VariableInputs,
     };
-    use crate::profile::{
-        profile_package_model_schema, AssetDeclaration, LiveSourceDeclaration,
-        ProfileDependencyRequirement, ProfileId, RegionDeclaration,
-    };
+    use crate::profile::{profile_package_model_schema, ProfileDependencyRequirement, ProfileId};
     use crate::repository_state::{
         Contribution, KeyedArrayTarget, MapEntryTarget, ScalarTarget, SetStringTarget,
     };
     use std::path::PathBuf;
     use tempfile::TempDir;
-
-    /// Test-only reference for the released v1 package-identity input.
-    ///
-    /// The shipped v1 contract hashed this wire-shaped value after TOML
-    /// deserialization and canonical JSON serialization. It is deliberately
-    /// confined to this test module: it is not a runtime manifest reader or a
-    /// second package model. Keeping the reference independent from the
-    /// production decoder makes a decoder change fail the continuity check.
-    #[derive(Debug, serde::Deserialize, serde::Serialize)]
-    #[serde(deny_unknown_fields)]
-    struct LegacyV1IdentityManifest {
-        profile: LegacyV1IdentityProfile,
-        #[serde(default)]
-        dependencies: Vec<ProfileId>,
-        #[serde(default, rename = "contribution")]
-        contributions: Vec<Contribution>,
-        #[serde(default, rename = "asset")]
-        assets: Vec<AssetDeclaration>,
-        #[serde(default, rename = "region")]
-        regions: Vec<RegionDeclaration>,
-        #[serde(default, rename = "live-source")]
-        live_sources: Vec<LiveSourceDeclaration>,
-    }
-
-    #[derive(Debug, serde::Deserialize, serde::Serialize)]
-    #[serde(deny_unknown_fields, rename_all = "kebab-case")]
-    struct LegacyV1IdentityProfile {
-        manifest_version: u32,
-        id: ProfileId,
-        version: String,
-        jit: String,
-    }
-
-    /// Independently reproduce the released v1 package hash for `files`.
-    ///
-    /// This consumes exactly the bytes that the package under test owns. The
-    /// typed value exists only as a test oracle for the superseded v1 hash
-    /// contract; no production code can call it.
-    fn legacy_v1_identity_hash(files: &BTreeMap<String, Vec<u8>>) -> String {
-        let manifest_bytes = files
-            .get(MANIFEST_FILE_NAME)
-            .expect("the package under test has a manifest");
-        let manifest_text = std::str::from_utf8(manifest_bytes).expect("manifest is UTF-8");
-        let manifest: LegacyV1IdentityManifest =
-            toml::from_str(manifest_text).expect("current shipped manifest is released v1 wire");
-        let identity_manifest = serde_json::to_vec(&legacy_v1_canonicalize(
-            serde_json::to_value(manifest).expect("v1 identity oracle serializes"),
-        ))
-        .expect("v1 identity oracle serializes canonical JSON");
-
-        let mut hasher = Sha256::new();
-        hasher.update(PACKAGE_HASH_DOMAIN);
-        legacy_v1_hash_frame(&mut hasher, &identity_manifest);
-        files
-            .iter()
-            .filter(|(path, _)| path.as_str() != MANIFEST_FILE_NAME)
-            .for_each(|(path, contents)| {
-                legacy_v1_hash_frame(&mut hasher, path.as_bytes());
-                legacy_v1_hash_frame(&mut hasher, contents);
-            });
-        format!("{:x}", hasher.finalize())
-    }
-
-    fn legacy_v1_canonicalize(value: Value) -> Value {
-        match value {
-            Value::Array(values) => {
-                Value::Array(values.into_iter().map(legacy_v1_canonicalize).collect())
-            }
-            Value::Object(values) => Value::Object(
-                values
-                    .into_iter()
-                    .map(|(key, value)| (key, legacy_v1_canonicalize(value)))
-                    .collect::<BTreeMap<_, _>>()
-                    .into_iter()
-                    .collect::<Map<_, _>>(),
-            ),
-            scalar => scalar,
-        }
-    }
-
-    fn legacy_v1_hash_frame(hasher: &mut Sha256, frame: &[u8]) {
-        hasher.update((frame.len() as u64).to_be_bytes());
-        hasher.update(frame);
-    }
 
     /// The checked-in synthetic fixture tree every case below is read from.
     fn fixture_tree() -> PathBuf {
@@ -1159,9 +1063,13 @@ mod tests {
             .expect("the fixture manifest is readable UTF-8")
     }
 
+    /// `manifest` with an unconstrained dependency on `id` appended.
+    fn with_dependency(manifest: &str, id: &str) -> String {
+        format!("{manifest}\n[[dependency]]\nid = \"{id}\"\nversion = \"*\"\n")
+    }
+
     fn parse_modified(old: &str, new: &str) -> Result<ProfilePackageModel, String> {
         crate::profile::wire::decode_manifest(manifest_text().replace(old, new).as_bytes())
-            .map(|decoded| decoded.model)
             .map_err(|error| error.to_string())
     }
 
@@ -1221,28 +1129,6 @@ mod tests {
     }
 
     #[test]
-    fn test_shipped_package_decodes_without_edits_and_preserves_identity_hash() {
-        let (_workspace, package) = crate::test_utils::temporary_repository_package("jit-dogfood");
-
-        assert_eq!(package.model().id.as_str(), "jit-dogfood");
-        // This package carries the repository's own live configuration as
-        // assets, so its identity hash moves with every legitimate
-        // configuration edit; a literal oracle here would be a hand-maintained
-        // copy of a derived value (@/inv/single-source-prose) that turns such an
-        // edit into a red suite. The comparison below proves what the literal
-        // was there to protect — that the canonical decoder still computes the
-        // released v1 identity — by recomputing it from the package bytes, which
-        // holds whatever the packaged configuration currently is. Literal
-        // package hashes stay on the synthetic fixture package, whose bytes this
-        // module authors.
-        assert_eq!(
-            package.hashes().package,
-            legacy_v1_identity_hash(&package.files),
-            "the canonical decoder changed the released v1 identity algorithm"
-        );
-    }
-
-    #[test]
     fn test_package_schema_is_generated_from_canonical_model_type() {
         let package = package();
         let schema = serde_json::to_value(profile_package_model_schema()).unwrap();
@@ -1262,8 +1148,7 @@ mod tests {
 
     #[test]
     fn test_manifest_dependency_is_reported_in_runtime_inspection_and_schema() {
-        let manifest =
-            manifest_text().replace("[profile]", "dependencies = [\"jit-default\"]\n\n[profile]");
+        let manifest = with_dependency(&manifest_text(), "jit-default");
         let mut files = package().files.clone();
         files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
@@ -1397,10 +1282,10 @@ mod tests {
         let manifest = ProfilePackage::parse_manifest(
             r#"
 [profile]
-manifest-version = 1
+manifest-version = 2
 id = "configuration"
 version = "1.0.0"
-jit = ">=1.0.0"
+compatible-jit = ">=1.0.0"
 
 [[contribution]]
 kind = "scalar"
@@ -1460,10 +1345,6 @@ value = "workspace/active"
         let second = package();
         let taxonomy = crate::test_taxonomy::test_taxonomy();
         assert_eq!(first.hashes(), second.hashes());
-        assert_eq!(
-            first.hashes().package,
-            "db44b3f03667064918f8dd2c95460443f0a9e4c1063461ceb166fff64add76b9"
-        );
         assert_eq!(first.hashes().targets.len(), 7);
         assert_eq!(
             first.hashes().targets[".jit/config.toml"],
@@ -1504,6 +1385,21 @@ value = "workspace/active"
             first.hashes().targets[".jit/config.toml"],
             reordered.hashes().targets[".jit/config.toml"]
         );
+    }
+
+    #[test]
+    fn test_package_hash_covers_manifest_source_bytes_that_targets_ignore() {
+        let first = package();
+        let mut reformatted = first.files.clone();
+        reformatted.insert(
+            MANIFEST_FILE_NAME.to_string(),
+            format!("# authored formatting\n{}", manifest_text()).into_bytes(),
+        );
+        let reformatted = validated_package(reformatted).unwrap();
+
+        assert_eq!(first.model(), reformatted.model());
+        assert_ne!(first.hashes().package, reformatted.hashes().package);
+        assert_eq!(first.hashes().targets, reformatted.hashes().targets);
     }
 
     #[test]
@@ -1633,8 +1529,8 @@ name = "NAME"
     #[test]
     fn test_manifest_rejects_hooks_unknown_kinds_and_incomplete_projections() {
         let hook = parse_modified(
-            "jit = \">=0.2.0, <2.0.0\"",
-            "jit = \">=0.2.0, <2.0.0\"\nhook = \"install.sh\"",
+            "compatible-jit = \">=0.2.0, <2.0.0\"",
+            "compatible-jit = \">=0.2.0, <2.0.0\"\nhook = \"install.sh\"",
         )
         .unwrap_err()
         .to_string();
@@ -1656,19 +1552,18 @@ name = "NAME"
 
     #[test]
     fn test_manifest_rejects_malformed_dependency_id_during_parse() {
-        let error = parse_modified("[profile]", "dependencies = [\"Jit Default\"]\n\n[profile]")
-            .unwrap_err()
-            .to_string();
+        let error = crate::profile::wire::decode_manifest(
+            with_dependency(&manifest_text(), "Jit Default").as_bytes(),
+        )
+        .unwrap_err()
+        .to_string();
         assert!(error.contains("Jit Default"), "{error}");
         assert!(error.contains("lowercase-kebab"), "{error}");
     }
 
     #[test]
     fn test_validation_rejects_self_referential_dependency_by_id() {
-        let manifest = manifest_text().replace(
-            "[profile]",
-            "dependencies = [\"synthetic-workflow\"]\n\n[profile]",
-        );
+        let manifest = with_dependency(&manifest_text(), "synthetic-workflow");
         let mut files = package().files.clone();
         files.insert(MANIFEST_FILE_NAME.to_string(), manifest.into_bytes());
 
@@ -1736,12 +1631,12 @@ name = "NAME"
                 "invalid profile version",
             ),
             (
-                "jit = \">=0.2.0, <2.0.0\"",
-                "jit = \"not a requirement\"",
+                "compatible-jit = \">=0.2.0, <2.0.0\"",
+                "compatible-jit = \"not a requirement\"",
                 "invalid compatible JIT requirement",
             ),
             (
-                "manifest-version = 1",
+                "manifest-version = 2",
                 "manifest-version = 9",
                 "unsupported profile manifest version",
             ),

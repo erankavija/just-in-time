@@ -73,11 +73,11 @@ Plain `jit init` remains the methodology-neutral alternative. It creates the
 structural minimum — the schema version and the project name, beside the empty
 registries, the event log and the index — and declares no workflow vocabulary.
 
-## Author a version-2 manifest
+## Author a manifest
 
 Create a package as a directory with a root `manifest.toml`. The minimal
-version-2 package needs no sources or declarations; this copyable manifest is
-accepted by the package decoder as-is:
+package needs no sources or declarations; this copyable manifest is accepted by
+the package decoder as-is:
 
 ```toml
 [profile]
@@ -90,18 +90,15 @@ compatible-jit = "*"
 `id` is a lowercase-kebab package identifier, `version` is a semantic version,
 and `compatible-jit` is a semantic-version requirement for the JIT binary. The
 version discriminator, identity, package version, and compatibility requirement
-are all required. New packages use version 2: it has the `compatible-jit`
-spelling above and hashes the authored manifest bytes as part of package
-identity. The decoder continues to accept version-1 manifests already present
-in package content, but their `jit` compatibility spelling, bare dependency
-IDs, and lack of variables, incompatibilities, and template opt-in are not this
-authoring contract.
+are all required. `manifest-version` is `2`, the only manifest version; the
+decoder rejects any other value. Package identity hashes the authored manifest
+bytes.
 
 The rest of the top-level declarations are optional arrays of tables. Omit a
 family to declare none of it; repeat `[[...]]` to declare several entries in
-the order written. Version-2 manifests reject unknown fields. Every package
-path is a non-empty, safe relative path: it cannot be absolute, traverse with
-`..`, contain an empty path segment, or use a platform path prefix.
+the order written. Manifests reject unknown fields. Every package path is a
+non-empty, safe relative path: it cannot be absolute, traverse with `..`,
+contain an empty path segment, or use a platform path prefix.
 
 ```toml
 # Each block below is optional and repeatable.

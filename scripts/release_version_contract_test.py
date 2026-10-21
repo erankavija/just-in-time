@@ -169,8 +169,9 @@ class ReleaseVersionContractTests(unittest.TestCase):
 
         self._write(
             PROFILE_PACKAGE_MANIFEST,
-            '[profile]\nmanifest-version = 1\nid = "jit-dogfood"\n'
-            f'version = "{self.version}"\njit = "{bounded_range(self.version)}"\n',
+            '[profile]\nmanifest-version = 2\nid = "jit-dogfood"\n'
+            f'version = "{self.version}"\n'
+            f'compatible-jit = "{bounded_range(self.version)}"\n',
         )
 
         # Product and repository-format versions are separate contracts. The

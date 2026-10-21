@@ -82,7 +82,7 @@ fn write_live_source_package(repo: &Path) {
     fs::create_dir_all(root.join("assets/install")).expect("create package directories");
     fs::write(
         root.join("manifest.toml"),
-        "[profile]\nmanifest-version = 1\nid = \"captured\"\nversion = \"1.0.0\"\njit = \">=0.2.0, <2.0.0\"\n\n[[live-source]]\nroot = \"docs\"\nexclude = []\n\n[[asset]]\nsource = \"assets/live/docs/guide.md\"\ntarget = \"docs/guide.md\"\n\n[[asset]]\nsource = \"assets/install/settings.toml\"\ntarget = \"settings.toml\"\n",
+        "[profile]\nmanifest-version = 2\nid = \"captured\"\nversion = \"1.0.0\"\ncompatible-jit = \">=0.2.0, <2.0.0\"\n\n[[live-source]]\nroot = \"docs\"\nexclude = []\n\n[[asset]]\nsource = \"assets/live/docs/guide.md\"\ntarget = \"docs/guide.md\"\n\n[[asset]]\nsource = \"assets/install/settings.toml\"\ntarget = \"settings.toml\"\n",
     )
     .expect("write package manifest");
     fs::write(

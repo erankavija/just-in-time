@@ -1197,19 +1197,13 @@ pub fn write_package_declaring(
         .expect("the source package manifest parses");
     let declared = dependencies
         .iter()
-        .map(|dependency| format!("\"{dependency}\""))
-        .collect::<Vec<_>>()
-        .join(", ");
+        .map(|dependency| format!("\n[[dependency]]\nid = \"{dependency}\"\nversion = \"*\"\n"))
+        .collect::<String>();
     let rewritten = source.assets.iter().fold(
-        authored
-            .replace(
-                &format!("id = \"{}\"", source.id),
-                &format!("id = \"{id}\""),
-            )
-            .replace(
-                "[profile]",
-                &format!("dependencies = [{declared}]\n\n[profile]"),
-            ),
+        authored.replace(
+            &format!("id = \"{}\"", source.id),
+            &format!("id = \"{id}\""),
+        ) + &declared,
         |manifest, asset| {
             let renamed = Path::new(&asset.target)
                 .parent()
@@ -1276,8 +1270,8 @@ pub fn write_package_tree_at_model_limits(root: &Path) -> PathBuf {
             .collect::<String>()
     };
     let manifest = std::iter::once(
-        "[profile]\nmanifest-version = 1\nid = \"bounded-package\"\nversion = \"1.0.0\"\n\
-         jit = \">=0.2.0, <2.0.0\"\n"
+        "[profile]\nmanifest-version = 2\nid = \"bounded-package\"\nversion = \"1.0.0\"\n\
+         compatible-jit = \">=0.2.0, <2.0.0\"\n"
             .to_string(),
     )
     .chain((0..assets).map(|index| {

@@ -7,10 +7,10 @@
 # is sequenced.
 
 [profile]
-manifest-version = 1
+manifest-version = 2
 id = "jit-default"
 version = "1.0.0"
-jit = ">=1.0.0, <2.0.0"
+compatible-jit = ">=1.0.0, <2.0.0"
 
 # =============================================================================
 # TYPE HIERARCHY
