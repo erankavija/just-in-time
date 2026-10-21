@@ -16,6 +16,14 @@ The investigations cite the epic's criteria as numbered **before** commit 2abebd
 
 A REQ number qualified by another issue's short id (for example `842b0ac6 REQ-05`) is that issue's own criterion and is not remapped.
 
+Corrections made during planning:
+
+- There are 9 applied-record readers, not 7, and one reserved-target matcher with two call sites.
+- There are 14 production short-id truncation sites; `claim.rs:1057` is test code.
+- `dependency.rs:551-572` is a tenth prefix-matching site.
+- The two `claim_coordinator` prefix sites tolerate legacy short-id lease records; they are not user-prefix resolution.
+- There are three production `HierarchyConfig` construction sites, not four.
+
 ## Part: Issue identity, events, leases and record paths
 
 ### Scope and baseline
