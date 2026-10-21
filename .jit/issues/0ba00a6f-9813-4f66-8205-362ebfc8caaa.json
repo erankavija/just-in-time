@@ -74,14 +74,15 @@
       "path": "dev/active/df129d9e-rust-code-quality/breakdown.json"
     }
   ],
+  "done_at": "2026-10-21T01:17:03.657279502Z",
   "first_ready_at": "2026-10-20T20:38:39.166228363Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T01:11:26.073098991Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T01:16:51.362704808Z",
       "updated_by": "auto:executor"
     }
   },
@@ -96,7 +97,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-10-21T01:15:01.117776417Z"
+  "updated_at": "2026-10-21T01:17:03.657279502Z"
 }
