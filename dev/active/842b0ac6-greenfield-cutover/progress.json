@@ -203,7 +203,7 @@
           "title": "Keep one enforcement drift function",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "awaiting-merge"
+          "status": "done"
         },
         {
           "id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
@@ -308,7 +308,7 @@
           "title": "State each configuration default once",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "awaiting-merge"
         },
         {
           "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
