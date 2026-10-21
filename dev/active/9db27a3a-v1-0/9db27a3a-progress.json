@@ -509,7 +509,8 @@
     "2026-10-21 14:26: the steward reinstalled the dogfood binary at main HEAD (after 24268b05 and 719a5501 changed the CLI surface) to unstick mcp-ci. Interim rule: reinstall after each CLI-surface merge.",
     "2026-10-21 ~15:30-18:30: fourth shared usage-limit stall; background leads were resumed at 18:31. Tally at resume: 8376299c 15/17 done; 842b0ac6 18 done; 3d9a0ce3 10 done; df129d9e 9 done; f4d9502a in planning.",
     "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome.",
-    "2026-10-21 ~19:00: f4d9502a planned (53 issues, 92 edges). Re-homing 5f82e09a left f4d9502a unreachable from the tag task, so bb03df0a -> f4d9502a was added. Divergence then flagged 72d89161 and 8673dc5e outside 3d9a0ce3's containment; the 3d9a0ce3 lead is asked to restore it. just-in-time-59 is assigned to plan 9876a23a."
+    "2026-10-21 ~19:00: f4d9502a planned (53 issues, 92 edges). Re-homing 5f82e09a left f4d9502a unreachable from the tag task, so bb03df0a -> f4d9502a was added. Divergence then flagged 72d89161 and 8673dc5e outside 3d9a0ce3's containment; the 3d9a0ce3 lead is asked to restore it. just-in-time-59 is assigned to plan 9876a23a.",
+    "2026-10-21 ~19:30: df129d9e's continuation lead stopped with waves 1-2 done except d8176fd3 (global-json-flag; 6 more tasks done; handoff-3.md). d8176fd3 waits on 3d9a0ce3's 8673dc5e and 3754095f (behind f37d228e). 3d9a0ce3's lead was asked to prioritise them. A fresh df129d9e lead goes out once both are done."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
