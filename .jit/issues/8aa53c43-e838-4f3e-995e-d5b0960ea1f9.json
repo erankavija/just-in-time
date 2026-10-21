@@ -46,6 +46,7 @@
       "path": "dev/active/2195c98f-semantic-types/breakdown.json"
     }
   ],
+  "done_at": "2026-10-21T05:31:43.966543412Z",
   "first_ready_at": "2026-10-21T00:40:04.620217727Z",
   "gates_required": [
     "plan-review"
@@ -69,7 +70,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-21T01:47:14.426774228Z"
+  "updated_at": "2026-10-21T05:31:43.966543412Z"
 }
