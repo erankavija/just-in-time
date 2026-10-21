@@ -397,6 +397,12 @@
       "date": "2026-10-21",
       "decision": "3d9a0ce3 REQ-02",
       "summary": "Chosen (A): a new task makes scripts/cargo-ci.sh exit 75 (infrastructure error, never reused) when every failing step is environment-sensitive (timeouts with no FAIL, or a suite-duration overrun). Mixed failures still exit 1. The new task depends on fd9bfab8. Rejected (B): reopening merged fd9bfab8. The bar is not loosened, because an error run never passes."
+    },
+    {
+      "container_short_id": "df129d9e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "72d89161 (3d9a0ce3) removed the 'already passed at HEAD' output, so df129d9e's gate-run-status renderer task's REQ-01/REQ-03 were narrowed to the surviving run-status lines, and a stale real_repo_root reference was corrected (applied by df129d9e's continuation lead)."
     }
   ],
   "notes": [
