@@ -3,7 +3,8 @@
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
   "dependencies": [
-    "182350ce-35f1-46aa-8106-1a5a7dca3542"
+    "182350ce-35f1-46aa-8106-1a5a7dca3542",
+    "aa423d02-85bd-4e57-ac43-660a4ebdc55b"
   ],
   "description": "Give `Priority` its rank order through `Ord`, and delete the copied rank matches.\n\n## Background\n\n`Priority` (`crates/jit/src/domain/types.rs:177`) has no `Ord`, so `commands/query.rs:141-146` and `commands/issue.rs:788-793` each copy a priority-to-rank match to sort critical first. Both sorts rely on stability to keep tie order (`commands/issue.rs:785`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Priority` implements `Ord` with low below normal below high below critical.\n- [hard] REQ-02: Both rank matches are gone, and both sorts order critical first with tie order unchanged.\n",
   "documents": [],
@@ -26,5 +27,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Priority orders by rank through Ord",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-21T05:32:34.117519436Z"
 }

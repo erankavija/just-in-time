@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b",
     "93aaba24-09a4-40b4-993a-de08baf9b4e9",
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
   ],
@@ -31,5 +32,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Dependency commands move to library handlers",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T05:32:34.861421381Z"
 }

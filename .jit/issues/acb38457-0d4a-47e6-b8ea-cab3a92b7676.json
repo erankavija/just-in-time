@@ -2,7 +2,10 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T05:31:58.815538561Z",
-  "dependencies": [],
+  "dependencies": [
+    "31b4f30e-eb13-47dd-a9c5-4a922b998264",
+    "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b"
+  ],
   "description": "Let the graph traits yield dependency ids as borrowed string views, so a node can store typed ids without changing the graph algorithms.\n\n## Background\n\n`GraphNode::dependencies(&self) -> &[String]` (`crates/jit/src/graph/mod.rs:45-51`) and `HierarchyNode::dependencies` (`graph/hierarchy.rs:158-168`) force each implementor to store a `Vec<String>`. Implementors are `Issue` (`domain/types.rs:814`), `EdgeView` (`graph/hierarchy.rs:493`), `ProspectiveNode` (`commands/template_expand.rs:457`), whose placeholder ids are `__apply_placeholder__:{role}` (`:435`), and the test nodes `TestNode` (`graph/mod.rs:585`), `PropNode` (`graph/hierarchy.rs:1106`) and `FixtureNode` (`crates/jit/tests/fast_issue/hierarchy_vectors_test.rs:41`), which read non-UUID ids such as `r-t1` from the hierarchy test vectors. Placeholder and vector ids are not issue ids, so the traits stay independent of the issue-id type. The MSRV (1.97) supports return-position `impl Trait` in traits.\n\n## Success Criteria\n\n- [hard] REQ-01: `GraphNode::dependencies` and `HierarchyNode::dependencies` return an iterator of `&str` instead of a slice of `String`.\n- [hard] REQ-02: Each implementor compiles against the new signature without changing the type of the ids it stores, and placeholder and test-vector nodes keep their non-UUID ids.\n- [hard] REQ-03: The existing graph property tests pass with unchanged assertions.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T05:31:58.815538561Z",
@@ -23,7 +26,7 @@
     "enforces:@/invariant/semantic-types"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Graph node traits expose dependency ids as string views",
-  "updated_at": "2026-10-21T05:31:58.815538561Z"
+  "updated_at": "2026-10-21T05:32:17.015213927Z"
 }

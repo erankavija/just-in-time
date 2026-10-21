@@ -4,6 +4,7 @@
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
     "2f15d48d-64ca-4fcb-b453-89492e78c840",
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b",
     "a3a99cf8-5c62-4c91-a890-7404d9cfe9c9",
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa",
     "fd2073b7-d6ff-4617-98ae-826a2573d390"
@@ -33,5 +34,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Issue read commands move to library handlers",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T05:32:35.115250552Z"
 }
