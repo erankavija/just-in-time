@@ -11,10 +11,10 @@
     {
       "assets": [
         {
-          "asset_type": "missing",
-          "content_hash": null,
+          "asset_type": "local",
+          "content_hash": "89e62e77d3c36f5fdbd7f0c22ce9ac6dd5a79cb281d8511ff0aaca13710366a2",
           "is_shared": false,
-          "mime_type": null,
+          "mime_type": "text/markdown",
           "original_path": "plan.md",
           "resolved_path": "dev/active/df129d9e-rust-code-quality/plan.md"
         },
@@ -37,11 +37,11 @@
       "assets": [
         {
           "asset_type": "local",
-          "content_hash": "ac6d4471a6f8434a657a6fc836eff687ec03b089360f20fcdfff94789b2e7365",
+          "content_hash": "e5099fd96f86de2d1e09f3c12536382dc25b900f03d8c164c01fa912b6eadba9",
           "is_shared": false,
           "mime_type": null,
-          "original_path": "breakdown.json",
-          "resolved_path": "dev/active/df129d9e-rust-code-quality/breakdown.json"
+          "original_path": "prodlines.py",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/prodlines.py"
         },
         {
           "asset_type": "local",
@@ -53,11 +53,11 @@
         },
         {
           "asset_type": "local",
-          "content_hash": "e5099fd96f86de2d1e09f3c12536382dc25b900f03d8c164c01fa912b6eadba9",
+          "content_hash": "2860fb2e3633d40d59a16240d08df7b06711864002630562eeb473df4b10caa2",
           "is_shared": false,
           "mime_type": null,
-          "original_path": "prodlines.py",
-          "resolved_path": "dev/active/df129d9e-rust-code-quality/prodlines.py"
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/breakdown.json"
         }
       ],
       "commit": null,
@@ -98,5 +98,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-10-21T00:35:17.438723160Z"
+  "updated_at": "2026-10-21T00:51:58.797016935Z"
 }
