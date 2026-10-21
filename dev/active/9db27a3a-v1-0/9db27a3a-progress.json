@@ -494,7 +494,7 @@
       "status": "resolved",
       "date": "2026-10-21",
       "decision": "@/inv/canonical-cutover",
-      "summary": "Rework limit reached on REQ-03: gates_status entries lacking the new run_id show as unrun (92 legacy manual statuses). Chosen (A): an idempotent one-time conversion of this repo's records through jit's publication path. Each entry is pointed at its run, or gets a run published from the entry's own fields; counts are reported; no engine compatibility code. Rejected (B), narrowing REQ-03: leaves the views disagreeing. Rejected (C), re-attesting: fabricates attestations."
+      "summary": "Rework limit reached on REQ-03: gates_status entries lacking the new run_id show as unrun (92 legacy manual statuses). Chosen (A): an idempotent one-time conversion of this repo's records through jit's publication path. Each entry is pointed at its run, or gets a run published from the entry's own fields; counts are reported; no engine compatibility code. Rejected (B), narrowing REQ-03: leaves the views disagreeing. Rejected (C), re-attesting: fabricates attestations. REFINED: the scan found 2393 passed + 6 failed entries with runs (backfill run_id), 210 passed entries with no run (publish a run carrying only status, updated_by verbatim including auto:executor, updated_at, origin attested; no exit code or output), and 19 pending (untouched). Rejected: reverting rework 2. The dogfood reinstall is held until the conversion merges."
     }
   ],
   "notes": [
@@ -525,7 +525,8 @@
     "2026-10-21 ~15:30-18:30: fourth shared usage-limit stall; background leads were resumed at 18:31. Tally at resume: 8376299c 15/17 done; 842b0ac6 18 done; 3d9a0ce3 10 done; df129d9e 9 done; f4d9502a in planning.",
     "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome.",
     "2026-10-21 ~19:00: f4d9502a planned (53 issues, 92 edges). Re-homing 5f82e09a left f4d9502a unreachable from the tag task, so bb03df0a -> f4d9502a was added. Divergence then flagged 72d89161 and 8673dc5e outside 3d9a0ce3's containment; the 3d9a0ce3 lead is asked to restore it. just-in-time-59 is assigned to plan 9876a23a.",
-    "2026-10-21 ~19:30: df129d9e's continuation lead stopped with waves 1-2 done except d8176fd3 (global-json-flag; 6 more tasks done; handoff-3.md). d8176fd3 waits on 3d9a0ce3's 8673dc5e and 3754095f (behind f37d228e). 3d9a0ce3's lead was asked to prioritise them. A fresh df129d9e lead goes out once both are done."
+    "2026-10-21 ~19:30: df129d9e's continuation lead stopped with waves 1-2 done except d8176fd3 (global-json-flag; 6 more tasks done; handoff-3.md). d8176fd3 waits on 3d9a0ce3's 8673dc5e and 3754095f (behind f37d228e). 3d9a0ce3's lead was asked to prioritise them. A fresh df129d9e lead goes out once both are done.",
+    "2026-10-21 ~20:00: dogfood reinstall HELD until 8673dc5e's gates_status run_id conversion merges, because the new engine would otherwise show every legacy status as unrun."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
@@ -572,7 +573,7 @@
     },
     {
       "date": "2026-10-21",
-      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code)."
+      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones."
     }
   ]
 }
