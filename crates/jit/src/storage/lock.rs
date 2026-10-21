@@ -110,39 +110,26 @@ pub struct LockMetadata {
 #[derive(Debug)]
 pub struct LockGuard {
     file: Option<File>,
-    #[allow(dead_code)]
+    #[cfg(test)]
     path: PathBuf,
     /// Path to metadata file (if tracking enabled)
     meta_path: Option<PathBuf>,
 }
 
 impl LockGuard {
-    fn new(file: File, path: PathBuf) -> Self {
+    fn new(file: Option<File>, path: &Path, meta_path: Option<PathBuf>) -> Self {
+        #[cfg(not(test))]
+        let _ = path;
         Self {
-            file: Some(file),
-            path,
-            meta_path: None,
-        }
-    }
-
-    fn new_without_os_lock(path: PathBuf) -> Self {
-        Self {
-            file: None,
-            path,
-            meta_path: None,
-        }
-    }
-
-    fn new_with_metadata(file: File, path: PathBuf, meta_path: PathBuf) -> Self {
-        Self {
-            file: Some(file),
-            path,
-            meta_path: Some(meta_path),
+            file,
+            #[cfg(test)]
+            path: path.to_path_buf(),
+            meta_path,
         }
     }
 
     /// Get the path of the locked file
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn path(&self) -> &Path {
         &self.path
     }
@@ -212,32 +199,8 @@ impl FileLocker {
     /// - The lock cannot be acquired within the timeout
     pub fn lock_exclusive(&self, path: &Path) -> Result<LockGuard> {
         let file = self.open_or_create(path)?;
-
-        // Try to acquire lock with polling and timeout
-        let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
-
-        loop {
-            match Fs4FileExt::try_lock_exclusive(&file) {
-                Ok(true) => {
-                    return Ok(LockGuard::new(file, path.to_path_buf()));
-                }
-                Ok(false) => {
-                    if start.elapsed() >= self.timeout {
-                        return Err(LockTimeout {
-                            mode: LockMode::Exclusive,
-                            path: path.to_path_buf(),
-                            waited: self.timeout,
-                        }
-                        .into());
-                    }
-                    std::thread::sleep(poll_interval);
-                }
-                Err(e) => {
-                    anyhow::bail!("IO error while trying to lock {}: {}", path.display(), e);
-                }
-            }
-        }
+        self.poll_lock(&file, path, LockMode::Exclusive)?;
+        Ok(LockGuard::new(Some(file), path, None))
     }
 
     /// Acquire a shared (read) lock on the file
@@ -252,33 +215,10 @@ impl FileLocker {
     /// request succeeds without an OS lock and records a storage warning.
     pub fn lock_shared(&self, path: &Path) -> Result<LockGuard> {
         let Some(file) = self.open_for_shared(path) else {
-            return Ok(LockGuard::new_without_os_lock(path.to_path_buf()));
+            return Ok(LockGuard::new(None, path, None));
         };
-
-        let start = std::time::Instant::now();
-        let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
-
-        loop {
-            match Fs4FileExt::try_lock_shared(&file) {
-                Ok(true) => {
-                    return Ok(LockGuard::new(file, path.to_path_buf()));
-                }
-                Ok(false) => {
-                    if start.elapsed() >= self.timeout {
-                        return Err(LockTimeout {
-                            mode: LockMode::Shared,
-                            path: path.to_path_buf(),
-                            waited: self.timeout,
-                        }
-                        .into());
-                    }
-                    std::thread::sleep(poll_interval);
-                }
-                Err(e) => {
-                    anyhow::bail!("IO error while trying to lock {}: {}", path.display(), e);
-                }
-            }
-        }
+        self.poll_lock(&file, path, LockMode::Shared)?;
+        Ok(LockGuard::new(Some(file), path, None))
     }
 
     /// Try to acquire an exclusive lock without blocking
@@ -289,15 +229,11 @@ impl FileLocker {
     /// # Errors
     ///
     /// Returns an error only if the file cannot be opened.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn try_lock_exclusive(&self, path: &Path) -> Result<Option<LockGuard>> {
         let file = self.open_or_create(path)?;
 
-        match Fs4FileExt::try_lock_exclusive(&file) {
-            Ok(true) => Ok(Some(LockGuard::new(file, path.to_path_buf()))),
-            Ok(false) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        Ok(try_lock(&file, LockMode::Exclusive)?.then(|| LockGuard::new(Some(file), path, None)))
     }
 
     /// Try to acquire a shared lock without blocking
@@ -310,17 +246,13 @@ impl FileLocker {
     /// Returns an error only if the OS reports an error while acquiring the
     /// lock. If the lock file cannot be created or opened for reading, this
     /// returns an unlocked guard and records a storage warning.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn try_lock_shared(&self, path: &Path) -> Result<Option<LockGuard>> {
         let Some(file) = self.open_for_shared(path) else {
-            return Ok(Some(LockGuard::new_without_os_lock(path.to_path_buf())));
+            return Ok(Some(LockGuard::new(None, path, None)));
         };
 
-        match Fs4FileExt::try_lock_shared(&file) {
-            Ok(true) => Ok(Some(LockGuard::new(file, path.to_path_buf()))),
-            Ok(false) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
+        Ok(try_lock(&file, LockMode::Shared)?.then(|| LockGuard::new(Some(file), path, None)))
     }
 
     /// Acquire an exclusive lock with metadata tracking
@@ -345,49 +277,42 @@ impl FileLocker {
     /// - Metadata file cannot be written
     pub fn lock_exclusive_with_metadata(&self, path: &Path, agent_id: &str) -> Result<LockGuard> {
         let file = self.open_or_create(path)?;
+        self.poll_lock(&file, path, LockMode::Exclusive)?;
 
-        // Try to acquire lock with polling and timeout
+        let meta_path = path.with_extension("lock.meta");
+        let metadata = LockMetadata {
+            pid: std::process::id(),
+            agent_id: agent_id.to_string(),
+            created_at: Utc::now(),
+            last_updated: Utc::now(),
+        };
+
+        std::fs::write(
+            &meta_path,
+            serde_json::to_string_pretty(&metadata).context("Failed to serialize lock metadata")?,
+        )
+        .with_context(|| format!("Failed to write lock metadata: {}", meta_path.display()))?;
+
+        Ok(LockGuard::new(Some(file), path, Some(meta_path)))
+    }
+
+    /// Poll for `mode` on `file` until it is granted or the timeout expires.
+    fn poll_lock(&self, file: &File, path: &Path, mode: LockMode) -> Result<()> {
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(crate::runtime_defaults::LOCK_POLL_INTERVAL_MS);
 
         loop {
-            match Fs4FileExt::try_lock_exclusive(&file) {
-                Ok(true) => {
-                    // Lock acquired - write metadata
-                    let meta_path = path.with_extension("lock.meta");
-                    let metadata = LockMetadata {
-                        pid: std::process::id(),
-                        agent_id: agent_id.to_string(),
-                        created_at: Utc::now(),
-                        last_updated: Utc::now(),
-                    };
-
-                    std::fs::write(
-                        &meta_path,
-                        serde_json::to_string_pretty(&metadata)
-                            .context("Failed to serialize lock metadata")?,
-                    )
-                    .with_context(|| {
-                        format!("Failed to write lock metadata: {}", meta_path.display())
-                    })?;
-
-                    return Ok(LockGuard::new_with_metadata(
-                        file,
-                        path.to_path_buf(),
-                        meta_path,
-                    ));
-                }
-                Ok(false) => {
-                    if start.elapsed() >= self.timeout {
-                        return Err(LockTimeout {
-                            mode: LockMode::Exclusive,
-                            path: path.to_path_buf(),
-                            waited: self.timeout,
-                        }
-                        .into());
+            match try_lock(file, mode) {
+                Ok(true) => return Ok(()),
+                Ok(false) if start.elapsed() >= self.timeout => {
+                    return Err(LockTimeout {
+                        mode,
+                        path: path.to_path_buf(),
+                        waited: self.timeout,
                     }
-                    std::thread::sleep(poll_interval);
+                    .into());
                 }
+                Ok(false) => std::thread::sleep(poll_interval),
                 Err(e) => {
                     anyhow::bail!("IO error while trying to lock {}: {}", path.display(), e);
                 }
@@ -434,6 +359,14 @@ impl FileLocker {
                 path: path.to_path_buf(),
             });
         None
+    }
+}
+
+/// One non-blocking attempt at `mode`; `Ok(false)` means another holder blocks it.
+fn try_lock(file: &File, mode: LockMode) -> std::io::Result<bool> {
+    match mode {
+        LockMode::Exclusive => Fs4FileExt::try_lock_exclusive(file),
+        LockMode::Shared => Fs4FileExt::try_lock_shared(file),
     }
 }
 
