@@ -11,6 +11,7 @@ use crate::domain::{
     DocumentReference, GateContext, GateRunResult, GateRunStatus, InputsDigest,
     InputsDigestBuilder, RepositoryInputs, GATE_RUN_SCHEMA_VERSION,
 };
+use crate::repository_state::RootRelativePath;
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::path::Path;
@@ -367,11 +368,15 @@ fn kill_process_group(child: &mut std::process::Child) {
 /// therefore excluded by saying so in the declaration
 /// ([`RepositoryInputs::covers`]), where a reader can see it.
 ///
-/// The one thing skipped structurally is a `.git` entry: the repository's own
-/// object store is where content is versioned, never content a checker reads,
-/// and it changes with every commit. A checker's own build output is likewise
-/// not an input — it is a function of the inputs, produced after this digest is
-/// taken — so a declaration names neither.
+/// Two things are skipped structurally. A `.git` entry is the repository's own
+/// object store: where content is versioned, never content a checker reads, and
+/// it changes with every commit. `tracker_written` names the worktree-relative
+/// paths jit writes during a mutation
+/// ([`RepositoryLayout::tracker_written_paths`](crate::repository_state::RepositoryLayout::tracker_written_paths)),
+/// so recording a gate result never moves the digest it was recorded under,
+/// while configuration beside those paths stays an input. A checker's own build
+/// output is likewise not an input — it is a function of the inputs, produced
+/// after this digest is taken — so a declaration names neither.
 ///
 /// A symlink contributes its link target text rather than the bytes it points
 /// at, so the digest describes the repository's own content, a link out of the
@@ -387,9 +392,14 @@ fn kill_process_group(child: &mut std::process::Child) {
 pub(crate) fn digest_declared_inputs(
     worktree_root: &Path,
     inputs: &RepositoryInputs,
+    tracker_written: &[RootRelativePath],
     declaration: &[u8],
 ) -> Result<InputsDigest> {
-    let mut paths = declared_input_paths(worktree_root, inputs)?;
+    let walk = InputWalk {
+        inputs,
+        tracker_written,
+    };
+    let mut paths = walk.declared_input_paths(worktree_root)?;
     paths.sort_unstable();
     paths.dedup();
 
@@ -417,91 +427,111 @@ pub(crate) fn digest_declared_inputs(
         .map(InputsDigestBuilder::finish)
 }
 
-/// Every repository-relative path the declaration covers, walking only the
-/// declared roots.
-///
-/// Walking the roots rather than the whole worktree is what keeps a narrowly
-/// scoped gate cheap: a declaration naming one directory never stats a file
-/// outside it.
-fn declared_input_paths(worktree_root: &Path, inputs: &RepositoryInputs) -> Result<Vec<String>> {
-    inputs
-        .roots()
-        .iter()
-        .try_fold(Vec::new(), |mut paths, root| {
-            collect_declared_root(worktree_root, root.as_str(), inputs, &mut paths)?;
-            Ok(paths)
-        })
+/// One declaration's walk, with the paths it skips structurally.
+struct InputWalk<'a> {
+    inputs: &'a RepositoryInputs,
+    tracker_written: &'a [RootRelativePath],
 }
 
-/// Collect the covered paths at or beneath one declared root.
-fn collect_declared_root(
-    worktree_root: &Path,
-    root: &str,
-    inputs: &RepositoryInputs,
-    paths: &mut Vec<String>,
-) -> Result<()> {
-    if is_git_plumbing(root) {
-        return Ok(());
+impl InputWalk<'_> {
+    /// Every repository-relative path the declaration covers, walking only the
+    /// declared roots.
+    ///
+    /// Walking the roots rather than the whole worktree is what keeps a narrowly
+    /// scoped gate cheap: a declaration naming one directory never stats a file
+    /// outside it.
+    fn declared_input_paths(&self, worktree_root: &Path) -> Result<Vec<String>> {
+        self.inputs
+            .roots()
+            .iter()
+            .try_fold(Vec::new(), |mut paths, root| {
+                self.collect_declared_root(worktree_root, root.worktree_relative(), &mut paths)?;
+                Ok(paths)
+            })
     }
-    let absolute = worktree_root.join(root);
-    let Ok(metadata) = std::fs::symlink_metadata(&absolute) else {
-        // A declared root that is not present contributes nothing.
-        return Ok(());
-    };
-    if metadata.is_dir() {
-        return collect_walked_paths(&absolute, root, inputs, paths);
-    }
-    if inputs.covers(root) {
-        paths.push(root.to_string());
-    }
-    Ok(())
-}
 
-/// Recursively collect every covered path beneath `directory`, which the
-/// repository-relative `prefix` names.
-///
-/// Descent stops at a directory the declaration excludes whole
-/// ([`RepositoryInputs::excludes_directory`]), so taking a large generated tree
-/// out of a gate's inputs costs one declared pattern and no traversal. A
-/// directory symlink is not followed: it is recorded as the link it is.
-fn collect_walked_paths(
-    directory: &Path,
-    prefix: &str,
-    inputs: &RepositoryInputs,
-    paths: &mut Vec<String>,
-) -> Result<()> {
-    let entries = std::fs::read_dir(directory)
-        .with_context(|| format!("Failed to walk declared inputs at {}", directory.display()))?;
-    for entry in entries {
-        let entry = entry.with_context(|| {
+    /// Collect the covered paths at or beneath one declared root, which `root`
+    /// names worktree-relative (empty for the worktree itself).
+    fn collect_declared_root(
+        &self,
+        worktree_root: &Path,
+        root: &str,
+        paths: &mut Vec<String>,
+    ) -> Result<()> {
+        if self.is_skipped(root) {
+            return Ok(());
+        }
+        let absolute = worktree_root.join(root);
+        let Ok(metadata) = std::fs::symlink_metadata(&absolute) else {
+            // A declared root that is not present contributes nothing.
+            return Ok(());
+        };
+        if metadata.is_dir() {
+            return self.collect_walked_paths(&absolute, root, paths);
+        }
+        if self.inputs.covers(root) {
+            paths.push(root.to_string());
+        }
+        Ok(())
+    }
+
+    /// Recursively collect every covered path beneath `directory`, which the
+    /// repository-relative `prefix` names.
+    ///
+    /// Descent stops at a directory the declaration excludes whole
+    /// ([`RepositoryInputs::excludes_directory`]), so taking a large generated
+    /// tree out of a gate's inputs costs one declared pattern and no traversal.
+    /// A directory symlink is not followed: it is recorded as the link it is.
+    fn collect_walked_paths(
+        &self,
+        directory: &Path,
+        prefix: &str,
+        paths: &mut Vec<String>,
+    ) -> Result<()> {
+        let entries = std::fs::read_dir(directory).with_context(|| {
             format!("Failed to walk declared inputs at {}", directory.display())
         })?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if is_git_plumbing(&name) {
-            continue;
-        }
-        let path = if prefix.is_empty() {
-            name
-        } else {
-            format!("{prefix}/{name}")
-        };
-        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-            if !inputs.excludes_directory(&path) {
-                collect_walked_paths(&entry.path(), &path, inputs, paths)?;
+        for entry in entries {
+            let entry = entry.with_context(|| {
+                format!("Failed to walk declared inputs at {}", directory.display())
+            })?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let path = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if self.is_skipped(&path) {
+                continue;
             }
-        } else if inputs.covers(&path) {
-            paths.push(path);
+            if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                if !self.inputs.excludes_directory(&path) {
+                    self.collect_walked_paths(&entry.path(), &path, paths)?;
+                }
+            } else if self.inputs.covers(&path) {
+                paths.push(path);
+            }
         }
+        Ok(())
     }
-    Ok(())
+
+    /// Whether the walk skips `repository_path` whatever the declaration says:
+    /// it is git plumbing or a path jit writes during a mutation.
+    fn is_skipped(&self, repository_path: &str) -> bool {
+        is_git_plumbing(repository_path)
+            || self
+                .tracker_written
+                .iter()
+                .any(|written| written.contains(repository_path))
+    }
 }
 
 /// Whether `repository_path` names the repository's own object store, in either
 /// spelling: a directory in an ordinary checkout, a file in a linked worktree.
 ///
 /// This is where content is versioned, never content a checker reads, and it
-/// moves with every commit — so it is the one thing the walk skips without a
-/// declared exclusion, at a declared root as much as inside one.
+/// moves with every commit — so the walk skips it without a declared
+/// exclusion, at a declared root as much as inside one.
 fn is_git_plumbing(repository_path: &str) -> bool {
     repository_path.split('/').any(|segment| segment == ".git")
 }
@@ -665,6 +695,11 @@ pub(crate) fn get_git_tree_dirty(working_dir: &Path) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::{
+        gate_run_result_relative_path, RepositoryLayout, RepositoryRootEvidence, VirtualPath,
+        BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
+        RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
+    };
     use std::collections::HashMap;
 
     #[test]
@@ -841,7 +876,7 @@ mod tests {
 
     fn digest_of(root: &Path, roots: &[&str], exclude: &[&str]) -> InputsDigest {
         let inputs = RepositoryInputs::parse(roots, exclude).expect("a declarable input set");
-        digest_declared_inputs(root, &inputs, b"checker").expect("the declared inputs digest")
+        digest_declared_inputs(root, &inputs, &[], b"checker").expect("the declared inputs digest")
     }
 
     /// REQ-02: the digest is over the working tree, so a source file the
@@ -1014,6 +1049,172 @@ mod tests {
         std::fs::remove_file(temp.path().join("docs/guide.md")).expect("remove");
         let absent = digest_of(temp.path(), &["docs/guide.md"], &[]);
         assert_ne!(rewritten, absent, "an absent root contributes nothing");
+    }
+
+    /// The worktree root `.` digests every file beneath the worktree that no
+    /// declared pattern excludes, top-level files included.
+    #[test]
+    fn test_digest_declared_inputs_worktree_root_covers_every_unexcluded_file() {
+        let temp = worktree_with_declared_inputs();
+        let declared: &[&str] = &["docs/**"];
+        let baseline = digest_of(temp.path(), &["."], declared);
+
+        std::fs::write(temp.path().join("docs/guide.md"), "rewritten\n").expect("write");
+        assert_eq!(
+            baseline,
+            digest_of(temp.path(), &["."], declared),
+            "a declared exclusion still applies under the worktree root"
+        );
+
+        std::fs::write(temp.path().join("NEW.md"), "new\n").expect("write");
+        let added = digest_of(temp.path(), &["."], declared);
+        assert_ne!(
+            baseline, added,
+            "a new top-level file must change the digest"
+        );
+
+        std::fs::write(temp.path().join("src/lib.rs"), "fn main() { }\n").expect("write");
+        assert_ne!(
+            added,
+            digest_of(temp.path(), &["."], declared),
+            "a nested edit must change the digest"
+        );
+    }
+
+    /// A worktree whose data root sits at `data_offset`, holding configuration,
+    /// with its layout.
+    fn worktree_with_data_root(data_offset: &str) -> (tempfile::TempDir, RepositoryLayout) {
+        let temp = tempfile::TempDir::new().expect("a temp worktree");
+        let data = temp.path().join(data_offset);
+        std::fs::create_dir_all(data.join("schemas")).expect("create data root");
+        std::fs::create_dir_all(temp.path().join("src")).expect("create src");
+        std::fs::write(temp.path().join("src/lib.rs"), "fn main() {}\n").expect("write");
+        for configuration in [VirtualPath::CONFIG, VirtualPath::GATES, VirtualPath::RULES] {
+            std::fs::write(data.join(configuration.relative().as_path()), "# seed\n")
+                .expect("write configuration");
+        }
+        let evidence =
+            |path: &Path| RepositoryRootEvidence::new(path, format!("id:{}", path.display()), true);
+        let layout =
+            RepositoryLayout::new(evidence(temp.path()), evidence(&data)).expect("a nested layout");
+        (temp, layout)
+    }
+
+    fn layout_digest(layout: &RepositoryLayout, roots: &[&str]) -> InputsDigest {
+        let inputs = RepositoryInputs::parse(roots, &[]).expect("a declarable input set");
+        digest_declared_inputs(
+            layout.worktree_root(),
+            &inputs,
+            &layout.tracker_written_paths(),
+            b"checker",
+        )
+        .expect("the declared inputs digest")
+    }
+
+    /// Append to every path jit writes during a mutation, each named through
+    /// the storage layout.
+    fn write_tracker_paths(layout: &RepositoryLayout) {
+        let data = layout.data_root();
+        let records = [
+            VirtualPath::EVENTS,
+            VirtualPath::data(
+                gate_run_result_relative_path("run-1")
+                    .expect("a gate-run record path")
+                    .as_path(),
+            )
+            .expect("a gate-run record path"),
+            VirtualPath::INDEX,
+        ];
+        let written = records
+            .iter()
+            .map(|path| layout.resolve(path).expect("a resolvable record"))
+            .chain(
+                [
+                    REPO_WRITE_LOCK_FILE,
+                    INDEX_LOCK_FILE,
+                    GATES_LOCK_FILE,
+                    EVENTS_LOCK_FILE,
+                    WORKTREE_IDENTITY_FILE,
+                ]
+                .map(|file| data.join(file)),
+            )
+            .chain([
+                layout
+                    .resolve(&VirtualPath::ISSUES)
+                    .expect("the issue directory")
+                    .join("0f0e0d0c-0000-4000-8000-000000000000.json"),
+                data.join(RECORD_SCRATCH_DIR)
+                    .join(crate::storage::RECORD_FILE_NAME),
+                layout.worktree_root().join(BOOTSTRAP_LOCK_FILE),
+            ]);
+        for path in written {
+            std::fs::create_dir_all(path.parent().expect("a parent")).expect("create parent");
+            let previous = std::fs::read(&path).unwrap_or_default();
+            std::fs::write(&path, [previous.as_slice(), b"written\n"].concat())
+                .expect("write tracker path");
+        }
+    }
+
+    /// Tracker writes never move a digest, wherever the data root sits and
+    /// whether a root covers the whole worktree or the data root alone.
+    #[test]
+    fn test_digest_declared_inputs_ignores_every_tracker_written_path() {
+        for data_offset in [".jit", "state/data"] {
+            let (_temp, layout) = worktree_with_data_root(data_offset);
+            let roots: [&[&str]; 2] = [&["."], &[data_offset]];
+            let baselines = roots.map(|roots| layout_digest(&layout, roots));
+
+            write_tracker_paths(&layout);
+            write_tracker_paths(&layout);
+
+            assert_eq!(
+                baselines,
+                roots.map(|roots| layout_digest(&layout, roots)),
+                "tracker writes under {data_offset} must leave every digest unchanged"
+            );
+        }
+    }
+
+    /// The data root's configuration stays an input: a checker reading it must
+    /// see its edits.
+    #[test]
+    fn test_digest_declared_inputs_covers_configuration_under_the_data_root() {
+        let (_temp, layout) = worktree_with_data_root(".jit");
+        for configuration in [VirtualPath::CONFIG, VirtualPath::GATES, VirtualPath::RULES] {
+            let baseline = layout_digest(&layout, &["."]);
+            let path = layout
+                .resolve(&configuration)
+                .expect("a configuration path");
+            std::fs::write(&path, "# edited\n").expect("edit configuration");
+            assert_ne!(
+                baseline,
+                layout_digest(&layout, &["."]),
+                "editing {} must change the digest",
+                path.display()
+            );
+        }
+        let baseline = layout_digest(&layout, &[".jit"]);
+        std::fs::write(layout.data_root().join("schemas/rule.json"), "{}").expect("add schema");
+        assert_ne!(baseline, layout_digest(&layout, &[".jit"]));
+    }
+
+    /// A relocated data root moves the exclusion with it: the conventional
+    /// spelling is then ordinary worktree content.
+    #[test]
+    fn test_digest_declared_inputs_hard_codes_no_data_root_spelling() {
+        let (temp, layout) = worktree_with_data_root("state/data");
+        let baseline = layout_digest(&layout, &["."]);
+
+        std::fs::create_dir_all(temp.path().join(".jit")).expect("create");
+        std::fs::write(
+            temp.path()
+                .join(".jit")
+                .join(VirtualPath::INDEX.relative().as_path()),
+            "{}",
+        )
+        .expect("write");
+
+        assert_ne!(baseline, layout_digest(&layout, &["."]));
     }
 
     /// REQ-01: the tree probe reports a committed tree clean and a modified tree

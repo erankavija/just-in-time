@@ -147,7 +147,8 @@ exclude = ["crates/*/fixtures/**"]
 ```
 
 A root is a repository-relative path: a file, or a directory standing for
-everything beneath it. An exclusion pattern removes paths a root would
+everything beneath it. The root `.` stands for the whole worktree, so a new
+top-level file enters the digest without a root list to maintain. An exclusion pattern removes paths a root would
 otherwise claim — `*` stays inside one path segment, `**` spans segments, and
 the match is against the whole repository-relative path. Both are validated
 when the registry is parsed, so an absolute root or an uncompilable pattern is
@@ -184,11 +185,17 @@ costs one line and no traversal. A pattern that reaches only into a directory
 (`web/build/**`) still removes the paths it matches, but the walk descends to
 find them.
 
-Two things are never in the digest and need no pattern. The `.git` directory is
-where content is versioned rather than content a checker reads. And a checker's
-own build output is not an input at all — it is a function of the inputs,
-produced after the digest is taken — so leave it out of `roots` rather than
-excluding it.
+Three things are never in the digest and need no pattern. The `.git` directory is
+where content is versioned rather than content a checker reads. The paths jit
+itself writes when it records work — issue records, the event log, gate-run
+records, the index, its lock files, its scratch directory, the worktree identity
+file, and the worktree's bootstrap lock — never enter a digest, wherever the
+data root is located, so recording a gate result cannot invalidate a reusable
+verdict. Configuration beside them under the data root, such as `gates.toml`,
+`rules.toml`, and schemas, stays an input whenever a root covers it. And a
+checker's own build output is not an input at all — it is a function of the
+inputs, produced after the digest is taken — so leave it out of `roots` rather
+than excluding it.
 
 The digest is bound to the gate's own declaration as well as to that content,
 so editing the checker — its command, timeout, working directory, environment,

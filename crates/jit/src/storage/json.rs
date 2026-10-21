@@ -10,7 +10,8 @@ use crate::declarations::GateRegistry;
 use crate::domain::{parse_known_events, Event, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
-    BOOTSTRAP_LOCK_FILE, SUPPORTED_INDEX_SCHEMA_VERSION,
+    BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
+    SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
     AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
@@ -659,11 +660,12 @@ impl JsonFileStorage {
     /// record, so typed event readers are excluded while those bytes are
     /// applied.
     pub(crate) fn acquire_events_write_lock(&self) -> Result<crate::storage::lock::LockGuard> {
-        self.locker.lock_exclusive(&self.root.join(".events.lock"))
+        self.locker
+            .lock_exclusive(&self.root.join(EVENTS_LOCK_FILE))
     }
 
     pub(crate) fn events_lock_spec(&self) -> (FileLocker, PathBuf) {
-        (self.locker.clone(), self.root.join(".events.lock"))
+        (self.locker.clone(), self.root.join(EVENTS_LOCK_FILE))
     }
 
     /// Check if the storage directory exists and is initialized.
@@ -1302,7 +1304,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
-        let index_lock_path = self.root.join(".index.lock");
+        let index_lock_path = self.root.join(INDEX_LOCK_FILE);
         let _lock = self.locker.lock_shared(&index_lock_path)?;
 
         // One-time index-maintenance cleanup: remove any orphaned per-issue
@@ -1324,7 +1326,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn read_issues(&self) -> Result<Vec<Issue>> {
-        let index_lock_path = self.root.join(".index.lock");
+        let index_lock_path = self.root.join(INDEX_LOCK_FILE);
         let _lock = self.locker.lock_shared(&index_lock_path)?;
 
         // The enumeration alone: the sidecar sweep `list_issues` carries is
@@ -1334,7 +1336,7 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn load_gate_registry(&self) -> Result<GateRegistry> {
-        let gates_lock_path = self.root.join(".gates.lock");
+        let gates_lock_path = self.root.join(GATES_LOCK_FILE);
         let _lock = self.locker.lock_shared(&gates_lock_path)?;
         crate::storage::gate_store::load_gate_registry(&self.root)
     }
@@ -1345,7 +1347,7 @@ impl IssueStore for JsonFileStorage {
             return Ok(Vec::new());
         }
 
-        let events_lock_path = self.root.join(".events.lock");
+        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
         let _lock = self.locker.lock_shared(&events_lock_path)?;
 
         let contents = fs::read_to_string(&events_path).context("Failed to read events file")?;
@@ -1357,7 +1359,7 @@ impl IssueStore for JsonFileStorage {
         if !events_path.exists() {
             return Ok(Vec::new());
         }
-        let events_lock_path = self.root.join(".events.lock");
+        let events_lock_path = self.root.join(EVENTS_LOCK_FILE);
         let _lock = self.locker.lock_shared(&events_lock_path)?;
         let reader =
             BufReader::new(fs::File::open(&events_path).context("Failed to open events file")?);

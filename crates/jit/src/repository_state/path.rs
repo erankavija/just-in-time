@@ -15,6 +15,21 @@ pub const RECORD_SCRATCH_DIR: &str = "tmp";
 /// one worktree over the init publisher's sibling stage.
 pub const BOOTSTRAP_LOCK_FILE: &str = ".jit-bootstrap.lock";
 
+/// The data root's repository write lock, the outermost lock a mutation holds.
+pub const REPO_WRITE_LOCK_FILE: &str = ".repo-write.lock";
+
+/// The data root's index lock.
+pub const INDEX_LOCK_FILE: &str = ".index.lock";
+
+/// The data root's gate-registry lock.
+pub const GATES_LOCK_FILE: &str = ".gates.lock";
+
+/// The data root's event-log lock.
+pub const EVENTS_LOCK_FILE: &str = ".events.lock";
+
+/// The data root's machine-local worktree identity record.
+pub const WORKTREE_IDENTITY_FILE: &str = "worktree.json";
+
 /// Whether `path` names the worktree bootstrap lock, or something below it.
 ///
 /// No mutation may target it. Publication writes a file by staging it and
@@ -110,6 +125,23 @@ impl RootRelativePath {
     /// Whether this identity denotes the selected root itself.
     pub fn is_root(&self) -> bool {
         matches!(self, Self::Root)
+    }
+
+    /// Whether `path`, relative to the same root, is this path or lies beneath
+    /// it by whole components.
+    pub(crate) fn contains(&self, path: &str) -> bool {
+        match self {
+            Self::Root => true,
+            Self::Descendant(prefix) => enters(path, prefix),
+        }
+    }
+
+    /// This path extended by `child`, a canonical relative path.
+    fn join(&self, child: &str) -> Self {
+        Self::Descendant(Cow::Owned(match self {
+            Self::Root => child.to_owned(),
+            Self::Descendant(prefix) => format!("{prefix}/{child}"),
+        }))
     }
 }
 
@@ -494,6 +526,43 @@ impl RepositoryLayout {
         self.data.path()
     }
 
+    /// Worktree-relative paths jit writes during a mutation, which no gate
+    /// input digest may contain.
+    ///
+    /// The data-root entries (issue records, the event log, gate-run records,
+    /// the index, the fixed lock set, the record scratch directory, and the
+    /// worktree identity) appear at the data root's worktree offset, and not at
+    /// all when the data root lies outside the worktree. Configuration under
+    /// the data root is not in the set, so its edits reach a digest.
+    pub(crate) fn tracker_written_paths(&self) -> Vec<RootRelativePath> {
+        let records = [
+            VirtualPath::ISSUES,
+            VirtualPath::EVENTS,
+            VirtualPath::GATE_RUNS,
+            VirtualPath::INDEX,
+        ];
+        let data_entries = records
+            .iter()
+            .map(|record| record.relative().as_str())
+            .chain([
+                REPO_WRITE_LOCK_FILE,
+                INDEX_LOCK_FILE,
+                GATES_LOCK_FILE,
+                EVENTS_LOCK_FILE,
+                RECORD_SCRATCH_DIR,
+                WORKTREE_IDENTITY_FILE,
+            ]);
+        std::iter::once(RootRelativePath::Descendant(Cow::Borrowed(
+            BOOTSTRAP_LOCK_FILE,
+        )))
+        .chain(
+            self.nested_data_relative
+                .iter()
+                .flat_map(|offset| data_entries.clone().map(|entry| offset.join(entry))),
+        )
+        .collect()
+    }
+
     /// Boundary identity captured for the worktree root.
     pub(crate) fn worktree_identity(&self) -> &str {
         self.worktree.identity()
@@ -772,6 +841,42 @@ mod tests {
             layout.resolve(&VirtualPath::worktree(".jit/index.json").unwrap()),
             Err(RepositoryLayoutError::DataRootAlias(_))
         ));
+    }
+
+    /// The set follows the selected data root: every data-root entry sits at
+    /// the root's worktree offset, and an external data root contributes none.
+    #[test]
+    fn test_tracker_written_paths_follow_the_selected_data_root() {
+        let entries_under = |data: &str| {
+            let layout = RepositoryLayout::new(root("/repo"), root(data)).unwrap();
+            layout
+                .tracker_written_paths()
+                .into_iter()
+                .filter(|path| path.as_str() != BOOTSTRAP_LOCK_FILE)
+                .collect::<Vec<_>>()
+        };
+
+        let conventional = entries_under("/repo/.jit");
+        let relocated = entries_under("/repo/state/data");
+        assert!(!conventional.is_empty());
+        assert_eq!(conventional.len(), relocated.len());
+        assert!(relocated
+            .iter()
+            .all(|path| path.as_str().starts_with("state/data/")));
+        assert!(relocated.contains(&RootRelativePath::parse("state/data/tmp").unwrap()));
+        assert!(entries_under("/external/data").is_empty());
+    }
+
+    /// The bootstrap lock sits at the worktree root wherever the data root is.
+    #[test]
+    fn test_tracker_written_paths_keep_the_bootstrap_lock_at_the_worktree_root() {
+        let bootstrap = RootRelativePath::parse(BOOTSTRAP_LOCK_FILE).unwrap();
+        for data in ["/repo/.jit", "/external/data"] {
+            let written = RepositoryLayout::new(root("/repo"), root(data))
+                .unwrap()
+                .tracker_written_paths();
+            assert!(written.contains(&bootstrap), "{data}");
+        }
     }
 
     #[test]

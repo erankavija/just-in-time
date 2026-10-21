@@ -34,22 +34,35 @@ use std::path::{Component, Path};
 /// confused with a digest some other mechanism computed over the same bytes.
 const DIGEST_DOMAIN: &[u8] = b"jit-repository-inputs-v1\0";
 
+/// The authored spelling of the root covering the whole worktree.
+const WORKTREE_ROOT: &str = ".";
+
 /// A repository-relative path a declaration names as a root.
 ///
 /// A root stands for itself when it names a file, and for everything beneath
 /// it when it names a directory — [`covers`](Self::covers) answers that
-/// question for a candidate path. Parsing rejects anything that is not a
-/// relative path of ordinary segments, so a consumer receives a root it can
-/// join to a repository worktree without re-checking it.
+/// question for a candidate path. `.` names the worktree itself and covers
+/// every path. Parsing rejects anything else that is not a relative path of
+/// ordinary segments, so a consumer receives a root it can join to a
+/// repository worktree without re-checking it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 #[serde(transparent)]
 #[schemars(with = "String")]
 pub struct DeclaredRoot(String);
 
 impl DeclaredRoot {
-    /// Borrow the repository-relative root path.
+    /// Borrow the authored root path.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// The root as a worktree-relative path: empty for the worktree root.
+    pub fn worktree_relative(&self) -> &str {
+        if self.0 == WORKTREE_ROOT {
+            ""
+        } else {
+            &self.0
+        }
     }
 
     /// Whether `repository_path` is this root itself or lies beneath it.
@@ -57,9 +70,11 @@ impl DeclaredRoot {
     /// The separator is required, so a sibling whose name merely starts with
     /// the root's name is not covered.
     pub fn covers(&self, repository_path: &str) -> bool {
-        repository_path
-            .strip_prefix(self.as_str())
-            .is_some_and(|remainder| remainder.is_empty() || remainder.starts_with('/'))
+        let root = self.worktree_relative();
+        root.is_empty()
+            || repository_path
+                .strip_prefix(root)
+                .is_some_and(|remainder| remainder.is_empty() || remainder.starts_with('/'))
     }
 
     /// The root-relative remainder of `repository_path`, or `None` when the
@@ -70,10 +85,13 @@ impl DeclaredRoot {
     /// asking whether the root's own path is claimed wants
     /// [`covers`](Self::covers).
     pub fn relative_path<'a>(&self, repository_path: &'a str) -> Option<&'a str> {
-        repository_path
-            .strip_prefix(self.as_str())
-            .and_then(|remainder| remainder.strip_prefix('/'))
-            .filter(|remainder| !remainder.is_empty())
+        match self.worktree_relative() {
+            "" => Some(repository_path),
+            root => repository_path
+                .strip_prefix(root)
+                .and_then(|remainder| remainder.strip_prefix('/')),
+        }
+        .filter(|remainder| !remainder.is_empty())
     }
 }
 
@@ -81,11 +99,11 @@ impl TryFrom<&str> for DeclaredRoot {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if is_safe_relative_path(value) {
+        if value == WORKTREE_ROOT || is_safe_relative_path(value) {
             Ok(Self(value.to_string()))
         } else {
             Err(format!(
-                "invalid root '{value}'; expected a relative repository path"
+                "invalid root '{value}'; expected `.` or a relative repository path"
             ))
         }
     }
@@ -450,7 +468,8 @@ impl InputsDigestBuilder {
 ///
 /// One rule for every declared path: the sources and targets the profile
 /// package model validates, the live-source roots a manifest declares, and the
-/// roots a repository input set declares (`@/invariant/convention-convergence`).
+/// roots a repository input set declares besides the worktree root `.`
+/// (`@/invariant/convention-convergence`).
 pub(crate) fn is_safe_relative_path(path: &str) -> bool {
     let parsed = Path::new(path);
     let has_windows_prefix = path.as_bytes().get(1) == Some(&b':')
@@ -534,6 +553,21 @@ mod tests {
         );
         assert_eq!(root.relative_path("docs"), None);
         assert_eq!(root.relative_path("docsite/index.md"), None);
+    }
+
+    #[test]
+    fn test_declared_root_worktree_root_covers_every_repository_path() {
+        let root = DeclaredRoot::try_from(".").expect("the worktree root");
+        assert!(root.covers("Cargo.toml"));
+        assert!(root.covers(".jit/config.toml"));
+        assert_eq!(root.relative_path("docs/index.md"), Some("docs/index.md"));
+        assert_eq!(root.worktree_relative(), "");
+        assert_eq!(
+            DeclaredRoot::try_from("docs")
+                .expect("a relative root")
+                .worktree_relative(),
+            "docs"
+        );
     }
 
     #[test]

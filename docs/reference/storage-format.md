@@ -57,9 +57,9 @@ ignore file is neither read nor written. The store's fixed lock set under
 independent of the number of issues. The repository-sibling
 `.jit-bootstrap.lock` and the `.git/jit/locks/claims.lock` control-plane lock
 complete the fixed set. Their paths come from the
-[`JsonFileStorage`](../../crates/jit/src/storage/json.rs) and
+[storage layout](../../crates/jit/src/repository_state/path.rs) and the
 [`ClaimCoordinator`](../../crates/jit/src/storage/claim_coordinator.rs)
-implementations. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
+implementation. The `.jit/` storage locks and `.jit-bootstrap.lock` retain
 their inodes for advisory-lock race safety; they are opened with
 create-if-absent semantics and are not unlinked. No lock and no
 `worktree.json` write creates `.jit/`; `jit init` alone creates the data root.

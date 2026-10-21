@@ -30,6 +30,7 @@
 
 use super::errors::RepositoryNotFoundError;
 use super::lock::{FileLocker, LockGuard, LockMode, LockTimeout};
+use crate::repository_state::REPO_WRITE_LOCK_FILE;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
@@ -72,12 +73,6 @@ fn canonical_lock_key(path: &Path) -> PathBuf {
     }
     normalized
 }
-
-/// File name of the repository write lock inside the storage root.
-///
-/// Machine-local coordination state, matched by the `.jit/**/*.lock` gitignore
-/// entry alongside `.index.lock` and friends.
-pub const REPO_WRITE_LOCK_FILE: &str = ".repo-write.lock";
 
 /// Who currently holds the lock, how deep, and the file lock they hold.
 #[derive(Debug, Default)]
