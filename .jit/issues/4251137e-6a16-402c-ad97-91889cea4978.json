@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T06:32:33.807515516Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,6 +8,7 @@
   ],
   "description": "Listing issues sweeps `.jit/issues/` once per process for retired read-lock sidecars. The sweep misses short-id sidecars, and a trait method exists only to keep it out of one caller.\n\n## Background\n\n- `list_issues` runs the sweep at `crates/jit/src/storage/json.rs:1304-1324`, guarded by `sidecars_swept` (`:395-397,442`), through the helper at `storage/lock.rs:440-492`. The helper requires `Uuid::parse_str(stem)` (`lock.rs:480-484`), so it skips short-id names. This repository holds 19 such files (`003f.lock`, `003f9f83.lock`, and others), untracked and ignored by `.gitignore:5`.\n- The `read_issues` trait default (`storage/mod.rs:193-224`) and its JSON override (`json.rs:1326-1333`) have one production caller, document conformance (`commands/document.rs:215`). The trait doc on `list_issues` mentions it.\n- Tests: `json.rs:2305,2411-2470`; `lock.rs:1015-1080`; `tests/cli_repo_workflow/artifact_conformance_cli_tests.rs:415-427,464-467`, which plants a sidecar to prove conformance leaves it in place.\n- Docs: `docs/reference/storage-format.md:77-82`.\n\nAfter the sweep is removed, `list_issues` still takes a shared lock on `.index.lock`, which it creates if absent (`lock.rs:255`). Lock files are gitignored runtime state.\n\n## Success Criteria\n\n- [hard] REQ-01: The sidecar sweep, its once-per-process guard, its helper and the `read_issues` trait method with its override no longer exist, and document conformance lists issues through `list_issues`.\n- [hard] REQ-02: Listing issues creates, rewrites or removes no file other than the storage's own index lock. One owning test compares the data root before and after a listing.\n- [hard] REQ-03: No test plants or sweeps a read-lock sidecar.\n- [hard] REQ-04: The storage-format reference does not describe the sweep.\n\n## Notes\n\nStale sidecars already on disk are gitignored runtime residue, not repository content, and this change does not delete them.\n",
   "documents": [],
+  "done_at": "2026-10-21T06:59:36.618511794Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
@@ -15,7 +16,28 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:52:10.142511661Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:59:25.261522949Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:53:49.939778373Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:52:29.806650451Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4251137e-6a16-402c-ad97-91889cea4978",
   "labels": [
     "type:task",
@@ -27,7 +49,7 @@
     "satisfies:842b0ac6/REQ-07"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove the read-lock sidecar sweep",
-  "updated_at": "2026-10-21T06:32:33.866170904Z"
+  "updated_at": "2026-10-21T06:59:36.618511794Z"
 }

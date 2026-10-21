@@ -19,6 +19,16 @@
       "status": "passed",
       "updated_at": "2026-10-21T06:54:19.483342120Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:57:38.911157482Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:59:19.867674538Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "72d89161-39e7-4858-9f16-31deb4ff7505",
@@ -32,5 +42,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Reuse gate verdicts only by declared-input digest",
-  "updated_at": "2026-10-21T06:54:19.483342120Z"
+  "updated_at": "2026-10-21T06:59:19.867674538Z"
 }

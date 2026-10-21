@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "3ee0e572d5e850322f7263b04ffa54866fce258e",
+  "completed_at": "2026-10-21T06:59:19.625686545Z",
+  "duration_ms": 100321,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The leaf issue's digest-only gate reuse behavior and retired fields are accurately and discoverably documented.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "72d89161-39e7-4858-9f16-31deb4ff7505",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ca57af8e-b182-47c7-90d0-a33d63f4ec89",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:57:39.303888765Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `task` is a leaf type and has no resolved children. I reviewed its two implementation/docs commits plus the tagged merge commit (no standalone patch).\n\nDocumentation accurately describes digest-only reuse, unconditional `--force`, no-input execution, and removed fields in the canonical how-to and references: [custom-gates.md](/home/vkaskivuo/Projects/just-in-time/docs/how-to/custom-gates.md:205), [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:2150), and [storage-records.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/storage-records.md:119).\n\n1. None.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The leaf issue's digest-only gate reuse behavior and retired fields are accurately and discoverably documented.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

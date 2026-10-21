@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4ad6eb1aa79825128034963838a1d13b26e00306",
+  "completed_at": "2026-10-21T06:59:24.878081851Z",
+  "duration_ms": 334626,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "4251137e-6a16-402c-ad97-91889cea4978",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "75ce874e-fb00-4f7d-bdc3-0e3da1ebd436",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:53:50.251922394Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f9add0dd8; 95c5cbb4 (first-parent merge patch)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; docs/reference/storage-format.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/issue/842b0ac6/requirement/REQ-07 and @/issue/8e071e18/decision/D-7 (markdown-first issue scope)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:51:18Z); doc-review passed (exit 0, 2026-10-21T06:52:30Z); docs-mechanical passed (exit 0, 2026-10-21T06:52:26Z)\nTruncation recovery: Re-read each relevant tagged patch by path, inspected the merge against its first parent, and narrowed historical-log search results to shipping source paths.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
