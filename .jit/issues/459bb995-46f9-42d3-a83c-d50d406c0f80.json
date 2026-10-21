@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T16:46:59.169852888Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -15,7 +15,18 @@
     "doc-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:56:48.947216753Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T17:03:15.093216724Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
   "labels": [
     "type:task",
@@ -30,5 +41,5 @@
   "priority": "high",
   "state": "ready",
   "title": "State each configuration default once",
-  "updated_at": "2026-10-21T16:46:59.228823028Z"
+  "updated_at": "2026-10-21T17:03:15.093216724Z"
 }

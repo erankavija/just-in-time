@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [],
+  "description": "Make `CaptureSpec`'s growth methods validate only the entries they add, so growing a spec one request at a time is linear.\n\n## Background\n\n- `discover_paths`, `discover_tail` and `discover_listings` (`crates/jit/src/repository_state/image.rs:566-612`) clone the whole spec, add the request and re-run `validate` (`:660-686`) over every held path, listing and pinned request. `discover_pinned` (`:620-629`) already validates only its request.\n- Every check in `validate` is per entry (depth within `max_depth`, `ensure_semantic`, `validate_pinned_request`) or a count (`listings.len()` within `max_listings`), and every mutator goes through these methods, so every held entry is already valid.\n- `discover_paths` refuses a whole read of the event log, a per-entry check.\n- `RepositoryImage::close` validates the spec once (`:705`).\n\n## Success Criteria\n\n- [hard] REQ-01: `discover_paths`, `discover_tail` and `discover_listings` validate only the entries a call adds plus the listing count, and clone nothing; a refused call leaves the spec unchanged.\n- [hard] REQ-02: A proptest shows that, for generated specs and batches, a batch is accepted exactly when whole-spec validation of the grown spec succeeds, and that the grown spec is the same either way.\n- [hard] REQ-03: A unit test shows that a refused batch leaves the spec equal to its prior value.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T20:31:28.613451335Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2f12d920-2bbc-4b8f-99f5-bca7d0e9ff4a",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-side-paths",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:9876a23a/REQ-09"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Capture specs validate only added entries",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

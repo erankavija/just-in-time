@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "001a9c46-75ce-45a5-8ca3-7dffa4352736",
+    "b3a768b3-5d32-4ebb-ab92-9b9854e5b703",
+    "ccd6e1fb-1297-4f3e-a5b4-04f9546e2b59",
+    "f968dfe1-64d2-4d37-8bdc-0f04bfca2bb8"
+  ],
+  "description": "Replace the two repository-validation entry points and their `Result` pair with one pure function that computes a `ValidationReport` from a captured validation and the inputs its caller supplies.\n\n## Background\n\n- `validate_repository` (`crates/jit/src/validation/repository.rs:152-181`) derives the materialization plan and calls `validate_repository_with_materializations` (`:183-332`); both return `Result<RepositoryValidationReport, RepositoryValidationFailure>` (`:52-130`), where the failure carries the partial report.\n- The function is not pure: `collect_rule_findings` reads the wall clock (`:589`), and `validate_machine_local_claims` (`:536-552`) reads `crate::test_mode` and calls `crate::commands::validate_claims_index_at` (`commands/validate.rs:2453-2459`), which re-detects the worktree layout and reads the machine-local claims index.\n- Callers: `commands/validate.rs` (`validate_silent` `:107-125`, `validate_repository_report` `:523-532`, `validate_repository_report_with_divergences` `:535-545`, `capture_validation_report` `:547-586`, `capture_repair_plan` `:650-703`), `commands/gate_check.rs` (`repository_rule_report` `:440-448`, `gate_findings_from_report` `:639-665`, the repository checker at `:1050-1055`), `commands/init.rs:284-292,498-520,680`, `commands/profile.rs:24,356,1427`, `commands/config.rs:328`, `main.rs` (the whole-repository branch of the `Commands::Validate` arm, which calls `validate_repository_report_with_divergences`), the tests in `validation/repository.rs` and `crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs:183`.\n- The validation layer parses records through the shared records loader.\n\nKept as one change for a build reason: the report type replaces a `Result` pair whose callers only compile together.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation::report(&CapturedValidation, &ReportInputs) -> ValidationReport` is the only function that computes the repository report. `CapturedValidation` pairs a captured image with the records the loader parsed from it, and `CapturedValidation::from_image` parses them. `validate_repository`, `validate_repository_with_materializations`, `RepositoryValidationReport` and `RepositoryValidationFailure` no longer exist.\n- [hard] REQ-02: The report reads only its arguments. The evaluation instant is a field of `ReportInputs`, and while the claims-index check exists, its problems are a `ReportInputs` field computed by the executor from its own worktree paths with today's test-mode skip. `crates/jit/src/validation/` reads no clock, environment or machine-local file and calls no `crate::commands` function.\n- [hard] REQ-03: `ValidationReport` exposes the passes reached, the structural failure if any, and the findings projected to the wire `RuleReport`; a structural failure keeps every finding collected before it.\n- [hard] REQ-04: Every listed caller computes the report through the new function, and `jit validate`, `config set`, `init`, profile apply and the repository-validation gate keep their output and exit status; the existing suites pass, and a unit test shows that an injected instant decides a `gate-recency` finding.\n\n## Notes\n\n- The claims-index field is an interim input: it exists only while the machine-local claims-index check does, and the change that deletes that check deletes the field and its executor computation with it.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "6ba4f623-99fb-420a-9c47-3f3655db3815",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-core",
+    "component:validation",
+    "component:gates",
+    "component:core",
+    "per:@/charter/D-20",
+    "per:@/charter/D-18",
+    "satisfies:9876a23a/REQ-01",
+    "satisfies:9876a23a/REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "One pure function computes the validation report",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

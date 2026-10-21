@@ -19,6 +19,11 @@
       "status": "passed",
       "updated_at": "2026-10-21T16:50:25.251660096Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T17:20:01.793084282Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
@@ -32,5 +37,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Replace emoji status markers in CLI output with words",
-  "updated_at": "2026-10-21T16:50:25.251660096Z"
+  "updated_at": "2026-10-21T17:20:01.793084282Z"
 }
