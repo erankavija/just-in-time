@@ -237,7 +237,9 @@ not a function of repository content alone:
 - a checker that consults the clock, the network, or machine state (a
   vulnerability audit against a remote advisory database) is not a function of
   the repository at all;
-- a checker that reads files the repository rewrites on every evaluation.
+- a checker that reads files the repository rewrites on every evaluation;
+- a checker that reads git state — the `HEAD` tree or the index — rather than
+  working-tree files, since the digest describes working-tree content.
 
 Declare roots that cover everything the checker reads, and exclusions that cover
 only what it does not. A checker that reads a file no declared root covers — or
