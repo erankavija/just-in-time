@@ -12,6 +12,7 @@ export interface GateState {
   status: 'pending' | 'passed' | 'failed';
   updated_by?: string;
   updated_at: string;
+  run_id?: string;
 }
 
 export interface GateDefinition {

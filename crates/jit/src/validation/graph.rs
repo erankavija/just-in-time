@@ -3170,6 +3170,7 @@ source-of-truth = "markdown-first"
                 status: GateStatus::Passed,
                 updated_by: Some("ci:x".parse().unwrap()),
                 updated_at: fixed_now() - chrono::Duration::hours(hours_ago),
+                run_id: None,
             },
         );
         i

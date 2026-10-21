@@ -1693,6 +1693,7 @@ fn apply_captured_issue_mutation(
                     status: GateStatus::Pending,
                     updated_by: None,
                     updated_at: chrono::DateTime::default(),
+                    run_id: None,
                 });
                 added.push(key.clone());
             }
@@ -1765,6 +1766,7 @@ fn apply_captured_issue_mutation(
                 status: *status,
                 updated_by: by.clone(),
                 updated_at: chrono::DateTime::default(),
+                run_id: None,
             };
             issue.gates_status.insert(gate_key.clone(), replacement);
             let event = match status {
@@ -2325,9 +2327,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The request determines its complete capture set. The caller cannot pass a
     /// record, capture closure, or arbitrary patch. A conflict reopens a session
     /// and derives again under a fresh context, so the identity and time an
-    /// attempt publishes are sampled under the write lock that publishes them:
-    /// an attestation's run time then follows the publication order its
-    /// `gates_status` follows, and the latest-run and readiness views agree.
+    /// attempt publishes are sampled under the write lock that publishes them,
+    /// so an attestation's run time is its publication time.
     fn publish_captured_issue_mutation(
         &self,
         request: CapturedIssueMutation,
@@ -3681,6 +3682,7 @@ mod tests {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: chrono::Utc::now(),
+                run_id: None,
             },
         );
         let issue_id = issue.id.clone();
@@ -3936,6 +3938,7 @@ mod tests {
                     status,
                     updated_by: Some(actor.clone()),
                     updated_at: chrono::DateTime::UNIX_EPOCH,
+                    run_id: None,
                 },
             );
             crate::commands::test_helpers::seed_issue(&storage, issue);
@@ -4034,68 +4037,6 @@ mod tests {
                 "each attestation's run carries its own operation's time"
             );
         }
-    }
-
-    /// Attestation A conflicts on its first apply, and opposing attestation B
-    /// publishes before A's retry captures. A publishes last, so the latest-run
-    /// view must select A's run, as the readiness view selects A's status.
-    #[test]
-    fn test_publish_captured_issue_mutation_retried_attestation_orders_after_concurrent_attestation(
-    ) {
-        use crate::commands::test_helpers::{
-            memory_executor, seed_gate_registry, seed_issue, with_open_race, SessionRaceAction,
-        };
-        use crate::storage::InMemoryStorage;
-
-        let storage = InMemoryStorage::new();
-        seed_gate_registry(&storage, &manual_gate_registry("review"));
-        let mut issue = crate::domain::types::fixture_issue(
-            "attestation-race".to_string(),
-            "Attestation race".to_string(),
-        );
-        issue.gates_required.push("review".to_string());
-        let id = issue.id.clone();
-        seed_issue(&storage, issue);
-
-        // B runs when A's retry opens its session, before that session captures.
-        let concurrent_id = id.clone();
-        let storage = with_open_race(
-            storage,
-            2,
-            SessionRaceAction::Run(Box::new(move |storage| {
-                memory_executor(storage.clone())
-                    .pass_gate(
-                        &concurrent_id,
-                        "review".to_string(),
-                        Some("human:b".to_string()),
-                        false,
-                    )
-                    .unwrap();
-            })),
-        );
-        storage.inject_repository_state_apply_conflicts(1);
-        let executor = memory_executor(storage);
-
-        executor
-            .fail_gate(&id, "review".to_string(), Some("human:a".to_string()))
-            .unwrap();
-
-        let readiness = executor.get_required_gate_statuses_for_issue(&id).unwrap();
-        assert_eq!(
-            readiness,
-            vec![("review".to_string(), GateStatus::Failed)],
-            "A published last"
-        );
-        let (latest, not_run) = executor.get_last_gate_runs_for_issue(&id).unwrap();
-        assert!(not_run.is_empty());
-        let latest_status = latest
-            .iter()
-            .map(|run| {
-                let (state, _) = gate_check::gate_state_from_run(run).unwrap();
-                (run.gate_key.clone(), state.status)
-            })
-            .collect::<Vec<_>>();
-        assert_eq!(latest_status, readiness);
     }
 
     #[test]

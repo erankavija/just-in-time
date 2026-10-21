@@ -1631,17 +1631,14 @@ impl GateView {
     /// Build the per-gate view for a single required gate.
     ///
     /// `state` is the issue's recorded [`GateState`] for this gate (if any) and
-    /// `runs` are all recorded runs for the issue; the latest run matching
-    /// `key` supplies `last_run_at`/`exit_code`.
+    /// `runs` are all recorded runs for the issue; the run `state` was projected
+    /// from, the gate's latest published run, supplies `last_run_at`/`exit_code`.
     fn build(key: &str, state: Option<&crate::domain::GateState>, runs: &[GateRunResult]) -> Self {
         let status = state
             .map(|s| s.status)
             .unwrap_or(crate::domain::GateStatus::Pending);
 
-        let latest = runs
-            .iter()
-            .filter(|r| r.gate_key == key)
-            .max_by_key(|r| r.started_at);
+        let latest = state.and_then(|state| state.projected_run(key, runs));
 
         GateView {
             key: key.to_string(),
@@ -3011,7 +3008,7 @@ mod tests {
         use chrono::Utc;
 
         // A gate that has run: status from GateState, last_run_at/exit_code from
-        // the latest matching GateRunResult.
+        // the GateRunResult the state names.
         let mut issue = crate::domain::types::fixture_issue("T".to_string(), "B".to_string());
         issue.gates_required = vec!["tests".to_string()];
         let run_at = Utc::now();
@@ -3021,6 +3018,7 @@ mod tests {
                 status: GateStatus::Passed,
                 updated_by: Some("ci:test".parse().unwrap()),
                 updated_at: run_at,
+                run_id: Some("run-1".to_string()),
             },
         );
 

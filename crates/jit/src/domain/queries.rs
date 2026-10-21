@@ -872,6 +872,7 @@ mod tests {
                 status: GateStatus::Failed,
                 updated_by: None,
                 updated_at: chrono::Utc::now(),
+                run_id: None,
             },
         );
 

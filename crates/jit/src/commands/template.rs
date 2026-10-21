@@ -1203,6 +1203,7 @@ fn attach_captured_gates(
                     status: GateStatus::Pending,
                     updated_by: None,
                     updated_at: chrono::DateTime::default(),
+                    run_id: None,
                 },
             );
             events.push((1, Event::draft_gate_added(issue.id.clone(), key)));

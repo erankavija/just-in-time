@@ -1770,7 +1770,7 @@ Gate: tests
 
 The unified gate-run inspection surface (inspection only, non-mutating). It
 offers four views over the stored run records: the latest
-run (default), prior runs (history), the raw report text (flat), and the
+run (default), which is the last-published run that the gate's readiness status records, prior runs (history), the raw report text (flat), and the
 structured findings (findings). All are read-only and reuse already-recorded
 runs; none executes a checker or mutates gate state. A manual gate's
 attestation is a run record like a checker run: the latest-run and history

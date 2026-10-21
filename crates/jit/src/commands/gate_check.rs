@@ -239,20 +239,25 @@ pub(super) fn gate_state_from_run(
             status,
             updated_by: by.clone(),
             updated_at: chrono::DateTime::default(),
+            run_id: Some(result.run_id.clone()),
         },
         by,
     ))
 }
 
-/// Select and sanitize the latest run for one gate before it enters checker context.
+/// Select and sanitize the run `state` was projected from, the gate's latest
+/// published run, before it enters checker context.
 ///
 /// Stored results are never mutated. Structured findings replace verbose stdout;
 /// legacy unstructured runs retain stdout as their compatibility signal. Stderr is
 /// always diagnostic noise and is removed from the context copy.
-fn compact_run_history_for_context(runs: &[GateRunResult], gate_key: &str) -> Vec<GateRunResult> {
-    runs.iter()
-        .filter(|run| run.gate_key == gate_key)
-        .max_by_key(|run| run.started_at)
+fn compact_run_history_for_context(
+    runs: &[GateRunResult],
+    gate_key: &str,
+    state: Option<&GateState>,
+) -> Vec<GateRunResult> {
+    state
+        .and_then(|state| state.projected_run(gate_key, runs))
         .cloned()
         .map(|mut run| {
             run.stderr.clear();
@@ -1221,9 +1226,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
-    /// Return the most recent gate run result for a given issue and gate key.
+    /// Return the latest published run of `gate_key` on an issue: the run its
+    /// recorded gate status was projected from, so this view and readiness agree.
     ///
-    /// Returns `Ok(None)` if no runs have been recorded yet.
+    /// Returns `Ok(None)` if no run has been recorded since the gate became
+    /// required.
     pub fn get_last_gate_run(
         &self,
         issue_id: &str,
@@ -1232,10 +1239,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         let full_id = self
             .storage
             .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
-        let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
-        runs.retain(|r| r.gate_key == gate_key);
-        runs.sort_by_key(|r| r.started_at);
-        Ok(runs.into_iter().next_back())
+        let issue = self.storage.load_issue(&full_id)?;
+        self.projected_gate_run(&issue, gate_key)
+    }
+
+    /// Load the run `issue`'s recorded status for `gate_key` names.
+    fn projected_gate_run(&self, issue: &Issue, gate_key: &str) -> Result<Option<GateRunResult>> {
+        issue
+            .gates_status
+            .get(gate_key)
+            .and_then(|state| state.run_id.as_deref())
+            .map(|run_id| self.storage.load_gate_run_result(run_id))
+            .transpose()
     }
 
     fn build_captured_gate_context(
@@ -1296,7 +1311,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 "description": input.gate.description,
                 "stage": input.gate.stage,
             }),
-            run_history: compact_run_history_for_context(input.runs, input.gate_key),
+            run_history: compact_run_history_for_context(
+                input.runs,
+                input.gate_key,
+                input.issue.gates_status.get(input.gate_key),
+            ),
         }))
     }
 
@@ -1342,8 +1361,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Return the most recent recorded run for each registered required gate on
-    /// an issue: an automated gate's checker run or a manual gate's attestation.
+    /// Return the latest published run for each registered required gate on an
+    /// issue, an automated gate's checker run or a manual gate's attestation, as
+    /// [`Self::get_last_gate_run`] selects it.
     ///
     /// Results are ordered by gate priority, preserving insertion order for ties.
     /// The second vector contains the gate keys that have no recorded run.
@@ -1365,36 +1385,16 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         gates.sort_by_key(|(_, gate)| gate.priority);
 
-        let latest_runs = self
-            .storage
-            .list_gate_runs_for_issue(&full_id)?
-            .into_iter()
-            .fold(
-                HashMap::<String, GateRunResult>::new(),
-                |mut latest_runs, run| {
-                    match latest_runs.get(&run.gate_key) {
-                        Some(existing) if existing.started_at >= run.started_at => {}
-                        _ => {
-                            latest_runs.insert(run.gate_key.clone(), run);
-                        }
-                    }
-                    latest_runs
-                },
-            );
-
-        let (results, not_run) = gates.into_iter().fold(
+        gates.into_iter().try_fold(
             (Vec::new(), Vec::new()),
             |(mut results, mut not_run), (gate_key, _)| {
-                if let Some(result) = latest_runs.get(gate_key).cloned() {
-                    results.push(result);
-                } else {
-                    not_run.push(gate_key.clone());
+                match self.projected_gate_run(&issue, gate_key)? {
+                    Some(result) => results.push(result),
+                    None => not_run.push(gate_key.clone()),
                 }
-                (results, not_run)
+                Ok((results, not_run))
             },
-        );
-
-        Ok((results, not_run))
+        )
     }
 
     /// Return the per-issue readiness status of every REQUIRED gate on an issue
@@ -1403,7 +1403,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// The authoritative status is the issue's recorded `gates_status`, which
     /// each gate run — an automated gate's checker run or a manual gate's
-    /// attestation — writes together with its run record. A gate with no
+    /// attestation — writes together with its run record and names that run. A gate with no
     /// recorded state is reported as [`GateStatus::Pending`]. `status-all`
     /// folds these statuses into its green/not-green readiness verdict.
     pub fn get_required_gate_statuses_for_issue(
@@ -1784,22 +1784,26 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
     }
 
     #[test]
-    fn test_compact_run_history_selects_latest_matching_run_by_timestamp() {
-        let latest = prior_run("latest", "review", 30, None);
+    fn test_compact_run_history_selects_the_run_the_gate_status_names() {
+        let named = prior_run("named", "review", 20, None);
         let runs = vec![
-            latest.clone(),
+            named.clone(),
             prior_run("other-gate", "cargo-ci", 40, None),
+            prior_run("started-later", "review", 30, None),
             prior_run("oldest", "review", 10, None),
-            prior_run("middle", "review", 20, None),
         ];
 
-        let compact = compact_run_history_for_context(&runs, "review");
+        let compact = compact_run_history_for_context(
+            &runs,
+            "review",
+            Some(&super::gate_state_from_run(&named).unwrap().0),
+        );
 
         assert_eq!(compact.len(), 1);
-        assert_eq!(compact[0].run_id, latest.run_id);
-        assert_eq!(compact[0].stdout, latest.stdout);
+        assert_eq!(compact[0].run_id, named.run_id);
+        assert_eq!(compact[0].stdout, named.stdout);
         assert!(compact[0].stderr.is_empty());
-        assert_eq!(runs[0], latest, "source run must remain unchanged");
+        assert_eq!(runs[0], named, "source run must remain unchanged");
     }
 
     #[test]
@@ -1811,7 +1815,11 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
         };
         let source = prior_run("structured", "review", 10, Some(findings.clone()));
 
-        let compact = compact_run_history_for_context(std::slice::from_ref(&source), "review");
+        let compact = compact_run_history_for_context(
+            std::slice::from_ref(&source),
+            "review",
+            Some(&super::gate_state_from_run(&source).unwrap().0),
+        );
 
         assert_eq!(compact.len(), 1);
         assert_eq!(compact[0].findings, Some(findings));
@@ -1823,9 +1831,10 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
 
     #[test]
     fn test_compact_run_history_is_empty_without_matching_runs() {
-        let runs = vec![prior_run("cargo", "cargo-ci", 10, None)];
+        let run = prior_run("cargo", "cargo-ci", 10, None);
+        let state = super::gate_state_from_run(&run).unwrap().0;
 
-        assert!(compact_run_history_for_context(&runs, "review").is_empty());
+        assert!(compact_run_history_for_context(&[run], "review", Some(&state)).is_empty());
     }
 
     #[test]
@@ -1858,6 +1867,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             .gates_status
             .insert("first".into(), super::gate_state_from_run(&run).unwrap().0);
 
+        let second = issue.gates_status.get("second").cloned();
         let mut view = serde_json::to_value(crate::output::IssueShowResponse::from_issue(
             issue,
             Vec::new(),
@@ -1868,7 +1878,7 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
 
         assert_eq!(view["gates"][0]["status"], "passed");
         assert!(view["gates"][0]["last_run_at"].is_string());
-        assert!(compact_run_history_for_context(&[run], "second").is_empty());
+        assert!(compact_run_history_for_context(&[run], "second", second.as_ref()).is_empty());
     }
 
     #[test]
@@ -3450,6 +3460,96 @@ source-of-truth = "markdown-first"
             };
             assert_eq!(from_run, status, "views disagree on {key}");
         }
+    }
+
+    /// Runs publish in an order their start times do not follow: automated run A
+    /// starts first and publishes after a later-started B, and attestation A
+    /// retries its publication after a concurrent attestation B. The latest-run
+    /// view must select what readiness reflects, the last publication.
+    #[cfg(unix)]
+    #[test]
+    fn test_get_last_gate_runs_for_issue_follows_publication_order_across_run_kinds() {
+        use crate::commands::test_helpers::{memory_executor, with_open_race, SessionRaceAction};
+
+        let base = setup();
+        let marker_dir = tempfile::tempdir().unwrap();
+        let marker = marker_dir.path().join("b-started");
+        let mut registry = base.storage.load_gate_registry().unwrap();
+        registry.gates.insert(
+            "auto".to_string(),
+            make_auto_gate("auto", &format!("test -e {}", marker.display())),
+        );
+        registry
+            .gates
+            .insert("review".to_string(), make_manual_gate("review"));
+        seed_gate_registry(base.storage(), &registry);
+        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        issue.gates_required = vec!["auto".to_string(), "review".to_string()];
+        let issue_id = issue.id.clone();
+        seed_issue(base.storage(), issue);
+
+        // Automated B starts after A's checker ran and publishes before A's
+        // record session captures.
+        let concurrent = issue_id.clone();
+        let evaluating = with_open_race(
+            base.storage.clone(),
+            2,
+            SessionRaceAction::Run(Box::new(move |storage| {
+                std::fs::write(&marker, "").unwrap();
+                let run = memory_executor(storage.clone())
+                    .check_gate(&concurrent, "auto")
+                    .unwrap();
+                assert_eq!(run.status, GateRunStatus::Passed);
+            })),
+        );
+        let run = memory_executor(evaluating)
+            .check_gate(&issue_id, "auto")
+            .unwrap();
+        assert_eq!(run.status, GateRunStatus::Failed);
+
+        // Attestation A conflicts on its first apply; B publishes before A's
+        // retry captures.
+        let concurrent = issue_id.clone();
+        let attesting = with_open_race(
+            base.storage.clone(),
+            2,
+            SessionRaceAction::Run(Box::new(move |storage| {
+                memory_executor(storage.clone())
+                    .pass_gate(
+                        &concurrent,
+                        "review".to_string(),
+                        Some("human:b".to_string()),
+                        false,
+                    )
+                    .unwrap();
+            })),
+        );
+        attesting.inject_repository_state_apply_conflicts(1);
+        memory_executor(attesting)
+            .fail_gate(&issue_id, "review".to_string(), Some("human:a".to_string()))
+            .unwrap();
+
+        let readiness = base
+            .get_required_gate_statuses_for_issue(&issue_id)
+            .unwrap();
+        assert_eq!(
+            readiness,
+            vec![
+                ("auto".to_string(), crate::domain::GateStatus::Failed),
+                ("review".to_string(), crate::domain::GateStatus::Failed),
+            ],
+            "each A published last"
+        );
+        let (latest, not_run) = base.get_last_gate_runs_for_issue(&issue_id).unwrap();
+        assert!(not_run.is_empty());
+        let latest_status = latest
+            .iter()
+            .map(|run| {
+                let (state, _) = super::gate_state_from_run(run).unwrap();
+                (run.gate_key.clone(), state.status)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(latest_status, readiness);
     }
 
     #[test]
@@ -5465,8 +5565,6 @@ source-of-truth = "markdown-first"
         executor.add_gate(&issue_id, "g".to_string()).unwrap();
 
         let first = executor.check_gate(&issue_id, "g").unwrap();
-        // Small sleep so timestamps differ
-        std::thread::sleep(std::time::Duration::from_millis(10));
         let second = executor.check_gate(&issue_id, "g").unwrap();
 
         let last = executor.get_last_gate_run(&issue_id, "g").unwrap().unwrap();
