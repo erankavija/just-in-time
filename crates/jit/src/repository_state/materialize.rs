@@ -724,15 +724,7 @@ kind = "advisory"
             max_depth: 8,
         };
         let spec = CaptureSpec::new(entries.keys().cloned(), budget).unwrap();
-        RepositoryImage::close(
-            layout,
-            spec,
-            entries,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
+        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
     }
 
     fn absent_image(paths: Vec<VirtualPath>) -> RepositoryImage {
@@ -752,7 +744,6 @@ kind = "advisory"
                 .into_iter()
                 .map(|path| (path, RepositoryEntry::Absent))
                 .collect(),
-            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
         )

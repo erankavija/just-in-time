@@ -641,7 +641,6 @@ mod tests {
             entries.into_iter().collect::<BTreeMap<_, _>>(),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap()
     }

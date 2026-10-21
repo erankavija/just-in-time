@@ -765,7 +765,6 @@ fn assert_planning_document_capture(existing: bool) {
         .any(|path| path == &VirtualPath::worktree("dev/active").unwrap()));
     assert_eq!(final_image.file_bytes(&target).unwrap().is_some(), existing);
     assert!(final_image.pinned_evidence().is_empty());
-    assert!(final_image.linked_worktree_evidence().is_empty());
 }
 
 #[test]

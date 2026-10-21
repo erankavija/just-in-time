@@ -57,10 +57,9 @@ pub(crate) use export::{
 pub(crate) use image::CapturedAnswers;
 pub use image::{
     CaptureBudget, CaptureError, CaptureSpec, CapturedBytes, DeltaError, DirectoryListing,
-    EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence,
-    LinkedWorktreeSourceClass, PinnedDocumentEvidence, PinnedSourceClass, ReadMode,
-    RepositoryAction, RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryTargetKind,
-    TargetClaim, EVENT_LOG_TAIL_WINDOW,
+    EntryIdentity, EventLogTail, ExpectedPreimage, FileMode, PinnedDocumentEvidence,
+    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryTargetKind, TargetClaim, EVENT_LOG_TAIL_WINDOW,
 };
 pub use index::RepositoryIndexError;
 pub(crate) use index::{RepositoryIndex, SUPPORTED_INDEX_SCHEMA_VERSION};
@@ -1270,7 +1269,6 @@ mod tests {
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap();
         let target = VirtualPath::data("unrequested.json").unwrap();
@@ -1365,7 +1363,6 @@ mod tests {
             ]),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap();
         let expected = plan(
@@ -1433,7 +1430,6 @@ mod tests {
             BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap()
     }
@@ -1444,7 +1440,6 @@ mod tests {
             layout(),
             CaptureSpec::new(paths, budget()).unwrap(),
             entries.into_iter().collect::<BTreeMap<_, _>>(),
-            BTreeMap::new(),
             BTreeMap::new(),
             BTreeMap::new(),
         )

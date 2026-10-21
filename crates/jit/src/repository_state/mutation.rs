@@ -1420,7 +1420,6 @@ mod tests {
             entries.into_iter().collect::<BTreeMap<_, _>>(),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap()
     }
@@ -1764,15 +1763,7 @@ mod tests {
             VirtualPath::EVENTS,
             RepositoryEntry::FileTail { tail, mode },
         )]);
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
+        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
     }
 
     /// An append over a log read as its tail lands at the log's length and

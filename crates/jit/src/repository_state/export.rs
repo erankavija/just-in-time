@@ -346,7 +346,6 @@ mod tests {
             ]),
             BTreeMap::from([(parent, DirectoryListing::default())]),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap()
     }
@@ -474,7 +473,6 @@ mod tests {
             spec,
             entries,
             BTreeMap::from([(parent, DirectoryListing::default())]),
-            BTreeMap::new(),
             BTreeMap::new(),
         )
         .unwrap();
