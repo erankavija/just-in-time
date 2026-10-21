@@ -134,7 +134,7 @@
           "title": "Remove the silent integrity validator",
           "classification": "implementation",
           "model": "haiku",
-          "status": "dispatched"
+          "status": "done"
         },
         {
           "id": "72d4990c-0fe7-4a8c-815e-c8ab158fcb11",
@@ -170,7 +170,7 @@
           "title": "Remove dead taxonomy error and membership types",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "8397eb74-827c-46e5-9f59-7e67c534ed0e",
@@ -179,7 +179,7 @@
           "title": "Give the file lock one poll loop",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
@@ -188,7 +188,7 @@
           "title": "Parse lifecycle states from canonical tokens only",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "rework-dispatched"
         }
       ]
     },
@@ -418,13 +418,15 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "0ec8b001": 1
+    "0ec8b001": 1,
+    "66bd4b5c": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
     "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns).",
     "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass.",
-    "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510)."
+    "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510).",
+    "Suite clock is load-sensitive even at low start load: 66bd4b5c measured 34.2 s (start load 3.3), rerun 27.5 s while load rose to 16. Clocks after cutover deletions: 21.2 s (84745746), 27.6 s (71b0af0e)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
