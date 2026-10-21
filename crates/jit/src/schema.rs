@@ -167,7 +167,7 @@ impl CommandSchema {
         // top level, including `--schema` and `--quiet`.
         let mut global_options: Vec<Flag> = cli
             .get_arguments()
-            .filter(|arg| !arg.is_positional())
+            .filter(|arg| !arg.is_positional() && !arg.is_hide_set())
             .map(Self::extract_flag)
             .collect();
 
@@ -183,8 +183,8 @@ impl CommandSchema {
         for subcmd in cli.get_subcommands() {
             let name = subcmd.get_name();
 
-            // Skip help command
-            if name == "help" {
+            // Skip help command and clap-hidden commands
+            if name == "help" || subcmd.is_hide_set() {
                 continue;
             }
 
@@ -301,7 +301,7 @@ impl CommandSchema {
             let mut sub_map = HashMap::new();
             for subcmd in subcommands_vec {
                 let name = subcmd.get_name();
-                if name != "help" {
+                if name != "help" && !subcmd.is_hide_set() {
                     // Build path for subcommand (e.g., "issue_show")
                     let sub_path = format!("{}_{}", cmd_path, name);
                     sub_map.insert(
@@ -325,8 +325,8 @@ impl CommandSchema {
         let mut flags = Vec::new();
 
         for arg in clap_cmd.get_arguments() {
-            // Skip built-in help/version flags
-            if arg.get_id() == "help" || arg.get_id() == "version" {
+            // Skip built-in help/version flags and clap-hidden arguments
+            if arg.get_id() == "help" || arg.get_id() == "version" || arg.is_hide_set() {
                 continue;
             }
 
@@ -1375,6 +1375,67 @@ mod tests {
         assert!(text.contains("manifest-version"));
         assert!(text.contains("map-entry"));
         assert!(text.contains("projection"));
+    }
+
+    /// Clap-hidden commands and flags are not advertised in the schema.
+    #[test]
+    fn test_schema_omits_clap_hidden_commands_and_flags() {
+        fn walk(cmd: &clap::Command, path: &str, hidden: &mut Vec<String>) {
+            for arg in cmd.get_arguments().filter(|a| a.is_hide_set()) {
+                hidden.push(format!("{path}--{}", arg.get_id()));
+            }
+            for sub in cmd.get_subcommands() {
+                let p = format!("{path}{} ", sub.get_name());
+                if sub.is_hide_set() {
+                    hidden.push(p.clone());
+                }
+                walk(sub, &p, hidden);
+            }
+        }
+        fn present(schema: &CommandSchema, tokens: &[&str], flag: Option<&str>) -> bool {
+            let mut cmd = match schema.commands.get(tokens[0]) {
+                Some(c) => c,
+                None => return false,
+            };
+            for t in &tokens[1..] {
+                match cmd.subcommands.as_ref().and_then(|s| s.get(*t)) {
+                    Some(c) => cmd = c,
+                    None => return false,
+                }
+            }
+            flag.is_none_or(|f| cmd.flags.iter().any(|x| x.name == f))
+        }
+
+        let mut hidden = Vec::new();
+        walk(&crate::cli::Cli::command(), "", &mut hidden);
+        assert!(
+            hidden.iter().any(|h| h == "validate --divergence"),
+            "validate --divergence must be clap-hidden; found {hidden:?}"
+        );
+
+        let schema = CommandSchema::generate();
+        for entry in &hidden {
+            let (cmd_part, flag) = match entry.split_once("--") {
+                Some((c, f)) => (c, Some(f)),
+                None => (entry.as_str(), None),
+            };
+            let tokens: Vec<&str> = cmd_part.split_whitespace().collect();
+            if tokens.is_empty() {
+                assert!(
+                    !schema
+                        .global_options
+                        .iter()
+                        .any(|g| Some(g.name.as_str()) == flag),
+                    "hidden global flag {entry} leaked into schema"
+                );
+            } else {
+                assert!(
+                    !present(&schema, &tokens, flag),
+                    "hidden item `{entry}` leaked into schema"
+                );
+            }
+        }
+        assert!(present(&schema, &["validate"], None));
     }
 
     /// REQ-02/REQ-03: every global flag accepted at the top level — `quiet`,
