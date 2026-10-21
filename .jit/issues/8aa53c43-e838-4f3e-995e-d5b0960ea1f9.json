@@ -13,6 +13,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/2195c98f-semantic-types/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "80a2e217f94e0dbeb1041cfeca8c5500bc3a922fd23d8b7088abfbab9ce944d8",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/2195c98f-semantic-types/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "2976fa0b9f72151bb5cc299b6862e69d7d3273d6361241d35712dcfb16c0b635",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/2195c98f-semantic-types/breakdown.json"
+        }
+      ],
+      "commit": null,
+      "doc_type": "plan",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/2195c98f-semantic-types/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown-manifest",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/2195c98f-semantic-types/breakdown.json"
     }
   ],
   "gates_required": [
@@ -39,5 +71,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "planning: Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-20T20:56:22.591722788Z"
+  "updated_at": "2026-10-21T00:39:10.437192539Z"
 }
