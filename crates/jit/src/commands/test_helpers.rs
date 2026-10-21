@@ -91,7 +91,12 @@ impl crate::storage::MutationInterruptionInjector for SessionOpenCounter {
 pub(crate) enum SessionRaceAction {
     Save(Box<crate::domain::Issue>),
     Delete(String),
-    WriteRepoFile { path: String, content: String },
+    WriteRepoFile {
+        path: String,
+        content: String,
+    },
+    /// A concurrent operation of its own, run against the raced store.
+    Run(Box<dyn FnOnce(&InMemoryStorage) + Send>),
 }
 
 /// Performs one repository write when a session reaches `point` for the
@@ -129,6 +134,7 @@ impl crate::storage::MutationInterruptionInjector for SessionRace {
                 SessionRaceAction::WriteRepoFile { path, content } => {
                     seed_repo_file(&storage, &path, &content);
                 }
+                SessionRaceAction::Run(operation) => operation(&storage),
             }
         }
         Ok(())

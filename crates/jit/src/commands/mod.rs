@@ -2333,7 +2333,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// The request determines its complete capture set. The caller cannot pass a
     /// record, capture closure, or arbitrary patch. A conflict reopens a session
-    /// and derives again while retaining the operation's identity/time context.
+    /// and derives again under a fresh context, so the identity and time an
+    /// attempt publishes are sampled under the write lock that publishes them:
+    /// an attestation's run time then follows the publication order its
+    /// `gates_status` follows, and the latest-run and readiness views agree.
     fn publish_captured_issue_mutation(
         &self,
         request: CapturedIssueMutation,
@@ -2345,17 +2348,17 @@ impl<S: IssueStore> CommandExecutor<S> {
         use std::collections::BTreeSet;
 
         let layout = self.require_layout()?;
-        let context = production_mutation_context();
-        let run_paths = if request.records_gate_run() {
-            gate_run_record_paths(&context, 1)?
-        } else {
-            Vec::new()
-        };
         with_mutation_session(
             &self.storage,
             &layout,
             "captured issue mutation",
             |session| {
+                let context = production_mutation_context();
+                let run_paths = if request.records_gate_run() {
+                    gate_run_record_paths(&context, 1)?
+                } else {
+                    Vec::new()
+                };
                 let mut paths = BTreeSet::from([
                     VirtualPath::data(format!("issues/{}.json", request.issue_id()))?,
                     VirtualPath::EVENTS,
@@ -3828,7 +3831,7 @@ mod tests {
     }
 
     #[test]
-    fn test_captured_issue_retry_preserves_unrelated_change_and_context_identity() {
+    fn test_captured_issue_retry_preserves_unrelated_change() {
         use crate::repository_state::{finalize, MutationContext};
         use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
 
@@ -3881,11 +3884,6 @@ mod tests {
         )
         .unwrap();
         let retry_plan = finalize(&layout, &retry_image, &context, &retry.intents).unwrap();
-        assert_eq!(
-            event_bytes(&first_plan),
-            event_bytes(&retry_plan),
-            "one operation context must keep event identity and time stable"
-        );
         retry_session.apply(&retry_plan).unwrap();
 
         let updated = storage.load_issue(&id).unwrap();
@@ -3924,9 +3922,9 @@ mod tests {
     }
 
     #[test]
-    fn test_manual_gate_evidence_repeats_but_operation_retry_is_stable() {
+    fn test_manual_gate_evidence_repeats_with_fresh_identity_and_time() {
         use crate::repository_state::{finalize, MutationContext};
-        use crate::storage::{InMemoryStorage, RepositoryStateStore, RepositoryStateStoreError};
+        use crate::storage::{InMemoryStorage, RepositoryStateStore};
 
         for status in [GateStatus::Passed, GateStatus::Failed] {
             let storage = InMemoryStorage::new();
@@ -3973,37 +3971,8 @@ mod tests {
             .unwrap();
             let first_plan =
                 finalize(&layout, &first_image, &first_context, &first.intents).unwrap();
-
-            // Force a genuine captured-image retry. The operation context must
-            // retain its event identity and timestamp when the issue preimage
-            // changes between attempts.
-            let mut concurrent = storage.load_issue(&id).unwrap();
-            concurrent.labels.push("owner:concurrent".to_string());
-            crate::commands::test_helpers::seed_issue(&storage, concurrent);
-            assert!(matches!(
-                first_session.apply(&first_plan),
-                Err(RepositoryStateStoreError::RetryableConflict { .. })
-            ));
+            first_session.apply(&first_plan).unwrap();
             drop(first_session);
-
-            let mut retry_session = storage.open_mutation_session(layout.clone()).unwrap();
-            let retry_image = retry_session
-                .capture(captured_gate_issue_spec(&id, &first_context))
-                .unwrap();
-            let retry = derive_captured_issue_mutation(
-                issue_from_image(&retry_image, &id),
-                &gate_registry_from_image(&retry_image),
-                &request,
-            )
-            .unwrap();
-            let retry_plan =
-                finalize(&layout, &retry_image, &first_context, &retry.intents).unwrap();
-            assert_eq!(
-                event_bytes(&first_plan),
-                event_bytes(&retry_plan),
-                "one operation context must keep manual evidence identity and time stable"
-            );
-            retry_session.apply(&retry_plan).unwrap();
             assert_eq!(
                 storage.load_issue(&id).unwrap().gates_status["review"].updated_at,
                 first_time
@@ -4074,6 +4043,68 @@ mod tests {
                 "each attestation's run carries its own operation's time"
             );
         }
+    }
+
+    /// Attestation A conflicts on its first apply, and opposing attestation B
+    /// publishes before A's retry captures. A publishes last, so the latest-run
+    /// view must select A's run, as the readiness view selects A's status.
+    #[test]
+    fn test_publish_captured_issue_mutation_retried_attestation_orders_after_concurrent_attestation(
+    ) {
+        use crate::commands::test_helpers::{
+            memory_executor, seed_gate_registry, seed_issue, with_open_race, SessionRaceAction,
+        };
+        use crate::storage::InMemoryStorage;
+
+        let storage = InMemoryStorage::new();
+        seed_gate_registry(&storage, &manual_gate_registry("review"));
+        let mut issue = crate::domain::types::fixture_issue(
+            "attestation-race".to_string(),
+            "Attestation race".to_string(),
+        );
+        issue.gates_required.push("review".to_string());
+        let id = issue.id.clone();
+        seed_issue(&storage, issue);
+
+        // B runs when A's retry opens its session, before that session captures.
+        let concurrent_id = id.clone();
+        let storage = with_open_race(
+            storage,
+            2,
+            SessionRaceAction::Run(Box::new(move |storage| {
+                memory_executor(storage.clone())
+                    .pass_gate(
+                        &concurrent_id,
+                        "review".to_string(),
+                        Some("human:b".to_string()),
+                        false,
+                    )
+                    .unwrap();
+            })),
+        );
+        storage.inject_repository_state_apply_conflicts(1);
+        let executor = memory_executor(storage);
+
+        executor
+            .fail_gate(&id, "review".to_string(), Some("human:a".to_string()))
+            .unwrap();
+
+        let readiness = executor.get_required_gate_statuses_for_issue(&id).unwrap();
+        assert_eq!(
+            readiness,
+            vec![("review".to_string(), GateStatus::Failed)],
+            "A published last"
+        );
+        let (latest, not_run) = executor.get_last_gate_runs_for_issue(&id).unwrap();
+        assert!(not_run.is_empty());
+        let latest_status = latest
+            .iter()
+            .map(|run| {
+                let (state, _) = gate_check::gate_state_from_run(run).unwrap();
+                (run.gate_key.clone(), state.status)
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(latest_status, readiness);
     }
 
     #[test]
