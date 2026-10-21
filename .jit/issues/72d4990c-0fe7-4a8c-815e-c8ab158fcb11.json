@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T11:58:10.358556429Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -26,5 +27,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Render state symbols in the output layer",
-  "updated_at": "2026-10-21T01:01:02.115551205Z"
+  "updated_at": "2026-10-21T11:58:10.413998467Z"
 }

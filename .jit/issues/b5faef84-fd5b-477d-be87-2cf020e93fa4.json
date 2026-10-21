@@ -14,7 +14,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "failed",
-      "updated_at": "2026-10-21T11:47:43.139109209Z",
+      "updated_at": "2026-10-21T11:58:09.834406605Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -33,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Search endpoint returns no issue matches for the default nested data directory",
-  "updated_at": "2026-10-21T11:51:56.769441728Z"
+  "updated_at": "2026-10-21T11:58:09.834406605Z"
 }
