@@ -80,8 +80,9 @@ example test when you care about one specific input.
 
 ## 2. Harness Tests
 
-Location: `crates/jit/tests/common/harness.rs` (the harness, below Cargo's auto-discovery
-boundary so it is never its own test target) and the in-process suites that use it, such as
+Location: `crates/jit/src/test_harness.rs` (the harness, a `jit` library module gated on
+`cfg(any(test, feature = "test-support"))` so it compiles once for every target) and the
+in-process suites that use it, such as
 `crates/jit/tests/fast_docs_templates/harness_demo.rs`.
 
 `TestHarness` backs a real `CommandExecutor` with `InMemoryStorage`, so a test drives command
@@ -135,12 +136,10 @@ let h = TestHarness::new().with_item_kinds();
 
 ### Usage
 
-A suite that runs in-process declares the shared harness once in its `main.rs`
-(`#[path = "../common/harness.rs"] mod harness;`); each test module inside the suite reaches
-it through the crate root:
+A suite that runs in-process imports the shared harness from the `jit` library:
 
 ```rust
-use crate::harness::TestHarness;
+use jit::test_harness::TestHarness;
 
 #[test]
 fn test_harness_query_ready() {
@@ -209,8 +208,8 @@ vacuous, and substituting one makes the self-test fail. Every fixture is a
 dependency-free two-module crate with its own target directory, so the whole
 self-test costs seconds and never rebuilds this workspace.
 
-Shared helpers live below Cargo's auto-discovery boundary in `crates/jit/tests/common/`, so
-they never surface as their own test targets. Add a new integration case to the file that
+Shared in-process helpers live in the `jit` library's `test-support` surface (for example
+`crates/jit/src/test_harness.rs`), so they never surface as their own test targets. Add a new integration case to the file that
 matches its subsystem, or add a module file plus a `mod` line in the suite's `main.rs`.
 
 The CLI suites spawn the compiled binary through `env!("CARGO_BIN_EXE_jit")` against a
@@ -744,5 +743,5 @@ fn test_cli_defer_issue() {
 - [AGENTS.md](../AGENTS.md) - architecture, layer boundaries, coding conventions
 - [.github/copilot-instructions.md](../.github/copilot-instructions.md) - TDD guidelines and functional style
 - [docs/reference/jit-content-standards.md](../docs/reference/jit-content-standards.md) - content standards for docs and issues
-- [crates/jit/tests/common/harness.rs](../crates/jit/tests/common/harness.rs) - the harness implementation
+- [crates/jit/src/test_harness.rs](../crates/jit/src/test_harness.rs) - the harness implementation
 - [crates/jit/tests/fast_docs_templates/harness_demo.rs](../crates/jit/tests/fast_docs_templates/harness_demo.rs) - worked harness examples

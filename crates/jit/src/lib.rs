@@ -32,6 +32,8 @@ pub mod storage;
 // neither's vocabulary; nothing outside this crate writes a tar.
 pub(crate) mod tar_format;
 pub mod templates;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_harness;
 pub mod test_mode;
 pub mod test_taxonomy;
 pub mod test_utils;

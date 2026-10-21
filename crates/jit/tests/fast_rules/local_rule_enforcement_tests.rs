@@ -234,7 +234,7 @@ fn test_update_enforce_rule_blocks_and_force_logs() {
     issue.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Removing the only req: label would violate the enforce rule -> blocked.
     let blocked = executor.update_issue(
@@ -317,7 +317,7 @@ assert = { require-label = { label = "owner:*", min = 1 } }
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     let updated_at_before = executor.storage().load_issue(&id).unwrap().updated_at;
     let events_before = executor.storage().read_events().unwrap().len();
@@ -399,7 +399,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     issue.labels = vec!["type:epic".to_string()];
     issue.state = State::Ready;
     let id = issue.id.clone();
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Adding a `bad:*` label via bulk update violates the schema -> error, no force.
     let filter = QueryFilter::parse("state:ready").unwrap();
@@ -457,7 +457,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
     issue.state = State::InProgress;
     issue.gates_required = vec!["manual-gate".to_string()]; // unpassed
     let id = issue.id.clone();
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     let result = executor.update_issue(
         &id,
@@ -521,7 +521,7 @@ assert = { json-schema = "schemas/no-bad.json" }
     let mut issue = crate::fixture_issue("An epic".to_string(), String::new());
     issue.labels = vec!["type:epic".to_string(), "bad:value".to_string()];
     issue.state = State::Ready;
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     // Adding a label the issue already has is a no-op (no field change), but the
     // issue still violates the enforce rule, so a forced write must log a bypass.
@@ -611,7 +611,7 @@ fn test_update_evaluates_rules_against_post_transition_shape() {
     issue.labels = vec!["type:task".to_string()];
     issue.state = State::Backlog;
     let id = issue.id.clone();
-    crate::harness::seed_memory_issue(executor.storage(), &issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &issue);
 
     let blocked = executor.update_issue(
         &id,

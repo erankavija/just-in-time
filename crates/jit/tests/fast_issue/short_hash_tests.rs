@@ -1,8 +1,8 @@
 //! Tests for short hash issue ID resolution
 //!
 //! Validates that partial UUID prefixes work like git short hashes.
-use crate::harness::TestHarness;
 use jit::storage::{InMemoryStorage, IssueStore};
+use jit::test_harness::TestHarness;
 use proptest::prelude::*;
 
 #[test]
@@ -236,7 +236,7 @@ fn make_storage() -> InMemoryStorage {
 fn seed_issue_with_id(storage: &InMemoryStorage, custom_id: &str, title: &str) {
     let mut issue = crate::fixture_issue(title.to_string(), String::new());
     issue.id = custom_id.to_string();
-    crate::harness::seed_memory_issue(storage, &issue);
+    jit::test_harness::seed_memory_issue(storage, &issue);
 }
 
 /// Return the normalized (lowercase, no hyphens) form of a UUID string.

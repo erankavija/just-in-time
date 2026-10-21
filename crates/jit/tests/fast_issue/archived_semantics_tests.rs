@@ -6,10 +6,10 @@
 //! the recorded pre-archive state exactly, closing the `done → archived → ready`
 //! resurrection loophole. These tests exercise the dependency, readiness,
 //! transition, rollup, revive, event-log, and compatibility surfaces.
-use crate::harness::TestHarness;
 use jit::domain::{Issue, State};
 use jit::output::StateRollup;
 use jit::storage::IssueStore;
+use jit::test_harness::TestHarness;
 
 /// Drive a dependency-free issue to `Done` (no gates required).
 fn drive_to_done(h: &TestHarness, id: &str) {
@@ -31,7 +31,7 @@ fn save_legacy_archived(h: &TestHarness, id: &str) {
     let mut issue = h.get_issue(id);
     issue.state = State::Archived;
     issue.archived_from = None;
-    crate::harness::seed_memory_issue(&h.storage, &issue);
+    jit::test_harness::seed_memory_issue(&h.storage, &issue);
 }
 
 fn count_state_changes(h: &TestHarness, id: &str) -> usize {

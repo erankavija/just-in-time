@@ -6,10 +6,10 @@
 //! creation (REQ-02), across whole-repository validation and its `--fix` remedy
 //! (REQ-04), and over arbitrary dependency edits (REQ-06).
 
-use crate::harness::TestHarness;
 use jit::commands::BatchIssueDef;
 use jit::domain::{queries::build_issue_map, Issue, State};
 use jit::storage::IssueStore;
+use jit::test_harness::TestHarness;
 use proptest::prelude::*;
 
 /// A batch entry with the given symbolic key, title, and in-batch dependencies.
@@ -109,7 +109,7 @@ fn test_validate_reports_a_ready_issue_with_an_unmet_dependency_as_a_violation()
     // `Ready` while the dependency that blocks it is untouched.
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
-    crate::harness::seed_memory_issue(&h.storage, &incoherent);
+    jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
     let error = h
         .executor
@@ -136,7 +136,7 @@ fn test_validate_fix_demotes_a_ready_issue_that_carries_an_unmet_dependency() {
     h.executor.add_dependency(&dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
-    crate::harness::seed_memory_issue(&h.storage, &incoherent);
+    jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
     let (fixes, _messages) = h.executor.validate_with_fix(true, false).unwrap();
 
@@ -156,7 +156,7 @@ fn test_validate_fix_records_the_repair_demotion_in_the_event_log() {
     h.executor.add_dependency(&dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
-    crate::harness::seed_memory_issue(&h.storage, &incoherent);
+    jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
     let events_before = h.storage.read_events().unwrap().len();
 
     h.executor.validate_with_fix(true, false).unwrap();
@@ -182,7 +182,7 @@ fn test_validate_fix_dry_run_reports_the_incoherent_issue_without_repairing_it()
     h.executor.add_dependency(&dependent, &upstream).unwrap();
     let mut incoherent = h.get_issue(&dependent);
     incoherent.state = State::Ready;
-    crate::harness::seed_memory_issue(&h.storage, &incoherent);
+    jit::test_harness::seed_memory_issue(&h.storage, &incoherent);
 
     let (fixes, messages) = h.executor.validate_with_fix(true, true).unwrap();
 

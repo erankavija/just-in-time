@@ -23,7 +23,7 @@ trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
 impl ScopeFixtureStore for InMemoryStorage {
     fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String {
         let id = issue.id.clone();
-        crate::harness::seed_memory_issue(executor.storage(), &issue);
+        jit::test_harness::seed_memory_issue(executor.storage(), &issue);
         id
     }
 }
@@ -320,7 +320,7 @@ fn test_rule_validation_uses_selected_issue_and_repository_context() {
     );
     let mut rejected_issue = executor.storage().load_issue(&rejected).unwrap();
     rejected_issue.state = State::Rejected;
-    crate::harness::seed_memory_issue(executor.storage(), &rejected_issue);
+    jit::test_harness::seed_memory_issue(executor.storage(), &rejected_issue);
     let rejected_short = rejected_issue.short_id();
     let historical = seed(
         &executor,
@@ -411,7 +411,7 @@ fn test_rule_validation_reports_selected_container_errors_precisely() {
         let mut target = crate::fixture_issue(title.to_string(), String::new());
         target.id = id.to_string();
         target.labels = vec!["type:epic".to_string()];
-        crate::harness::seed_memory_issue(executor.storage(), &target);
+        jit::test_harness::seed_memory_issue(executor.storage(), &target);
     });
     let ambiguous = seed(
         &executor,
@@ -436,7 +436,7 @@ fn test_rule_validation_resolves_rejected_selected_container() {
     let (selected, container) = selected_rule_fixture(&executor);
     let mut rejected = executor.storage().load_issue(&container).unwrap();
     rejected.state = State::Rejected;
-    crate::harness::seed_memory_issue(executor.storage(), &rejected);
+    jit::test_harness::seed_memory_issue(executor.storage(), &rejected);
 
     let report = executor
         .validate_rule(&selected, "selected-coverage")

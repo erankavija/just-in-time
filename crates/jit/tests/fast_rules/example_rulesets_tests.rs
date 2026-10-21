@@ -699,7 +699,7 @@ mod sdd_lifecycle {
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        crate::harness::seed_memory_issue(executor.storage(), &epic);
+        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
 
         // Attempt to transition to done: must be blocked.
         let result = executor.update_issue(
@@ -799,7 +799,7 @@ mod sdd_lifecycle {
         epic.labels = vec!["type:epic".to_string(), "req:REQ-01".to_string()];
         epic.state = State::InProgress;
         let epic_id = epic.id.clone();
-        crate::harness::seed_memory_issue(executor.storage(), &epic);
+        jit::test_harness::seed_memory_issue(executor.storage(), &epic);
 
         // Seed a done child the epic depends on (containment) satisfying REQ-01.
         let mut child = crate::fixture_issue("implement REQ-01".to_string(), String::new());
@@ -809,7 +809,7 @@ mod sdd_lifecycle {
         ];
         child.state = State::Done;
         let child_id = child.id.clone();
-        crate::harness::seed_memory_issue(executor.storage(), &child);
+        jit::test_harness::seed_memory_issue(executor.storage(), &child);
         // Wire containment: the epic depends on its child.
         executor.add_dependency(&epic_id, &child_id).unwrap();
 
@@ -1552,7 +1552,7 @@ assert = { label-coverage = { criteria-section = "hypotheses", marker = "[hard]"
         issue.labels = labels.iter().map(|s| s.to_string()).collect();
         issue.state = state;
         let id = issue.id.clone();
-        crate::harness::seed_memory_issue(executor.storage(), &issue);
+        jit::test_harness::seed_memory_issue(executor.storage(), &issue);
         id
     }
 
