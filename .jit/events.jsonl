@@ -17602,3 +17602,10 @@
 {"gate_key":"code-review","id":"c517b061-0269-476c-bd9c-bdc0d9711922","issue_id":"66986f88-b4fb-402a-9d2c-d643033c94a7","timestamp":"2026-10-21T06:38:38.449443626Z","type":"gate_passed","updated_by":"auto:executor"}
 {"assignee":"agent:jit-execution-lead","id":"d68deb12-cdc8-4d26-b3aa-1a8b5bed3410","issue_id":"866bdde0-94f6-4af7-b2b0-d3d454a59afe","timestamp":"2026-10-21T06:38:38.567372114Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"6d8740a4-9b85-480c-954a-cafcad90e4b9","issue_id":"866bdde0-94f6-4af7-b2b0-d3d454a59afe","timestamp":"2026-10-21T06:38:38.636931354Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"287b03c8-e9f9-435c-8dd1-94ccfeb172ff","issue_id":"c0d0c8bf-679f-463b-87ca-25cae8945646","timestamp":"2026-10-21T06:40:29.909914217Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"28b2b9bd-05d7-4c05-917d-aad5643e4ef2","issue_id":"fd9bfab8-63dd-40d3-92a2-2dfb3d17260d","timestamp":"2026-10-21T06:42:39.976348789Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"3fa4058b-7b75-40bf-8302-3811c8a015e2","issue_id":"0ec8b001-ef0b-49c8-82a9-536ca896996c","timestamp":"2026-10-21T06:43:07.427654207Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"5c68e4e8-77d5-4cc8-8962-74a2116003e4","issue_id":"ae2e3739-f5f7-42be-8ae4-8ae3e1866800","timestamp":"2026-10-21T06:44:59.630284961Z","type":"gate_failed","updated_by":"auto:executor"}
+{"assignee":"agent:planning-lead-f8a6b298","id":"22bb44ed-95fb-426b-8de0-4484ababcccc","issue_id":"5e615dc2-5ca4-4a8c-b94a-dd8689894069","timestamp":"2026-10-21T06:46:40.893261935Z","type":"issue_claimed"}
+{"gate_key":"code-review","id":"a9e7fc87-1c92-4f34-bae2-13a14209ea73","issue_id":"c0d0c8bf-679f-463b-87ca-25cae8945646","timestamp":"2026-10-21T06:47:29.854954447Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"doc-review","id":"eacf9f9c-d830-44d2-b92f-036b5fd03989","issue_id":"66986f88-b4fb-402a-9d2c-d643033c94a7","timestamp":"2026-10-21T06:47:52.993856377Z","type":"gate_failed","updated_by":"auto:executor"}
