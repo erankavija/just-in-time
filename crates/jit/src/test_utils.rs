@@ -6,6 +6,7 @@
 
 use crate::commands::CommandExecutor;
 use crate::commands::ProfileSelector;
+use crate::domain::DocumentReference;
 use crate::profile::{capture_package_tree, CapturedPackageTree, ProfilePackage};
 use crate::repository_state::{FileMode, VirtualPath};
 use crate::storage::worktree_paths::WorktreePaths;
@@ -24,6 +25,40 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, SystemTime};
 use tempfile::TempDir;
+
+/// A reference to `path` at HEAD with no label, type, format, or assets.
+pub fn document_reference(path: impl Into<String>) -> DocumentReference {
+    DocumentReference {
+        path: path.into(),
+        commit: None,
+        label: None,
+        doc_type: None,
+        format: None,
+        assets: Vec::new(),
+    }
+}
+
+/// A reference to `path` pinned to `commit`.
+pub fn document_reference_at(
+    path: impl Into<String>,
+    commit: impl Into<String>,
+) -> DocumentReference {
+    DocumentReference {
+        commit: Some(commit.into()),
+        ..document_reference(path)
+    }
+}
+
+/// A reference to `path` at HEAD carrying the document type `doc_type`.
+pub fn document_reference_typed(
+    path: impl Into<String>,
+    doc_type: impl Into<String>,
+) -> DocumentReference {
+    DocumentReference {
+        doc_type: Some(doc_type.into()),
+        ..document_reference(path)
+    }
+}
 
 /// Serializes tests that temporarily change the process-wide working directory.
 ///

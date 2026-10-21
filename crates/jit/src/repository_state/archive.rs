@@ -598,11 +598,11 @@ mod tests {
         PendingDeletion, PolicyStatus,
     };
     use crate::domain::types::fixture_issue;
-    use crate::domain::DocumentReference;
     use crate::repository_state::{
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, RepositoryImage,
         RepositoryLayout, RepositoryRootEvidence,
     };
+    use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::BTreeMap;
 
     fn layout() -> RepositoryLayout {
@@ -868,10 +868,7 @@ mod tests {
     fn test_finalize_archive_execution_relink_targets_pinned_document() {
         let mut issue = fixture_issue("Owner".into(), String::new());
         issue.id = "owner-1".into();
-        issue.documents = vec![DocumentReference::at_commit(
-            "doc.md".into(),
-            "a".repeat(40),
-        )];
+        issue.documents = vec![document_reference_at("doc.md", "a".repeat(40))];
         let change = ReferenceChange {
             issue: issue.id.clone(),
             document_index: 0,
@@ -891,7 +888,7 @@ mod tests {
     fn test_finalize_archive_execution_relink_stale() {
         let mut issue = fixture_issue("Owner".into(), String::new());
         issue.id = "owner-1".into();
-        issue.documents = vec![DocumentReference::new("other.md".into())];
+        issue.documents = vec![document_reference("other.md")];
         let change = ReferenceChange {
             issue: issue.id.clone(),
             document_index: 0,

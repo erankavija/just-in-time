@@ -885,62 +885,6 @@ pub struct DocumentReference {
     pub assets: Vec<crate::document::Asset>,
 }
 
-impl DocumentReference {
-    /// Create a new document reference pointing to HEAD
-    #[allow(dead_code)]
-    pub fn new(path: String) -> Self {
-        Self {
-            path,
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: Vec::new(),
-        }
-    }
-
-    /// Create a reference to a document at a specific commit
-    #[allow(dead_code)]
-    pub fn at_commit(path: String, commit: String) -> Self {
-        Self {
-            path,
-            commit: Some(commit),
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: Vec::new(),
-        }
-    }
-
-    /// Builder method to add a label
-    #[allow(dead_code)]
-    pub fn with_label(mut self, label: String) -> Self {
-        self.label = Some(label);
-        self
-    }
-
-    /// Builder method to add a document type
-    #[allow(dead_code)]
-    pub fn with_type(mut self, doc_type: String) -> Self {
-        self.doc_type = Some(doc_type);
-        self
-    }
-
-    /// Builder method to add format
-    #[allow(dead_code)]
-    pub fn with_format(mut self, format: String) -> Self {
-        self.format = Some(format);
-        self
-    }
-
-    /// Builder method to set assets
-    #[allow(dead_code)]
-    pub fn with_assets(mut self, assets: Vec<crate::document::Asset>) -> Self {
-        self.assets = assets;
-        self
-    }
-}
-
 /// Structured context passed to gate checker processes
 ///
 /// When `pass_context` is enabled on a gate checker, this context is serialized
@@ -2104,6 +2048,7 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_utils::{document_reference, document_reference_at};
 
     fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
         let mut issue = fixture_issue("Archived".to_string(), String::new());
@@ -2468,35 +2413,11 @@ mod tests {
     }
 
     #[test]
-    fn test_document_reference_new() {
-        let doc = DocumentReference::new("docs/design.md".to_string());
-        assert_eq!(doc.path, "docs/design.md");
-        assert_eq!(doc.commit, None);
-        assert_eq!(doc.label, None);
-        assert_eq!(doc.doc_type, None);
-    }
-
-    #[test]
-    fn test_document_reference_at_commit() {
-        let doc = DocumentReference::at_commit("docs/design.md".to_string(), "a1b2c3d".to_string());
-        assert_eq!(doc.path, "docs/design.md");
-        assert_eq!(doc.commit, Some("a1b2c3d".to_string()));
-    }
-
-    #[test]
-    fn test_document_reference_builder() {
-        let doc = DocumentReference::new("docs/design.md".to_string())
-            .with_label("API Design".to_string())
-            .with_type("design".to_string());
-
-        assert_eq!(doc.label, Some("API Design".to_string()));
-        assert_eq!(doc.doc_type, Some("design".to_string()));
-    }
-
-    #[test]
     fn test_document_reference_serialization() {
-        let doc = DocumentReference::new("docs/design.md".to_string())
-            .with_label("Design Doc".to_string());
+        let doc = DocumentReference {
+            label: Some("Design Doc".to_string()),
+            ..document_reference("docs/design.md")
+        };
 
         let json = serde_json::to_string(&doc).unwrap();
         let deserialized: DocumentReference = serde_json::from_str(&json).unwrap();
@@ -2510,9 +2431,7 @@ mod tests {
             crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
         assert_eq!(issue.documents.len(), 0);
 
-        issue
-            .documents
-            .push(DocumentReference::new("docs/design.md".to_string()));
+        issue.documents.push(document_reference("docs/design.md"));
         assert_eq!(issue.documents.len(), 1);
         assert_eq!(issue.documents[0].path, "docs/design.md");
     }
@@ -2521,10 +2440,10 @@ mod tests {
     fn test_issue_serialization_with_documents() {
         let mut issue =
             crate::domain::types::fixture_issue("Test".to_string(), "Description".to_string());
-        issue.documents.push(
-            DocumentReference::at_commit("docs/design.md".to_string(), "abc123".to_string())
-                .with_label("Design".to_string()),
-        );
+        issue.documents.push(DocumentReference {
+            label: Some("Design".to_string()),
+            ..document_reference_at("docs/design.md", "abc123")
+        });
 
         let json = serde_json::to_string(&issue).unwrap();
         let deserialized: Issue = serde_json::from_str(&json).unwrap();

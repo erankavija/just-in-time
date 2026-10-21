@@ -1602,6 +1602,7 @@ mod tests {
         GateFindings, GateRunResult, GateRunStatus, State, GATE_RUN_SCHEMA_VERSION,
     };
     use crate::storage::{InMemoryStorage, IssueStore, JsonFileStorage, MutationPoint, RedoPoint};
+    use crate::test_utils::document_reference;
     use chrono::{TimeZone, Utc};
     use std::collections::HashMap;
     use std::path::PathBuf;
@@ -2722,9 +2723,7 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
             .add_gate(&issue_id, "editable-review".to_string())
             .unwrap();
         let mut issue = executor.storage.load_issue(&issue_id).unwrap();
-        issue.documents.push(crate::domain::DocumentReference::new(
-            "../../outside".to_string(),
-        ));
+        issue.documents.push(document_reference("../../outside"));
         let bytes = crate::repository_state::serialize_issue(&issue).unwrap();
         std::fs::write(
             repo.path().join(format!(".jit/issues/{issue_id}.json")),
