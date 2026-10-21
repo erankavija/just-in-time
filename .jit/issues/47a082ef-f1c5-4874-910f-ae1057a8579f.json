@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T05:56:43.506146216Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,24 @@
   ],
   "description": "The in-memory storage backend parses each event line strictly and fails on a retired event tag, while the JSON backend skips such records. Both backends load a log through one parser, and one cross-backend test owns the property.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-76`) deserializes a record only when its type is in `EventTag::ALL` (`:66`) and skips other well-formed records. The JSON backend reads through it (`storage/json.rs:160,1352`), and so do `repository_state/mutation.rs:684` and `repository_state/archive.rs:465`.\n\n`InMemoryStorage::load_events` (`storage/memory.rs:480-492`) deserializes each line straight into `Event` with `serde_json::from_str`, so a log holding a retired tag fails to load in that backend. The two backends diverge on one interface (`@/inv/shared-test-contracts`).\n\nThe property is owned by a JSON-only test, `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1830`). No `IssueStore` conformance suite for event reads exists. The shared suites that run both backends are the cross-backend conformance matrix in `storage/repository_state_store_tests.rs:660`, which covers capture and publication semantics, and the redo interruption matrix in `storage/redo_conformance.rs`. Each backend seeds itself through its `test_fixtures` module (`storage/memory.rs:1330`, `storage/redo_apply.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: `InMemoryStorage` loads its event log through `parse_known_events`, and no strict per-line event deserialization remains in storage.\n- [hard] REQ-02: One cross-backend test, run against both the JSON and in-memory backends, proves that a log holding a structurally valid retired tag loads, skipping that record and keeping every known record in order, and that a malformed known record is an error.\n- [hard] REQ-03: The JSON-only retired-tag test no longer exists; its assertions live in the cross-backend test.\n\n## Notes\n\nThe cross-backend test joins the existing cross-backend conformance matrix in `storage/repository_state_store_tests.rs`, which already seeds both backends.\n",
   "documents": [],
+  "done_at": "2026-10-21T06:37:56.588918303Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:36:40.494989610Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:37:46.816332889Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "47a082ef-f1c5-4874-910f-ae1057a8579f",
   "labels": [
     "type:task",
@@ -25,7 +37,7 @@
     "satisfies:842b0ac6/REQ-08"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Parse in-memory event logs through the shared event parser",
-  "updated_at": "2026-10-21T05:56:43.561574548Z"
+  "updated_at": "2026-10-21T06:37:56.588918303Z"
 }
