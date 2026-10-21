@@ -193,7 +193,7 @@
           "short_id": "df129d9e",
           "title": "Dispatch layering, executor surface, and build hygiene in crates/jit",
           "wave": 2,
-          "status": "planning"
+          "status": "executing"
         },
         {
           "id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
@@ -355,6 +355,19 @@
       "date": "2026-10-21",
       "category": "project-wide infrastructure",
       "summary": "OD-9: this checkout's drift checks keep the jit-dogfood package manifest and .jit/ in sync. D-8 states that no drift check exists for applied profiles, but it does not name this repository-local consistency check. Decide whether to keep it (dogfood package must mirror .jit/), remove it under D-8/D-18, or replace it by deriving one from the other. Outside 3d9a0ce3's scope until decided."
+    },
+    {
+      "container_short_id": "df129d9e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Cross-epic edges: 083c9a91 (claims facade) now depends on 842b0ac6's d759d606 (claim storage type parameter). The 2195c98f task-level ordering (CLI dispatch after handler migrations; error-code vocabulary before retire-unproduced-error-codes) is delegated to just-in-time-59 for its breakdown. 0f8efc37 notes now state that it consumes df129d9e's repository bootstrap and executor search entry point, and that REQ-13 covers hidden_commands()."
+    },
+    {
+      "container_short_id": "df129d9e",
+      "status": "blocked-for-user",
+      "date": "2026-10-21",
+      "category": "project-wide infrastructure",
+      "summary": "CI clippy bar mismatch: GitHub CI runs clippy with --all-features and the cargo-ci gate does not. Decide which bar is authoritative and align the other. This is outside df129d9e REQ-06."
     }
   ],
   "notes": [
@@ -367,7 +380,8 @@
     "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up.",
     "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces.",
     "2026-10-21: 842b0ac6 planning accepted (P 201634a8 and B 6792cc41 done; 38 tasks, 42 edges). Execution is assigned to just-in-time-7e, the same session that planned it, because no other session is free. The deviation from the fresh-lead rule is contained: the gated breakdown is fixed, and changes go through escalation and a new planning pass.",
-    "2026-10-21: 3d9a0ce3 planned (both gates passed; 35 new tasks joined to 7 existing children; REQ-14/15 added). Execution was dispatched to a fresh background execution-lead subagent. A breakdown dep add transitively reduced bb03df0a: its direct edges to 5f71a48d and f4d9502a are gone, and both stay reachable through 3d9a0ce3."
+    "2026-10-21: 3d9a0ce3 planned (both gates passed; 35 new tasks joined to 7 existing children; REQ-14/15 added). Execution was dispatched to a fresh background execution-lead subagent. A breakdown dep add transitively reduced bb03df0a: its direct edges to 5f71a48d and f4d9502a are gone, and both stay reachable through 3d9a0ce3.",
+    "2026-10-21: df129d9e planned (78 issues, 227 edges; both gates passed). Execution was dispatched to a fresh background execution-lead subagent."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
