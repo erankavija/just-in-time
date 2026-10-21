@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-10-21T01:29:09.264239788Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -26,5 +27,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Introduce the generic ListEnvelope type",
-  "updated_at": "2026-10-21T01:25:15.142235148Z"
+  "updated_at": "2026-10-21T01:29:09.264239788Z"
 }
