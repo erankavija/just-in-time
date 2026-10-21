@@ -204,8 +204,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Applies operations to all matched issues with per-issue atomicity.
     /// Best-effort: continues on errors, tracks successes and failures.
-    /// A batch that moves issues to a terminal state ends with one dependent-readiness
-    /// cascade, as the single-issue update runs.
+    /// A batch that moves at least one issue into a terminal state ends with one
+    /// dependent-readiness cascade, as the single-issue update runs.
     ///
     /// Only opens per-issue preflight/publication sessions for matched issues
     /// that are not confirmed no-ops. [`UpdateOperations::is_provable_noop`]
@@ -261,6 +261,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .unwrap_or_default()
         };
 
+        let mut entered_terminal = false;
         for issue in matched {
             if confirmed_skips.contains(&issue.id) {
                 result
@@ -269,11 +270,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                 continue;
             }
             match self.apply_operations_to_issue(issue, operations, force) {
-                Ok((modified, issue_warnings)) => {
-                    for msg in issue_warnings {
+                Ok(outcome) => {
+                    entered_terminal |= outcome.entered_terminal;
+                    for msg in outcome.warnings {
                         result.warnings.push((issue.id.clone(), msg));
                     }
-                    if modified {
+                    if outcome.changed {
                         result.modified.push(issue.id.clone());
                     } else {
                         result
@@ -289,7 +291,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // One cascade after the batch, as the single-issue update runs after
         // its terminal change.
-        if !result.modified.is_empty() && operations.state.is_some_and(State::is_terminal) {
+        if entered_terminal {
             self.check_auto_transitions()?;
         }
 
@@ -422,8 +424,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Best-effort operation: applies all changes that pass validation,
     /// tracks which fields were modified, and logs appropriate events.
     ///
-    /// Returns `Ok((modified, warnings))` where `modified` is `true` when the issue
-    /// was changed and `warnings` carries non-enforcing graph-rule findings from the
+    /// Returns the publication outcome: whether the issue changed, whether it
+    /// entered a terminal state, and the non-enforcing graph-rule warnings from the
     /// state transition (if any).  Returns `Err` on hard failures so the caller can
     /// record the issue in its `errors` list and continue best-effort.
     ///
@@ -441,7 +443,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue: &Issue,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<(bool, Vec<String>)>
+    ) -> Result<CapturedFieldUpdateOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2044,6 +2046,35 @@ mod tests {
             ..Default::default()
         };
         executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        assert_eq!(reader.load_issue("aaaa1111").unwrap().state, State::Backlog);
+    }
+
+    /// REQ-03: a terminal target that changes only issues already in that state
+    /// leaves a stale backlog dependent untouched.
+    #[test]
+    fn test_apply_bulk_update_terminal_target_over_already_terminal_issue_leaves_dependent_unchanged(
+    ) {
+        use crate::storage::IssueStore;
+
+        let storage = crate::storage::InMemoryStorage::new();
+        let mut dependent = create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]);
+        dependent.dependencies = vec!["bbbb2222".to_string()];
+        crate::commands::test_helpers::seed_issue(&storage, dependent);
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("bbbb2222", State::Done, vec!["type:task"]),
+        );
+        let reader = storage.clone();
+        let mut executor = crate::commands::test_helpers::memory_executor(storage);
+        let filter = QueryFilter::parse("state:done").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::Done),
+            add_labels: vec!["milestone:v1.0".to_string()],
+            ..Default::default()
+        };
+        let result = executor.apply_bulk_update(&filter, &ops, false).unwrap();
+        assert_eq!(result.modified, vec!["bbbb2222".to_string()]);
 
         assert_eq!(reader.load_issue("aaaa1111").unwrap().state, State::Backlog);
     }
