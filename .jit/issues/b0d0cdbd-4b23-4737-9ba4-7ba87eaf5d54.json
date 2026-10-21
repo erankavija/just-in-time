@@ -1,0 +1,43 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:46:10.226099400Z",
+  "dependencies": [
+    "28ccf9a9-939a-40e4-9c5c-e3cee6e1c7c3"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Reach git through one storage-owned CLI module instead of libgit2 (f4d9502a) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-21T10:46:10.226099400Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-21T10:46:10.226099400Z",
+      "updated_by": null
+    }
+  },
+  "id": "b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54",
+  "labels": [
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "component:storage",
+    "component:core",
+    "component:gates",
+    "component:validation",
+    "per:@/charter/D-21",
+    "per:@/charter/D-4",
+    "type:breakdown",
+    "brackets:f4d9502a"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "breakdown: Reach git through one storage-owned CLI module instead of libgit2",
+  "updated_at": "2026-10-21T10:46:10.226099400Z"
+}

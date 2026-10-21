@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:45:34.434086131Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d759d606-cf7b-4548-9fbe-bcf48793856e",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Drop the unused storage type parameter from claim commands",
-  "updated_at": "2026-10-21T10:42:58.832682676Z"
+  "updated_at": "2026-10-21T10:45:34.434086131Z"
 }
