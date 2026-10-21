@@ -767,9 +767,9 @@ impl<S: IssueStore + RepositoryStateStore> CommandExecutor<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::DocumentReference;
     use crate::snapshot::{IssuesInfo, MetadataInfo, RepoInfo, SnapshotManifest, VerificationInfo};
     use crate::storage::InMemoryStorage;
+    use crate::test_utils::document_reference;
     use std::collections::HashMap;
 
     fn exporter(storage: &InMemoryStorage) -> SnapshotExporter<'_, InMemoryStorage> {
@@ -897,34 +897,13 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         let mut issue1 = crate::domain::types::fixture_issue("Issue 1".to_string(), String::new());
-        issue1.documents.push(DocumentReference {
-            path: "docs/design.md".to_string(),
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: vec![],
-        });
+        issue1.documents.push(document_reference("docs/design.md"));
         crate::commands::test_helpers::seed_issue(&storage, issue1.clone());
 
         let mut issue2 = crate::domain::types::fixture_issue("Issue 2".to_string(), String::new());
-        issue2.documents.push(DocumentReference {
-            path: "docs/impl.md".to_string(),
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: vec![],
-        });
+        issue2.documents.push(document_reference("docs/impl.md"));
         // Duplicate document reference
-        issue2.documents.push(DocumentReference {
-            path: "docs/design.md".to_string(),
-            commit: None,
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: vec![],
-        });
+        issue2.documents.push(document_reference("docs/design.md"));
         crate::commands::test_helpers::seed_issue(&storage, issue2.clone());
 
         let exporter = exporter(&storage);

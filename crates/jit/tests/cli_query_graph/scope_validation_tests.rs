@@ -15,6 +15,7 @@
 use jit::commands::CommandExecutor;
 use jit::domain::{DocumentReference, State};
 use jit::storage::{InMemoryStorage, IssueStore, RepositoryStateStore};
+use jit::test_utils::document_reference;
 
 trait ScopeFixtureStore: IssueStore + RepositoryStateStore {
     fn publish_scope_issue(executor: &CommandExecutor<Self>, issue: jit::domain::Issue) -> String;
@@ -107,12 +108,8 @@ fn wire_plan_bracket<S: ScopeFixtureStore>(
     p.labels = vec!["type:planning".to_string()];
     p.state = planning_state;
     p.documents.push(DocumentReference {
-        path: plan_path.to_string(),
-        commit: None,
         label: Some("plan".to_string()),
-        doc_type: None,
-        format: None,
-        assets: Vec::new(),
+        ..document_reference(plan_path)
     });
     let p_id = S::publish_scope_issue(executor, p);
 
