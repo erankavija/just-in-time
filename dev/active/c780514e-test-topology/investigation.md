@@ -42,7 +42,7 @@ The Background misses six facts:
 | 7 | `batch_create.rs:686-711` repeats `graph/keyed.rs` tests over an adapter. | valid-and-open | `detect_cycle` is at `crates/jit/src/commands/batch_create.rs:640`, with four tests at `:686-707`. The owner `crates/jit/src/graph/keyed.rs:145-195` includes a proptest at `:344`. |
 | 8 | `harness_demo.rs:133`, `integration_test.rs:616`, and `exit_code_tests.rs:69` re-prove cycle rejection. | valid-and-open | All three cited lines match. §D.3 classifies three more cycle tests; each owns a different property. |
 | 9 | About 800 lines at `repository_state_store_tests.rs:1735-2555` re-prove finalization. | invalid-as-stated (location) | The section is now `crates/jit/src/storage/repository_state_store_tests.rs:1754-2585` ("REQ-01: typed mutation determinism"). Its own comment (`:1756-1760`) says the finalizer is a pure function of the image, which confirms the re-proof. The file has 3,810 lines. |
-| 10 | 19 tests in `list_envelope_tests.rs` assert `count == len`, again at `search_tests.rs:236`, `artifact_conformance_cli_tests.rs:647`, and `profile_cli_tests.rs:1940`. | invalid-as-stated (locations, scope) | 19 tests confirmed. Re-assertions now sit at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs:~640`, `profile_cli_tests.rs:1695` (`assert_count_envelope`, not `:1940`), `worktree_cli_tests.rs:546,1036`, `container_rollup_tests.rs:211,348`, and `cli_issue/issue_search_json_tests.rs:234`. New since `79c177fbd`: `crates/jit/src/domain/list_envelope.rs` derives `count` and owns it in unit tests (`:261`, `:305`). Only `ProfileCollection` uses it (`crates/jit/src/profile/application.rs:29`). 39 hand-written `count: usize` fields remain (25 in `output.rs`), plus inline `json!` bodies in `main.rs`. Twelve list-emitting commands have no typed output schema (§D.4), so a schema-driven enumeration misses them. |
+| 10 | 19 tests in `list_envelope_tests.rs` assert `count == len`, again at `search_tests.rs:236`, `artifact_conformance_cli_tests.rs:647`, and `profile_cli_tests.rs:1940`. | invalid-as-stated (locations, scope) | 19 tests confirmed. Re-assertions now sit at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs:~640`, `profile_cli_tests.rs:1695` (`assert_count_envelope`, not `:1940`), `worktree_cli_tests.rs:546,1036`, `container_rollup_tests.rs:211,348`, and `cli_issue/issue_search_json_tests.rs:234`. New since `79c177fbd`: `crates/jit/src/domain/list_envelope.rs` derives `count` and owns it in unit tests (`:261`, `:305`). Only `ProfileCollection` uses it (`crates/jit/src/profile/application.rs:29`). Since 650e6a56, the output module's count structs are `ListEnvelope` instantiations. Sixteen list-emitting commands still have no typed output schema (§D.4, derived from emission sites), so a schema-driven enumeration misses them. |
 
 ### Fixtures and contracts
 
@@ -250,15 +250,24 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
 
 ### D.2 Projected exit codes asserted outside the projection suite
 
-Numeric exit-code assertions (`.code(N)`, `status.code() == Some(N)`) per file, excluding `exit_code_tests.rs`, the parity suite and the projection suite. The projection's wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command, so each such assertion re-proves a row unless the command and code pair has no row. `failure_probe_fixture.rs` records statuses as corpus data and is not a re-proof.
+Sweep over `crates/jit/tests/cli_*`, excluding `exit_code_tests.rs`, the parity suite and the projection suite. It covers four forms:
+
+- numeric `.code(N)`;
+- `status.code()` compared with `Some(…)`, single-line or multi-line, where the expected value is a literal, `ExitCode::X`, or a derived `code.exit_code().code()`;
+- symbolic `ExitCode::X.code()` and `ExitCode::X as i32`;
+- helpers that take an expected exit code (`profile_acceptance_tests.rs:105` `failed_json_with_path`).
+
+The projection's wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command, so each such assertion re-proves a row unless its command and code pair has no row. Several tests use the code as their only evidence of the error class on a path, for example `repo_discovery_tests.rs:355` ("NotFound (3), not GenericError (1)") and the lock timeouts in `lock_contention_tests.rs:66` and `profile_concurrency_tests.rs:119`. These need another class witness, such as the `--json` envelope's `error.code`.
 
 | Target | Files (assertion sites) |
 | --- | --- |
-| `cli_gate` | `gate_evaluate_exit_code_test.rs` (9; 13 tests, whose added property is the JSON verdict), `gate_cli_integration_test.rs` (7), `gate_status_all_strict_test.rs` (5), `gate_evaluate_rerun_test.rs` (4), `gate_evaluate_all_test.rs` (2), and one each in `gate_findings_test.rs`, `bracket_coverage_gate_run_test.rs`, `gate_preset_apply_json_failure_test.rs` and `gate_status_all_lean_response_test.rs` |
-| `cli_issue` | `batch_create_tests.rs` (10), `top_level_failure_envelope_tests.rs` (6), `issue_status_projection_tests.rs` (4), `issue_show_projection_test.rs` (4), `issue_create_description_file_tests.rs` (3), and one each in `stored_record_classification_tests.rs`, `search_exit_status_tests.rs`, `snapshot_export_tests.rs`, `verb_hint_tests.rs`, `serve_failure_envelope_tests.rs` and `container_rollup_tests.rs` |
-| `cli_query_graph` | `check_links_tests.rs` (7), `dep_add_redundancy_cli_tests.rs` (4), `graph_json_tests.rs` (2), `label_query_json_tests.rs` (2), `scope_validation_tests.rs` (2) |
-| `cli_item_validate` | `validate_cli_rule_tests.rs` (6), `invariant_check_cli_tests.rs` (4), `derived_state_repair_tests.rs` (3), `validation_lease_tests.rs` (1) |
-| `cli_repo_workflow` | `profile_cli_tests.rs` (9), `claim_integration_tests.rs` (5), `config_get_tests.rs` (4), `project_config_tests.rs` (2), `worktree_cli_tests.rs` (1), `integration_test.rs` (1) |
+| `cli_gate` | `gate_evaluate_exit_code_test.rs` (13 sites in 13 tests, whose added property is the JSON verdict), `gate_evaluate_all_test.rs` (9), `gate_cli_integration_test.rs` (7), `gate_status_all_strict_test.rs` (5), `gate_evaluate_rerun_test.rs` (5), `gate_preset_apply_json_failure_test.rs` (2), and one each in `gate_findings_test.rs`, `bracket_coverage_gate_run_test.rs` and `gate_status_all_lean_response_test.rs` |
+| `cli_issue` | `batch_create_tests.rs` (10), `top_level_failure_envelope_tests.rs` (6), `issue_status_projection_tests.rs` (4), `issue_show_projection_test.rs` (4), `issue_create_description_file_tests.rs` (3), and one each in `error_json_tests.rs`, `issue_search_label_filter_tests.rs` (`ExitCode::InvalidArgument`), `stored_record_classification_tests.rs`, `search_exit_status_tests.rs`, `snapshot_export_tests.rs`, `verb_hint_tests.rs`, `serve_failure_envelope_tests.rs` and `container_rollup_tests.rs` |
+| `cli_query_graph` | `check_links_tests.rs` (7), `dep_add_redundancy_cli_tests.rs` (7), `scope_validation_tests.rs` (4), `graph_json_tests.rs` (2), `label_query_json_tests.rs` (2, derived from the error classification) |
+| `cli_item_validate` | `validate_cli_rule_tests.rs` (6), `invariant_check_cli_tests.rs` (4), `derived_state_repair_tests.rs` (3), `project_render_cli_tests.rs` (1), `validation_lease_tests.rs` (1) |
+| `cli_repo_workflow` | `profile_cli_tests.rs` (9), `claim_integration_tests.rs` (5), `config_get_tests.rs` (4), `project_config_tests.rs` (4), `serve_cli_tests.rs` (2), and one each in `first_guess_residuals_test.rs`, `format_compat_cli_tests.rs`, `integration_test.rs`, `lock_contention_tests.rs` (`ExitCode::LockTimeout`), `profile_concurrency_tests.rs`, `repo_discovery_tests.rs` and `worktree_cli_tests.rs`; `profile_acceptance_tests.rs` asserts through its `failed_json_with_path` helper |
+
+Out of scope: three recorded-corpus contracts compare statuses against the registered error classification. They are `failure_probe_fixture.rs` (`:1101`, `:1251`), `failure_envelope_contract_tests.rs:95` and `failure_probe_coverage_tests.rs`. Matches under `scratch_build` and `fast_docs_templates/ai_review_verdict_tests.rs` assert shell-script exit codes, not `jit`'s.
 
 ### D.3 Query and cycle re-proofs outside `query_tests.rs`
 
@@ -276,9 +285,29 @@ The domain owns `query_by_label`, `query_by_labels` and `query_strategic` (`doma
 | `cli_issue/batch_create_tests.rs:196` | 1 | owner: batch atomicity (zero created) and cycle keys named in the message; only its exit code re-proves a row |
 | `fast_issue/bulk_operations_tests.rs:221` | 1 | owner: atomic rejection of a multi-edge dependency batch (`DependencyBatchRejectedError`) |
 
-### D.4 List-emitting commands without a typed output schema
+### D.4 List-emitting command outputs
 
-`schema.rs:730` falls back to `(None, "CommandResponse")`. These commands emit `count` beside a collection under that fallback: `gate preset list`, `events tail`, `events query`, `label values`, `claim status` and `claim list` (inline `json!` in `main.rs`), plus `doc list`, `doc assets list`, `item list`, `item search`, `invariant check` and `graph rdeps`. `list_envelope_tests.rs` covers all of them except `claim status`. The generated schema has 29 commands whose output carries `count`.
+Derived from emission sites, not from the schema. The sweep covered every struct under `crates/jit/src` with a numeric `count` field and every inline `json!` body with a `"count"` key. `schema.rs:730` falls back to `(None, "CommandResponse")` for unregistered commands. The generated schema has 29 commands whose output carries `count`.
+
+| Emission | Command | Schema today |
+| --- | --- | --- |
+| inline `json!` in `main.rs` (`:4547`, `:4984`, `:5005`, `:5900`, `:7391`, `:7476`) | `gate preset list`, `events tail`, `events query`, `label values`, `claim status`, `claim list` | fallback |
+| `DocumentListResult`, `AssetListResult` (`commands/mod.rs:1863`, `:1878`) | `doc list`, `doc assets list` | fallback |
+| `ItemListResult` (`commands/item.rs:20`) | `item list`, `item search` | fallback |
+| `InvariantCheckResult` (`commands/invariant.rs:24`) | `invariant check` | fallback |
+| `ProjectRenderResult` (`commands/project.rs:47`) | `project render` | fallback |
+| `ArchiveCandidates`, `ArtifactPlan` (`domain/artifact_plan.rs:30`, `:962`; `count` is the artifact or candidate length) | `archive candidates`, `archive document`, `archive container` | fallback |
+| `GraphDownstreamResponse`, registered under the key `graph_downstream` (`schema.rs:668`) | `graph rdeps` | fallback, because of the key mismatch |
+| `ListEnvelope` instantiations in `output.rs` | the 29 schema commands | typed |
+
+The following carry a `count` that is not a list envelope:
+
+- `ProjectionRenderReport.count` (`commands/project.rs:27`) counts rendered items, not `kinds`.
+- `StateCount` (`output.rs:1909`) is a tally.
+- `IssuesInfo` and `DocumentsInfo` (`snapshot.rs:53`, `:64`) are snapshot manifest data written to the export, not command stdout.
+- `GraphData` (`crates/server/src/routes.rs:117`) is the HTTP API, not a CLI command.
+
+`list_envelope_tests.rs` covers every fallback command except `claim status`, `project render` and the three archive commands.
 
 ### D.5 Tool-missing skips
 
@@ -293,8 +322,28 @@ The domain owns `query_by_label`, `query_by_labels` and `query_strategic` (`doma
 
 ### D.6 In-process private setups outside the CLI targets
 
-- `fast_docs_templates/git_revision_tests.rs:15-20` hand-rolls `git init` with a fixed author identity.
-- `fast_rules/default_rules_registry_derivation_tests.rs:28` and `fast_rules/type_hierarchy_schema_regen_tests.rs:16` define the same `setup_initialized_repo` (a `jit init`-ed `JsonFileStorage` repository with a one-namespace config).
-- `fast_docs_templates/templates_loader_tests.rs:16` defines `setup`, which writes declaration files into a temporary directory.
-- `fast_rules/cli_warnings_integration_tests.rs:24` defines a profiled setup; the rule-warning move removes it.
+File-backed setups. These are functions that create a temporary repository, write configuration, run `jit init` or open a `JsonFileStorage` executor:
 
+- `fast_rules/default_rules_registry_derivation_tests.rs`: `executor` (`:18`) and `setup_initialized_repo` (`:28`).
+- `fast_rules/type_hierarchy_schema_regen_tests.rs`: `executor` (`:10`) and `setup_initialized_repo` (`:16`), the same as the previous file.
+- `fast_rules/effective_rules_tests.rs`: `repo` (`:16`) and `executor` (`:36`).
+- `fast_rules/undeclared_taxonomy_tests.rs:20`: `scaffold_declaring`, a third init-from-config copy.
+- `fast_docs_templates/planning_preset_tests.rs:21`: `file_backed_executor`.
+- `fast_docs_templates/templates_loader_tests.rs:16`: `setup`, which writes declaration files into a temporary directory.
+- `fast_docs_templates/git_revision_tests.rs:15-20`: hand-rolls `git init` with a fixed author identity.
+- `fast_rules/cli_warnings_integration_tests.rs:24`: a profiled setup, which the rule-warning move removes.
+
+Memory-backed setups. These are functions that build an `InMemoryStorage` or a memory executor and seed declarations, instead of taking them from the shared executor:
+
+- `store_with_rules` in `fast_issue/graph_rule_validation_tests.rs:15` and `fast_rules/validate_rule_runner_tests.rs:21`.
+- `executor_with_rules` in `fast_issue/transition_graph_enforcement_tests.rs:24` and `fast_rules/local_rule_enforcement_tests.rs:20`.
+- `executor` in `fast_issue/strictness_enforcement_tests.rs:42` and `fast_issue/strictness_transition_tests.rs:41`.
+- `executor_for` in `fast_issue/graph_rule_validation_tests.rs:34`.
+- `make_storage` in `fast_issue/short_hash_tests.rs:389`.
+- `executor_with_templates` in `fast_docs_templates/template_binding_tests.rs:106`.
+- `memory_storage` in `fast_docs_templates/template_apply_atomicity_tests.rs:380`.
+- `storage_with` and `render_executor` in `fast_rules/project_render_harness_tests.rs:77,90`.
+- `strategic_executor` in `fast_rules/label_strategic_tests.rs:13`.
+- `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.
+
+Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.

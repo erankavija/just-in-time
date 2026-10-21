@@ -9,11 +9,11 @@ Fixtures land first, then the per-target migrations onto them; owners gain missi
 
 | Criterion | Approach | Evidence / open gap |
 |---|---|---|
-| REQ-01 | `exit-code-projection-ownership`: the projection suite derives its verified set from its binding cases and absorbs the two row-less parity cases. The 25 unique `exit_code_tests` cases move in three families (envelopes, claim and delete, arguments) before the two re-proof files are deleted. One sweep per CLI target strips the projected exit-code assertions elsewhere. | Investigation §1 #1–#3, §D.1, §D.2 |
+| REQ-01 | `exit-code-projection-ownership`: the projection suite derives its verified set from its binding cases and absorbs the two row-less parity cases. The 25 unique `exit_code_tests` cases move in three families (envelopes, claim and delete, arguments) before the two re-proof files are deleted. One sweep per CLI target strips projected exit-code assertions in numeric, multi-line, symbolic and helper form, and keeps error-class evidence through the envelope code. | Investigation §1 #1–#3, §D.1, §D.2 |
 | REQ-02 | `domain-query-ownership`: extract the `query available` composition and order, and the auto-transition decision, into pure domain functions. Then cut `query_tests`, the label and filter CLI files, and the executor label tests to wiring cases, cut cycle re-proofs, move six `harness_demo` cases and delete the suite. | §1 #4–#8, §5, §D.3 |
 | REQ-03 | Add missing finalization cases to `repository_state`, then delete the storage determinism section. | §1 #9 |
-| REQ-04 | `list-envelope-coverage`: twelve commands that lacked a schema gain typed `ListEnvelope` outputs. One schema-driven test then replaces the 19 per-command cases, and the per-command re-assertions go. | §1 #10, §4, §D.4 |
-| REQ-05 | `cli-process-fixture` (wave 1), then one migration per target or coherent file family (eight), plus shared git and initialised-repository setup for in-process tests. Files whose properties move elsewhere are excluded from migration and handled by their owner entries. | §1 #11–#17, §C, §D.6 |
+| REQ-04 | `list-envelope-coverage`: sixteen list-emitting commands found from their emission sites, not the schema, gain typed `ListEnvelope` outputs (six inline bodies plus a schema key, then nine command-layer results). One schema-driven test then replaces the 19 per-command cases with a runtime guard against untyped list output, and the per-command re-assertions go. | §1 #10, §4, §D.4 |
+| REQ-05 | `cli-process-fixture` (wave 1), then one migration per target or coherent file family (eight), plus shared git, file-backed and memory-backed setup for in-process suites. Files whose properties move elsewhere are excluded from migration and handled by their owner entries. | §1 #11–#17, §C, §D.6 |
 | REQ-06 | Wave-1 roots: shared `fixture_issue`, shared `TaxonomyRepo`, and one memory executor seeded by product init generalised over the store. | §1 #18, §4 |
 | REQ-07 | `shipped-item-kinds-fixture` in test support (wave 1), then unit-test and suite consumers. | §1 #20–#21 |
 | REQ-08 | `issue-store-conformance` (absorbs the three ad-hoc tests), then the in-memory path-read fix, then backend-test pruning. | §1 #22–#24 |
@@ -43,11 +43,11 @@ One test module written against the `IssueStore` trait, with reader and writer c
 
 ### `exit-code-projection-ownership` [plan-fixed] — Projection suite owns exit codes
 
-`CommandSchema::generate().command_exit_codes` is the binding source. Each row has exactly one binding case in both invocation forms, and the completeness check derives its verified set from those cases. The wildcard rows bind every command. Outside the suite, a subprocess test asserts success or failure and the property it adds (verdict, envelope code, remediation text, empty stdout). It names a numeric exit code only for a command and code pair with no row. Recorded failure-corpus statuses are data, not assertions.
+`CommandSchema::generate().command_exit_codes` is the binding source. Each row has exactly one binding case in both invocation forms, and the completeness check derives its verified set from those cases. The wildcard rows bind every command. Outside the suite, a subprocess test asserts success or failure and the property it adds (verdict, envelope code, remediation text, empty stdout). It names a numeric exit code only for a command and code pair with no row. Where a code was a test's only evidence of the error class on its path, the test asserts that class another way, such as the `--json` envelope's `error.code`. Recorded failure-corpus statuses are data, not assertions.
 
 ### `list-envelope-coverage` [plan-fixed] — One list-envelope test
 
-Every command whose JSON carries `count` beside a collection emits a `ListEnvelope` instantiation declared as its output schema in `schema.rs`, so the generated schema is the complete list. The twelve commands under the `CommandResponse` fallback are listed in investigation §D.4. The test enumerates list commands from that schema and holds one invocation per command, covering at least the commands of the 19 removed cases. It fails naming any schema list command without an invocation, and asserts `count == len` through the CLI process fixture.
+List-emitting commands are derived from emission sites: every serialized struct with a numeric `count` field and every inline `json!` body with a `"count"` key (investigation §D.4). Each one that counts a sibling collection becomes a `ListEnvelope` instantiation, declared as its command's output schema in `schema.rs`. §D.4 names the counts that are not list envelopes. The test enumerates list commands from the generated schema. It holds one invocation per command, covering the commands of the 19 removed cases and the §D.4 inventory. It fails naming any schema list command without an invocation, and asserts `count == len` through the CLI process fixture. Independently of the schema, it also fails when an invocation's JSON carries `count` beside an array while that command's schema is the untyped fallback.
 
 ### `domain-query-ownership` [plan-fixed] — Domain owns query and transition semantics
 
@@ -72,7 +72,7 @@ Each shell-script self-test is a `.jit/gates.toml` gate with `[gates.inputs]` co
 | shared-memory-executor | Memory executor initialised through product initialisation | task | One memory executor in shared test support seeds configuration and index through product initialisation. | — | REQ-06, D-02 | touches 9 | — | — |
 | harness-shipped-item-kinds | Shared test support derives shipped item kinds from the default package | task | Shared test support derives shipped item-kind declarations from the default profile package. | — | REQ-07, D-02 | touches 4 | — | — |
 | unit-test-shipped-item-kinds | Command unit tests take shipped item kinds from the default package | task | Item, validate and domain item unit tests read shipped item kinds from the shared derivation. | shipped-item-kinds-fixture | REQ-07 | touches 3 | — | harness-shipped-item-kinds |
-| suite-shipped-item-kinds | Integration suites take shipped item kinds from the default package | task | Decision-kind and projection-render suites read shipped item kinds from the shared derivation. | shipped-item-kinds-fixture | REQ-07 | touches 3 | — | harness-shipped-item-kinds, cli-item-validate-migration |
+| suite-shipped-item-kinds | Integration suites take shipped item kinds from the default package | task | Decision-kind and projection-render suites read shipped item kinds from the shared derivation. | shipped-item-kinds-fixture | REQ-07 | touches 3 | — | harness-shipped-item-kinds, cli-item-validate-migration, in-process-memory-setup-consolidation |
 | cli-gate-migration | cli_gate tests spawn jit through the shared process fixture | task | The cli_gate suite spawns jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
 | cli-issue-command-migration | cli_issue command tests spawn jit through the shared process fixture | task | The cli_issue command test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, REQ-06, D-02 | touches 17 | — | cli-process-fixture, shared-taxonomy-repo |
 | cli-issue-envelope-migration | cli_issue envelope tests spawn jit through the shared process fixture | task | The cli_issue envelope and failure test files spawn jit only through the shared CLI process fixture. | cli-process-fixture | REQ-05, D-02 | touches 16 | — | cli-process-fixture |
@@ -107,28 +107,30 @@ Each shell-script self-test is a `.jit/gates.toml` gate with `[gates.inputs]` co
 | profile-suite-selftest-gate | Suite-profiler self-test runs as a declared gate | task | The suite profiler self-test runs as its own gate over the script, outside the default suite. | script-self-test-gates | REQ-10 | touches 2 | — | — |
 | build-budget-selftest-gate | Build-budget checker self-test runs as a declared gate | task | The build-budget checker's cases run as the script's own self-test under a declared gate. | script-self-test-gates | REQ-10 | touches 4 | — | — |
 | dependency-policy-tool-failure | Dependency-feature policy tests fail when cargo is missing | task | The dependency-feature policy tests use the running toolchain's cargo and fail rather than skip. | script-self-test-gates | REQ-10 | touches 1 | — | — |
-| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, rule-warning-tests-down-a-layer, server-shutdown-test-bound, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure |
+| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, server-shutdown-test-bound, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure |
 | suite-clock-report | Suite clock before and after the epic is reported | task | The benchmark note records the suite clock before and after, and a per-test profile with no test over 5 s. | suite-measurement-protocol | REQ-13, D-01 | touches 1 | — | build-footprint-report |
 | library-git-fixture-adoption | In-process tests initialise git through the shared helper | task | In-process test modules initialise git repositories through one shared test-support helper. | cli-process-fixture | REQ-05, D-02 | touches 10 | — | cli-process-fixture |
-| in-process-repo-setup-consolidation | Shared initialised-repository setup for in-process suites | task | In-process suites build initialised repositories and declaration directories through shared test support. | — | REQ-05, D-02 | touches 4 | — | — |
 | exit-code-envelope-case-moves | Blocked-transition and startup envelope cases move beside their owners | task | Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 3 | — | exit-code-binding-completeness |
 | exit-code-claim-delete-case-moves | Claim and confirmed-delete cases move beside their owners | task | Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 3 | — | exit-code-binding-completeness, cli-repo-checkout-migration, cli-repo-workflow-migration |
 | exit-code-argument-case-moves | Id-prefix and argument-guard cases move beside their owners | task | Id-prefix and argument-guard cases live beside the tests of the commands they guard. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 5 | — | exit-code-binding-completeness, cli-issue-command-migration, cli-query-graph-migration, cli-repo-profile-migration |
 | exit-code-reassertion-cli-gate | cli_gate tests stop re-asserting projected exit codes | task | The cli_gate suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 9 | — | exit-code-binding-completeness, cli-gate-migration |
-| exit-code-reassertion-cli-issue | cli_issue tests stop re-asserting projected exit codes | task | The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 11 | — | exit-code-envelope-case-moves, exit-code-argument-case-moves |
-| exit-code-reassertion-cli-query-graph | cli_query_graph tests stop re-asserting projected exit codes | task | The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 5 | — | exit-code-argument-case-moves |
-| exit-code-reassertion-cli-item-validate | cli_item_validate tests stop re-asserting projected exit codes | task | The cli_item_validate suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 4 | — | exit-code-binding-completeness, cli-item-validate-migration |
-| exit-code-reassertion-cli-repo-workflow | cli_repo_workflow tests stop re-asserting projected exit codes | task | The cli_repo_workflow suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 6 | — | exit-code-claim-delete-case-moves, exit-code-argument-case-moves |
-| list-output-schemas | List-emitting commands declare typed list-envelope output schemas | task | Twelve list-emitting commands emit ListEnvelope types declared as their output schemas. | list-envelope-coverage | REQ-04, D-04 | touches 7, uncertain | — | — |
-| list-envelope-coverage-test | One test proves the list-envelope count for each list-emitting command | task | A single schema-driven test checks count against collection length for each list-emitting command. | list-envelope-coverage, cli-process-fixture | REQ-04, D-04 | touches 2 | — | cli-process-fixture, list-output-schemas |
-| label-query-cli-wiring-reduction | Label and filter CLI tests assert one wiring case per subcommand and flag | task | Label and filter CLI tests keep one wiring case per subcommand or flag, and the domain owns label semantics. | domain-query-ownership | REQ-02 | touches 5 | — | cli-query-graph-migration |
-| label-query-harness-reduction | Label and strategic executor tests keep one wiring case each | task | Executor label and strategic tests keep one wiring case per entry point, and the domain owns the semantics. | domain-query-ownership | REQ-02 | touches 3 | — | shared-memory-executor |
+| exit-code-reassertion-cli-issue | cli_issue tests stop re-asserting projected exit codes | task | The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 13 | — | exit-code-envelope-case-moves, exit-code-argument-case-moves |
+| exit-code-reassertion-cli-query-graph | cli_query_graph tests stop re-asserting projected exit codes | task | The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 5 | — | label-query-cli-wiring-reduction |
+| exit-code-reassertion-cli-item-validate | cli_item_validate tests stop re-asserting projected exit codes | task | The cli_item_validate suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 5 | — | exit-code-binding-completeness, cli-item-validate-migration |
+| exit-code-reassertion-cli-repo-workflow | cli_repo_workflow tests stop re-asserting projected exit codes | task | The cli_repo_workflow suite asserts only properties it adds, with no projected exit-code re-assertion. | exit-code-projection-ownership | REQ-01 | touches 13 | — | exit-code-claim-delete-case-moves, exit-code-argument-case-moves |
+| inline-list-output-types | Inline list bodies in main.rs become typed list envelopes | task | Six inline list bodies emit typed list envelopes, and graph rdeps declares its schema. | list-envelope-coverage | REQ-04, D-04 | touches 3 | — | — |
+| command-list-output-types | Command-layer list results become typed list envelopes | task | Command-layer list results for nine commands are list envelopes declared as their output schemas. | list-envelope-coverage | REQ-04, D-04 | touches 7 | — | inline-list-output-types |
+| in-process-file-setup-consolidation | Shared file-backed repository setup for in-process suites | task | In-process suites build file-backed repositories and executors through shared test support. | — | REQ-05, D-02 | touches 7 | — | rule-warning-tests-down-a-layer |
+| in-process-memory-setup-consolidation | Memory-backed suite setups go through the shared memory executor | task | In-process suites build memory stores and executors through the shared memory executor. | — | REQ-05, REQ-06, D-02 | touches 13 | — | shared-memory-executor |
+| label-query-cli-wiring-reduction | Label and filter CLI tests assert one wiring case per subcommand and flag | task | Label and filter CLI tests keep one wiring case per subcommand or flag, and the domain owns label semantics. | domain-query-ownership | REQ-02 | touches 5 | — | exit-code-argument-case-moves |
+| list-envelope-coverage-test | One test proves the list-envelope count for each list-emitting command | task | A single schema-driven test checks count against collection length for each list-emitting command. | list-envelope-coverage, cli-process-fixture | REQ-04, D-04 | touches 2 | — | cli-process-fixture, command-list-output-types |
+| label-query-harness-reduction | Label and strategic executor tests keep one wiring case each | task | Executor label and strategic tests keep one wiring case per entry point, and the domain owns the semantics. | domain-query-ownership | REQ-02 | touches 3 | — | in-process-memory-setup-consolidation |
 | mcp-parity-tool-failure | MCP parity test fails when node is missing | task | The MCP parity test fails rather than skips when node is missing. | script-self-test-gates | REQ-10 | touches 1 | — | cli-item-validate-migration |
 | server-shutdown-test-bound | Server shutdown force-close test stays under the per-test bound | task | Drain entitlement is proven with a short deadline, and no server test waits the real five-second drain. | suite-measurement-protocol | REQ-13, D-01 | touches 2 | — | — |
 | exit-code-envelope-ownership | Exit codes and list envelopes each have one owning test | story | command exit codes and the list-envelope count each have one owning test | — | REQ-01, REQ-04 | — | — | exit-code-reproof-deletion, list-envelope-reassertion-removal, exit-code-reassertion-cli-gate, exit-code-reassertion-cli-issue, exit-code-reassertion-cli-query-graph, exit-code-reassertion-cli-item-validate, exit-code-reassertion-cli-repo-workflow |
 | query-graph-ownership | Query, transition and cycle semantics are proven at the domain and graph layers | story | query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring | — | REQ-02 | — | — | query-cli-wiring-reduction, auto-transition-wiring-reduction, auto-transition-harness-owner, cycle-reproof-removal, harness-demo-deletion, label-query-cli-wiring-reduction, label-query-harness-reduction |
 | storage-contracts | Storage behaviour is proven once per contract | story | finalization is proven in repository state and every IssueStore backend runs one conformance suite | — | REQ-03, REQ-08 | — | — | backend-specific-test-pruning |
-| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-gate-migration, cli-issue-command-migration, cli-issue-envelope-migration, cli-query-graph-migration, cli-repo-checkout-migration, cli-repo-profile-migration, cli-repo-workflow-migration, library-git-fixture-adoption, shared-fixture-issue, shared-memory-executor, unit-test-shipped-item-kinds, suite-shipped-item-kinds, env-reading-tests-guarded, in-process-repo-setup-consolidation |
+| shared-test-fixtures | Tests run on shared fixtures and guards | story | CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards | — | REQ-05, REQ-06, REQ-07, REQ-09, D-02 | — | — | cli-gate-migration, cli-issue-command-migration, cli-issue-envelope-migration, cli-query-graph-migration, cli-repo-checkout-migration, cli-repo-profile-migration, cli-repo-workflow-migration, library-git-fixture-adoption, shared-fixture-issue, unit-test-shipped-item-kinds, suite-shipped-item-kinds, env-reading-tests-guarded, in-process-file-setup-consolidation |
 | suite-cost | The default suite runs within its time and footprint budgets | story | the default suite runs no nested cargo build or tool-skipping test, fixtures are keyed on inputs, and footprint and clock are reported | — | REQ-10, REQ-11, REQ-12, REQ-13, D-01 | — | — | suite-clock-report |
 
 ```mermaid
@@ -177,29 +179,32 @@ flowchart LR
     N41["build-footprint-report: Build-footprint figures before and after the epic are reported"]
     N42["suite-clock-report: Suite clock before and after the epic is reported"]
     N43["library-git-fixture-adoption: In-process tests initialise git through the shared helper"]
-    N44["in-process-repo-setup-consolidation: Shared initialised-repository setup for in-process suites"]
-    N45["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
-    N46["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
-    N47["exit-code-argument-case-moves: Id-prefix and argument-guard cases move beside their owners"]
-    N48["exit-code-reassertion-cli-gate: cli_gate tests stop re-asserting projected exit codes"]
-    N49["exit-code-reassertion-cli-issue: cli_issue tests stop re-asserting projected exit codes"]
-    N50["exit-code-reassertion-cli-query-graph: cli_query_graph tests stop re-asserting projected exit codes"]
-    N51["exit-code-reassertion-cli-item-validate: cli_item_validate tests stop re-asserting projected exit codes"]
-    N52["exit-code-reassertion-cli-repo-workflow: cli_repo_workflow tests stop re-asserting projected exit codes"]
-    N53["list-output-schemas: List-emitting commands declare typed list-envelope output schemas"]
-    N54["list-envelope-coverage-test: One test proves the list-envelope count for each list-emitting command"]
-    N55["label-query-cli-wiring-reduction: Label and filter CLI tests assert one wiring case per subcommand and flag"]
-    N56["label-query-harness-reduction: Label and strategic executor tests keep one wiring case each"]
-    N57["mcp-parity-tool-failure: MCP parity test fails when node is missing"]
-    N58["server-shutdown-test-bound: Server shutdown force-close test stays under the per-test bound"]
-    N59["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
-    N60["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
-    N61["storage-contracts: Storage behaviour is proven once per contract"]
-    N62["shared-test-fixtures: Tests run on shared fixtures and guards"]
-    N63["suite-cost: The default suite runs within its time and footprint budgets"]
+    N44["exit-code-envelope-case-moves: Blocked-transition and startup envelope cases move beside their owners"]
+    N45["exit-code-claim-delete-case-moves: Claim and confirmed-delete cases move beside their owners"]
+    N46["exit-code-argument-case-moves: Id-prefix and argument-guard cases move beside their owners"]
+    N47["exit-code-reassertion-cli-gate: cli_gate tests stop re-asserting projected exit codes"]
+    N48["exit-code-reassertion-cli-issue: cli_issue tests stop re-asserting projected exit codes"]
+    N49["exit-code-reassertion-cli-query-graph: cli_query_graph tests stop re-asserting projected exit codes"]
+    N50["exit-code-reassertion-cli-item-validate: cli_item_validate tests stop re-asserting projected exit codes"]
+    N51["exit-code-reassertion-cli-repo-workflow: cli_repo_workflow tests stop re-asserting projected exit codes"]
+    N52["inline-list-output-types: Inline list bodies in main.rs become typed list envelopes"]
+    N53["command-list-output-types: Command-layer list results become typed list envelopes"]
+    N54["in-process-file-setup-consolidation: Shared file-backed repository setup for in-process suites"]
+    N55["in-process-memory-setup-consolidation: Memory-backed suite setups go through the shared memory executor"]
+    N56["label-query-cli-wiring-reduction: Label and filter CLI tests assert one wiring case per subcommand and flag"]
+    N57["list-envelope-coverage-test: One test proves the list-envelope count for each list-emitting command"]
+    N58["label-query-harness-reduction: Label and strategic executor tests keep one wiring case each"]
+    N59["mcp-parity-tool-failure: MCP parity test fails when node is missing"]
+    N60["server-shutdown-test-bound: Server shutdown force-close test stays under the per-test bound"]
+    N61["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
+    N62["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
+    N63["storage-contracts: Storage behaviour is proven once per contract"]
+    N64["shared-test-fixtures: Tests run on shared fixtures and guards"]
+    N65["suite-cost: The default suite runs within its time and footprint budgets"]
     N4 --> N5
     N4 --> N6
     N10 --> N6
+    N55 --> N6
     N0 --> N7
     N0 --> N8
     N1 --> N8
@@ -212,10 +217,10 @@ flowchart LR
     N0 --> N14
     N33 --> N15
     N9 --> N16
+    N44 --> N17
     N45 --> N17
     N46 --> N17
-    N47 --> N17
-    N54 --> N18
+    N57 --> N18
     N11 --> N18
     N14 --> N18
     N13 --> N18
@@ -238,73 +243,74 @@ flowchart LR
     N32 --> N33
     N33 --> N34
     N9 --> N34
-    N59 --> N41
-    N60 --> N41
     N61 --> N41
     N62 --> N41
+    N63 --> N41
+    N64 --> N41
     N34 --> N41
-    N35 --> N41
-    N58 --> N41
+    N60 --> N41
     N36 --> N41
     N37 --> N41
     N38 --> N41
     N39 --> N41
     N40 --> N41
-    N57 --> N41
+    N59 --> N41
     N41 --> N42
     N0 --> N43
+    N16 --> N44
     N16 --> N45
+    N12 --> N45
+    N14 --> N45
     N16 --> N46
-    N12 --> N46
-    N14 --> N46
+    N8 --> N46
+    N11 --> N46
+    N13 --> N46
     N16 --> N47
-    N8 --> N47
-    N11 --> N47
-    N13 --> N47
-    N16 --> N48
-    N7 --> N48
-    N45 --> N49
-    N47 --> N49
-    N47 --> N50
-    N16 --> N51
-    N10 --> N51
-    N46 --> N52
-    N47 --> N52
-    N0 --> N54
-    N53 --> N54
-    N11 --> N55
-    N3 --> N56
-    N10 --> N57
-    N17 --> N59
-    N18 --> N59
-    N48 --> N59
-    N49 --> N59
-    N50 --> N59
-    N51 --> N59
-    N52 --> N59
-    N21 --> N60
-    N22 --> N60
-    N23 --> N60
-    N24 --> N60
-    N26 --> N60
-    N55 --> N60
-    N56 --> N60
-    N31 --> N61
-    N7 --> N62
-    N8 --> N62
-    N9 --> N62
-    N11 --> N62
-    N12 --> N62
-    N13 --> N62
-    N14 --> N62
-    N43 --> N62
-    N2 --> N62
-    N3 --> N62
-    N5 --> N62
-    N6 --> N62
-    N15 --> N62
-    N44 --> N62
-    N42 --> N63
+    N7 --> N47
+    N44 --> N48
+    N46 --> N48
+    N56 --> N49
+    N16 --> N50
+    N10 --> N50
+    N45 --> N51
+    N46 --> N51
+    N52 --> N53
+    N35 --> N54
+    N3 --> N55
+    N46 --> N56
+    N0 --> N57
+    N53 --> N57
+    N55 --> N58
+    N10 --> N59
+    N17 --> N61
+    N18 --> N61
+    N47 --> N61
+    N48 --> N61
+    N49 --> N61
+    N50 --> N61
+    N51 --> N61
+    N21 --> N62
+    N22 --> N62
+    N23 --> N62
+    N24 --> N62
+    N26 --> N62
+    N56 --> N62
+    N58 --> N62
+    N31 --> N63
+    N7 --> N64
+    N8 --> N64
+    N9 --> N64
+    N11 --> N64
+    N12 --> N64
+    N13 --> N64
+    N14 --> N64
+    N43 --> N64
+    N2 --> N64
+    N5 --> N64
+    N6 --> N64
+    N15 --> N64
+    N54 --> N64
+    N42 --> N65
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -313,11 +319,11 @@ flowchart LR
 | Risk / decision | Resolution and rationale |
 |---|---|
 | D-01 REQ-13 scope (steward) | Chosen: the server shutdown test and the doctest substep are in scope. Early-relief terminals with no upstream edge are `profiled-fixture-input-key`, `rule-warning-tests-down-a-layer`, `server-shutdown-test-bound` and `doctest-substep-bound`. The before figures are the investigation's §A. |
-| D-02 Fixtures first (steward D1) | Chosen: the wave-1 fixture roots are `cli-process-fixture`, `shared-taxonomy-repo`, `shared-fixture-issue`, `shared-memory-executor` and `harness-shipped-item-kinds`. They have no edge at all. The per-target migrations depend only on `cli-process-fixture` and `shared-taxonomy-repo` (wave 2). No entry that 2195c98f consumes reaches 2195c98f, 842b0ac6 or df129d9e. `library-git-fixture-adoption`, `in-process-repo-setup-consolidation`, `unit-test-shipped-item-kinds` and `suite-shipped-item-kinds` are D1-clean too (no external dependency). Incoming edges to add at breakdown: 0af95f14 → `shared-fixture-issue`, `finalization-reproof-deletion`, `library-git-fixture-adoption`, `unit-test-shipped-item-kinds`; b45a2865 → `shared-memory-executor`, `suite-shipped-item-kinds`, `in-process-repo-setup-consolidation`; 19d9bd7d → `cli-gate-migration`, `cli-item-validate-migration`, `cli-query-graph-migration`, `cli-repo-checkout-migration`, `cli-repo-workflow-migration`. Implied, so no direct edge (a direct one would be transitively redundant): 13190465, b73b3e5a and 5fac48b8 reach the 0af95f14 targets through 0af95f14; c797b59b reaches `shared-memory-executor`, `suite-shipped-item-kinds` and `harness-shipped-item-kinds` through b45a2865; cd8adfc1 reaches them through c797b59b. |
+| D-02 Fixtures first (steward D1) | Chosen: the wave-1 fixture roots are `cli-process-fixture`, `shared-taxonomy-repo`, `shared-fixture-issue`, `shared-memory-executor` and `harness-shipped-item-kinds`. They have no edge at all. The per-target migrations depend only on `cli-process-fixture` and `shared-taxonomy-repo` (wave 2). No entry that 2195c98f consumes reaches 2195c98f, 842b0ac6 or df129d9e. `library-git-fixture-adoption`, `in-process-file-setup-consolidation`, `in-process-memory-setup-consolidation`, `unit-test-shipped-item-kinds` and `suite-shipped-item-kinds` are D1-clean too (no external dependency). Incoming edges to add at breakdown: 0af95f14 → `shared-fixture-issue`, `finalization-reproof-deletion`, `library-git-fixture-adoption`, `unit-test-shipped-item-kinds`; b45a2865 → `suite-shipped-item-kinds`, `in-process-file-setup-consolidation`; 13190465 → `in-process-memory-setup-consolidation`; b73b3e5a → `in-process-memory-setup-consolidation`, `in-process-file-setup-consolidation`; 19d9bd7d → `cli-gate-migration`, `cli-item-validate-migration`, `cli-query-graph-migration`, `cli-repo-checkout-migration`, `cli-repo-workflow-migration`. Implied, so no direct edge (a direct one would be transitively redundant): 5fac48b8 reaches the 0af95f14 targets through 0af95f14; b45a2865 reaches `shared-memory-executor` and `in-process-memory-setup-consolidation` through `suite-shipped-item-kinds`; c797b59b reaches every fast-suite target through 13190465, b45a2865 and b73b3e5a; cd8adfc1 reaches them through c797b59b; 89e7a273 reaches the setup consolidations it overlaps (`local_rule_enforcement_tests.rs`, `template_apply_atomicity_tests.rs`) through 13190465 and b73b3e5a. |
 | D-03 Conformance suite owner (steward D2) | Chosen: `issue-store-conformance-suite` owns the suite. Incoming edge 89e7a273 → `issue-store-conformance-suite`. Rejected: waiting for the in-memory fix, because the suite already passes both backends on the cases it carries. |
-| D-04 df129d9e ordering (steward D4) | 650e6a56 (count structs as `ListEnvelope`) is done, so REQ-01 and REQ-04 both already follow it, and no edge is needed. Neither waits for the handler moves. `list-output-schemas` types the twelve fallback lists now, so the handler-move tasks find those lists already wrapped. |
+| D-04 df129d9e ordering (steward D4) | 650e6a56 (count structs as `ListEnvelope`) is done, so REQ-01 and REQ-04 both already follow it, and no edge is needed. Neither waits for the handler moves. `inline-list-output-types` and `command-list-output-types` type the sixteen fallback lists now, so the handler-move tasks find those lists already wrapped. |
 | Outgoing edges (onto ready tasks) | `harness-demo-case-moves` → d125490a (edits `harness_demo.rs` and the harness gate helper; this key is outside every 2195c98f edge, so there is no cycle or D1 conflict). `query-available-domain-order` → 2492ab29 (deletes backfill tests in the same `domain/queries.rs` test module). `memory-backend-path-reads` → ec190bd5 (`memory.rs`). |
-| Conflict-avoid, no edge | 5687e281 (`main.rs`/`schema.rs`, also edited by `list-output-schemas`, `fixture-setup-hook-removal` and `exit-code-binding-completeness`; 25 handler moves, and waiting would stall REQ-01, REQ-04 and REQ-11). b73b3e5a (`harness_demo.rs`). b45a2865 (`cli_warnings_integration_tests.rs` and the executor label tests). 13190465 (`domain_queries_tests.rs`, `lifecycle_timestamps_tests.rs`). d125490a against `harness-shipped-item-kinds`, `shared-memory-executor` (`test_harness.rs:209-220`) and `fixture-setup-hook-removal` (`template_apply_tests.rs`); those are wave-1 roots and D1 forbids the edge. 0e3b69fc (`Cargo.toml` test-support comment; backlog). bc1955a8 and b4fe7887 (`D-[0-9]+` literals; rule-compilation chain). b4929342 and 63c11d08 (`domain::types::fixture_issue` paths, which `shared-fixture-issue` removes). 0af95f14 (`domain/queries.rs` ids and rustdoc examples, also touched by the query extraction and doctest pruning). fe761000 (`auto` keys in `.jit/gates.toml`; new gates carry none). f9977efd and fb2dc5c3 (budget script and re-measurement; backlog). e3d06f82 and 3625b18b (event matchers in moved cases). afc2b698 (a different `scratch_build` file). |
+| Conflict-avoid, no edge | 5687e281 (`main.rs`/`schema.rs`, also edited by `inline-list-output-types`, `command-list-output-types`, `fixture-setup-hook-removal` and `exit-code-binding-completeness`; 25 handler moves, and waiting would stall REQ-01, REQ-04 and REQ-11). b73b3e5a (`harness_demo.rs`). b45a2865 (`cli_warnings_integration_tests.rs` and the executor label tests). 13190465 (`domain_queries_tests.rs`, `lifecycle_timestamps_tests.rs`). d125490a against `harness-shipped-item-kinds`, `shared-memory-executor` (`test_harness.rs:209-220`) and `fixture-setup-hook-removal` (`template_apply_tests.rs`); those are wave-1 roots and D1 forbids the edge. 0e3b69fc (`Cargo.toml` test-support comment; backlog). bc1955a8 and b4fe7887 (`D-[0-9]+` literals; rule-compilation chain). b4929342 and 63c11d08 (`domain::types::fixture_issue` paths, which `shared-fixture-issue` removes). 0af95f14 (`domain/queries.rs` ids and rustdoc examples, also touched by the query extraction and doctest pruning). fe761000 (`auto` keys in `.jit/gates.toml`; new gates carry none). f9977efd and fb2dc5c3 (budget script and re-measurement; backlog). e3d06f82 and 3625b18b (event matchers in moved cases). afc2b698 (a different `scratch_build` file). |
 | Stale external citations | c400730c and 2ac50581 cite `exit_code_tests.rs`, `query_tests` and `harness_demo`, and cc6ef886 cites `tests/common/`. Their owners must re-point them once the deletions land. |
 | Migration scope | Chosen: migrations skip files whose properties move to one owner (`exit_code_tests.rs`, the parity suite, `list_envelope_tests.rs`, `query_tests.rs`). Owner entries delete or rewrite those files on the fixture. Rejected: migrating then deleting them (about 3,600 lines of churn). |
 | `TaxonomyRepo` vs. process fixture | Chosen: one shared `TaxonomyRepo` that the process fixture can own. Rejected: folding taxonomy setup into the fixture root, which would merge a 17-file caller migration into the wave-1 foundation. |
@@ -326,6 +332,7 @@ flowchart LR
 | A test over 5 s at report time | `suite-clock-report`'s criterion fails if any test exceeds 5 s, so the report cannot pass over a regression. The execution lead adds a remediation terminal under `suite-cost` for each named test (owning the move down a layer, like the rule-warning and server cases), makes the report depend on it, and re-runs the report. The likeliest candidates are the two `profile_cli_tests` cases (3.66 s quiet). |
 | Root-only lock-test skip | `storage/lock.rs:652` skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool, so it is outside REQ-10. It stays and is recorded in investigation §D.5. |
 | Measurement ordering | Chosen: `build-footprint-report` depends on the four other stories and the remaining suite-cost terminals, so "after" covers all changes. Risk: the stories' holistic reviews then sit on the critical path to the report. |
+| Same-file ordering | `exit-code-argument-case-moves` → `label-query-cli-wiring-reduction` → `exit-code-reassertion-cli-query-graph` serialises `query_json_tests.rs` and `label_query_json_tests.rs`; the wiring cut keeps the moved parent-filter guard. `in-process-memory-setup-consolidation` precedes `label-query-harness-reduction` and `suite-shipped-item-kinds`, and the rule-warning move precedes `in-process-file-setup-consolidation`. |
 | Shared-file contention | `test_utils.rs`, `dev/TESTING.md`, `.jit/gates.toml`, `.config/nextest.toml`, `repository_state_store_tests.rs` and `commands/issue.rs` are edited by several entries. Edges serialise same-region rewrites: query extraction before the auto-transition decision, finalization deletion before the conformance suite, hook removal before the corpus fixture, and migrations before the re-assertion and wiring cuts in their files. Workers rebase over the remaining advisories. |
 
 ## Investigation sources
