@@ -13,8 +13,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-10-21T06:40:29.909914217Z",
+      "status": "failed",
+      "updated_at": "2026-10-21T07:06:52.597500238Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Accept namespace wildcards in issue search label filters",
-  "updated_at": "2026-10-21T06:47:29.854954447Z"
+  "updated_at": "2026-10-21T07:06:52.597500238Z"
 }

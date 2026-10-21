@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "a152dd020edc0b6afbe83a332fa73990cc9a8444",
+  "completed_at": "2026-10-21T07:08:23.583123732Z",
+  "duration_ms": 332689,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met in the current attributable source footprint.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "866bdde0-94f6-4af7-b2b0-d3d454a59afe",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4e25e831-661a-4c2b-8fc8-c77245c74e93",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T07:02:50.894010548Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 91e6da50b (implementation); 7f4b74e92 (merge, no standalone patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-01 (issue description); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T07:01:10Z); code-review pending/unrun\nTruncation recovery: recovered with per-commit/path statistics, bounded deletion-patch reads, and targeted current-tree searches\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met in the current attributable source footprint.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
