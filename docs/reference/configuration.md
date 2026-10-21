@@ -26,6 +26,8 @@ or customize individual settings.
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
 
+Every `config.toml` layer accepts only the keys this reference documents: a file holding any other key fails to load, with an error naming the key.
+
 Priority (how the merged effective configuration is resolved, e.g. for `jit config`): repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
 
 ---
@@ -579,8 +581,7 @@ Maximum indefinite (TTL=0) leases per agent. The default is listed in
 Maximum indefinite leases across the entire repository. The default is listed in
 [Runtime Defaults](runtime-defaults.md).
 
-These two limits are the only `[coordination]` keys; a config setting any
-other key in the section fails to load. Claim timing is not configurable: a
+These two limits are the only `[coordination]` keys. Claim timing is not configurable: a
 timed claim takes its duration from `jit claim acquire --ttl`, defaulting to
 the built-in claim lease TTL, and an indefinite lease becomes stale once its
 last `jit claim heartbeat` is older than the built-in claim stale threshold.
@@ -699,7 +700,8 @@ jit config set <section.field> <value> --global
 ```
 
 A repository-scoped key such as `worktree.enforce_leases` takes effect only in
-the repository config.
+the repository config. At either scope, `jit config set` refuses an edit after
+which the file would not load, and leaves the file unchanged.
 
 ### Validate Config
 

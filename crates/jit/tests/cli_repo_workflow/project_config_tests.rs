@@ -269,6 +269,43 @@ fn test_config_set_rejects_invalid_project_name_without_writing() {
     assert_eq!(before, after, "a rejected set must not modify the file");
 }
 
+/// `config set` parses the edited document as configuration at both scopes and
+/// refuses an edit that would not load, leaving each file untouched.
+#[test]
+fn test_config_set_rejects_unknown_key_at_repo_and_global_scope_without_writing() {
+    let temp = TempDir::new().unwrap();
+    let repo_dir = temp.path().join("unknown-key-repo");
+    fs::create_dir(&repo_dir).unwrap();
+    assert!(jit_init(&repo_dir).status.success());
+    let home = temp.path().join("isolated-home");
+    let repo_config = repo_dir.join(".jit/config.toml");
+    let user_config = home.join(".config/jit/config.toml");
+    let before = fs::read_to_string(&repo_config).unwrap();
+
+    for scope in [&[][..], &["--global"][..]] {
+        let out = Command::new(jit_binary())
+            .args(["config", "set", "coordination.undeclared_key", "x"])
+            .args(scope)
+            .current_dir(&repo_dir)
+            .env("HOME", &home)
+            .env_remove("JIT_WORKTREE_WRITE_POLICY")
+            .output()
+            .expect("failed to run jit config set");
+        assert!(!out.status.success(), "{scope:?}: unknown key accepted");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("undeclared_key"),
+            "{scope:?}: error names the key: {stderr}"
+        );
+    }
+
+    assert_eq!(fs::read_to_string(&repo_config).unwrap(), before);
+    assert!(
+        !user_config.exists(),
+        "a rejected global set must not write"
+    );
+}
+
 #[test]
 fn test_config_set_accepts_valid_project_name_and_round_trips() {
     let temp = TempDir::new().unwrap();
