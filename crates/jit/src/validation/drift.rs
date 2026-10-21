@@ -22,7 +22,7 @@
 //!   legacy bare name (`cargo-ci`), a colon-prefixed name (`legacy:old-rule`), a
 //!   different item kind, or a non-project scope — is likewise unresolved: D11
 //!   is a clean cut, with no bare-name fallback. The
-//!   unloadable case is handled by [`enforcement_drift_tolerant`] / [`SourceState`].
+//!   unloadable case is handled by [`enforcement_drift`] / [`SourceState`].
 //!
 //! The reverse direction — a loadable rule or gate that NO invariant claims — is
 //! deliberately NOT reported (REQ-05). Unioning every rule name and gate key and
@@ -91,31 +91,6 @@ impl DriftFinding {
     }
 }
 
-/// Compute enforcement drift between the invariant registry and the declared
-/// rules/gates.
-///
-/// `rule_names` and `gate_keys` are the names of every LOADABLE rule and every
-/// known gate key, respectively. A binding (an invariant's `enforced-by`) is
-/// "enforced" iff it parses as `@/rule/<name>` with `<name>` in `rule_names`, or
-/// `@/gate/<key>` with `<key>` in `gate_keys`. For every other invariant — one
-/// whose binding does not resolve that way — a
-/// [declared-but-unenforced](DriftFinding) finding is produced. A loadable rule
-/// or gate that no invariant claims is NOT reported (REQ-05).
-///
-/// Results are deterministic: findings follow the invariants' authored order.
-/// The function is pure — it reads only its arguments.
-pub fn enforcement_drift(
-    invariants: &[Invariant],
-    rule_names: &BTreeSet<&str>,
-    gate_keys: &BTreeSet<&str>,
-) -> Vec<DriftFinding> {
-    enforcement_drift_tolerant(
-        invariants,
-        SourceState::Loaded(rule_names),
-        SourceState::Loaded(gate_keys),
-    )
-}
-
 /// The load state of an enforcement SOURCE (the rule set or the gate registry).
 ///
 /// An invariant's `enforced-by` binding can only be confirmed "enforced" against
@@ -143,11 +118,15 @@ impl SourceState<'_> {
     }
 }
 
-/// Compute enforcement drift, tolerating an UNLOADABLE rule set or gate registry
-/// rather than erroring (REQ-01 "missing OR unloadable").
+/// Compute enforcement drift between the invariant registry and the rule set and
+/// gate registry, tolerating an UNLOADABLE source rather than erroring
+/// (REQ-01 "missing OR unloadable").
 ///
-/// Semantics extend [`enforcement_drift`]: a binding is reported
-/// declared-but-unenforced when it does not resolve. The address form pins down
+/// A binding (an invariant's `enforced-by`) is "enforced" iff it resolves; every
+/// other binding yields a [declared-but-unenforced](DriftFinding) finding, in the
+/// invariants' authored order. A loadable rule or gate that no invariant claims
+/// is NOT reported (REQ-05). The function is pure — it reads only its arguments.
+/// The address form pins down
 /// exactly ONE candidate source per binding — `@/rule/<name>` resolves only
 /// against `rules`, `@/gate/<key>` only against `gates` — so the
 /// [`DriftFinding::unloadable`] flag reflects THAT source's own state: set when
@@ -160,7 +139,7 @@ impl SourceState<'_> {
 /// # Examples
 ///
 /// ```
-/// use jit::validation::drift::{enforcement_drift_tolerant, SourceState};
+/// use jit::validation::drift::{enforcement_drift, SourceState};
 /// use jit::declarations::invariants::InvariantRegistry;
 /// use std::collections::BTreeSet;
 ///
@@ -171,7 +150,7 @@ impl SourceState<'_> {
 /// .unwrap();
 /// let gates: BTreeSet<&str> = BTreeSet::new();
 /// // The rule set failed to parse; the gate registry loaded (and is empty).
-/// let findings = enforcement_drift_tolerant(
+/// let findings = enforcement_drift(
 ///     &reg.invariants,
 ///     SourceState::Unloadable,
 ///     SourceState::Loaded(&gates),
@@ -181,7 +160,7 @@ impl SourceState<'_> {
 /// assert!(f.unloadable, "binding into an unloadable source is flagged");
 /// assert!(f.message().contains("failed to load"));
 /// ```
-pub fn enforcement_drift_tolerant(
+pub fn enforcement_drift(
     invariants: &[Invariant],
     rules: SourceState<'_>,
     gates: SourceState<'_>,
@@ -249,7 +228,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert_eq!(findings[0].invariant_id, "sample-invariant");
         assert_eq!(findings[0].subject, "@/rule/ghost-rule");
@@ -265,7 +248,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["dag-no-cycles"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         // The binding resolves, so no drift.
         assert!(findings.is_empty(), "{findings:?}");
     }
@@ -278,7 +265,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = ["code-review"].into_iter().collect();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert!(findings.is_empty(), "{findings:?}");
     }
 
@@ -292,7 +283,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["rule-a", "rule-b"].into_iter().collect();
         let gates: BTreeSet<&str> = ["gate-x"].into_iter().collect();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         // rule-b and gate-x are unclaimed but reported nowhere; rule-a resolves.
         assert!(findings.is_empty(), "{findings:?}");
     }
@@ -306,13 +301,21 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["only-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert!(findings.is_empty(), "{findings:?}");
     }
 
     #[test]
     fn test_no_invariants_no_rules_no_gates_is_clean() {
-        let findings = enforcement_drift(&[], &BTreeSet::new(), &BTreeSet::new());
+        let findings = enforcement_drift(
+            &[],
+            SourceState::Loaded(&BTreeSet::new()),
+            SourceState::Loaded(&BTreeSet::new()),
+        );
         assert!(findings.is_empty());
     }
 
@@ -325,7 +328,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["real-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert_eq!(findings[0].subject, "@/rule/ghost");
         assert!(!findings[0].unloadable);
@@ -342,7 +349,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["label-format"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert!(!findings[0].unloadable);
     }
@@ -358,7 +369,11 @@ mod tests {
         );
         let rules: BTreeSet<&str> = BTreeSet::new();
         let gates: BTreeSet<&str> = ["cargo-ci"].into_iter().collect();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert_eq!(findings[0].subject, "cargo-ci");
     }
@@ -373,12 +388,16 @@ mod tests {
         );
         let rules: BTreeSet<&str> = ["old-rule"].into_iter().collect();
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift(&r.invariants, &rules, &gates);
+        let findings = enforcement_drift(
+            &r.invariants,
+            SourceState::Loaded(&rules),
+            SourceState::Loaded(&gates),
+        );
         assert_eq!(findings.len(), 1, "{findings:?}");
         assert_eq!(findings[0].subject, "legacy:old-rule");
     }
 
-    // --- tolerant (unloadable source) -------------------------------------
+    // --- unloadable source ------------------------------------------------
 
     #[test]
     fn test_unloadable_rule_source_makes_binding_declared_but_unenforced() {
@@ -389,7 +408,7 @@ mod tests {
                      enforced-by = \"@/rule/bad-rule\"\n",
         );
         let gates: BTreeSet<&str> = BTreeSet::new();
-        let findings = enforcement_drift_tolerant(
+        let findings = enforcement_drift(
             &r.invariants,
             SourceState::Unloadable,
             SourceState::Loaded(&gates),
@@ -410,7 +429,7 @@ mod tests {
                      enforced-by = \"@/gate/some-gate\"\n",
         );
         let rules: BTreeSet<&str> = ["a-rule"].into_iter().collect();
-        let findings = enforcement_drift_tolerant(
+        let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
             SourceState::Unloadable,
@@ -430,7 +449,7 @@ mod tests {
                      enforced-by = \"@/rule/a-rule\"\n",
         );
         let rules: BTreeSet<&str> = ["a-rule"].into_iter().collect();
-        let findings = enforcement_drift_tolerant(
+        let findings = enforcement_drift(
             &r.invariants,
             SourceState::Loaded(&rules),
             SourceState::Unloadable,

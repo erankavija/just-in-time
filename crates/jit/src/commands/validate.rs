@@ -1402,7 +1402,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// `unloadable` instead of an error. Only `cached_config` (the invariant
     /// registry itself) can still error.
     pub fn compute_drift_findings(&self) -> Result<Vec<crate::validation::drift::DriftFinding>> {
-        use crate::validation::drift::{enforcement_drift_tolerant, SourceState};
+        use crate::validation::drift::{enforcement_drift, SourceState};
         use std::collections::BTreeSet;
 
         let config = self.cached_config()?;
@@ -1436,11 +1436,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             None => SourceState::Unloadable,
         };
 
-        Ok(enforcement_drift_tolerant(
-            invariants,
-            rules_state,
-            gates_state,
-        ))
+        Ok(enforcement_drift(invariants, rules_state, gates_state))
     }
 
     /// Defensively resolve the names of every LOADABLE rule, returning `None` when
