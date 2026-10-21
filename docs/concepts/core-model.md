@@ -1161,17 +1161,22 @@ For agents that just want "next available work":
 # Claim next ready issue by priority
 jit issue claim-next agent:worker-1
 
+# Claim the highest-priority ready issue matching a filter
+jit issue claim-next agent:worker-1 --filter "label:type:epic AND priority:high"
+
 ```
 
 **Behavior:**
 1. Queries ready issues (unassigned, state=ready, unblocked)
-2. Sorts by priority (critical → high → normal → low)
-3. Attempts to claim the first selected issue
-4. Returns claimed issue ID
+2. Keeps issues matching `--filter`, if given
+3. Sorts by priority (critical → high → normal → low)
+4. Attempts to claim the first selected issue
+5. Returns claimed issue ID
 
-`claim-next --filter` is accepted by the CLI but its current handler does not
-apply it. Do not use it for targeted work. Query ready work with labels or a
-separate query first, and acquire a lease if the selection must be exclusive.
+`claim-next --filter` takes the boolean query language of `jit issue update --filter`
+and narrows the ready set before priority ordering. A filter that does not parse
+fails before anything is claimed; a filter matching no ready issue fails with the
+not-found error.
 
 **Race handling:**
 - Concurrent `claim-next` calls can choose the same candidate
@@ -1237,15 +1242,17 @@ done
 
 **Pattern 2: Targeted Work Distribution**
 ```bash
-# Discover a component-specific ready issue, then coordinate it exclusively.
+# Claim the highest-priority ready backend issue.
+jit issue claim-next agent:backend-specialist --filter "label:component:backend"
+
+# Or discover a candidate, then coordinate it exclusively.
 jit query available --label component:backend
 jit claim acquire <selected-issue-id> --ttl 600 --agent-id agent:backend-specialist
 jit issue claim <selected-issue-id> agent:backend-specialist
 ```
 
-`claim-next` already orders its unfiltered candidates by priority. For component
-or priority targeting, use a separate query because its current `--filter`
-handler does not apply that argument.
+`claim-next --filter` narrows the candidate set and claims the highest-priority
+match. Use a separate query plus a lease when the selection must be exclusive.
 
 **Pattern 3: Timeout and Recovery**
 ```bash

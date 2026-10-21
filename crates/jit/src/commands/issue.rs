@@ -771,19 +771,35 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.publish_captured_release(full_id, reason.to_string())
     }
 
+    /// Claim the highest-priority ready issue matching `filter`, a
+    /// [`QueryFilter`](crate::query_engine::QueryFilter) expression.
+    ///
+    /// The filter is parsed before anything is claimed; a parse failure is an
+    /// [`InvalidArgumentError`](crate::errors::InvalidArgumentError).
     pub fn claim_next(
         &self,
         assignee: String,
-        _filter: Option<String>,
+        filter: Option<String>,
     ) -> Result<(String, Vec<StorageWarning>)>
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let filter = filter
+            .map(|expr| {
+                crate::query_engine::QueryFilter::parse(&expr)
+                    .map_err(|e| crate::errors::InvalidArgumentError::new(e.to_string()))
+            })
+            .transpose()?;
         let issues = self.storage.list_issues()?;
+        let context = crate::query_engine::QueryContext::from_issues(&issues);
 
         // Highest-priority issue of the domain ready set (Ready, unassigned, every
-        // dependency met); `sort_by_key` is stable, so ties keep storage order.
-        let mut candidates = crate::domain::queries::query_ready(&issues);
+        // dependency met) matching the filter; `sort_by_key` is stable, so ties
+        // keep storage order.
+        let mut candidates: Vec<_> = crate::domain::queries::query_ready(&issues)
+            .into_iter()
+            .filter(|i| filter.as_ref().is_none_or(|f| f.matches(i, &context)))
+            .collect();
 
         candidates.sort_by_key(|i| match i.priority {
             Priority::Critical => 0,
@@ -946,6 +962,77 @@ mod tests {
                 .is_some(),
             "claim-next absence must retain a typed classifier, got: {error:?}"
         );
+    }
+
+    fn seed_ready(
+        executor: &CommandExecutor<InMemoryStorage>,
+        title: &str,
+        priority: Priority,
+        label: &str,
+    ) -> String {
+        let mut issue = crate::domain::types::fixture_issue(title.into(), String::new());
+        issue.state = State::Ready;
+        issue.priority = priority;
+        issue.labels = vec![label.to_string()];
+        let id = issue.id.clone();
+        crate::commands::test_helpers::seed_issue(&executor.storage, issue);
+        id
+    }
+
+    #[test]
+    fn test_claim_next_filter_excluding_top_priority_claims_best_matching_issue() {
+        let executor = setup();
+        seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
+        let beta = seed_ready(&executor, "Beta", Priority::Low, "type:epic");
+        let gamma = seed_ready(&executor, "Gamma", Priority::High, "type:epic");
+
+        let (claimed, _) = executor
+            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .unwrap();
+
+        assert_eq!(claimed, gamma);
+        let unclaimed = executor.storage.load_issue(&beta).unwrap();
+        assert!(unclaimed.assignee.is_none());
+    }
+
+    #[test]
+    fn test_claim_next_filter_matching_no_ready_issue_returns_not_found_and_claims_nothing() {
+        let executor = setup();
+        let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
+
+        let error = executor
+            .claim_next("agent:w1".to_string(), Some("label:type:epic".to_string()))
+            .expect_err("a filter matching no ready issue must not claim");
+
+        assert!(error
+            .downcast_ref::<crate::errors::NotFoundError>()
+            .is_some());
+        assert!(executor
+            .storage
+            .load_issue(&alpha)
+            .unwrap()
+            .assignee
+            .is_none());
+    }
+
+    #[test]
+    fn test_claim_next_unparseable_filter_returns_invalid_argument_and_claims_nothing() {
+        let executor = setup();
+        let alpha = seed_ready(&executor, "Alpha", Priority::Critical, "type:task");
+
+        let error = executor
+            .claim_next("agent:w1".to_string(), Some("garbage %%%".to_string()))
+            .expect_err("a malformed filter must be rejected");
+
+        assert!(error
+            .downcast_ref::<crate::errors::InvalidArgumentError>()
+            .is_some());
+        assert!(executor
+            .storage
+            .load_issue(&alpha)
+            .unwrap()
+            .assignee
+            .is_none());
     }
 
     #[test]

@@ -1197,6 +1197,10 @@ pub enum IssueCommands {
         /// Assignee (format: type:identifier, e.g., agent:worker-1)
         assignee: String,
 
+        /// Claim only a ready issue matching this boolean query, e.g.
+        /// "label:type:epic AND priority:high" (fields: state, label, priority,
+        /// assignee; operators: AND, OR, NOT, parentheses; same language as
+        /// `issue update --filter`)
         #[arg(short, long)]
         filter: Option<String>,
 
