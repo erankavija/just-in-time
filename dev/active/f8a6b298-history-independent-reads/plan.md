@@ -18,7 +18,7 @@ Every per-key read gets a record addressed by that key, written in the same redo
 | REQ-07 | The lease-file rename or unlink is the commit point, and history is appended after it. An injector matrix proves prior-or-next. | Leases §5.1 option A |
 | REQ-08 | The claim event follows the assignee change (DEC-12). The capture is the issue record plus the tail probe (DEC-16). | Leases §5.3 |
 | REQ-09 | Archive executions become one domain record type. Per-target evidence records are written in the execute redo record, and this repository's targets are seeded once. | Events §5.3 (A) |
-| REQ-10 | One torn-line rule (DEC-15) comes first. Retired tags become errors only after the claim, validation and archive commands stop parsing the log. | Events §5.1 |
+| REQ-10 | One torn-line rule (DEC-15) comes first. Readers then converge on the one parser, which skips retired tags uniformly, and select by typed tag. | Events §5.1 |
 | REQ-11 | Unanchored ripgrep negations are built from one history-path declaration. | Events §5.4 (A) |
 | REQ-12 | The claims index is deleted, nothing is seeded from history at runtime, and `RedoRecord` refuses a put or delete at the log. | Leases R12c; Events §4 |
 | REQ-13 | Validation, mutation captures, claim and archive move to the tail probe, and `CaptureSpec` refuses a whole read of the log. The storage-format reference names the readers (DEC-19). | Events §3.1 |
@@ -61,7 +61,7 @@ Until renew, heartbeat and force-evict are addressed by issue (DEC-11), they fin
 
 ### `event-log-rule` [plan-fixed] — One event-log parser
 
-`domain::parse_known_events` is the only parser, and it skips blank lines. A final line without a terminating newline is an uncommitted append and is ignored. Any other line that is not a well-formed record with a current `EventTag` is an error that names the line. Appending over an unterminated final line prefixes a newline. Callers select events by typed tag.
+`domain::parse_known_events` is the only parser, and it skips blank lines. A final line without a terminating newline is an uncommitted append and is ignored. A well-formed record whose tag is not a current `EventTag` (a retired tag) is skipped by every caller. Any other malformed line is an error that names the line. Appending over an unterminated final line prefixes a newline. Callers select events by typed tag.
 
 ### `event-append-probe` [plan-fixed] — Bounded end-of-log probe
 
@@ -107,7 +107,7 @@ A non-history command reaches the event log only through `CaptureSpec::discover_
 | archive-execution-record-type | Archive executions are one domain record type | task | Archive evidence folds read one domain execution record type shared with the event. | — | REQ-09, DEC-17, DEC-01 | touches 8 | — | event-torn-line-rule |
 | archive-evidence-records | Archive evidence is a per-target record | task | Archive preview and execute read a target's evidence from its per-target record once. | archive-evidence-record, archive-execution-record, event-append-probe | REQ-09, DEC-17, DEC-03 | touches 12 | archive-evidence-cutover | archive-execution-record-type, validation-skips-event-log |
 | archive-evidence-seeding | This repository's archived targets get evidence records | task | This repository's archived targets each have an evidence record matching the event log. | archive-evidence-record | REQ-09, DEC-17 | creates 1, touches 1 | archive-evidence-cutover | archive-evidence-records |
-| event-log-reader-convergence | Event-log readers share one parser and reject retired tags | task | Event-log reads go through one parser that rejects retired tags and selects by typed tag. | event-log-rule | REQ-10, DEC-15 | touches 5, uncertain | — | claim-event-from-assignee, archive-evidence-records |
+| event-log-reader-convergence | Event-log readers share one parser and select events by typed tag | task | Event-log reads go through one parser that skips retired tags and selects by typed tag. | event-log-rule | REQ-10, DEC-15 | touches 5, uncertain | — | claim-event-from-assignee, archive-evidence-records |
 | capture-refuses-whole-event-log | Captures and redo records refuse whole-log access | task | The capture layer and the redo record admit only a tail probe and an append on the event log. | event-append-probe | REQ-12, REQ-13, DEC-19 | touches 3 | — | mutation-event-tail-captures, claim-event-from-assignee, archive-evidence-records |
 | search-excludes-history | Default search reads no history file | task | A search without an explicit file selection excludes the declared history paths. | — | REQ-11, DEC-18, DEC-01 | touches 2 | — | — |
 | storage-records-per-key-reference | The storage-record reference describes verdict and archive-evidence records | task | The generated storage-record reference covers verdict and archive-evidence records. | gate-verdict-record, archive-evidence-record | REQ-15, DEC-06, DEC-17 | touches 2 | — | gate-run-per-issue-layout, archive-evidence-records |
@@ -144,7 +144,7 @@ flowchart LR
     N20["archive-execution-record-type: Archive executions are one domain record type"]
     N21["archive-evidence-records: Archive evidence is a per-target record"]
     N22["archive-evidence-seeding: This repository's archived targets get evidence records"]
-    N23["event-log-reader-convergence: Event-log readers share one parser and reject retired tags"]
+    N23["event-log-reader-convergence: Event-log readers share one parser and select events by typed tag"]
     N24["capture-refuses-whole-event-log: Captures and redo records refuse whole-log access"]
     N25["search-excludes-history: Default search reads no history file"]
     N26["storage-records-per-key-reference: The storage-record reference describes verdict and archive-evidence records"]
@@ -230,7 +230,7 @@ flowchart LR
 | DEC-12 Claim event | Chosen: `IssueClaimed` exactly when the assignee changes, for both `claim acquire` and `issue claim`. Fixes acquire → unassign → acquire emitting nothing. |
 | DEC-13 Limit check | Chosen: the indefinite-lease limits read current lease records only (REQ-05 amended). |
 | DEC-14 Checkout leases | Chosen: one idempotent rewrite, `lease-records-rewrite`, in landing group `lease-cutover`. No reader of the old index remains. |
-| DEC-15 Parser rule | Chosen: `event-log-rule`. Retired tags are an error, and the marker protocol is removed. Kept: `@/issue/c88822a5/decision/D-1`. d72bf093 REQ-03 (byte-identical re-serialization of this log) is unaffected: no line here carries `isolated_torn_tail`. Open owner decision: this log holds retired-tag records (7 `document_archived`, plus 1 `lifecycle_timestamps_backfilled` once 2492ab29 retires it), so after `event-log-reader-convergence` the history commands fail on this repository. Options are amending DEC-15 to skip retired tags uniformly, or a one-time removal of those records, which conflicts with REQ-12's append-only history. |
+| DEC-15 Parser rule | Chosen: `event-log-rule`. Retired-tag records are skipped uniformly, since history is append-only (REQ-12) and this log holds 7 `document_archived` records, plus 1 `lifecycle_timestamps_backfilled` once 2492ab29 retires its tag. Rejected: erroring on retired tags, which would require rewriting history. The marker protocol is removed. Kept: `@/issue/c88822a5/decision/D-1`. d72bf093 REQ-03 (byte-identical re-serialization of this log) is unaffected: no line here carries `isolated_torn_tail`. |
 | DEC-16 Content | Chosen: `event-append-probe`. The bounded probe is allowed, and no record is parsed. |
 | DEC-17 Archive evidence | Chosen: `archive-evidence-record`, plus one seeding task in landing group `archive-evidence-cutover`. Rejected: evidence on the `.jit-container` marker or on the issue record. |
 | DEC-18 Search | Chosen: exclusion by construction of the default selection from `history-paths`. Rejected: running `rg` from the data root, which changes result paths. |

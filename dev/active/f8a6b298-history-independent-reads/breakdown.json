@@ -1207,8 +1207,8 @@
  },
  {
   "key": "event-log-reader-convergence",
-  "title": "Event-log readers share one parser and reject retired tags",
-  "description": "Make both storage backends and every history-reporting command parse the event log through the one domain parser, treat a retired or unknown tag as an error, and select events by typed tag.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a well-formed record whose tag is not in `EventTag::ALL`. The file backend parses through it at `storage/json.rs:161` (`read_exact_store`, used by `jit worktree store-divergence`) and `:1344-1356` (`read_events`). The in-memory backend reads through the same parser. `jit events query --event-type` compares tag strings (`commands/events.rs:25`). The property that retired tags are skipped is owned by `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1830`) and by a cross-backend event-read test.\n\nThe claim, validation and archive commands no longer parse the log; its only parsers are the history commands `jit events` and `jit worktree store-divergence`. This repository's log holds retired-tag records (`document_archived`).\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` returns an error naming the line for a record whose tag is not a current `EventTag`; it skips no well-formed record.\n- [hard] REQ-02: Both backends' `read_events` and `read_exact_store` parse only through `parse_known_events`, and one cross-backend test owns the retired-tag rule.\n- [hard] REQ-03: `jit events query --event-type` parses its argument into `EventTag` and selects by typed tag; no event tag string literal is compared outside the tag vocabulary.\n- [hard] REQ-04: `jit events tail` on a log holding a retired tag fails with `PARSE_ERROR` and exit 1.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "title": "Event-log readers share one parser and select events by typed tag",
+  "description": "Make both storage backends and every history-reporting command parse the event log through the one domain parser, skip retired-tag records uniformly, and select events by typed tag.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a well-formed record whose tag is not in `EventTag::ALL`. The file backend parses through it at `storage/json.rs:161` (`read_exact_store`, used by `jit worktree store-divergence`) and `:1344-1356` (`read_events`). The in-memory backend reads through the same parser. `jit events query --event-type` compares tag strings (`commands/events.rs:25`). The JSON backend's skipping of retired tags is owned by `test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records` (`storage/json.rs:1830`) and by a cross-backend event-read test.\n\nThe claim, validation and archive commands no longer parse the log; its only parsers are the history commands `jit events` and `jit worktree store-divergence`. This repository's log holds retired-tag records (`document_archived`), and history is append-only, so they stay in the log and every reader skips them.\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` skips a well-formed record whose tag is not a current `EventTag`, and every caller receives the same records from the same bytes.\n- [hard] REQ-02: Both backends' `read_events` and `read_exact_store` parse only through `parse_known_events`, and one cross-backend test owns the retired-tag rule.\n- [hard] REQ-03: `jit events query --event-type` parses its argument into `EventTag` and selects by typed tag; no event tag string literal is compared outside the tag vocabulary.\n- [hard] REQ-04: `jit events tail` and `jit events query` succeed on a log holding a retired-tag record and omit it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1231,7 +1231,7 @@
    "archive-evidence-records"
   ],
   "planning": {
-   "outcome": "Event-log reads go through one parser that rejects retired tags and selects by typed tag.",
+   "outcome": "Event-log reads go through one parser that skips retired tags and selects by typed tag.",
    "contract_refs": [
     "event-log-rule"
    ],
@@ -1243,7 +1243,7 @@
    "terminal": {
     "consumer_family": "event-log readers",
     "test_boundary": "cross-backend event-read tests",
-    "worker_sized_reason": "One parser rule change and three reader call sites converge.",
+    "worker_sized_reason": "Three reader call sites converge on one parser and one typed selection.",
     "footprint": {
      "touches": [
       "crates/jit/src/domain/event_log.rs",
