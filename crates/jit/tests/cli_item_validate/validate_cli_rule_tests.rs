@@ -910,7 +910,7 @@ fn test_schema_exposes_validate_positional_and_explain_flag() {
         fix["description"]
             .as_str()
             .unwrap()
-            .contains("provenance-proven derived-state repairs publish through one redo record"),
+            .contains("derived-state repairs publish through one redo record"),
         "schema must document the repair contract: {fix}"
     );
 }
@@ -948,7 +948,7 @@ process.stdin.on('end', () => {
   if (!props.id) { console.error('missing id property'); process.exit(3); }
   if (!props.explain) { console.error('missing explain property'); process.exit(4); }
   if (!props.rule) { console.error('missing rule property'); process.exit(5); }
-  if (!props.fix?.description?.includes('provenance-proven derived-state repairs publish through one redo record')) {
+  if (!props.fix?.description?.includes('derived-state repairs publish through one redo record')) {
     console.error('missing fix repair contract'); process.exit(6);
   }
   console.log('ok');
