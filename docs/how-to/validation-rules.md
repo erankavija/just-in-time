@@ -73,6 +73,8 @@ assert = { require-section = { heading = "Success Criteria" } }  # exactly one k
   blocking.
 - **`assert`** holds **exactly one** assertion kind. A shorthand kind and a
   `json-schema` file reference cannot coexist in one rule.
+- An unknown key in a rule, its `when` selector, or its `assert` payload fails
+  the load with an error naming the key.
 
 ### Selectors (`when`)
 
@@ -84,7 +86,7 @@ every issue:
 | `type`         | whose `type:<value>` label equals this                   |
 | `label`        | carrying this label; supports `ns:*` wildcards           |
 | `state`        | in one of these lifecycle states (single value or list)  |
-| `has-doc-type` | with an attached document of this `doc_type`             |
+| `has_doc_type` | with an attached document of this `doc_type`             |
 
 #### State predicates
 

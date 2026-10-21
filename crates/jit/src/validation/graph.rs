@@ -1349,7 +1349,7 @@ fn linked_issues<'a>(issue: &Issue, issues: &'a [Issue]) -> Vec<&'a Issue> {
 /// # Config keys
 ///
 /// - `target` (table, required): a [`Selector`]-shaped table (`type`/`label`/
-///   `state`/`has-doc-type`) identifying the issues the source must depend on.
+///   `state`/`has_doc_type`) identifying the issues the source must depend on.
 /// - `mode` (string, optional, default `"must"`): `"must"` or `"should"`. This
 ///   only shapes the finding message; the finding's blocking weight comes from
 ///   the rule's own [`Severity`].
@@ -2577,7 +2577,14 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_child_type_exclude_must_be_array_of_strings() {
-        let rule = coverage_rule("child-type-exclude = \"breakdown\"");
+        // Loading rejects the mistyped value; a directly built payload reaches the evaluator.
+        let mut rule = coverage_rule("");
+        if let Assertion::LabelCoverage { config } = &mut rule.assert {
+            config.insert(
+                "child-type-exclude".to_string(),
+                toml::Value::String("breakdown".to_string()),
+            );
+        }
         let initiative = initiative_chain_head(&["REQ-01"]);
         let rules = vec![&rule];
         let findings = evaluate_graph(
@@ -3029,7 +3036,11 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_label_reference_missing_key_is_config_error() {
-        let rule = reference_rule("from = \"implements\""); // missing `to`
+        // Loading rejects a missing key; a directly built payload reaches the evaluator.
+        let mut rule = reference_rule("from = \"implements\", to = \"req\"");
+        if let Assertion::LabelReference { config } = &mut rule.assert {
+            config.remove("to");
+        }
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
@@ -3133,7 +3144,11 @@ source-of-truth = "markdown-first"
 
     #[test]
     fn test_dependency_shape_missing_target_is_config_error() {
-        let rule = shape_rule("mode = \"must\""); // no target
+        // Loading rejects a missing key; a directly built payload reaches the evaluator.
+        let mut rule = shape_rule("target = { type = \"design\" }");
+        if let Assertion::DependencyShape { config } = &mut rule.assert {
+            config.remove("target");
+        }
         let rules = vec![&rule];
         let findings = evaluate_graph(
             &rules,
