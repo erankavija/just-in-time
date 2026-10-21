@@ -38,61 +38,28 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: the whole tracked repository surface. The Rust suites this gate runs
-# read the repository itself — the profile package's live-source conformance
-# walks the worktree and the documentation projections compare against docs/ —
-# so the footprint is the tree, not the workspace alone.
-#
-# Every exclusion below is material no step of this gate opens. Generated trees
-# (agent worktrees, node_modules, the web bundle, the tracker's scratch dir) are
-# named because the walk consults no ignore rule: a file beneath a declared root
-# is an input unless a pattern here says otherwise. The tracker's records and
-# machine-local state are named because every evaluation rewrites them. This
-# gate's own build output is not named: `target/` is not a declared root, and a
-# checker's output is a function of its inputs rather than one of them.
+# Inputs: the worktree root. The Rust suites this gate runs read the repository
+# itself (the profile package's live-source conformance walks the worktree and
+# the documentation projections compare against docs/), so the footprint is the
+# tree. The walk consults no ignore rule, so the exclusions name the git-ignored
+# generated and machine-local trees no step opens; the paths jit writes while
+# recording results never enter a digest.
 [gates.inputs]
-roots = [
-  ".agents",
-  ".dockerignore",
-  ".github",
-  ".gitattributes",
-  ".gitignore",
-  ".jit",
-  "AGENTS.md",
-  "CHANGELOG.md",
-  "CLAUDE.md",
-  "Cargo.lock",
-  "Cargo.toml",
-  "Dockerfile",
-  "INSTALL.md",
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "contrib",
-  "crates",
-  "dev",
-  "docker-compose.yml",
-  "docs",
-  "mcp-server",
-  "profiles",
-  "scripts",
-  "test-vectors",
-  "web",
-]
+roots = ["."]
 exclude = [
+  ".agents/cache-pool",
   ".agents/worktrees",
-  ".jit/*.lock",
-  ".jit/events.jsonl",
-  ".jit/gate-runs",
-  ".jit/index.json",
-  ".jit/issues",
+  ".claude",
   ".jit/server.log",
   ".jit/server.pid.json",
-  ".jit/tmp",
-  ".jit/worktree.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
   "mcp-server/node_modules",
+  "target",
   "web/dist",
   "web/node_modules",
+  "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -119,48 +86,21 @@ pass_context = false
 # compiles and tests the same crate over the same repository. See the cargo-ci
 # declaration for why the footprint is the tree and what the exclusions are.
 [gates.inputs]
-roots = [
-  ".agents",
-  ".dockerignore",
-  ".github",
-  ".gitattributes",
-  ".gitignore",
-  ".jit",
-  "AGENTS.md",
-  "CHANGELOG.md",
-  "CLAUDE.md",
-  "Cargo.lock",
-  "Cargo.toml",
-  "Dockerfile",
-  "INSTALL.md",
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "contrib",
-  "crates",
-  "dev",
-  "docker-compose.yml",
-  "docs",
-  "mcp-server",
-  "profiles",
-  "scripts",
-  "test-vectors",
-  "web",
-]
+roots = ["."]
 exclude = [
+  ".agents/cache-pool",
   ".agents/worktrees",
-  ".jit/*.lock",
-  ".jit/events.jsonl",
-  ".jit/gate-runs",
-  ".jit/index.json",
-  ".jit/issues",
+  ".claude",
   ".jit/server.log",
   ".jit/server.pid.json",
-  ".jit/tmp",
-  ".jit/worktree.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
   "mcp-server/node_modules",
+  "target",
   "web/dist",
   "web/node_modules",
+  "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -305,51 +245,23 @@ DOCS_FOOTPRINT = "docs/"
 # from every tracked file and resolves `@/` items through the repository's
 # registries; the projection checker re-renders through a jit binary built from
 # the workspace; the shipped-policy checker clones the repository and runs
-# `jit init`. The exclusions name generated trees no checker opens and the
-# tracker records every evaluation rewrites.
+# `jit init`. The exclusions are cargo-ci's.
 [gates.inputs]
-roots = [
-  ".agents",
-  ".dockerignore",
-  ".github",
-  ".gitattributes",
-  ".gitignore",
-  ".jit",
-  "AGENTS.md",
-  "CHANGELOG.md",
-  "CLAUDE.md",
-  "Cargo.lock",
-  "Cargo.toml",
-  "Dockerfile",
-  "INSTALL.md",
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "contrib",
-  "crates",
-  "dev",
-  "docker-compose.yml",
-  "docs",
-  "mcp-server",
-  "profiles",
-  "scripts",
-  "test-vectors",
-  "web",
-]
+roots = ["."]
 exclude = [
+  ".agents/cache-pool",
   ".agents/worktrees",
-  ".jit/*.lock",
-  ".jit/events.jsonl",
-  ".jit/gate-runs",
-  ".jit/index.json",
-  ".jit/issues",
+  ".claude",
   ".jit/server.log",
   ".jit/server.pid.json",
-  ".jit/tmp",
-  ".jit/worktree.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
   "mcp-server/node_modules",
+  "target",
   "web/dist",
   "web/node_modules",
+  "web/test-output.log",
 ]
 
 [gates.reserved]
@@ -559,52 +471,10 @@ pass_context = false
 
 [gates.checker.env]
 
-# Inputs: every tracked file, the tracker's records included —
-# scripts/secret-scan.sh copies the working-tree version of all of them into the
-# scan, so a secret committed to an issue record is a finding rather than a path
-# outside the digest. Only generated trees and machine-local state are excluded:
-# `git ls-files` never lists them, so the scan never reads them.
-[gates.inputs]
-roots = [
-  ".agents",
-  ".dockerignore",
-  ".github",
-  ".gitattributes",
-  ".gitignore",
-  ".jit",
-  "AGENTS.md",
-  "CHANGELOG.md",
-  "CLAUDE.md",
-  "Cargo.lock",
-  "Cargo.toml",
-  "Dockerfile",
-  "INSTALL.md",
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "contrib",
-  "crates",
-  "dev",
-  "docker-compose.yml",
-  "docs",
-  "mcp-server",
-  "profiles",
-  "scripts",
-  "test-vectors",
-  "web",
-]
-exclude = [
-  ".agents/worktrees",
-  ".jit/*.lock",
-  ".jit/server.log",
-  ".jit/server.pid.json",
-  ".jit/tmp",
-  ".jit/worktree.json",
-  "mcp-server/node_modules",
-  "web/dist",
-  "web/node_modules",
-]
-
+# No inputs: scripts/secret-scan.sh scans every tracked file, the tracker's
+# records included, and those records never enter an input digest, so a reused
+# verdict could pass a record that gained a secret. The gate runs on every
+# evaluation.
 [gates.reserved]
 
 [[gates]]
@@ -652,50 +522,23 @@ pass_context = false
 # Inputs: the tree-wide footprint. `cargo test --lib` reaches the same
 # repository-walking suites cargo-ci does (profile live sources, documentation
 # projections, the repository's own registries), so it reads the same tree and
-# excludes the same generated and rewritten material.
+# excludes the same generated trees.
 [gates.inputs]
-roots = [
-  ".agents",
-  ".dockerignore",
-  ".github",
-  ".gitattributes",
-  ".gitignore",
-  ".jit",
-  "AGENTS.md",
-  "CHANGELOG.md",
-  "CLAUDE.md",
-  "Cargo.lock",
-  "Cargo.toml",
-  "Dockerfile",
-  "INSTALL.md",
-  "LICENSE-APACHE",
-  "LICENSE-MIT",
-  "README.md",
-  "contrib",
-  "crates",
-  "dev",
-  "docker-compose.yml",
-  "docs",
-  "mcp-server",
-  "profiles",
-  "scripts",
-  "test-vectors",
-  "web",
-]
+roots = ["."]
 exclude = [
+  ".agents/cache-pool",
   ".agents/worktrees",
-  ".jit/*.lock",
-  ".jit/events.jsonl",
-  ".jit/gate-runs",
-  ".jit/index.json",
-  ".jit/issues",
+  ".claude",
   ".jit/server.log",
   ".jit/server.pid.json",
-  ".jit/tmp",
-  ".jit/worktree.json",
+  "badges",
+  "coverage.json",
+  "mcp-server/jit-schema.json",
   "mcp-server/node_modules",
+  "target",
   "web/dist",
   "web/node_modules",
+  "web/test-output.log",
 ]
 
 [gates.reserved]
