@@ -1082,39 +1082,6 @@ pub enum IssueCommands {
         json: bool,
     },
 
-    /// Hidden stub: not a real command. `issue rm` is not the canonical
-    /// spelling in this group (that's `issue delete`); this variant exists
-    /// only to fail fast with a hint instead of clap's generic "unrecognized
-    /// subcommand" error. See `verb_hint_error` in `main.rs`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Rm {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Rm` above. `issue remove` is not a command.
-    #[command(hide = true, trailing_var_arg = true)]
-    Remove {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Rm` above. `issue complete` is not a command; use
-    /// `issue update --state done`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Complete {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Rm` above. `issue edit` is not a command; use
-    /// `issue update`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Edit {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
     /// Assign issue to someone
     ///
     /// Assignment bookkeeping only, not a lease — for an exclusive, time-boxed
@@ -1285,23 +1252,6 @@ pub enum DepCommands {
 
         #[arg(long)]
         json: bool,
-    },
-
-    /// Hidden stub: not a real command. The canonical spelling in this group
-    /// is `dep rm`; this variant exists only to fail fast with a hint instead
-    /// of clap's generic "unrecognized subcommand" error. See
-    /// `verb_hint_error` in `main.rs`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Remove {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Remove` above. `dep delete` is not a command.
-    #[command(hide = true, trailing_var_arg = true)]
-    Delete {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 }
 
@@ -1506,23 +1456,6 @@ pub enum GateCommands {
 
         #[arg(long)]
         json: bool,
-    },
-
-    /// Hidden stub: not a real command. The canonical spelling in this group
-    /// is `gate remove`; this variant exists only to fail fast with a hint
-    /// instead of clap's generic "unrecognized subcommand" error. See
-    /// `verb_hint_error` in `main.rs`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Rm {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Rm` above. `gate delete` is not a command.
-    #[command(hide = true, trailing_var_arg = true)]
-    Delete {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 
     /// Add a gate requirement to an issue
@@ -1982,23 +1915,6 @@ pub enum DocCommands {
 
         #[arg(long)]
         json: bool,
-    },
-
-    /// Hidden stub: not a real command. The canonical spelling in this group
-    /// is `doc remove`; this variant exists only to fail fast with a hint
-    /// instead of clap's generic "unrecognized subcommand" error. See
-    /// `verb_hint_error` in `main.rs`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Rm {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Rm` above. `doc delete` is not a command.
-    #[command(hide = true, trailing_var_arg = true)]
-    Delete {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 
     /// Show document content
@@ -2564,32 +2480,6 @@ pub enum LabelCommands {
 
         #[arg(long)]
         json: bool,
-    },
-
-    /// Hidden stub: not a real command. There is no `label add` — labeling an
-    /// issue goes through `jit issue update --label`; this variant exists
-    /// only to fail fast with a hint instead of clap's generic "unrecognized
-    /// subcommand" error. See `verb_hint_error` in `main.rs`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Add {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Add` above. `label rm` is not a command; use
-    /// `jit issue update --remove-label`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Rm {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
-    },
-
-    /// Hidden stub: see `Add` above. `label remove` is not a command; use
-    /// `jit issue update --remove-label`.
-    #[command(hide = true, trailing_var_arg = true)]
-    Remove {
-        #[arg(allow_hyphen_values = true)]
-        args: Vec<String>,
     },
 }
 
@@ -3384,11 +3274,7 @@ impl IssueCommands {
             | Self::Status { .. }
             | Self::Children { .. }
             | Self::Progress { .. }
-            | Self::List { .. }
-            | Self::Rm { .. }
-            | Self::Remove { .. }
-            | Self::Complete { .. }
-            | Self::Edit { .. } => false,
+            | Self::List { .. } => false,
         }
     }
 }
@@ -3397,7 +3283,6 @@ impl DepCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             Self::Add { .. } | Self::Rm { .. } => true,
-            Self::Remove { .. } | Self::Delete { .. } => false,
         }
     }
 }
@@ -3414,9 +3299,7 @@ impl GateCommands {
             | Self::EvaluateMany { .. }
             | Self::Fail { .. } => true,
             Self::Preset(command) => command.requires_recovery_dispatch(),
-            Self::Rm { .. }
-            | Self::Delete { .. }
-            | Self::List { .. }
+            Self::List { .. }
             | Self::Show { .. }
             | Self::Status { .. }
             | Self::StatusAll { .. } => false,
@@ -3439,8 +3322,6 @@ impl DocCommands {
             Self::Add { .. } | Self::Remove { .. } => true,
             Self::Assets { command } => command.requires_recovery_dispatch(),
             Self::List { .. }
-            | Self::Rm { .. }
-            | Self::Delete { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
             | Self::Conformance { .. }
@@ -3559,10 +3440,6 @@ impl IssueCommands {
             | Self::Status { .. }
             | Self::Children { .. }
             | Self::Progress { .. }
-            | Self::Rm { .. }
-            | Self::Remove { .. }
-            | Self::Complete { .. }
-            | Self::Edit { .. }
             | Self::Assign { .. }
             | Self::Unassign { .. }
             | Self::Release { .. }
@@ -3576,7 +3453,7 @@ impl DepCommands {
         match self {
             // Both CLI verbs use the batch mutation variants, whose current
             // contract does not enter claims coordination.
-            Self::Add { .. } | Self::Rm { .. } | Self::Remove { .. } | Self::Delete { .. } => false,
+            Self::Add { .. } | Self::Rm { .. } => false,
         }
     }
 }
@@ -3588,8 +3465,6 @@ impl GateCommands {
             Self::Define { .. }
             | Self::Update { .. }
             | Self::Remove { .. }
-            | Self::Rm { .. }
-            | Self::Delete { .. }
             | Self::Add { .. }
             | Self::Evaluate { .. }
             | Self::EvaluateAll { .. }
@@ -3627,8 +3502,6 @@ impl DocCommands {
             Self::Add { .. }
             | Self::List { .. }
             | Self::Remove { .. }
-            | Self::Rm { .. }
-            | Self::Delete { .. }
             | Self::Show { .. }
             | Self::Dir { .. }
             | Self::Conformance { .. }
@@ -3684,11 +3557,7 @@ impl QueryCommands {
 impl LabelCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::Namespaces { .. }
-            | Self::Values { .. }
-            | Self::Add { .. }
-            | Self::Rm { .. }
-            | Self::Remove { .. } => false,
+            Self::Namespaces { .. } | Self::Values { .. } => false,
         }
     }
 }
@@ -3800,26 +3669,21 @@ mod recovery_dispatch_tests {
         "config show-hierarchy",
         "config validate",
         "dep add",
-        "dep delete",
-        "dep remove",
         "dep rm",
         "doc add",
         "doc assets list",
         "doc check-links",
         "doc conformance",
-        "doc delete",
         "doc diff",
         "doc dir",
         "doc history",
         "doc list",
         "doc remove",
-        "doc rm",
         "doc show",
         "events query",
         "events tail",
         "gate add",
         "gate define",
-        "gate delete",
         "gate evaluate",
         "gate evaluate-all",
         "gate evaluate-many",
@@ -3830,7 +3694,6 @@ mod recovery_dispatch_tests {
         "gate preset list",
         "gate preset show",
         "gate remove",
-        "gate rm",
         "gate show",
         "gate status",
         "gate status-all",
@@ -3848,16 +3711,12 @@ mod recovery_dispatch_tests {
         "issue children",
         "issue claim",
         "issue claim-next",
-        "issue complete",
         "issue create",
         "issue delete",
-        "issue edit",
         "issue list",
         "issue progress",
         "issue reject",
         "issue release",
-        "issue remove",
-        "issue rm",
         "issue search",
         "issue show",
         "issue status",
@@ -3867,10 +3726,7 @@ mod recovery_dispatch_tests {
         "item resolve",
         "item search",
         "item show",
-        "label add",
         "label namespaces",
-        "label remove",
-        "label rm",
         "label values",
         "list",
         "migrate lifecycle-timestamps",
