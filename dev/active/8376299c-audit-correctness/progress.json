@@ -126,7 +126,7 @@
           "title": "Accept namespace wildcards in issue search label filters",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 merged; code-review passed; cargo-ci load-failure --force rerun queued",
+          "status": "done",
           "note": "after 34999aad: search paths"
         }
       ]
@@ -174,7 +174,7 @@
     {
       "from": "d7d0d0db worker",
       "finding": "renew_lease and the lease-acquire paths drop an eviction when they bail before writing the claims index (same defect class as d7d0d0db, outside its criteria)",
-      "disposition": "open; not filed under this epic"
+      "disposition": "routed to f8a6b298 REQ-06 (steward ruling A); outside 8376299c's filed scope"
     },
     {
       "from": "lead",
