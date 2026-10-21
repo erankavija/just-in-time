@@ -94,16 +94,6 @@ pub struct TemplateApplyResult {
 }
 
 impl<S: IssueStore> CommandExecutor<S> {
-    /// The repository's [`RoleBindings`]: the names its templates give the
-    /// planning and breakdown nodes (`.jit/templates.toml`'s `[roles]` table).
-    ///
-    /// The single lookup every consumer (apply, refresh, breakdown, validation)
-    /// asks for the bracket roles through, so no command reads the config keys
-    /// itself.
-    pub(crate) fn template_roles(&self) -> Result<&RoleBindings> {
-        Ok(&self.cached_config()?.templates.roles)
-    }
-
     /// The repository's name for the anchor `jit apply <template> <container>`
     /// binds to its positional `<container>` argument
     /// (`.jit/templates.toml`'s `[anchors] container`, defaulting to

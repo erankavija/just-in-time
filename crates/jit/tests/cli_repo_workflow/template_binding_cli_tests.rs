@@ -14,10 +14,6 @@
 //! `test_apply_aborts_when_the_bound_anchor_names_no_declared_anchor` pins that
 //! failure directly; the other tests pass no `--anchor` flag and assert the
 //! reported `anchor_bindings` carry exactly `target`.
-//!
-//! Coverage of `bracket_breakdown` lives in `template_binding_tests.rs`: that
-//! operation is a library API with no CLI surface, so its renamed-role path is
-//! reachable only in-process.
 
 use assert_cmd::prelude::*;
 use serde_json::Value;

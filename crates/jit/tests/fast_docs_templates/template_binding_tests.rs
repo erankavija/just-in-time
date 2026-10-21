@@ -11,17 +11,16 @@
 //! `templates.toml` (the bindings are read from the repository, so an in-test TOML
 //! string would not exercise them), covering the library contract:
 //!
-//! - a repository that renames all three bindings: apply, bracket breakdown, and
-//!   `--force` refresh end to end;
+//! - a repository that renames all three bindings: apply and `--force` refresh end
+//!   to end;
 //! - a repository that declares NO bindings: the shipped names, unchanged.
 //!
-//! `bracket_breakdown` is reachable only here: it is a library API with no CLI
-//! surface. The container anchor's auto-binding is the CLI's own step — it fills
+//! The container anchor's auto-binding is the CLI's own step — it fills
 //! the binding map these tests pass explicitly — and is covered against the real
 //! binary in `template_binding_cli_tests.rs`.
 
-use jit::commands::{BracketChild, CommandExecutor};
-use jit::domain::{GateStatus, Issue, Priority};
+use jit::commands::CommandExecutor;
+use jit::domain::{Issue, Priority};
 use jit::storage::{InMemoryStorage, IssueStore};
 use std::collections::BTreeMap;
 
@@ -141,33 +140,12 @@ fn create_container(executor: &CommandExecutor<InMemoryStorage>, title: &str) ->
         .0
 }
 
-/// Mark the planning node's plan-quality gate PASSED, as breakdown requires.
-fn approve_plan(executor: &CommandExecutor<InMemoryStorage>, planning_id: &str) {
-    let mut p = executor.storage().load_issue(planning_id).unwrap();
-    p.gates_status
-        .get_mut("plan-review")
-        .expect("the planning node carries the plan gate")
-        .status = GateStatus::Passed;
-    crate::harness::seed_memory_issue(executor.storage(), &p);
-}
-
 /// The issue's `type:` label value, if any.
 fn type_of(issue: &Issue) -> Option<String> {
     issue
         .labels
         .iter()
         .find_map(|l| l.strip_prefix("type:").map(str::to_string))
-}
-
-fn child(title: &str) -> BracketChild {
-    BracketChild {
-        title: title.to_string(),
-        description: String::new(),
-        priority: Priority::Normal,
-        gates: vec![],
-        labels: vec![],
-        deps: vec![],
-    }
 }
 
 // =========== REQ-2: renamed bindings complete the whole bracket flow ===========
@@ -203,28 +181,6 @@ fn test_renamed_bindings_complete_the_bracket_flow_end_to_end() {
     assert!(split.dependencies.contains(&spec_id), "B → P");
     let c = executor.storage().load_issue(&container).unwrap();
     assert!(c.dependencies.contains(&split_id), "C → B");
-
-    // --- breakdown ---
-    approve_plan(&executor, &spec_id);
-    let broken = executor
-        .bracket_breakdown(&container, vec![child("Build login"), child("Wire logout")])
-        .expect("breakdown locates B and P through the renamed roles");
-    assert_eq!(broken.child_ids.len(), 2);
-    assert_eq!(
-        broken.breakdown_id, split_id,
-        "B is consumed, not re-created"
-    );
-    assert_eq!(broken.planning_id, spec_id);
-
-    // Every source child hangs off B, so the fan-out cannot release before the
-    // breakdown node's gates pass.
-    for child_id in &broken.child_ids {
-        let issue = executor.storage().load_issue(child_id).unwrap();
-        assert!(
-            issue.dependencies.contains(&split_id),
-            "source child {child_id} depends on B"
-        );
-    }
 
     // --- forced refresh ---
     let mut c = executor.storage().load_issue(&container).unwrap();
@@ -268,13 +224,6 @@ fn test_absent_bindings_reproduce_the_shipped_names_end_to_end() {
         .unwrap();
     let planning_id = applied.created_node_ids_by_role["planning"].clone();
     let breakdown_id = applied.created_node_ids_by_role["breakdown"].clone();
-
-    approve_plan(&executor, &planning_id);
-    let broken = executor
-        .bracket_breakdown(&container, vec![child("Build login")])
-        .unwrap();
-    assert_eq!(broken.breakdown_id, breakdown_id);
-    assert_eq!(broken.planning_id, planning_id);
 
     let (refreshed, _) = executor
         .apply_template("plan", &container, &bindings, true)

@@ -13,8 +13,8 @@
 //! It exercises the real subprocess path end-to-end (built `jit` binary against a
 //! temp `.jit` repo). The bracket spine `C → child → B` is built by hand so that
 //! `B` (which carries the coverage rule's `type:breakdown` selector and the
-//! `brackets:<C-short-id>` pointer) is inside `C`'s dependency closure — exactly the shape
-//! `bracket_breakdown` produces. The configured rule resolves the selected container from
+//! `brackets:<C-short-id>` pointer) is inside `C`'s dependency closure — exactly the shape of
+//! a drafted bracket. The configured rule resolves the selected container from
 //! the rule's `container-from-label` setting while keeping `B` as the sole firing issue.
 
 use assert_cmd::prelude::*;
@@ -148,9 +148,8 @@ fn setup_bracket_repo() -> TempDir {
     temp
 }
 
-/// Build a bracket `C → child → B` by hand (the shape `bracket_breakdown`
-/// produces) with the coverage-preview gate attached to `B`. When `covered`, the
-/// child credits the criterion with `satisfies:<C-short-id>/<req_id>`. Returns
+/// Build a bracket `C → child → B` by hand (the shape of a drafted bracket)
+/// with the coverage-preview gate attached to `B`. When `covered`, the child credits the criterion with `satisfies:<C-short-id>/<req_id>`. Returns
 /// `(container_id, breakdown_id)`.
 fn build_bracket(
     temp: &TempDir,
