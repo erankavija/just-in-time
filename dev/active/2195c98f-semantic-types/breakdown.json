@@ -97,7 +97,7 @@
   {
     "key": "graph-node-result-refs",
     "title": "Graph queries return nodes rather than id strings",
-    "description": "Make the graph's id-returning queries return references into the node set, so a typed caller reads the id from the node instead of parsing a string.\n\n## Background\n\n`DependencyGraph` returns owned id strings: `compute_transitive_reduction -> HashSet<String>` (`crates/jit/src/graph/mod.rs:442`), `find_shortest_path -> Vec<String>` (`:475`) and `find_redundant_edges -> Vec<(String, String)>` (`:519`). `GraphError::NodeNotFound { id: String }` (`:61`) names a dangling reference. Callers sit in `graph/hierarchy.rs`, `commands/dependency.rs`, `commands/template.rs`, `commands/validate.rs`, `validation/graph.rs`, `validation/repository.rs` and `main.rs`. Once nodes store typed ids, a caller handed a `String` would have to rebuild an id from it.\n\n## Success Criteria\n\n- [hard] REQ-01: `compute_transitive_reduction`, `find_shortest_path` and `find_redundant_edges` return references to nodes of the graph (or ids borrowed from them), not owned strings.\n- [hard] REQ-02: Each caller reads ids from the returned nodes, and no caller rebuilds an id from a string the graph produced.\n- [hard] REQ-03: `GraphError::NodeNotFound` names the missing reference for display only, and no caller converts it into an id.\n- [hard] REQ-04: Graph property tests pass with unchanged assertions.\n",
+    "description": "Make the graph's id-returning queries return references into the node set, so a typed caller reads the id from the node instead of parsing a string.\n\n## Background\n\n`DependencyGraph` returns owned id strings: `compute_transitive_reduction -> HashSet<String>` (`crates/jit/src/graph/mod.rs:442`), `find_shortest_path -> Vec<String>` (`:475`) and `find_redundant_edges -> Vec<(String, String)>` (`:519`). `GraphError::NodeNotFound { id: String }` (`:61`) names a dangling reference. Callers sit in `graph/hierarchy.rs`, `commands/dependency.rs`, `commands/template.rs`, `commands/validate.rs`, `validation/graph.rs`, `validation/repository.rs` and `main.rs`. Once nodes store typed ids, a caller handed a `String` would have to rebuild an id from it.\n\n## Success Criteria\n\n- [hard] REQ-01: `compute_transitive_reduction`, `find_shortest_path` and `find_redundant_edges` return references to nodes of the graph (or ids borrowed from them), not owned strings.\n- [hard] REQ-02: Each caller reads ids from the returned nodes, and no caller rebuilds an id from a string the graph produced.\n- [hard] REQ-03: `GraphError::NodeNotFound` names the missing reference for display only, and no caller converts it into an id.\n- [hard] REQ-04: `HierarchyConfig::membership_closure` (`graph/hierarchy.rs:296`) returns node references, and `MembershipDivergence.issue_id` (`:575`) holds the node's own id type.\n- [hard] REQ-05: Graph property tests pass with unchanged assertions.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -147,7 +147,7 @@
   {
     "key": "canonical-unit-test-ids",
     "title": "Library unit tests take canonical issue ids from one fixture",
-    "description": "Give library unit tests one shared fixture for canonical issue ids, so tests keep compiling and passing once issue ids are validated.\n\n## Background\n\nUnit tests under `crates/jit/src` build issues, events, gate runs and leases with non-UUID ids such as `\"dep1\"` or `\"task-1\"` in about 25 files. The heaviest are `domain/queries.rs` (27 lines), `storage/claim_coordinator.rs` (16), `output.rs` (15), `graph/hierarchy.rs` (9), `repository_state/mutation.rs` (8), `main.rs` (7), `commands/gate_check.rs` (7), `validation/graph.rs` (6), `storage/repository_state_store_tests.rs` (6), `storage/gate_runs.rs` (6) and `commands/worktree.rs` (6); the others are listed in the footprint. Rustdoc examples with non-UUID ids sit at `domain/queries.rs:114-116,416-430`, `graph/hierarchy.rs:110-116` and `storage/claim_coordinator.rs:63-70`. Shared fixtures live in `test_utils.rs`, compiled under `test` or the `test-support` feature (`lib.rs:20`), so integration suites can reach them too.\n\n## Success Criteria\n\n- [hard] REQ-01: `test_utils` provides one fixture that deterministically returns a distinct canonical issue id, typed as `IssueId`, for each distinct seed.\n- [hard] REQ-02: No unit test or rustdoc example under `crates/jit/src` that builds an issue, an issue summary, a gate-run result, an event or a lease uses a non-UUID issue id. Each takes its id from the fixture or from a generated id.\n- [hard] REQ-03: Graph test nodes that do not model issues keep their own ids.\n- [hard] REQ-04: A test that asserted a literal id asserts the relationship it cares about instead, such as id equality or the short id of a given id.\n",
+    "description": "Give library unit tests one shared fixture for canonical issue ids, so tests keep compiling and passing once issue ids are validated.\n\n## Background\n\nUnit tests under `crates/jit/src` build issues, events, gate runs and leases with non-UUID ids such as `\"dep1\"` or `\"task-1\"` in about 25 files. The heaviest are `domain/queries.rs` (27 lines), `storage/claim_coordinator.rs` (16), `output.rs` (15), `graph/hierarchy.rs` (9), `repository_state/mutation.rs` (8), `main.rs` (7), `commands/gate_check.rs` (7), `validation/graph.rs` (6), `storage/repository_state_store_tests.rs` (6), `storage/gate_runs.rs` (6) and `commands/worktree.rs` (6); the others are listed in the footprint. Rustdoc examples with non-UUID ids sit at `domain/queries.rs:114-116,416-430`, `graph/hierarchy.rs:110-116` and `storage/claim_coordinator.rs:63-70`. Shared fixtures live in `test_utils.rs`, compiled under `test` or the `test-support` feature (`lib.rs:20`), so integration suites can reach them too.\n\n## Success Criteria\n\n- [hard] REQ-01: `test_utils` provides one fixture that deterministically returns a distinct canonical issue id, typed as `IssueId`, for each distinct seed.\n- [hard] REQ-02: No unit test or rustdoc example under `crates/jit/src` that builds an issue, an issue summary, a gate-run result, an event or a lease uses a non-UUID issue id, and no test assigns an issue id from a string conversion (`to_string`, `into`, `format!`). Each takes its id from the fixture or from a generated id.\n- [hard] REQ-03: Graph test nodes that do not model issues keep their own ids.\n- [hard] REQ-04: A test that asserted a literal id asserts the relationship it cares about instead, such as id equality or the short id of a given id.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -207,7 +207,12 @@
             "crates/jit/src/gate_execution.rs",
             "crates/jit/src/errors.rs",
             "crates/jit/src/commands/bulk_update.rs",
-            "crates/jit/src/repository_state/mod.rs"
+            "crates/jit/src/repository_state/mod.rs",
+            "crates/jit/src/query_engine/evaluator.rs",
+            "crates/jit/src/query_engine/mod.rs",
+            "crates/jit/src/commands/snapshot.rs",
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/domain/artifact_conformance.rs"
           ]
         }
       }
@@ -279,7 +284,7 @@
   {
     "key": "prefix-resolution",
     "title": "Id prefixes parse once into an IssueIdPrefix",
-    "description": "Type the input and output of issue-id prefix resolution, so a user-supplied prefix is parsed once and resolves to an `IssueId`.\n\n## Background\n\n`IssueStore::resolve_issue_id(&self, partial_id: &str) -> Result<String>` (`crates/jit/src/storage/mod.rs:191`) takes raw input. On their full-length fast paths the JSON backend (`storage/json.rs:1264-1268`) and the memory backend (`storage/memory.rs:849-853`) pass that raw input to `load_issue`. `MIN_ID_PREFIX_LENGTH` lives in storage (`storage/errors.rs:251`), and `storage/reference.rs:56` const-asserts `SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH`. One shared pure resolver owns prefix normalisation, minimum length and matching; this change keeps that behaviour and types its signature.\n\nThe shared resolver's contract fixes two error classes. A prefix that normalises below the minimum length fails with the invalid-prefix error before any record is read, as `crates/jit/tests/fast_issue/short_hash_tests.rs:74,380` and `crates/jit/tests/cli_issue/exit_code_tests.rs:1220,1372` assert. Input of well-formed length that lies outside the id alphabet, such as `nonexistent`, or matches no issue is reported as not found with exit code 3, as `cli_issue/error_json_tests.rs:26`, `cli_issue/exit_code_tests.rs:57`, `cli_issue/top_level_failure_envelope_tests.rs:87`, `cli_issue/quiet_mode_tests.rs:188` and `cli_repo_workflow/workflow_tests.rs:438` assert. Where this description and the landed resolver contract differ, the resolver contract governs. Production callers of `resolve_issue_id` sit in `commands/claim.rs`, `commands/issue.rs`, `commands/document.rs`, `main.rs`, `commands/gate.rs`, `storage/reference.rs`, `commands/graph.rs`, `commands/gate_check.rs`, `commands/validate.rs`, `commands/item.rs`, `commands/archive.rs` and `commands/mod.rs`; in this change each parses its input where it calls the resolver.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::IssueIdPrefix` is the parsed form of user-supplied id input. It applies the resolver's normalisation and minimum-length rules, and it owns `MIN_ID_PREFIX_LENGTH`.\n- [hard] REQ-02: The shared prefix resolver and `IssueStore::resolve_issue_id` take `&IssueIdPrefix` and return `IssueId`.\n- [hard] REQ-03: `IssueIdPrefix` parsing produces exactly two error classes: a prefix that normalises below the minimum length fails with the resolver's invalid-prefix error before any record is read, and input of well-formed length that is outside the id alphabet or matches nothing keeps the not-found class and exit code 3. The error-contract tests listed above pass unchanged.\n- [hard] REQ-04: Neither backend passes unparsed user input to `load_issue`, and a full-length prefix resolves through the same resolver as a short one.\n- [hard] REQ-05: Both storage backends pass the shared prefix-resolution conformance tests.\n",
+    "description": "Type the input and output of issue-id prefix resolution, so a user-supplied prefix is parsed once and resolves to an `IssueId`.\n\n## Background\n\n`IssueStore::resolve_issue_id(&self, partial_id: &str) -> Result<String>` (`crates/jit/src/storage/mod.rs:191`) takes raw input. On their full-length fast paths the JSON backend (`storage/json.rs:1264-1268`) and the memory backend (`storage/memory.rs:849-853`) pass that raw input to `load_issue`. `MIN_ID_PREFIX_LENGTH` lives in storage (`storage/errors.rs:251`), and `storage/reference.rs:56` const-asserts `SHORT_ID_LENGTH >= MIN_ID_PREFIX_LENGTH`. One shared pure resolver owns prefix normalisation, minimum length and matching; this change keeps that behaviour and types its signature.\n\nThe shared resolver's contract fixes two error classes. A prefix that normalises below the minimum length fails with `InvalidIdPrefixError` (`storage/json.rs:1274`, `storage/memory.rs:858`), refined to `INVALID_ID_PREFIX` (`output.rs:1163`), before any record is read, as `crates/jit/tests/fast_issue/short_hash_tests.rs:84,399`, `crates/jit/tests/cli_issue/issue_status_projection_tests.rs:350`, `crates/jit/tests/cli_issue/exit_code_tests.rs:1220,1372` and `storage/reference.rs:742` assert. Input of well-formed length that lies outside the id alphabet, such as `nonexistent`, or matches no issue is reported as not found with exit code 3, as `cli_issue/error_json_tests.rs:26`, `cli_issue/exit_code_tests.rs:57`, `cli_issue/top_level_failure_envelope_tests.rs:87`, `cli_issue/quiet_mode_tests.rs:188` and `cli_repo_workflow/workflow_tests.rs:438` assert. Where this description and the landed resolver contract differ, the resolver contract governs. Production callers of `resolve_issue_id` sit in `commands/claim.rs`, `commands/issue.rs`, `commands/document.rs`, `main.rs`, `commands/gate.rs`, `storage/reference.rs`, `commands/graph.rs`, `commands/gate_check.rs`, `commands/validate.rs`, `commands/item.rs`, `commands/archive.rs` and `commands/mod.rs`; in this change each parses its input where it calls the resolver.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::identity::IssueIdPrefix` is the parsed form of user-supplied id input. It applies the resolver's normalisation and minimum-length rules, and it owns `MIN_ID_PREFIX_LENGTH`.\n- [hard] REQ-02: The shared prefix resolver and `IssueStore::resolve_issue_id` take `&IssueIdPrefix` and return `IssueId`.\n- [hard] REQ-03: Input that normalises below `MIN_ID_PREFIX_LENGTH` fails at parse with the invalid-prefix error before any record is read. Input of sufficient length that is outside the id alphabet or matches nothing is reported as not found with exit code 3. The listed not-found tests and invalid-prefix tests pass unchanged.\n- [hard] REQ-04: Neither backend passes unparsed user input to `load_issue`, and a full-length prefix resolves through the same resolver as a short one.\n- [hard] REQ-05: Both storage backends pass the shared prefix-resolution conformance tests.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -340,7 +345,9 @@
             "crates/jit/tests/cli_issue/exit_code_tests.rs",
             "crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs",
             "crates/jit/tests/cli_issue/quiet_mode_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/workflow_tests.rs"
+            "crates/jit/tests/cli_repo_workflow/workflow_tests.rs",
+            "crates/jit/tests/cli_issue/issue_status_projection_tests.rs",
+            "crates/jit/src/output.rs"
           ]
         }
       }
@@ -349,7 +356,7 @@
   {
     "key": "cli-issue-id-boundary",
     "title": "The CLI resolves each issue-id argument once at entry",
-    "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\n## Success Criteria\n\n- [hard] REQ-01: Each issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n",
+    "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\n## Success Criteria\n\n- [hard] REQ-01: Each plain issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call. The dependency argument of dependency removal is parsed into `IssueIdPrefix` and passed unresolved, because it may name a dangling dependency.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -368,7 +375,8 @@
       "code-review"
     ],
     "depends_on": [
-      "prefix-resolution"
+      "prefix-resolution",
+      "graph-node-result-refs"
     ],
     "planning": {
       "outcome": "CLI entry resolves each issue-id argument once, before calling the executor.",
@@ -446,9 +454,64 @@
     }
   },
   {
+    "key": "scoped-issue-id-arguments",
+    "title": "Composite arguments carry their issue as a typed id",
+    "description": "Resolve the issue inside archive targets, document scopes and snapshot scopes once at entry, and type the issue segment of item addresses.\n\n## Background\n\nSeveral arguments wrap an issue id inside a larger value. `ArchiveTarget::Container(&str)` is resolved inside the executor (`crates/jit/src/commands/archive.rs:188`). `DocumentScope::Issue(String)` (`document/scope.rs:27`) is documented as possibly partial, and `SnapshotScope::Issue(String)` (`snapshot.rs:145`) is loaded directly (`commands/snapshot.rs:103`). Item addresses carry an issue segment as `String` (`domain/item.rs:75,133,467`), resolved inside the executor (`commands/item.rs:356`) and matched by hand with `starts_with` when addresses are decoded from documents (`validation/repository.rs:869`). Item addresses decoded from documents are a file-decoding boundary, so their segment is parsed where they are decoded and resolved where they are used.\n\n## Success Criteria\n\n- [hard] REQ-01: `ArchiveTarget::Container`, `DocumentScope::Issue` and `SnapshotScope::Issue` hold `IssueId`, resolved once in the CLI entry point before the executor call.\n- [hard] REQ-02: Item-address issue segments hold `IssueIdPrefix`, parsed when an address is parsed from input or decoded from a document, and resolved through the shared resolver; the hand-written `starts_with` match is gone.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found class and exit code 3.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:semantic-types",
+      "milestone:v1.0",
+      "story:issue-identity",
+      "component:cli",
+      "satisfies:2195c98f/REQ-02",
+      "satisfies:2195c98f/REQ-17",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/semantic-types"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-issue-id-boundary"
+    ],
+    "planning": {
+      "outcome": "Composite scope arguments hold IssueId, and item references hold IssueIdPrefix.",
+      "contract_refs": [
+        "issue-id-prefix",
+        "alias-staging-bridge"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02",
+        "REQ-17",
+        "DEC-23",
+        "DEC-24"
+      ],
+      "terminal": {
+        "consumer_family": "composite issue arguments",
+        "test_boundary": "command harness tests",
+        "worker_sized_reason": "Four composite argument types with their few resolution sites.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/src/document/scope.rs",
+            "crates/jit/src/snapshot.rs",
+            "crates/jit/src/commands/snapshot.rs",
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/archive.rs",
+            "crates/jit/src/domain/item.rs",
+            "crates/jit/src/validation/repository.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "stage-graph-command-issue-ids",
     "title": "Dependency, graph and template commands carry typed issue ids",
-    "description": "Retype issue ids in the dependency, graph, template and batch-creation commands.\n\n## Background\n\n`commands/dependency.rs` holds 65 production issue-id references and 10 raw-id function signatures, `commands/template.rs` 9 signatures, and `commands/graph.rs` 17 references. Dependency removal matches a prefix against `issue.dependencies` by hand (`commands/dependency.rs:551-572`) instead of using the shared resolver. Short ids are truncated by length at `commands/graph.rs:326,588` and `commands/batch_create.rs:339`, and `commands/batch_create.rs:409` builds a placeholder short id with `\"0\".repeat(SHORT_ID_LENGTH)`. `commands/template_expand.rs` carries ids of the issues an apply creates. Integration tests call `add_dependency` about 120 times, nearly all with `&String` arguments.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter in `commands/dependency.rs`, `commands/graph.rs`, `commands/template.rs`, `commands/template_expand.rs` or `commands/batch_create.rs` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`. Template placeholder ids, which are not issue ids, keep their own type.\n- [hard] REQ-02: Executor methods in this family take `&IssueId` and resolve no prefixes; callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-03: Dependency removal resolves its prefix argument through the shared resolver over the issue's dependency ids, and no hand-written prefix match remains in this family.\n- [hard] REQ-04: Short ids in this family come only from `short_id()`, and no site truncates an id by length.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype issue ids in the dependency, graph, template and batch-creation commands.\n\n## Background\n\n`commands/dependency.rs` holds 65 production issue-id references and 10 raw-id function signatures, `commands/template.rs` 9 signatures, and `commands/graph.rs` 17 references. Dependency removal matches a prefix against `issue.dependencies` by hand (`commands/dependency.rs:551-572`) instead of using the shared resolver. Short ids are truncated by length at `commands/graph.rs:326,588` and `commands/batch_create.rs:339`, and `commands/batch_create.rs:409` builds a placeholder short id with `\"0\".repeat(SHORT_ID_LENGTH)`. `commands/template_expand.rs` carries ids of the issues an apply creates. Integration tests call `add_dependency` about 120 times, nearly all with `&String` arguments.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter in `commands/dependency.rs`, `commands/graph.rs`, `commands/template.rs`, `commands/template_expand.rs` or `commands/batch_create.rs` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`. Template placeholder ids, which are not issue ids, keep their own type.\n- [hard] REQ-02: Executor methods in this family take `&IssueId` and resolve no prefixes, with one exception: dependency removal takes `&IssueIdPrefix` and matches it against the issue's own dependency list, so a dangling dependency can still be removed. Callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-03: Dependency removal matches its prefix through the shared resolver over the issue's dependency ids, and no hand-written prefix match remains in this family.\n- [hard] REQ-04: Short ids in this family come only from `short_id()`, and no site truncates an id by length.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -469,7 +532,8 @@
     ],
     "depends_on": [
       "cli-issue-id-boundary",
-      "server-issue-id-boundary"
+      "server-issue-id-boundary",
+      "stage-test-harness-issue-ids"
     ],
     "planning": {
       "outcome": "Graph-editing commands hold issue ids as IssueId and resolve no prefixes.",
@@ -522,7 +586,8 @@
     ],
     "depends_on": [
       "cli-issue-id-boundary",
-      "server-issue-id-boundary"
+      "server-issue-id-boundary",
+      "stage-test-harness-issue-ids"
     ],
     "planning": {
       "outcome": "Gate commands hold issue ids as IssueId and resolve no prefixes.",
@@ -554,7 +619,7 @@
   {
     "key": "stage-lifecycle-command-issue-ids",
     "title": "Issue lifecycle commands carry typed issue ids",
-    "description": "Retype issue ids in the issue, claim, label, event and bulk-update commands.\n\n## Background\n\n`commands/issue.rs` holds 25 production issue-id references and 4 raw-id signatures, `commands/claim.rs` 26 references and 5 signatures, and `commands/labels.rs`, `commands/events.rs`, `commands/bulk_update.rs` and `search.rs` a few each. `CommandExecutor::claim_next` lives at `commands/issue.rs:774`. Integration tests call `update_issue_state` 22 times and `update_issue` 16 times, with `&String` arguments.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter in `commands/issue.rs`, `commands/claim.rs`, `commands/labels.rs`, `commands/events.rs`, `commands/bulk_update.rs` or `search.rs` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Executor methods in this family take `&IssueId` and resolve no prefixes; callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype issue ids in the issue, claim, label, event and bulk-update commands.\n\n## Background\n\n`commands/issue.rs` holds 25 production issue-id references and 4 raw-id signatures, `commands/claim.rs` 26 references and 5 signatures, and `commands/labels.rs`, `commands/events.rs`, `commands/bulk_update.rs` and `search.rs` a few each. `CommandExecutor::claim_next` lives at `commands/issue.rs:774`, and the query engine builds issue ids in its tests (`query_engine/evaluator.rs:85`, `query_engine/mod.rs:81`). Integration tests call `update_issue_state` 22 times and `update_issue` 16 times, with `&String` arguments.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter in `commands/issue.rs`, `commands/claim.rs`, `commands/labels.rs`, `commands/events.rs`, `commands/bulk_update.rs`, `search.rs` or `query_engine/` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Executor methods in this family take `&IssueId` and resolve no prefixes; callers that hold full ids, such as templates, batch creation and tests, pass them directly.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -573,7 +638,8 @@
     ],
     "depends_on": [
       "cli-issue-id-boundary",
-      "server-issue-id-boundary"
+      "server-issue-id-boundary",
+      "stage-test-harness-issue-ids"
     ],
     "planning": {
       "outcome": "Lifecycle commands hold issue ids as IssueId and resolve no prefixes.",
@@ -598,7 +664,10 @@
             "crates/jit/src/commands/labels.rs",
             "crates/jit/src/commands/events.rs",
             "crates/jit/src/commands/bulk_update.rs",
-            "crates/jit/src/search.rs"
+            "crates/jit/src/search.rs",
+            "crates/jit/src/query_engine/evaluator.rs",
+            "crates/jit/src/query_engine/mod.rs",
+            "crates/jit/src/query_engine/parser.rs"
           ]
         }
       }
@@ -627,7 +696,8 @@
       "code-review"
     ],
     "depends_on": [
-      "cli-issue-id-boundary",
+      "scoped-issue-id-arguments",
+      "stage-test-harness-issue-ids",
       "server-issue-id-boundary"
     ],
     "planning": {
@@ -679,7 +749,8 @@
     ],
     "depends_on": [
       "cli-issue-id-boundary",
-      "server-issue-id-boundary"
+      "server-issue-id-boundary",
+      "stage-test-harness-issue-ids"
     ],
     "planning": {
       "outcome": "The executor core holds issue ids as IssueId and resolves no prefixes.",
@@ -869,7 +940,7 @@
   {
     "key": "stage-storage-issue-ids",
     "title": "Storage trait and backends take issue ids as IssueId",
-    "description": "Retype the issue-id parameters of the storage trait, its backends and the repository index.\n\n## Background\n\n`IssueStore` methods `load_issue` (`crates/jit/src/storage/mod.rs:155`), `load_issue_or_not_found` (`:176`) and `list_gate_runs_for_issue` (`:269`) take raw ids. Implementors are `InMemoryStorage` (`storage/memory.rs:820`) and `JsonFileStorage` (`storage/json.rs:1045`), plus the test wrappers `PublicationProbeStore` (`crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs:125`) and `FailingMutationStorage` (`crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:840`). `RepositoryIndex.all_ids` and `deleted_ids` are `Vec<String>` (`repository_state/index.rs:13-15`), with `storage/json.rs` the heaviest consumer. `storage/warnings.rs` carries ids in three fields, and `storage/repository_state_store_tests.rs` is the shared store test module.\n\n## Success Criteria\n\n- [hard] REQ-01: `load_issue`, `load_issue_or_not_found` and `list_gate_runs_for_issue` take `&IssueId`, and both backends and both test wrappers implement the retyped trait.\n- [hard] REQ-02: `RepositoryIndex` holds `all_ids` and `deleted_ids` as `Vec<IssueId>`, and the stored index is byte-identical.\n- [hard] REQ-03: No struct field or function parameter under `crates/jit/src/storage/`, lease records excepted, holds an issue id as `String`, `&str` or `Vec<String>`.\n- [hard] REQ-04: The shared storage conformance suite passes against both backends.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype the issue-id parameters of the storage trait, its backends and the repository index.\n\n## Background\n\n`IssueStore` methods `load_issue` (`crates/jit/src/storage/mod.rs:155`), `load_issue_or_not_found` (`:176`) and `list_gate_runs_for_issue` (`:269`) take raw ids. Implementors are `InMemoryStorage` (`storage/memory.rs:820`) and `JsonFileStorage` (`storage/json.rs:1045`), plus the test wrappers `PublicationProbeStore` (`crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs:125`) and `FailingMutationStorage` (`crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs:840`). `RepositoryIndex.all_ids` and `deleted_ids` are `Vec<String>` (`repository_state/index.rs:13-15`), with `storage/json.rs` the heaviest consumer. `storage/warnings.rs` carries ids in three fields, `storage/artifact_planning.rs:32` takes `container_id: &str`, and `storage/repository_state_store_tests.rs` is the shared store test module.\n\n## Success Criteria\n\n- [hard] REQ-01: `load_issue`, `load_issue_or_not_found` and `list_gate_runs_for_issue` take `&IssueId`, and both backends and both test wrappers implement the retyped trait; the rest of the wrappers' test files belongs to their suites.\n- [hard] REQ-02: `RepositoryIndex` holds `all_ids` and `deleted_ids` as `Vec<IssueId>`, and the stored index is byte-identical.\n- [hard] REQ-03: No struct field or function parameter under `crates/jit/src/storage/`, lease records excepted, holds an issue id as `String`, `&str` or `Vec<String>`.\n- [hard] REQ-04: The shared storage conformance suite passes against both backends.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -914,6 +985,7 @@
             "crates/jit/src/storage/warnings.rs",
             "crates/jit/src/repository_state/index.rs",
             "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/storage/artifact_planning.rs",
             "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
             "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
           ]
@@ -924,7 +996,7 @@
   {
     "key": "stage-domain-issue-ids",
     "title": "Domain types carry issue ids as IssueId",
-    "description": "Retype the issue ids that domain structs, event bodies and domain functions carry.\n\n## Background\n\nDomain carriers are `Issue.id` and `dependencies` (`crates/jit/src/domain/types.rs:414,427`), `MinimalIssue.id` (`:670`), `MinimalBlockedIssue.id` (`:758`), `GateRunResult.issue_id` (`:947`), the `issue_id` field of the issue-scoped event variants and `DependencyReduced.removed_deps` (`types.rs:1292-1616`), the artifact-plan issue fields (`domain/artifact_plan.rs:290,352`) and `PlanTarget::Container`, `domain/artifact_classifier.rs:223`, `domain/store_divergence.rs:76`, and `domain/type_taxonomy.rs`. About 15 functions in `domain/types.rs` take raw ids. Short ids are truncated by length at `domain/types.rs:551,733,795` and `domain/artifact_classifier.rs:1715`.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter under `crates/jit/src/domain/` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Domain short-id methods delegate to `short_id()` on the id, and no domain site truncates an id by length.\n- [hard] REQ-03: Serialized issue, gate-run and event JSON is byte-identical before and after.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype the issue ids that domain structs, event bodies and domain functions carry.\n\n## Background\n\nDomain carriers are `Issue.id` and `dependencies` (`crates/jit/src/domain/types.rs:414,427`), `MinimalIssue.id` (`:670`), `MinimalBlockedIssue.id` (`:758`), `GateRunResult.issue_id` (`:947`), the `issue_id` field of the issue-scoped event variants and `DependencyReduced.removed_deps` (`types.rs:1292-1616`), the artifact-plan issue fields (`domain/artifact_plan.rs:290,352`) and `PlanTarget::Container`, `domain/artifact_classifier.rs:223`, `domain/store_divergence.rs:76`, `domain/type_taxonomy.rs`, the container roots of `domain/artifact_inventory.rs:293,315` and `domain/artifact_discovery.rs:537`, `domain/artifact_conformance.rs:44`, the sample events of `EventTag::sample` (`domain/event_catalog.rs:281-282`), and the domain files `event_log.rs`, `projection.rs` and `item.rs`. About 15 functions in `domain/types.rs` take raw ids. Short ids are truncated by length at `domain/types.rs:551,733,795` and `domain/artifact_classifier.rs:1715`.\n\n## Success Criteria\n\n- [hard] REQ-01: No struct field, enum field or function parameter under `crates/jit/src/domain/` holds an issue id as `String`, `&str` or `Vec<String>`; each uses `IssueId`.\n- [hard] REQ-02: Domain short-id methods delegate to `short_id()` on the id, and no domain site truncates an id by length.\n- [hard] REQ-03: Serialized issue, gate-run and event JSON is byte-identical before and after.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -968,7 +1040,14 @@
             "crates/jit/src/domain/artifact_plan.rs",
             "crates/jit/src/domain/artifact_classifier.rs",
             "crates/jit/src/domain/store_divergence.rs",
-            "crates/jit/src/domain/type_taxonomy.rs"
+            "crates/jit/src/domain/type_taxonomy.rs",
+            "crates/jit/src/domain/artifact_inventory.rs",
+            "crates/jit/src/domain/artifact_discovery.rs",
+            "crates/jit/src/domain/artifact_conformance.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/domain/event_log.rs",
+            "crates/jit/src/domain/projection.rs",
+            "crates/jit/src/domain/item.rs"
           ]
         }
       }
@@ -977,7 +1056,7 @@
   {
     "key": "stage-test-harness-issue-ids",
     "title": "The shared integration harness carries typed issue ids",
-    "description": "Retype the issue ids that the shared integration-test harness returns and accepts.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The shared harness (`crates/jit/tests/common/harness.rs:111-230`) returns created ids as `String` and takes `get_issue(&self, id: &str)`.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness's issue-creating helpers return `IssueId`, and its id-taking helpers take `&IssueId`.\n- [hard] REQ-02: Suite callers of the harness compile unchanged.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype the issue ids that the shared integration-test harness returns and accepts.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The shared harness (`crates/jit/tests/common/harness.rs:111-230`) returns created ids as `String` and takes `get_issue(&self, id: &str)`.\n\n## Success Criteria\n\n- [hard] REQ-01: The harness's issue-creating helpers return `IssueId`, and its id-taking helpers take `&IssueId`.\n- [hard] REQ-02: Suite callers of the harness, which already pass `&IssueId`, compile unchanged.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -995,7 +1074,10 @@
       "code-review"
     ],
     "depends_on": [
-      "canonical-unit-test-ids"
+      "stage-fast-issue-test-issue-ids",
+      "stage-fast-docs-templates-test-issue-ids",
+      "stage-fast-rules-test-issue-ids",
+      "stage-cli-suite-test-issue-ids"
     ],
     "planning": {
       "outcome": "The shared integration harness returns and takes issue ids as IssueId.",
@@ -1024,7 +1106,7 @@
   {
     "key": "stage-fast-issue-test-issue-ids",
     "title": "The fast_issue suite carries typed canonical issue ids",
-    "description": "Move the `fast_issue` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_issue` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example the `\"nonexistent1\"` and `\"nonexistent2\"` dependencies at `fast_rules/validation_tests.rs:178-179`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_issue` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_issue` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Move the `fast_issue` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_issue` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example `reject(h, id: &str)` at `fast_issue/dependency_met_tests.rs:14-15` and `state_of(.., id: &str)` at `fast_issue/strictness_transition_tests.rs:65-66`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_issue` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_issue` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1042,7 +1124,7 @@
       "code-review"
     ],
     "depends_on": [
-      "stage-test-harness-issue-ids"
+      "canonical-unit-test-ids"
     ],
     "planning": {
       "outcome": "The fast_issue suite holds issue ids as IssueId with canonical values.",
@@ -1086,7 +1168,7 @@
   {
     "key": "stage-fast-docs-templates-test-issue-ids",
     "title": "The fast_docs_templates suite carries typed canonical issue ids",
-    "description": "Move the `fast_docs_templates` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_docs_templates` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example the `\"nonexistent1\"` and `\"nonexistent2\"` dependencies at `fast_rules/validation_tests.rs:178-179`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_docs_templates` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_docs_templates` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Move the `fast_docs_templates` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_docs_templates` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example `PlanTarget::Container { id: \"<uuid>\".to_string() }` at `fast_docs_templates/artifact_plan_model_tests.rs:24` and the id helpers at `fast_docs_templates/template_binding_tests.rs:146,222`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_docs_templates` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_docs_templates` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1104,7 +1186,7 @@
       "code-review"
     ],
     "depends_on": [
-      "stage-test-harness-issue-ids"
+      "canonical-unit-test-ids"
     ],
     "planning": {
       "outcome": "The fast_docs_templates suite holds issue ids as IssueId with canonical values.",
@@ -1135,7 +1217,10 @@
             "crates/jit/tests/fast_docs_templates/research_bracket_tests.rs",
             "crates/jit/tests/fast_docs_templates/sdd_bracket_tests.rs",
             "crates/jit/tests/fast_docs_templates/template_apply_tests.rs",
-            "crates/jit/tests/fast_docs_templates/template_binding_tests.rs"
+            "crates/jit/tests/fast_docs_templates/template_binding_tests.rs",
+            "crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs",
+            "crates/jit/tests/fast_docs_templates/content_format_dispatch.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs"
           ]
         }
       }
@@ -1144,7 +1229,7 @@
   {
     "key": "stage-fast-rules-test-issue-ids",
     "title": "The fast_rules suite carries typed canonical issue ids",
-    "description": "Move the `fast_rules` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_rules` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example the `\"nonexistent1\"` and `\"nonexistent2\"` dependencies at `fast_rules/validation_tests.rs:178-179`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_rules` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_rules` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Move the `fast_rules` integration suite onto typed, canonical issue ids.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. The `crates/jit/tests/fast_rules` suite holds id-carrying helpers, string id assertions and some literal non-UUID ids, for example the `\"nonexistent1\"` and `\"nonexistent2\"` dependencies at `fast_rules/validation_tests.rs:178-179` and the id sites of `fast_rules/local_rule_enforcement_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in `crates/jit/tests/fast_rules` that builds an issue, an event, a gate-run result or a lease uses a non-UUID issue id; each takes its id from the shared fixture or from an id the command under test returned.\n- [hard] REQ-02: Helpers in `crates/jit/tests/fast_rules` take and return issue ids as `IssueId`, and assertions compare ids as `IssueId` values or through `as_str()`.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Hierarchy vector tests keep their vector node ids, and a test that asserted a literal id asserts the relationship it cares about instead.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1162,7 +1247,7 @@
       "code-review"
     ],
     "depends_on": [
-      "stage-test-harness-issue-ids"
+      "canonical-unit-test-ids"
     ],
     "planning": {
       "outcome": "The fast_rules suite holds issue ids as IssueId with canonical values.",
@@ -1196,7 +1281,8 @@
             "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
             "crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs",
             "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
-            "crates/jit/tests/fast_rules/validation_tests.rs"
+            "crates/jit/tests/fast_rules/validation_tests.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
           ]
         }
       }
@@ -1205,7 +1291,7 @@
   {
     "key": "stage-cli-suite-test-issue-ids",
     "title": "CLI suites that use the library carry typed issue ids",
-    "description": "Retype issue ids in the CLI integration tests that drive the library directly.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. Most `cli_*` tests drive the binary and exchange ids as process strings, which is the CLI boundary. The files in the footprint also call executor or storage APIs directly.\n\n## Success Criteria\n\n- [hard] REQ-01: Library-facing code in the listed `cli_*` files takes and returns issue ids as `IssueId` and uses no non-UUID issue id.\n- [hard] REQ-02: Ids exchanged with the binary stay strings at the process boundary, parsed once where a test hands them to the library.\n- [hard] REQ-03: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
+    "description": "Retype issue ids in the CLI integration tests that drive the library directly.\n\n## Background\n\nIntegration suites link the library with the `test-support` feature (`crates/jit/Cargo.toml:103`), so the shared canonical-id fixture in `jit::test_utils` is reachable. Their helpers take and return ids as `&str` or `String`, and assertions compare ids and dependency lists with strings; once ids are validated, those comparisons and conversions stop compiling. Hierarchy vector node ids model graph nodes, not issues. Most `cli_*` tests drive the binary and exchange ids as process strings, which is the CLI boundary. The files in the footprint also call executor or storage APIs directly.\n\n## Success Criteria\n\n- [hard] REQ-01: Library-facing code in the listed `cli_*` files takes and returns issue ids as `IssueId` and uses no non-UUID issue id.\n- [hard] REQ-02: Ids exchanged with the binary stay strings at the process boundary, parsed once where a test hands them to the library.\n- [hard] REQ-03: Suite helpers take `&IssueId` and pass `&IssueId` onward, so callees that still take `&str` accept them through deref coercion.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n\n## Notes\n\n`crate::domain::identity::IssueId` is at this point an alias for `String`, and the `IssueIdStaging` trait gives it `short_id()`. Retyping to the alias is compiler-neutral, so this change is checked by its criteria rather than by type errors; a later change replaces the alias with the validated newtype and the compiler then reports any site missed here. Parameters are retyped outside-in: the CLI and server entry points already resolve ids, and callers in this family are retyped before the functions they call in inner layers.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1223,7 +1309,7 @@
       "code-review"
     ],
     "depends_on": [
-      "stage-test-harness-issue-ids"
+      "canonical-unit-test-ids"
     ],
     "planning": {
       "outcome": "Library-facing CLI tests hold issue ids as IssueId.",
@@ -1283,12 +1369,7 @@
     ],
     "depends_on": [
       "stage-domain-issue-ids",
-      "lease-issue-identity",
-      "graph-node-result-refs",
-      "stage-fast-issue-test-issue-ids",
-      "stage-fast-docs-templates-test-issue-ids",
-      "stage-fast-rules-test-issue-ids",
-      "stage-cli-suite-test-issue-ids"
+      "lease-issue-identity"
     ],
     "planning": {
       "outcome": "The validated newtype takes the IssueId name, the bridge is gone, and stored ids decode strictly.",
@@ -1307,7 +1388,7 @@
       "terminal": {
         "consumer_family": "issue id decode sites",
         "test_boundary": "storage decode tests",
-        "worker_sized_reason": "The residue is bounded to decode sites because every family and suite is pre-staged.",
+        "worker_sized_reason": "The residue is bounded because each file holding an issue id sits in a staged footprint.",
         "footprint": {
           "touches": [
             "crates/jit/src/domain/identity.rs",
@@ -1859,7 +1940,7 @@
   {
     "key": "event-envelope",
     "title": "Event becomes an envelope around a tagged body",
-    "description": "Make `Event` hold `id` and `timestamp` once around a tagged body, while serialized event-log lines keep their bytes.\n\n## Background\n\nEach event variant repeats `id` and `timestamp` (`crates/jit/src/domain/types.rs:1292-1616`). Draft constructors (`types.rs:1689-1980`) build variants with an empty id and an epoch timestamp, and the mutation finalizer stamps both through `assign_identity` (`types.rs:1653`, called at `repository_state/mutation.rs:1217`), with `sentinel_time` at `mutation.rs:495-500`. The canonical writer `serialize_event` (`mutation.rs:571-601`) sorts keys, so field order inside the struct does not reach the log. `parse_known_events` (`domain/event_log.rs:42`) decodes through `serde_json::Value`. Every matcher outside `domain/types.rs` already goes through `Event::body()`, a temporary `EventBody` alias and the identity accessors, and every construction outside it goes through draft constructors or the `test_utils` stamping helper.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` is a struct with `id`, `timestamp` and a flattened `body: EventBody`, and `EventBody` is the internally tagged enum whose variants carry neither id nor timestamp.\n- [hard] REQ-02: Draft constructors return `EventBody`. In production only the mutation finalizer and event decoding build an `Event`, and `assign_identity`, the epoch sentinel and the `EventBody` alias no longer exist.\n- [hard] REQ-03: Each line of this repository's event log decodes through the unchanged `parse_known_events` and re-serializes through the canonical writer to identical bytes.\n- [hard] REQ-04: The published event schema still pins each variant's `type`, and the event catalog conformance tests pass.\n\n## Notes\n\nRaw `serde_json::to_string` key order changes from `type,id,...` to `id,timestamp,type,...`; this affects only the event command's stdout, which is not a stored shape.\n",
+    "description": "Make `Event` hold `id` and `timestamp` once around a tagged body, while serialized event-log lines keep their bytes.\n\n## Background\n\nEach event variant repeats `id` and `timestamp` (`crates/jit/src/domain/types.rs:1292-1616`). Draft constructors (`types.rs:1689-1980`) build variants with an empty id and an epoch timestamp, and the mutation finalizer stamps both through `assign_identity` (`types.rs:1653`, called at `repository_state/mutation.rs:1217`), with `sentinel_time` at `mutation.rs:495-500`. The canonical writer `serialize_event` (`mutation.rs:571-601`) sorts keys, so field order inside the struct does not reach the log. `parse_known_events` (`domain/event_log.rs:42`) decodes through `serde_json::Value`. Every matcher outside `domain/types.rs` already goes through `Event::body()`, a temporary `EventBody` alias and the identity accessors, and every construction outside it goes through draft constructors or the `test_utils` stamping helper.\n\n## Success Criteria\n\n- [hard] REQ-01: `Event` is a struct with `id`, `timestamp` and a flattened `body: EventBody`, and `EventBody` is the internally tagged enum whose variants carry neither id nor timestamp.\n- [hard] REQ-02: Draft constructors return `EventBody`. In production only the mutation finalizer, event decoding and `EventTag::sample` (`domain/event_catalog.rs:280`, used by the generated reference and the events command) build an `Event`; `assign_identity`, the epoch sentinel and the `EventBody` alias no longer exist.\n- [hard] REQ-03: Each line of this repository's event log decodes through the unchanged `parse_known_events` and re-serializes through the canonical writer to identical bytes.\n- [hard] REQ-04: The published event schema still pins each variant's `type`, and the event catalog conformance tests pass.\n\n## Notes\n\nRaw `serde_json::to_string` key order changes from `type,id,...` to `id,timestamp,type,...`; this affects only the event command's stdout, which is not a stored shape.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -1909,7 +1990,7 @@
   {
     "key": "event-issue-accessor",
     "title": "Event issue accessor returns an optional IssueId",
-    "description": "Replace the empty-string sentinel of the event issue accessor with an optional typed id.\n\n## Background\n\n`Event::get_issue_id` returns `\"\"` for repository-scoped events (`crates/jit/src/domain/types.rs:1989-2013`, arms `:2001,2006-2011`). Production callers are `repository_state/mutation.rs:1349` (`event_identities`, which sorts by the returned string), `domain/queries.rs:77` and `commands/events.rs:30`; 18 test sites call it too.\n\n## Success Criteria\n\n- [hard] REQ-01: `EventBody::issue_id()`, and an `Event` delegate, return `Option<&IssueId>`: `Some` for issue-scoped variants and `None` for repository-scoped ones.\n- [hard] REQ-02: `get_issue_id` is gone, and no event accessor returns an empty string.\n- [hard] REQ-03: Event identity ordering in the mutation finalizer is unchanged: repository-scoped events still sort before issue-scoped ones.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n",
+    "description": "Replace the empty-string sentinel of the event issue accessor with an optional typed id.\n\n## Background\n\n`Event::get_issue_id` returns `\"\"` for repository-scoped events (`crates/jit/src/domain/types.rs:1989-2013`, arms `:2001,2006-2011`). Production callers are `repository_state/mutation.rs:1349` (`event_identities`, which sorts by the returned string), `domain/queries.rs:77`, `commands/events.rs:30` and `domain/event_catalog.rs`. Test callers sit in the `commands/issue.rs` test module (10), `crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs` (2), `fast_docs_templates/document_event_log_tests.rs` (1), `fast_issue/dep_add_atomic_tests.rs` (2), `fast_issue/transitive_reduction_validation_tests.rs` (1) and `fast_rules/local_rule_enforcement_tests.rs` (1).\n\n## Success Criteria\n\n- [hard] REQ-01: `EventBody::issue_id()`, and an `Event` delegate, return `Option<&IssueId>`: `Some` for issue-scoped variants and `None` for repository-scoped ones.\n- [hard] REQ-02: `get_issue_id` is gone, and no event accessor returns an empty string.\n- [hard] REQ-03: Event identity ordering in the mutation finalizer is unchanged: repository-scoped events still sort before issue-scoped ones.\n- [hard] REQ-04: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1948,7 +2029,14 @@
             "crates/jit/src/domain/types.rs",
             "crates/jit/src/repository_state/mutation.rs",
             "crates/jit/src/domain/queries.rs",
-            "crates/jit/src/commands/events.rs"
+            "crates/jit/src/commands/events.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs",
+            "crates/jit/tests/fast_docs_templates/document_event_log_tests.rs",
+            "crates/jit/tests/fast_issue/dep_add_atomic_tests.rs",
+            "crates/jit/tests/fast_issue/transitive_reduction_validation_tests.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
           ]
         }
       }
@@ -2052,7 +2140,7 @@
   {
     "key": "agent-identity-assignee",
     "title": "Resolved agent identity is an Assignee",
-    "description": "Carry the resolved agent identity as an `Assignee` from resolution through the claim coordinator into lease records.\n\n## Background\n\n`resolve_agent_id` returns `Result<String>` (`crates/jit/src/agent_config.rs:88`) after validating through `Assignee` and discarding the result (`:162`). `ClaimCoordinator::new(paths, locker, worktree_id: String, agent_id: String)` (`storage/claim_coordinator.rs:371-376`) is called at `commands/claim.rs:245,534,580,634,702` and `commands/mod.rs:732`. `ClaimCoordinator` stores the agent as a `String` (`:268`), as does `Lease.agent_id` (`:37`). Each agent id in this checkout's claims log parses as an `Assignee`.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_agent_id` returns `Assignee`.\n- [hard] REQ-02: `ClaimCoordinator`, `Lease` and `ClaimOp` hold the agent as `Assignee`, and system callers pass the named actor constants.\n- [hard] REQ-03: A claims-log entry whose agent is not a valid assignee fails to decode with an error naming the field.\n- [hard] REQ-04: Claims-log lines are byte-identical before and after.\n",
+    "description": "Carry the resolved agent identity as an `Assignee` from resolution through the claim coordinator into lease records.\n\n## Background\n\n`resolve_agent_id` returns `Result<String>` (`crates/jit/src/agent_config.rs:88`) after validating through `Assignee` and discarding the result (`:162`). `ClaimCoordinator::new(paths, locker, worktree_id: String, agent_id: String)` (`storage/claim_coordinator.rs:364`) is called at `commands/claim.rs:245,534,580,634,702` and `commands/mod.rs:732`. `ClaimCoordinator` stores the agent as a `String` (`:268`), as does `Lease.agent_id` (`:37`). Each agent id in this checkout's claims log parses as an `Assignee`.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_agent_id` returns `Assignee`.\n- [hard] REQ-02: `ClaimCoordinator`, `Lease` and `ClaimOp` hold the agent as `Assignee`, and system callers pass the named actor constants.\n- [hard] REQ-03: A claims-log entry whose agent is not a valid assignee fails to decode with an error naming the field.\n- [hard] REQ-04: Claims-log lines are byte-identical before and after.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -3967,7 +4055,7 @@
   {
     "key": "issue-identity",
     "title": "Issue identity is one validated type end to end",
-    "description": "Aggregate the work that delivers this outcome: issue identity, prefixes, gate-run ids, gate keys and record paths are typed end to end, with the staging bridge removed.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueId`, `IssueIdPrefix`, `GateRunId` and `GateKey` are the identity types in domain, storage, commands, tests and the server, the staging alias no longer exists, and prefixes are resolved only at the CLI and server entry points.\n- [hard] REQ-02: Outside CLI argument structs, server extractors, serde impls and rendering, no production code carries these identities as raw strings.\n- [hard] REQ-03: Issue and gate-run record paths come only from `VirtualPath` constructors.\n- [hard] REQ-04: Short ids are derived only by `IssueId`, including in the web UI.\n- [hard] REQ-05: Stored issue, index, event and gate-run data loads and re-serializes byte-identically.\n",
+    "description": "Aggregate the work that delivers this outcome: issue identity, prefixes, gate-run ids, gate keys and record paths are typed end to end, with the staging bridge removed.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueId`, `IssueIdPrefix`, `GateRunId` and `GateKey` are the identity types in domain, storage, commands, tests and the server, the staging alias no longer exists, and prefixes are resolved only at the CLI and server entry points, except dependency removal over an issue's own dependencies and item-address segments decoded from documents.\n- [hard] REQ-02: Outside CLI argument structs, server extractors, serde impls and rendering, no production code carries these identities as raw strings.\n- [hard] REQ-03: Issue and gate-run record paths come only from `VirtualPath` constructors.\n- [hard] REQ-04: Short ids are derived only by `IssueId`, including in the web UI.\n- [hard] REQ-05: Stored issue, index, event and gate-run data loads and re-serializes byte-identically.\n",
     "type": "story",
     "priority": "normal",
     "labels": [

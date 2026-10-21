@@ -25,7 +25,7 @@ Every criterion types a value at its parse boundary and deletes the restatements
 | REQ-14 | `Ord` on `Priority`, ordered after aa423d02. | Vocab C17 |
 | REQ-15 | `compiled-graph-assertions`: one entry per assertion kind, with `id-pattern` shared. | Vocab C18–C20 |
 | REQ-16 | One constructor first, with the existing policies kept; then the fallback goes and the callers propagate its error. | Vocab C21; DEC-22 |
-| REQ-17 | Each typing entry deletes its interior strings, and the flip's compile errors catch identity residue. The `Debug`-render sweep closes the vocabulary remainder. No grep enforcement check is added. | a122b9b3 precedent |
+| REQ-17 | Each staging entry's REQ-01 owns the raw identity fields of its files, and the staged footprints cover each file that holds an issue id (CLI-process tests, which exchange ids with the binary as strings, are boundary). The flip's compile errors catch misused values. The `Debug`-render sweep closes the vocabulary remainder. No grep enforcement check is added. | a122b9b3 precedent |
 
 ## Shared architectural contracts
 
@@ -39,11 +39,11 @@ A canonical-string newtype (DEC-07). Its trait set is exactly `Display` (the sam
 
 ### `alias-staging-bridge` [implementation-produced] — Temporary IssueId alias
 
-`pub type IssueId = String;` at the final path, plus an `IssueIdStaging` trait that gives `String` a `short_id()`. Each staging entry, test suites included, uses issue ids only through the newtype's trait set and methods, so its code compiles unchanged at the flip. Parameters are retyped outside-in, so each caller is already typed when its callee changes. This is a named bridge with a tracked removal condition: the flip entry deletes it, and that entry depends transitively on every staging entry (`@/inv/canonical-cutover`, `@/inv/convention-convergence`).
+`pub type IssueId = String;` at the final path, plus an `IssueIdStaging` trait that gives `String` a `short_id()`. Each staging entry, test suites included, uses issue ids only through the newtype's trait set and methods, so its code compiles unchanged at the flip. Parameters are retyped outside-in, so each caller is already typed when its callee changes: test suites first, then the shared harness, then the CLI and server entry points and command families, then inner layers. A caller holding `&IssueId` still reaches a callee taking `&str` through deref coercion. This is a named bridge with a tracked removal condition: the flip entry deletes it, and that entry depends transitively on every staging entry (`@/inv/canonical-cutover`, `@/inv/convention-convergence`).
 
 ### `issue-id-prefix` [implementation-produced] — Parsed id prefix
 
-`IssueIdPrefix` owns `MIN_ID_PREFIX_LENGTH` and the normalisation rules of the shared resolver. Resolution maps `&IssueIdPrefix` to `IssueId`. Parsing produces exactly two error classes: a prefix that normalises below the minimum length gets the resolver's invalid-prefix error before any record is read, and well-formed-length input outside the alphabet or matching nothing keeps not-found, exit 3 (DEC-23). The landed 16d63038 contract governs where they differ. Only the CLI and server entry points parse and resolve; executor and internal methods take `IssueId` (DEC-24).
+`IssueIdPrefix` owns `MIN_ID_PREFIX_LENGTH` and the normalisation rules of the shared resolver. Resolution maps `&IssueIdPrefix` to `IssueId`. Parsing produces exactly two error classes: a prefix that normalises below the minimum length gets the resolver's invalid-prefix error before any record is read, and well-formed-length input outside the alphabet or matching nothing keeps not-found, exit 3 (DEC-23). The landed 16d63038 contract governs where they differ. Only the CLI and server entry points parse and resolve; executor and internal methods take `IssueId` (DEC-24). Two cases resolve inside: dependency removal matches a parsed `IssueIdPrefix` against the issue's own dependency list, so a dangling dependency stays removable, and item-address issue segments decoded from documents, a file-decoding boundary, hold `IssueIdPrefix` and resolve where the address is used.
 
 ### `test-issue-id-fixture` [implementation-produced] — Canonical test ids
 
@@ -51,7 +51,7 @@ One deterministic fixture in `test_utils` that maps a seed to a distinct canonic
 
 ### `event-envelope` [plan-fixed] — Event envelope shape
 
-`struct Event { id, timestamp, #[serde(flatten)] body: EventBody }`, where `EventBody` is `#[serde(tag = "type", rename_all = "snake_case")]`. Drafts build `EventBody`, and only the finalizer builds `Event`. The probe in the investigation showed that canonical log bytes are unchanged and `parse_known_events` decodes the envelope unmodified. Flatten forbids `deny_unknown_fields` on `Event`.
+`struct Event { id, timestamp, #[serde(flatten)] body: EventBody }`, where `EventBody` is `#[serde(tag = "type", rename_all = "snake_case")]`. Drafts build `EventBody`. In production only the finalizer, event decoding and `EventTag::sample` (used by the generated reference and the events command) build `Event`. The probe in the investigation showed that canonical log bytes are unchanged and `parse_known_events` decodes the envelope unmodified. Flatten forbids `deny_unknown_fields` on `Event`.
 
 ### `event-body-view` [implementation-produced] — Temporary body view
 
@@ -89,27 +89,28 @@ Each graph assertion lowers its table at load through a `Raw*` struct, following
 | issue-id-types | Validated issue identity type with an alias staging bridge | task | A validated issue-id newtype with a fixed trait set exists beside a temporary String alias. | identity-newtype-convention | REQ-01, REQ-03, DEC-07, DEC-08 | creates 1, touches 1 | — | — |
 | graph-node-id-views | Graph node traits expose dependency ids as string views | task | GraphNode and HierarchyNode yield dependency ids as borrowed string views. | — | REQ-01, REQ-17 | touches 5 | — | — |
 | graph-node-result-refs | Graph queries return nodes rather than id strings | task | Graph queries return node references, so callers never reparse an id string. | — | REQ-01, REQ-17 | touches 8 | — | graph-node-id-views |
-| canonical-unit-test-ids | Library unit tests take canonical issue ids from one fixture | task | Library unit tests take issue ids from one shared fixture that yields canonical ids. | alias-staging-bridge | REQ-01, REQ-17 | touches 24 | — | issue-id-types |
+| canonical-unit-test-ids | Library unit tests take canonical issue ids from one fixture | task | Library unit tests take issue ids from one shared fixture that yields canonical ids. | alias-staging-bridge | REQ-01, REQ-17 | touches 29 | — | issue-id-types |
 | issue-draft-identity | Issue drafts carry their pre-derived identifier | task | Issue drafts take their id from a dedicated issue-id accessor, so no empty-string issue id exists. | alias-staging-bridge, test-issue-id-fixture | REQ-01, DEC-09 | touches 19 | — | canonical-unit-test-ids |
-| prefix-resolution | Id prefixes parse once into an IssueIdPrefix | task | Prefix resolution maps a parsed IssueIdPrefix to an IssueId through the one shared resolver. | alias-staging-bridge | REQ-02, DEC-03, DEC-23 | touches 23 | — | issue-id-types |
-| cli-issue-id-boundary | The CLI resolves each issue-id argument once at entry | task | CLI entry resolves each issue-id argument once, before calling the executor. | issue-id-prefix, alias-staging-bridge | REQ-02, REQ-03, REQ-17, DEC-23, DEC-24 | touches 3 | — | prefix-resolution |
+| prefix-resolution | Id prefixes parse once into an IssueIdPrefix | task | Prefix resolution maps a parsed IssueIdPrefix to an IssueId through the one shared resolver. | alias-staging-bridge | REQ-02, DEC-03, DEC-23 | touches 25 | — | issue-id-types |
+| cli-issue-id-boundary | The CLI resolves each issue-id argument once at entry | task | CLI entry resolves each issue-id argument once, before calling the executor. | issue-id-prefix, alias-staging-bridge | REQ-02, REQ-03, REQ-17, DEC-23, DEC-24 | touches 3 | — | prefix-resolution, graph-node-result-refs |
 | server-issue-id-boundary | The server resolves each issue-id path parameter once | task | Server routes resolve each issue-id path parameter once, before calling the executor. | issue-id-prefix, alias-staging-bridge | REQ-02, REQ-17, DEC-24 | touches 1 | — | prefix-resolution |
-| stage-graph-command-issue-ids | Dependency, graph and template commands carry typed issue ids | task | Graph-editing commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge, issue-id-prefix | REQ-01, REQ-17, DEC-08, DEC-24 | touches 5 | — | cli-issue-id-boundary, server-issue-id-boundary |
-| stage-gate-command-issue-ids | Gate commands carry typed issue ids | task | Gate commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 4 | — | cli-issue-id-boundary, server-issue-id-boundary |
-| stage-lifecycle-command-issue-ids | Issue lifecycle commands carry typed issue ids | task | Lifecycle commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 6 | — | cli-issue-id-boundary, server-issue-id-boundary |
-| stage-document-command-issue-ids | Document-family commands carry typed issue ids | task | Document-family commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 4 | — | cli-issue-id-boundary, server-issue-id-boundary |
-| stage-dispatch-issue-ids | Executor core carries typed issue ids | task | The executor core holds issue ids as IssueId and resolves no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 2 | — | cli-issue-id-boundary, server-issue-id-boundary |
+| scoped-issue-id-arguments | Composite arguments carry their issue as a typed id | task | Composite scope arguments hold IssueId, and item references hold IssueIdPrefix. | issue-id-prefix, alias-staging-bridge | REQ-02, REQ-17, DEC-23, DEC-24 | touches 8 | — | cli-issue-id-boundary |
+| stage-graph-command-issue-ids | Dependency, graph and template commands carry typed issue ids | task | Graph-editing commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge, issue-id-prefix | REQ-01, REQ-17, DEC-08, DEC-24 | touches 5 | — | cli-issue-id-boundary, server-issue-id-boundary, stage-test-harness-issue-ids |
+| stage-gate-command-issue-ids | Gate commands carry typed issue ids | task | Gate commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 4 | — | cli-issue-id-boundary, server-issue-id-boundary, stage-test-harness-issue-ids |
+| stage-lifecycle-command-issue-ids | Issue lifecycle commands carry typed issue ids | task | Lifecycle commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 9 | — | cli-issue-id-boundary, server-issue-id-boundary, stage-test-harness-issue-ids |
+| stage-document-command-issue-ids | Document-family commands carry typed issue ids | task | Document-family commands hold issue ids as IssueId and resolve no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 4 | — | scoped-issue-id-arguments, stage-test-harness-issue-ids, server-issue-id-boundary |
+| stage-dispatch-issue-ids | Executor core carries typed issue ids | task | The executor core holds issue ids as IssueId and resolves no prefixes. | alias-staging-bridge | REQ-01, REQ-17, DEC-08, DEC-24 | touches 2 | — | cli-issue-id-boundary, server-issue-id-boundary, stage-test-harness-issue-ids |
 | stage-repository-state-issue-ids | Repository-state mutations carry typed issue ids | task | Repository-state code holds issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 4 | — | stage-graph-command-issue-ids, stage-gate-command-issue-ids, stage-lifecycle-command-issue-ids, stage-document-command-issue-ids, stage-dispatch-issue-ids, issue-draft-identity |
 | stage-validation-issue-ids | Validation carries typed issue ids | task | Validation code holds issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 3 | — | stage-graph-command-issue-ids, stage-gate-command-issue-ids, stage-lifecycle-command-issue-ids, stage-document-command-issue-ids, stage-dispatch-issue-ids |
 | stage-error-output-issue-ids | Errors and output carry typed issue ids | task | Error and output types hold issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 3 | — | stage-graph-command-issue-ids, stage-gate-command-issue-ids, stage-lifecycle-command-issue-ids, stage-document-command-issue-ids, stage-dispatch-issue-ids |
-| stage-storage-issue-ids | Storage trait and backends take issue ids as IssueId | task | The storage trait, backends and index take issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 8 | — | stage-repository-state-issue-ids, stage-validation-issue-ids, stage-error-output-issue-ids |
-| stage-domain-issue-ids | Domain types carry issue ids as IssueId | task | Domain structs, event bodies and domain functions declare issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 6 | — | stage-storage-issue-ids, event-issue-accessor |
-| stage-test-harness-issue-ids | The shared integration harness carries typed issue ids | task | The shared integration harness returns and takes issue ids as IssueId. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 1 | — | canonical-unit-test-ids |
-| stage-fast-issue-test-issue-ids | The fast_issue suite carries typed canonical issue ids | task | The fast_issue suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 16 | — | stage-test-harness-issue-ids |
-| stage-fast-docs-templates-test-issue-ids | The fast_docs_templates suite carries typed canonical issue ids | task | The fast_docs_templates suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 12 | — | stage-test-harness-issue-ids |
-| stage-fast-rules-test-issue-ids | The fast_rules suite carries typed canonical issue ids | task | The fast_rules suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 15 | — | stage-test-harness-issue-ids |
-| stage-cli-suite-test-issue-ids | CLI suites that use the library carry typed issue ids | task | Library-facing CLI tests hold issue ids as IssueId. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 12 | — | stage-test-harness-issue-ids |
-| issue-id-flip | IssueId becomes the validated newtype | task | The validated newtype takes the IssueId name, the bridge is gone, and stored ids decode strictly. | issue-identity-newtype, alias-staging-bridge | REQ-01, REQ-17, DEC-07, DEC-08, DEC-15 | touches 5, uncertain | — | stage-domain-issue-ids, lease-issue-identity, graph-node-result-refs, stage-fast-issue-test-issue-ids, stage-fast-docs-templates-test-issue-ids, stage-fast-rules-test-issue-ids, stage-cli-suite-test-issue-ids |
+| stage-storage-issue-ids | Storage trait and backends take issue ids as IssueId | task | The storage trait, backends and index take issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 9 | — | stage-repository-state-issue-ids, stage-validation-issue-ids, stage-error-output-issue-ids |
+| stage-domain-issue-ids | Domain types carry issue ids as IssueId | task | Domain structs, event bodies and domain functions declare issue ids as IssueId. | alias-staging-bridge | REQ-01, REQ-17, DEC-08 | touches 13 | — | stage-storage-issue-ids, event-issue-accessor |
+| stage-test-harness-issue-ids | The shared integration harness carries typed issue ids | task | The shared integration harness returns and takes issue ids as IssueId. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 1 | — | stage-fast-issue-test-issue-ids, stage-fast-docs-templates-test-issue-ids, stage-fast-rules-test-issue-ids, stage-cli-suite-test-issue-ids |
+| stage-fast-issue-test-issue-ids | The fast_issue suite carries typed canonical issue ids | task | The fast_issue suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 16 | — | canonical-unit-test-ids |
+| stage-fast-docs-templates-test-issue-ids | The fast_docs_templates suite carries typed canonical issue ids | task | The fast_docs_templates suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 15 | — | canonical-unit-test-ids |
+| stage-fast-rules-test-issue-ids | The fast_rules suite carries typed canonical issue ids | task | The fast_rules suite holds issue ids as IssueId with canonical values. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 16 | — | canonical-unit-test-ids |
+| stage-cli-suite-test-issue-ids | CLI suites that use the library carry typed issue ids | task | Library-facing CLI tests hold issue ids as IssueId. | alias-staging-bridge, test-issue-id-fixture | REQ-01, REQ-17, DEC-08 | touches 12 | — | canonical-unit-test-ids |
+| issue-id-flip | IssueId becomes the validated newtype | task | The validated newtype takes the IssueId name, the bridge is gone, and stored ids decode strictly. | issue-identity-newtype, alias-staging-bridge | REQ-01, REQ-17, DEC-07, DEC-08, DEC-15 | touches 5, uncertain | — | stage-domain-issue-ids, lease-issue-identity |
 | issue-record-path-storage | Issue record paths come from a VirtualPath constructor | task | VirtualPath::issue_record derives record paths from an IssueId in storage and repository-state code. | virtual-path-constructors, issue-identity-newtype | REQ-01, REQ-07 | touches 6 | — | issue-id-flip |
 | issue-record-path-commands | Commands take issue record paths from the VirtualPath constructor | task | Commands and validation take issue record paths from the VirtualPath constructor. | virtual-path-constructors | REQ-07 | touches 10 | — | issue-record-path-storage |
 | gate-run-ids | Gate runs are identified by a validated GateRunId | task | Gate runs carry a validated GateRunId from draft to record path. | identity-newtype-convention, virtual-path-constructors | REQ-01, DEC-09 | touches 12 | — | issue-record-path-storage, gate-run-actor |
@@ -121,7 +122,7 @@ Each graph assertion lowers its table at load through a `Raw*` struct, following
 | event-body-unit-test-view | Unit tests match events through the body view | task | Library unit tests match and build events through the body view. | event-body-view | REQ-05, DEC-13 | touches 19 | — | event-body-view |
 | event-body-integration-test-view | Integration tests match events through the body view | task | Integration tests match and build events through the body view. | event-body-view | REQ-05, DEC-13 | touches 10 | — | event-body-view |
 | event-envelope | Event becomes an envelope around a tagged body | task | Event holds id and timestamp once around a flattened EventBody that drafts build. | event-envelope, event-body-view | REQ-05, DEC-13 | touches 4 | — | event-body-unit-test-view, event-body-integration-test-view |
-| event-issue-accessor | Event issue accessor returns an optional IssueId | task | The event issue accessor returns Option<&IssueId> with no empty-string sentinel. | event-envelope, alias-staging-bridge | REQ-04 | touches 4 | — | event-envelope, issue-id-types |
+| event-issue-accessor | Event issue accessor returns an optional IssueId | task | The event issue accessor returns Option<&IssueId> with no empty-string sentinel. | event-envelope, alias-staging-bridge | REQ-04 | touches 11 | — | event-envelope, issue-id-types |
 | system-actor-constants | System actors are named Assignee constants | task | Each engine-owned actor is a named Assignee constant. | system-actor-constants | REQ-11 | touches 6 | — | — |
 | gate-run-actor | Gate-run actors are Assignee values | task | Gate-run actors are stored and read as Assignee values. | system-actor-constants | REQ-11 | touches 5 | — | system-actor-constants |
 | agent-identity-assignee | Resolved agent identity is an Assignee | task | The agent identity is an Assignee from resolution to lease record. | system-actor-constants | REQ-06, REQ-11 | touches 4 | — | system-actor-constants |
@@ -181,213 +182,219 @@ flowchart LR
     N5["prefix-resolution: Id prefixes parse once into an IssueIdPrefix"]
     N6["cli-issue-id-boundary: The CLI resolves each issue-id argument once at entry"]
     N7["server-issue-id-boundary: The server resolves each issue-id path parameter once"]
-    N8["stage-graph-command-issue-ids: Dependency, graph and template commands carry typed issue ids"]
-    N9["stage-gate-command-issue-ids: Gate commands carry typed issue ids"]
-    N10["stage-lifecycle-command-issue-ids: Issue lifecycle commands carry typed issue ids"]
-    N11["stage-document-command-issue-ids: Document-family commands carry typed issue ids"]
-    N12["stage-dispatch-issue-ids: Executor core carries typed issue ids"]
-    N13["stage-repository-state-issue-ids: Repository-state mutations carry typed issue ids"]
-    N14["stage-validation-issue-ids: Validation carries typed issue ids"]
-    N15["stage-error-output-issue-ids: Errors and output carry typed issue ids"]
-    N16["stage-storage-issue-ids: Storage trait and backends take issue ids as IssueId"]
-    N17["stage-domain-issue-ids: Domain types carry issue ids as IssueId"]
-    N18["stage-test-harness-issue-ids: The shared integration harness carries typed issue ids"]
-    N19["stage-fast-issue-test-issue-ids: The fast_issue suite carries typed canonical issue ids"]
-    N20["stage-fast-docs-templates-test-issue-ids: The fast_docs_templates suite carries typed canonical issue ids"]
-    N21["stage-fast-rules-test-issue-ids: The fast_rules suite carries typed canonical issue ids"]
-    N22["stage-cli-suite-test-issue-ids: CLI suites that use the library carry typed issue ids"]
-    N23["issue-id-flip: IssueId becomes the validated newtype"]
-    N24["issue-record-path-storage: Issue record paths come from a VirtualPath constructor"]
-    N25["issue-record-path-commands: Commands take issue record paths from the VirtualPath constructor"]
-    N26["gate-run-ids: Gate runs are identified by a validated GateRunId"]
-    N27["gate-key-registry-type: Gate keys are a validated GateKey in the registry and gate runs"]
-    N28["gate-key-issue-fields: Issue gate fields are keyed by GateKey"]
-    N29["server-short-id-field: Server issue responses carry the domain short id"]
-    N30["web-short-id-render: Web UI renders the server-provided short id"]
-    N31["event-body-view: Production event matchers read events through a body view"]
-    N32["event-body-unit-test-view: Unit tests match events through the body view"]
-    N33["event-body-integration-test-view: Integration tests match events through the body view"]
-    N34["event-envelope: Event becomes an envelope around a tagged body"]
-    N35["event-issue-accessor: Event issue accessor returns an optional IssueId"]
-    N36["system-actor-constants: System actors are named Assignee constants"]
-    N37["gate-run-actor: Gate-run actors are Assignee values"]
-    N38["agent-identity-assignee: Resolved agent identity is an Assignee"]
-    N39["lease-worktree-ids: Lease and worktree ids are dedicated types"]
-    N40["lease-issue-identity: Lease records name their issue by IssueId"]
-    N41["query-assignee-filter: Query assignee filters parse to an Assignee"]
-    N42["wire-vocabulary-macro: One macro declares a closed wire vocabulary"]
-    N43["event-tag-vocabulary: Event tags declare their wire spelling once"]
-    N44["artifact-plan-codes: Artifact-plan codes declare their wire spelling once"]
-    N45["plan-error-derive: Artifact-plan errors use the derive-based error convention"]
-    N46["lifecycle-state-vocabulary: Lifecycle state tokens come from one declaration"]
-    N47["priority-vocabulary: Priority tokens come from one declaration"]
-    N48["priority-ord: Priority orders by rank through Ord"]
-    N49["validation-strictness-vocabulary: Validation strictness is typed at load"]
-    N50["content-format-vocabulary: Content format is typed at load"]
-    N51["kind-scope-vocabulary: Item-kind scope has one enum"]
-    N52["transform-kind-vocabulary: Template transform kind is typed at load"]
-    N53["projection-mode-style-vocabulary: Projection mode and style reach output typed"]
-    N54["gate-finding-vocabulary: Built-in gate findings use closed severity and disposition enums"]
-    N55["repository-action-owner: Repository action owners are one enum"]
-    N56["projection-typed-fields: Validation projections hold typed state and priority"]
-    N57["rule-severity-scope-vocabulary: Rule severity and scope tokens come from one declaration"]
-    N58["type-hierarchy-kind-vocabulary: Type-hierarchy and label-uniqueness rule options are typed"]
-    N59["gate-stage-mode-vocabulary: Gate stage and mode tokens come from one declaration"]
-    N60["error-code-vocabulary: Error codes come from one declaration"]
-    N61["divergence-vocabulary: Store divergence tokens come from one declaration"]
-    N62["debug-token-renders: Human output renders vocabulary tokens, not Debug names"]
-    N63["compiled-id-pattern: Rule patterns compile at declaration load"]
-    N64["item-kind-id-pattern: Item kinds hold their id pattern as IdPattern"]
-    N65["typed-label-reference: Label-reference assertions are typed at load"]
-    N66["typed-dependency-shape: Dependency-shape assertions are typed at load"]
-    N67["typed-label-coverage: Label-coverage assertions are typed and compiled at load"]
-    N68["hierarchy-config-constructor: HierarchyConfig has one fallible constructor from declarations"]
-    N69["hierarchy-config-callers: Hierarchy callers propagate the constructor's error"]
-    N70["schema-path-constructor: Schema paths come from a VirtualPath constructor"]
-    N71["well-known-paths-repository-state: Repository-state code names well-known files through VirtualPath constants"]
-    N72["well-known-paths-commands: Commands name well-known files through VirtualPath constants"]
-    N73["well-known-paths-storage: Storage and configuration code name well-known files through VirtualPath constants"]
-    N74["control-file-path-constants: Worktree and server files under .jit have VirtualPath constants"]
-    N75["reserved-target-predicate: One VirtualPath predicate recognises reserved application targets"]
-    N76["domain-profile-id: ProfileId is defined in the domain layer"]
-    N77["typed-profile-dependency-resolution: Profile dependency resolution compares ProfileId values"]
-    N78["issue-identity: Issue identity is one validated type end to end"]
-    N79["event-records: Events are an envelope around a tagged body"]
-    N80["actor-identity: Actors and leases carry typed identities"]
-    N81["wire-vocabularies: Closed vocabularies state their wire spelling once"]
-    N82["typed-declarations: Declarations are typed and compiled at load"]
-    N83["repository-paths: Repository paths and profile identity are typed"]
+    N8["scoped-issue-id-arguments: Composite arguments carry their issue as a typed id"]
+    N9["stage-graph-command-issue-ids: Dependency, graph and template commands carry typed issue ids"]
+    N10["stage-gate-command-issue-ids: Gate commands carry typed issue ids"]
+    N11["stage-lifecycle-command-issue-ids: Issue lifecycle commands carry typed issue ids"]
+    N12["stage-document-command-issue-ids: Document-family commands carry typed issue ids"]
+    N13["stage-dispatch-issue-ids: Executor core carries typed issue ids"]
+    N14["stage-repository-state-issue-ids: Repository-state mutations carry typed issue ids"]
+    N15["stage-validation-issue-ids: Validation carries typed issue ids"]
+    N16["stage-error-output-issue-ids: Errors and output carry typed issue ids"]
+    N17["stage-storage-issue-ids: Storage trait and backends take issue ids as IssueId"]
+    N18["stage-domain-issue-ids: Domain types carry issue ids as IssueId"]
+    N19["stage-test-harness-issue-ids: The shared integration harness carries typed issue ids"]
+    N20["stage-fast-issue-test-issue-ids: The fast_issue suite carries typed canonical issue ids"]
+    N21["stage-fast-docs-templates-test-issue-ids: The fast_docs_templates suite carries typed canonical issue ids"]
+    N22["stage-fast-rules-test-issue-ids: The fast_rules suite carries typed canonical issue ids"]
+    N23["stage-cli-suite-test-issue-ids: CLI suites that use the library carry typed issue ids"]
+    N24["issue-id-flip: IssueId becomes the validated newtype"]
+    N25["issue-record-path-storage: Issue record paths come from a VirtualPath constructor"]
+    N26["issue-record-path-commands: Commands take issue record paths from the VirtualPath constructor"]
+    N27["gate-run-ids: Gate runs are identified by a validated GateRunId"]
+    N28["gate-key-registry-type: Gate keys are a validated GateKey in the registry and gate runs"]
+    N29["gate-key-issue-fields: Issue gate fields are keyed by GateKey"]
+    N30["server-short-id-field: Server issue responses carry the domain short id"]
+    N31["web-short-id-render: Web UI renders the server-provided short id"]
+    N32["event-body-view: Production event matchers read events through a body view"]
+    N33["event-body-unit-test-view: Unit tests match events through the body view"]
+    N34["event-body-integration-test-view: Integration tests match events through the body view"]
+    N35["event-envelope: Event becomes an envelope around a tagged body"]
+    N36["event-issue-accessor: Event issue accessor returns an optional IssueId"]
+    N37["system-actor-constants: System actors are named Assignee constants"]
+    N38["gate-run-actor: Gate-run actors are Assignee values"]
+    N39["agent-identity-assignee: Resolved agent identity is an Assignee"]
+    N40["lease-worktree-ids: Lease and worktree ids are dedicated types"]
+    N41["lease-issue-identity: Lease records name their issue by IssueId"]
+    N42["query-assignee-filter: Query assignee filters parse to an Assignee"]
+    N43["wire-vocabulary-macro: One macro declares a closed wire vocabulary"]
+    N44["event-tag-vocabulary: Event tags declare their wire spelling once"]
+    N45["artifact-plan-codes: Artifact-plan codes declare their wire spelling once"]
+    N46["plan-error-derive: Artifact-plan errors use the derive-based error convention"]
+    N47["lifecycle-state-vocabulary: Lifecycle state tokens come from one declaration"]
+    N48["priority-vocabulary: Priority tokens come from one declaration"]
+    N49["priority-ord: Priority orders by rank through Ord"]
+    N50["validation-strictness-vocabulary: Validation strictness is typed at load"]
+    N51["content-format-vocabulary: Content format is typed at load"]
+    N52["kind-scope-vocabulary: Item-kind scope has one enum"]
+    N53["transform-kind-vocabulary: Template transform kind is typed at load"]
+    N54["projection-mode-style-vocabulary: Projection mode and style reach output typed"]
+    N55["gate-finding-vocabulary: Built-in gate findings use closed severity and disposition enums"]
+    N56["repository-action-owner: Repository action owners are one enum"]
+    N57["projection-typed-fields: Validation projections hold typed state and priority"]
+    N58["rule-severity-scope-vocabulary: Rule severity and scope tokens come from one declaration"]
+    N59["type-hierarchy-kind-vocabulary: Type-hierarchy and label-uniqueness rule options are typed"]
+    N60["gate-stage-mode-vocabulary: Gate stage and mode tokens come from one declaration"]
+    N61["error-code-vocabulary: Error codes come from one declaration"]
+    N62["divergence-vocabulary: Store divergence tokens come from one declaration"]
+    N63["debug-token-renders: Human output renders vocabulary tokens, not Debug names"]
+    N64["compiled-id-pattern: Rule patterns compile at declaration load"]
+    N65["item-kind-id-pattern: Item kinds hold their id pattern as IdPattern"]
+    N66["typed-label-reference: Label-reference assertions are typed at load"]
+    N67["typed-dependency-shape: Dependency-shape assertions are typed at load"]
+    N68["typed-label-coverage: Label-coverage assertions are typed and compiled at load"]
+    N69["hierarchy-config-constructor: HierarchyConfig has one fallible constructor from declarations"]
+    N70["hierarchy-config-callers: Hierarchy callers propagate the constructor's error"]
+    N71["schema-path-constructor: Schema paths come from a VirtualPath constructor"]
+    N72["well-known-paths-repository-state: Repository-state code names well-known files through VirtualPath constants"]
+    N73["well-known-paths-commands: Commands name well-known files through VirtualPath constants"]
+    N74["well-known-paths-storage: Storage and configuration code name well-known files through VirtualPath constants"]
+    N75["control-file-path-constants: Worktree and server files under .jit have VirtualPath constants"]
+    N76["reserved-target-predicate: One VirtualPath predicate recognises reserved application targets"]
+    N77["domain-profile-id: ProfileId is defined in the domain layer"]
+    N78["typed-profile-dependency-resolution: Profile dependency resolution compares ProfileId values"]
+    N79["issue-identity: Issue identity is one validated type end to end"]
+    N80["event-records: Events are an envelope around a tagged body"]
+    N81["actor-identity: Actors and leases carry typed identities"]
+    N82["wire-vocabularies: Closed vocabularies state their wire spelling once"]
+    N83["typed-declarations: Declarations are typed and compiled at load"]
+    N84["repository-paths: Repository paths and profile identity are typed"]
     N1 --> N2
     N0 --> N3
     N3 --> N4
     N0 --> N5
     N5 --> N6
+    N2 --> N6
     N5 --> N7
     N6 --> N8
-    N7 --> N8
     N6 --> N9
     N7 --> N9
+    N19 --> N9
     N6 --> N10
     N7 --> N10
+    N19 --> N10
     N6 --> N11
     N7 --> N11
-    N6 --> N12
+    N19 --> N11
+    N8 --> N12
+    N19 --> N12
     N7 --> N12
-    N8 --> N13
-    N9 --> N13
-    N10 --> N13
-    N11 --> N13
-    N12 --> N13
-    N4 --> N13
-    N8 --> N14
+    N6 --> N13
+    N7 --> N13
+    N19 --> N13
     N9 --> N14
     N10 --> N14
     N11 --> N14
     N12 --> N14
-    N8 --> N15
+    N13 --> N14
+    N4 --> N14
     N9 --> N15
     N10 --> N15
     N11 --> N15
     N12 --> N15
+    N13 --> N15
+    N9 --> N16
+    N10 --> N16
+    N11 --> N16
+    N12 --> N16
     N13 --> N16
-    N14 --> N16
-    N15 --> N16
+    N14 --> N17
+    N15 --> N17
     N16 --> N17
-    N35 --> N17
-    N3 --> N18
-    N18 --> N19
-    N18 --> N20
-    N18 --> N21
-    N18 --> N22
-    N17 --> N23
-    N40 --> N23
-    N2 --> N23
-    N19 --> N23
-    N20 --> N23
-    N21 --> N23
-    N22 --> N23
-    N23 --> N24
+    N17 --> N18
+    N36 --> N18
+    N20 --> N19
+    N21 --> N19
+    N22 --> N19
+    N23 --> N19
+    N3 --> N20
+    N3 --> N21
+    N3 --> N22
+    N3 --> N23
+    N18 --> N24
+    N41 --> N24
     N24 --> N25
-    N24 --> N26
-    N37 --> N26
-    N23 --> N27
-    N76 --> N27
-    N27 --> N28
-    N23 --> N29
-    N29 --> N30
-    N31 --> N32
-    N31 --> N33
+    N25 --> N26
+    N25 --> N27
+    N38 --> N27
+    N24 --> N28
+    N77 --> N28
+    N28 --> N29
+    N24 --> N30
+    N30 --> N31
+    N32 --> N33
     N32 --> N34
-    N33 --> N34
+    N33 --> N35
     N34 --> N35
-    N0 --> N35
-    N36 --> N37
-    N36 --> N38
-    N38 --> N39
-    N0 --> N39
+    N35 --> N36
+    N0 --> N36
+    N37 --> N38
+    N37 --> N39
     N39 --> N40
-    N42 --> N43
-    N34 --> N43
-    N42 --> N44
-    N42 --> N46
-    N46 --> N47
+    N0 --> N40
+    N40 --> N41
+    N43 --> N44
+    N35 --> N44
+    N43 --> N45
+    N43 --> N47
     N47 --> N48
-    N42 --> N49
-    N49 --> N50
-    N42 --> N51
-    N42 --> N52
-    N42 --> N53
-    N42 --> N54
-    N42 --> N55
-    N47 --> N56
-    N46 --> N57
-    N57 --> N58
-    N42 --> N59
-    N42 --> N60
-    N42 --> N61
-    N47 --> N62
-    N63 --> N64
-    N58 --> N65
-    N63 --> N65
-    N65 --> N66
+    N48 --> N49
+    N43 --> N50
+    N50 --> N51
+    N43 --> N52
+    N43 --> N53
+    N43 --> N54
+    N43 --> N55
+    N43 --> N56
+    N48 --> N57
+    N47 --> N58
+    N58 --> N59
+    N43 --> N60
+    N43 --> N61
+    N43 --> N62
+    N48 --> N63
+    N64 --> N65
+    N59 --> N66
+    N64 --> N66
     N66 --> N67
-    N68 --> N69
-    N70 --> N71
+    N67 --> N68
+    N69 --> N70
     N71 --> N72
     N72 --> N73
     N73 --> N74
-    N0 --> N76
-    N76 --> N77
-    N25 --> N78
-    N26 --> N78
-    N28 --> N78
-    N30 --> N78
-    N35 --> N79
-    N37 --> N80
-    N40 --> N80
-    N41 --> N80
-    N43 --> N81
-    N44 --> N81
-    N45 --> N81
-    N48 --> N81
-    N50 --> N81
-    N51 --> N81
-    N52 --> N81
-    N53 --> N81
-    N54 --> N81
-    N55 --> N81
-    N56 --> N81
-    N58 --> N81
-    N59 --> N81
-    N60 --> N81
-    N61 --> N81
-    N62 --> N81
-    N64 --> N82
-    N67 --> N82
-    N69 --> N82
-    N74 --> N83
-    N75 --> N83
-    N77 --> N83
+    N74 --> N75
+    N0 --> N77
+    N77 --> N78
+    N26 --> N79
+    N27 --> N79
+    N29 --> N79
+    N31 --> N79
+    N36 --> N80
+    N38 --> N81
+    N41 --> N81
+    N42 --> N81
+    N44 --> N82
+    N45 --> N82
+    N46 --> N82
+    N49 --> N82
+    N51 --> N82
+    N52 --> N82
+    N53 --> N82
+    N54 --> N82
+    N55 --> N82
+    N56 --> N82
+    N57 --> N82
+    N59 --> N82
+    N60 --> N82
+    N61 --> N82
+    N62 --> N82
+    N63 --> N82
+    N65 --> N83
+    N68 --> N83
+    N70 --> N83
+    N75 --> N84
+    N76 --> N84
+    N78 --> N84
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -418,7 +425,7 @@ flowchart LR
 | DEC-21 Unnamed token twins | Chosen: rule severity and scope, gate stage and mode, `ErrorCode`, the divergence enums and the type-hierarchy kind, each in a bounded macro entry. Rejected: leaving them out, which is a convergence defect. |
 | DEC-22 HierarchyConfig | Chosen: one fallible constructor at three production sites. The silent fallback is removed, and callers propagate the error. Rejected: also validating at declaration load (optional follow-up). |
 | DEC-23 Id-input error classes | Chosen: follow the landed 16d63038 contract, which is authoritative. A prefix that normalises below the minimum length gets the invalid-prefix error before any record is read, and well-formed-length input outside the id alphabet or matching nothing keeps not-found and exit code 3. Rejected: a new invalid-argument class, which is a contract change no criterion asks for. |
-| DEC-24 Prefix boundary | Chosen: executor and internal command methods take `IssueId`, and `IssueIdPrefix` is parsed and resolved only at the CLI and server entry points, each owned by one entry. Rejected: prefix-typed executor methods, which re-resolve full ids and churn about 160 test call sites twice. |
+| DEC-24 Prefix boundary | Chosen: executor and internal command methods take `IssueId`, and `IssueIdPrefix` is parsed and resolved only at the CLI and server entry points, each owned by one entry. Composite arguments (archive, document and snapshot scopes) resolve there too. The two in-executor cases are dependency removal over the issue's own dependency list and item-address segments decoded from documents. Rejected: prefix-typed executor methods, which re-resolve full ids and churn about 160 test call sites twice. |
 | Shared-file contention | `domain/types.rs`, `main.rs`, `commands/mod.rs`, `declarations/rules.rs`, `validation/graph.rs`, `test_utils.rs` and `crates/server/src/routes.rs` are edited by several entries. Edges serialize every same-region rewrite the review found: the event chain before domain staging, the gate-run actor before gate-run ids, the pattern type before the assertion chain, and the well-known-path chain. The footprint advisories list the overlaps that remain; workers rebase over them. |
 
 ## Investigation sources
