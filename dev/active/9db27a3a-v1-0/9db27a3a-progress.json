@@ -421,6 +421,19 @@
       "status": "open",
       "date": "2026-10-21",
       "summary": "When b697a3f7 is planned: its REQ-06 (archive preview through the execute planner) task must depend on f8a6b298's archive-preview-reads-evidence."
+    },
+    {
+      "container_short_id": "8376299c",
+      "issue": "b5faef84",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "The 8376299c lead filed b5faef84 (/api/search misses issue records under the hidden .jit because rg skips hidden dirs). Accepted after the fact, with a minimal fix and no new rg-over-issue-JSON mechanism, since 0f8efc37 REQ-08 replaces server issue search with the domain search. Lead reminded to ask before adding scope."
+    },
+    {
+      "container_short_id": "0f8efc37",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "When 0f8efc37 is planned: its REQ-08 domain-search migration supersedes b5faef84's interim rg fix. Remove the interim fix there."
     }
   ],
   "notes": [
