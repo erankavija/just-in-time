@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "21958883e1018899a24ce70d78bd45d49935cc21",
+  "completed_at": "2026-10-21T00:41:01.846239121Z",
+  "duration_ms": 172534,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "a90f7e31fa6929a3b7047780978a112f57c5e716a3476c54aa403a12a35f7dd7",
+  "issue_id": "0fa1e09e-8014-413e-ad89-44ce5d535806",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ea28a1e7-92c5-4cb3-9126-b5c6f10f4229",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:38:09.311838765Z",
+  "status": "failed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE  PATH\nflock           2923590 WRITE /run/user/1000/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 70464 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 70464 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 47954 ms, warmed 17 executables (2077329168 bytes) in 73 ms.\n  ✓ fmt: ok (1680 ms)\n  ✓ clippy: ok (28764 ms)\n  ✓ suite-build: built in 47954 ms, warmed 17 executables (2077329168 bytes) in 73 ms (48030 ms)\n  ✓ test: 4752 passed, 0 failed, 0 skipped (65463 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4983 ms)\n  ✓ suite-clock: 70464 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (87 ms)\n\n",
+  "tree_dirty": true
+}

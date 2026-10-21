@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1d119206f5c8e7f1dd93af3710512bd5ce8166d6",
+  "completed_at": "2026-10-21T00:38:15.375697698Z",
+  "duration_ms": 52182,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The namespace-based orphan-leaf fix and focused regression test satisfy all hard requirements.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d23c58c0-9f72-4ebf-bf22-df0df02cd4f9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "9fb4aa6d-d487-4b4a-b89b-0fb4295d1abe",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:37:23.193319834Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7691e0e09, fe67df9dc (jit:d23c58c0)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/issue/d23c58c0/requirement/REQ-01, REQ-02, REQ-03 (issue Markdown); @/invariant/domain-agnostic, architecture-dependency-direction, semantic-test-assertions, shared-test-contracts, orthogonal-tests, essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, code-review (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-20T21:14:01Z); code-review pending\nTruncation recovery: narrowed reads to the changed function, regression test, and relevant configuration/registry entries\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The namespace-based orphan-leaf fix and focused regression test satisfy all hard requirements.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

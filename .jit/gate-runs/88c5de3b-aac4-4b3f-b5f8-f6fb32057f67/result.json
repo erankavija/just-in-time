@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "149251669a5c788f38d014e9cd682dc5c6de13a6",
+  "completed_at": "2026-10-21T00:37:14.596936185Z",
+  "duration_ms": 216161,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "724c149d306a6b1b9158c7e1edac2743f4604693ab76e97c06d4ee34a27ae372",
+  "issue_id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "88c5de3b-aac4-4b3f-b5f8-f6fb32057f67",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:33:38.435380218Z",
+  "status": "passed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nflock           2671231 WRITE* /run/user/1000/cargo-ci.lock\nflock           2664323 WRITE  /run/user/1000/cargo-ci.lock\n",
+  "stdout": "  ✓ fmt: ok (1777 ms)\n  ✓ clippy: ok (264 ms)\n  ✓ suite-build: built in 535 ms, warmed 17 executables (2076783168 bytes) in 2569 ms (3107 ms)\n  ✓ test: 4745 passed, 0 failed, 0 skipped (22996 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4972 ms)\n  ✓ suite-clock: 27987 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (7 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1744521408/2147483648 profile=line-tables-only dep-features=pruned suite-duration=27987ms (81 ms)\n\n",
+  "tree_dirty": true
+}

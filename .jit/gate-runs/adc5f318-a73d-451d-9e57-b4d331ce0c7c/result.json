@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "149251669a5c788f38d014e9cd682dc5c6de13a6",
+  "completed_at": "2026-10-21T00:33:51.088567318Z",
+  "duration_ms": 98242,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/842b0ac6-greenfield-cutover/breakdown.json",
+        "id": "F1",
+        "line": 492,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/842b0ac6/requirement/REQ-07"
+        ],
+        "severity": "high",
+        "summary": "REQ-07 defers deletion of the 19 ignored issue sidecars to an unspecified integration action instead of assigning it to a manifest leaf."
+      },
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/storage/memory.rs",
+        "id": "F2",
+        "line": 479,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/842b0ac6/requirement/REQ-08",
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "The REQ-08 plan relies on retired-tag tolerance that JSON storage provides but InMemoryStorage bypasses, leaving the required historical backfill record unloadable in that backend."
+      }
+    ],
+    "summary": "Two required outcomes are not deliverable by the manifest as written: ignored sidecar cleanup lacks an assigned leaf, and retired-event tolerance diverges across storage backends.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "201634a8-3df6-4b53-aa3d-6beb59115b54",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "adc5f318-a73d-451d-9e57-b4d331ce0c7c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:32:12.846201805Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5437 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15bdf-72e4-7630-90ce-db91b8c32aa3\n--------\nuser\n--- 5424 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact.** REQ-07 requires this repository’s `.jit/issues/` to contain no `.lock` files, but the only REQ-07 leaf defers deletion of the 19 existing ignored files to an unspecified execution-lead integration action ([breakdown.json:492](/home/vkaskivuo/Projects/just-in-time/dev/active/842b0ac6-greenfield-cutover/breakdown.json:492); [plan.md:184](/home/vkaskivuo/Projects/just-in-time/dev/active/842b0ac6-greenfield-cutover/plan.md:184)). Create an explicit, assigned integration leaf in the authoritative manifest that safely removes these exact primary-checkout sidecars and records the required zero-sidecar evidence.\n\n2. **F2 — blocking, issue-impact.** REQ-08’s chosen retired-tag tolerance only works in JSON storage. `InMemoryStorage::load_events` strictly deserializes every line as `Event`, so it will reject the newly retired backfill record ([breakdown.json:539](/home/vkaskivuo/Projects/just-in-time/dev/active/842b0ac6-greenfield-cutover/breakdown.json:539); [memory.rs:479](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/memory.rs:479)). Add `storage/memory.rs` to the leaf footprint, make it use the same known-event tolerance, and cover the behavior through the shared storage contract.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two required outcomes are not deliverable by the manifest as written: ignored sidecar cleanup lacks an assigned leaf, and retired-event tolerance diverges across storage backends.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-07 defers deletion of the 19 ignored issue sidecars to an unspecified integration action instead of assigning it to a manifest leaf.\",\"file\":\"dev/active/842b0ac6-greenfield-cutover/breakdown.json\",\"line\":492,\"references\":[\"@/issue/842b0ac6/requirement/REQ-07\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The REQ-08 plan relies on retired-tag tolerance that JSON storage provides but InMemoryStorage bypasses, leaving the required historical backfill record unloadable in that backend.\",\"file\":\"crates/jit/src/storage/memory.rs\",\"line\":479,\"references\":[\"@/issue/842b0ac6/requirement/REQ-08\",\"@/inv/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

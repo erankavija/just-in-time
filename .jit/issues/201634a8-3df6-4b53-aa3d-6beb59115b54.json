@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-842b0ac6",
+  "claimed_at": "2026-10-21T00:32:09.463622778Z",
   "context": {},
   "created_at": "2026-10-20T20:17:42.709764601Z",
   "dependencies": [],
@@ -45,15 +46,16 @@
       "path": "dev/active/842b0ac6-greenfield-cutover/breakdown.json"
     }
   ],
+  "done_at": "2026-10-21T00:53:51.452262214Z",
   "first_ready_at": "2026-10-20T20:17:42.709764601Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:17:42.709764601Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T00:53:45.582127268Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "201634a8-3df6-4b53-aa3d-6beb59115b54",
@@ -71,7 +73,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-20T20:47:54.384678472Z"
+  "updated_at": "2026-10-21T00:53:51.452262214Z"
 }

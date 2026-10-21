@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "51a31c081f0ce19cb8ae186cbd9f14615e7cf9d5",
+  "completed_at": "2026-10-20T21:13:29.155616157Z",
+  "duration_ms": 464259,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "72ed57f83df81a37e4d73e251593d92bd7885c67f4587ddcc57f6d84ad00359d",
+  "issue_id": "cd2ed136-84ce-46c7-9741-b4d167ed540d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e6bcd541-5882-4b2f-81f9-5c6106e75ab9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-20T21:05:44.895719039Z",
+  "status": "failed",
+  "stderr": "cargo-ci: another build holds /run/user/1000/cargo-ci.lock; waiting up to 1800s\nCOMMAND             PID MODE   PATH\nflock           2374135 WRITE* /run/user/1000/cargo-ci.lock\nflock           2373968 WRITE* /run/user/1000/cargo-ci.lock\nflock           2373014 WRITE  /run/user/1000/cargo-ci.lock\n",
+  "stdout": "--- budget diagnostics ---\nrust-build-budget: FAILED\n  - test suite duration: observed 81510 ms, threshold 30000 ms (must be below threshold). The observation is a suite clock its caller is required to take over an already-built, page-cache-warm target (see --test-suite-ms above), so a value over the threshold is execution cost in the measured tree and not compilation or first-touch artifact I/O. Corrective area: shorten the suite's slowest tests or the work they repeat (dev/TESTING.md, 'Inherent Test Costs').\n--- suite-clock scope ---\nsuite-clock 81510 ms spans the test and doctest substeps only.\nExcluded, and reported by the suite-build step: built in 50270 ms, warmed 17 executables (2076783168 bytes) in 271 ms.\n  ✓ fmt: ok (1625 ms)\n  ✓ clippy: ok (36321 ms)\n  ✓ suite-build: built in 50270 ms, warmed 17 executables (2076783168 bytes) in 271 ms (50544 ms)\n  ✓ test: 4745 passed, 0 failed, 0 skipped (76962 ms)\n  ✓ doctest: 63 passed, 0 failed, 0 ignored (4530 ms)\n  ✓ suite-clock: 81510 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✗ budget: FAILED (exit 1) (77 ms)\n\n",
+  "tree_dirty": true
+}

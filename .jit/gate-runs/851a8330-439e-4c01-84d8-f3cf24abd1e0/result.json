@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "21958883e1018899a24ce70d78bd45d49935cc21",
+  "completed_at": "2026-10-21T00:39:49.931619276Z",
+  "duration_ms": 92619,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Scoped and unscoped graph exports now enumerate sorted selected nodes, with adequate regression and property coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "cd2ed136-84ce-46c7-9741-b4d167ed540d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "851a8330-439e-4c01-84d8-f3cf24abd1e0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:38:17.312508964Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: f641f2f29, d6569d332 (merge integration), c0113c6b4 (gate record only)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/gate/cargo-ci, @/invariant/no-ignored-tests, @/invariant/bounded-rust-build-footprint\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T00:31:38Z); code-review pending\nTruncation recovery: reread bounded source, test, hierarchy, and merge first-parent diffs; second-parent-only merge changes were unrelated mainline history outside the export impact cone\n\n1. No findings. The sorted node accessor is used by DOT, Mermaid, summary JSON, and full JSON; scoped nodes are retained and output ordering is deterministic. The added regression and property tests cover the prior rootless-scope failure and generated DAG scopes.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Scoped and unscoped graph exports now enumerate sorted selected nodes, with adequate regression and property coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

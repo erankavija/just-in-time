@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fe2115c88509da395ea966d13d122e66193d59f0",
+  "completed_at": "2026-10-21T00:49:49.393498746Z",
+  "duration_ms": 184174,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met: current paths are guarded and documented, and isolated installed-hook regression tests cover divergent global edits and strict lease enforcement.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "514df7d3-caa6-40bb-9fba-d250e1bb756d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d92f0dac-eaac-4efa-9fd9-1113222acdcc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:46:45.218787279Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 11ab05027, ef070806e\nPolicy sources: AGENTS.md; docs/reference/storage-format.md\nResolved items: @/charter/D-1 and @/charter/D-4 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, and @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit code none, 2026-10-20T21:15:13Z; code-review pending with no prior run\nTruncation recovery: hooks.rs test range and merge first-parent patch inspected separately\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met: current paths are guarded and documented, and isolated installed-hook regression tests cover divergent global edits and strict lease enforcement.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "fe2115c88509da395ea966d13d122e66193d59f0",
+  "completed_at": "2026-10-21T00:46:44.642082313Z",
+  "duration_ms": 213589,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/query_engine/lexer.rs",
+        "id": "F1",
+        "line": 423,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/7d1bfe89/requirement/REQ-05"
+        ],
+        "severity": "medium",
+        "summary": "The proptest regex strategy \".*\" excludes line-feed characters, leaving REQ-05's arbitrary UTF-8 property unmet."
+      }
+    ],
+    "summary": "REQ-05's property strategy excludes newline, so it does not cover arbitrary UTF-8 input.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f4eff454-1be5-4af9-be5d-09684214531d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:43:11.052172292Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6032 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15be9-7dfc-7600-8437-707c0aaa6d1b\n--------\nuser\n--- 6019 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 39ac419f0, 51a31c081 (merge contains the same implementation patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/7d1bfe89/requirement/REQ-05 (issue Markdown); @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/no-ignored-tests, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed, exit 0, 2026-10-21T00:33:38Z; code-review pending\nTruncation recovery: narrowed reads of main.rs, query_engine/mod.rs, configuration, invariant registry, and proptest string strategy source\n\n1. F1 — **blocking, issue-impact, medium**: [`crates/jit/src/query_engine/lexer.rs:423`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/query_engine/lexer.rs:423) uses proptest’s `\".*\"` generator, which excludes line-feed characters. The property therefore does not cover arbitrary UTF-8 input as required by REQ-05. Use a strategy spanning arbitrary `char` values (including newline) before converting to `String`. References: `@/issue/7d1bfe89/requirement/REQ-05`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"REQ-05's property strategy excludes newline, so it does not cover arbitrary UTF-8 input.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The proptest regex strategy \\\".*\\\" excludes line-feed characters, leaving REQ-05's arbitrary UTF-8 property unmet.\",\"file\":\"crates/jit/src/query_engine/lexer.rs\",\"line\":423,\"references\":[\"@/issue/7d1bfe89/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

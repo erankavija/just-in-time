@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "24186b5b84c0221809bf54a259f47bd90e9a3478",
+  "completed_at": "2026-10-21T00:52:42.554148848Z",
+  "duration_ms": 116245,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/server/src/lib.rs",
+        "id": "F1",
+        "line": 227,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "Revised test-helper rustdoc retains task-history tags; keep only the concurrency contract."
+      }
+    ],
+    "summary": "Hard criteria are met; one advisory prose finding remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "6ff14f21-2150-4e48-9dc6-5c4e2f7ac2d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "71bf6384-8789-41b5-8107-35965d4e7af6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:50:46.308549556Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 457c96ed2d3a1b9d584d6faaee434b58ef433a10; 2210e044ad8e483620ca2576ca0d4ece5624efd7 (merge inspected against both parents)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code unrecorded, 2026-10-20T21:15:04Z); code-review pending\nTruncation recovery: partitioned patches by commit/path and merge parent; re-read zero-context test changes and current guard, test-mode, policy-test, and invariant source slices\n\n1. [advisory, issue-impact] `crates/server/src/lib.rs:227` retains historical `jit:` task tags in revised rustdoc. Keep the concurrency contract, but move task history to git/JIT. (`@/invariant/essential-code-prose`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Hard criteria are met; one advisory prose finding remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"Revised test-helper rustdoc retains task-history tags; keep only the concurrency contract.\",\"file\":\"crates/server/src/lib.rs\",\"line\":227,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
