@@ -186,13 +186,10 @@ costs one line and no traversal. A pattern that reaches only into a directory
 find them.
 
 Three things are never in the digest and need no pattern. The `.git` directory is
-where content is versioned rather than content a checker reads. The paths jit
-itself writes when it records work — issue records, the event log, gate-run
-records, the index, its lock files, its scratch directory, the worktree identity
-file, and the worktree's bootstrap lock — never enter a digest, wherever the
-data root is located, so recording a gate result cannot invalidate a reusable
-verdict. Configuration beside them under the data root, such as `gates.toml`,
-`rules.toml`, and schemas, stays an input whenever a root covers it. And a
+where content is versioned rather than content a checker reads. The files jit
+writes while it records issues, events, and gate runs never enter a digest, so
+recording a result never invalidates a reusable verdict. Configuration under the
+data root, such as `gates.toml`, still enters the digest whenever a root covers it. And a
 checker's own build output is not an input at all — it is a function of the
 inputs, produced after the digest is taken — so leave it out of `roots` rather
 than excluding it.

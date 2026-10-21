@@ -2977,18 +2977,23 @@ JSON returns the list envelope with the issue id alongside it:
 
 ### `jit doc show`
 
-Print a document's content as recorded for an issue.
+Print one of an issue's documents: an explicit reference or a [derived
+document](configuration.md#issue-artifact-directories).
 
 ```bash
 jit doc show <ID> <PATH> [--at <COMMIT>] [--json]
 ```
 
-`--at <COMMIT>` reads the document as it stood at that commit instead of at
-`HEAD`.
+`--at <COMMIT>` reads the document as it stood at that commit. Without it, a
+pinned reference reads at its pinned commit, and any other document reads from
+the committed tree at `HEAD` when a Git repository exists, or from the working
+tree otherwise. An uncommitted derived file is therefore listed by
+[`jit doc list`](#jit-doc-list) but cannot be shown until it is committed.
 
 ### `jit doc history`
 
-List the commits that touched a document.
+List the commits that touched one of an issue's documents, explicit or derived.
+It reads Git history, so an uncommitted file has none.
 
 ```bash
 jit doc history <ID> <PATH> [--json]
@@ -2996,7 +3001,7 @@ jit doc history <ID> <PATH> [--json]
 
 ### `jit doc diff`
 
-Diff a document between two commits.
+Diff one of an issue's documents, explicit or derived, between two commits.
 
 ```bash
 jit doc diff <ID> <PATH> --from <COMMIT> [--to <COMMIT>] [--json]
@@ -3518,7 +3523,7 @@ failure's typed classification: an unsafe repair uses `VALIDATION_FAILED`, a
 permission failure uses `PERMISSION_DENIED`, and other failures keep the
 registered code selected by the shared classifier. That code determines the
 process status. Its `error.message` retains the complete actionable cause chain,
-including ambiguous managed-region delimiters or mismatched profile provenance.
+including ambiguous managed-region delimiters.
 The human error reports the same cause, and no repair target is written.
 
 ### `jit recover`
