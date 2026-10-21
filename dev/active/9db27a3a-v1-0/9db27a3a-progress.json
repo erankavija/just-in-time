@@ -383,6 +383,13 @@
       "date": "2026-10-21",
       "decision": "@/inv/convention-convergence, @/charter/D-20",
       "summary": "The coordination lease limits are reported layer-merged by config show but enforced repository-only. Chosen (B): fold into 842b0ac6's config work as its new REQ-26 plus a task depending on bedf0962 (just-in-time-7e adds both). Rejected (A), a separate bug: a second pass over the same config.rs regions. Rejected (C), widening bedf0962: scope creep on a nearly-done bug."
+    },
+    {
+      "container_short_id": "f8a6b298",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-19, @/charter/D-18, @/inv/atomic-writes, @/inv/event-log",
+      "summary": "REQ-05 amended (a): the indefinite-lease limit check reads current lease records only, never the claims log. Rejected (b), dropping the limits: capability removal for no gain. Rejected (c), a lease counter: adds mechanism. REQ-08 reworded: claim parses no event-log record, only the shared bounded end-of-log probe. IssueClaimed is emitted only on an assignee change, reversing 19e7298a REQ-02 as a plan decision. The one-time rewrite of existing gate runs and archives is an idempotent, count-verified task."
     }
   ],
   "notes": [
