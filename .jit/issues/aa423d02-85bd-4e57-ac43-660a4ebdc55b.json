@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-21T05:46:14.085237049Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
   "labels": [
     "epic:audit-correctness",
@@ -23,5 +29,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Apply the claim-next filter when choosing which issue to claim",
-  "updated_at": "2026-10-21T05:39:23.115071867Z"
+  "updated_at": "2026-10-21T05:46:14.085237049Z"
 }
