@@ -19,7 +19,7 @@ One file, `crates/jit/src/storage/git.rs`, starts every git process through one 
 | REQ-08 | `git-worktree-listing`, then `lease-validation-lists-once` with a counting test. | CLI surface C8, §4.5 |
 | REQ-09 | `gate-evidence-through-module`; in-memory runs record none (DEC-11). | CLI surface C7 |
 | REQ-10 | `git-object-reads` (one reader per command), then path reads at a commit, document show, diff, history, asset checks, snapshot and archive planning each move in their own entry. The server image gains the git executable first. | libgit2 §3 replacement table |
-| REQ-11 | Operations land only with production callers; `git-surface-trim` restricts test constructors to `test-support` and deletes test-only layout entry points. | CLI surface REQ-11 row, §5.4 |
+| REQ-11 | Each operation lands as a primitive just before its first production consumer; `git-surface-trim` checks that every public item has a production caller, restricts `Git::with_program` to `test-support` once the bridge and storage have migrated, and deletes test-only layout entry points. | CLI surface REQ-11 row, §5.4 |
 | REQ-12 | A typed mapping in `claims-head-lookup`; `no-git-command-tests` covers the no-executable condition; the outside-repository tests already exist (DEC-17). | CLI surface REQ-12 row, §4.6 |
 | REQ-13 | The `ureq` comment and Dockerfile builder step change with the removal; `libgit2-prose` corrects `dev/vision`. | libgit2 §3 REQ-13 sites |
 
@@ -55,7 +55,7 @@ The CLI bootstrap (`crates/jit/src/main.rs`, the `WorktreePaths::detect_for_data
 
 ### `git-revision-resolver-bridge` [implementation-produced] — Interim revision resolver
 
-`storage/git_revision.rs` keeps `GitRevisionResolver` with its public methods, each delegating to a `GitCheckout` built from its program and root, and `GitRevisionError` names the module error type. The logic exists once, in the module, while callers move one at a time. It is a named temporary bridge with one producer, `pinned-reads-into-module`. Its users are storage's pinned inspection (moved by `storage-pinned-inspection-migration`), the behaviour suite (moved by `pinned-read-suite-relocation`) and the archive planner (moved by `archive-pinned-reads-batched`). Its one remover is `git-revision-bridge-removal`, which depends on all three moves. Removal criterion: neither `storage/git_revision.rs`, `GitRevisionResolver` nor `GitCheckout::read_pinned_path` exists (`@/inv/canonical-cutover`).
+`storage/git_revision.rs` keeps `GitRevisionResolver` with its public methods, each delegating to a `GitCheckout` built from its program and root, and `GitRevisionError` names the module error type. The logic exists once, in the module, while callers move one at a time. It is a named temporary bridge with one producer, `pinned-reads-into-module`. Its users are storage's pinned inspection (moved by `storage-pinned-inspection-migration`), the behaviour suite (moved by `pinned-read-suite-relocation`) and the archive planner (moved by `archive-pinned-reads-batched`). Its one remover is `git-revision-bridge-removal`, which depends on all three moves. Removal criterion: none of `storage/git_revision.rs`, `GitRevisionResolver`, `GitRevisionError`, `GitCheckout::read_pinned_path` or `PinnedArtifactRead` exists (`@/inv/canonical-cutover`).
 
 ### `git-object-reads` [implementation-produced] — One object reader per command
 
@@ -82,7 +82,8 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 <!-- jit:breakdown-overview:begin -->
 | Key | Title | Type | Outcome | Contracts | Sources | Footprint | Landing | Depends on |
 |---|---|---|---|---|---|---|---|---|
-| git-cli-test-fixture | Shared git repository and counting stand-in test fixtures | task | Tests build git repositories and count git processes through one shared fixture pair. | — | REQ-01, REQ-07, DEC-08, DEC-16, DEC-19 | touches 2 | — | — |
+| git-cli-test-fixture | Shared git repository and counting stand-in test fixtures | task | Tests build git repositories and count git processes through one shared fixture pair. | — | REQ-07, DEC-08, DEC-16, DEC-19 | touches 1 | — | — |
+| document-fixture-off-libgit2 | Pinned-document test builds its commit through the git fixture | task | The pinned-document test builds its repository without libgit2. | git-test-fixtures | REQ-01, DEC-16 | touches 1 | — | git-cli-test-fixture |
 | git-module-foundation | Storage-owned git module with a one-process probe | task | One public storage module owns the git executable and a one-process directory probe. | git-test-fixtures | REQ-02, REQ-03, REQ-12, DEC-07, DEC-09, DEC-17 | creates 2, touches 3 | — | git-cli-test-fixture |
 | layout-probe-adoption | Layout detection uses the module's one-process probe | task | WorktreePaths detection runs one probe process instead of three. | git-module, layout-once | REQ-02, REQ-04, DEC-09 | touches 1 | — | git-module-foundation |
 | server-layout-from-data-root | Server detects its layout once from the selected data root | task | jit-server detects its layout from --data-dir once and configures its handles with it. | layout-once, git-module | REQ-03, REQ-04, DEC-09 | touches 2 | — | layout-probe-adoption |
@@ -126,7 +127,7 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 | snapshot-metadata-through-module | Snapshot source and repository facts come from the module | task | Snapshot export takes commit, origin, branch and dirtiness from the git module. | git-dirty-paths, git-head, git-pinned-reads, git-test-fixtures | REQ-05, REQ-10, DEC-10, DEC-12, DEC-14 | touches 1 | — | git-dirty-paths, git-head-lookup, git-origin-url, pinned-reads-into-module, layout-fallback-removal |
 | snapshot-blobs-through-module | Snapshot export reads committed files through one git process | task | A git-mode snapshot export reads its files through one reader process. | git-object-reads, git-test-fixtures | REQ-01, REQ-10, DEC-14 | touches 2 | — | snapshot-metadata-through-module, git-object-reads |
 | server-image-git-cli | Server image ships the git executable | task | The server image carries the git executable its document reads need. | — | REQ-10, DEC-13, DEC-20 | touches 2 | — | — |
-| drop-libgit2 | Remove the libgit2 binding from the workspace | task | The workspace has no git2 dependency and a policy test keeps it out. | — | REQ-01, REQ-13, DEC-02, DEC-15, DEC-16 | touches 5 | — | document-diff-through-module, asset-check-through-module, snapshot-blobs-through-module |
+| drop-libgit2 | Remove the libgit2 binding from the workspace | task | The workspace has no git2 dependency and a policy test keeps it out. | — | REQ-01, REQ-13, DEC-02, DEC-15, DEC-16 | touches 5 | — | document-diff-through-module, asset-check-through-module, snapshot-blobs-through-module, document-fixture-off-libgit2 |
 | binary-linkage-budget-check | Build-policy check rejects native git and OpenSSL linkage | task | The build-policy script fails when a built executable links libgit2 or OpenSSL. | — | REQ-01, DEC-15 | touches 2 | — | drop-libgit2 |
 | document-read-docs | Document command reference states the show and history semantics | task | The command reference states working-tree show and git-log history semantics. | document-read-versions, git-file-history | REQ-10, DEC-06, DEC-13 | touches 1 | — | document-show-reads-storage, document-history-through-module |
 | git-executable-docs | Git requirement pages name the git executable | task | The git-requirement pages say git-backed operations need the git executable. | git-module | REQ-12, DEC-07, DEC-17 | touches 3 | — | drop-libgit2 |
@@ -138,147 +139,150 @@ A document read uses the explicit `--at` revision, else the reference's pinned c
 ```mermaid
 flowchart LR
     N0["git-cli-test-fixture: Shared git repository and counting stand-in test fixtures"]
-    N1["git-module-foundation: Storage-owned git module with a one-process probe"]
-    N2["layout-probe-adoption: Layout detection uses the module's one-process probe"]
-    N3["server-layout-from-data-root: Server detects its layout once from the selected data root"]
-    N4["layout-fallback-removal: Storage and executor stop re-detecting the layout"]
-    N5["init-git-classification-from-layout: Init reads git classification from the invocation's layout"]
-    N6["hooks-install-from-layout: Hook installation targets the selected repository's common directory"]
-    N7["git-process-budget-test: CLI test bounds the git processes of issue reads"]
-    N8["git-head-lookup: One head lookup in the git module"]
-    N9["gate-evidence-through-module: Gate runs take commit and branch evidence from the module"]
-    N10["worktree-info-head-lookup: Worktree info reads its branch through the module"]
-    N11["init-identity-head-lookup: Init records the worktree branch through the module"]
-    N12["claims-head-lookup: Claims take their branch and git requirement from the module"]
-    N13["git-user-name: User name query in the git module"]
-    N14["release-actor-through-module: Release actor reads git user.name through the module"]
-    N15["git-worktree-listing: One worktree listing in the git module"]
-    N16["worktree-list-through-module: Worktree list reads worktrees through the module"]
-    N17["lease-validation-lists-once: Lease validation lists worktrees once per run"]
-    N18["git-base-comparison: Base comparison operation in the git module"]
-    N19["branch-drift-through-module: Branch drift validation compares in the selected worktree"]
-    N20["main-history-guard-through-module: Main-history guard runs against the selected worktree"]
-    N21["no-git-command-tests: CLI tests for commands with no git executable"]
-    N22["git-surface-trim: Trim the layout and git module surface to production callers"]
-    N23["head-tier-removal: Issue reads stop consulting git HEAD"]
-    N24["two-tier-read-docs: Issue visibility pages describe two read sources"]
-    N25["pinned-reads-into-module: Pinned revision reads move into the git module behind a bridge"]
-    N26["storage-pinned-inspection-migration: Storage pinned inspection runs on a module checkout"]
-    N27["pinned-read-suite-relocation: Pinned-read behaviour suite moves into the git module suite"]
-    N28["pinned-counting-wrappers-converge: Pinned-read tests count processes with the shared stand-in"]
-    N29["git-object-reads: Object reader and presence check in the git module"]
-    N30["pinned-inspection-object-reader: Pinned target inspection reads blobs through the object reader"]
-    N31["archive-pinned-reads-batched: Archive planning reads pinned evidence through one git process"]
-    N32["git-revision-bridge-removal: Remove the revision resolver bridge"]
-    N33["pinned-path-reads-through-module: Path reads at a commit go through the git module"]
-    N34["document-show-reads-storage: Document show reads through storage at the version it names"]
-    N35["document-diff-through-module: Document diff reads both versions through one git process"]
-    N36["git-file-history: Path history query in the git module"]
-    N37["document-history-through-module: Document history comes from the module's path history"]
-    N38["asset-check-through-module: Link checks test asset presence through one git process"]
-    N39["git-dirty-paths: Dirty-path query in the git module"]
-    N40["git-origin-url: Origin URL query in the git module"]
-    N41["snapshot-metadata-through-module: Snapshot source and repository facts come from the module"]
-    N42["snapshot-blobs-through-module: Snapshot export reads committed files through one git process"]
-    N43["server-image-git-cli: Server image ships the git executable"]
-    N44["drop-libgit2: Remove the libgit2 binding from the workspace"]
-    N45["binary-linkage-budget-check: Build-policy check rejects native git and OpenSSL linkage"]
-    N46["document-read-docs: Document command reference states the show and history semantics"]
-    N47["git-executable-docs: Git requirement pages name the git executable"]
-    N48["libgit2-prose: Contributor documents stop presenting libgit2 as the git integration"]
-    N49["git-layout-once: Layout facts are detected once and reach every consumer"]
-    N50["git-operations: Branch, worktree and base facts come from one module"]
-    N51["libgit2-removal: The workspace reaches git without libgit2"]
+    N1["document-fixture-off-libgit2: Pinned-document test builds its commit through the git fixture"]
+    N2["git-module-foundation: Storage-owned git module with a one-process probe"]
+    N3["layout-probe-adoption: Layout detection uses the module's one-process probe"]
+    N4["server-layout-from-data-root: Server detects its layout once from the selected data root"]
+    N5["layout-fallback-removal: Storage and executor stop re-detecting the layout"]
+    N6["init-git-classification-from-layout: Init reads git classification from the invocation's layout"]
+    N7["hooks-install-from-layout: Hook installation targets the selected repository's common directory"]
+    N8["git-process-budget-test: CLI test bounds the git processes of issue reads"]
+    N9["git-head-lookup: One head lookup in the git module"]
+    N10["gate-evidence-through-module: Gate runs take commit and branch evidence from the module"]
+    N11["worktree-info-head-lookup: Worktree info reads its branch through the module"]
+    N12["init-identity-head-lookup: Init records the worktree branch through the module"]
+    N13["claims-head-lookup: Claims take their branch and git requirement from the module"]
+    N14["git-user-name: User name query in the git module"]
+    N15["release-actor-through-module: Release actor reads git user.name through the module"]
+    N16["git-worktree-listing: One worktree listing in the git module"]
+    N17["worktree-list-through-module: Worktree list reads worktrees through the module"]
+    N18["lease-validation-lists-once: Lease validation lists worktrees once per run"]
+    N19["git-base-comparison: Base comparison operation in the git module"]
+    N20["branch-drift-through-module: Branch drift validation compares in the selected worktree"]
+    N21["main-history-guard-through-module: Main-history guard runs against the selected worktree"]
+    N22["no-git-command-tests: CLI tests for commands with no git executable"]
+    N23["git-surface-trim: Trim the layout and git module surface to production callers"]
+    N24["head-tier-removal: Issue reads stop consulting git HEAD"]
+    N25["two-tier-read-docs: Issue visibility pages describe two read sources"]
+    N26["pinned-reads-into-module: Pinned revision reads move into the git module behind a bridge"]
+    N27["storage-pinned-inspection-migration: Storage pinned inspection runs on a module checkout"]
+    N28["pinned-read-suite-relocation: Pinned-read behaviour suite moves into the git module suite"]
+    N29["pinned-counting-wrappers-converge: Pinned-read tests count processes with the shared stand-in"]
+    N30["git-object-reads: Object reader and presence check in the git module"]
+    N31["pinned-inspection-object-reader: Pinned target inspection reads blobs through the object reader"]
+    N32["archive-pinned-reads-batched: Archive planning reads pinned evidence through one git process"]
+    N33["git-revision-bridge-removal: Remove the revision resolver bridge"]
+    N34["pinned-path-reads-through-module: Path reads at a commit go through the git module"]
+    N35["document-show-reads-storage: Document show reads through storage at the version it names"]
+    N36["document-diff-through-module: Document diff reads both versions through one git process"]
+    N37["git-file-history: Path history query in the git module"]
+    N38["document-history-through-module: Document history comes from the module's path history"]
+    N39["asset-check-through-module: Link checks test asset presence through one git process"]
+    N40["git-dirty-paths: Dirty-path query in the git module"]
+    N41["git-origin-url: Origin URL query in the git module"]
+    N42["snapshot-metadata-through-module: Snapshot source and repository facts come from the module"]
+    N43["snapshot-blobs-through-module: Snapshot export reads committed files through one git process"]
+    N44["server-image-git-cli: Server image ships the git executable"]
+    N45["drop-libgit2: Remove the libgit2 binding from the workspace"]
+    N46["binary-linkage-budget-check: Build-policy check rejects native git and OpenSSL linkage"]
+    N47["document-read-docs: Document command reference states the show and history semantics"]
+    N48["git-executable-docs: Git requirement pages name the git executable"]
+    N49["libgit2-prose: Contributor documents stop presenting libgit2 as the git integration"]
+    N50["git-layout-once: Layout facts are detected once and reach every consumer"]
+    N51["git-operations: Branch, worktree and base facts come from one module"]
+    N52["libgit2-removal: The workspace reaches git without libgit2"]
     N0 --> N1
-    N1 --> N2
+    N0 --> N2
     N2 --> N3
     N3 --> N4
-    N23 --> N4
     N4 --> N5
-    N2 --> N7
-    N23 --> N7
-    N1 --> N8
-    N8 --> N9
-    N4 --> N9
-    N8 --> N10
-    N8 --> N11
-    N8 --> N12
-    N1 --> N13
-    N12 --> N14
-    N13 --> N14
-    N1 --> N15
-    N15 --> N16
-    N15 --> N17
-    N1 --> N18
-    N18 --> N19
-    N4 --> N19
-    N18 --> N20
-    N4 --> N20
-    N12 --> N21
-    N5 --> N22
-    N6 --> N22
-    N9 --> N22
-    N10 --> N22
-    N11 --> N22
-    N14 --> N22
-    N16 --> N22
-    N17 --> N22
-    N19 --> N22
-    N20 --> N22
-    N32 --> N22
-    N44 --> N22
-    N23 --> N24
-    N1 --> N25
-    N28 --> N25
-    N25 --> N26
-    N25 --> N27
-    N0 --> N28
-    N27 --> N29
-    N29 --> N30
-    N29 --> N31
-    N4 --> N31
-    N31 --> N32
-    N26 --> N32
-    N29 --> N33
-    N43 --> N33
-    N33 --> N34
+    N24 --> N5
+    N5 --> N6
+    N3 --> N8
+    N24 --> N8
+    N2 --> N9
+    N9 --> N10
+    N5 --> N10
+    N9 --> N11
+    N9 --> N12
+    N9 --> N13
+    N2 --> N14
+    N13 --> N15
+    N14 --> N15
+    N2 --> N16
+    N16 --> N17
+    N16 --> N18
+    N2 --> N19
+    N19 --> N20
+    N5 --> N20
+    N19 --> N21
+    N5 --> N21
+    N13 --> N22
+    N6 --> N23
+    N7 --> N23
+    N10 --> N23
+    N11 --> N23
+    N12 --> N23
+    N15 --> N23
+    N17 --> N23
+    N18 --> N23
+    N20 --> N23
+    N21 --> N23
+    N33 --> N23
+    N45 --> N23
+    N24 --> N25
+    N2 --> N26
+    N29 --> N26
+    N26 --> N27
+    N26 --> N28
+    N0 --> N29
+    N28 --> N30
+    N30 --> N31
+    N30 --> N32
+    N5 --> N32
+    N32 --> N33
+    N27 --> N33
+    N30 --> N34
+    N44 --> N34
     N34 --> N35
-    N37 --> N35
-    N1 --> N36
-    N36 --> N37
-    N4 --> N37
-    N43 --> N37
-    N29 --> N38
-    N4 --> N38
-    N1 --> N39
-    N1 --> N40
-    N39 --> N41
-    N8 --> N41
-    N40 --> N41
-    N25 --> N41
-    N4 --> N41
+    N35 --> N36
+    N38 --> N36
+    N2 --> N37
+    N37 --> N38
+    N5 --> N38
+    N44 --> N38
+    N30 --> N39
+    N5 --> N39
+    N2 --> N40
+    N2 --> N41
+    N40 --> N42
+    N9 --> N42
     N41 --> N42
-    N29 --> N42
-    N35 --> N44
-    N38 --> N44
-    N42 --> N44
-    N44 --> N45
-    N34 --> N46
-    N37 --> N46
-    N44 --> N47
-    N44 --> N48
-    N5 --> N49
-    N6 --> N49
-    N7 --> N49
-    N22 --> N50
-    N21 --> N50
-    N24 --> N51
-    N45 --> N51
-    N46 --> N51
-    N47 --> N51
-    N48 --> N51
-    N32 --> N51
-    N30 --> N51
+    N26 --> N42
+    N5 --> N42
+    N42 --> N43
+    N30 --> N43
+    N36 --> N45
+    N39 --> N45
+    N43 --> N45
+    N1 --> N45
+    N45 --> N46
+    N35 --> N47
+    N38 --> N47
+    N45 --> N48
+    N45 --> N49
+    N6 --> N50
+    N7 --> N50
+    N8 --> N50
+    N23 --> N51
+    N22 --> N51
+    N25 --> N52
+    N46 --> N52
+    N47 --> N52
+    N48 --> N52
+    N49 --> N52
+    N33 --> N52
+    N31 --> N52
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -301,7 +305,7 @@ flowchart LR
 | DEC-13 Object and history reads | Chosen: one `cat-file --batch` reader per command, answering one request at a time because snapshot export discovers assets after reading documents; presence through one `--batch-check`. Diffs keep the in-Rust `similar` rendering for byte-identical output. History is one `git log`, and its merge and deletion semantics change, as stated in `document-history-through-module`. The server image gains git first (`server-image-git-cli`). Rejected: a write-all-then-read batch only, which cannot serve snapshot's second round in one process; `git diff` output, which is not byte-identical. |
 | DEC-14 Snapshot export | Chosen: commits through `resolve_commit`, files through one reader with the blob id as `blob_sha`, origin through `git remote get-url origin`, branch through `Head::branch_label()`, and dirtiness through `git-dirty-paths`, which no longer counts ignored files. Rejected: `git archive` (no per-file object id, reads the whole tree); `ls-tree` (ids without bytes). |
 | DEC-15 Linkage proof | Chosen: `drop-libgit2` asserts the manifest and lock facts in `dependency_feature_policy_tests.rs`, and `binary-linkage-budget-check` makes `scripts/rust-build-budget.sh` fail on a dynamic dependency on libgit2, libssl or libcrypto, through an injectable listing with fixtures. Rejected: an `ldd` assertion inside a Rust test, since the build-policy script is where linkage policy runs. |
-| DEC-16 Git test fixtures | Chosen: `git-test-fixtures` in `jit::test_harness`. The libgit2-built document fixture moves in `git-cli-test-fixture`, the snapshot unit test in `snapshot-metadata-through-module`, and both local counting wrappers in `pinned-counting-wrappers-converge`, before the pinned reads move into the module, so the stand-in's prefix-stripped records keep their assertions unchanged. Rejected: converging the other local `git()` helpers here; that is unrelated test churn. |
+| DEC-16 Git test fixtures | Chosen: `git-test-fixtures` in `jit::test_harness`. The libgit2-built document fixture moves in `document-fixture-off-libgit2`, which `drop-libgit2` follows, the snapshot unit test in `snapshot-metadata-through-module`, and both local counting wrappers in `pinned-counting-wrappers-converge`, before the pinned reads move into the module, so the stand-in's prefix-stripped records keep their assertions unchanged. Rejected: converging the other local `git()` helpers here; that is unrelated test churn. |
 | DEC-17 No-git behaviour | Chosen: the typed mapping in `claims-head-lookup`, and `no-git-command-tests` for the no-executable condition. The outside-repository condition keeps its existing owners (`profile_no_git_lifecycle_tests.rs`, `claim_integration_tests.rs`, `@/inv/orthogonal-tests`). |
 | DEC-18 Detached HEAD | Accepted: `git-head` returns no branch name on a detached HEAD, and `Head::branch_label()` renders it as `HEAD`; consumers that record a branch keep today's values, so only init's recorded branch for detached or commit-less repositories changes (`init-identity-head-lookup`). |
 | DEC-19 Cutover sink | Chosen: every root with no other upstream edge follows 842b0ac6's sink 63c11d08 (single-domain-module-paths), whose crate-wide domain path move would otherwise conflict textually. External dependency 63c11d08 → `git-cli-test-fixture`, `hooks-install-from-layout`, `server-image-git-cli`. `head-tier-removal` reaches it through its 2195c98f edges, and every other entry through a root. Rejected: roots with no upstream edge. |
@@ -309,7 +313,7 @@ flowchart LR
 | DEC-21 Base comparison outcome | Chosen: `git-base-comparison` returns `Compared`, `BaseUnresolved` or `NoMergeBase`. `branch-drift-through-module` states a message and exit 1 for each outcome and for a missing checkout, with asserting tests, and `main-history-guard-through-module` allows on every outcome but a diverged `Compared`. Rejected: one `None` with one stated error, which hides distinct outcomes. |
 | DEC-22 `doc show` error contract | Chosen: 22189592 owns the classification of path-read failures. External dependency 22189592 → `pinned-path-reads-through-module`; `document-show-reads-storage` follows it through that entry, since a direct edge would be redundant. `document-show-reads-storage` keeps the contract 22189592 establishes and states it with asserting tests (`--at` an unresolvable revision and a pinned path absent at its commit both report the document-not-found code with exit 3). Rejected: re-owning the classification here, or landing first and changing the contract under 22189592. |
 | Terminal sizing | Each terminal delivers one class (new primitive, caller migration, bridge, deletion, test relocation or docs) with at most four criteria. The revision-reader move is split into the module primitive with its bridge, storage migration, suite relocation, archive migration, bridge removal and pinned-inspection convergence; the user-name, origin-URL and path-history queries land as primitives before their consumers. Entries that delete a private function their migration leaves uncalled state that build reason in Background. |
-| Investigation corrections | C7: gate execution starts two processes, both removed by `gate-evidence-through-module`. C10: no production `git_program` setting exists; DEC-07 covers it. Missed sites: `read_path_bytes` → `pinned-path-reads-through-module`; the `snapshot.rs` git2 unit test → `snapshot-metadata-through-module`; `document_event_log_tests.rs` → `git-cli-test-fixture`; `archive.rs`'s literal-`git` resolver → bridge, then `archive-pinned-reads-batched` and `git-revision-bridge-removal`. |
+| Investigation corrections | C7: gate execution starts two processes, both removed by `gate-evidence-through-module`. C10: no production `git_program` setting exists; DEC-07 covers it. Missed sites: `read_path_bytes` → `pinned-path-reads-through-module`; the `snapshot.rs` git2 unit test → `snapshot-metadata-through-module`; `document_event_log_tests.rs` → `document-fixture-off-libgit2`; `archive.rs`'s literal-`git` resolver → bridge, then `archive-pinned-reads-batched` and `git-revision-bridge-removal`. |
 | Behaviour changes | Each change is stated with its asserting test in the owning entry: a `.git` directory classified as outside version control; server layout from `--data-dir`; hooks follow the selected data root; init identity branch in detached and commit-less repositories; gate evidence from the selected worktree, none in memory; a locally deleted issue stays deleted by full id; unpinned `doc show` reads the working tree; history lists deletions and drops merges identical to a parent; snapshot dirtiness ignores ignored files.; worktree info and list, branch drift and lease validation name their no-git and missing-fact failures instead of quoting git's stderr; `doc show` read failures take the path-read codes (DEC-22); a submodule path no longer counts as a present asset |
 | Container identity | Git refuses a repository its process user does not own, so a container that runs as the default `10001` identity over a host-owned mount probes as non-git and serves without history. The documented deployment maps the owner onto the container identity, which passes git's check. Chosen: no `safe.directory` override in the image. |
 | Interim server window | `pinned-path-reads-through-module` and `document-history-through-module` follow `server-image-git-cli`, so the image carries git before any server path depends on it. |
