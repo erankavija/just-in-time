@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1dd53a5b9f9b5dd24667f52ad31ed257eeeed8f9",
+  "completed_at": "2026-10-21T21:12:24.578041719Z",
+  "duration_ms": 116629,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard success criteria are satisfied by the attributable current tree and recorded cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f50b26db-e846-421a-bd47-0d949082166f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T21:10:27.948541177Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 467a8181f, 0df007081, 720eea747, and merge 1dd53a5b9 (`jit:494f1d4b`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/3d9a0ce3/requirement/REQ-02 (issue description, markdown-first); @/gate/cargo-ci (.jit/gates.toml, registry-first); @/invariant/no-ignored-tests, @/invariant/bounded-rust-build-footprint, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, executed at 1dd53a5b9)\nTruncation recovery: path-scoped commit patches, current script line ranges, self-test wiring, projection source/target, and gate-result reads\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard success criteria are satisfied by the attributable current tree and recorded cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

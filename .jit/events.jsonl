@@ -18519,3 +18519,11 @@
 {"assignee":"agent:worker","id":"1ea78447-e953-47e6-b87e-cdc5e616c2b3","issue_id":"fbb661f2-31f6-476f-b125-1cd6bcfdbd7c","timestamp":"2026-10-21T21:07:44.075377494Z","type":"issue_claimed"}
 {"assignee":"agent:jit-execution-lead","id":"0a4128d8-22f4-4074-9ff0-4a814b94fdd3","issue_id":"cd7b6c4a-5555-48a5-b9a9-b3ba19441015","timestamp":"2026-10-21T21:07:54.314194619Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"67541726-1da4-4fd2-ba8d-7eaa4ab5f674","issue_id":"cd7b6c4a-5555-48a5-b9a9-b3ba19441015","timestamp":"2026-10-21T21:08:00.094383303Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"86486b35-85f8-411f-9788-983f618515c7","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T21:09:03.581437158Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"9a859715-7217-40a4-8c64-fa59b61b0d5c","issue_id":"1a989754-d48c-409a-a796-dee1671f800a","timestamp":"2026-10-21T21:10:08.118676654Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"1978ac20-b020-4e80-a71f-18664940473c","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T21:12:24.803369778Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"in_progress","id":"be49fa88-c366-488f-8033-308716990c4c","issue_id":"1a989754-d48c-409a-a796-dee1671f800a","timestamp":"2026-10-21T21:12:30.018026977Z","to":"done","type":"issue_state_changed"}
+{"id":"66cd53ec-34fa-4d30-acd4-6356b9cf8aaa","issue_id":"1a989754-d48c-409a-a796-dee1671f800a","timestamp":"2026-10-21T21:12:30.018026977Z","type":"issue_completed"}
+{"from":"backlog","id":"ffe9b21a-9511-42ee-969d-5adab3827a9b","issue_id":"f866d9d8-384e-4b5e-9616-78bfa5e1b440","timestamp":"2026-10-21T21:12:30.128463009Z","to":"ready","type":"issue_state_changed"}
+{"from":"in_progress","id":"9d4e1420-6870-4b37-9609-968667f11540","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T21:12:30.406122201Z","to":"done","type":"issue_state_changed"}
+{"id":"cb63c66c-8fe6-4e66-980d-52d83f8b85f1","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T21:12:30.406122201Z","type":"issue_completed"}

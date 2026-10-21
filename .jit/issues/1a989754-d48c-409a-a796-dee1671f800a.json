@@ -8,6 +8,7 @@
   ],
   "description": "A profile selector is a bare package directory path: the `id:` and `path:` selector tags, the `profile show` id argument and its `applied` field are removed.\n\n## Background\n\nA `--profile` selector today carries a tag (`ProfileSelector`, `crates/jit/src/commands/profile.rs:120`): `id:NAME` resolves a package only through the applied record (`profile.rs:546-559`), and `path:DIR` reads a package directory. Charter decision D-8 deletes the records, so `id:` has no resolution route left. Redefining `id:` over a declared packages root was considered and rejected: it adds mechanism where a path already names the package (`@/charter/D-18`). With `id:` gone, `path:` is a prefix with one alternative, so it goes too and a selector is the directory path itself. `profile show` takes an id argument and prints an `applied` field (`ProfileShowEntry.applied` in `crates/jit/src/profile/application.rs`).\n\nCallers select with tags in several places:\n\n- Three skills (`.agents/skills/jit-manage/SKILL.md:82`, `.agents/skills/jit-migrate/SKILL.md:26`, `.agents/skills/jit-project-lead/SKILL.md:200`).\n- The release workflow's dry run (`.github/workflows/release-artifacts.yml:270`).\n- Failure-lever arms (`crates/jit/tests/cli_issue/failure_lever_registry.toml:696,705,714,887`), checked by the failure-probe coverage test.\n- The acceptance tests and MCP integration tests (`crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs:288`, `mcp-server/test-integration.js`).\n\nLine numbers are at the investigation baseline. The selector type keeps one variant here; unwrapping it into the path it holds is separate work.\n\n## Success Criteria\n\n- [hard] REQ-01: A selector is read as a package directory path; an argument beginning `id:` or `path:` is refused with an error that names the bare-path form.\n- [hard] REQ-02: The selector's id variant and its resolution through applied records are gone from the source.\n- [hard] REQ-03: `profile show` accepts a package path only, and its output has no `applied` field.\n- [hard] REQ-04: The skills, the release workflow, the failure-lever arms and the MCP integration tests select packages by bare path, and the failure-probe coverage and MCP tests pass.\n",
   "documents": [],
+  "done_at": "2026-10-21T21:12:30.018026977Z",
   "first_ready_at": "2026-10-21T16:26:02.699930441Z",
   "gates_required": [
     "cargo-ci",
@@ -22,9 +23,9 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "run_id": "bdbd0609-4298-403b-a3d6-8ccd5cd00ccc",
-      "status": "failed",
-      "updated_at": "2026-10-21T20:55:06.529197639Z",
+      "run_id": "4d22e207-dcbb-4da4-9bee-c9d845d3edab",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:10:08.118676654Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -45,7 +46,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the profile selector tags",
-  "updated_at": "2026-10-21T21:05:59.439623684Z"
+  "updated_at": "2026-10-21T21:12:30.018026977Z"
 }
