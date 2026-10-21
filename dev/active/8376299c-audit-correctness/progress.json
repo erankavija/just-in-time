@@ -1,7 +1,7 @@
 {
   "epic_id": "8376299c-f9e1-4b7b-be62-27af493f6969",
   "epic_short_id": "8376299c",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -12,7 +12,7 @@
           "title": "Issue update and reject apply all requested changes atomically or none",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged; cargo-ci passed; REQ-02 amended per steward; code-review running"
+          "status": "done"
         },
         {
           "id": "d7d0d0db-05dd-4954-805a-3564cf7af4a6",
@@ -29,7 +29,7 @@
           "title": "Remove the inert coordination timing keys",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged (18a1e3ea4, new scope); cargo-ci passed; code-review running",
+          "status": "done",
           "note": "same worker as d7d0d0db, committed after it; rescoped mid-wave by user decision (D-18) to delete the three coordination timing keys; worker redirected"
         },
         {
@@ -38,7 +38,7 @@
           "title": "Server serves storage reads when started with a relative data directory",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged; cargo-ci passed; code-review running"
+          "status": "done"
         },
         {
           "id": "cd2ed136-84ce-46c7-9741-b4d167ed540d",
@@ -54,7 +54,7 @@
           "title": "Batch update filter panics on non-ASCII query text",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 (opus): code-review F1 proptest strategy excludes newlines"
+          "status": "code-review passed after rework 1; cargo-ci rerun under shared lock (load-only failures)"
         },
         {
           "id": "34999aad-b3c6-4664-b80d-bf5a548f9200",
@@ -99,7 +99,7 @@
           "title": "Config show misreports the lease enforcement mode that commands apply",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
+          "status": "dispatched (focused checks only; lead runs full gate)",
           "note": "after d92f54aa: config.rs/config_manager.rs"
         },
         {
@@ -108,7 +108,7 @@
           "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "pending: dispatch frozen by steward resource policy",
           "note": "after 2d10f1dd: commands/issue.rs"
         },
         {
@@ -117,7 +117,7 @@
           "title": "Apply the claim-next filter when choosing which issue to claim",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "dispatched (focused checks only; lead runs full gate)",
           "note": "after 2d10f1dd: commands/issue.rs, main.rs"
         },
         {
@@ -126,7 +126,7 @@
           "title": "Accept namespace wildcards in issue search label filters",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending",
+          "status": "dispatched (focused checks only; lead runs full gate)",
           "note": "after 34999aad: search paths"
         }
       ]
@@ -184,5 +184,6 @@
     "Worker worktrees grow to ~17-23 GB each after a full cargo-ci; cap parallel workers by free disk.",
     "Main checkout is shared with other sessions: commit only this epic's paths (git add --pathspec-from-file), never git add .jit wholesale.",
     "Redirect messages to a running worker can be missed: w-d7d0d0db implemented d92f54aa's superseded scope despite a redirect; verify commit scope on return."
-  ]
+  ],
+  "resource_policy": "Steward (binding, 2026-10-21): no new worker worktree until df shows >=100 GB free; at most 2 live worker worktrees for this lead; every full cargo-ci gate runs under `flock /tmp/jit-full-ci.lock`; a budget-only failure under load is rerun under the lock, not treated as a code finding."
 }
