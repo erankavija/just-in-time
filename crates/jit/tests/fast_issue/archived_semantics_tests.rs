@@ -240,13 +240,16 @@ fn test_rollup_folds_archived_by_terminal_origin() {
     archive(&h, &parked);
 
     let rollup = StateRollup::from_issues(&h.all_issues());
-    assert_eq!(rollup.total, 3);
+    assert_eq!(rollup.extras.total, 3);
     // Archived-from-Done counts as delivered, archived-from-Rejected as rejected,
     // archived-from-non-terminal as open.
-    assert_eq!(rollup.done, 1, "archived-from-done is delivered");
-    assert_eq!(rollup.rejected, 1, "archived-from-rejected is rejected");
-    assert_eq!(rollup.open, 1, "archived-from-non-terminal is open");
-    assert_eq!(rollup.percent, 33);
+    assert_eq!(rollup.extras.done, 1, "archived-from-done is delivered");
+    assert_eq!(
+        rollup.extras.rejected, 1,
+        "archived-from-rejected is rejected"
+    );
+    assert_eq!(rollup.extras.open, 1, "archived-from-non-terminal is open");
+    assert_eq!(rollup.extras.percent, 33);
 }
 
 #[test]

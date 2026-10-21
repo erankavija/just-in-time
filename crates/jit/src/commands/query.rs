@@ -232,11 +232,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// // No label filter aggregates the whole repository.
     /// let rollup = executor.query_count_by_state(&[]).unwrap();
-    /// assert_eq!(rollup.total, 2);
-    /// assert_eq!(rollup.done, 1);
-    /// assert_eq!(rollup.percent, 50);
+    /// assert_eq!(rollup.extras.total, 2);
+    /// assert_eq!(rollup.extras.done, 1);
+    /// assert_eq!(rollup.extras.percent, 50);
     /// // Every lifecycle state has a bucket, zero-count states included.
-    /// assert_eq!(rollup.by_state.len(), State::all().len());
+    /// assert_eq!(rollup.items.len(), State::all().len());
     /// ```
     pub fn query_count_by_state(
         &self,

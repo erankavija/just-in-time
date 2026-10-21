@@ -567,19 +567,13 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     Err(failure) => {
                         return Ok(SessionStep::Done((
                             Err(failure),
-                            crate::output::DivergenceResponse {
-                                count: 0,
-                                divergences: Vec::new(),
-                            },
+                            crate::output::DivergenceResponse::new(Vec::new()),
                         )));
                     }
                 };
                 let divergences =
                     captured_divergences(&captured.image, captured.declarations.config())
-                        .unwrap_or_else(|_| crate::output::DivergenceResponse {
-                            count: 0,
-                            divergences: Vec::new(),
-                        });
+                        .unwrap_or_else(|_| crate::output::DivergenceResponse::new(Vec::new()));
                 let report =
                     crate::validation::repository::validate_repository_with_materializations(
                         &captured.image,
@@ -743,10 +737,7 @@ fn captured_divergences(
             }
         })
         .collect::<Vec<_>>();
-    Ok(DivergenceResponse {
-        count: divergences.len(),
-        divergences,
-    })
+    Ok(DivergenceResponse::new(divergences))
 }
 
 /// Effective-bytes byte source over a captured image and a proposed overlay.

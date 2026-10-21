@@ -365,11 +365,12 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(crate::output::ArtifactConformanceEntry::from)
             .collect::<Vec<_>>();
 
-        Ok(crate::output::ArtifactConformanceResponse {
-            areas: listings.into_iter().map(|(area, _)| area).collect(),
-            count: artifacts.len(),
+        Ok(crate::output::ArtifactConformanceResponse::with_extras(
             artifacts,
-        })
+            crate::output::ConformanceScope {
+                areas: listings.into_iter().map(|(area, _)| area).collect(),
+            },
+        ))
     }
 
     pub fn remove_document_reference(

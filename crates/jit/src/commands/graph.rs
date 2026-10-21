@@ -480,8 +480,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// executor.add_dependency(&epic, &task).unwrap();
     ///
     /// let response = executor.resolve_hierarchy_tree(None).unwrap();
-    /// assert_eq!(response.count, 2);
-    /// let epic_view = response.nodes.iter().find(|n| n.id == epic).unwrap();
+    /// assert_eq!(response.count(), 2);
+    /// let epic_view = response.items.iter().find(|n| n.id == epic).unwrap();
     /// assert_eq!(epic_view.hierarchy.children, vec![task.clone()]);
     /// assert_eq!(epic_view.hierarchy.parent, None);
     /// ```
@@ -529,11 +529,10 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect();
         nodes.sort_by(|a, b| a.short_id.cmp(&b.short_id));
 
-        Ok(GraphTreeResponse {
-            root: root_id,
-            count: nodes.len(),
+        Ok(GraphTreeResponse::with_extras(
             nodes,
-        })
+            crate::output::TreeRoot { root: root_id },
+        ))
     }
 
     /// Report membership labels that disagree with DAG-resolved containment
@@ -574,8 +573,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// let report = executor.detect_divergences().unwrap();
-    /// assert_eq!(report.count, 1);
-    /// assert_eq!(report.divergences[0].label, membership);
+    /// assert_eq!(report.count(), 1);
+    /// assert_eq!(report.items[0].label, membership);
     /// ```
     pub fn detect_divergences(&self) -> Result<crate::output::DivergenceResponse> {
         use crate::output::{DivergenceResponse, DivergenceView};
@@ -602,10 +601,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             })
             .collect::<Vec<_>>();
 
-        Ok(DivergenceResponse {
-            count: views.len(),
-            divergences: views,
-        })
+        Ok(DivergenceResponse::new(views))
     }
 }
 

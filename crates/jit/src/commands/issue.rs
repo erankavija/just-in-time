@@ -369,10 +369,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// executor.add_dependency(&epic, &child).unwrap();
     ///
     /// let response = executor.issue_children(&epic).unwrap();
-    /// assert_eq!(response.container.title, "Epic");
-    /// assert_eq!(response.count, 1);
-    /// assert_eq!(response.issues[0].title, "Child");
-    /// assert!(response.dangling.is_empty());
+    /// assert_eq!(response.extras.container.title, "Epic");
+    /// assert_eq!(response.count(), 1);
+    /// assert_eq!(response.items[0].title, "Child");
+    /// assert!(response.extras.dangling.is_empty());
     /// ```
     pub fn issue_children(&self, id: &str) -> Result<crate::output::IssueChildrenResponse> {
         let container = self.show_issue(id)?;
@@ -384,12 +384,13 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect::<Result<Vec<_>>>()?;
         issues.sort_by(|a, b| a.short_id.cmp(&b.short_id));
 
-        Ok(crate::output::IssueChildrenResponse {
-            container: crate::output::ContainerHeader::from(&container),
-            count: issues.len(),
+        Ok(crate::output::IssueChildrenResponse::with_extras(
             issues,
-            dangling,
-        })
+            crate::output::ChildrenScope {
+                container: crate::output::ContainerHeader::from(&container),
+                dangling,
+            },
+        ))
     }
 
     /// Build the `jit issue progress` response: the counts-by-state rollup over
@@ -429,9 +430,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///     .unwrap();
     ///
     /// let progress = executor.issue_progress(&epic).unwrap();
-    /// assert_eq!(progress.rollup.total, 2);
-    /// assert_eq!(progress.rollup.done, 1);
-    /// assert_eq!(progress.rollup.percent, 50);
+    /// assert_eq!(progress.rollup.extras.total, 2);
+    /// assert_eq!(progress.rollup.extras.done, 1);
+    /// assert_eq!(progress.rollup.extras.percent, 50);
     /// assert!(progress.dangling.is_empty());
     /// ```
     pub fn issue_progress(&self, id: &str) -> Result<crate::output::ContainerProgressResponse> {
