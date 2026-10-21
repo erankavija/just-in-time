@@ -3802,7 +3802,7 @@ timestamp is unrecoverable, not defaulted.
 Resolve a dotted key against the WHOLE configuration surface — type
 hierarchy, label namespaces, item kinds, documentation paths, validation
 settings, project identity, schema version, and the system/user/repo-layered
-worktree/coordination/lock/event settings — via a generic path walk over the
+worktree and coordination settings — via a generic path walk over the
 config, not a hand-maintained list of recognised keys.
 
 **Usage:**
@@ -3834,14 +3834,15 @@ jit config get documentation --json
 # {"key": "documentation", "value": {"development_root": "dev", ...}}
 
 # The layered settings resolve through their precedence chain
-# (env var, then repo, then user, then system, then default).
-jit config get worktree.mode
+# (repo, then user, then system, then default); worktree.enforce_leases
+# reads the repo config only.
+jit config get worktree.enforce_leases
 jit config get coordination.max_indefinite_leases_per_agent
 ```
 
 **Two resolution strategies**, matching how the rest of jit already reads
 these sections — `config get` does not invent a third:
-- `worktree`, `coordination`, `global_operations`, `locks`, `events`: the
+- `worktree`, `coordination`: the
   system/user/repo-merged, default-filled view (same as `jit config show`).
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
   `documentation`, `namespaces`, `item_kinds`, `projection`): read from the
@@ -3867,9 +3868,8 @@ segment and its resolved parent path.
 ```bash
 jit config get bogus_section
 # Error: unknown config key 'bogus_section'; valid top-level sections:
-# coordination, documentation, events, global_operations,
-# item_kinds, locks, namespaces, project, projection,
-# type_hierarchy, validation, version, worktree
+# coordination, documentation, item_kinds, namespaces, project,
+# projection, type_hierarchy, validation, version, worktree
 
 jit config get documentation.bogus_field
 # Error: unknown config key 'documentation.bogus_field': no 'bogus_field'

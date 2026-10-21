@@ -141,7 +141,7 @@ fn test_config_validate_reports_invalid_project_name() {
         .args(["config", "validate"])
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
         .output()
         .expect("failed to run jit config validate");
 
@@ -169,12 +169,15 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
 
     let config_path = temp.path().join(".jit/config.toml");
     fs::write(&config_path, "[project]\nname = \"1abc\"\n").unwrap();
+    let home = temp.path().join("isolated-home");
+    fs::create_dir_all(home.join(".config/jit")).unwrap();
+    fs::write(home.join(".config/jit/config.toml"), "not = valid = toml").unwrap();
 
     let out = Command::new(jit_binary())
         .args(["config", "validate", "--json"])
         .current_dir(temp.path())
-        .env("HOME", temp.path().join("isolated-home"))
-        .env("JIT_WORKTREE_MODE", "not-a-worktree-mode")
+        .env("HOME", &home)
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
         .output()
         .expect("failed to run jit config validate --json");
 
@@ -191,7 +194,7 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
         .as_array()
         .expect("validation details carry an errors array");
     assert_eq!(errors.len(), 2, "every actionable finding is retained");
-    for source in ["repo config", "JIT_WORKTREE_MODE"] {
+    for source in ["repo config", "user config"] {
         assert!(
             errors
                 .iter()
@@ -210,7 +213,7 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
         .args(["config", "validate"])
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
         .output()
         .expect("run valid human config validation");
     assert_eq!(human.status.code(), Some(0));
@@ -223,7 +226,7 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
         .args(["config", "validate", "--json"])
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
-        .env_remove("JIT_WORKTREE_MODE")
+        .env_remove("JIT_WORKTREE_WRITE_POLICY")
         .output()
         .expect("run valid machine-readable config validation");
     assert_eq!(json.status.code(), Some(0));

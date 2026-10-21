@@ -420,8 +420,7 @@ jit worktree info
 **Symptom:** `jit query all` returns nothing in secondary worktree.
 
 **Cause:** The aggregated read path could not find the issue in this worktree,
-Git `HEAD`, or the recognized main worktree. Visibility does not depend on a
-`worktree.mode` runtime switch.
+Git `HEAD`, or the recognized main worktree.
 
 **Solutions:**
 
