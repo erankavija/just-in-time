@@ -2,7 +2,9 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
-  "dependencies": [],
+  "dependencies": [
+    "b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54"
+  ],
   "description": "Remove the git `HEAD` tier from issue reads, so reading issues starts no git process and loads no git object in any checkout, and a locally deleted issue stays deleted.\n\n## Background\n\n- Issue reads aggregate three sources: the checkout's own data root, the data root's files in the `HEAD` tree, and, in a linked checkout, the primary checkout's data root. `load_aggregated_index` (`crates/jit/src/storage/json.rs:752-803`) merges `load_index_from_git` (`crates/jit/src/storage/json.rs:822-863`), which opens libgit2 on every aggregated read, including in a primary checkout. `load_issue` (`crates/jit/src/storage/json.rs:1176-1214`) and `load_issue_or_not_found` (`crates/jit/src/storage/json.rs:1216-1254`) fall back to `load_issue_from_git` (`crates/jit/src/storage/json.rs:891-919`), one `git show` process per missing issue with the literal `git`.\n- The data root's own `.gitignore` ignores only `/tmp/`, so `index.json` and the issue records are tracked, and every checkout already has its `HEAD` tree's records on disk. The `HEAD` tier adds a record only when it is committed and absent from the checkout's files: an uncommitted local deletion.\n- Reproduced in a primary checkout: after committing an issue and deleting it with `JIT_ALLOW_DELETION=1 jit issue delete`, `jit issue show <full-id>` still returns it from `HEAD` through the full-id fast path of `resolve_issue_id` (`crates/jit/src/storage/json.rs:1256-1267`), while `jit issue show <prefix>` reports not found and `jit query all` lists nothing.\n- Tier tests: `crates/jit/src/storage/json.rs:2336`, `:2424`, `:2466`, `:2490`, `:2530`, `:2694`, `:2742`. CLI: `test_issue_show_reads_from_git_in_secondary_worktree` (`crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs:86`) passes without the tier, and `test_query_all_shows_issues_from_all_sources` (`:184`) names git in its messages.\n- `IssueNotFoundError::AcrossSources` reads \"not found in local storage, git, or main worktree\" (`crates/jit/src/storage/errors.rs:35`).\n\n## Success Criteria\n\n- [hard] REQ-01: Issue and index reads use the checkout's own data root and, in a linked checkout, the primary checkout's data root. `load_index_from_git` and `load_issue_from_git` no longer exist, and `storage/json.rs` reads issues through no git process or object.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: a committed issue deleted locally is not found by its full id, just as it is not found by prefix or in listings.\n- [hard] REQ-03: The unit tests of the `HEAD` tier are deleted; the precedence tests keep local over primary checkout. The secondary-worktree CLI test is renamed for what it proves (an issue committed before the linked checkout was made is read from that checkout's own store), and no CLI assertion message names git as a read source.\n- [hard] REQ-04: Rustdoc and the not-found message name only the checkout's own store and the primary checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T15:43:27.849030738Z",
@@ -24,7 +26,7 @@
     "satisfies:f4d9502a/REQ-06"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "backlog",
   "title": "Issue reads stop consulting git HEAD",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-10-21T15:43:43.099487610Z"
 }

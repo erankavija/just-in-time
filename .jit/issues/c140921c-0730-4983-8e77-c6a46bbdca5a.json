@@ -6,6 +6,7 @@
     "3a3b86cf-1aee-416a-88c9-e3ab8cdbe124",
     "46a89061-8383-42e0-b20a-a92406f33fcb",
     "4ba18af4-dcf3-480d-a785-40dc4533349c",
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
     "bb5040a8-1341-4e8e-ac13-6eef116574f4",
     "d68150e2-d10c-4213-9056-9ce6b80f7d11"
   ],
@@ -30,5 +31,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Snapshot source and repository facts come from the module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-10-21T15:43:44.802320656Z"
 }

@@ -3,6 +3,7 @@
   "context": {},
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
+    "22189592-0133-4465-b850-3f6ffff129b7",
     "810e32d4-2922-4837-a100-58ab13ef0161",
     "d48e28bf-e001-4f50-9f01-44c97cc8658c"
   ],
@@ -28,5 +29,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Path reads at a commit go through the git module",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-10-21T15:43:47.070591659Z"
 }

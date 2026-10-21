@@ -161,7 +161,7 @@
           "title": "Require archived_from on archived issue records",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "awaiting-merge"
+          "status": "rework-dispatched"
         },
         {
           "id": "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
@@ -239,7 +239,7 @@
           "title": "Remove inert configuration keys",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -429,7 +429,8 @@
   ],
   "rework_counts": {
     "0ec8b001": 1,
-    "66bd4b5c": 0
+    "66bd4b5c": 0,
+    "9aa54649": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",

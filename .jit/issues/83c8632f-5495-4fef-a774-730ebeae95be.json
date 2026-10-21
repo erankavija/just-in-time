@@ -4,6 +4,7 @@
   "created_at": "2026-10-21T15:43:27.849030738Z",
   "dependencies": [
     "810e32d4-2922-4837-a100-58ab13ef0161",
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
     "cc9f213e-7683-47a5-91fe-fedbba10043b",
     "d68150e2-d10c-4213-9056-9ce6b80f7d11"
   ],
@@ -29,5 +30,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Document history comes from the module's path history",
-  "updated_at": "2026-10-21T15:43:27.849030738Z"
+  "updated_at": "2026-10-21T15:43:44.241229744Z"
 }
