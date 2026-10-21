@@ -22,7 +22,7 @@ use jit::cli::{
     ProfileCommands, ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
-use jit::domain::{GateRunResult, Priority, State};
+use jit::domain::{GateRunResult, IssueIdPrefix, Priority, State};
 use jit::output::failure::{
     claim_json_error, classify, command_json_error, profile_json_error, validate_fix_json_error,
 };
@@ -3131,7 +3131,7 @@ fn run() -> Result<()> {
                 }
                 IssueCommands::Assign { id, assignee, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&id)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     let warnings = executor.assign_issue(&full_id, assignee)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -3160,7 +3160,7 @@ fn run() -> Result<()> {
                     json,
                 } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&id)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
 
                     if assign_only {
                         // Assign without transitioning state: reuse the same
@@ -3228,7 +3228,7 @@ fn run() -> Result<()> {
                 }
                 IssueCommands::Unassign { id, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&id)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     let warnings = executor.unassign_issue(&full_id)?;
                     for warning in warnings {
                         output_ctx.print_warning(&warning)?;
@@ -3245,7 +3245,7 @@ fn run() -> Result<()> {
                 }
                 IssueCommands::Reject { id, reason, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&id)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
 
                     for warning in executor.reject_issue(&full_id, reason.as_deref())? {
                         output_ctx.print_warning(&warning)?;
@@ -3267,7 +3267,7 @@ fn run() -> Result<()> {
                 }
                 IssueCommands::Release { id, reason, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
-                    let full_id = storage.resolve_issue_id(&id)?;
+                    let full_id = storage.resolve_issue_id(&IssueIdPrefix::parse(&id)?)?;
                     executor.release_issue(&full_id, &reason)?;
 
                     if json {
@@ -4116,9 +4116,13 @@ fn run() -> Result<()> {
                     // two positionals are almost certainly swapped, so emit an
                     // actionable did-you-mean rather than misparsing into
                     // "issue not found".
-                    if executor.storage().resolve_issue_id(&id).is_err() {
-                        let gate_key_is_issue =
-                            executor.storage().resolve_issue_id(&gate_key).is_ok();
+                    let is_issue = |raw: &str| {
+                        IssueIdPrefix::parse(raw).is_ok_and(|prefix| {
+                            executor.storage().resolve_issue_id(&prefix).is_ok()
+                        })
+                    };
+                    if !is_issue(&id) {
+                        let gate_key_is_issue = is_issue(&gate_key);
                         let id_is_gate = executor
                             .list_gates()
                             .map(|gates| gates.iter().any(|g| g.key == id))
@@ -7567,7 +7571,12 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_status(&worktree_paths, issue.as_deref(), agent.as_deref()) {
+                match execute_claim_status(
+                    &storage,
+                    &worktree_paths,
+                    issue.as_deref(),
+                    agent.as_deref(),
+                ) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());

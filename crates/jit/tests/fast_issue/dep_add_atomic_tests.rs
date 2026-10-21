@@ -103,7 +103,7 @@ fn test_multiple_invalid_edges_are_all_named() {
 
 /// Rejections are rendered in request order, not grouped by the validation
 /// phase that discovered them. Here the first target fails graph validation
-/// after the later target has already failed prefix resolution.
+/// after the later target has already failed to resolve.
 #[test]
 fn test_mixed_batch_rejections_preserve_request_order() {
     let h = TestHarness::new();
@@ -116,10 +116,10 @@ fn test_mixed_batch_rejections_preserve_request_order() {
         .executor
         .add_dependencies_with_policy(
             &a,
-            &[cycle_target.clone(), "bad".to_string()],
+            &[cycle_target.clone(), "zzzz".to_string()],
             jit::commands::RedundancyPolicy::Reject,
         )
-        .expect_err("both the earlier cycle and later invalid prefix must reject the batch");
+        .expect_err("both the earlier cycle and later unresolved id must reject the batch");
     let rejected = error
         .downcast_ref::<DependencyBatchRejectedError>()
         .expect("must be a typed batch rejection")
@@ -128,7 +128,7 @@ fn test_mixed_batch_rejections_preserve_request_order() {
         .map(|(target, _)| target.as_str())
         .collect::<Vec<_>>();
 
-    assert_eq!(rejected, vec![cycle_target.as_str(), "bad"]);
+    assert_eq!(rejected, vec![cycle_target.as_str(), "zzzz"]);
 }
 
 /// REQ-02 precision: a shadow-type redundancy must be attributed ONLY to the

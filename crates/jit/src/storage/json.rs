@@ -1253,11 +1253,10 @@ impl IssueStore for JsonFileStorage {
         )))
     }
 
-    fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
-        let prefix = IssueIdPrefix::parse(partial_id)?;
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String> {
         let index = self.load_aggregated_index()?;
         crate::storage::resolve_unique_issue_id(
-            &prefix,
+            prefix,
             index.all_ids.iter().map(String::as_str),
             |id| {
                 self.load_issue(id)

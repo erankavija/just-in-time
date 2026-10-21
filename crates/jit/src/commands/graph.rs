@@ -123,7 +123,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::domain::MinimalIssue;
         use crate::graph::Expansion;
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -174,7 +176,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         direction: Direction,
         depth: u32,
     ) -> Result<Vec<Issue>> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let graph = DependencyGraph::new(&issue_refs);
@@ -220,6 +224,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         full: bool,
         scope: Option<&str>,
     ) -> Result<String> {
+        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
@@ -236,7 +241,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             None
         };
 
-        let member_ids = match scope {
+        let member_ids = match &scope {
             Some(container) => {
                 let container_id = self.storage.resolve_issue_id(container)?;
                 Some(
@@ -300,11 +305,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// The returned [`BatchExport::defs`] serializes to exactly the JSON array
     /// `batch-create` consumes.
     pub fn export_graph_batch(&self, scope: Option<&str>) -> Result<BatchExport> {
+        let scope = scope.map(IssueIdPrefix::parse).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
 
         // Membership scope (the whole graph when unscoped).
-        let member_ids: Option<HashSet<String>> = match scope {
+        let member_ids: Option<HashSet<String>> = match &scope {
             Some(container) => {
                 let container_id = self.storage.resolve_issue_id(container)?;
                 let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
@@ -485,6 +491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::output::GraphTreeResponse> {
         use crate::output::{GraphTreeResponse, HierarchyNodeView};
 
+        let root = root.map(IssueIdPrefix::parse).transpose()?;
         let issues = self.storage.list_issues()?;
         let issue_refs: Vec<&Issue> = issues.iter().collect();
         let config = crate::config_manager::get_hierarchy_config(&self.storage)?;
@@ -493,7 +500,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // When scoped to a root, keep the root plus its transitive dependency
         // closure (the DAG subtree it contains). Resolution itself stays
         // repository-wide; only the listed node set is filtered.
-        let root_id = match root {
+        let root_id = match &root {
             Some(r) => Some(self.storage.resolve_issue_id(r)?),
             None => None,
         };

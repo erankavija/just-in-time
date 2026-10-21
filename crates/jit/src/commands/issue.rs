@@ -263,7 +263,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn show_issue(&self, id: &str) -> Result<Issue> {
-        let full_id = self.storage.resolve_issue_id(id)?;
+        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
         self.storage.load_issue(&full_id)
     }
 
@@ -515,7 +515,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|assignee| assignee.parse::<crate::domain::Assignee>())
             .transpose()?;
         let outcome = self.publish_captured_field_update(CapturedFieldUpdate {
-            issue_id: id.to_string(),
+            issue_id: IssueIdPrefix::parse(id)?,
             title,
             description,
             priority,
@@ -594,6 +594,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::finalize;
 
+        let id = &IssueIdPrefix::parse(id)?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("issue deletion", || {
@@ -664,7 +665,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         let outcome = self.publish_captured_state_transition(
-            id,
+            IssueIdPrefix::parse(id)?,
             new_state,
             false,
             new_state == State::Done,
@@ -688,7 +689,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             return self.update_issue_state(id, State::Rejected);
         };
         let mut request = CapturedFieldUpdate::label_edit(
-            id.to_string(),
+            IssueIdPrefix::parse(id)?,
             CapturedLabelEdit::AppendUnchecked(format!("resolution:{reason}")),
         );
         request.state = Some(State::Rejected);
@@ -703,7 +704,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
+        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -734,7 +735,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         // The captured claim owns the precheck capture/checker/recapture loop so
         // checker success and coordinator evidence cannot be applied to a
         // different source state or short-id target.
-        self.publish_captured_claim(id.to_string(), claimant)
+        self.publish_captured_claim(IssueIdPrefix::parse(id)?, claimant)
     }
 
     /// Unassign an issue.
@@ -744,7 +745,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
+        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
 
         // Collect warnings instead of printing
         let mut warnings = Vec::new();
@@ -762,8 +763,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(id)?;
-        self.publish_captured_release(full_id, reason.to_string())
+        let full_id = self.storage.resolve_issue_id(&IssueIdPrefix::parse(id)?)?;
+        self.publish_captured_release(IssueIdPrefix::of_stored(&full_id), reason.to_string())
     }
 
     /// Claim the highest-priority ready issue matching `filter`, a
@@ -816,8 +817,10 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        self.publish_captured_auto_transition(full_id, State::Ready)
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Ready)
     }
 
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`.
@@ -831,16 +834,20 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        self.publish_captured_auto_transition(full_id, State::Backlog)
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Backlog)
     }
 
     pub(super) fn auto_transition_to_done(&self, issue_id: &str) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
-        if self.publish_captured_auto_transition(full_id, State::Done)? {
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
+        if self.publish_captured_auto_transition(IssueIdPrefix::of_stored(&full_id), State::Done)? {
             // Check if any dependent issues can now transition to ready
             self.check_auto_transitions()?;
             Ok(true)
@@ -1340,7 +1347,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
 
         let error = executor
-            .publish_captured_claim(issue_id.clone(), "agent:test".parse().unwrap())
+            .publish_captured_claim(
+                IssueIdPrefix::parse(&issue_id).unwrap(),
+                "agent:test".parse().unwrap(),
+            )
             .expect_err("the graph rule must block the claim");
         assert!(
             error
@@ -1374,7 +1384,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
 
         let outcome = executor
             .publish_captured_lifecycle_mutation(CapturedLifecycleMutation::Claim {
-                issue_id: issue_id.clone(),
+                issue_id: IssueIdPrefix::parse(&issue_id).unwrap(),
                 assignee: "agent:test".parse().unwrap(),
             })
             .unwrap();
@@ -1419,7 +1429,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let executor = crate::commands::test_helpers::memory_executor(storage);
 
         let error = executor
-            .publish_captured_claim(issue_id.clone(), "agent:test".parse().unwrap())
+            .publish_captured_claim(
+                IssueIdPrefix::parse(&issue_id).unwrap(),
+                "agent:test".parse().unwrap(),
+            )
             .expect_err("the newly required manual precheck must block the claim");
 
         assert!(error
@@ -1440,14 +1453,23 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue.clone());
 
         let outcome = executor
-            .publish_captured_state_transition("abcd", State::Gated, false, false, true)
+            .publish_captured_state_transition(
+                IssueIdPrefix::parse("abcd").unwrap(),
+                State::Gated,
+                false,
+                false,
+                true,
+            )
             .unwrap();
         let mut collision =
             crate::domain::types::fixture_issue("Collision".to_string(), String::new());
         collision.id = "abcd2222222222222222222222222222".to_string();
         crate::commands::test_helpers::seed_issue(&executor.storage, collision);
 
-        assert!(executor.storage.resolve_issue_id("abcd").is_err());
+        assert!(executor
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse("abcd").unwrap())
+            .is_err());
         executor.run_postchecks(&outcome.target_id).unwrap();
         assert_eq!(outcome.target_id, issue.id);
         assert_eq!(
@@ -2510,7 +2532,10 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         let a_id = a.id.clone();
         crate::commands::test_helpers::seed_issue(&executor.storage, a);
         assert!(
-            executor.storage.resolve_issue_id(&b_id).is_err(),
+            executor
+                .storage
+                .resolve_issue_id(&IssueIdPrefix::parse(&b_id).unwrap())
+                .is_err(),
             "the missing dependency must not resolve, matching the reported bug"
         );
 

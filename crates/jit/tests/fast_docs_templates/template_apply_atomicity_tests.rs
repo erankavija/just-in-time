@@ -136,14 +136,14 @@ impl<S: IssueStore> IssueStore for PublicationProbeStore<S> {
     fn load_issue_or_not_found(&self, id: &str) -> Result<Issue, PathReadError> {
         self.inner.load_issue_or_not_found(id)
     }
-    fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
+    fn resolve_issue_id(&self, prefix: &jit::domain::IssueIdPrefix) -> Result<String> {
         assert_eq!(
             self.active_sessions.load(Ordering::SeqCst),
             0,
             "ambient issue resolution entered while a repository session was held"
         );
         self.resolve_calls.fetch_add(1, Ordering::SeqCst);
-        self.inner.resolve_issue_id(partial_id)
+        self.inner.resolve_issue_id(prefix)
     }
     fn list_issues(&self) -> Result<Vec<Issue>> {
         self.inner.list_issues()

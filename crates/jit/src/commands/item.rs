@@ -57,7 +57,7 @@ enum ResolvedItemAddress {
     /// pattern-ambiguous or matches no kind (deferring to actual-item matching,
     /// which still errors on a genuine multi-item collision).
     Issue {
-        issue_ref: String,
+        issue_ref: IssueIdPrefix,
         kind: Option<String>,
         self_id: String,
     },
@@ -354,7 +354,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                 self_id,
             } => {
                 let full_id = self.storage.resolve_issue_id(&issue_ref).with_context(|| {
-                    format!("cannot resolve issue scope '{issue_ref}' in '{qualified}'")
+                    format!(
+                        "cannot resolve issue scope '{}' in '{qualified}'",
+                        issue_ref.requested()
+                    )
                 })?;
                 let issue = self.storage.load_issue(&full_id)?;
 
@@ -432,6 +435,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     "'{qualified}' is not a qualified id; expected '<short-id>/<self-id>'"
                 ));
             };
+            let issue_ref = IssueIdPrefix::parse(issue_ref)?;
             // A self-id whose shape names exactly one issue-scoped kind fixes the
             // kind (resolution filters by kind AND self-id). A pattern-ambiguous or
             // unmatched self-id leaves the kind open and defers to actual-item
@@ -448,7 +452,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 }
             };
             return Ok(ResolvedItemAddress::Issue {
-                issue_ref: issue_ref.to_string(),
+                issue_ref,
                 kind,
                 self_id: self_id.to_string(),
             });
@@ -487,7 +491,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         self_id: addr.self_id,
                     }),
                     Scope::Issue(issue_ref) => Ok(ResolvedItemAddress::Issue {
-                        issue_ref,
+                        issue_ref: IssueIdPrefix::parse(&issue_ref)?,
                         kind: Some(kind),
                         self_id: addr.self_id,
                     }),

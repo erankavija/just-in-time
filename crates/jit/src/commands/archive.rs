@@ -37,7 +37,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Copy)]
 enum ArchiveTarget<'a> {
     Document(&'a str),
-    Container(&'a str),
+    Container(&'a crate::domain::IssueIdPrefix),
 }
 
 /// Ids of configured non-leaf containers that are archive candidates: those that
@@ -160,7 +160,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = self.storage.list_issues()?;
         let plans = effectively_terminal_container_ids(&issues, &hierarchy)
             .into_iter()
-            .map(|id| self.plan_archive_target(ArchiveTarget::Container(&id)))
+            .map(|id| {
+                self.plan_archive_target(ArchiveTarget::Container(
+                    &crate::domain::IssueIdPrefix::of_stored(&id),
+                ))
+            })
             .collect::<Result<Vec<_>>>()?;
         Ok(ArchiveCandidates::new(plans))
     }
@@ -172,7 +176,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Build a complete non-mutating plan for one resolved container subtree.
     pub fn preview_archive_container(&self, id: &str) -> Result<ArtifactPlan> {
-        self.plan_archive_target(ArchiveTarget::Container(id))
+        self.plan_archive_target(ArchiveTarget::Container(
+            &crate::domain::IssueIdPrefix::parse(id)?,
+        ))
     }
 
     fn plan_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArtifactPlan> {
@@ -833,7 +839,9 @@ impl CommandExecutor<JsonFileStorage> {
 
     /// Execute a freshly recomputed container archive plan under one write guard.
     pub fn execute_archive_container(&self, id: &str) -> Result<ArchiveExecutionResult> {
-        self.execute_archive_target(ArchiveTarget::Container(id))
+        self.execute_archive_target(ArchiveTarget::Container(
+            &crate::domain::IssueIdPrefix::parse(id)?,
+        ))
     }
 
     fn execute_archive_target(&self, target: ArchiveTarget<'_>) -> Result<ArchiveExecutionResult> {

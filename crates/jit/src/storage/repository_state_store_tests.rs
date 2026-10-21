@@ -236,7 +236,9 @@ fn test_session_published_issue_reads_back_typed_on_both_backends() {
     assert_eq!(memory.load_issue(&issue.id).unwrap(), issue);
     assert_eq!(memory.list_issues().unwrap(), vec![issue.clone()]);
     assert_eq!(
-        memory.resolve_issue_id(&issue.short_id()).unwrap(),
+        memory
+            .resolve_issue_id(&crate::domain::IssueIdPrefix::parse(&issue.short_id()).unwrap())
+            .unwrap(),
         issue.id
     );
 
@@ -271,26 +273,18 @@ fn publish_issue<S: RepositoryStateStore>(storage: &S, worktree: &Path, issue: &
         .unwrap();
 }
 
-/// Each backend resolves a full id in any case or hyphenation to the issue,
-/// and refuses a prefix below the minimum as an invalid prefix.
+/// Each backend resolves a full id in any case or hyphenation to the issue.
 #[test]
 fn test_conformance_resolve_issue_id_normalises_full_ids_on_both_backends() {
     fn assert_resolution(backend: &str, storage: &impl IssueStore, id: &str) {
-        let short: String = id.replace('-', "")[..crate::domain::MIN_ID_PREFIX_LENGTH - 1].into();
         for requested in [id.to_string(), id.to_uppercase(), id.replace('-', "")] {
+            let prefix = crate::domain::IssueIdPrefix::parse(&requested).unwrap();
             assert_eq!(
-                storage.resolve_issue_id(&requested).ok().as_deref(),
+                storage.resolve_issue_id(&prefix).ok().as_deref(),
                 Some(id),
                 "{backend} must resolve {requested}"
             );
         }
-        let error = storage.resolve_issue_id(&short).unwrap_err();
-        assert!(
-            error
-                .downcast_ref::<crate::domain::InvalidIdPrefixError>()
-                .is_some(),
-            "{backend} must refuse {short:?} as an invalid prefix: {error:?}"
-        );
     }
 
     let issue = crate::domain::types::fixture_issue("Resolve".to_string(), String::new());

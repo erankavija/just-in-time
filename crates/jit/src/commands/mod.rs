@@ -105,7 +105,7 @@ use crate::config_manager::ConfigManager;
 use crate::declarations::rules::{RuleConfigError, RuleSet};
 use crate::declarations::{GateDefinition, GateMode};
 use crate::domain::{
-    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue,
+    is_dependency_met, Event, GateEvaluationStability, GateState, GateStatus, Issue, IssueIdPrefix,
     LabelNamespaces, Priority, ReadinessCorrection, State,
 };
 use crate::graph::DependencyGraph;
@@ -791,7 +791,7 @@ fn captured_lease_warnings(
         let active = guard
             .map(|guard| {
                 guard.has_active_lease(id, agent.as_deref(), |raw| {
-                    resolve_issue_from_capture(issues, raw)
+                    resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
                 })
             })
             .transpose()?
@@ -819,7 +819,7 @@ fn ensure_claim_available(
     let Some(lease) = guard
         .map(|guard| {
             guard.conflicting_lease(target, Some(&assignee.to_string()), |raw| {
-                resolve_issue_from_capture(issues, raw)
+                resolve_issue_from_capture(issues, &IssueIdPrefix::parse(raw)?)
             })
         })
         .transpose()?
@@ -842,36 +842,36 @@ fn ensure_claim_available(
 #[derive(Clone)]
 enum CapturedLifecycleMutation {
     State {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
         target: State,
         force: bool,
         divert_unpassed_gates: bool,
         enforce_lease: bool,
     },
     Claim {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
         assignee: crate::domain::Assignee,
     },
     Release {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
         reason: String,
     },
     AutoReady {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
     },
     /// Demote a `Ready` issue an unmet dependency blocks back to `Backlog`,
     /// restoring agreement between stored readiness and the dependency graph
     /// (`@/invariant/derived-state-coherence`). The inverse of [`Self::AutoReady`].
     AutoBacklog {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
     },
     AutoDone {
-        issue_id: String,
+        issue_id: IssueIdPrefix,
     },
 }
 
 impl CapturedLifecycleMutation {
-    fn issue_id(&self) -> &str {
+    fn issue_id(&self) -> &IssueIdPrefix {
         match self {
             Self::State { issue_id, .. }
             | Self::Claim { issue_id, .. }
@@ -913,7 +913,7 @@ struct CapturedLifecycleOutcome {
 
 #[derive(Clone)]
 struct CapturedFieldUpdate {
-    issue_id: String,
+    issue_id: IssueIdPrefix,
     title: Option<String>,
     description: Option<DescriptionUpdate>,
     priority: Option<Priority>,
@@ -946,7 +946,7 @@ impl CapturedFieldUpdate {
     /// identical authoritative request through [`derive_field_update`] --
     /// there is exactly one place that turns `UpdateOperations` into a
     /// captured request, so the two call sites cannot silently drift apart.
-    fn bulk(issue_id: String, operations: &UpdateOperations, force: bool) -> Result<Self> {
+    fn bulk(issue_id: IssueIdPrefix, operations: &UpdateOperations, force: bool) -> Result<Self> {
         Ok(Self {
             issue_id,
             title: None,
@@ -1004,7 +1004,7 @@ impl CapturedFieldUpdate {
         .collect()
     }
 
-    fn label_edit(issue_id: String, label_edit: CapturedLabelEdit) -> Self {
+    fn label_edit(issue_id: IssueIdPrefix, label_edit: CapturedLabelEdit) -> Self {
         Self {
             issue_id,
             title: None,
@@ -2131,8 +2131,28 @@ fn discover_gate_run_results(
     Ok(())
 }
 
-fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {
-    crate::storage::resolve_issue_id_among(&crate::domain::IssueIdPrefix::parse(requested)?, issues)
+/// The prefix an issue-id filter matches stored ids by: the canonical id
+/// `requested` resolves to, or, when it names no live issue, `requested` itself,
+/// so records of a deleted issue still match.
+///
+/// # Errors
+///
+/// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
+/// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
+pub(crate) fn resolve_issue_filter<S: IssueStore>(
+    storage: &S,
+    requested: &str,
+) -> Result<IssueIdPrefix> {
+    let prefix = IssueIdPrefix::parse(requested)?;
+    match storage.resolve_issue_id(&prefix) {
+        Ok(id) => Ok(IssueIdPrefix::of_stored(&id)),
+        Err(error) if error.is::<crate::storage::IssueNotFoundError>() => Ok(prefix),
+        Err(error) => Err(error),
+    }
+}
+
+fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<String> {
+    crate::storage::resolve_issue_id_among(prefix, issues)
 }
 
 /// Executes CLI commands with business logic and validation.
@@ -2671,7 +2691,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let plan_content = validate::plan_content_with_issues(&image, &issues, &issues)?;
             let mut effective_request = request.clone();
-            effective_request.issue_id = target.clone();
+            effective_request.issue_id = IssueIdPrefix::of_stored(&target);
             let mut derived = derive_field_update(
                 issue,
                 &effective_request,
@@ -2722,13 +2742,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let request = CapturedFieldUpdate::bulk(issue_id, operations, force)?;
+        let request =
+            CapturedFieldUpdate::bulk(IssueIdPrefix::of_stored(&issue_id), operations, force)?;
         self.publish_captured_field_update(request)
     }
 
     fn publish_captured_state_transition(
         &self,
-        issue_id: &str,
+        issue_id: IssueIdPrefix,
         target: State,
         force: bool,
         divert_unpassed_gates: bool,
@@ -2738,7 +2759,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         S: crate::storage::RepositoryStateStore,
     {
         self.publish_captured_lifecycle_mutation(CapturedLifecycleMutation::State {
-            issue_id: issue_id.to_string(),
+            issue_id,
             target,
             force,
             divert_unpassed_gates,
@@ -2748,7 +2769,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     fn publish_captured_claim(
         &self,
-        issue_id: String,
+        issue_id: IssueIdPrefix,
         assignee: crate::domain::Assignee,
     ) -> Result<Vec<crate::storage::StorageWarning>>
     where
@@ -2762,7 +2783,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .storage_warnings)
     }
 
-    fn publish_captured_release(&self, issue_id: String, reason: String) -> Result<()>
+    fn publish_captured_release(&self, issue_id: IssueIdPrefix, reason: String) -> Result<()>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -2773,7 +2794,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         Ok(())
     }
 
-    fn publish_captured_auto_transition(&self, issue_id: String, target: State) -> Result<bool>
+    fn publish_captured_auto_transition(
+        &self,
+        issue_id: IssueIdPrefix,
+        target: State,
+    ) -> Result<bool>
     where
         S: crate::storage::RepositoryStateStore,
     {
@@ -3365,6 +3390,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::agent_config::resolve_agent_id;
         use crate::storage::claim_coordinator::ClaimsIndex;
 
+        let prefix = IssueIdPrefix::parse(issue_id)?;
         let paths = self.require_worktree_paths()?;
 
         // Load the active-lease index through storage (an absent index yields an
@@ -3375,7 +3401,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let current_agent = resolve_agent_id(None).ok();
 
         // Check if active lease exists for this issue
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self.storage.resolve_issue_id(&prefix)?;
         let now = chrono::Utc::now();
 
         let has_active_lease = claims_index.leases.iter().any(|lease| {
@@ -3680,7 +3706,11 @@ mod tests {
             .open_mutation_session(executor.require_layout().unwrap())
             .unwrap();
         let crate::commands::validate::MutationBase { image, issues } = executor
-            .capture_mutation_base(session.as_mut(), &[], Some(issue_id))
+            .capture_mutation_base(
+                session.as_mut(),
+                &[],
+                Some(&IssueIdPrefix::parse(issue_id).unwrap()),
+            )
             .unwrap()
             .unwrap();
         let issue = issues
