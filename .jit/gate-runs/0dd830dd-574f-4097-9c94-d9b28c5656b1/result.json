@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6155397c3b610b6f7dfc2327d4ad4c61d85554d1",
+  "completed_at": "2026-10-21T06:29:49.523243003Z",
+  "duration_ms": 299516,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The implementation satisfies the issue criteria with focused unit coverage and no attributable defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ae2e3739-f5f7-42be-8ae4-8ae3e1866800",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0dd830dd-574f-4097-9c94-d9b28c5656b1",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:24:50.006311187Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `5066bec26`, `a51913ccd` (`jit:ae2e3739`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`\nResolved items: `@/charter/D-18` (dev/vision/9db27a3a-charter.md); `@/issue/3d9a0ce3/requirement/REQ-01` (issue description); `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/invariant/architecture-dependency-direction` (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit code unavailable); doc-review pending (no run)\nTruncation recovery: reviewed attributable patches in commit/path-bounded reads, including the merge’s first-parent patch; omitted its unrelated second-parent integration ancestry.\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The implementation satisfies the issue criteria with focused unit coverage and no attributable defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

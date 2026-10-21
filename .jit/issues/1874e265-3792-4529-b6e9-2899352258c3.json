@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:22:25.179623811Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1874e265-3792-4529-b6e9-2899352258c3",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Move the error classifier into output::failure",
-  "updated_at": "2026-10-21T01:29:02.061632563Z"
+  "updated_at": "2026-10-21T06:22:25.179623811Z"
 }

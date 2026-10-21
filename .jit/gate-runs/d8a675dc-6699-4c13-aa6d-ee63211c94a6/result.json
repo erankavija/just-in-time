@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6a0a0eec4e1d85b58ad0e53721dc31ea3793a15f",
+  "completed_at": "2026-10-21T06:19:31.392352697Z",
+  "duration_ms": 237613,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The tagged change satisfies the issue criteria: both paths use pack/add with no capture, and the recorded documentation gate passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d8a675dc-6699-4c13-aa6d-ee63211c94a6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:15:33.778454151Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `89458b597`, `48999bd25` (first-parent merge diff); no renames/copies\nPolicy sources: `AGENTS.md`\nResolved items: `@/charter/D-8` — `dev/vision/9db27a3a-charter.md`; `@/issue/3d9a0ce3/requirement/REQ-04` — issue description; `@/invariant/essential-code-prose`, `@/invariant/orthogonal-tests` — `.jit/invariants.toml`\nGate evidence: `docs-mechanical` passed (exit 0, 2026-10-21T05:48:39Z); `code-review` pending\nTruncation recovery: reread issue, policy, gate, affected-script, and pack/add implementation sections in bounded calls\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The tagged change satisfies the issue criteria: both paths use pack/add with no capture, and the recorded documentation gate passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

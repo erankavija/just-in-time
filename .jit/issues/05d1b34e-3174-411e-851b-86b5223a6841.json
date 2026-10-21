@@ -13,8 +13,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:13:40.420817509Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:30:16.831142926Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -33,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
-  "updated_at": "2026-10-21T06:17:33.404756184Z"
+  "updated_at": "2026-10-21T06:30:16.831142926Z"
 }

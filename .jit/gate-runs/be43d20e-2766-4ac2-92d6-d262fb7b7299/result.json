@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6155397c3b610b6f7dfc2327d4ad4c61d85554d1",
+  "completed_at": "2026-10-21T06:24:49.440241408Z",
+  "duration_ms": 316959,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All four hard criteria are met by the attributed implementation, tests, and documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "be43d20e-2766-4ac2-92d6-d262fb7b7299",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:19:32.480686104Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: a6259bde0, 45a8bab79, 131e5080c (all tagged `jit:fd9bfab8`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3d9a0ce3/requirement/REQ-02 (issue Markdown); @/invariant/gate-semantics, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:09:10Z); doc-review pending\nTruncation recovery: re-read the merge’s first-parent patch and each affected current file in bounded path/line ranges; excluded unrelated second-parent history\n\n1. No findings. The implementation classifies exit 75 as an error run, preserves other exit handling, tests the CLI and review-wrapper cases, and documents both checker and jit-process termination behavior.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All four hard criteria are met by the attributed implementation, tests, and documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

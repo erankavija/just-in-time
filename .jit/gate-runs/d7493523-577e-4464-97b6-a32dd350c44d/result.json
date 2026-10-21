@@ -1,0 +1,44 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "94b072c0421a1b44969657cba0d36d1c15394f86",
+  "completed_at": "2026-10-21T06:31:57.748973711Z",
+  "duration_ms": 126954,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/concepts/guarantees.md",
+        "id": "F1",
+        "line": 662,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/invariant/single-source-prose",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Documentation and rustdoc still state that jit validate reads or repairs profile provenance, contrary to the removed validation behavior."
+      }
+    ],
+    "summary": "Validation behavior and tests meet the removal criteria, but recurring documentation and rustdoc still describe removed profile-provenance validation and repair.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d7493523-577e-4464-97b6-a32dd350c44d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:29:50.794213984Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18592 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d26-e407-7c70-bda3-a362e3ba81b4\n--------\nuser\n--- 18579 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 9fb54cd36, 78684701c, b22cf19bd, af530c678\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue Markdown); @/invariant/single-source-prose, @/invariant/essential-code-prose ( .jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:02:35Z); code-review pending\nTruncation recovery: re-read tagged patches by path, first-parent merge integrations, current validation capture/repair code, tests, configuration, and directly affected documentation\n\n1. F1 — blocking, issue-impact, medium: [`docs/concepts/guarantees.md:662`](/home/vkaskivuo/Projects/just-in-time/docs/concepts/guarantees.md:662) still states that `jit validate --fix` handles “provenance,” while [`docs/reference/cli-commands.md:3533`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:3533) still promises mismatched profile provenance as a `validate --fix` failure. This contradicts the implementation, which captures validation without profile records and derives repairs with `profiles: Vec::new()` ([`validate.rs:198`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:198), [`validate.rs:693`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:693)). The same obsolete contract remains in rustdoc at [`validate.rs:107`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:107) and [`validate.rs:363`](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/validate.rs:363). Update these descriptions as part of the profile-validation removal. References: @/charter/D-8, @/invariant/single-source-prose, @/invariant/essential-code-prose.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Validation behavior and tests meet the removal criteria, but recurring documentation and rustdoc still describe removed profile-provenance validation and repair.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Documentation and rustdoc still state that jit validate reads or repairs profile provenance, contrary to the removed validation behavior.\",\"file\":\"docs/concepts/guarantees.md\",\"line\":662,\"references\":[\"@/charter/D-8\",\"@/invariant/single-source-prose\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}
