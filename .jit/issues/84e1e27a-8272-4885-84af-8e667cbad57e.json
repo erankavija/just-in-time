@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "c2930451-2555-4bed-ae3a-eaa6d72b7522"
+  ],
+  "description": "Give the event-log parser one torn-line rule: ignore a final line without a terminating newline and reject any other malformed line.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a malformed line only when the next line is a profile-lifecycle record whose `isolated_torn_tail` is true (`certifies_preceding_torn_tail`, `:78`). Event appends now land at the committed length, so an unterminated final line is an uncommitted append that never becomes a middle line. The parser's tests are at `event_log.rs:96-160`.\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` ignores a final line that has no terminating newline, skips blank lines and records with a retired tag, and returns an error naming the line for any other line that is not a well-formed event record.\n- [hard] REQ-02: No reader certifies a malformed line by the record that follows it, and `certifies_preceding_torn_tail` no longer exists.\n- [hard] REQ-03: One parser unit test owns the rule: an unterminated final line is ignored, and a malformed middle line is rejected.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "84e1e27a-8272-4885-84af-8e667cbad57e",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:history-boundary",
+    "component:core",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/convention-convergence",
+    "satisfies:f8a6b298/REQ-10"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Event-log readers ignore an unterminated final line",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

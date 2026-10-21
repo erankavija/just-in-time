@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "bf8df628-e395-42e6-b8b5-8f0894cf12f6"
+  ],
+  "description": "Move every reader of an issue's latest run of a gate onto the gate-state accessor, so showing an issue or its gate status opens one run per gate instead of every run of the issue.\n\n## Background\n\nThree readers select an issue's latest run of a gate from a listing of all its runs:\n\n- `get_last_gate_run` (`crates/jit/src/commands/gate_check.rs:1241-1252`, stable sort, last wins), called by `main.rs:4125,4235,4330` (gate status) and `commands/gate.rs:1005`;\n- `get_last_gate_runs_for_issue` (`commands/gate_check.rs:1361-1395`, keeps the first on a tie), called by `main.rs:4373`;\n- `GateView::build` (`output.rs:1710-1725`, `max_by_key`), fed by `IssueShowResponse::from_issue` with every run of the issue from the show and status builders at `main.rs:1267,2573,2821,2872` and `commands/issue.rs:308`.\n\nAn executor accessor returns the run each gate state names. `tests/cli_gate/gate_cli_integration_test.rs:169-200` (`test_issue_show_errors_on_corrupt_gate_run`) plants a corrupt run record that belongs to no issue and requires `issue show` to fail; a show that loads only named runs never opens it.\n\n## Success Criteria\n\n- [hard] REQ-01: `get_last_gate_run`, `get_last_gate_runs_for_issue` and the show, status, create and children responses take latest runs from the gate-state accessor, and none of them lists the issue's runs.\n- [hard] REQ-02: `IssueShowResponse::from_issue` receives the latest run of each gate, and `GateView::build` selects nothing.\n- [hard] REQ-03: History views (`gate status --all` and `--limit`, the server's run list) still list the issue's runs.\n- [hard] REQ-04: `test_issue_show_errors_on_corrupt_gate_run` corrupts the run record that the shown issue's `last_run` names, locating it through the public `VirtualPath::gate_run_record` constructor, and `issue show` still fails on it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2117739f-f6b9-4b39-9dbd-f3deb7a0885e",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-gate-runs",
+    "component:gates",
+    "component:cli",
+    "per:@/charter/D-19",
+    "per:@/charter/D-20",
+    "satisfies:f8a6b298/REQ-01",
+    "satisfies:f8a6b298/REQ-02"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Latest-run readers use the gate-state accessor",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

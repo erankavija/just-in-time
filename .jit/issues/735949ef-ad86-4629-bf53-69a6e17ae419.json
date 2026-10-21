@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "2a23bb58-9b3d-445b-afb9-e369dfe3504e",
+    "964db1a8-3cd0-4ce8-96d1-05d7593fa047",
+    "be45195f-4d01-4bfe-85df-dc43b2e9f894",
+    "e3b1908d-e974-4e5c-b7a7-6649ee8b8375"
+  ],
+  "description": "Gate-run records are stored and read by key, so reading one issue's runs, its latest run of a gate, or a reusable verdict never reads another key's records.\n\n## Background\n\nGate runs were stored flat, and every reader enumerated and parsed all of them. This story stores runs per issue, names each issue's latest run of a gate on its gate state, finds reusable verdicts through a per-key verdict record, captures only the evaluated issue's latest runs into gate mutations, and rewrites this repository's recorded runs once into that layout.\n\n## Success Criteria\n\n- [hard] REQ-01: Reading one issue's latest runs or its run history opens only that issue's run records.\n- [hard] REQ-02: Reuse reads one verdict record and the run it names.\n- [hard] REQ-03: Gate evaluation, precheck planning and validation capture no other issue's run records.\n- [hard] REQ-04: This repository's recorded runs, latest-run references and verdict records are in the per-key layout, and every cited run id resolves.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "735949ef-ad86-4629-bf53-69a6e17ae419",
+  "labels": [
+    "type:story",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-gate-runs",
+    "component:gates",
+    "component:storage",
+    "per:@/charter/D-19"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Gate runs are addressed per issue, per gate and per inputs digest",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

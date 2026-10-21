@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "903cdeab-1714-4848-90b7-79b4734e222b"
+  ],
+  "description": "Delete the three lease APIs that no production code calls.\n\n## Background\n\n`ClaimCoordinator::acquire_claim` (`crates/jit/src/storage/claim_coordinator.rs:450`), `acquire_claim_with_reason` (`:527`) and `release_lease` (`:1087`) have no production caller, and no test calls them: tests acquire through `acquire_claim_synchronized` and release through the production release path. The test-only `acquire_claim` evicts and then returns without persisting the eviction (`:460-470`).\n\n## Success Criteria\n\n- [hard] REQ-01: `ClaimCoordinator::acquire_claim`, `acquire_claim_with_reason` and `release_lease` no longer exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "becea20a-ff56-4499-8b13-d88ad816448f",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:storage",
+    "per:@/charter/D-18",
+    "satisfies:f8a6b298/REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Test-only lease APIs are gone",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

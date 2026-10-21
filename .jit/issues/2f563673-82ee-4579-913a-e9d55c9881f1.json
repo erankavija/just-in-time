@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "15009590-fc1a-4777-84f4-fd19a7134eda",
+    "a7314585-a227-4a97-9127-d3228736aa9e",
+    "c3e3e2ff-f7bd-44cd-bb89-e9b05c3310bc",
+    "cc6ef886-17a2-48e6-acff-0c206dcd664b"
+  ],
+  "description": "Store each issue's lease in its own file, published by the lease lock's apply, so reading or changing one lease reads only that file and an interruption leaves the prior or the next lease.\n\n## Background\n\nThe lease lock (`LeaseLock`: `load`, `list`, `apply` in `crates/jit/src/storage/claim_coordinator.rs`) and the lock-free reads (`read_leases`, `read_active_leases`, `read_active_lease`) are the only access to lease state. They store every lease in `.git/jit/claims.index.json`, rebuilt from `claims.jsonl` when the lock is taken (`:1252-1360`), and take each sequence number by rescanning the log (`get_next_seq`, `:959-976`, private). The index publish has a fixed temp name and no directory sync (`write_index_atomic`, `:877-895`). The atomic-write primitives `write_file_synced`, `create_file_synced` and `sync_directory` (`storage/atomic_write.rs:55-95`) are visible to the storage module. `jit recover` still verifies and rebuilds the index from the log (`commands/claim.rs:733-741`) until its own removal, which lands in the same integration. Kept as one change for a test reason: the shared test helper and the failure-lever expectations name the store's files, so the suites stay green only if they move with the store. CLI tests reach lease storage only through the shared helper `tests/common/lease_store.rs`, and the failure-lever registry expects `PARSE_ERROR: Failed to parse claims index` for a malformed store (`tests/cli_issue/failure_lever_registry.toml:70-88`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each active lease is the file `.git/jit/leases/<issue-id>.json`, named by one path constructor on `WorktreePaths`; an absent file means no lease, and a record stores no `stale` field. `LeaseLock` and the lock-free reads read and write only these files, and neither reads or writes `claims.index.json` or reads `claims.jsonl`.\n- [hard] REQ-02: `apply` publishes by synced temp file, rename and directory sync (or unlink and directory sync), then takes the next number from `.git/jit/claims.seq`, then appends the operation's history lines; `get_next_seq` no longer exists. Reading or changing one issue's lease reads only that file, and only the limit check and listing read the lease directory.\n- [hard] REQ-03: The shared lease test helper plants, reads and corrupts lease records, and the failure levers expect a malformed lease record to fail `claim status` and `claim list` with `PARSE_ERROR` and exit 1.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Leases active when this lands are carried over by the checkout's one-time lease rewrite, which lands with it.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "2f563673-82ee-4579-913a-e9d55c9881f1",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:storage",
+    "per:@/charter/D-19",
+    "enforces:@/invariant/atomic-writes",
+    "satisfies:f8a6b298/REQ-05",
+    "satisfies:f8a6b298/REQ-07"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Each lease is one record under the lease lock",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "5582e39e-10d5-4079-b81f-47f23a81e45a",
+    "5b0e3d63-9fc3-4ad7-a6b7-be4d5108547e",
+    "77f3db10-26b7-49f4-85c3-95f7adb843c3"
+  ],
+  "description": "Make gate evaluation, precheck planning and validation's precheck-history capture request the evaluated issue's latest run of each gate by path, so the mutation image never holds another issue's runs.\n\n## Background\n\nA checker that consumes run history (`checker_consumes_run_history`, `crates/jit/src/commands/mod.rs:589-597`) receives the latest run of its gate on the evaluated issue (`compact_run_history_for_context`, `commands/gate_check.rs:252-266`). To find it, three captures list the whole `gate-runs/` root and take every run record into the image, then parse each one and keep those whose `issue_id` matches:\n\n- gate evaluation: `discover_gate_run_results` (`commands/mod.rs:2048-2069`) called at `commands/gate_check.rs:806`, parsed by `captured_gate_runs` (`gate_check.rs:273-318`);\n- precheck planning: `captured_precheck_plan` (`commands/mod.rs:622-680`, parse and filter at `:661-679`);\n- validation's precheck-history capture: `commands/validate.rs:503-505`.\n\nAll three go through `captured_gate_run_result_paths` (`repository_state/mutation.rs:524-549`). Kept as one change for a build reason: these three captures are the only callers of `discover_gate_run_results` and `captured_gate_run_result_paths`, and unused crate-private code fails the zero-warning build, so both helpers go with them. The capture budget is 512 MB (`commands/mod.rs:235`), so the whole-root capture is also a future hard failure.\n\nThe issue record's gate state names the latest run of each gate (`GateState.last_run`), so the run record path is known from the issue record alone (`VirtualPath::gate_run_record`).\n\n## Success Criteria\n\n- [hard] REQ-01: Gate evaluation, precheck planning and validation's precheck-history capture request, for each history-consuming gate on the evaluated issue, only the run record that the issue's gate state names. None of them lists the `gate-runs/` root.\n- [hard] REQ-02: `discover_gate_run_results` and `captured_gate_run_result_paths` no longer exist.\n- [hard] REQ-03: A test shows that evaluating a history-consuming gate on one issue captures no run record of another issue, with other issues' runs present, and that the checker still receives the evaluated issue's latest run of that gate.\n- [hard] REQ-04: A gate with no recorded latest run passes the checker an empty run history, and `compact_run_history_for_context` sanitizes the one captured run without selecting among runs.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0bd2c797-ca80-4f18-8cc9-1df1604dc55d",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-gate-runs",
+    "component:gates",
+    "component:storage",
+    "per:@/charter/D-19",
+    "satisfies:f8a6b298/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Gate captures hold only the evaluated issue's latest runs",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

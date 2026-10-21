@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "a085ca6a-9017-4f08-a937-b0074b0efe86"
+  ],
+  "description": "Make the lease check inside repository mutations hold one lease lock across the session and read its targets through it, without writing and without locking twice.\n\n## Background\n\nThe repository-mutation guard `lock_claims_for_repository_mutation` (`crates/jit/src/storage/claim_coordinator.rs:413-432`) takes the claims lock and replays the whole claims log into a snapshot. `claims_mutation_guard` (`commands/mod.rs:720-739`) takes it before the repository session opens (`commands/mod.rs:2600-2607`), and `captured_lease_warnings` and `ensure_claim_available` (`commands/mod.rs:741-800`) read the snapshot. `CoordinationOrderGuard::enter` refuses while a repository order guard is held (`storage/guard_order.rs:52-62`). `ClaimCoordinator::lock()` returns a `LeaseLock` with `load`, `list` and `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: The repository-mutation guard takes one `LeaseLock` before the repository session opens, holds it across the session and reads each target only through `load`; it writes nothing, takes no second claims lock and enters no second coordination guard, and an expired lease counts as inactive.\n- [hard] REQ-02: A test shows that a lease-enforced mutation succeeds for the lease holder, is refused for another agent, and leaves the claims log unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "15009590-fc1a-4777-84f4-fd19a7134eda",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:storage",
+    "component:core",
+    "per:@/charter/D-19",
+    "enforces:@/invariant/convention-convergence",
+    "satisfies:f8a6b298/REQ-05",
+    "satisfies:f8a6b298/REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The repository-mutation lease check reads through the held lease lock",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

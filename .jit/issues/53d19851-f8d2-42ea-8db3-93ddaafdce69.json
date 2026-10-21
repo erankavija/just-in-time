@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "2f563673-82ee-4579-913a-e9d55c9881f1"
+  ],
+  "description": "Delete the claims-index rebuild, verification and index-write machinery and the recovery step and warnings that used it, now that leases are per-issue records.\n\n## Background\n\nLeases are stored one file per issue under the lease lock, and no lease operation reads the index or the log. What remains of the index model: `rebuild_index_from_log`, `rebuild_index_from_log_at`, `verify_index_consistency`, `write_index_atomic`, `evict_expired` and `load_claims_index` (`crates/jit/src/storage/claim_coordinator.rs:872-1360`); `jit recover`'s verify-and-rebuild step (`commands/claim.rs:733-741`), its `index_rebuilt` report field (`main.rs:7246,7259`) and help text (`cli.rs:424`); `StorageWarning::SequenceGap`, `DuplicateLease` and `IndexRebuilt` (`storage/warnings.rs:37-48,98-106,156-175`); the rebuild property tests in `storage/claim_coordinator_proptests.rs` (`prop_index_rebuild_idempotent`, `prop_no_data_loss_in_rebuild`, `prop_staleness_computed_during_rebuild`); and the recovery tests that remove the index (`tests/cli_repo_workflow/claim_integration_tests.rs:750-785`).\n\n## Success Criteria\n\n- [hard] REQ-01: The listed functions, the three warnings, `RecoveryReport.index_rebuilt` and recovery's verify-and-rebuild step no longer exist; no command rebuilds lease state from the claims log, reads `claims.jsonl` or writes `claims.index.json`.\n- [hard] REQ-02: `jit recover`'s help names exactly its passes: stale-lock cleanup, expired-lease eviction and stale indefinite-lease reclaim.\n- [hard] REQ-03: The rebuild property tests and the index-removal recovery tests no longer exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "53d19851-f8d2-42ea-8db3-93ddaafdce69",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:storage",
+    "component:cli",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/canonical-cutover",
+    "satisfies:f8a6b298/REQ-07",
+    "satisfies:f8a6b298/REQ-12"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Claims-index rebuild machinery is gone",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

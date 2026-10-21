@@ -17,7 +17,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T06:15:01.510035793Z",
+      "updated_at": "2026-10-21T10:38:57.525021615Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive an issue's documents from its artifact directory",
-  "updated_at": "2026-10-21T07:27:56.808382835Z"
+  "updated_at": "2026-10-21T10:38:57.525021615Z"
 }

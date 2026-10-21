@@ -1,0 +1,28 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [],
+  "description": "Add one activeness predicate on `Lease` and three lock-free lease reads in storage, so every lease reader has one path to call.\n\n## Background\n\nLease activeness is decided in four places with four rules that disagree at `now == expires_at`, and some ignore staleness (`crates/jit/src/commands/mod.rs:3355-3361`, `commands/template.rs:303`, `commands/validate.rs:2495-2496`, and `Lease::is_expired` at `storage/claim_coordinator.rs:92`). `Lease::is_stale` exists at `:105`. Lock-free readers load the whole index through `ClaimsIndex::load` (`claim_coordinator.rs:210-231`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Lease::is_active(now)` is true when a lease is neither expired nor stale, and one unit test owns its boundaries.\n- [hard] REQ-02: `storage/claim_coordinator.rs` offers `read_leases(&WorktreePaths)` (every stored lease), `read_active_leases(&WorktreePaths, now)` and `read_active_lease(&WorktreePaths, &IssueId, now)`, reading without the claims lock, with unit tests.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T10:39:53.980326737Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "915be53e-b0e0-4085-86d1-7f96fb3b0a2c",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:storage",
+    "per:@/charter/D-19",
+    "satisfies:f8a6b298/REQ-05"
+  ],
+  "priority": "high",
+  "state": "ready",
+  "title": "Storage offers one lock-free lease read path and one activeness rule",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}
