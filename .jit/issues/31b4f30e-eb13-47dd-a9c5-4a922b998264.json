@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-2195c98f",
+  "claimed_at": "2026-10-21T05:33:10.916388052Z",
   "context": {},
   "created_at": "2026-10-20T20:35:51.260510554Z",
   "dependencies": [
@@ -19,9 +20,9 @@
       "updated_by": null
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:35:51.260510554Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T05:34:16.553709527Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "31b4f30e-eb13-47dd-a9c5-4a922b998264",
@@ -37,7 +38,7 @@
     "brackets:2195c98f"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "breakdown: Give every identity and closed vocabulary one semantic type",
-  "updated_at": "2026-10-21T05:31:44.097379039Z"
+  "updated_at": "2026-10-21T05:34:16.553709527Z"
 }
