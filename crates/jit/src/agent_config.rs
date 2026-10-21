@@ -18,9 +18,9 @@ use std::path::PathBuf;
 
 /// Agent configuration from `~/.config/jit/agent.toml`.
 ///
-/// Unknown sections (e.g. a legacy `[behavior]` block) are ignored on load, so
-/// an older config file remains parseable.
+/// Unknown keys and sections are rejected on load.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct AgentConfig {
     /// Agent configuration section
     pub agent: AgentSection,
@@ -28,6 +28,7 @@ pub struct AgentConfig {
 
 /// Agent identity section
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct AgentSection {
     /// Persistent agent identity (format: {type}:{identifier})
     pub id: String,
@@ -35,9 +36,6 @@ pub struct AgentSection {
     pub created_at: String,
     /// Human-readable description
     pub description: String,
-    /// Optional default TTL preference (in seconds)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_ttl_secs: Option<u64>,
 }
 
 impl AgentConfig {
@@ -78,69 +76,28 @@ impl AgentConfig {
 
 /// Resolve agent identity with priority: CLI flag > env var > config file > error.
 ///
-/// # Arguments
-///
-/// * `cli_flag` - Optional agent ID from CLI `--agent-id` flag
-///
 /// # Errors
 ///
 /// Returns an error if no agent identity is configured or if the format is invalid.
 pub fn resolve_agent_id(cli_flag: Option<String>) -> Result<String> {
-    // Priority 1: CLI flag
-    if let Some(id) = cli_flag {
-        validate_agent_id(&id)?;
-        return Ok(id);
-    }
-
-    // Priority 2: Environment variable
-    if let Ok(id) = env::var("JIT_AGENT_ID") {
-        validate_agent_id(&id)?;
-        return Ok(id);
-    }
-
-    // Priority 3: Config file
-    if let Some(config) = AgentConfig::load()? {
-        return Ok(config.agent.id);
-    }
-
-    // No configuration found
-    bail!(
-        "No agent identity configured.\n\
-         \n\
-         Set one of the following (priority order):\n\
-         1. CLI flag: --agent-id agent:your-name\n\
-         2. Environment: export JIT_AGENT_ID=agent:your-name\n\
-         3. Config file: ~/.config/jit/agent.toml\n\
-         \n\
-         Format: {{type}}:{{identifier}}\n\
-         Examples: agent:copilot-1, human:alice, ci:github-actions"
-    )
+    resolve_agent_id_with(cli_flag, |key| env::var(key).ok(), AgentConfig::load)
 }
 
-/// Internal implementation that accepts a custom environment reader for testing.
-#[cfg(test)]
-fn resolve_agent_id_with_env<F>(cli_flag: Option<String>, env_reader: F) -> Result<String>
-where
-    F: Fn(&str) -> Result<String, env::VarError>,
-{
-    // Priority 1: CLI flag
-    if let Some(id) = cli_flag {
+/// [`resolve_agent_id`] over an environment lookup and a configuration loader.
+pub fn resolve_agent_id_with(
+    cli_flag: Option<String>,
+    env_lookup: impl Fn(&str) -> Option<String>,
+    load_config: impl FnOnce() -> Result<Option<AgentConfig>>,
+) -> Result<String> {
+    if let Some(id) = cli_flag.or_else(|| env_lookup("JIT_AGENT_ID")) {
         validate_agent_id(&id)?;
         return Ok(id);
     }
 
-    // Priority 2: Environment variable
-    if let Ok(id) = env_reader("JIT_AGENT_ID") {
-        validate_agent_id(&id)?;
-        return Ok(id);
-    }
-
-    // Priority 3: Config file
-    if let Some(config) = AgentConfig::load()? {
+    if let Some(config) = load_config()? {
         return Ok(config.agent.id);
     }
 
-    // No configuration found
     bail!(
         "No agent identity configured.\n\
          \n\
@@ -234,119 +191,116 @@ mod tests {
         assert!(validate_agent_id("agent:copilot ").is_err());
     }
 
-    #[test]
-    fn test_parse_agent_config() {
-        let toml = r#"
+    const VALID_TOML: &str = r#"
 [agent]
 id = "agent:copilot-1"
 created_at = "2026-01-03T12:00:00Z"
 description = "GitHub Copilot Workspace Session 1"
-default_ttl_secs = 900
 "#;
 
-        let config: AgentConfig = toml::from_str(toml).unwrap();
+    #[test]
+    fn test_parse_agent_config_reads_every_field() {
+        let config: AgentConfig = toml::from_str(VALID_TOML).unwrap();
         assert_eq!(config.agent.id, "agent:copilot-1");
         assert_eq!(config.agent.created_at, "2026-01-03T12:00:00Z");
         assert_eq!(
             config.agent.description,
             "GitHub Copilot Workspace Session 1"
         );
-        assert_eq!(config.agent.default_ttl_secs, Some(900));
     }
 
     #[test]
-    fn test_parse_minimal_agent_config() {
-        let toml = r#"
-[agent]
-id = "human:alice"
-created_at = "2026-01-06T12:00:00Z"
-description = "Alice's development machine"
-"#;
-
-        let config: AgentConfig = toml::from_str(toml).unwrap();
-        assert_eq!(config.agent.id, "human:alice");
-        assert_eq!(config.agent.default_ttl_secs, None);
-    }
-
-    /// A config file carrying a legacy `[behavior]` section (the removed
-    /// auto-heartbeat daemon settings) still parses: the unknown section is
-    /// ignored rather than rejected, so an older agent.toml keeps working.
-    #[test]
-    fn test_parse_agent_config_ignores_legacy_behavior_section() {
-        let toml = r#"
-[agent]
-id = "agent:copilot-1"
-created_at = "2026-01-03T12:00:00Z"
-description = "Legacy config"
-
-[behavior]
-auto_heartbeat = true
-heartbeat_interval = 30
-"#;
-
-        let config: AgentConfig = toml::from_str(toml).unwrap();
-        assert_eq!(config.agent.id, "agent:copilot-1");
+    fn test_parse_agent_config_missing_required_field_fails() {
+        for missing in ["created_at", "description"] {
+            let toml: String = VALID_TOML
+                .lines()
+                .filter(|l| !l.starts_with(missing))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let err = toml::from_str::<AgentConfig>(&toml)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(missing), "{missing} must be required: {err}");
+        }
     }
 
     #[test]
-    fn test_resolve_agent_id_cli_flag_priority() {
-        // Mock environment that returns invalid agent
-        let env_reader = |key: &str| {
-            if key == "JIT_AGENT_ID" {
-                Ok("env:should-not-use".to_string())
-            } else {
-                Err(env::VarError::NotPresent)
-            }
-        };
+    fn test_parse_agent_config_rejects_unknown_keys() {
+        for (extra, key) in [
+            ("\n[behavior]\nauto_heartbeat = true\n", "behavior"),
+            ("\n[other]\nx = 1\n", "other"),
+        ] {
+            let err = toml::from_str::<AgentConfig>(&format!("{VALID_TOML}{extra}"))
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains(key), "error must name {key}: {err}");
+        }
+        let err = toml::from_str::<AgentConfig>(&format!("{VALID_TOML}default_ttl_secs = 900\n"))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("default_ttl_secs"), "{err}");
+    }
 
-        // CLI flag should take highest priority
+    fn no_env(_: &str) -> Option<String> {
+        None
+    }
+
+    fn config_with_id(id: &str) -> Result<Option<AgentConfig>> {
+        Ok(Some(AgentConfig {
+            agent: AgentSection {
+                id: id.to_string(),
+                created_at: "2026-01-03T12:00:00Z".to_string(),
+                description: String::new(),
+            },
+        }))
+    }
+
+    #[test]
+    fn test_resolve_agent_id_cli_flag_beats_env_and_config() {
+        let env = |_: &str| Some("env:should-not-use".to_string());
+        let result = resolve_agent_id_with(Some("agent:cli".to_string()), env, || {
+            config_with_id("file:should-not-use")
+        })
+        .unwrap();
+        assert_eq!(result, "agent:cli");
+    }
+
+    #[test]
+    fn test_resolve_agent_id_env_beats_config() {
+        let env = |key: &str| (key == "JIT_AGENT_ID").then(|| "agent:from-env".to_string());
         let result =
-            resolve_agent_id_with_env(Some("agent:cli-override".to_string()), env_reader).unwrap();
-        assert_eq!(result, "agent:cli-override");
-    }
-
-    #[test]
-    fn test_resolve_agent_id_env_var() {
-        // Mock environment with valid agent ID
-        let env_reader = |key: &str| {
-            if key == "JIT_AGENT_ID" {
-                Ok("agent:from-env".to_string())
-            } else {
-                Err(env::VarError::NotPresent)
-            }
-        };
-
-        let result = resolve_agent_id_with_env(None, env_reader).unwrap();
+            resolve_agent_id_with(None, env, || config_with_id("file:should-not-use")).unwrap();
         assert_eq!(result, "agent:from-env");
     }
 
     #[test]
-    fn test_resolve_agent_id_invalid_format() {
-        // Mock environment with invalid format
-        let env_reader = |key: &str| {
-            if key == "JIT_AGENT_ID" {
-                Ok("invalid-no-colon".to_string())
-            } else {
-                Err(env::VarError::NotPresent)
-            }
-        };
-
-        let result = resolve_agent_id_with_env(None, env_reader);
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid agent ID format"));
+    fn test_resolve_agent_id_config_used_without_flag_or_env() {
+        let result = resolve_agent_id_with(None, no_env, || config_with_id("agent:from-file"));
+        assert_eq!(result.unwrap(), "agent:from-file");
     }
 
     #[test]
-    fn test_resolve_agent_id_no_config_error() {
-        // Mock environment with no JIT_AGENT_ID
-        let env_reader = |_key: &str| Err(env::VarError::NotPresent);
+    fn test_resolve_agent_id_invalid_env_format_fails() {
+        let env = |_: &str| Some("invalid-no-colon".to_string());
+        let err = resolve_agent_id_with(None, env, || Ok(None))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("Invalid agent ID format"));
+    }
 
-        let result = resolve_agent_id_with_env(None, env_reader);
-        assert!(result.is_err());
-        let err = result.unwrap_err().to_string();
+    #[test]
+    fn test_resolve_agent_id_loader_error_propagates() {
+        let err = resolve_agent_id_with(None, no_env, || Err(anyhow!("unreadable")))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unreadable"));
+    }
+
+    #[test]
+    fn test_resolve_agent_id_nothing_configured_names_every_source() {
+        let err = resolve_agent_id_with(None, no_env, || Ok(None))
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("No agent identity configured"));
         assert!(err.contains("--agent-id"));
         assert!(err.contains("JIT_AGENT_ID"));
