@@ -1,11 +1,10 @@
 //! One public profile-lifecycle journey through a repository Git never touches.
 
 use super::profile_cli_tests::{
-    applied_ids, capture_sources, id_selector, jit, json, only_profile, path_selector,
+    applied_ids, id_selector, jit, json, live_asset_package, only_profile, path_selector,
     requested_profile, write_lifecycle_package,
 };
 use serde_json::Value;
-use std::fs;
 use std::path::Path;
 use std::process::Output;
 use tempfile::TempDir;
@@ -113,41 +112,21 @@ fn test_profile_lifecycle_completes_without_git() {
 
     let lifecycle_id_selector = id_selector(lifecycle_id);
 
-    capture_sources(repo, "packages/capture-source");
-    let captured = successful_lifecycle_json(
-        repo,
-        "capture profile package",
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/capture-source",
-            "--destination",
-            "packages/captured",
-            "--json",
-        ],
-    );
-    assert_eq!(only_profile(&captured)["destination"], "packages/captured");
-    assert_eq!(
-        fs::read_to_string(repo.join("packages/captured/assets/live/docs/guide.md"))
-            .expect("read captured live asset"),
-        "# Captured guide\n"
-    );
-
+    live_asset_package(repo, "packages/capture-source");
     let packed = successful_lifecycle_json(
         repo,
-        "pack captured profile package",
+        "pack profile package",
         &[
             "profile",
             "pack",
             "--source",
-            "packages/captured",
+            "packages/capture-source",
             "--output",
-            "packages/captured.tar",
+            "packages/packed.tar",
             "--json",
         ],
     );
-    assert!(repo.join("packages/captured.tar").is_file());
+    assert!(repo.join("packages/packed.tar").is_file());
 
     let added = successful_lifecycle_json(
         repo,
@@ -156,7 +135,7 @@ fn test_profile_lifecycle_completes_without_git() {
             "profile",
             "add",
             "--archive",
-            "packages/captured.tar",
+            "packages/packed.tar",
             "--destination",
             "packages/imported",
             "--json",

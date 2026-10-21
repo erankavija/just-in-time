@@ -2956,42 +2956,6 @@ pub enum ProfileCommands {
         json: bool,
     },
 
-    /// Capture a package tree from the repository targets its manifest declares
-    ///
-    /// Reads the manifest at the package directory, draws every live asset from
-    /// the repository file its declaration targets and every other declared
-    /// source from the package directory itself, and republishes the whole tree
-    /// at the destination through one redo record. A source the
-    /// manifest no longer declares does not survive the republication.
-    ///
-    /// Both directories are worktree paths. A declared target that is a
-    /// symbolic link, resolves outside the worktree, or carries executable
-    /// permission its declaration did not is refused before anything is
-    /// published.
-    ///
-    /// Examples:
-    ///   jit profile capture --source profiles/my-profile --destination build/my-profile
-    ///   jit profile capture --source profiles/my-profile --destination profiles/my-profile
-    ///
-    /// JSON output uses the profile envelope `{"count": N, "profiles": [...]}`.
-    Capture {
-        /// Package directory whose manifest declares what to capture
-        #[arg(long, value_name = "DIR")]
-        source: std::path::PathBuf,
-
-        /// Directory the captured package tree is published at
-        #[arg(long, value_name = "DIR")]
-        destination: std::path::PathBuf,
-
-        /// Build and validate the exact capture plan without writing
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Pack a package directory into one portable archive file
     ///
     /// Reads the package directory, validates it, and writes an uncompressed
@@ -3150,13 +3114,10 @@ impl ProfileCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
             Self::Apply { dry_run, .. } => !*dry_run,
-            // Each of these publishes a redo record — a captured or
-            // added package tree, or an archive written inside a repository
-            // root — so they dispatch recovery like every other mutating
-            // profile operation.
-            Self::Capture { dry_run, .. }
-            | Self::Pack { dry_run, .. }
-            | Self::Add { dry_run, .. } => !*dry_run,
+            // Each of these publishes a redo record — an added package tree,
+            // or an archive written inside a repository root — so they
+            // dispatch recovery like every other mutating profile operation.
+            Self::Pack { dry_run, .. } | Self::Add { dry_run, .. } => !*dry_run,
             Self::Show { .. } | Self::Diff { .. } => false,
         }
     }
@@ -3320,7 +3281,6 @@ impl ProfileCommands {
             Self::Show { .. }
             | Self::Diff { .. }
             | Self::Apply { .. }
-            | Self::Capture { .. }
             | Self::Pack { .. }
             | Self::Add { .. } => false,
         }
@@ -3634,7 +3594,6 @@ mod recovery_dispatch_tests {
         "migrate lifecycle-timestamps",
         "profile add",
         "profile apply",
-        "profile capture",
         "profile diff",
         "profile pack",
         "profile show",

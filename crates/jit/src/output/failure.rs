@@ -1012,7 +1012,7 @@ mod repository_state_classifier_tests {
         assert_eq!(diverged["conflict"]["kind"], "diverged");
         assert_eq!(
             diverged["conflict"]["remedy"]["resolutions"],
-            serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+            serde_json::json!(["restore-recorded-content"])
         );
 
         let contested = &conflicts[2];
@@ -1026,18 +1026,6 @@ mod repository_state_classifier_tests {
             ])
         );
 
-        // Only the diverged entry's remedy allows capture, so it is the only
-        // resolution naming `jit profile capture` — named once, not per entry.
-        assert_eq!(
-            json.error
-                .suggestions
-                .iter()
-                .filter(|suggestion| suggestion.contains("jit profile capture"))
-                .count(),
-            1,
-            "suggestions: {:?}",
-            json.error.suggestions
-        );
         assert!(
             json.error
                 .suggestions

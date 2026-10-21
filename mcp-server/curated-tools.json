@@ -56,7 +56,6 @@
     "jit_profile_show": "Inspects a profile manifest and package identity read from a repository package location before an agent applies it.",
     "jit_profile_diff": "States what a package read from a repository location would create, update, retain, remove, or fail to publish in this repository — files and registry declarations alike — and who claims each of them, so an agent inspects a decision before publishing it.",
     "jit_profile_apply": "Dry-runs or recoverably applies a workflow package read from a repository location to the current repository; a refused target or declaration carries a structured remedy as the resolution source.",
-    "jit_profile_capture": "Republishes a workflow package tree from the repository files its manifest declares, so an agent folds an in-place edit back into the package that owns it.",
     "jit_search": "Text search across issues and documents in one call.",
     "jit_apply": "Instantiates a graph template into a container, the plan-before-fan-out scaffold.",
     "jit_validate": "Repository integrity check; an agent runs it before handing work back."

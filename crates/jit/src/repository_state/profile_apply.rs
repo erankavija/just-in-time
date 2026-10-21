@@ -667,20 +667,16 @@ impl ProfileTargetConflict {
         match self {
             Self::Occupied {
                 occupant: ProfileConflictOccupant::Repository,
-            } => ProfileRemedy::new([
-                ProfileResolution::MoveTargetAside,
-                ProfileResolution::CaptureRepositoryContent,
-            ]),
+            } => ProfileRemedy::new([ProfileResolution::MoveTargetAside]),
             Self::Occupied {
                 occupant: ProfileConflictOccupant::Package(_),
             } => ProfileRemedy::new([
                 ProfileResolution::StopOnePackageFromDeclaringTarget,
                 ProfileResolution::ApplyOneOfConflictingPackages,
             ]),
-            Self::Diverged { .. } => ProfileRemedy::new([
-                ProfileResolution::RestoreRecordedContent,
-                ProfileResolution::CaptureRepositoryContent,
-            ]),
+            Self::Diverged { .. } => {
+                ProfileRemedy::new([ProfileResolution::RestoreRecordedContent])
+            }
             Self::Contested { .. } => ProfileRemedy::new([
                 ProfileResolution::MakeDefinitionsIdentical,
                 ProfileResolution::ApplyOnlyOneDeclaringPackage,
@@ -735,8 +731,6 @@ pub enum ProfileResolution {
     MoveTargetAside,
     /// Restore the content recorded when this profile last published the target.
     RestoreRecordedContent,
-    /// Capture the repository's current content into its live-source package.
-    CaptureRepositoryContent,
     /// Stop one of the conflicting packages from declaring the shared target.
     StopOnePackageFromDeclaringTarget,
     /// Apply only one of the packages that conflict over a target.
@@ -754,11 +748,6 @@ impl ProfileResolution {
         match self {
             Self::MoveTargetAside => "move it aside before applying",
             Self::RestoreRecordedContent => "restore the value this profile published",
-            Self::CaptureRepositoryContent => {
-                "fold it into a live-source package with \
-                                               'jit profile capture --source <package-dir> \
-                                               --destination <package-dir>'"
-            }
             Self::StopOnePackageFromDeclaringTarget => {
                 "stop one of the two packages from declaring it"
             }
@@ -787,12 +776,6 @@ impl ProfileRemedy {
     /// The individually named resolutions that apply.
     pub fn resolutions(&self) -> &[ProfileResolution] {
         &self.resolutions
-    }
-
-    /// Whether capturing repository content is an applicable resolution.
-    pub fn allows_capture_repository_content(&self) -> bool {
-        self.resolutions
-            .contains(&ProfileResolution::CaptureRepositoryContent)
     }
 
     /// Render the resolutions as the human prose attached to a finding.
@@ -976,8 +959,7 @@ impl ProfileTargetConflictsError {
         Self { conflicts }
     }
 
-    /// Distinct resolutions across every refused decision, naming capture only
-    /// where some decision's remedy allows it.
+    /// Distinct resolutions across every refused decision.
     pub fn suggestions(&self) -> Vec<String> {
         remedy_suggestions(self.conflicts.iter().map(|entry| entry.conflict.remedy()))
     }
@@ -986,9 +968,7 @@ impl ProfileTargetConflictsError {
 /// Distinct resolution messages carried by `remedies`, in first-occurrence
 /// order — what a JSON envelope attaches as `suggestions` beside a refusal or
 /// a divergence report. A resolution named by more than one remedy in the
-/// sequence is suggested once, so `capture-repository-content`'s prose names
-/// `jit profile capture` only when some remedy in the sequence actually
-/// carries it.
+/// sequence is suggested once.
 pub fn remedy_suggestions(remedies: impl IntoIterator<Item = ProfileRemedy>) -> Vec<String> {
     let mut seen = Vec::new();
     let mut suggestions = Vec::new();
@@ -2378,7 +2358,7 @@ fn compose_profile_contributions(
 /// * A registry holding a value no owner ever published is
 ///   [`ProfileTargetConflict::Diverged`], the same refusal an asset edited after
 ///   its owner published it receives, and with the same remedy — restore the
-///   published value, or capture the edit into the package that owns it.
+///   published value.
 ///
 /// The last case is why this reads the registry rather than the record alone:
 /// repository-wide validation reports exactly that declaration as diverged, so a
@@ -2764,10 +2744,7 @@ fn repository_definition(
 ///
 /// This is where a registry's text answers an identity, and it is deliberately
 /// separate from where the text comes from: composition and the ownership check
-/// read it out of a captured image, while a package capture reads it out of the
-/// registry file its own confined open returned. Both therefore agree about what
-/// the repository declares without a second interpretation of a registry's shape
-/// (`@/inv/convention-convergence`).
+/// read it out of a captured image.
 ///
 /// # Errors
 ///
@@ -3301,14 +3278,14 @@ fn json_object_to_table(value: &JsonValue, registry: &str) -> Result<Table, Repo
 /// The value one contribution declares, as its own model states it.
 ///
 /// Every variant carries its declaration in one `value`, so this is the single
-/// answer to "what does this contribution say", shared by the packaged-carrier
-/// comparison and by the capture that writes a repository's value back into the
-/// manifest that declared it.
+/// answer to "what does this contribution say" for the packaged-carrier
+/// comparison.
 ///
 /// # Errors
 ///
 /// Returns [`RepositoryStateError`] when a projection configuration does not
 /// serialize.
+#[cfg(any(test, feature = "test-support"))]
 pub(crate) fn contributed_json_value(
     contribution: &Contribution,
 ) -> Result<JsonValue, RepositoryStateError> {
@@ -3326,27 +3303,6 @@ pub(crate) fn contributed_json_value(
             )
         }),
     }
-}
-
-/// The value one contribution declares, in the TOML spelling a manifest carries
-/// it with.
-///
-/// A capture writes the value a registry holds back into the manifest that
-/// declared it, and it reaches that document through the same JSON-to-TOML
-/// rendering that writes a composed contribution into a registry, so the two
-/// carriers of one declaration cannot spell one value differently.
-///
-/// # Errors
-///
-/// Returns [`RepositoryStateError`] when the declared value has no TOML
-/// spelling — a null, or a number outside what TOML carries.
-pub(crate) fn contributed_toml_value(
-    contribution: &Contribution,
-) -> Result<Value, RepositoryStateError> {
-    json_to_edit_value(
-        &contributed_json_value(contribution)?,
-        contribution.registry_path(),
-    )
 }
 
 fn json_to_item(value: &JsonValue, registry: &str) -> Result<Item, RepositoryStateError> {
@@ -4180,8 +4136,13 @@ mod tests {
                 );
             }
             assert!(
-                message.contains(", or "),
-                "a refusal offers the adopter a choice of remedy: {message}"
+                entry
+                    .conflict
+                    .remedy()
+                    .resolutions()
+                    .iter()
+                    .all(|resolution| message.contains(resolution.message())),
+                "a refusal states every resolution its remedy carries: {message}"
             );
             let subject = match &entry.subject {
                 ProfileTargetSubject::File(path) => path.repository_relative(),
@@ -4192,15 +4153,6 @@ mod tests {
                 "a refusal names the profile and what it is about: {message}"
             );
         }
-        assert_eq!(
-            entries
-                .iter()
-                .filter(|entry| entry.to_string().contains("jit profile capture"))
-                .count(),
-            2,
-            "capture is named wherever folding the repository's own content resolves the refusal, \
-             and nowhere it would leave the refusal in place"
-        );
         let diverged = entries[2].to_string();
         assert!(
             diverged.contains(&"a".repeat(FINGERPRINT_MESSAGE_DIGITS))
@@ -4223,45 +4175,12 @@ mod tests {
         assert_eq!(serialized["kind"], "diverged");
         assert_eq!(
             serialized["remedy"]["resolutions"],
-            serde_json::json!(["restore-recorded-content", "capture-repository-content"])
+            serde_json::json!(["restore-recorded-content"])
         );
         assert_eq!(
             conflict.remedy().resolutions(),
-            &[
-                ProfileResolution::RestoreRecordedContent,
-                ProfileResolution::CaptureRepositoryContent,
-            ]
+            &[ProfileResolution::RestoreRecordedContent]
         );
-    }
-
-    #[test]
-    fn test_profile_target_conflict_remedy_marks_capture_only_for_resolvable_conflicts() {
-        let conflicts = [
-            ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Repository,
-            },
-            ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("base")),
-            },
-            ProfileTargetConflict::Diverged {
-                base: ThreeWayValue::Absent,
-                current: ThreeWayValue::Absent,
-                candidate: ThreeWayValue::Absent,
-            },
-            ProfileTargetConflict::Contested { owners: Vec::new() },
-        ];
-
-        assert_eq!(
-            conflicts
-                .iter()
-                .filter(|conflict| conflict.remedy().allows_capture_repository_content())
-                .count(),
-            2,
-            "capture applies only to repository-owned occupants and diverged owned targets"
-        );
-        assert!(conflicts
-            .iter()
-            .all(|conflict| conflict.message().contains(&conflict.remedy().message())));
     }
 
     #[test]
@@ -4284,7 +4203,7 @@ mod tests {
         assert_eq!(serialized["conflict"]["kind"], "occupied");
         assert_eq!(
             serialized["conflict"]["remedy"]["resolutions"],
-            serde_json::json!(["move-target-aside", "capture-repository-content"])
+            serde_json::json!(["move-target-aside"])
         );
     }
 
@@ -4328,60 +4247,27 @@ mod tests {
     }
 
     #[test]
-    fn test_profile_target_conflicts_error_suggestions_dedupes_and_marks_capture_only_when_applicable(
-    ) {
-        let entry = |owner: &str, conflict: ProfileTargetConflict| ProfileTargetConflictEntry {
+    fn test_profile_target_conflicts_error_suggestions_dedupes_across_entries() {
+        let entry = |owner: &str| ProfileTargetConflictEntry {
             owner: ProfileId::try_from(owner).expect("a canonical test profile id"),
             subject: ProfileTargetSubject::File(
                 VirtualPath::worktree(format!("{owner}.txt")).expect("a canonical worktree path"),
             ),
-            conflict,
+            conflict: ProfileTargetConflict::Occupied {
+                occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
+            },
         };
 
-        // Two package-occupied entries carry the identical remedy, so their
-        // resolutions collapse into one suggestion apiece rather than repeating.
-        let occupied_only = ProfileTargetConflictsError::new(vec![
-            entry(
-                "first",
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
-                },
-            ),
-            entry(
-                "second",
-                ProfileTargetConflict::Occupied {
-                    occupant: ProfileConflictOccupant::Package(ProfilePackageId::new("other")),
-                },
-            ),
-        ]);
-        let suggestions = occupied_only.suggestions();
+        // Two entries carry the identical remedy, so their resolutions collapse
+        // into one suggestion apiece rather than repeating.
+        let suggestions =
+            ProfileTargetConflictsError::new(vec![entry("first"), entry("second")]).suggestions();
+
         assert_eq!(
             suggestions.len(),
             2,
             "a package-occupied remedy names two resolutions, deduplicated across entries: \
              {suggestions:?}"
-        );
-        assert!(
-            suggestions
-                .iter()
-                .all(|text| !text.contains("jit profile capture")),
-            "no entry's remedy allows capture, so no suggestion names it: {suggestions:?}"
-        );
-
-        // A repository-occupied entry's remedy allows capture, so it is named.
-        let with_capture = ProfileTargetConflictsError::new(vec![entry(
-            "third",
-            ProfileTargetConflict::Occupied {
-                occupant: ProfileConflictOccupant::Repository,
-            },
-        )]);
-        assert!(
-            with_capture
-                .suggestions()
-                .iter()
-                .any(|text| text.contains("jit profile capture")),
-            "a repository-occupied remedy allows capture: {:?}",
-            with_capture.suggestions()
         );
     }
 

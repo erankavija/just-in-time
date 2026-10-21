@@ -2181,58 +2181,6 @@ fn run() -> Result<()> {
                 CommandExecutor::plan_profiles_from_sources,
                 CommandExecutor::apply_profile_from_sources,
             )?,
-            ProfileCommands::Capture {
-                source,
-                destination,
-                dry_run,
-                json,
-            } => {
-                let invocation_dir = std::env::current_dir()?;
-                let result = if dry_run {
-                    executor.plan_profile_capture(&invocation_dir, &source, &destination)
-                } else {
-                    executor.capture_profile_package(&invocation_dir, &source, &destination)
-                };
-                match result {
-                    Ok(result) => {
-                        if json {
-                            let output = JsonOutput::success(&result);
-                            println!("{}", output.to_json_string()?);
-                        } else {
-                            for profile in result.items {
-                                let status = match profile.status {
-                                    jit::profile::ProfileApplicationStatus::Unchanged => {
-                                        "unchanged"
-                                    }
-                                    jit::profile::ProfileApplicationStatus::WouldApply => {
-                                        "would capture"
-                                    }
-                                    jit::profile::ProfileApplicationStatus::Applied => "captured",
-                                };
-                                print_profile_heading(
-                                    &profile.id,
-                                    &profile.version,
-                                    &profile.origin,
-                                    status,
-                                );
-                                println!("Destination: {}", profile.destination);
-                                println!("Package hash: {}", profile.package_hash);
-                                println!(
-                                    "Files: {} ({} bytes)",
-                                    profile.file_count, profile.byte_size
-                                );
-                                print_profile_decisions(&profile.targets, &profile.contributions);
-                            }
-                        }
-                    }
-                    Err(error) if json => {
-                        let json_error = profile_json_error(&error)?;
-                        println!("{}", json_error.to_json_string()?);
-                        std::process::exit(json_error.exit_code().code());
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
             ProfileCommands::Pack {
                 source,
                 output,

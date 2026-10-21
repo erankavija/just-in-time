@@ -489,10 +489,6 @@ impl CommandSchema {
                 Some(schema_to_value::<crate::profile::ProfilePlanResult>()),
                 "ProfilePlanResult",
             ),
-            "profile_capture" => (
-                Some(schema_to_value::<crate::profile::ProfileCaptureResult>()),
-                "ProfileCaptureResult",
-            ),
             "profile_pack" => (
                 Some(schema_to_value::<crate::profile::ProfilePackResult>()),
                 "ProfilePackResult",
