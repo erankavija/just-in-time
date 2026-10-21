@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1726f007add3e36b8367c1919dd5818df325aa4d",
+  "completed_at": "2026-10-21T01:06:26.084657207Z",
+  "duration_ms": 234612,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The byte-offset lexer fix and UTF-8 regression coverage satisfy REQ-01 through REQ-05; the prior property-generator finding is addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6a3b4c29-a035-4f53-b198-92fd8d9d0f34",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:02:31.471790938Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 39ac419f0, 51a31c081, 7b54b90e5, 35b8fff00 (`jit:7d1bfe89`)\nPolicy sources: AGENTS.md\nResolved items: REQ-01–REQ-05 (issue markdown); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/no-ignored-tests, @/invariant/semantic-test-assertions, @/invariant/bounded-rust-build-footprint (.jit/invariants.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T01:00:48Z); code-review failed (exit 1, prior F1 addressed by 7b54b90e5)\nTruncation recovery: scoped re-reads of affected commits, current lexer/tests, caller, and policy registries after aggregate-output truncation.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The byte-offset lexer fix and UTF-8 regression coverage satisfy REQ-01 through REQ-05; the prior property-generator finding is addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
