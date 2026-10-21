@@ -953,15 +953,6 @@ pub struct GateRunResult {
     /// Git branch the checker was launched on, under the same conditions as
     /// [`commit`](Self::commit).
     pub branch: Option<String>,
-    /// Whether the working tree differed from the named [`commit`](Self::commit)
-    /// when the checker started. `Some(true)` means the tree carried uncommitted
-    /// or untracked changes, so the run evidences that modified tree rather than
-    /// the commit alone; `Some(false)` means the tree matched the commit exactly;
-    /// `None` means there was no commit to compare against — a clean tree is
-    /// never fabricated in that case. Defaulted so run records written before
-    /// this field existed parse as `None`.
-    #[serde(default)]
-    pub tree_dirty: Option<bool>,
     /// Result status
     pub status: GateRunStatus,
     /// When execution started

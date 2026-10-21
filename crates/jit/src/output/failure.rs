@@ -520,7 +520,6 @@ mod exit_code_projection_tests {
             issue_id: "abc123".to_string(),
             commit: None,
             branch: None,
-            tree_dirty: None,
             status,
             started_at: chrono::Utc::now(),
             completed_at: None,

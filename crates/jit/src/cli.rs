@@ -1583,13 +1583,11 @@ pub enum GateCommands {
     /// `fail` on checker failure, `error` on runner error. Pre-verdict argument
     /// and lookup errors (codes 2 and 3) carry no `verdict` field.
     ///
-    /// When an automated gate already passed at the current HEAD commit, its
-    /// checker is skipped and JSON reports `already_passed: true`. A gate that
-    /// declares the repository files its checker reads takes a prior run's
-    /// verdict over the same content instead of executing again, and its run
-    /// record names the run that verdict came from. Every manual evaluation
-    /// records a fresh attestation. Use --force to execute an automated checker
-    /// unconditionally.
+    /// An automated gate executes its checker on every evaluation, except that a
+    /// gate declaring the repository files its checker reads takes a prior
+    /// run's verdict over the same content, and its run record names the run
+    /// that verdict came from. Every manual evaluation records a fresh
+    /// attestation. Use --force to execute an automated checker unconditionally.
     #[command(visible_alias = "eval")]
     Evaluate {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1608,8 +1606,8 @@ pub enum GateCommands {
         #[arg(short, long)]
         by: Option<String>,
 
-        /// Execute the checker even where the gate already passed at the
-        /// current HEAD, or declares inputs a prior run's verdict covers
+        /// Execute the checker even where a prior run's verdict covers the
+        /// gate's declared inputs
         #[arg(long)]
         force: bool,
 
@@ -1633,9 +1631,9 @@ pub enum GateCommands {
     /// list (auto gates before it still run and record their verdict; later
     /// gates are not attempted) — it never silently passes a manual gate.
     ///
-    /// Automated gates inherit skip-if-passed-at-HEAD and declared-input
-    /// verdict reuse; every manual gate records a fresh attestation. Use --force
-    /// to execute every automated checker. An issue with no required gates
+    /// Automated gates inherit declared-input verdict reuse; every manual gate
+    /// records a fresh attestation. Use --force to execute every automated
+    /// checker. An issue with no required gates
     /// succeeds (exit 0) with an empty result set.
     EvaluateAll {
         /// Issue ID (full UUID, 8-char short id, or unique prefix)
@@ -1646,8 +1644,8 @@ pub enum GateCommands {
         #[arg(short, long)]
         by: Option<String>,
 
-        /// Execute every checker, even where a gate already passed at the
-        /// current HEAD or declares inputs a prior run's verdict covers
+        /// Execute every checker, even where a prior run's verdict covers a
+        /// gate's declared inputs
         #[arg(long)]
         force: bool,
 
@@ -1680,7 +1678,7 @@ pub enum GateCommands {
         #[arg(short, long)]
         by: Option<String>,
 
-        /// Execute the checker even where the gate already passed or its declared inputs are reusable
+        /// Execute the checker even where a prior run's verdict covers the gate's declared inputs
         #[arg(long)]
         force: bool,
 

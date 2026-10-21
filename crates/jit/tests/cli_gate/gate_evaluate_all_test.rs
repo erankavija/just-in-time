@@ -2,8 +2,7 @@
 //!
 //! Covers: all-pass -> exit 0 with per-gate JSON; fail-fast at the first
 //! non-passing gate (a later gate's checker never runs) -> exit 4; runner error
-//! -> exit 10; inheritance of automated-gate skip-if-passed-at-HEAD from
-//! `gate evaluate`; and, for a mixed auto/manual gate set, fail-fast at an
+//! -> exit 10; and, for a mixed auto/manual gate set, fail-fast at an
 //! unattested manual gate rather than a silent pass (jit:1d59070d REQ-03).
 
 use std::fs;
@@ -157,7 +156,6 @@ fn test_evaluate_all_all_gates_pass_exit_0() {
     let gates = json["gates"].as_array().unwrap();
     assert_eq!(gates.len(), 2);
     assert_eq!(gates[0]["key"], "g1");
-    assert_eq!(gates[0]["already_passed"], false);
     assert_eq!(gates[1]["key"], "g2");
     assert_eq!(run_count(&root, "g1"), 1);
     assert_eq!(run_count(&root, "g2"), 1);
@@ -256,43 +254,6 @@ fn test_evaluate_all_runner_error_exit_10() {
     assert_eq!(json["error"]["code"], "IO_ERROR");
     assert_eq!(json["error"]["details"]["verdict"], "error");
     assert_eq!(run_count(&root, "g2"), 0, "later gate must not run");
-}
-
-#[test]
-fn test_evaluate_all_skips_already_passed_gate() {
-    let (_temp, root) = setup_git_jit_repo();
-    define_gate(&root, "g1", "true");
-    define_gate(&root, "g2", "true");
-    let id = create_issue_with_gates(&root, &["g1", "g2"]);
-
-    // Pre-pass g1 at HEAD so evaluate-all should skip it.
-    jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate", &id, "g1"])
-        .output()
-        .unwrap();
-    assert_eq!(run_count(&root, "g1"), 1);
-
-    let out = jit()
-        .current_dir(&root)
-        .args(["gate", "evaluate-all", &id, "--json"])
-        .output()
-        .unwrap();
-    assert_eq!(out.status.code(), Some(0));
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-    let gates = json["gates"].as_array().unwrap();
-    assert_eq!(gates.len(), 2);
-    assert_eq!(gates[0]["key"], "g1");
-    assert_eq!(
-        gates[0]["already_passed"], true,
-        "g1 already passed at HEAD; must be skipped"
-    );
-    assert_eq!(gates[1]["key"], "g2");
-    assert_eq!(gates[1]["already_passed"], false);
-
-    // g1's checker did NOT re-run; g2's ran once.
-    assert_eq!(run_count(&root, "g1"), 1, "g1 must not re-run");
-    assert_eq!(run_count(&root, "g2"), 1);
 }
 
 #[test]

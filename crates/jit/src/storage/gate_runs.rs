@@ -70,7 +70,6 @@ mod tests {
             issue_id: "issue-123".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
-            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: Utc::now(),
             completed_at: Some(Utc::now()),
@@ -155,11 +154,10 @@ mod tests {
         assert!(loaded.findings.is_none());
     }
 
-    /// REQ-03: a run recorded before the `tree_dirty` field existed must still
-    /// load; the serde default fills it with `None` rather than erroring, and a
-    /// record that carries the field round-trips its value.
+    /// A run recorded while gate runs carried the retired `tree_dirty` key still
+    /// loads; the key is ignored.
     #[test]
-    fn test_load_gate_run_tree_dirty_defaults_and_round_trips() {
+    fn test_load_gate_run_ignores_retired_tree_dirty_key() {
         let base = serde_json::json!({
             "schema_version": 1,
             "run_id": "tree-legacy",
@@ -177,18 +175,12 @@ mod tests {
             "stderr": "",
             "command": "true",
             "by": null,
-            "message": null
+            "message": null,
+            "tree_dirty": true
         });
 
-        // No `tree_dirty` key: defaults to None.
-        let legacy: GateRunResult = serde_json::from_value(base.clone()).unwrap();
-        assert_eq!(legacy.tree_dirty, None);
-
-        // Present and true: preserved through load.
-        let mut dirty = base;
-        dirty["tree_dirty"] = serde_json::json!(true);
-        let loaded: GateRunResult = serde_json::from_value(dirty).unwrap();
-        assert_eq!(loaded.tree_dirty, Some(true));
+        let loaded: GateRunResult = serde_json::from_value(base).unwrap();
+        assert_eq!(loaded.run_id, "tree-legacy");
     }
 
     #[test]
@@ -238,7 +230,6 @@ mod tests {
                     issue_id: "issue-123".to_string(),
                     commit: None,
                     branch: None,
-                    tree_dirty: None,
                     status: if i == 2 {
                         GateRunStatus::Passed
                     } else {
@@ -298,9 +289,8 @@ mod tests {
             gate_key: "lint".to_string(),
             stage: GateStage::Postcheck,
             issue_id: "issue-456".to_string(),
-            commit: None,     // No git context
-            branch: None,     // No git context
-            tree_dirty: None, // No git context
+            commit: None, // No git context
+            branch: None, // No git context
             status: GateRunStatus::Passed,
             started_at: Utc::now(),
             completed_at: Some(Utc::now()),

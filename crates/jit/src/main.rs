@@ -1089,7 +1089,6 @@ mod gate_findings_text_tests {
             issue_id: "issue-1".to_string(),
             commit: None,
             branch: None,
-            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc::now(),
             completed_at: None,
@@ -1183,9 +1182,6 @@ fn print_gate_run_details(result: &GateRunResult) {
     }
     if let Some(commit) = &result.commit {
         println!("  Commit: {}", commit);
-    }
-    if let Some(dirty) = result.tree_dirty {
-        println!("  Tree: {}", if dirty { "dirty" } else { "clean" });
     }
     if let Some(source_run) = result.origin.source_run() {
         println!("  Verdict: taken from run {source_run} over the same declared inputs");
@@ -4554,33 +4550,18 @@ fn run() -> Result<()> {
                             output_ctx.print_warning(warning)?;
                         }
 
-                        let already_passed = outcome.already_passed;
                         if json {
                             use jit::output::JsonOutput;
-                            let message = if already_passed {
-                                format!(
-                                    "Gate '{}' already passed at HEAD for issue {}; skipped",
-                                    gate_key, id
-                                )
-                            } else {
-                                format!("Passed gate '{}' for issue {}", gate_key, id)
-                            };
                             let response = serde_json::json!({
                                 "issue_id": id,
                                 "key": gate_key,
                                 "status": "passed",
                                 "verdict": "pass",
-                                "already_passed": already_passed,
                                 "warnings": outcome.warnings,
-                                "message": message,
+                                "message": format!("Passed gate '{}' for issue {}", gate_key, id),
                             });
                             let output = JsonOutput::success(response);
                             println!("{}", output.to_json_string()?);
-                        } else if already_passed {
-                            let _ = output_ctx.print_success(format!(
-                                "Gate '{}' already passed at HEAD for issue {}, skipping (use --force to re-run)",
-                                gate_key, id
-                            ));
                         } else {
                             let _ = output_ctx.print_success(format!(
                                 "Passed gate '{}' for issue {}",
@@ -4619,7 +4600,6 @@ fn run() -> Result<()> {
                                         "key": entry.gate_key,
                                         "status": "passed",
                                         "verdict": "pass",
-                                        "already_passed": entry.already_passed,
                                         "warnings": entry.warnings,
                                     })
                                 })
@@ -4642,14 +4622,9 @@ fn run() -> Result<()> {
                                 .print_success(format!("No required gates for issue {}", id));
                         } else {
                             for entry in &outcome.results {
-                                let suffix = if entry.already_passed {
-                                    " (already passed at HEAD)"
-                                } else {
-                                    ""
-                                };
                                 let _ = output_ctx.print_success(format!(
-                                    "Passed gate '{}' for issue {}{}",
-                                    entry.gate_key, id, suffix
+                                    "Passed gate '{}' for issue {}",
+                                    entry.gate_key, id
                                 ));
                             }
                         }
@@ -4678,14 +4653,9 @@ fn run() -> Result<()> {
                                 for warning in &outcome.warnings {
                                     output_ctx.print_warning(warning)?;
                                 }
-                                let suffix = if outcome.already_passed {
-                                    " (already passed at HEAD)"
-                                } else {
-                                    ""
-                                };
                                 output_ctx.print_success(format!(
-                                    "Passed gate '{}' for issue {}{}",
-                                    gate_key, entry.issue_id, suffix
+                                    "Passed gate '{}' for issue {}",
+                                    gate_key, entry.issue_id
                                 ))?;
                             }
                             results.push(jit::output::GateEvaluateManyResult {
@@ -4693,7 +4663,6 @@ fn run() -> Result<()> {
                                 key: gate_key.clone(),
                                 status: "passed".to_string(),
                                 verdict: Some("pass".to_string()),
-                                already_passed: Some(outcome.already_passed),
                                 warnings: outcome.warnings,
                                 error: None,
                             });
@@ -4727,7 +4696,6 @@ fn run() -> Result<()> {
                                 key: gate_key.clone(),
                                 status: "failed".to_string(),
                                 verdict,
-                                already_passed: None,
                                 warnings,
                                 error: Some(error_value),
                             });

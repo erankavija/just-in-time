@@ -3678,7 +3678,6 @@ mod tests {
             issue_id: issue_id.to_string(),
             commit: None,
             branch: None,
-            tree_dirty: None,
             status: crate::domain::GateRunStatus::Passed,
             started_at: chrono::Utc::now(),
             completed_at: Some(chrono::Utc::now()),

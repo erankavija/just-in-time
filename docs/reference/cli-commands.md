@@ -2122,7 +2122,7 @@ The gate key may be supplied as a positional argument or via `--gate <key>`. Exa
 **Options:**
 - `--gate <KEY>` - Gate key (flag form, alternative to the positional argument)
 - `--by <WHO>` - Who is passing the gate (e.g., `human:alice`, `ci:github-actions`). Required for a manual gate; ignored for an automated gate, whose verdict comes from the checker.
-- `--force` - Execute an automated gate's checker even where it already passed at the current HEAD commit, or where the gate declares inputs a prior run's verdict covers
+- `--force` - Execute an automated gate's checker even where a prior run's verdict covers the gate's declared inputs
 
 **Examples:**
 ```bash
@@ -2135,32 +2135,17 @@ jit gate evaluate abc123 --gate code-review --by "human:alice"
 # Evaluate an automated gate — runs its checker (no --by needed)
 jit gate evaluate abc123 tests
 
-# Force a re-run even if it already passed at HEAD
+# Force a re-run even where a prior verdict covers the declared inputs
 jit gate evaluate abc123 tests --force
 jit gate evaluate abc123 --gate tests --force
 ```
 
 **Behavior:**
-- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence with a new event and timestamp, including when the same attestor already passed the gate at the current `HEAD`. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
+- For a manual gate: `--by` is required. Bare `jit gate evaluate <id> <gate>` on a manual gate is a usage error (exit 2) — a manual gate has no checker to run, so evaluating it without an attestor would silently record an unattributed pass. With `--by`, every invocation records fresh evidence with a new event and timestamp, including when the same attestor already passed the gate. If that clears the final blocker on a `gated` issue, the manual-pass path may transition it to `done`.
 - For an automated (auto) gate: runs the checker and records `passed` only when the checker passes; `--by` is not required. This evaluation records a run; it does not itself complete the issue.
 - A checker executes at most once per evaluation. Its verdict is recorded even when the repository changes while it runs.
 - The gate-run record and `--json` gate-run output report `evaluation_stability` as `stable` or `inputs_moved`.
 - After required statuses are passed, use `jit issue update <id> --state done` to complete a gated issue through the explicit completion path.
-
-**Automated skip when already passed at HEAD:**
-- If an automated gate's latest run already passed at the current `HEAD` commit,
-  `jit gate evaluate` skips the (often expensive) checker, exits `0`, and reports
-  `already_passed: true` in `--json`. The non-`--json` path prints a concise
-  "already passed at HEAD, skipping (use --force to re-run)" line.
-- The skip compares the current `HEAD` against the commit stamped on the latest
-  recorded run; both must be present and equal. When there is no git repository
-  or no commit (`HEAD` unresolvable), the run is never skipped — the prior pass
-  cannot be proven current.
-- Manual attestations are never skipped; each invocation with `--by` records
-  fresh evidence even at the same `HEAD`.
-- `--force` bypasses the automated check and executes the checker unconditionally.
-- On a normal run (manual attestation, or a freshly executed checker), `--json`
-  reports `already_passed: false`.
 
 **Verdict reuse over unchanged declared inputs:**
 - A gate that declares the repository files its checker reads
@@ -2173,8 +2158,9 @@ jit gate evaluate abc123 --gate tests --force
 - `jit gate status <id> <gate> --json` reports the run's `inputs_digest` and an
   `origin` of `{"derivation": "executed"}` or
   `{"derivation": "reused", "source_run": "<run-id>"}`, so a reused verdict is
-  never counted as an independent verification. A gate declaring no inputs
-  executes its checker on every evaluation.
+  never counted as an independent verification.
+- A gate declaring no inputs executes its checker on every evaluation.
+- `--force` executes the checker unconditionally.
 
 **Exit-code taxonomy** (auto and manual gates): the
 [exit-code reference](exit-codes.md#command-specific-mappings) is the authority
@@ -2205,7 +2191,7 @@ jit gate evaluate abc123 tests --json
 #   "key": "tests",
 #   "status": "passed",
 #   "verdict": "pass",
-#   "already_passed": false,
+#   "warnings": [],
 #   "message": "Passed gate 'tests' for issue abc123"
 # }
 
@@ -2224,15 +2210,13 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 
 **Options:**
 - `--by <WHO>` - Record who passed the gates (e.g., `human:alice`, `ci:github-actions`)
-- `--force` - Execute every gate's checker even where it already passed at the current HEAD commit, or declares inputs a prior run's verdict covers
+- `--force` - Execute every gate's checker even where a prior run's verdict covers the gate's declared inputs
 
 **Behavior:**
 - Runs each required gate in declaration order, delegating to `jit gate evaluate`, so
   every gate inherits the same exit-code taxonomy and `verdict` semantics.
-  Automated gates also inherit **skip-if-passed-at-HEAD** behaviour (an
-  already-passed gate is not re-run; its entry reports `already_passed: true`)
-  and declared-input verdict reuse, while manual gates record fresh evidence on
-  every invocation.
+  Automated gates also inherit declared-input verdict reuse, while manual gates
+  record fresh evidence on every invocation.
 - **Manual gates require attestation:** every manual gate in the required set
   needs `--by <attestor>` (applied uniformly; ignored by automated gates).
   Without it, evaluation fails fast at the first manual gate reached in
@@ -2246,21 +2230,21 @@ jit gate evaluate-all <ISSUE_ID> [--by <WHO>] [--force]
 - An issue with **no required gates** succeeds with exit `0` and an empty
   `gates` array.
 - `--json` emits a top-level `verdict: "pass"` plus a `gates` array, one entry
-  per gate (`key`, `status`, `verdict`, `already_passed`, `warnings`). On the first
+  per gate (`key`, `status`, `verdict`, `warnings`). On the first
   failure it emits the same JSON-error shape as `jit gate evaluate` (with
   `error.details.key` naming the offending gate, and `error.details.verdict`
   `fail` or `error`).
 
 ```bash
-# All gates pass (one already passed at HEAD, one freshly run)
+# All gates pass
 jit gate evaluate-all abc123 --json
 # {
 #   "issue_id": "abc123",
 #   "status": "passed",
 #   "verdict": "pass",
 #   "gates": [
-#     { "key": "tests",  "status": "passed", "verdict": "pass", "already_passed": true,  "warnings": [] },
-#     { "key": "clippy", "status": "passed", "verdict": "pass", "already_passed": false, "warnings": [] }
+#     { "key": "tests",  "status": "passed", "verdict": "pass", "warnings": [] },
+#     { "key": "clippy", "status": "passed", "verdict": "pass", "warnings": [] }
 #   ],
 #   "message": "Passed 2 required gate(s) for issue abc123"
 # }
@@ -2285,8 +2269,8 @@ jit gate evaluate-many <GATE_KEY> <ISSUE_ID>... [--by <WHO>] [--force]
 The gate key comes first, followed by one or more issue IDs. This common-
 argument-first shape matches the multi-issue `gate preset apply` command. Use
 `--by <WHO>` for a manual gate; it is ignored for an automated gate. Use
-`--force` to execute an automated checker even when its current pass or a
-declared-input verdict is reusable.
+`--force` to execute an automated checker even when a declared-input verdict
+is reusable.
 
 Issues are evaluated in argument order. Evaluation is serialised per issue,
 and the command continues after a checker failure, runner error, lookup error,
@@ -2296,8 +2280,8 @@ evaluate`](#jit-gate-evaluate) taxonomy.
 
 With `--json`, the response uses the list envelope `{"count": N,
 "results": [...]}`. Each result contains `issue_id`, `key`, `status`,
-`verdict` when a verdict was produced, `already_passed` for automated checker
-reuse, `warnings`, and `error` when that issue did not pass.
+`verdict` when a verdict was produced, `warnings`, and `error` when that issue
+did not pass.
 
 ### `jit gate fail`
 
