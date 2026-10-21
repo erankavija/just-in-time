@@ -87,7 +87,7 @@ fn dep_add_batch_json_error(
         {
             ErrorCode::IssueNotFound.as_str()
         } else if err
-            .downcast_ref::<jit::storage::InvalidIdPrefixError>()
+            .downcast_ref::<jit::domain::InvalidIdPrefixError>()
             .is_some()
         {
             ErrorCode::InvalidIdPrefix.as_str()
@@ -5419,7 +5419,7 @@ fn run() -> Result<()> {
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
                             || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::storage::InvalidIdPrefixError>()
+                            || e.downcast_ref::<jit::domain::InvalidIdPrefixError>()
                                 .is_some()
                         {
                             JsonError::issue_not_found(&id)

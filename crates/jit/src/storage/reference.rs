@@ -11,7 +11,7 @@
 //! - The identifier widths come from the constants that enforce them:
 //!   [`SHORT_ID_LENGTH`], the width [`Issue::short_id`](crate::domain::Issue::short_id)
 //!   truncates to, and [`MIN_ID_PREFIX_LENGTH`], the minimum
-//!   [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id) accepts.
+//!   [`IssueIdPrefix`](crate::domain::IssueIdPrefix) accepts.
 //! - The event-log sample lines are [`EventTag::sample`] records encoded by
 //!   [`serialize_event`] with the newline terminator the finalizer's positioned
 //!   append adds to each line (`compose_events`). The tag vocabulary is NOT restated here: it is the event
@@ -29,12 +29,12 @@
 //!   the projection.
 
 use crate::declarations::GateStage;
+use crate::domain::MIN_ID_PREFIX_LENGTH;
 use crate::domain::{
     EventTag, GateFinding, GateFindings, GateRunResult, GateRunStatus, GATE_RUN_SCHEMA_VERSION,
     SHORT_ID_LENGTH,
 };
 use crate::repository_state::{gate_run_result_relative_path, serialize_event, serialize_gate_run};
-use crate::storage::MIN_ID_PREFIX_LENGTH;
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::path::Path;
@@ -445,17 +445,16 @@ pub fn render_reference_markdown() -> Result<String> {
 
     // One line per rule, so the interpolated minimum cannot skew the wrapping.
     let prefix_rules = [
-        "- an input of full-id length (32 hex digits once normalized) is looked up directly, \
-         as given: it resolves only in the canonical hyphenated lowercase form the record is \
-         stored under, and is not searched for as a prefix;"
-            .to_string(),
         format!(
-            "- a shorter input must be at least {MIN_ID_PREFIX_LENGTH} characters after \
-             normalization; below the minimum it is refused as an argument error (exit code 2, \
-             see [Exit Codes](exit-codes.md)) rather than searched for;"
+            "- the normalized input must be at least {MIN_ID_PREFIX_LENGTH} characters; below the \
+             minimum it is refused as an argument error (exit code 2, see \
+             [Exit Codes](exit-codes.md)) before any issue record is read;"
         ),
-        "- the prefix must match exactly one id in the repository index. Several matches are \
-         refused as ambiguous, and the error lists the candidates."
+        "- it names every id whose normalized form it prefixes, so a full id resolves in any \
+         case or hyphenation;"
+            .to_string(),
+        "- it must name exactly one id in the repository index. Several matches are refused as \
+         ambiguous, and the error lists the candidates."
             .to_string(),
     ]
     .join("\n");
@@ -501,7 +500,7 @@ pub fn render_reference_markdown() -> Result<String> {
          share their leading {SHORT_ID_LENGTH} characters would print the same short id.\n\
          \n\
          Commands take an id **prefix** wherever they take an issue id. Resolution\n\
-         lowercases the input and drops its hyphens to measure it, then:\n\
+         lowercases the input and drops its hyphens, then:\n\
          \n\
          {prefix_rules}\n\
          \n\
@@ -555,8 +554,6 @@ pub fn render_reference_markdown() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::Issue;
-    use crate::storage::{InMemoryStorage, InvalidIdPrefixError, IssueStore};
     use schemars::schema_for;
     use std::collections::BTreeSet;
     use std::path::PathBuf;
@@ -568,22 +565,6 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join(test_support::REFERENCE_PATH)
-    }
-
-    fn seed_issue_preimage(storage: &InMemoryStorage, issue: &Issue) {
-        storage.add_data_file(
-            format!("issues/{}.json", issue.id),
-            std::str::from_utf8(&crate::repository_state::serialize_issue(issue).unwrap()).unwrap(),
-        );
-        let index = crate::repository_state::RepositoryIndex {
-            schema_version: crate::repository_state::SUPPORTED_INDEX_SCHEMA_VERSION,
-            all_ids: vec![issue.id.clone()],
-            deleted_ids: Vec::new(),
-        };
-        storage.add_data_file(
-            "index.json",
-            std::str::from_utf8(&index.to_pretty_bytes().unwrap()).unwrap(),
-        );
     }
 
     /// REQ-04 (field completeness): the projected field list must be exactly the
@@ -701,71 +682,6 @@ mod tests {
         assert!(!record
             .values()
             .any(|value| value == &serde_json::json!(issue.short_id())));
-    }
-
-    /// REQ-01: the prefix minimum the page states is the one resolution enforces
-    /// — an input below it is refused as an [`InvalidIdPrefixError`], whatever the
-    /// index holds.
-    #[test]
-    fn test_resolution_refuses_a_prefix_below_the_projected_minimum() {
-        let storage = InMemoryStorage::new();
-        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
-        let id = issue.id.clone();
-        seed_issue_preimage(&storage, &issue);
-
-        let too_short: String = id
-            .replace('-', "")
-            .chars()
-            .take(MIN_ID_PREFIX_LENGTH - 1)
-            .collect();
-        let error = storage
-            .resolve_issue_id(&too_short)
-            .expect_err("a prefix below the minimum is refused");
-        assert!(error.downcast_ref::<InvalidIdPrefixError>().is_some());
-
-        // At the minimum, resolution searches the index instead of refusing.
-        let shortest: String = id
-            .replace('-', "")
-            .chars()
-            .take(MIN_ID_PREFIX_LENGTH)
-            .collect();
-        assert_eq!(
-            storage
-                .resolve_issue_id(&shortest)
-                .expect("a prefix at the minimum resolves"),
-            id
-        );
-    }
-
-    /// REQ-01: an input of full-id length is looked up **as given**, so it
-    /// resolves only in the canonical hyphenated lowercase form — the page must
-    /// not promise that a hyphenless or uppercased full id resolves.
-    ///
-    /// Resolution normalizes the input to *measure* it, then takes the full-id
-    /// fast path with the original string; a 32-hex-digit input therefore never
-    /// falls through to the prefix search that would have matched it.
-    #[test]
-    fn test_full_id_resolves_only_in_canonical_form() {
-        let storage = InMemoryStorage::new();
-        let issue = crate::domain::types::fixture_issue("Probe".to_string(), String::new());
-        let id = issue.id.clone();
-        seed_issue_preimage(&storage, &issue);
-
-        assert_eq!(
-            storage
-                .resolve_issue_id(&id)
-                .expect("the canonical full id resolves"),
-            id
-        );
-
-        assert!(
-            storage.resolve_issue_id(&id.replace('-', "")).is_err(),
-            "a hyphenless full id is looked up as given, so it does not resolve"
-        );
-        assert!(
-            storage.resolve_issue_id(&id.to_uppercase()).is_err(),
-            "an uppercased full id is looked up as given, so it does not resolve"
-        );
     }
 
     /// REQ-03: the page names the path shared by finalization and readers, taken

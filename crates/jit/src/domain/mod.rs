@@ -4,6 +4,8 @@
 //! - **types**: Core runtime records (Issue, State, Priority, GateState, Event, etc.);
 //!   authored gate/rule declarations live in crate-root [`crate::declarations`]
 //! - **projection**: Pure normalization of an Issue into the canonical validation shape
+//! - **issue_id**: The id normalisation and prefix-matching rule every issue-id
+//!   resolver applies
 //! - **item**: Addressable structured items (qualified ids, item kinds) projected
 //!   from issue descriptions
 //! - **event_catalog**: The event-log tag vocabulary, each tag's association scope,
@@ -32,6 +34,7 @@ pub mod artifact_plan;
 pub mod event_catalog;
 pub mod event_log;
 pub mod gate_findings;
+pub mod issue_id;
 pub mod item;
 pub mod key_reference;
 pub mod projection;
@@ -63,6 +66,9 @@ pub use event_log::{parse_known_events, EventLogError};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.
 pub use projection::{project, ProjectedSection, Projection};
+
+// Re-export the issue-id matching rule.
+pub use issue_id::{InvalidIdPrefixError, IssueIdPrefix, MIN_ID_PREFIX_LENGTH};
 
 // Re-export the addressable-item model.
 pub use item::{

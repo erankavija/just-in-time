@@ -1,11 +1,10 @@
 //! Dependency graph operations
 
 use super::*;
+use crate::domain::IssueIdPrefix;
 use crate::errors::{DependencyBatchRejectedError, RedundantDependencyError};
 use crate::repository_state::{finalize, MutationIntent};
-use crate::storage::{
-    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, MIN_ID_PREFIX_LENGTH,
-};
+use crate::storage::{AmbiguousIdError, IssueNotFoundError};
 use std::collections::HashSet;
 
 #[derive(Clone)]
@@ -273,7 +272,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let expected_source = match &request {
                 CapturedDependencyMutation::Single { issue_id, .. }
                 | CapturedDependencyMutation::Batch { issue_id, .. } => {
-                    Some(resolve_captured_issue_id(&issues, issue_id)?)
+                    Some(super::resolve_issue_from_capture(&issues, issue_id)?)
                 }
                 CapturedDependencyMutation::ReduceAll { .. } => None,
                 _ => unreachable!("removals use the captured removal coordinator"),
@@ -366,14 +365,14 @@ impl<S: IssueStore> CommandExecutor<S> {
                     issue_id,
                     dependency_id,
                 } => CapturedDependencyMutation::RemoveSingle {
-                    issue_id: resolve_captured_issue_id(&issues, issue_id)?,
-                    dependency_id: resolve_captured_issue_id(&issues, dependency_id)?,
+                    issue_id: super::resolve_issue_from_capture(&issues, issue_id)?,
+                    dependency_id: super::resolve_issue_from_capture(&issues, dependency_id)?,
                 },
                 CapturedDependencyMutation::RemoveBatch {
                     issue_id,
                     dependency_ids,
                 } => CapturedDependencyMutation::RemoveBatch {
-                    issue_id: resolve_captured_issue_id(&issues, issue_id)?,
+                    issue_id: super::resolve_issue_from_capture(&issues, issue_id)?,
                     dependency_ids: dependency_ids.clone(),
                 },
                 _ => unreachable!("removal coordinator receives only removals"),
@@ -423,15 +422,14 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// Remove multiple dependencies from an issue.
     ///
     /// This is what `jit dep rm <from> <id>...` calls. Each `dep_id` is
-    /// matched directly against `issue`'s OWN stored `dependencies` (by exact
-    /// id, or by normalized prefix once at least 4 characters are given) —
-    /// NOT resolved through the repo-wide index first. A dependency whose
-    /// target issue was deleted no longer resolves there, which previously
-    /// made a dangling edge permanently unremovable via the CLI (jit:f847df3f);
-    /// matching the raw stored id sidesteps that resolution step entirely and
-    /// works whether the target is alive or gone. An exact stored id always
-    /// wins; a prefix that matches more than one stored dependency is rejected
-    /// as ambiguous rather than removing an arbitrary one.
+    /// matched by [`IssueIdPrefix`] directly against `issue`'s OWN stored
+    /// `dependencies` — NOT resolved through the repo-wide index first. A
+    /// dependency whose target issue was deleted no longer resolves there,
+    /// which previously made a dangling edge permanently unremovable via the
+    /// CLI (jit:f847df3f); matching the raw stored id sidesteps that
+    /// resolution step entirely and works whether the target is alive or gone. A prefix that matches more
+    /// than one stored dependency is rejected as ambiguous rather than
+    /// removing an arbitrary one.
     pub fn remove_dependencies(
         &self,
         issue_id: &str,
@@ -452,34 +450,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             CapturedDependencyOutcome::RemovedBatch(result) => Ok(result),
             _ => unreachable!("batch removal returns a batch-removal outcome"),
         }
-    }
-}
-
-fn resolve_captured_issue_id(issues: &[Issue], partial_id: &str) -> Result<String> {
-    let normalized = partial_id.to_lowercase().replace('-', "");
-    if normalized.len() < MIN_ID_PREFIX_LENGTH {
-        return Err(InvalidIdPrefixError::new(partial_id).into());
-    }
-    let matches = issues
-        .iter()
-        .filter(|issue| {
-            issue
-                .id
-                .replace('-', "")
-                .to_lowercase()
-                .starts_with(&normalized)
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(partial_id).into()),
-        [issue] => Ok(issue.id.clone()),
-        _ => Err(AmbiguousIdError::issue(
-            partial_id,
-            matches
-                .iter()
-                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
-        )
-        .into()),
     }
 }
 
@@ -548,39 +518,18 @@ fn derive_dependency_removal(
             let mut reported_removed = Vec::new();
             let mut not_found = Vec::new();
             for requested in dependency_ids {
-                let normalized = requested.to_lowercase().replace('-', "");
-                let exact = issue
+                let prefix = IssueIdPrefix::parse(requested)?;
+                let matches = issue
                     .dependencies
                     .iter()
                     .filter(|stored| !removed.contains(*stored))
-                    .find(|stored| stored.as_str() == requested.as_str())
-                    .cloned();
-                let matched = match exact {
-                    Some(exact) => Some(exact),
-                    None => {
-                        if normalized.len() < MIN_ID_PREFIX_LENGTH {
-                            return Err(InvalidIdPrefixError::new(requested).into());
-                        }
-                        let matches = issue
-                            .dependencies
-                            .iter()
-                            .filter(|stored| !removed.contains(*stored))
-                            .filter(|stored| {
-                                stored
-                                    .to_lowercase()
-                                    .replace('-', "")
-                                    .starts_with(&normalized)
-                            })
-                            .cloned()
-                            .collect::<Vec<_>>();
-                        match matches.as_slice() {
-                            [] => None,
-                            [only] => Some(only.clone()),
-                            _ => {
-                                return Err(AmbiguousIdError::dependency(requested, matches).into())
-                            }
-                        }
-                    }
+                    .filter(|stored| prefix.matches(stored))
+                    .cloned()
+                    .collect::<Vec<_>>();
+                let matched = match matches.as_slice() {
+                    [] => None,
+                    [only] => Some(only.clone()),
+                    _ => return Err(AmbiguousIdError::dependency(requested, matches).into()),
                 };
                 match matched {
                     Some(id) => {
@@ -683,8 +632,8 @@ fn derive_single_dependency_add(
     policy: RedundancyPolicy,
     warning: Option<String>,
 ) -> Result<DerivedDependencyMutation> {
-    let full_issue_id = resolve_captured_issue_id(issues, issue_id)?;
-    let full_dependency_id = resolve_captured_issue_id(issues, dependency_id)?;
+    let full_issue_id = super::resolve_issue_from_capture(issues, issue_id)?;
+    let full_dependency_id = super::resolve_issue_from_capture(issues, dependency_id)?;
     let graph = dependency_graph(issues);
     graph.validate_add_dependency(&full_issue_id, &full_dependency_id)?;
     let from = captured_issue(issues, &full_issue_id)?;
@@ -735,7 +684,7 @@ fn derive_batch_dependency_add(
     dependency_ids: &[String],
     policy: RedundancyPolicy,
 ) -> Result<DerivedDependencyMutation> {
-    let full_issue_id = resolve_captured_issue_id(issues, issue_id)?;
+    let full_issue_id = super::resolve_issue_from_capture(issues, issue_id)?;
     let from_deps = dependency_set(captured_issue(issues, &full_issue_id)?);
     let mut already_exist = Vec::new();
     let mut new_edges = Vec::new();
@@ -743,7 +692,7 @@ fn derive_batch_dependency_add(
     let mut seen = HashSet::new();
 
     for (ordinal, dependency_id) in dependency_ids.iter().enumerate() {
-        match resolve_captured_issue_id(issues, dependency_id) {
+        match super::resolve_issue_from_capture(issues, dependency_id) {
             Ok(full_id) if from_deps.contains(&full_id) || !seen.insert(full_id.clone()) => {
                 already_exist.push(dependency_id.clone());
             }

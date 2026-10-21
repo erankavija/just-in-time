@@ -882,9 +882,9 @@ mod tests {
 
         // Create test issues
         for issue in [
-            create_test_issue("1", State::Ready, vec![]),
-            create_test_issue("2", State::Ready, vec![]),
-            create_test_issue("3", State::InProgress, vec![]),
+            create_test_issue("0001", State::Ready, vec![]),
+            create_test_issue("0002", State::Ready, vec![]),
+            create_test_issue("0003", State::InProgress, vec![]),
         ] {
             crate::commands::test_helpers::seed_issue(&storage, issue);
         }
@@ -904,10 +904,10 @@ mod tests {
         assert_eq!(result.summary.total_modified, 2);
 
         // Verify labels added
-        let issue1 = executor.get_issue("1").unwrap();
+        let issue1 = executor.get_issue("0001").unwrap();
         assert!(issue1.labels.contains(&"milestone:v1.0".to_string()));
 
-        let issue3 = executor.get_issue("3").unwrap();
+        let issue3 = executor.get_issue("0003").unwrap();
         assert!(!issue3.labels.contains(&"milestone:v1.0".to_string()));
     }
 
@@ -946,7 +946,7 @@ mod tests {
         let storage = InMemoryStorage::new();
 
         // Create issue with unpassed gates
-        let mut issue = create_test_issue("1", State::Gated, vec![]);
+        let mut issue = create_test_issue("0001", State::Gated, vec![]);
         issue.gates_required = vec!["tests".to_string()];
         crate::commands::test_helpers::seed_issue(&storage, issue);
 
@@ -979,16 +979,16 @@ mod tests {
         // Create mix of valid and invalid issues
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec![]),
+            create_test_issue("0001", State::Ready, vec![]),
         );
 
-        let mut blocked = create_test_issue("2", State::Ready, vec![]);
+        let mut blocked = create_test_issue("0002", State::Ready, vec![]);
         blocked.gates_required = vec!["tests".to_string()];
         crate::commands::test_helpers::seed_issue(&storage, blocked);
 
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("3", State::Ready, vec![]),
+            create_test_issue("0003", State::Ready, vec![]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1008,9 +1008,9 @@ mod tests {
         assert_eq!(result.summary.total_errors, 1);
 
         // Verify partial success
-        assert!(result.modified.contains(&"1".to_string()));
-        assert!(result.modified.contains(&"3".to_string()));
-        assert_eq!(result.errors[0].0, "2");
+        assert!(result.modified.contains(&"0001".to_string()));
+        assert!(result.modified.contains(&"0003".to_string()));
+        assert_eq!(result.errors[0].0, "0002");
     }
 
     #[test]
@@ -1021,7 +1021,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec!["type:task"]),
+            create_test_issue("0001", State::Ready, vec!["type:task"]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1065,7 +1065,7 @@ mod tests {
         crate::commands::test_helpers::seed_issue(
             &storage,
             create_test_issue(
-                "1",
+                "0001",
                 State::Ready,
                 vec![&format!("type:{}", taxonomy.type_at_level(4))],
             ),
@@ -1128,7 +1128,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec![]),
+            create_test_issue("0001", State::Ready, vec![]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1148,7 +1148,7 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
 
         // Verify assignee set correctly
-        let updated = executor.get_issue("1").unwrap();
+        let updated = executor.get_issue("0001").unwrap();
         assert_eq!(updated.assignee, Some("agent:copilot".parse().unwrap()));
     }
 
@@ -1351,7 +1351,7 @@ mod tests {
         let storage = InMemoryStorage::new();
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec!["type:task"]),
+            create_test_issue("0001", State::Ready, vec!["type:task"]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);
@@ -1371,7 +1371,7 @@ mod tests {
         assert_eq!(result.summary.total_errors, 0);
 
         // Verify labels added
-        let updated = executor.get_issue("1").unwrap();
+        let updated = executor.get_issue("0001").unwrap();
         assert!(updated.labels.contains(&"milestone:v1.0".to_string()));
         assert!(updated.labels.contains(&"epic:auth".to_string()));
     }
@@ -1741,7 +1741,7 @@ mod tests {
         // already violates the always-enforced default label-format rule.
         crate::commands::test_helpers::seed_issue(
             &storage,
-            create_test_issue("1", State::Ready, vec!["bad_label_no_colon"]),
+            create_test_issue("0001", State::Ready, vec!["bad_label_no_colon"]),
         );
 
         let mut executor = crate::commands::test_helpers::memory_executor(storage);

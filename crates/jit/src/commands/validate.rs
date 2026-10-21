@@ -276,7 +276,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
-        let normalized = requested.to_lowercase().replace('-', "");
+        let prefix = crate::domain::IssueIdPrefix::parse(requested)?;
         let mut candidates = Vec::new();
         let spec = CaptureSpec::new(
             [VirtualPath::CONFIG, VirtualPath::INDEX],
@@ -289,9 +289,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             candidates = crate::storage::json::parse_repository_index(index_bytes)?
                 .all_ids
                 .into_iter()
-                .filter(|id| {
-                    id == requested || id.to_lowercase().replace('-', "").starts_with(&normalized)
-                })
+                .filter(|id| prefix.matches(id))
                 .collect();
             Ok(spec.discover_paths(
                 candidates
@@ -308,7 +306,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
              repo_rel: &str|
              -> Result<Option<Vec<u8>>> { super::image_repo_bytes(image, repo_rel) };
         let issues = effective_issues(&image, &candidates, &effective)?;
-        let target_id = super::resolve_issue_from_capture(&issues, requested)?;
+        let target_id = crate::storage::resolve_issue_id_among(&prefix, &issues)?;
         let target = issues
             .into_iter()
             .find(|issue| issue.id == target_id)
@@ -3753,6 +3751,37 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::INVARIANTS));
         assert!(!spec.contains_path(&VirtualPath::EVENTS));
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
+    }
+
+    /// A prefix below the minimum is refused before any issue record is read:
+    /// an unreadable record every short prefix matches never surfaces.
+    #[test]
+    fn test_capture_mutation_preflight_rejects_a_short_prefix_before_reading_records() {
+        use crate::commands::test_helpers::{seed_issue, setup};
+        use crate::storage::RepositoryStateStore;
+
+        let executor = setup();
+        let issue = crate::domain::types::fixture_issue("Unreadable".to_string(), String::new());
+        let id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        executor
+            .storage()
+            .add_data_file(format!("issues/{id}.json"), "not an issue record");
+        let layout = executor.require_layout().unwrap();
+        let mut session = executor.storage().open_mutation_session(layout).unwrap();
+
+        for requested in ["", &id[..crate::domain::MIN_ID_PREFIX_LENGTH - 1]] {
+            let error = executor
+                .capture_mutation_preflight(session.as_mut(), requested, |_| false)
+                .err()
+                .expect("a short prefix is refused");
+            assert!(
+                error
+                    .downcast_ref::<crate::domain::InvalidIdPrefixError>()
+                    .is_some(),
+                "{requested:?}: {error:?}"
+            );
+        }
     }
 
     /// A session counting the capture rounds it opens.

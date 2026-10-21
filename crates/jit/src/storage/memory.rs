@@ -11,9 +11,9 @@ use crate::repository_state::{
 };
 use crate::storage::redo_apply::{check_interruption, occupied_directory};
 use crate::storage::{
-    AmbiguousIdError, EventAppend, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, PresetNotFoundError, PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint,
-    RedoRecord, RepoWriteGuard, RepoWriteLock, RepositoryStateStoreError, MIN_ID_PREFIX_LENGTH,
+    EventAppend, GateRunNotFoundError, IssueNotFoundError, IssueStore, PresetNotFoundError,
+    PutFile, RedoApplyError, RedoInterruptionInjector, RedoPoint, RedoRecord, RepoWriteGuard,
+    RepoWriteLock, RepositoryStateStoreError,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::BTreeMap;
@@ -835,48 +835,11 @@ impl IssueStore for InMemoryStorage {
     }
 
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
-        // Normalize input: lowercase and remove hyphens
-        let normalized = partial_id.to_lowercase().replace('-', "");
-
-        // Full UUID check (fast path) - 32 hex chars without hyphens
-        if normalized.len() == 32 {
-            // Verify it exists
-            return self
-                .load_issue(partial_id)
-                .map(|issue| issue.id)
-                .map_err(|_| IssueNotFoundError::new(partial_id).into());
-        }
-
-        // Minimum length check
-        if normalized.len() < MIN_ID_PREFIX_LENGTH {
-            return Err(InvalidIdPrefixError::new(partial_id).into());
-        }
-
-        // Find matching issues from the captured records.
-        let issues = Self::load_issues(&self.repository_state())?;
-        let matches: Vec<&Issue> = issues
-            .iter()
-            .filter(|issue| {
-                issue
-                    .id
-                    .replace('-', "")
-                    .to_lowercase()
-                    .starts_with(&normalized)
-            })
-            .collect();
-
-        match matches.len() {
-            0 => Err(IssueNotFoundError::new(partial_id).into()),
-            1 => Ok(matches[0].id.clone()),
-            _ => {
-                // Get titles for better error message
-                let issue_list: Vec<String> = matches
-                    .iter()
-                    .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
-                    .collect();
-                Err(AmbiguousIdError::issue(partial_id, issue_list).into())
-            }
-        }
+        let prefix = crate::domain::IssueIdPrefix::parse(partial_id)?;
+        crate::storage::resolve_issue_id_among(
+            &prefix,
+            &Self::load_issues(&self.repository_state())?,
+        )
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
