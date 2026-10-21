@@ -28,7 +28,6 @@
 
 mod archive;
 pub mod batch_create;
-mod breakdown;
 pub mod bulk_update;
 pub mod claim;
 mod config;
@@ -71,7 +70,6 @@ pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
 };
-pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
