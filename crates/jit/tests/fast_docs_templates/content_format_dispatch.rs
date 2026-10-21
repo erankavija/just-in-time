@@ -4,7 +4,8 @@
 //! identical canonical output. THIS file proves something different and stronger:
 //! that the PRODUCTION validation entry points (`evaluate_local` and
 //! `evaluate_graph`) actually DISPATCH to the parser selected by
-//! [`content_parser_for`] — issue `content_format` -> repo default -> Markdown —
+//! [`content_parser_for`] — issue `content_format` -> repo default -> built-in
+//! default —
 //! rather than always using Markdown.
 //!
 //! The proof technique: feed an HTML (or XML) body to a rule that depends on the

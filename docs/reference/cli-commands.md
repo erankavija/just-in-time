@@ -901,7 +901,7 @@ jit issue create --title <TITLE> [OPTIONS]
 | `--type <KIND>` | Issue type, written as a `type:<kind>` label. Must be declared in `[type_hierarchy]` in `config.toml`. Long-only, because `-t` is `--title`. |
 | `-g`, `--gate <GATE>` | Gate keys the issue requires. Repeatable and comma-separated. Keys are persisted as given without a registry lookup; `jit validate` later flags any that no gate defines. |
 | `-l`, `--label <LABEL>` | Labels in `namespace:value` form. Repeatable and comma-separated. |
-| `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to Markdown. `html`/`xml` require the matching cargo feature. |
+| `--content-format <FORMAT>` | Parser for the description body during validation: `markdown`, `html`, or `xml`. Omitted, the repository default (`[validation].content_format`) applies, falling back to the default content format in [Runtime Defaults](runtime-defaults.md). `html`/`xml` require the matching cargo feature. |
 | `--force` | Bypass blocking (`enforce = true`) rule failures and record each bypass as an event. Warnings never block, so they are unaffected. |
 | `--orphan` | Suppress the workflow profile's `orphan-leaf` hint for an issue deliberately created without a container. |
 | `--json` | Emit the created issue as the `issue show` object, plus a `message` field. |
@@ -3457,8 +3457,9 @@ An addressable item kind is a source of truth: invariants in `.jit/invariants.to
 rules in `.jit/rules.toml`, gates in `.jit/gates.toml`, and any markdown-first kind
 in its own source file. A `[projection.<name>]` config table projects a kind (or
 kinds) into a documentation target. Each target path, projection mode, render
-style, and region delimiter comes from configuration alone; delimiters default to
-`<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`. In `region` mode only the
+style, and region delimiter comes from configuration alone; unset delimiters
+derive from the projection name, as listed in
+[Runtime Defaults](runtime-defaults.md). In `region` mode only the
 delimited region of the target is rewritten and every byte outside it is
 preserved; in `separate-file` mode the whole file is written.
 

@@ -342,8 +342,8 @@ pub fn evaluate_local(
 ///
 /// When the body is parsed, the [`ContentParser`](crate::document::ContentParser)
 /// is chosen by [`content_parser_for`]: the issue's own `content_format` → else
-/// `repo_default_format` → else Markdown. A selected format whose parser feature
-/// is not compiled surfaces as a [`LocalEvalError::ContentParser`] rather than a
+/// `repo_default_format` → else [`ContentFormat::DEFAULT`]. A selected format
+/// whose parser feature is not compiled surfaces as a [`LocalEvalError::ContentParser`] rather than a
 /// silent Markdown fallback.
 fn build_projection(
     issue: &Issue,
@@ -449,7 +449,7 @@ assert = { require-label = { label = "req:*", min = 1 } }
         let rules = rules_from(EPIC_REQ_WARN);
         let issue = epic_without_req();
 
-        // Loose (default): a warning never blocks; it is surfaced as a warning.
+        // Loose: a warning never blocks; it is surfaced as a warning.
         let loose = evaluate_local(&issue, &rules, ContentFormat::Markdown)
             .unwrap()
             .with_strictness(Strictness::Loose);
