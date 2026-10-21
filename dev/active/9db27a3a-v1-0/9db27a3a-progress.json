@@ -441,6 +441,13 @@
       "status": "resolved",
       "date": "2026-10-21",
       "summary": "f7f01654 REQ-04 (ProfileAgreement count through ListEnvelope) is void because 24268b05 deleted the type. It stays visible as superseded; plan row D-25. Rejected: retargeting to another type, since 650e6a56 owns them."
+    },
+    {
+      "container_short_id": "842b0ac6",
+      "issue": "66bd4b5c",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Rework limit exceeded: code review failed 3 times on non-canonical state names in docs (lowercase-only sweeps missed the 'Open' legend). Approved: one counter reset; a sonnet rework does an exhaustive case-insensitive sweep with every hit listed in the task notes. Rejected: the lead fixing it directly (breaks the worker/review separation), and accepting as-is (the finding is [hard])."
     }
   ],
   "notes": [
