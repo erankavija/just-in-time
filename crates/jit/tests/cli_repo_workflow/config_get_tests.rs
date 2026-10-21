@@ -211,7 +211,7 @@ fn test_get_unknown_top_level_key_fails_exit_2_with_sections() {
         stderr.contains("valid top-level sections"),
         "stderr should list valid sections: {stderr}"
     );
-    // A handful of the 14 sections must be named.
+    // A handful of the sections must be named.
     assert!(stderr.contains("documentation"));
     assert!(stderr.contains("worktree"));
     assert!(stderr.contains("coordination"));
@@ -273,7 +273,7 @@ fn test_get_corrupt_config_toml_is_not_invalid_argument() {
     )
     .unwrap();
 
-    let out = config_get(temp.path(), &["worktree.mode"]);
+    let out = config_get(temp.path(), &["worktree.enforce_leases"]);
     assert!(!out.status.success());
     assert_ne!(
         out.status.code(),
@@ -298,7 +298,7 @@ fn test_get_corrupt_config_toml_json_emits_registered_parse_error() {
     )
     .unwrap();
 
-    let out = config_get(temp.path(), &["worktree.mode", "--json"]);
+    let out = config_get(temp.path(), &["worktree.enforce_leases", "--json"]);
     assert!(!out.status.success());
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
@@ -369,17 +369,4 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON output");
     assert_eq!(parsed["value"], serde_json::json!({}));
-}
-
-#[test]
-fn test_get_worktree_mode_still_works_unchanged() {
-    // Backward-compat: the two keys real workflows already document
-    // (docs/reference/configuration.md, dev/archive/ad601a15-parallel-work/design/worktree-parallel-work.md)
-    // must keep working exactly as before.
-    let temp = TempDir::new().unwrap();
-    assert!(jit_init(temp.path()).status.success());
-
-    let out = config_get(temp.path(), &["worktree.mode"]);
-    assert!(out.status.success());
-    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "auto");
 }

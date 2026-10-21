@@ -55,12 +55,6 @@ pub struct JitConfig {
     pub worktree: Option<WorktreeConfig>,
     /// Coordination settings for leases and agents (optional).
     pub coordination: Option<CoordinationConfig>,
-    /// Global operations configuration (optional).
-    pub global_operations: Option<GlobalOperationsConfig>,
-    /// Lock file configuration (optional).
-    pub locks: Option<LocksConfig>,
-    /// Event logging configuration (optional).
-    pub events: Option<EventsConfig>,
     /// Graph templates loaded and validated from `.jit/templates.toml`.
     ///
     /// Not read from `config.toml`: populated by [`JitConfig::load`] from the
@@ -123,7 +117,7 @@ pub enum ProjectNameError {
 /// Parsed from a string matching `^[a-z][a-z0-9-]*$` (starts with a lowercase
 /// letter; digits and hyphens allowed thereafter) by both
 /// [`ProjectName::from_str`] and TOML deserialization, mirroring the
-/// [`WorktreeMode`] / [`EnforcementMode`] pattern: an invalid value is a
+/// [`EnforcementMode`] pattern: an invalid value is a
 /// descriptive parse error, not a silent fallback, so a misconfigured
 /// `[project] name` is rejected at [`JitConfig::load`] time and surfaces
 /// through `jit config validate`.
@@ -1180,21 +1174,6 @@ pub enum ItemKindConfigError {
     },
 }
 
-/// Parse error for [`WorktreeMode`].
-///
-/// Returned by [`WorktreeMode::from_str`] and (via serde) by TOML /
-/// environment-variable deserialization when the value is not one of the
-/// recognised tokens.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum WorktreeModeError {
-    /// The value is not one of `"auto"`, `"on"`, or `"off"`.
-    #[error("invalid worktree mode '{value}'; expected 'auto', 'on', or 'off'")]
-    Invalid {
-        /// The unrecognised value.
-        value: String,
-    },
-}
-
 /// Parse error for [`EnforcementMode`].
 ///
 /// Returned by [`EnforcementMode::from_str`] and (via serde) by TOML /
@@ -1213,52 +1192,12 @@ pub enum EnforcementModeError {
 /// Worktree and parallel work configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorktreeConfig {
-    /// Worktree mode (default: [`WorktreeMode::Auto`]).
-    pub mode: Option<WorktreeMode>,
     /// Lease enforcement mode; resolved by [`JitConfig::enforcement_mode`].
     pub enforce_leases: Option<EnforcementMode>,
     /// Write-policy stance for state-mutating commands run inside a linked
     /// non-primary checkout (default:
     /// [`LinkedCheckoutWriteStance::DEFAULT`](crate::domain::LinkedCheckoutWriteStance::DEFAULT)).
     pub write_policy: Option<crate::domain::LinkedCheckoutWriteStance>,
-}
-
-/// Worktree detection mode.
-///
-/// Parsed (case-insensitively) from the tokens `"auto"` / `"on"` / `"off"` by
-/// both TOML configuration (`[worktree] mode = ...`) and the
-/// `JIT_WORKTREE_MODE` environment variable, so the two sources share one
-/// case-handling rule.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WorktreeMode {
-    /// Detect git worktree and enable automatically (default).
-    Auto,
-    /// Force worktree mode (fail if not in worktree).
-    On,
-    /// Disable worktree features (use legacy .jit/ only).
-    Off,
-}
-
-impl std::str::FromStr for WorktreeMode {
-    type Err = WorktreeModeError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "auto" => Ok(WorktreeMode::Auto),
-            "on" => Ok(WorktreeMode::On),
-            "off" => Ok(WorktreeMode::Off),
-            _ => Err(WorktreeModeError::Invalid {
-                value: s.to_string(),
-            }),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for WorktreeMode {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(d)?;
-        s.parse::<WorktreeMode>().map_err(serde::de::Error::custom)
-    }
 }
 
 /// Enforcement mode for lease requirements.
@@ -1299,14 +1238,6 @@ impl<'de> serde::Deserialize<'de> for EnforcementMode {
 }
 
 impl WorktreeConfig {
-    /// Get the worktree mode, defaulting to [`WorktreeMode::Auto`] when unset.
-    ///
-    /// The field is typed — invalid tokens are rejected at TOML parse time, so
-    /// this method is infallible.
-    pub fn worktree_mode(&self) -> WorktreeMode {
-        self.mode.unwrap_or(WorktreeMode::Auto)
-    }
-
     /// Get the write-policy stance, defaulting to
     /// [`LinkedCheckoutWriteStance::DEFAULT`](crate::domain::LinkedCheckoutWriteStance::DEFAULT)
     /// when unset.
@@ -1338,65 +1269,6 @@ impl CoordinationConfig {
 
     pub fn max_indefinite_leases_per_repo(&self) -> u32 {
         self.max_indefinite_leases_per_repo.unwrap_or(10)
-    }
-}
-
-/// Global operations configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct GlobalOperationsConfig {
-    /// Require common history with main for global operations (default: true).
-    pub require_main_history: Option<bool>,
-    /// Branches allowed to modify global config (default: ["main"]).
-    pub allowed_branches: Option<Vec<String>>,
-}
-
-impl GlobalOperationsConfig {
-    pub fn require_main_history(&self) -> bool {
-        self.require_main_history.unwrap_or(true)
-    }
-
-    pub fn allowed_branches(&self) -> Vec<String> {
-        self.allowed_branches
-            .clone()
-            .unwrap_or_else(|| vec!["main".to_string()])
-    }
-}
-
-/// Lock file configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct LocksConfig {
-    /// Maximum age for lock files before considered stale in seconds (default: 3600).
-    pub max_age_secs: Option<u64>,
-    /// Enable lock metadata for diagnostics (default: true).
-    pub enable_metadata: Option<bool>,
-}
-
-impl LocksConfig {
-    pub fn max_age_secs(&self) -> u64 {
-        self.max_age_secs.unwrap_or(3600)
-    }
-
-    pub fn enable_metadata(&self) -> bool {
-        self.enable_metadata.unwrap_or(true)
-    }
-}
-
-/// Event logging configuration.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct EventsConfig {
-    /// Enable sequence numbers in event logs (default: true).
-    pub enable_sequences: Option<bool>,
-    /// Standardize event envelopes across control and data plane (default: true).
-    pub use_unified_envelope: Option<bool>,
-}
-
-impl EventsConfig {
-    pub fn enable_sequences(&self) -> bool {
-        self.enable_sequences.unwrap_or(true)
-    }
-
-    pub fn use_unified_envelope(&self) -> bool {
-        self.use_unified_envelope.unwrap_or(true)
     }
 }
 
@@ -1490,9 +1362,6 @@ impl JitConfig {
                 projection: None,
                 worktree: None,
                 coordination: None,
-                global_operations: None,
-                locks: None,
-                events: None,
                 // No config.toml means no type hierarchy, so node-`type` checks
                 // are skipped (empty slice); a sibling `templates.toml` is still
                 // loaded and validated, and a load/validation error propagates
@@ -1728,47 +1597,6 @@ impl EffectiveConfig {
         Ok(loader.build())
     }
 
-    /// Get the effective worktree mode.
-    /// Priority: env var > repo > user > system > default
-    ///
-    /// Both the env-var and TOML paths share the same [`WorktreeMode::from_str`]
-    /// implementation (case-insensitive), so the two sources handle case
-    /// identically.
-    pub fn worktree_mode(&self) -> Result<WorktreeMode> {
-        // Check env var first (highest priority). Uses the same FromStr as TOML.
-        if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-            return val.parse::<WorktreeMode>().map_err(|e| {
-                crate::errors::InvalidArgumentError::new(format!("invalid JIT_WORKTREE_MODE: {e}"))
-                    .into()
-            });
-        }
-
-        // Check repo first, then user, then system
-        if let Some(ref cfg) = self.repo_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.mode.is_some() {
-                    return Ok(wt.worktree_mode());
-                }
-            }
-        }
-        if let Some(ref cfg) = self.user_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.mode.is_some() {
-                    return Ok(wt.worktree_mode());
-                }
-            }
-        }
-        if let Some(ref cfg) = self.system_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.mode.is_some() {
-                    return Ok(wt.worktree_mode());
-                }
-            }
-        }
-        // Default
-        Ok(WorktreeMode::Auto)
-    }
-
     /// Get the effective enforcement mode: the repository config's
     /// [`JitConfig::enforcement_mode`].
     pub fn enforcement_mode(&self) -> EnforcementMode {
@@ -1799,42 +1627,6 @@ impl EffectiveConfig {
         }
     }
 
-    /// Get effective global operations config with merged values.
-    pub fn global_operations(&self) -> MergedGlobalOperationsConfig {
-        MergedGlobalOperationsConfig {
-            repo: self
-                .repo_config
-                .as_ref()
-                .and_then(|c| c.global_operations.clone()),
-            user: self
-                .user_config
-                .as_ref()
-                .and_then(|c| c.global_operations.clone()),
-            system: self
-                .system_config
-                .as_ref()
-                .and_then(|c| c.global_operations.clone()),
-        }
-    }
-
-    /// Get effective locks config with merged values.
-    pub fn locks(&self) -> MergedLocksConfig {
-        MergedLocksConfig {
-            repo: self.repo_config.as_ref().and_then(|c| c.locks.clone()),
-            user: self.user_config.as_ref().and_then(|c| c.locks.clone()),
-            system: self.system_config.as_ref().and_then(|c| c.locks.clone()),
-        }
-    }
-
-    /// Get effective events config with merged values.
-    pub fn events(&self) -> MergedEventsConfig {
-        MergedEventsConfig {
-            repo: self.repo_config.as_ref().and_then(|c| c.events.clone()),
-            user: self.user_config.as_ref().and_then(|c| c.events.clone()),
-            system: self.system_config.as_ref().and_then(|c| c.events.clone()),
-        }
-    }
-
     /// Assemble a single JSON snapshot of the effective configuration across
     /// its WHOLE surface, for `jit config get`'s generic dotted-path walk
     /// (see [`resolve_dotted_key`](crate::commands::resolve_dotted_key)).
@@ -1842,10 +1634,9 @@ impl EffectiveConfig {
     /// Two resolution strategies, matching how the rest of the codebase
     /// already reads these sections — this method does not invent a THIRD
     /// merge policy:
-    /// - `worktree`, `coordination`, `global_operations`, `locks`, `events`:
-    ///   the accessors above that `jit config show` uses (the merged
-    ///   env var, repo, user, system, default chain, except the repo-only
-    ///   [`Self::enforcement_mode`]).
+    /// - `worktree`, `coordination`: the accessors above that `jit config
+    ///   show` uses (the merged repo, user, system, default chain, except the
+    ///   repo-only [`Self::enforcement_mode`]).
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
@@ -1911,11 +1702,6 @@ impl EffectiveConfig {
         map.insert(
             "worktree".to_string(),
             serde_json::json!({
-                "mode": format!(
-                    "{:?}",
-                    self.worktree_mode().unwrap_or(WorktreeMode::Auto)
-                )
-                .to_lowercase(),
                 "enforce_leases": format!("{:?}", self.enforcement_mode()).to_lowercase(),
             }),
         );
@@ -1924,27 +1710,6 @@ impl EffectiveConfig {
             serde_json::json!({
                 "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
                 "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
-            }),
-        );
-        map.insert(
-            "global_operations".to_string(),
-            serde_json::json!({
-                "require_main_history": self.global_operations().require_main_history(),
-                "allowed_branches": self.global_operations().allowed_branches(),
-            }),
-        );
-        map.insert(
-            "locks".to_string(),
-            serde_json::json!({
-                "max_age_secs": self.locks().max_age_secs(),
-                "enable_metadata": self.locks().enable_metadata(),
-            }),
-        );
-        map.insert(
-            "events".to_string(),
-            serde_json::json!({
-                "enable_sequences": self.events().enable_sequences(),
-                "use_unified_envelope": self.events().use_unified_envelope(),
             }),
         );
 
@@ -1993,94 +1758,6 @@ impl MergedCoordinationConfig {
                     .and_then(|c| c.max_indefinite_leases_per_repo)
             })
             .unwrap_or(10)
-    }
-}
-
-/// Merged global operations config with priority resolution per field.
-#[derive(Debug)]
-pub struct MergedGlobalOperationsConfig {
-    repo: Option<GlobalOperationsConfig>,
-    user: Option<GlobalOperationsConfig>,
-    system: Option<GlobalOperationsConfig>,
-}
-
-impl MergedGlobalOperationsConfig {
-    pub fn require_main_history(&self) -> bool {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.require_main_history)
-            .or_else(|| self.user.as_ref().and_then(|c| c.require_main_history))
-            .or_else(|| self.system.as_ref().and_then(|c| c.require_main_history))
-            .unwrap_or(true)
-    }
-
-    pub fn allowed_branches(&self) -> Vec<String> {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.allowed_branches.clone())
-            .or_else(|| self.user.as_ref().and_then(|c| c.allowed_branches.clone()))
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.allowed_branches.clone())
-            })
-            .unwrap_or_else(|| vec!["main".to_string()])
-    }
-}
-
-/// Merged locks config with priority resolution per field.
-#[derive(Debug)]
-pub struct MergedLocksConfig {
-    repo: Option<LocksConfig>,
-    user: Option<LocksConfig>,
-    system: Option<LocksConfig>,
-}
-
-impl MergedLocksConfig {
-    pub fn max_age_secs(&self) -> u64 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.max_age_secs)
-            .or_else(|| self.user.as_ref().and_then(|c| c.max_age_secs))
-            .or_else(|| self.system.as_ref().and_then(|c| c.max_age_secs))
-            .unwrap_or(3600)
-    }
-
-    pub fn enable_metadata(&self) -> bool {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.enable_metadata)
-            .or_else(|| self.user.as_ref().and_then(|c| c.enable_metadata))
-            .or_else(|| self.system.as_ref().and_then(|c| c.enable_metadata))
-            .unwrap_or(true)
-    }
-}
-
-/// Merged events config with priority resolution per field.
-#[derive(Debug)]
-pub struct MergedEventsConfig {
-    repo: Option<EventsConfig>,
-    user: Option<EventsConfig>,
-    system: Option<EventsConfig>,
-}
-
-impl MergedEventsConfig {
-    pub fn enable_sequences(&self) -> bool {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.enable_sequences)
-            .or_else(|| self.user.as_ref().and_then(|c| c.enable_sequences))
-            .or_else(|| self.system.as_ref().and_then(|c| c.enable_sequences))
-            .unwrap_or(true)
-    }
-
-    pub fn use_unified_envelope(&self) -> bool {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.use_unified_envelope)
-            .or_else(|| self.user.as_ref().and_then(|c| c.use_unified_envelope))
-            .or_else(|| self.system.as_ref().and_then(|c| c.use_unified_envelope))
-            .unwrap_or(true)
     }
 }
 
@@ -3072,13 +2749,7 @@ types = { task = 1 }
     }
 
     #[test]
-    fn test_worktree_mode_and_enforcement_mode_from_str_case_insensitive() {
-        // Both WorktreeMode and EnforcementMode accept mixed-case input via
-        // FromStr, so TOML and env-var paths share one case-handling rule.
-        assert_eq!("AUTO".parse::<WorktreeMode>().unwrap(), WorktreeMode::Auto);
-        assert_eq!("On".parse::<WorktreeMode>().unwrap(), WorktreeMode::On);
-        assert_eq!("OFF".parse::<WorktreeMode>().unwrap(), WorktreeMode::Off);
-
+    fn test_enforcement_mode_from_str_case_insensitive() {
         assert_eq!(
             "STRICT".parse::<EnforcementMode>().unwrap(),
             EnforcementMode::Strict
@@ -3091,29 +2762,6 @@ types = { task = 1 }
             "OFF".parse::<EnforcementMode>().unwrap(),
             EnforcementMode::Off
         );
-    }
-
-    #[test]
-    fn test_worktree_mode_case_sensitivity_divergence_is_gone() {
-        // Previously the TOML path (WorktreeConfig::worktree_mode) only
-        // accepted exact lowercase, while the env-var path normalised with
-        // to_lowercase() first.  Now both go through the same FromStr, so a
-        // mixed-case env-var produces the same value as the lowercase TOML form.
-        let mut env = EnvGuard::acquire();
-
-        // Uppercase env var parsed via EffectiveConfig (env-var path).
-        env.set("JIT_WORKTREE_MODE", "AUTO");
-        let via_env = ConfigLoader::new().build().worktree_mode().unwrap();
-
-        // Lowercase TOML form parsed directly (TOML path).
-        let toml_cfg: JitConfig = toml::from_str("[worktree]\nmode = \"auto\"\n").unwrap();
-        let via_toml = toml_cfg.worktree.unwrap().worktree_mode();
-
-        assert_eq!(
-            via_env, via_toml,
-            "TOML and env-var must resolve identically"
-        );
-        assert_eq!(via_env, WorktreeMode::Auto);
     }
 
     #[test]
@@ -3305,66 +2953,6 @@ types = { task = 1 }
     // ============================================================
 
     #[test]
-    fn test_worktree_mode_auto() {
-        let config_toml = r#"
-[worktree]
-mode = "auto"
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        // worktree_mode() is now infallible — the field is typed.
-        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
-    }
-
-    #[test]
-    fn test_worktree_mode_on() {
-        let config_toml = r#"
-[worktree]
-mode = "on"
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode(), WorktreeMode::On);
-    }
-
-    #[test]
-    fn test_worktree_mode_off() {
-        let config_toml = r#"
-[worktree]
-mode = "off"
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode(), WorktreeMode::Off);
-    }
-
-    #[test]
-    fn test_worktree_mode_default_to_auto() {
-        let config_toml = r#"
-[worktree]
-enforce_leases = "strict"
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
-    }
-
-    #[test]
-    fn test_worktree_mode_invalid() {
-        // Invalid tokens are now caught at TOML parse time, not at method call time.
-        let config_toml = r#"
-[worktree]
-mode = "maybe"
-"#;
-        let err = toml::from_str::<JitConfig>(config_toml).unwrap_err();
-        let msg = err.to_string();
-        assert!(
-            msg.contains("maybe"),
-            "error must mention the bad value: {msg}"
-        );
-    }
-
-    #[test]
     fn test_coordination_config_full() {
         let config_toml = r#"
 [coordination]
@@ -3403,102 +2991,21 @@ max_indefinite_leases_per_repo = 10
     }
 
     #[test]
-    fn test_global_operations_config() {
-        let config_toml = r#"
-[global_operations]
-require_main_history = true
-allowed_branches = ["main", "develop"]
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let global_ops = config.global_operations.unwrap();
-        assert_eq!(global_ops.require_main_history, Some(true));
-        assert_eq!(
-            global_ops.allowed_branches,
-            Some(vec!["main".to_string(), "develop".to_string()])
-        );
-    }
-
-    #[test]
-    fn test_global_operations_defaults() {
-        let global_ops = GlobalOperationsConfig::default();
-        assert!(global_ops.require_main_history());
-        assert_eq!(global_ops.allowed_branches(), vec!["main".to_string()]);
-    }
-
-    #[test]
-    fn test_locks_config() {
-        let config_toml = r#"
-[locks]
-max_age_secs = 7200
-enable_metadata = false
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let locks = config.locks.unwrap();
-        assert_eq!(locks.max_age_secs, Some(7200));
-        assert_eq!(locks.enable_metadata, Some(false));
-    }
-
-    #[test]
-    fn test_locks_config_defaults() {
-        let locks = LocksConfig::default();
-        assert_eq!(locks.max_age_secs(), 3600);
-        assert!(locks.enable_metadata());
-    }
-
-    #[test]
-    fn test_events_config() {
-        let config_toml = r#"
-[events]
-enable_sequences = true
-use_unified_envelope = true
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let events = config.events.unwrap();
-        assert_eq!(events.enable_sequences, Some(true));
-        assert_eq!(events.use_unified_envelope, Some(true));
-    }
-
-    #[test]
-    fn test_events_config_defaults() {
-        let events = EventsConfig::default();
-        assert!(events.enable_sequences());
-        assert!(events.use_unified_envelope());
-    }
-
-    #[test]
     fn test_full_parallel_work_config() {
         let config_toml = r#"
 [worktree]
-mode = "auto"
 enforce_leases = "strict"
 
 [coordination]
 max_indefinite_leases_per_agent = 3
-
-[global_operations]
-require_main_history = true
-allowed_branches = ["main", "develop"]
-
-[locks]
-max_age_secs = 3600
-enable_metadata = true
-
-[events]
-enable_sequences = true
-use_unified_envelope = true
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
 
         // All sections present
         assert!(config.worktree.is_some());
         assert!(config.coordination.is_some());
-        assert!(config.global_operations.is_some());
-        assert!(config.locks.is_some());
-        assert!(config.events.is_some());
 
         assert_eq!(config.enforcement_mode(), EnforcementMode::Strict);
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
 
         // Verify coordination
         let coord = config.coordination.unwrap();
@@ -3611,9 +3118,6 @@ description = "Test agent"
 
         // Should have all defaults
         assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
-        assert!(config.global_operations().require_main_history());
-        assert_eq!(config.locks().max_age_secs(), 3600);
-        assert!(config.events().enable_sequences());
     }
 
     #[test]
@@ -3731,37 +3235,6 @@ max_indefinite_leases_per_repo = 40
     }
 
     #[test]
-    fn test_effective_config_worktree_mode() {
-        let _env = EnvGuard::acquire();
-        let temp_dir = TempDir::new().unwrap();
-        let config_toml = r#"
-[worktree]
-mode = "on"
-enforce_leases = "warn"
-"#;
-        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
-
-        let loader = ConfigLoader::new()
-            .with_repo_config(temp_dir.path())
-            .unwrap();
-        let config = loader.build();
-
-        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::On);
-    }
-
-    // ============================================================
-    // Environment variable override tests (TDD)
-    // ============================================================
-
-    #[test]
-    fn test_env_override_worktree_mode() {
-        let mut env = EnvGuard::acquire();
-        env.set("JIT_WORKTREE_MODE", "off");
-        let config = ConfigLoader::new().build();
-        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
-    }
-
-    #[test]
     fn test_enforcement_mode_reported_matches_enforced_in_every_configuration_state() {
         const NO_SECTION: &str = "";
         const SECTION_WITHOUT_KEY: &str = "[worktree]\n";
@@ -3819,34 +3292,6 @@ enforce_leases = "warn"
         env.set("JIT_AGENT_ID", "agent:env-test");
         let config = ConfigLoader::new().build();
         assert_eq!(config.agent_id(), Some("agent:env-test".to_string()));
-    }
-
-    #[test]
-    fn test_env_overrides_config_file() {
-        let mut env = EnvGuard::acquire();
-        let temp_dir = TempDir::new().unwrap();
-        let config_toml = r#"
-[worktree]
-mode = "on"
-enforce_leases = "strict"
-"#;
-        std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
-
-        // Env var should override config file
-        env.set("JIT_WORKTREE_MODE", "off");
-        let config = ConfigLoader::new()
-            .with_repo_config(temp_dir.path())
-            .unwrap()
-            .build();
-        assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::Off);
-    }
-
-    #[test]
-    fn test_env_invalid_value_returns_error() {
-        let mut env = EnvGuard::acquire();
-        env.set("JIT_WORKTREE_MODE", "invalid");
-        let config = ConfigLoader::new().build();
-        assert!(config.worktree_mode().is_err());
     }
 
     // ============================================================

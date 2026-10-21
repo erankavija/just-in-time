@@ -15,8 +15,7 @@ use std::path::{Path, PathBuf};
 /// Environment variable carrying one invocation's linked-checkout write stance.
 ///
 /// It is the per-invocation counterpart of the repository's declared
-/// `[worktree] write_policy`, named after that key the way
-/// `JIT_WORKTREE_MODE` is named after `mode`.
+/// `[worktree] write_policy`, named after that key.
 pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
 /// Manages configuration loading and access.
