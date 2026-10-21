@@ -2743,8 +2743,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
-    /// state renders and serializes as effectively terminal; a legacy Archived
-    /// node (no recorded origin) stays non-terminal.
+    /// state renders and serializes as effectively terminal; one archived from a
+    /// non-terminal state stays non-terminal.
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
         let mut issue = crate::domain::MinimalIssue {
@@ -2762,11 +2762,9 @@ mod tests {
         let serialized = serde_json::to_value(&node).unwrap();
         assert_eq!(serialized["archived_from"], json!("done"));
 
-        issue.archived_from = None;
-        let legacy = DependencyTreeNode::from_minimal(&issue, 1);
-        assert_eq!(state_symbol(legacy.state, legacy.archived_from), "○");
-        let serialized = serde_json::to_value(&legacy).unwrap();
-        assert!(serialized.get("archived_from").is_none());
+        issue.archived_from = Some(State::InProgress);
+        let parked = DependencyTreeNode::from_minimal(&issue, 1);
+        assert_eq!(state_symbol(parked.state, parked.archived_from), "○");
     }
 
     #[test]

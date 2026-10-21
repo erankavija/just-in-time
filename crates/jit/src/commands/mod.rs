@@ -1104,22 +1104,13 @@ fn derive_state_transition(
 
     let mut warnings = Vec::new();
     if old_state == State::Archived {
-        match issue.archived_from {
-            Some(origin) if target != origin => {
-                return Err(crate::errors::TransitionBlockedError::archived_revive(
-                    issue.id.clone(),
-                    target,
-                    origin,
-                )
-                .into());
-            }
-            None => warnings.push(format!(
-                "issue {} was archived before its pre-archive state was recorded; reviving to \
-                 '{}' without a verified origin",
-                issue.short_id(),
-                target.as_str()
-            )),
-            Some(_) => {}
+        if let Some(origin) = issue.archived_from.filter(|origin| target != *origin) {
+            return Err(crate::errors::TransitionBlockedError::archived_revive(
+                issue.id.clone(),
+                target,
+                origin,
+            )
+            .into());
         }
     }
 

@@ -491,6 +491,7 @@ fn test_harness_archive_candidates_are_complete_and_non_mutating() {
     let save = |title: &str, state: State, kind: &str| {
         let mut issue = crate::fixture_issue(title.to_string(), String::new());
         issue.state = state;
+        issue.archived_from = (state == State::Archived).then_some(State::InProgress);
         issue.labels = vec![format!("type:{kind}")];
         let id = issue.id.clone();
         jit::test_harness::seed_memory_issue(&h.storage, &issue);
