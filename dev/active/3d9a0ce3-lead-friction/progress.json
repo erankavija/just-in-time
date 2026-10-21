@@ -80,7 +80,7 @@
           "title": "Declare this repository's tree-wide gate inputs as the worktree root",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged by lead 92a565df5 + test fix 1096a1179; REQ-04 demo db922866->809e03c1 reused; repo-validate/code-review running"
+          "status": "done"
         },
         {
           "id": "39710b3b-2b92-4fc1-bbc2-4c230577e350",
@@ -112,7 +112,7 @@
           "title": "Gate status reports a manual attestation as never run",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (opus) at 77cfcd1f4"
+          "status": "rework 1 (opus) dispatched: code-review F1 retried attestation timestamp ordering vs readiness"
         },
         {
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
@@ -120,7 +120,7 @@
           "title": "Remove the record-reading profile subcommands",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged 77cfcd1f4 (conflict resolved on branch); cargo-ci passed; mcp-ci failed: gate judges installed binary (escalated); code-review running"
+          "status": "rework 1 merged a080f00e6 (docs for removed commands); mcp-ci passed after binary reinstall; code-review re-run pending"
         },
         {
           "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
@@ -515,13 +515,17 @@
     "d6bbe05f: docs/reference/profiles.md 'Derived state and managed regions' still describes validation over profile-owned targets; ae85c6ce rewrites it.",
     "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root.",
     "materialize.rs: MaterializationRequest::RepairDerivedState.profiles, the derive_repair profile loop and AmbiguousOwnershipError::MultipleProfileClaims are dead after d6bbe05f; delete with records in 5179374d.",
-    "cli_warnings_integration_tests take ~6.3 s each alone and time out (20 s) under concurrency; recurring 'load' failures."
+    "cli_warnings_integration_tests take ~6.3 s each alone and time out (20 s) under concurrency; recurring 'load' failures.",
+    "24268b05: ProfileResolution::RestoreRecordedPackage is dead; remove with remedies in f866d9d8 (noted in its lead notes).",
+    "8673dc5e: manual passes recorded before the change have no run record (accepted, greenfield); removing and re-adding a gate leaves old run records visible in latest-run (pre-existing, outside REQ-03 per lead)."
   ],
   "rework_counts": {
     "d6bbe05f": 2,
     "fd9bfab8": 2,
     "ae2e3739": 1,
-    "66986f88": 1
+    "66986f88": 1,
+    "24268b05": 1,
+    "8673dc5e": 1
   },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock"
