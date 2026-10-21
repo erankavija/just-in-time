@@ -122,7 +122,7 @@ pub fn is_graph_relevant(event: &notify::Event) -> bool {
 /// Returns a `ChangeTracker` and keeps the watcher alive. The caller must
 /// keep the returned `RecommendedWatcher` alive for watching to continue.
 /// A background Tokio task handles debouncing filesystem events (~200ms).
-pub fn start_watching(data_dir: &str) -> Result<(ChangeTracker, RecommendedWatcher)> {
+pub fn start_watching(data_dir: impl AsRef<Path>) -> Result<(ChangeTracker, RecommendedWatcher)> {
     let tracker = ChangeTracker::new(64);
 
     // Use a tokio mpsc channel — the sender is Send and can be used from notify's thread
@@ -138,7 +138,7 @@ pub fn start_watching(data_dir: &str) -> Result<(ChangeTracker, RecommendedWatch
         },
     )?;
 
-    watcher.watch(Path::new(data_dir), RecursiveMode::Recursive)?;
+    watcher.watch(data_dir.as_ref(), RecursiveMode::Recursive)?;
 
     // Spawn a Tokio task that drains the channel with debouncing
     let debounce_tracker = tracker.clone();

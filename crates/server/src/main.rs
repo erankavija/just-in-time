@@ -71,10 +71,10 @@ async fn main() -> Result<()> {
     let worktree_root = worktree_paths.worktree_root;
     let executor_layout = jit::storage::discover_repository_layout(&worktree_root, data_dir_path)
         .context("failed to construct repository layout")?;
-    let (storage, recovery_session) =
-        prepare_server_storage(data_dir_path, executor_layout.clone())?;
+    let data_root = executor_layout.data_root().to_path_buf();
+    let (storage, recovery_session) = prepare_server_storage(executor_layout.clone())?;
 
-    info!("Using JIT repository at: {}", args.data_dir);
+    info!("Using JIT repository at: {}", data_root.display());
     let executor = Arc::new(CommandExecutor::new(storage).with_layout(executor_layout));
     if recovery_session.recovery_report().recovered_count() > 0 {
         info!(
@@ -88,9 +88,9 @@ async fn main() -> Result<()> {
     drop(recovery_session);
 
     // Start file watcher for live updates
-    let (tracker, _watcher) = watcher::start_watching(&args.data_dir)?;
+    let (tracker, _watcher) = watcher::start_watching(&data_root)?;
     let tracker = Arc::new(tracker);
-    info!("Watching {} for changes", args.data_dir);
+    info!("Watching {} for changes", data_root.display());
 
     // The display name follows the already-discovered repository boundary.
     let project_name = worktree_root
