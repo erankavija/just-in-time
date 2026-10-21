@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "40aaec18110192b240b41ca6709ea92b8e6b09a1",
+  "completed_at": "2026-10-21T11:11:50.433491771Z",
+  "duration_ms": 162771,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "mcp-server/test-unit.js",
+        "id": "F1",
+        "line": 18,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/719a5501/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "MCP curation coverage fails against the stale PATH-installed CLI, leaving hard REQ-03 unmet."
+      }
+    ],
+    "summary": "The MCP curation coverage requirement remains unpassed because the gate used a stale installed CLI.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "719a5501-d611-4a81-8728-1634a8c35b7c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0c6a655f-f694-46bc-89a7-0b04739eaf71",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:09:07.662386346Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7977 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e26-8f4e-74d1-8127-c15e0b6696a9\n--------\nuser\n--- 7964 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 3f271b6d7, 40aaec181 (jit:719a5501)\nPolicy sources: AGENTS.md\nResolved items: @/issue/719a5501/requirement/REQ-01..REQ-04 and @/issue/df129d9e/requirement/REQ-09, REQ-15, REQ-20 (issue descriptions); @/charter/D-18, D-20 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose, orthogonal-tests, single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (reused); mcp-ci failed (executed source run exit 1, then reused failed projection); code-review pending\nTruncation recovery: per-commit/path patch reads; targeted current-source, test, documentation, curation, gate, policy, and linked-plan reads\n\n1. [blocking][issue-impact] The required MCP curation coverage test does not pass. Its latest execution exits 1 with all 13 removed verbs uncurated. `mcp-server/test-unit.js:18` reads the older PATH-installed `jit`, whose schema still contains those tools; the current workspace binary’s schema has clean curation. The source changes are correct, but REQ-03 remains unmet until the current dogfood binary is installed and `mcp-ci` is rerun. References: @/issue/719a5501/requirement/REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The MCP curation coverage requirement remains unpassed because the gate used a stale installed CLI.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"MCP curation coverage fails against the stale PATH-installed CLI, leaving hard REQ-03 unmet.\",\"file\":\"mcp-server/test-unit.js\",\"line\":18,\"references\":[\"@/issue/719a5501/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

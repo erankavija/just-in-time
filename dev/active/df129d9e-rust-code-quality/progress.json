@@ -52,7 +52,7 @@
           "short_id": "719a5501",
           "title": "Wrong-verb hints come only from the parser-level path",
           "classification": "implementation",
-          "status": "in_progress (worker w-719a5501, sonnet, worktree agent-719a5501)"
+          "status": "merged 40aaec181; cargo-ci passed; mcp-ci failed on stale PATH jit (reused by digest, --force denied); code-review R1 failed only on that (run 0c6a655f). Retry mcp-ci with fresh target/debug/jit on PATH once crates/ or mcp-server/ digest changes, then code-review."
         },
         {
           "key": "list-envelope-type",
@@ -60,7 +60,7 @@
           "short_id": "f7f01654",
           "title": "Introduce the generic ListEnvelope type",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-f7f01654, opus, worktree agent-f7f01654)"
         }
       ]
     },
@@ -703,7 +703,9 @@
       "status": "applied b6002519c"
     }
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "719a5501": 0
+  },
   "surfaced_pitfalls": [],
   "external_blockers": {
     "d8176fd3": [
