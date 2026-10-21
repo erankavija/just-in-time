@@ -88,10 +88,6 @@ struct GateEvaluationEvidence {
         (String, String),
         crate::repository_state::PinnedDocumentEvidence,
     >,
-    linked: std::collections::BTreeMap<
-        crate::repository_state::VirtualPath,
-        crate::repository_state::LinkedWorktreeEvidence,
-    >,
     validation_view: Option<super::PrecheckValidationView>,
 }
 
@@ -409,12 +405,6 @@ fn captured_gate_evaluation(
         .filter(|(key, _)| broad_validation || wanted_pinned.contains(*key))
         .map(|(key, value)| (key.clone(), value.clone()))
         .collect::<BTreeMap<_, _>>();
-    let linked = image
-        .linked_worktree_evidence()
-        .iter()
-        .filter(|(path, _)| broad_validation || inputs.iter().any(|(input, _)| input == *path))
-        .map(|(path, value)| (path.clone(), value.clone()))
-        .collect::<BTreeMap<_, _>>();
     let validation_view = broad_validation.then(|| super::PrecheckValidationView {
         listings: image.directory_listings().clone(),
     });
@@ -423,7 +413,6 @@ fn captured_gate_evaluation(
             gate: gate.clone(),
             inputs,
             pinned,
-            linked,
             validation_view,
         },
         prompt,

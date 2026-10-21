@@ -356,15 +356,7 @@ mod tests {
             spec.discover_pinned(revision, path).unwrap();
             pinned.insert((revision.to_string(), path.to_string()), evidence);
         }
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries,
-            BTreeMap::new(),
-            pinned,
-            BTreeMap::new(),
-        )
-        .unwrap()
+        RepositoryImage::close(layout(), spec, entries, BTreeMap::new(), pinned).unwrap()
     }
 
     #[test]

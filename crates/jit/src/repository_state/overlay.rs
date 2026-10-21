@@ -59,7 +59,6 @@ pub fn apply_overlay(
     let mut entries = base.entries().clone();
     let mut listings = base.directory_listings().clone();
     let pinned = base.pinned_evidence().clone();
-    let linked = base.linked_worktree_evidence().clone();
 
     for (path, value) in overrides {
         layout.ensure_canonical(&path)?;
@@ -91,7 +90,7 @@ pub fn apply_overlay(
     }
 
     Ok(RepositoryImage::close(
-        layout, spec, entries, listings, pinned, linked,
+        layout, spec, entries, listings, pinned,
     )?)
 }
 
@@ -195,15 +194,7 @@ mod tests {
             let names = names.iter().map(|name| (*name).to_string());
             listings.insert(dir, DirectoryListing::new(names).unwrap());
         }
-        RepositoryImage::close(
-            layout(),
-            spec,
-            entries,
-            listings,
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
+        RepositoryImage::close(layout(), spec, entries, listings, BTreeMap::new()).unwrap()
     }
 
     #[test]

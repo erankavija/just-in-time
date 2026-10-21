@@ -1,6 +1,6 @@
 //! Closed repository images, bounded capture declarations, and exact deltas.
 
-use super::{RepositoryLayout, RepositoryLayoutError, RepositoryRootClass, VirtualPath};
+use super::{RepositoryLayout, RepositoryLayoutError, VirtualPath};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -124,11 +124,6 @@ impl CapturedBytes {
     /// Exact captured bytes.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
-    }
-
-    /// Take ownership of the exact captured bytes.
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.bytes
     }
 }
 
@@ -500,86 +495,6 @@ impl PinnedDocumentEvidence {
     }
 }
 
-/// Source class for linked-worktree fallback evidence.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LinkedWorktreeSourceClass {
-    /// Selected data root.
-    LocalData,
-    /// Immutable Git HEAD blob.
-    GitHead,
-    /// Main worktree no-follow file.
-    MainWorktree,
-    /// No candidate existed.
-    Absent,
-}
-
-/// Boundary-acquired linked-worktree fallback evidence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct LinkedWorktreeEvidence {
-    /// Logical Data path requested.
-    path: VirtualPath,
-    /// Selected fallback source.
-    source: LinkedWorktreeSourceClass,
-    /// Exact identity when present.
-    identity: Option<EntryIdentity>,
-    /// Exact bytes when present; serialization carries `identity` alone.
-    #[serde(skip_serializing)]
-    bytes: Option<Vec<u8>>,
-}
-
-impl LinkedWorktreeEvidence {
-    /// Construct and validate one linked-worktree fallback result.
-    pub fn new(
-        path: VirtualPath,
-        source: LinkedWorktreeSourceClass,
-        identity: Option<EntryIdentity>,
-        bytes: Option<Vec<u8>>,
-    ) -> Result<Self, CaptureError> {
-        let evidence = Self {
-            path,
-            source,
-            identity,
-            bytes,
-        };
-        evidence.validate_request(&evidence.path)?;
-        Ok(evidence)
-    }
-
-    /// The exact bytes read from the selected fallback source, when present.
-    pub fn bytes(&self) -> Option<&[u8]> {
-        self.bytes.as_deref()
-    }
-
-    /// Require that this evidence answers `request`. The payload needs no
-    /// revalidation: [`new`](Self::new) is the only constructor and validates it.
-    fn ensure_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
-        if &self.path != request {
-            return Err(CaptureError::LinkedEvidenceRequestMismatch(request.clone()));
-        }
-        Ok(())
-    }
-
-    fn validate_request(&self, request: &VirtualPath) -> Result<(), CaptureError> {
-        self.ensure_request(request)?;
-        if self.path.root_class() != RepositoryRootClass::Data {
-            return Err(CaptureError::LinkedEvidenceRequiresDataPath(
-                self.path.clone(),
-            ));
-        }
-        match (&self.source, &self.identity, &self.bytes) {
-            (LinkedWorktreeSourceClass::Absent, None, None) => Ok(()),
-            (LinkedWorktreeSourceClass::Absent, _, _) => Err(CaptureError::InvalidLinkedEvidence(
-                "absent evidence cannot contain identity or bytes".into(),
-            )),
-            (_, Some(identity), Some(bytes)) => identity.validate_bytes(bytes),
-            _ => Err(CaptureError::InvalidLinkedEvidence(
-                "present evidence requires matching identity and bytes".into(),
-            )),
-        }
-    }
-}
-
 /// Explicit bounds for one capture.
 ///
 /// Each dimension bounds something a capture can be asked for without anyone
@@ -627,7 +542,6 @@ pub struct CaptureSpec {
     tails: BTreeSet<VirtualPath>,
     listings: BTreeSet<VirtualPath>,
     pinned: BTreeSet<(String, String)>,
-    linked_worktree: BTreeSet<VirtualPath>,
     budget: CaptureBudget,
 }
 
@@ -642,7 +556,6 @@ impl CaptureSpec {
             tails: BTreeSet::new(),
             listings: BTreeSet::new(),
             pinned: BTreeSet::new(),
-            linked_worktree: BTreeSet::new(),
             budget,
         };
         spec.discover_paths(paths)?;
@@ -715,15 +628,6 @@ impl CaptureSpec {
         Ok(())
     }
 
-    /// Require one linked-worktree fallback result for a logical Data path.
-    pub fn discover_linked_worktree(&mut self, path: VirtualPath) -> Result<(), CaptureError> {
-        let mut candidate = self.clone();
-        candidate.linked_worktree.insert(path);
-        candidate.validate()?;
-        *self = candidate;
-        Ok(())
-    }
-
     /// Every exact path in canonical order.
     pub fn paths(&self) -> impl Iterator<Item = &VirtualPath> {
         self.paths.iter()
@@ -748,11 +652,6 @@ impl CaptureSpec {
         &self.pinned
     }
 
-    /// Every linked-worktree fallback request.
-    pub fn linked_worktree(&self) -> &BTreeSet<VirtualPath> {
-        &self.linked_worktree
-    }
-
     /// Capture bounds.
     pub fn budget(&self) -> CaptureBudget {
         self.budget
@@ -768,22 +667,12 @@ impl CaptureSpec {
         if let Some(path) = self
             .paths()
             .chain(self.listings.iter())
-            .chain(self.linked_worktree.iter())
             .find(|path| path.relative().depth() > self.budget.max_depth)
         {
             return Err(CaptureError::DepthBudgetExceeded(path.clone()));
         }
-        for path in self
-            .paths()
-            .chain(self.listings.iter())
-            .chain(self.linked_worktree.iter())
-        {
+        for path in self.paths().chain(self.listings.iter()) {
             path.ensure_semantic()?;
-        }
-        for path in &self.linked_worktree {
-            if path.root_class() != RepositoryRootClass::Data {
-                return Err(CaptureError::LinkedEvidenceRequiresDataPath(path.clone()));
-            }
         }
         for (revision, path) in &self.pinned {
             validate_pinned_request(revision, path)?;
@@ -802,7 +691,6 @@ pub(crate) struct CapturedAnswers {
     pub(crate) entries: BTreeMap<VirtualPath, RepositoryEntry>,
     pub(crate) listings: BTreeMap<VirtualPath, DirectoryListing>,
     pub(crate) pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
-    pub(crate) linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 }
 
 /// Complete immutable repository image consumed by pure producers.
@@ -813,7 +701,6 @@ pub struct RepositoryImage {
     entries: BTreeMap<VirtualPath, RepositoryEntry>,
     listings: BTreeMap<VirtualPath, DirectoryListing>,
     pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
-    linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 }
 
 impl RepositoryImage {
@@ -824,7 +711,6 @@ impl RepositoryImage {
         entries: BTreeMap<VirtualPath, RepositoryEntry>,
         listings: BTreeMap<VirtualPath, DirectoryListing>,
         pinned: BTreeMap<(String, String), PinnedDocumentEvidence>,
-        linked_worktree: BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
     ) -> Result<Self, CaptureError> {
         spec.validate()?;
         for (path, entry) in &entries {
@@ -888,20 +774,7 @@ impl RepositoryImage {
                 return Err(CaptureError::IncompletePinnedEvidence(request.clone()));
             }
         }
-        for (path, evidence) in &linked_worktree {
-            layout.ensure_canonical(path)?;
-            if !spec.linked_worktree.contains(path) {
-                return Err(CaptureError::UnexpectedLinkedEvidence(path.clone()));
-            }
-            evidence.ensure_request(path)?;
-        }
-        for path in &spec.linked_worktree {
-            if !linked_worktree.contains_key(path) {
-                return Err(CaptureError::IncompleteLinkedEvidence(path.clone()));
-            }
-        }
-        let byte_count =
-            captured_byte_count(&entries, &pinned, &linked_worktree).saturating_add(listing_bytes);
+        let byte_count = captured_byte_count(&entries, &pinned).saturating_add(listing_bytes);
         if byte_count > spec.budget.max_bytes {
             return Err(CaptureError::ByteBudgetExceeded {
                 actual: byte_count,
@@ -914,7 +787,6 @@ impl RepositoryImage {
             entries,
             listings,
             pinned,
-            linked_worktree,
         })
     }
 
@@ -967,12 +839,6 @@ impl RepositoryImage {
         &self.pinned
     }
 
-    /// Every boundary-acquired linked-worktree fallback evidence, keyed by the
-    /// canonical logical `Data(...)` path it resolves.
-    pub fn linked_worktree_evidence(&self) -> &BTreeMap<VirtualPath, LinkedWorktreeEvidence> {
-        &self.linked_worktree
-    }
-
     /// What this image read that `spec` requests the same way, for a capture
     /// of `spec` to keep rather than read again.
     pub(crate) fn into_answers(self, spec: &CaptureSpec) -> CapturedAnswers {
@@ -981,7 +847,6 @@ impl RepositoryImage {
             entries,
             listings,
             pinned,
-            linked_worktree,
             ..
         } = self;
         CapturedAnswers {
@@ -991,7 +856,6 @@ impl RepositoryImage {
                 .collect(),
             listings,
             pinned,
-            linked_worktree,
         }
     }
 }
@@ -1062,7 +926,6 @@ fn validate_pinned_request(revision: &str, path: &str) -> Result<(), CaptureErro
 fn captured_byte_count(
     entries: &BTreeMap<VirtualPath, RepositoryEntry>,
     pinned: &BTreeMap<(String, String), PinnedDocumentEvidence>,
-    linked_worktree: &BTreeMap<VirtualPath, LinkedWorktreeEvidence>,
 ) -> u64 {
     entries
         .values()
@@ -1076,11 +939,6 @@ fn captured_byte_count(
         })
         .chain(
             pinned
-                .values()
-                .filter_map(|evidence| evidence.bytes.as_ref().map(|bytes| bytes.len() as u64)),
-        )
-        .chain(
-            linked_worktree
                 .values()
                 .filter_map(|evidence| evidence.bytes.as_ref().map(|bytes| bytes.len() as u64)),
         )
@@ -1538,16 +1396,6 @@ pub enum CaptureError {
     InvalidPinnedRequest(String, String),
     #[error("pinned evidence is invalid: {0}")]
     InvalidPinnedEvidence(String),
-    #[error("capture did not provide linked-worktree evidence {0:?}")]
-    IncompleteLinkedEvidence(VirtualPath),
-    #[error("capture provided unrequested linked-worktree evidence {0:?}")]
-    UnexpectedLinkedEvidence(VirtualPath),
-    #[error("linked-worktree evidence does not match request {0:?}")]
-    LinkedEvidenceRequestMismatch(VirtualPath),
-    #[error("linked-worktree evidence requires a Data path, got {0:?}")]
-    LinkedEvidenceRequiresDataPath(VirtualPath),
-    #[error("linked-worktree evidence is invalid: {0}")]
-    InvalidLinkedEvidence(String),
     #[error("entry identity is invalid: {0}")]
     InvalidEntryIdentity(String),
     #[error("entry identity for object '{object}' does not match captured bytes")]
@@ -1626,7 +1474,6 @@ mod tests {
             )]),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap()
     }
@@ -1668,7 +1515,6 @@ mod tests {
                 extra_entries,
                 BTreeMap::new(),
                 BTreeMap::new(),
-                BTreeMap::new(),
             ),
             Err(CaptureError::UnexpectedCapturedPath(path)) if path == extra
         ));
@@ -1679,7 +1525,6 @@ mod tests {
                 spec.clone(),
                 entries.clone(),
                 BTreeMap::from([(extra.clone(), DirectoryListing::default())]),
-                BTreeMap::new(),
                 BTreeMap::new(),
             ),
             Err(CaptureError::UnexpectedListing(path)) if path == extra
@@ -1705,55 +1550,8 @@ mod tests {
                 entries.clone(),
                 BTreeMap::new(),
                 BTreeMap::from([(pinned_request.clone(), pinned)]),
-                BTreeMap::new(),
             ),
             Err(CaptureError::UnexpectedPinnedEvidence(request)) if request == pinned_request
-        ));
-
-        let linked = LinkedWorktreeEvidence::new(
-            extra.clone(),
-            LinkedWorktreeSourceClass::Absent,
-            None,
-            None,
-        )
-        .unwrap();
-        assert!(matches!(
-            RepositoryImage::close(
-                layout(),
-                spec,
-                entries,
-                BTreeMap::new(),
-                BTreeMap::new(),
-                BTreeMap::from([(extra.clone(), linked)]),
-            ),
-            Err(CaptureError::UnexpectedLinkedEvidence(path)) if path == extra
-        ));
-    }
-
-    #[test]
-    fn test_close_requires_requested_linked_evidence() {
-        let requested = VirtualPath::data("index.json").unwrap();
-        let linked_path = VirtualPath::data("config.toml").unwrap();
-        let mut spec = CaptureSpec::new(
-            [requested.clone()],
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 64,
-                max_depth: 4,
-            },
-        )
-        .unwrap();
-        spec.discover_linked_worktree(linked_path.clone()).unwrap();
-        assert!(matches!(
-            RepositoryImage::close(
-                layout(),
-                spec,
-                BTreeMap::from([(requested, RepositoryEntry::Absent)]),
-                BTreeMap::new(),
-                BTreeMap::new(),
-                BTreeMap::new(),
-            ),
-            Err(CaptureError::IncompleteLinkedEvidence(path)) if path == linked_path
         ));
     }
 
@@ -1784,7 +1582,6 @@ mod tests {
             spec,
             entries,
             BTreeMap::from([(path, listing)]),
-            BTreeMap::new(),
             BTreeMap::new(),
         )
     }
@@ -1835,8 +1632,8 @@ mod tests {
                     _ => spec.discover_paths([path.clone()])?,
                 }
                 let entries = BTreeMap::from([(path.clone(), entry.clone())]);
-                let (listings, pinned, linked) = Default::default();
-                RepositoryImage::close(layout(), spec, entries, listings, pinned, linked)
+                let (listings, pinned) = Default::default();
+                RepositoryImage::close(layout(), spec, entries, listings, pinned)
             };
             let read = read as u64;
 
@@ -1915,7 +1712,6 @@ mod tests {
                 (root, DirectoryListing::new(["issues".into()]).unwrap()),
                 (issues, DirectoryListing::default()),
             ]),
-            BTreeMap::new(),
             BTreeMap::new(),
         );
 
@@ -2248,15 +2044,6 @@ mod tests {
                 None,
             ),
             Err(CaptureError::InvalidPinnedEvidence(_))
-        ));
-        assert!(matches!(
-            LinkedWorktreeEvidence::new(
-                VirtualPath::worktree("config.toml").unwrap(),
-                LinkedWorktreeSourceClass::Absent,
-                None,
-                None,
-            ),
-            Err(CaptureError::LinkedEvidenceRequiresDataPath(_))
         ));
 
         let path = VirtualPath::data("index.json").unwrap();

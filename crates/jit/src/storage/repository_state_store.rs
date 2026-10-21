@@ -7,10 +7,10 @@
 
 use crate::repository_state::{
     CaptureError, CaptureSpec, CapturedAnswers, CapturedBytes, DirectoryListing, EntryIdentity,
-    EventLogTail, ExpectedPreimage, FileMode, LinkedWorktreeEvidence, LinkedWorktreeSourceClass,
-    MaterializationPlan, PinnedDocumentEvidence, PinnedSourceClass, ReadMode, RepositoryAction,
-    RepositoryDelta, RepositoryEntry, RepositoryImage, RepositoryLayout, RepositoryLayoutError,
-    RepositoryRootClass, RepositoryRootEvidence, RootRelativePath, VirtualPath,
+    EventLogTail, ExpectedPreimage, FileMode, MaterializationPlan, PinnedDocumentEvidence,
+    PinnedSourceClass, ReadMode, RepositoryAction, RepositoryDelta, RepositoryEntry,
+    RepositoryImage, RepositoryLayout, RepositoryLayoutError, RepositoryRootClass,
+    RepositoryRootEvidence, RootRelativePath, VirtualPath,
 };
 use crate::storage::atomic_write::sync_capability_directory;
 use crate::storage::init_publish;
@@ -594,15 +594,8 @@ impl JsonMutationSession {
         spec: CaptureSpec,
     ) -> Result<RepositoryImage, RepositoryStateStoreError> {
         revalidate_layout_capabilities(&self.layout, &self.roots)?;
-        let worktree_paths = self.storage.configured_worktree_paths()?;
-        let image = capture_capability_image(
-            &self.layout,
-            &self.roots,
-            &worktree_paths,
-            &self.storage,
-            spec,
-            prior,
-        )?;
+        let image =
+            capture_capability_image(&self.layout, &self.roots, &self.storage, spec, prior)?;
         self.captured = Some(image.clone());
         Ok(image)
     }
@@ -1105,7 +1098,6 @@ fn stable_unavailable_reason(diagnostic: &str) -> String {
 fn capture_capability_image(
     layout: &RepositoryLayout,
     roots: &CapabilityRoots,
-    worktree_paths: &crate::storage::WorktreePaths,
     storage: &JsonFileStorage,
     spec: CaptureSpec,
     mut prior: CapturedAnswers,
@@ -1215,19 +1207,7 @@ fn capture_capability_image(
             .collect();
     }
     drop(evidence_cache);
-    let linked = spec
-        .linked_worktree()
-        .iter()
-        .map(|path| {
-            let evidence = match prior.linked_worktree.remove(path) {
-                Some(evidence) => evidence,
-                None => capture_linked_evidence(layout, roots, worktree_paths, path)?,
-            };
-            Ok((path.clone(), evidence))
-        })
-        .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned, linked)
-        .map_err(Into::into)
+    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned).map_err(Into::into)
 }
 
 fn capture_memory_image(
@@ -1280,34 +1260,7 @@ fn capture_memory_image(
             ))
         })
         .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    let linked = spec
-        .linked_worktree()
-        .iter()
-        .map(|path| {
-            let evidence = match state.entries.get(path) {
-                Some(RepositoryEntry::File { content, .. }) => LinkedWorktreeEvidence::new(
-                    path.clone(),
-                    LinkedWorktreeSourceClass::LocalData,
-                    Some(content.identity().clone()),
-                    Some(content.bytes().to_vec()),
-                )?,
-                None | Some(RepositoryEntry::Absent) => LinkedWorktreeEvidence::new(
-                    path.clone(),
-                    LinkedWorktreeSourceClass::Absent,
-                    None,
-                    None,
-                )?,
-                _ => {
-                    return Err(RepositoryStateStoreError::UnsafeTarget(format!(
-                        "linked-worktree evidence at {path:?} is not a regular file"
-                    )))
-                }
-            };
-            Ok((path.clone(), evidence))
-        })
-        .collect::<Result<BTreeMap<_, _>, RepositoryStateStoreError>>()?;
-    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned, linked)
-        .map_err(Into::into)
+    RepositoryImage::close(layout.clone(), spec, entries, listings, pinned).map_err(Into::into)
 }
 
 fn memory_listing(
@@ -1575,88 +1528,6 @@ fn normalized_mode(metadata: &cap_std::fs::Metadata) -> FileMode {
         let _ = metadata;
         FileMode::Regular
     }
-}
-
-fn capture_linked_evidence(
-    layout: &RepositoryLayout,
-    roots: &CapabilityRoots,
-    worktree_paths: &crate::storage::WorktreePaths,
-    path: &VirtualPath,
-) -> Result<LinkedWorktreeEvidence, RepositoryStateStoreError> {
-    match inspect_capability_entry(layout, roots, path, ReadMode::Whole)? {
-        RepositoryEntry::File { content, .. } => {
-            return LinkedWorktreeEvidence::new(
-                path.clone(),
-                LinkedWorktreeSourceClass::LocalData,
-                Some(content.identity().clone()),
-                Some(content.into_bytes()),
-            )
-            .map_err(Into::into)
-        }
-        RepositoryEntry::Absent => {}
-        _ => {
-            return Err(RepositoryStateStoreError::UnsafeTarget(format!(
-                "linked-worktree evidence at {path:?} is not a regular file"
-            )))
-        }
-    }
-    let Ok(data_prefix) = layout.data_root().strip_prefix(layout.worktree_root()) else {
-        return LinkedWorktreeEvidence::new(
-            path.clone(),
-            LinkedWorktreeSourceClass::Absent,
-            None,
-            None,
-        )
-        .map_err(Into::into);
-    };
-    let git_path = data_prefix.join(path.relative().as_path());
-    let Some(git_path) = git_path.to_str() else {
-        return Err(RepositoryStateStoreError::UnsafeTarget(
-            git_path.display().to_string(),
-        ));
-    };
-    if let Ok(read) = crate::storage::GitRevisionResolver::new(layout.worktree_root())
-        .read_pinned_path("HEAD", git_path)
-    {
-        let bytes = read.bytes().to_vec();
-        return LinkedWorktreeEvidence::new(
-            path.clone(),
-            LinkedWorktreeSourceClass::GitHead,
-            Some(EntryIdentity::for_bytes(
-                format!("git-blob:{}", read.blob_oid()),
-                &bytes,
-            )?),
-            Some(bytes),
-        )
-        .map_err(Into::into);
-    }
-    if let (Some(main_root), Some(main_data)) = (
-        worktree_paths.primary_worktree_root()?,
-        worktree_paths.primary_data_root()?,
-    ) {
-        if let Ok(main_layout) = discover_repository_layout(main_root, &main_data) {
-            let (main_roots, _, _) = CapabilityRoots::open(&main_layout)?;
-            match inspect_capability_entry(&main_layout, &main_roots, path, ReadMode::Whole)? {
-                RepositoryEntry::File { content, .. } => {
-                    return LinkedWorktreeEvidence::new(
-                        path.clone(),
-                        LinkedWorktreeSourceClass::MainWorktree,
-                        Some(content.identity().clone()),
-                        Some(content.into_bytes()),
-                    )
-                    .map_err(Into::into)
-                }
-                RepositoryEntry::Absent => {}
-                _ => {
-                    return Err(RepositoryStateStoreError::UnsafeTarget(format!(
-                        "main-worktree evidence at {path:?} is not a regular file"
-                    )))
-                }
-            }
-        }
-    }
-    LinkedWorktreeEvidence::new(path.clone(), LinkedWorktreeSourceClass::Absent, None, None)
-        .map_err(Into::into)
 }
 
 /// Open the parent directory of a repository-relative target for capture.

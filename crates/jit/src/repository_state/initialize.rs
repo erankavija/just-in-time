@@ -1325,15 +1325,7 @@ mod tests {
             RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap();
-        RepositoryImage::close(
-            layout,
-            spec,
-            entries,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .unwrap()
+        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new()).unwrap()
     }
 
     #[test]

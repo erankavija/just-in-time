@@ -3674,15 +3674,8 @@ mod tests {
             DirectoryListing::new(records.iter().map(|(name, _, _)| name.clone())).unwrap(),
         )]);
         (
-            RepositoryImage::close(
-                layout.clone(),
-                spec,
-                entries,
-                listings,
-                BTreeMap::new(),
-                BTreeMap::new(),
-            )
-            .unwrap(),
+            RepositoryImage::close(layout.clone(), spec, entries, listings, BTreeMap::new())
+                .unwrap(),
             layout,
         )
     }
@@ -4731,7 +4724,6 @@ mod tests {
             )]),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap();
         let contribution = Contribution::MapEntry {
@@ -4890,7 +4882,6 @@ mod tests {
             )]),
             BTreeMap::new(),
             BTreeMap::new(),
-            BTreeMap::new(),
         )
         .unwrap();
 
@@ -4942,15 +4933,8 @@ mod tests {
                 (path.clone(), entry)
             })
             .collect();
-        RepositoryImage::close(
-            layout,
-            spec,
-            entries,
-            BTreeMap::new(),
-            BTreeMap::new(),
-            BTreeMap::new(),
-        )
-        .expect("image closes")
+        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new())
+            .expect("image closes")
     }
 
     #[test]

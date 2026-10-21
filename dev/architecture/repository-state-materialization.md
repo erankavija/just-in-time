@@ -86,8 +86,7 @@ all planning. `RepositoryImage::close` builds it from a `CaptureSpec` bounded by
 an unbounded tree. The image holds, per canonical path, a `RepositoryEntry` —
 `File` (exact bytes and mode), `FileTail` (a path read as `ReadMode::Tail`),
 `Directory`, `Symlink` (never followed), `Unsupported`, or `Absent` — plus
-`DirectoryListing`s, which hold child names only, and pinned or linked-worktree
-evidence.
+`DirectoryListing`s, which hold child names only, and pinned-document evidence.
 
 A mutation reads the repository in one pass. What it reads first names what it
 reads next (the index names the issue files, the issues name the plan documents
@@ -97,7 +96,7 @@ not already hold. Nothing is read twice, so no read is compared with an earlier
 one. The command-layer entries are `capture_mutation_preflight` and
 `capture_mutation_base` over `capture_proposed_base_inner` (`commands/validate.rs`).
 A mutation captures only the plan documents its transition rules read;
-issue-linked documents and pinned or linked evidence are validation's reads
+issue-linked documents and pinned evidence are validation's reads
 (`@/issue/8454236c/decision/D-1`).
 
 The event log is the one path a mutation reads as a tail: an `EventLogTail`
