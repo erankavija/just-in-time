@@ -1,0 +1,66 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4ce6f2c5cb81a6e3ac07d60f459f2d4a75d02923",
+  "completed_at": "2026-10-21T01:10:59.535436157Z",
+  "duration_ms": 441028,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/df129d9e-rust-code-quality/plan.md",
+        "id": "F1",
+        "line": 477,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Audit source IDs A3, A24, A25, A26, S13, and S14 have no resolvable investigation or linked audit artifact."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/df129d9e-rust-code-quality/plan.md",
+        "id": "F2",
+        "line": 461,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "The D-16 external sequencing decision is absent from the instantiated manifest graph."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/df129d9e-rust-code-quality/breakdown.json",
+        "id": "F3",
+        "line": 333,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "Five executor-facade terminal tasks combine multiple command families and broad call-site migrations beyond one focused worker cycle."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/df129d9e-rust-code-quality/breakdown.json",
+        "id": "F4",
+        "line": 2899,
+        "origin": "issue-impact",
+        "severity": "high",
+        "summary": "handlers-item-invariant-project mixes three independent command groups and omits their distinct created handler paths."
+      }
+    ],
+    "summary": "The plan has unresolved sources, missing required external sequencing, and materially oversized leaf tasks.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "0ba00a6f-9813-4f66-8205-362ebfc8caaa",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "20789ab8-a046-45a5-91a7-39e63a20c917",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:03:38.506615162Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9148 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15bfc-38a2-7080-8286-bb242a4de2d1\n--------\nuser\n--- 9135 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** Sources `A3`, `A24`, `A25`, `A26`, `S13`, and `S14` are unresolved. The plan merely names them as “audit rows,” while the investigation defines no such rows; many manifest entries rely on them. See [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/plan.md:477) and [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/breakdown.json:159). Replace each with a resolvable investigation finding or link the authoritative audit artifact and define stable anchors there.\n\n2. **F2 — blocking, issue-impact:** D-16 explicitly requires external sequencing, but the manifest does not encode or otherwise authoritatively wire it: `global-json-flag` depends only on two internal tasks despite the decision requiring it to wait for open issues `3754095f`, `16d63038`, `8673dc5e`, and `f37d228e`. The specifically named consumers also omit their required predecessor edges. See [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/plan.md:461) and [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/breakdown.json:280). Add an authoritative post-instantiation wiring step/record for those exact external edges, or revise the settled decision and task scopes so the graph as instantiated is safe.\n\n3. **F3 — blocking, issue-impact:** Several facade leaves are materially oversized: `executor-facade-issues`, `executor-facade-admin`, `executor-facade-queries`, `executor-facade-gates`, and `executor-facade-profiles`. They combine multiple independent command families, dozens of methods, broad test rewrites, and up to 21 touched paths; issue facade alone cites roughly 390 call sites in 50 files. See [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/breakdown.json:333), [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/plan.md:100), and [commands](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/commands/mod.rs:2107). Split each at coherent existing-family boundaries, with one bounded caller family and focused test boundary per leaf.\n\n4. **F4 — blocking, issue-impact:** `handlers-item-invariant-project` combines three independent CLI command groups, their distinct response/error contracts, and separate command-layer modules, while declaring only `dispatch/item.rs` and `output/item.rs` as created paths. This conflicts with the plan’s per-command-group handler shape and leaves greenfield paths undisclosed. See [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/breakdown.json:2899), [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/df129d9e-rust-code-quality/plan.md:74), and [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:298). Split it into item, invariant, and project handler leaves, each declaring its created module paths and focused tests.\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The plan has unresolved sources, missing required external sequencing, and materially oversized leaf tasks.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Audit source IDs A3, A24, A25, A26, S13, and S14 have no resolvable investigation or linked audit artifact.\",\"file\":\"dev/active/df129d9e-rust-code-quality/plan.md\",\"line\":477},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The D-16 external sequencing decision is absent from the instantiated manifest graph.\",\"file\":\"dev/active/df129d9e-rust-code-quality/plan.md\",\"line\":461},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Five executor-facade terminal tasks combine multiple command families and broad call-site migrations beyond one focused worker cycle.\",\"file\":\"dev/active/df129d9e-rust-code-quality/breakdown.json\",\"line\":333},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"handlers-item-invariant-project mixes three independent command groups and omits their distinct created handler paths.\",\"file\":\"dev/active/df129d9e-rust-code-quality/breakdown.json\",\"line\":2899}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

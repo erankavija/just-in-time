@@ -17002,3 +17002,10 @@
 {"fields":["assignee"],"id":"09640d10-2806-43c9-bf22-62e961a87d70","issue_id":"da12ad66-7451-4700-9731-74a36c895bb9","timestamp":"2026-10-21T01:08:02.651509009Z","type":"issue_updated","updated_by":"issue-unassign"}
 {"fields":["dependencies"],"id":"15b20995-c59a-4aaa-a7e3-c594c95140d4","issue_id":"24268b05-2ab4-4864-87fe-e8ff35945191","timestamp":"2026-10-21T01:08:05.518663963Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["assignee"],"id":"2824ebf5-1eb1-4441-a8ad-45829f9fec13","issue_id":"24268b05-2ab4-4864-87fe-e8ff35945191","timestamp":"2026-10-21T01:08:06.168539782Z","type":"issue_updated","updated_by":"issue-unassign"}
+{"assignee":"agent:planning-lead-3d9a0ce3","id":"73cc9b0e-0383-49b8-96f1-678f57d33ede","issue_id":"a3437bab-d2b7-44cc-9ec5-347a0df971c5","timestamp":"2026-10-21T01:08:41.570989187Z","type":"issue_claimed"}
+{"from":"ready","id":"0283dad9-5786-4b1b-9b8b-f0f565e356db","issue_id":"a3437bab-d2b7-44cc-9ec5-347a0df971c5","timestamp":"2026-10-21T01:08:41.669279738Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"coverage-preview","id":"eeabea03-a941-4245-a99b-fcafc5f0e40b","issue_id":"a3437bab-d2b7-44cc-9ec5-347a0df971c5","timestamp":"2026-10-21T01:08:42.475587782Z","type":"gate_passed","updated_by":"auto:executor"}
+{"gate_key":"plan-review","id":"4205bd53-7c16-4a4f-8749-c1ea6bc71794","issue_id":"0ba00a6f-9813-4f66-8205-362ebfc8caaa","timestamp":"2026-10-21T01:11:26.073098991Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"code-review","id":"d5cf4efc-45fb-4792-85f9-523e78f7be8d","issue_id":"dc6fac0c-f449-47fc-b2f3-29f756fad4b5","timestamp":"2026-10-21T01:11:26.388930419Z","type":"gate_passed","updated_by":"auto:executor"}
+{"from":"ready","id":"a0773c15-016c-4d78-8f76-4cc2e37b61b2","issue_id":"dc6fac0c-f449-47fc-b2f3-29f756fad4b5","timestamp":"2026-10-21T01:11:30.685012164Z","to":"done","type":"issue_state_changed"}
+{"id":"1dd2ce9f-f6cb-40a6-9b70-68aa55644a64","issue_id":"dc6fac0c-f449-47fc-b2f3-29f756fad4b5","timestamp":"2026-10-21T01:11:30.685012164Z","type":"issue_completed"}
