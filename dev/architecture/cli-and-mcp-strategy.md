@@ -57,9 +57,9 @@
 **Before** (human-readable):
 ```bash
 $ jit query all
-Open: 5  Ready: 3  In Progress: 2  Done: 10
+Backlog: 5  Ready: 3  In Progress: 2  Done: 10
 
-abc123 | Feature: Add authentication | high | open
+abc123 | Feature: Add authentication | high | backlog
 def456 | Bug: Fix login redirect     | critical | ready
 ```
 
@@ -74,7 +74,7 @@ $ jit query all --json
         "id": "abc123",
         "title": "Feature: Add authentication",
         "priority": "high",
-        "state": "open",
+        "state": "backlog",
         "assignee": null,
         "dependencies": [],
         "gates_required": ["unit-tests"],
@@ -91,7 +91,7 @@ $ jit query all --json
       }
     ],
     "summary": {
-      "open": 5,
+      "backlog": 5,
       "ready": 3,
       "in_progress": 2,
       "done": 10

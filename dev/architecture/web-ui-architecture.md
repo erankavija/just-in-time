@@ -255,7 +255,7 @@ export function IssueDetail({ issueId }: { issueId: string }) {
 ### Node Styling by State
 ```typescript
 const nodeColors = {
-  open: '#3B82F6',      // Blue
+  backlog: '#3B82F6',   // Blue
   ready: '#10B981',     // Green
   in_progress: '#F59E0B', // Amber
   done: '#6B7280',      // Gray

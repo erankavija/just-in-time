@@ -2889,13 +2889,34 @@ mod tests {
                 let token = serde_json::to_value(state).unwrap();
                 let token = token.as_str().unwrap();
                 assert_eq!(State::from_str(token).unwrap(), state);
-                for variant in [
+                let flip = |c: char| match c.is_ascii_lowercase() {
+                    true => c.to_ascii_uppercase(),
+                    false => c.to_ascii_lowercase(),
+                };
+                let alternating = |offset: usize| -> String {
+                    token
+                        .chars()
+                        .enumerate()
+                        .map(|(i, c)| if i % 2 == offset { flip(c) } else { c })
+                        .collect()
+                };
+                // Every single-letter flip covers the capitalised form and each
+                // letter after an underscore.
+                let single_flips = token
+                    .char_indices()
+                    .filter(|(_, c)| c.is_ascii_alphabetic())
+                    .map(|(i, c)| format!("{}{}{}", &token[..i], flip(c), &token[i + 1..]));
+                [
                     token.to_uppercase(),
-                    token[..1].to_uppercase() + &token[1..],
+                    alternating(0),
+                    alternating(1),
                     format!(" {token}"),
-                ] {
+                ]
+                .into_iter()
+                .chain(single_flips)
+                .for_each(|variant| {
                     assert!(State::from_str(&variant).is_err(), "accepted {variant:?}");
-                }
+                });
             }
             for token in ["open", "inprogress", "invalid", "pending", ""] {
                 assert!(State::from_str(token).is_err(), "accepted {token:?}");
