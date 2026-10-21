@@ -338,7 +338,14 @@
     "Wave 4 planning nodes depend on 2195c98f the same way. Wave 5 is the release epic b80e3c70 containing the tag task bb03df0a.",
     "Session rule from the user (2026-10-20): never ask the user mid-session; block issues needing user input and record the question for the next session; check workers every 30 min; write the handoff when only user-blocked work remains.",
     "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else.",
-    "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up."
+    "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up.",
+    "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces."
   ],
-  "started_at": "2026-07-03"
+  "started_at": "2026-07-03",
+  "user_actions": [
+    {
+      "date": "2026-10-21",
+      "item": "Delete 19 stale 0-byte gitignored read-lock sidecars in the primary checkout. Command: find .jit/issues -maxdepth 1 -name '*.lock' -size 0 -delete. lsof showed no holders. A session's permission classifier blocked the deletion, so it is left to the user. It gates nothing."
+    }
+  ]
 }
