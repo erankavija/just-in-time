@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "71ed9d4cebfb071fc4751faa846f5e2b61a8fc04",
+  "completed_at": "2026-10-21T16:06:10.976236329Z",
+  "duration_ms": 359117,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/output.rs",
+        "id": "F1",
+        "line": 1281,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Repeated marker rustdoc restates literal collection keys rather than documenting a non-obvious contract."
+      }
+    ],
+    "summary": "One recurring issue-impact rustdoc defect remains.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "650e6a56-e3fe-4169-8c2b-58229c9aaeca",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d36c94d9-8e43-40f0-b449-fbb52c2d5ad0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:00:11.858509675Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 9281 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15f31-0ad5-7ca3-b89b-5e58cba21916\n--------\nuser\n--- 9268 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: c4762af0e refactor; 988b20792 merge (same nine-file patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-04 and REQ-18 (parent issue description); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T15:59:26Z); mcp-ci passed (exit 0, 2026-10-21T16:00:04Z)\nTruncation recovery: targeted reads of policy, item sources, patches, aliases, schema tests, gate records, and merge diff\n\n1. [blocking][issue-impact] `crates/jit/src/output.rs:1281` adds eleven repeated rustdoc lines that merely restate each marker’s literal key (`IssuesKey = \"issues\"`, etc.). This recurring non-contract prose violates `@/invariant/essential-code-prose`; remove it or replace it with genuinely necessary contract documentation.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One recurring issue-impact rustdoc defect remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Repeated marker rustdoc restates literal collection keys rather than documenting a non-obvious contract.\",\"file\":\"crates/jit/src/output.rs\",\"line\":1281,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
