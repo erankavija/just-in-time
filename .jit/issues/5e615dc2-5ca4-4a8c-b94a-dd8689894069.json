@@ -11,6 +11,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f8a6b298-history-independent-reads/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "b8ccf3a069b360ae9791d200f787eb82e216d1eb4a88dd6bb5abe42c8c93cc11",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f8a6b298-history-independent-reads/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "bfdfc82300add7f5fcf11ba2cc6ad9be6cc961876813c1909b079b52610bde96",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f8a6b298-history-independent-reads/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "plan",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f8a6b298-history-independent-reads/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown-manifest",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f8a6b298-history-independent-reads/breakdown.json"
     }
   ],
   "first_ready_at": "2026-10-21T05:40:18.475115916Z",
@@ -40,5 +72,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-10-21T05:51:50.583711901Z"
+  "updated_at": "2026-10-21T06:24:54.868314209Z"
 }
