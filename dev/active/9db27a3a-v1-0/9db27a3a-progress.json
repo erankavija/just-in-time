@@ -425,6 +425,10 @@
     {
       "date": "2026-10-21",
       "item": "cargo-ci's 30 s suite-clock budget fails under parallel-agent host load (observed 30.6-110 s). Interim: a steward lock convention giving full gates quiet windows. Decide the durable answer: keep the budget and run full gates only in quiet windows (possibly enforced in the gate script), or measure the budget in CPU time or relative to load. This is a gate-definition change, which is yours."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "The harness flagged df129d9e's execution-lead subagent with an 'Instruction Poisoning' warning (about 09:20). Steward check: no commit in the last 30 minutes changed .agents/, .claude/, CLAUDE.md, AGENTS.md or scripts except planned tasks (9ca31c64 workspace lints; d1ff2273 release workflow and docs-check script under 3d9a0ce3). The likely trigger is the lead relaying the steward's lock-convention instructions to its workers. Review the lead's transcript if you want certainty."
     }
   ]
 }
