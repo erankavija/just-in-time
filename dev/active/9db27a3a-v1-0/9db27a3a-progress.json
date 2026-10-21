@@ -481,6 +481,10 @@
     {
       "date": "2026-10-21",
       "item": "Review (informational): the steward approved a 3d9a0ce3 task changing scripts/cargo-ci.sh so that a run failing only on timeouts or the suite-duration budget exits 75 (recorded as a non-reusable infrastructure error) instead of 1 (a reusable failed verdict). It applies 3d9a0ce3 REQ-02. The durable budget-under-load question recorded earlier remains open."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "The mcp-ci gate runs the MCP tests against whatever jit is on PATH (the dogfood ~/.cargo/bin/jit), but that binary is not among its declared digest inputs. A stale dogfood binary caused a failure (13 undecided tools from removed verb stubs) that digest reuse now pins until crates/ or mcp-server/ changes. A `--force` rerun was denied by the df129d9e lead's permission check, and the steward did not route around that. Decide: make mcp-ci build and use the workspace jit binary (and/or include it in inputs), or reinstall the dogfood binary as part of the gate. Affected: 719a5501 (gated, waiting)."
     }
   ]
 }
