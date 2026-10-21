@@ -602,12 +602,12 @@ fn collect_enforcement_drift_findings(
     rules: Option<&RuleSet>,
     gates: &GateRegistry,
 ) -> Vec<ReportedFinding> {
-    use crate::validation::drift::{enforcement_drift_tolerant, SourceState};
+    use crate::validation::drift::{enforcement_drift, SourceState};
 
     let rule_names: Option<BTreeSet<&str>> =
         rules.map(|rules| rules.rules.iter().map(|rule| rule.name.as_str()).collect());
     let gate_keys: BTreeSet<&str> = gates.gates.keys().map(String::as_str).collect();
-    enforcement_drift_tolerant(
+    enforcement_drift(
         &config.invariants.invariants,
         rule_names
             .as_ref()
