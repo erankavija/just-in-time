@@ -5,8 +5,9 @@
 //! file-lock acquisition timeout and poll interval, the orphaned temp-file
 //! cleanup threshold, the claim lease defaults, and the indefinite-lease limits.
 //! Call sites reference the constants here instead of inline literals, so each
-//! default value has one definition. The lease enforcement default is
-//! [`EnforcementMode::DEFAULT`], projected alongside them.
+//! default value has one definition. The lease enforcement default
+//! [`EnforcementMode::DEFAULT`] and the linked-checkout write-policy default
+//! [`LinkedCheckoutWriteStance::DEFAULT`] are projected alongside them.
 //!
 //! [`render_reference_markdown`] projects these constants into the committed
 //! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
@@ -14,6 +15,7 @@
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
 
 use crate::config::EnforcementMode;
+use crate::domain::LinkedCheckoutWriteStance;
 
 /// Maximum time, in seconds, a caller waits to acquire a file lock before
 /// failing. Every production lock resolves its wait through
@@ -111,6 +113,11 @@ pub fn render_reference_markdown() -> String {
             "Lease enforcement mode",
             EnforcementMode::DEFAULT.to_string(),
             "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. A repository with no `[worktree]` section enforces no leases.",
+        ),
+        (
+            "Linked-checkout write policy",
+            LinkedCheckoutWriteStance::DEFAULT.to_string(),
+            "Stance on state-mutating commands run inside a linked non-primary checkout when the repository declares no `[worktree] write_policy`, whether the key or the whole section is absent. The `JIT_WORKTREE_WRITE_POLICY` environment variable outranks it for one invocation.",
         ),
     ];
 

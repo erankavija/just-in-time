@@ -76,12 +76,12 @@ impl ConfigManager {
     /// inside a linked non-primary checkout.
     ///
     /// Returns the configured stance from `.jit/config.toml`, defaulting to
-    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] (refuse) if not
+    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] if not
     /// configured.
     ///
     /// Unlike [`JitConfig::enforcement_mode`], an absent `write_policy` key in
     /// a present `[worktree]` section and an absent `[worktree]` section
-    /// altogether resolve identically — both refuse.
+    /// altogether resolve identically, to the default.
     ///
     /// # Errors
     ///

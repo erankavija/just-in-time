@@ -501,8 +501,8 @@ variables do not change it.
 | `"allow"` | Permits state-mutating commands run inside a linked non-primary checkout |
 
 With no `[worktree]` section, and with the section present but `write_policy`
-omitted, the declared stance is `"refuse"` — unlike `enforce_leases`, both
-cases resolve identically rather than diverging by section presence.
+omitted, the declared stance is the [default stance](runtime-defaults.md).
+Unlike `enforce_leases`, both cases resolve identically.
 
 Under the refusing stance, a command that would open a repository mutation
 session inside a linked non-primary checkout fails with

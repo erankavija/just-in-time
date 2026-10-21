@@ -161,7 +161,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 **Symptom:**
 ```
 Error: Exceeded per-agent limit for indefinite leases.
-Agent copilot:worker-1 already has 2 indefinite lease(s) (max: 2).
+Agent copilot:worker-1 already has 3 indefinite lease(s) (max: 3).
 ```
 
 **Cause:** Policy limits prevent too many indefinite leases to avoid deadlocks.

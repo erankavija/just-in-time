@@ -16,3 +16,4 @@ module, which defines these values.
 | Indefinite leases per agent | 2 | Default maximum concurrent indefinite (`--ttl 0`) leases one agent holds; `jit claim acquire` refuses beyond it. Overridden by `[coordination] max_indefinite_leases_per_agent`. |
 | Indefinite leases per repository | 10 | Default maximum concurrent indefinite leases across the repository. Overridden by `[coordination] max_indefinite_leases_per_repo`. |
 | Lease enforcement mode | strict | Mode applied when the repository's `[worktree]` section omits `enforce_leases`. A repository with no `[worktree]` section enforces no leases. |
+| Linked-checkout write policy | refuse | Stance on state-mutating commands run inside a linked non-primary checkout when the repository declares no `[worktree] write_policy`, whether the key or the whole section is absent. The `JIT_WORKTREE_WRITE_POLICY` environment variable outranks it for one invocation. |

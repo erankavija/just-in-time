@@ -236,7 +236,7 @@ git push
 ```toml
 [worktree]
 enforce_leases = "strict"  # "strict" | "warn" | "off"
-write_policy = "allow"     # "refuse" (default) | "allow"
+write_policy = "allow"     # "refuse" | "allow"
 
 [coordination]
 max_indefinite_leases_per_agent = 3

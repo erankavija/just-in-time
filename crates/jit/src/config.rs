@@ -1293,7 +1293,8 @@ pub struct EffectiveCoordination {
 }
 
 /// Resolve the lease enforcement mode from a repository's `[worktree]` section:
-/// `off` without the section, `strict` when the section omits the key.
+/// `off` without the section, [`EnforcementMode::DEFAULT`] when the section
+/// omits the key.
 fn resolve_enforcement_mode(worktree: Option<&WorktreeConfig>) -> EnforcementMode {
     worktree.map_or(EnforcementMode::Off, |wt| {
         wt.enforce_leases.unwrap_or(EnforcementMode::DEFAULT)

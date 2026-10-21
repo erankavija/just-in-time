@@ -114,15 +114,16 @@ when the issue does not exist. For the code each failure exits with, see the
 
 Indefinite leases have policy limits to prevent deadlocks:
 
-- **Per-agent limit:** Max 2 indefinite leases per agent (configurable)
-- **Per-repo limit:** Max 10 indefinite leases per repository (configurable)
+- **Per-agent limit:** a maximum number of indefinite leases per agent
+- **Per-repo limit:** a maximum number of indefinite leases per repository
 
-Configure in `.jit/config.toml`:
+Both defaults are listed in [Runtime Coordination Defaults](runtime-defaults.md).
+Override them in `.jit/config.toml`:
 
 ```toml
 [coordination]
-max_indefinite_leases_per_agent = 2
-max_indefinite_leases_per_repo = 10
+max_indefinite_leases_per_agent = 3
+max_indefinite_leases_per_repo = 12
 ```
 
 ---
