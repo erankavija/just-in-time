@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aba30be472566a85ae376fa9897ff969e9ceb7ab",
+  "completed_at": "2026-10-21T01:00:55.196793497Z",
+  "duration_ms": 327810,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json",
+        "id": "F1",
+        "line": 20,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-14"
+        ],
+        "severity": "high",
+        "summary": "The v1.0 milestone does not depend on container 842b0ac6 despite its milestone membership label."
+      }
+    ],
+    "summary": "The 38-issue breakdown exactly matches its authoritative manifest; one pre-existing milestone-containment advisory remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "6792cc41-d648-45f1-a1f9-f19ddf2a0cae",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4d75457f-9a46-4802-ae52-2eb2e6425691",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:55:27.385934751Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Review result: PASS with one pre-existing advisory.\n\nMechanical verification passed:\n\n- Manifest validation and renderer `--check`: clean.\n- Native batch dry-run: 38 issues and 42 internal edges.\n- Stored-record comparison: all fields, gates, labels, and dependencies match.\n- Bracket geometry: 24 sources point to B; C points to the single sink.\n- `planning` is absent from stored records and batch export.\n- `jit validate`: passed.\n- All descriptions meet content standards.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | Focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---:|---:|---:|---:|---:|---:|---:|---|\n| remove-bracket-breakdown | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-silent-integrity-validator | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| keep-one-enforcement-drift | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-linked-worktree-evidence | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-inert-config-keys | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| state-config-defaults-once | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| strict-config-toml-loading | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| strict-rule-declarations | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| unify-agent-configuration | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| adopt-manifest-version-two | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-read-lock-sidecar-sweep | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| converge-memory-event-parsing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-lifecycle-backfill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| canonical-state-tokens | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| route-test-gates-through-definition | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-gate-auto-fields | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| require-archived-from | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| derive-mermaid-state-classes | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-retired-name-scans | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| single-domain-types-path | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| single-domain-module-paths | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| prune-output-surface | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-taxonomy-dead-errors | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-skipped-gate-run-status | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| move-state-symbol-to-output | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-small-domain-helpers | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-reference-builders | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-adapter-link-rewrite | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| trim-git-revision-access | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| drop-claim-type-parameter | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| unify-gate-not-required-error | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-test-only-gate-entry-points | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| collapse-container-destination-states | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| gate-reference-renderers | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| single-file-lock-poll-loop | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-storage-cfg-twins | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-repository-state-cfg-twins | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n| remove-orphan-web-module | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | PASS |\n\n1. **[advisory] [pre-existing]** Container `842b0ac6` carries `milestone:v1.0`, but milestone `9db27a3a` does not depend on it. Consequently, the container, its bracket nodes, and its 38 descendants account for 41 membership-divergence warnings and the v1.0 milestone does not gate this epic. The container was created before the planning bracket, so this is outside the reviewed breakdown and does not fail it. Reconcile separately by adding the milestone-to-container dependency; no manifest correction is needed. Reference: `@/charter/D-14`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 38-issue breakdown exactly matches its authoritative manifest; one pre-existing milestone-containment advisory remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"summary\":\"The v1.0 milestone does not depend on container 842b0ac6 despite its milestone membership label.\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"file\":\".jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json\",\"line\":20,\"references\":[\"@/charter/D-14\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

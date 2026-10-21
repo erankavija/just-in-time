@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ac32a7e95d56a7e4e2584278bd3a0793506447ec",
+  "completed_at": "2026-10-21T00:55:48.845665044Z",
+  "duration_ms": 89249,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 1674,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "The optional-reason behavior description ends mid-sentence and does not state what a failed rejection leaves unchanged."
+      }
+    ],
+    "summary": "Atomic update and reject publication meet the hard criteria; one attributable documentation sentence is incomplete.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2d10f1dd-64c6-4eaf-8e67-836ed80c23d9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a05ae8c4-d503-4696-9aaf-f31ae0661be7",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:54:19.596142284Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `bbd6a466f`, merge `7bf8182b0`, and `b15a23d64` (`jit:2d10f1dd`)\nPolicy sources: `AGENTS.md`; `.jit/config.toml`; `.jit/invariants.toml`; `.jit/gates.toml`; `dev/vision/9db27a3a-charter.md`\nResolved items: `@/invariant/atomic-writes`, `@/invariant/derived-state-coherence`, `@/invariant/architecture-dependency-direction`, `@/invariant/orthogonal-tests`, `@/invariant/essential-code-prose`, `@/charter/D-13`, `@/charter/D-17`, `@/gate/cargo-ci`, `@/gate/jit-validate`\nGate evidence: `cargo-ci` passed (exit 0, 2026-10-21T00:41:15Z)\nTruncation recovery: re-read tagged patches and current command/session ranges by path; excluded the merge’s unrelated second-parent integration diff\n\n1. **[advisory, issue-impact]** The new rejection documentation ends mid-sentence: “so a failure leaves neither” at `docs/reference/cli-commands.md:1674`. State explicitly that it leaves neither the rejection nor the resolution label.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Atomic update and reject publication meet the hard criteria; one attributable documentation sentence is incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"The optional-reason behavior description ends mid-sentence and does not state what a failed rejection leaves unchanged.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1674,\"references\":[]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

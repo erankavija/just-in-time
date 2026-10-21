@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aba30be472566a85ae376fa9897ff969e9ceb7ab",
+  "completed_at": "2026-10-21T00:57:17.946828244Z",
+  "duration_ms": 86162,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied by the attributable current-tree implementation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d92f54aa-761e-4049-b1aa-d5efc32f17c6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3ffa8c78-6f6d-4f2a-9b30-f49f3d473996",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:55:51.784240096Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 79c177fbd, 18a1e3ea4, fe2115c88 (jit:d92f54aa)\nPolicy sources: AGENTS.md\nResolved items: @/issue/d92f54aa/decision/D-01 (issue description), @/charter/D-18 (dev/vision/9db27a3a-charter.md), @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T00:50:16Z)\nTruncation recovery: narrowed to commit- and path-scoped patches, configuration/parser reads, and current line-range verification\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied by the attributable current-tree implementation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

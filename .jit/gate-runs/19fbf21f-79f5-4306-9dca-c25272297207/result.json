@@ -1,0 +1,80 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "495f0b89f06cc1e9a335aa25acba59094ac74402",
+  "completed_at": "2026-10-21T00:54:34.801121289Z",
+  "duration_ms": 367186,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/3d9a0ce3-lead-friction/plan.md",
+        "id": "F1",
+        "line": 237,
+        "origin": "issue-impact",
+        "references": [
+          "3d9a0ce3/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "REQ-05 has no required manifest source or satisfies-label coverage."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/3d9a0ce3-lead-friction/breakdown.json",
+        "id": "F2",
+        "line": 450,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/inv/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "profile-record-removal combines multiple independent deletion, lifecycle, schema, documentation, and fixture deliverables."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/3d9a0ce3-lead-friction/breakdown.json",
+        "id": "F3",
+        "line": 253,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8"
+        ],
+        "severity": "high",
+        "summary": "profile-capture-removal mixes capture deletion with release-workflow and documentation-check migrations."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/3d9a0ce3-lead-friction/breakdown.json",
+        "id": "F4",
+        "line": 957,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-18",
+          "@/inv/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "profile-single-variant-enums combines three independent enum and wire migrations across 19 paths."
+      }
+    ],
+    "summary": "The manifest lacks required REQ-05 coverage and contains three materially oversized mixed-scope leaves.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "19fbf21f-79f5-4306-9dca-c25272297207",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T00:48:27.614965998Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5397 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15bee-5290-7722-a9aa-0271b959159e\n--------\nuser\n--- 5384 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** REQ-05 has no authoritative manifest coverage. Required validation reports both `source coverage missing: REQ-05` and `satisfies coverage missing: 3d9a0ce3/REQ-05`; the plan only promises a later update to existing child 3754095f, whose current labels lack that coverage label. Add a manifest-declared, dependency-wired REQ-05 owner, or extend the authoritative manifest protocol to declare and validate the existing-child mutation. [plan.md](/home/vkaskivuo/Projects/just-in-time/dev/active/3d9a0ce3-lead-friction/plan.md:237) [existing child](/home/vkaskivuo/Projects/just-in-time/.jit/issues/3754095f-d396-40b7-b2f1-e7624aacd6a6.json:15)\n\n2. **F2 — blocking, issue-impact:** `profile-record-removal` is not worker-sized: it combines record/storage deletion, command and dependency-resolution removal, lifecycle vocabulary redesign, event-schema/catalog projection, generated documentation, and fixture migration across 18 paths and five acceptance clusters. Split the record-free application/selection removal from lifecycle-event/vocabulary and generated-reference work, with direct dependencies preserving green states. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/3d9a0ce3-lead-friction/breakdown.json:450)\n\n3. **F3 — blocking, issue-impact:** `profile-capture-removal` mixes command/reconciliation deletion with release-workflow migration and documentation-check/self-test migration. Move consumers to the pack path in a focused predecessor, then remove capture and its command surface in a separate leaf. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/3d9a0ce3-lead-friction/breakdown.json:253)\n\n4. **F4 — blocking, issue-impact:** `profile-single-variant-enums` launders three independent migrations into one leaf: package-source simplification, selector representation, and origin wire/schema migration. The origin change alone spans serialization, schemas, lifecycle output, and integration tests; the 19-path footprint cannot be completed in one focused cycle. Split by enum, sequencing selector after selector-tag removal and origin after its wire consumers. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/3d9a0ce3-lead-friction/breakdown.json:957)\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The manifest lacks required REQ-05 coverage and contains three materially oversized mixed-scope leaves.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"REQ-05 has no required manifest source or satisfies-label coverage.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/plan.md\",\"line\":237,\"references\":[\"3d9a0ce3/REQ-05\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"profile-record-removal combines multiple independent deletion, lifecycle, schema, documentation, and fixture deliverables.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/breakdown.json\",\"line\":450,\"references\":[\"@/charter/D-8\",\"@/inv/orthogonal-tests\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"profile-capture-removal mixes capture deletion with release-workflow and documentation-check migrations.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/breakdown.json\",\"line\":253,\"references\":[\"@/charter/D-8\"]},{\"id\":\"F4\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"profile-single-variant-enums combines three independent enum and wire migrations across 19 paths.\",\"file\":\"dev/active/3d9a0ce3-lead-friction/breakdown.json\",\"line\":957,\"references\":[\"@/charter/D-18\",\"@/inv/orthogonal-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

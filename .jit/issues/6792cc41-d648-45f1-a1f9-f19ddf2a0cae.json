@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Remove dead code and compatibility shims across the workspace (842b0ac6) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-21T01:01:01.328892510Z",
   "first_ready_at": "2026-10-21T00:53:53.587416371Z",
   "gates_required": [
     "coverage-preview",
@@ -15,14 +16,14 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:17:42.709764601Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T01:00:55.394315013Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:17:42.709764601Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T00:55:03.966546117Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "6792cc41-d648-45f1-a1f9-f19ddf2a0cae",
@@ -41,7 +42,7 @@
     "brackets:842b0ac6"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-21T00:54:08.581311202Z"
+  "updated_at": "2026-10-21T01:01:01.328892510Z"
 }
