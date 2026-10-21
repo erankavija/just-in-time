@@ -418,9 +418,15 @@ mod tests {
         );
     }
 
+    /// Strings over every Unicode scalar value; `any::<String>()` excludes control characters.
+    fn arbitrary_utf8() -> impl proptest::strategy::Strategy<Value = String> {
+        use proptest::strategy::Strategy;
+        proptest::collection::vec(proptest::char::any(), 0..64).prop_map(String::from_iter)
+    }
+
     proptest::proptest! {
         #[test]
-        fn test_tokenize_never_panics_on_arbitrary_utf8(input in ".*") {
+        fn test_tokenize_never_panics_on_arbitrary_utf8(input in arbitrary_utf8()) {
             let _ = Lexer::tokenize(&input);
         }
     }
