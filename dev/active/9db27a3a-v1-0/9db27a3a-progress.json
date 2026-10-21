@@ -179,7 +179,7 @@
           "short_id": "8376299c",
           "title": "Fix correctness defects found by the v1.0 code audit",
           "wave": 2,
-          "status": "executing"
+          "status": "accepted"
         },
         {
           "id": "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
@@ -261,7 +261,7 @@
           "short_id": "c780514e",
           "title": "Give each test property one owning test on shared fixtures and contracts",
           "wave": 4,
-          "status": "pending"
+          "status": "planning"
         },
         {
           "id": "0f8efc37-8054-420d-9409-dde888ea0040",
@@ -475,7 +475,8 @@
     "2026-10-21 14:00: the steward reinstalled the dogfood binary (~/.cargo/bin/jit) from main 582b1cc92 under the exclusive CI lock, at 3d9a0ce3's request: gate-engine changes merged today (ae2e3739, 72d89161, fd9bfab8) and 5a3a886f's '.' gate roots need it. The previous binary is backed up in the steward scratchpad as jit-2026-10-03.bak. Reinstall after each further gate-engine merge.",
     "2026-10-21 ~14:10: merge-lock rule. Every git merge into main, and any source edit to main's tree, runs under `flock turnstile flock -x /tmp/jit-full-ci.lock`, so full gates never see a half-merged tree (84745746's gate broke when 719a5501 merged mid-run). Tracker-only writes are exempt.",
     "2026-10-21 14:26: the steward reinstalled the dogfood binary at main HEAD (after 24268b05 and 719a5501 changed the CLI surface) to unstick mcp-ci. Interim rule: reinstall after each CLI-surface merge.",
-    "2026-10-21 ~15:30-18:30: fourth shared usage-limit stall; background leads were resumed at 18:31. Tally at resume: 8376299c 15/17 done; 842b0ac6 18 done; 3d9a0ce3 10 done; df129d9e 9 done; f4d9502a in planning."
+    "2026-10-21 ~15:30-18:30: fourth shared usage-limit stall; background leads were resumed at 18:31. Tally at resume: 8376299c 15/17 done; 842b0ac6 18 done; 3d9a0ce3 10 done; df129d9e 9 done; f4d9502a in planning.",
+    "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
