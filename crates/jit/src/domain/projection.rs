@@ -213,7 +213,8 @@ fn sections_from_parsed(parsed: ParsedContent) -> BTreeMap<String, ProjectedSect
 mod tests {
     use super::*;
     use crate::document::MarkdownContentParser;
-    use crate::domain::types::{DocumentReference, Issue};
+    use crate::domain::types::Issue;
+    use crate::test_utils::document_reference_typed;
 
     fn issue_with(labels: Vec<&str>, description: &str) -> Issue {
         let mut issue =
@@ -269,9 +270,9 @@ mod tests {
     fn test_doc_types_distinct_in_order() {
         let mut issue = issue_with(vec![], "");
         issue.documents = vec![
-            DocumentReference::new("a.md".to_string()).with_type("design".to_string()),
-            DocumentReference::new("b.md".to_string()).with_type("design".to_string()),
-            DocumentReference::new("c.md".to_string()).with_type("impl".to_string()),
+            document_reference_typed("a.md", "design"),
+            document_reference_typed("b.md", "design"),
+            document_reference_typed("c.md", "impl"),
         ];
         let p = project(&issue);
         assert_eq!(p.doc_types, vec!["design".to_string(), "impl".to_string()]);

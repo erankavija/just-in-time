@@ -16,7 +16,8 @@
 use std::path::{Path, PathBuf};
 
 use jit::declarations::rules::{Rule, RuleScope, RuleSet};
-use jit::domain::{ContentFormat, DocumentReference, Issue, State};
+use jit::domain::{ContentFormat, Issue, State};
+use jit::test_utils::document_reference_typed;
 use jit::validation::graph::{evaluate_graph, GraphFinding};
 use jit::validation::local::evaluate_local;
 
@@ -422,10 +423,10 @@ fn release_with_notes_doc() -> Issue {
     let body = "## Checklist\n\n- bump version\n- tag\n";
     let mut release = crate::fixture_issue("v1.0.0".to_string(), body.to_string());
     release.labels = vec!["type:release".to_string()];
-    release.documents = vec![
-        DocumentReference::new("docs/release-notes-1.0.0.md".to_string())
-            .with_type("release-notes".to_string()),
-    ];
+    release.documents = vec![document_reference_typed(
+        "docs/release-notes-1.0.0.md",
+        "release-notes",
+    )];
     release
 }
 

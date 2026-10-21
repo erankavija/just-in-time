@@ -280,6 +280,7 @@ fn owners_by_referenced_path(issues: &[Issue]) -> BTreeMap<String, Vec<&Issue>> 
 mod tests {
     use super::*;
     use crate::domain::types::fixture_issue;
+    use crate::test_utils::document_reference;
     use proptest::prelude::*;
     use std::collections::HashMap;
 
@@ -320,10 +321,7 @@ mod tests {
     /// `paths` — the claim a name carrying no short id leaves unsaid.
     fn referencing(issue: Issue, paths: &[&str]) -> Issue {
         Issue {
-            documents: paths
-                .iter()
-                .map(|path| crate::domain::DocumentReference::new((*path).to_string()))
-                .collect(),
+            documents: paths.iter().map(|path| document_reference(*path)).collect(),
             ..issue
         }
     }

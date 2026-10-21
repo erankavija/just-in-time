@@ -1529,7 +1529,8 @@ fn schema_source_from_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{DocumentReference, Issue, State};
+    use crate::domain::{Issue, State};
+    use crate::test_utils::document_reference;
 
     fn parse(content: &str) -> Result<RuleSet, RuleConfigError> {
         RuleSet::parse(content, None, [])
@@ -1796,7 +1797,7 @@ assert = { label-coverage = { child-state = "done" } }
             ..Default::default()
         };
         let mut issue = issue_with(&[], State::Ready);
-        let mut doc = DocumentReference::new("docs/d.md".to_string());
+        let mut doc = document_reference("docs/d.md");
         doc.doc_type = Some("design".to_string());
         issue.documents.push(doc);
         assert!(sel.matches(&issue));

@@ -121,7 +121,14 @@ pub fn derive_issue_documents(
         .filter(|file| !linked.contains(file))
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
-        .map(DocumentReference::new)
+        .map(|path| DocumentReference {
+            path,
+            commit: None,
+            label: None,
+            doc_type: None,
+            format: None,
+            assets: Vec::new(),
+        })
         .collect()
 }
 
@@ -156,6 +163,7 @@ fn membership_slug(issue: &Issue, hierarchy: &HierarchyConfig) -> Option<String>
 mod tests {
     use super::*;
     use crate::domain::types::fixture_issue;
+    use crate::test_utils::document_reference;
     use proptest::prelude::*;
     use std::collections::HashMap;
 
@@ -529,7 +537,7 @@ mod tests {
 
         let derived = derive(&issue, std::slice::from_ref(&file));
 
-        assert_eq!(derived, vec![DocumentReference::new(file)]);
+        assert_eq!(derived, vec![document_reference(file)]);
         assert!(derived.iter().all(|document| document.commit.is_none()
             && document.doc_type.is_none()
             && document.label.is_none()));
@@ -557,7 +565,7 @@ mod tests {
         let directory = resolve(&issue, AREA).unwrap();
         let linked = format!("{directory}/plan.md");
         let unlinked = format!("{directory}/notes.md");
-        let mut link = DocumentReference::new(format!("./{linked}"));
+        let mut link = document_reference(format!("./{linked}"));
         link.label = Some("Plan".to_string());
         issue.documents = vec![link];
 

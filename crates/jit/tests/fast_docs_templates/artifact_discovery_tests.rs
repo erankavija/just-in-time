@@ -7,10 +7,11 @@ use jit::domain::artifact_inventory::{
     inventory_explicit_roots, ExplicitRootTarget, PinnedRootEvidence, PinnedRootEvidenceMap,
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EdgeResolutionMode, WarningCode};
-use jit::domain::{DocumentReference, Issue, State};
+use jit::domain::{Issue, State};
 use jit::storage::{
     discover_archive_artifacts, discover_repository_layout, IssueStore, JsonFileStorage,
 };
+use jit::test_utils::document_reference_at;
 use std::fs;
 use tempfile::TempDir;
 
@@ -671,9 +672,7 @@ fn pinned_issue() -> Issue {
     issue.id = "history".to_string();
     issue.state = State::Done;
     issue.labels = vec!["type:initiative".to_string()];
-    let mut document = DocumentReference::new("docs/history.html".to_string());
-    document.commit = Some("release-v1".to_string());
-    issue.documents = vec![document];
+    issue.documents = vec![document_reference_at("docs/history.html", "release-v1")];
     issue
 }
 
