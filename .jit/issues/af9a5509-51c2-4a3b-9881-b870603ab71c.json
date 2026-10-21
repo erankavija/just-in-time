@@ -27,7 +27,7 @@
     "satisfies:842b0ac6/REQ-03"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove inert configuration keys",
-  "updated_at": "2026-10-21T00:54:29.023508672Z"
+  "updated_at": "2026-10-21T01:01:02.607378938Z"
 }

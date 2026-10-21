@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:planning-lead-842b0ac6",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T20:17:42.463660943Z",
   "context": {},
   "created_at": "2026-10-20T20:12:36.415815215Z",
@@ -31,5 +31,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-21T00:54:46.624561156Z"
+  "updated_at": "2026-10-21T01:03:20.402090505Z"
 }

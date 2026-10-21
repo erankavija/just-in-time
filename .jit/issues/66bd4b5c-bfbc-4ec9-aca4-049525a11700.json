@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-09"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Parse lifecycle states from canonical tokens only",
-  "updated_at": "2026-10-21T00:54:33.577873618Z"
+  "updated_at": "2026-10-21T01:01:01.977975354Z"
 }

@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-18"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Trim git revision access to production queries",
-  "updated_at": "2026-10-21T00:54:42.792682023Z"
+  "updated_at": "2026-10-21T01:01:01.797665164Z"
 }

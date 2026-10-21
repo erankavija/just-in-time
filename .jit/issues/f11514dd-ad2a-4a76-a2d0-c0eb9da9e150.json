@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove linked-worktree evidence from repository capture",
-  "updated_at": "2026-10-21T00:54:28.593094198Z"
+  "updated_at": "2026-10-21T01:01:03.111406130Z"
 }

@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "`issue update` and `issue reject` split one command into several independently published mutations. When a later step fails, the earlier steps are already committed, so the user sees an error while the issue was partly changed.\n\n## Background\n\n`issue update` publishes gate additions, gate removals, the assignee change, and the field update (title, description, priority, state, labels, type, content format) as up to four separate mutations (`crates/jit/src/main.rs:3614-3657`). Each step commits its own redo record and events before the next one runs, and a failure returns early without undoing the earlier ones.\n\n`issue reject --reason` publishes the `Rejected` state change (`crates/jit/src/main.rs:3951`) and then the `resolution:` label (`crates/jit/src/main.rs:3956`) as two mutations. If the label step fails, the issue stays rejected without its recorded reason.\n\nReproduction in a fresh repository with a defined gate `review`:\n\n```sh\njit issue update <id> --add-gate review --assignee agent:w1 --label BADLABEL\n# exit 4: [label-format] blocked\njit issue show <id> --json\n# gates: [review (pending)], assignee: agent:w1\n# events.jsonl gained gate_added and issue_claimed\n```\n\n## Success Criteria\n\n- [hard] REQ-01: An `issue update` combining gate, assignee and field changes publishes as one mutation with one redo record.\n- [hard] REQ-02: When any requested part of an `issue update` is rejected, the command exits nonzero, the issue file and the index are unchanged, and the event log gains no event except the refusal's own audit event (`transition_blocked`) where a graph rule refuses the state change.\n- [hard] REQ-03: `issue reject --reason` publishes the state change and the resolution label as one mutation; a failure leaves the issue in its prior state without the label.\n- [hard] REQ-04: A successful combined update or reject produces the same issue state and the same event set that the separate steps produce today.\n- [hard] REQ-05: A regression test runs an `issue update` with a valid gate and assignee change plus an invalid label, and asserts that the issue and its events are unchanged.\n\n## Notes\n\nThe fix belongs in the command layer: one executor operation that captures every requested change and publishes it through a single redo record. The CLI then calls that operation once.\n\nSteward resolution 2026-10-21: the refusal audit event is kept, consistent with blocked state-only updates.\n",
   "documents": [],
+  "done_at": "2026-10-21T01:00:11.881634334Z",
   "first_ready_at": "2026-10-20T19:42:10.956223142Z",
   "gates_required": [
     "cargo-ci",
@@ -32,7 +33,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Issue update and reject apply all requested changes atomically or none",
-  "updated_at": "2026-10-21T00:55:49.044270876Z"
+  "updated_at": "2026-10-21T01:00:11.881634334Z"
 }

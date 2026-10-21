@@ -1,0 +1,413 @@
+{
+  "epic_id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
+  "epic_short_id": "842b0ac6",
+  "current_wave": 1,
+  "waves": [
+    {
+      "wave_number": 1,
+      "label": "1a",
+      "issues": [
+        {
+          "id": "756ec5ec-4cae-4e18-b67d-96c3a6d7ecd9",
+          "short_id": "756ec5ec",
+          "key": "adopt-manifest-version-two",
+          "title": "Keep one profile manifest version",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "f11514dd-ad2a-4a76-a2d0-c0eb9da9e150",
+          "short_id": "f11514dd",
+          "key": "remove-linked-worktree-evidence",
+          "title": "Remove linked-worktree evidence from repository capture",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "0ec8b001-ef0b-49c8-82a9-536ca896996c",
+          "short_id": "0ec8b001",
+          "key": "prune-output-surface",
+          "title": "Prune the uncalled output surface",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
+          "short_id": "52732879",
+          "key": "trim-git-revision-access",
+          "title": "Trim git revision access to production queries",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "bc0bd663-859c-4d88-b46d-17a334f60784",
+          "short_id": "bc0bd663",
+          "key": "derive-mermaid-state-classes",
+          "title": "Derive mermaid state classes from the state enumeration",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        },
+        {
+          "id": "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
+          "short_id": "dc6fac0c",
+          "key": "remove-orphan-web-module",
+          "title": "Remove the orphaned web hierarchy module",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 2,
+      "label": "1b",
+      "issues": [
+        {
+          "id": "866bdde0-94f6-4af7-b2b0-d3d454a59afe",
+          "short_id": "866bdde0",
+          "key": "remove-bracket-breakdown",
+          "title": "Remove the bracket breakdown module",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "45b442f3-fe6d-4626-af72-905c6f25d388",
+          "short_id": "45b442f3",
+          "key": "collapse-container-destination-states",
+          "title": "Collapse container-destination classification to its outcomes",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "4c216a28-9362-4e0d-9ccd-e5cd43f9093b",
+          "short_id": "4c216a28",
+          "key": "remove-adapter-link-rewrite",
+          "title": "Remove the unimplemented link-rewrite adapter method",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        },
+        {
+          "id": "d759d606-cf7b-4548-9fbe-bcf48793856e",
+          "short_id": "d759d606",
+          "key": "drop-claim-type-parameter",
+          "title": "Drop the unused storage type parameter from claim commands",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        },
+        {
+          "id": "4251137e-6a16-402c-ad97-91889cea4978",
+          "short_id": "4251137e",
+          "key": "remove-read-lock-sidecar-sweep",
+          "title": "Remove the read-lock sidecar sweep",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "47a082ef-f1c5-4874-910f-ae1057a8579f",
+          "short_id": "47a082ef",
+          "key": "converge-memory-event-parsing",
+          "title": "Parse in-memory event logs through the shared event parser",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 3,
+      "label": "1c",
+      "issues": [
+        {
+          "id": "84745746-91d9-41d0-b120-f1e5e806a9d2",
+          "short_id": "84745746",
+          "key": "remove-silent-integrity-validator",
+          "title": "Remove the silent integrity validator",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        },
+        {
+          "id": "72d4990c-0fe7-4a8c-815e-c8ab158fcb11",
+          "short_id": "72d4990c",
+          "key": "move-state-symbol-to-output",
+          "title": "Render state symbols in the output layer",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "c998dfd3-07a4-4f7c-ab5c-86c84867fc00",
+          "short_id": "c998dfd3",
+          "key": "remove-skipped-gate-run-status",
+          "title": "Remove the skipped gate-run status",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "9aa54649-ae13-46da-bc35-6ec20f085b78",
+          "short_id": "9aa54649",
+          "key": "require-archived-from",
+          "title": "Require archived_from on archived issue records",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
+          "short_id": "71b0af0e",
+          "key": "remove-taxonomy-dead-errors",
+          "title": "Remove dead taxonomy error and membership types",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "8397eb74-827c-46e5-9f59-7e67c534ed0e",
+          "short_id": "8397eb74",
+          "key": "single-file-lock-poll-loop",
+          "title": "Give the file lock one poll loop",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
+          "short_id": "66bd4b5c",
+          "key": "canonical-state-tokens",
+          "title": "Parse lifecycle states from canonical tokens only",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 4,
+      "label": "1d",
+      "issues": [
+        {
+          "id": "e1af39db-860f-4715-9e68-b9d126a81c12",
+          "short_id": "e1af39db",
+          "key": "keep-one-enforcement-drift",
+          "title": "Keep one enforcement drift function",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
+          "short_id": "81e7cdc3",
+          "key": "remove-reference-builders",
+          "title": "Remove the DocumentReference builder methods",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "d125490a-558d-41d6-bfe6-2270d6bf7cf4",
+          "short_id": "d125490a",
+          "key": "route-test-gates-through-definition",
+          "title": "Define test gates through the production definition path",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "5e846743-174b-4385-9c95-a700a8df6587",
+          "short_id": "5e846743",
+          "key": "unify-agent-configuration",
+          "title": "Keep one agent configuration type",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
+          "short_id": "af9a5509",
+          "key": "remove-inert-config-keys",
+          "title": "Remove inert configuration keys",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 5,
+      "label": "2",
+      "issues": [
+        {
+          "id": "fe761000-c89f-447f-a20b-e292c5b4e2e8",
+          "short_id": "fe761000",
+          "key": "remove-gate-auto-fields",
+          "title": "Remove the auto and example-integration gate fields",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
+          "short_id": "2492ab29",
+          "key": "remove-lifecycle-backfill",
+          "title": "Remove the lifecycle-timestamp backfill",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "69af08af-ead8-4939-8d82-8f9017b82914",
+          "short_id": "69af08af",
+          "key": "remove-repository-state-cfg-twins",
+          "title": "Remove cfg twins in repository_state",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "afc2b698-34bb-43d1-b7e2-c859de8d8104",
+          "short_id": "afc2b698",
+          "key": "remove-retired-name-scans",
+          "title": "Remove source-scan tests for retired names",
+          "classification": "implementation",
+          "model": "haiku",
+          "status": "pending"
+        },
+        {
+          "id": "58282882-59d6-4e0c-b47b-f49a8ca11cc3",
+          "short_id": "58282882",
+          "key": "remove-small-domain-helpers",
+          "title": "Remove uncalled domain predicates and parsers",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "ec190bd5-af89-4776-969f-81f48412592a",
+          "short_id": "ec190bd5",
+          "key": "remove-storage-cfg-twins",
+          "title": "Remove cfg twins in storage",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+          "short_id": "459bb995",
+          "key": "state-config-defaults-once",
+          "title": "State each configuration default once",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
+          "short_id": "cd7b6c4a",
+          "key": "strict-rule-declarations",
+          "title": "Reject unknown keys in rule declarations",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 6,
+      "label": "3",
+      "issues": [
+        {
+          "id": "86d3625d-0d28-4141-b21c-f20b15278a3e",
+          "short_id": "86d3625d",
+          "key": "remove-test-only-gate-entry-points",
+          "title": "Remove test-only gate entry points",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+          "short_id": "fbb661f2",
+          "key": "strict-config-toml-loading",
+          "title": "Reject unknown keys in config.toml",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        },
+        {
+          "id": "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
+          "short_id": "287eef78",
+          "key": "unify-gate-not-required-error",
+          "title": "Report a non-required gate through one typed error",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 7,
+      "label": "4",
+      "issues": [
+        {
+          "id": "0e3b69fc-1af7-4cc8-9089-96f2debd6324",
+          "short_id": "0e3b69fc",
+          "key": "gate-reference-renderers",
+          "title": "Compile reference-page renderers only with test support",
+          "classification": "implementation",
+          "model": "opus",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 8,
+      "label": "5",
+      "issues": [
+        {
+          "id": "b4929342-6c7c-4f35-8e18-c8cbb0ec526c",
+          "short_id": "b4929342",
+          "key": "single-domain-types-path",
+          "title": "Import domain type items through the domain facade",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "wave_number": 9,
+      "label": "6",
+      "issues": [
+        {
+          "id": "63c11d08-054e-471a-9b0c-491c30b8d8a1",
+          "short_id": "63c11d08",
+          "key": "single-domain-module-paths",
+          "title": "Remove the remaining domain re-export paths",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "created_during_execution": [],
+  "escalations": [],
+  "rework_counts": {},
+  "surfaced_pitfalls": [],
+  "notes": [
+    "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
+    "Config tasks wait for bedf0962 (8376299c, just-in-time-05).",
+    "just-in-time-05: bedf0962 lands in ~2-3h; 16d63038 later and rebases onto our read_issues/load_events changes, so those land in 1b."
+  ],
+  "started_at": "2026-10-21T01:03:03.002143+00:00"
+}

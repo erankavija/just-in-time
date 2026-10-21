@@ -24,7 +24,7 @@
     "satisfies:842b0ac6/REQ-16"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove dead taxonomy error and membership types",
-  "updated_at": "2026-10-21T00:54:38.592583715Z"
+  "updated_at": "2026-10-21T01:01:02.047797145Z"
 }

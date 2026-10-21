@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-19"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Drop the unused storage type parameter from claim commands",
-  "updated_at": "2026-10-21T00:54:43.432027729Z"
+  "updated_at": "2026-10-21T01:01:02.886724542Z"
 }

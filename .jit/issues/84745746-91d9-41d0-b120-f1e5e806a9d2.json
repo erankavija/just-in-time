@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the silent integrity validator",
-  "updated_at": "2026-10-21T00:54:27.480852999Z"
+  "updated_at": "2026-10-21T01:01:02.398381388Z"
 }

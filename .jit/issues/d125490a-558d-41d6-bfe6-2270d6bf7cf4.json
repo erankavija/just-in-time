@@ -24,7 +24,7 @@
     "satisfies:842b0ac6/REQ-10"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Define test gates through the production definition path",
-  "updated_at": "2026-10-21T00:54:33.920591420Z"
+  "updated_at": "2026-10-21T01:01:02.816860730Z"
 }

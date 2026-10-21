@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-15"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Prune the uncalled output surface",
-  "updated_at": "2026-10-21T00:54:37.464646198Z"
+  "updated_at": "2026-10-21T01:01:01.425977083Z"
 }

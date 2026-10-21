@@ -23,7 +23,7 @@
     "satisfies:842b0ac6/REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Require archived_from on archived issue records",
-  "updated_at": "2026-10-21T00:54:34.248265938Z"
+  "updated_at": "2026-10-21T01:01:02.538835804Z"
 }
