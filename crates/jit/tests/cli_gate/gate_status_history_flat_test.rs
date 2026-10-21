@@ -108,6 +108,52 @@ fn test_status_latest_by_default_unchanged() {
         .stdout(predicate::str::contains("passed").or(predicate::str::contains("Passed")));
 }
 
+#[test]
+fn test_status_latest_run_shows_manual_attestation_with_attestor_and_time() {
+    let temp = setup_repo();
+    jit()
+        .current_dir(temp.path())
+        .args([
+            "gate",
+            "define",
+            "review",
+            "--title",
+            "review",
+            "--description",
+            "Review",
+            "--mode",
+            "manual",
+        ])
+        .assert()
+        .success();
+    let id = create_issue(&temp, &["review"]);
+    jit()
+        .current_dir(temp.path())
+        .args(["gate", "evaluate", &id, "review", "--by", "human:me"])
+        .assert()
+        .success();
+
+    let out = jit()
+        .current_dir(temp.path())
+        .args(["gate", "status", &id, "review", "--json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&out).unwrap();
+    let attested_at = json["started_at"]
+        .as_str()
+        .expect("the attestation is the gate's latest run");
+
+    jit()
+        .current_dir(temp.path())
+        .args(["gate", "status", &id, "review"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("human:me").and(predicate::str::contains(attested_at)));
+}
+
 // ---------------------------------------------------------------------------
 // History: --all lists prior runs newest-first
 // ---------------------------------------------------------------------------

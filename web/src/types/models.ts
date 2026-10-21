@@ -42,10 +42,12 @@ export interface GateRunSummary {
 }
 
 /** Where a recorded gate verdict came from: this run's own checker execution,
- * or an earlier run over the same declared inputs, which `source_run` names. */
+ * an earlier run over the same declared inputs, which `source_run` names, or a
+ * manual attestation. */
 export type GateVerdictOrigin =
   | { derivation: 'executed' }
-  | { derivation: 'reused'; source_run: string };
+  | { derivation: 'reused'; source_run: string }
+  | { derivation: 'attested' };
 
 /** Whether the evaluation inputs held still through recording. */
 export type GateEvaluationStability = 'stable' | 'inputs_moved';

@@ -1629,8 +1629,8 @@ pub struct DivergenceResponse {
 /// One entry per gate in the issue's `gates_required`. `status` reflects the
 /// gate's [`GateState`] (or `pending` when none exists). `last_run_at` and
 /// `exit_code` come from the gate's latest [`GateRunResult`] and are both
-/// `null` when no run has been recorded (required-but-never-run, or a manual
-/// gate attested without a run).
+/// `null` when no run has been recorded; a manual gate's attestation is a run
+/// whose `exit_code` is `null`.
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct GateView {
     /// Gate key.
@@ -2356,11 +2356,13 @@ pub struct GateRunSummary {
     /// value describe evaluations over identical content.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub inputs_digest: Option<crate::domain::InputsDigest>,
-    /// Whether this run executed the checker (`{"derivation": "executed"}`) or
+    /// Whether this run executed the checker (`{"derivation": "executed"}`),
     /// carried an earlier run's verdict
-    /// (`{"derivation": "reused", "source_run": "<run-id>"}`). A reader tallying
-    /// how many times a gate was actually verified counts the executed ones and
-    /// follows the named run for the report text behind a reused verdict.
+    /// (`{"derivation": "reused", "source_run": "<run-id>"}`), or records a
+    /// manual gate's attestation (`{"derivation": "attested"}`). A reader
+    /// tallying how many times a gate was actually verified counts the executed
+    /// and attested ones and follows the named run for the report text behind a
+    /// reused verdict.
     pub origin: crate::domain::GateVerdictOrigin,
     /// Whether the evaluation inputs still matched the repository when the run
     /// was recorded. `inputs_moved` means the verdict remains the checker's

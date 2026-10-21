@@ -972,7 +972,7 @@ pub struct GateRunResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inputs_digest: Option<crate::domain::InputsDigest>,
     /// Where this record's verdict came from: this run's own checker execution,
-    /// or an earlier run over the same declared inputs.
+    /// an earlier run over the same declared inputs, or a manual attestation.
     #[serde(default)]
     pub origin: GateVerdictOrigin,
     /// Whether the evaluation inputs this verdict was derived over still
@@ -997,6 +997,49 @@ impl GateRunResult {
             && self.inputs_digest.as_ref() == Some(digest)
             && self.origin.is_executed()
             && matches!(self.status, GateRunStatus::Passed | GateRunStatus::Failed)
+    }
+
+    /// The draft record of a manual gate's attestation of `status` by `by`.
+    ///
+    /// No checker ran, so the record carries no command, exit code, report
+    /// text, or inputs digest, and its [`GateVerdictOrigin::Attested`] origin
+    /// keeps it out of verdict reuse.
+    pub fn attestation(
+        issue_id: &str,
+        gate_key: &str,
+        stage: GateStage,
+        status: GateStatus,
+        by: Option<&Assignee>,
+    ) -> Self {
+        Self {
+            schema_version: GATE_RUN_SCHEMA_VERSION,
+            // Repository mutation finalization assigns the durable run identity
+            // and stamps the attestation time.
+            run_id: String::new(),
+            gate_key: gate_key.to_string(),
+            stage,
+            issue_id: issue_id.to_string(),
+            commit: None,
+            branch: None,
+            status: match status {
+                GateStatus::Passed => GateRunStatus::Passed,
+                GateStatus::Failed => GateRunStatus::Failed,
+                GateStatus::Pending => GateRunStatus::Pending,
+            },
+            started_at: DateTime::UNIX_EPOCH,
+            completed_at: None,
+            duration_ms: None,
+            exit_code: None,
+            stdout: String::new(),
+            stderr: String::new(),
+            command: String::new(),
+            by: by.map(ToString::to_string),
+            message: None,
+            findings: None,
+            inputs_digest: None,
+            origin: GateVerdictOrigin::Attested,
+            evaluation_stability: GateEvaluationStability::Stable,
+        }
     }
 }
 
@@ -1033,6 +1076,9 @@ pub enum GateVerdictOrigin {
     /// The verdict was taken from the run with this id, whose declared inputs
     /// digested to the same value. That run executed the checker.
     Reused(String),
+    /// The verdict is a manual gate's attestation: `by` names the attestor and
+    /// `started_at` the time. No checker ran.
+    Attested,
 }
 
 /// Whether the evaluation inputs a verdict was derived over still matched the
@@ -1053,11 +1099,11 @@ pub enum GateEvaluationStability {
 }
 
 impl GateVerdictOrigin {
-    /// The earlier run this verdict was taken from, or `None` when the checker
-    /// executed.
+    /// The earlier run this verdict was taken from, or `None` when the verdict
+    /// is this run's own.
     pub fn source_run(&self) -> Option<&str> {
         match self {
-            Self::Executed => None,
+            Self::Executed | Self::Attested => None,
             Self::Reused(run_id) => Some(run_id),
         }
     }
@@ -2000,6 +2046,22 @@ impl Event {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_reusable_for_rejects_an_attestation_over_a_matching_digest() {
+        let digest = crate::domain::InputsDigestBuilder::new(b"gate declaration").finish();
+        let attestor: Assignee = "human:reviewer".parse().unwrap();
+        let mut attested = GateRunResult::attestation(
+            "issue",
+            "review",
+            GateStage::Postcheck,
+            GateStatus::Passed,
+            Some(&attestor),
+        );
+        attested.inputs_digest = Some(digest.clone());
+
+        assert!(!attested.is_reusable_for("review", &digest));
+    }
 
     #[test]
     fn test_linked_checkout_write_stance_from_json_tokens() {

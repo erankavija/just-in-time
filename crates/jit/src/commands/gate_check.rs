@@ -842,21 +842,12 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        use crate::repository_state::{finalize, MutationIntent, VirtualPath};
+        use crate::repository_state::{finalize, MutationIntent};
 
         let layout = self.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.identifier_at(0);
-        let result_path = crate::repository_state::gate_run_result_relative_path(&run_id)?;
-        let run_dir = result_path
-            .as_path()
-            .parent()
-            .ok_or_else(|| anyhow!("canonical gate-run result path has no parent"))?;
-        let run_paths = [
-            VirtualPath::GATE_RUNS,
-            VirtualPath::data(run_dir)?,
-            VirtualPath::data(result_path.as_path())?,
-        ];
+        let run_paths = super::gate_run_record_paths(&mutation, 1)?;
         let (target_id, image, issue, issues, registry, runs, captured) =
             with_mutation_attempts("gate evaluation inputs", || {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
@@ -1343,10 +1334,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         }
     }
 
-    /// Return the most recent recorded run for each automated gate on an issue.
+    /// Return the most recent recorded run for each registered required gate on
+    /// an issue: an automated gate's checker run or a manual gate's attestation.
     ///
     /// Results are ordered by gate priority, preserving insertion order for ties.
-    /// The second vector contains automated gate keys that have not been run yet.
+    /// The second vector contains the gate keys that have no recorded run.
     pub fn get_last_gate_runs_for_issue(
         &self,
         issue_id: &str,
@@ -1355,14 +1347,13 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
-        // Collect auto gates and sort by priority (stable sort preserves insertion order for ties)
-        let mut auto_gates: Vec<_> = issue
+        // Sort by priority (stable sort preserves insertion order for ties)
+        let mut gates: Vec<_> = issue
             .gates_required
             .iter()
             .filter_map(|key| registry.gates.get(key).map(|g| (key, g)))
-            .filter(|(_, gate)| gate.mode == GateMode::Auto)
             .collect();
-        auto_gates.sort_by_key(|(_, gate)| gate.priority);
+        gates.sort_by_key(|(_, gate)| gate.priority);
 
         let latest_runs = self
             .storage
@@ -1381,7 +1372,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 },
             );
 
-        let (results, not_run) = auto_gates.into_iter().fold(
+        let (results, not_run) = gates.into_iter().fold(
             (Vec::new(), Vec::new()),
             |(mut results, mut not_run), (gate_key, _)| {
                 if let Some(result) = latest_runs.get(gate_key).cloned() {
@@ -1400,15 +1391,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// (automated AND manual), ordered by gate priority (insertion order for
     /// ties).
     ///
-    /// The authoritative status is the issue's recorded `gates_status`: an auto
-    /// gate's last run and a manual gate's attestation both write there. A gate
-    /// with no recorded state — an auto gate never run, or a manual gate never
-    /// attested — is reported as [`GateStatus::Pending`].
-    ///
-    /// This is the manual-aware companion to
-    /// [`get_last_gate_runs_for_issue`](Self::get_last_gate_runs_for_issue),
-    /// which covers automated gates only. `status-all` folds these statuses into
-    /// its green/not-green readiness verdict.
+    /// The authoritative status is the issue's recorded `gates_status`, which
+    /// each gate run — an automated gate's checker run or a manual gate's
+    /// attestation — writes together with its run record. A gate with no
+    /// recorded state is reported as [`GateStatus::Pending`]. `status-all`
+    /// folds these statuses into its green/not-green readiness verdict.
     pub fn get_required_gate_statuses_for_issue(
         &self,
         issue_id: &str,
@@ -3303,6 +3290,148 @@ source-of-truth = "markdown-first"
             .get_required_gate_statuses_for_issue(&issue_id)
             .unwrap();
         assert!(statuses.iter().all(|(_, s)| *s == GateStatus::Passed));
+    }
+
+    fn make_manual_gate(key: &str) -> crate::declarations::GateDefinition {
+        crate::declarations::GateDefinition {
+            mode: GateMode::Manual,
+            checker: None,
+            auto: false,
+            ..make_auto_gate(key, "")
+        }
+    }
+
+    /// An issue requiring the manual gate `review`, whose registry also declares
+    /// the automated gate `tests`.
+    fn seed_review_issue(executor: &CommandExecutor<InMemoryStorage>) -> String {
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        registry
+            .gates
+            .insert("review".to_string(), make_manual_gate("review"));
+        registry
+            .gates
+            .insert("tests".to_string(), make_auto_gate("tests", "exit 0"));
+        seed_gate_registry(executor.storage(), &registry);
+        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        issue.gates_required = vec!["review".to_string(), "tests".to_string()];
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+        issue_id
+    }
+
+    #[test]
+    fn test_pass_gate_manual_attestation_publishes_attested_gate_run() {
+        let executor = setup();
+        let issue_id = seed_review_issue(&executor);
+        let before = Utc::now();
+
+        executor
+            .pass_gate(
+                &issue_id,
+                "review".to_string(),
+                Some("human:me".to_string()),
+                false,
+            )
+            .unwrap();
+
+        let run = executor
+            .get_last_gate_run(&issue_id, "review")
+            .unwrap()
+            .expect("an attestation is a recorded gate run");
+        assert_eq!(run.status, GateRunStatus::Passed);
+        assert_eq!(run.by.as_deref(), Some("human:me"));
+        assert_eq!(run.origin, crate::domain::GateVerdictOrigin::Attested);
+        assert!(run.started_at >= before && run.started_at <= Utc::now());
+        assert_eq!(
+            executor.get_gate_run_result(&run.run_id).unwrap(),
+            run,
+            "the attestation is addressable by its run id"
+        );
+    }
+
+    #[test]
+    fn test_list_gate_runs_lists_manual_attestations_alongside_automated_runs() {
+        let executor = setup();
+        let issue_id = seed_review_issue(&executor);
+
+        executor.check_gate(&issue_id, "tests").unwrap();
+        for _ in 0..2 {
+            executor
+                .pass_gate(
+                    &issue_id,
+                    "review".to_string(),
+                    Some("human:me".to_string()),
+                    false,
+                )
+                .unwrap();
+        }
+
+        let runs = executor.list_gate_runs(&issue_id, None).unwrap();
+        let attested = runs
+            .iter()
+            .filter(|run| run.origin == crate::domain::GateVerdictOrigin::Attested)
+            .count();
+        assert_eq!(attested, 2, "every attestation is its own record");
+        assert!(runs
+            .iter()
+            .any(|run| run.gate_key == "tests" && run.origin.is_executed()));
+    }
+
+    #[test]
+    fn test_get_last_gate_runs_for_issue_agrees_with_required_gate_statuses() {
+        let executor = setup();
+        let mut registry = executor.storage.load_gate_registry().unwrap();
+        let gates = [
+            make_auto_gate("auto-pass", "exit 0"),
+            make_auto_gate("auto-fail", "exit 1"),
+            make_auto_gate("auto-pending", "exit 0"),
+            make_manual_gate("manual-pass"),
+            make_manual_gate("manual-fail"),
+            make_manual_gate("manual-pending"),
+        ];
+        for gate in &gates {
+            registry.gates.insert(gate.key.clone(), gate.clone());
+        }
+        seed_gate_registry(executor.storage(), &registry);
+        let mut issue = crate::domain::types::fixture_issue("T".to_string(), String::new());
+        issue.gates_required = gates.iter().map(|gate| gate.key.clone()).collect();
+        let issue_id = issue.id.clone();
+        seed_issue(executor.storage(), issue);
+
+        executor.check_gate(&issue_id, "auto-pass").unwrap();
+        executor.check_gate(&issue_id, "auto-fail").unwrap();
+        let attestor = Some("human:me".to_string());
+        executor
+            .pass_gate(
+                &issue_id,
+                "manual-pass".to_string(),
+                attestor.clone(),
+                false,
+            )
+            .unwrap();
+        executor
+            .fail_gate(&issue_id, "manual-fail".to_string(), attestor)
+            .unwrap();
+
+        let (runs, not_run) = executor.get_last_gate_runs_for_issue(&issue_id).unwrap();
+        let latest: HashMap<_, _> = runs
+            .iter()
+            .map(|run| (run.gate_key.clone(), run.clone()))
+            .collect();
+        let readiness = executor
+            .get_required_gate_statuses_for_issue(&issue_id)
+            .unwrap();
+        assert_eq!(readiness.len(), gates.len());
+        for (key, status) in readiness {
+            let from_run = match latest.get(&key) {
+                Some(run) => super::gate_state_from_run(run).unwrap().0.status,
+                None => {
+                    assert!(not_run.contains(&key), "{key} is neither run nor not-run");
+                    crate::domain::GateStatus::Pending
+                }
+            };
+            assert_eq!(from_run, status, "views disagree on {key}");
+        }
     }
 
     #[test]
