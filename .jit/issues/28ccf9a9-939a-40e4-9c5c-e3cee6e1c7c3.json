@@ -4,7 +4,15 @@
   "created_at": "2026-10-21T10:46:10.226099400Z",
   "dependencies": [],
   "description": "Plan Reach git through one storage-owned CLI module instead of libgit2 (f4d9502a) against every hard success criterion, write the concise design at dev/active/f4d9502a-git-cli-module/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "investigation",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f4d9502a-git-cli-module/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-10-21T10:46:13.738810598Z",
   "gates_required": [
     "plan-review"
@@ -31,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "planning: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T10:46:13.738810598Z"
+  "updated_at": "2026-10-21T10:57:12.842326102Z"
 }
