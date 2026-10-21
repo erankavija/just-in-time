@@ -29,8 +29,16 @@
       "format": "markdown",
       "label": "REQ-02 release-build reproduction verification",
       "path": "dev/active/8376299c-audit-correctness/repro-verification.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "completion-report",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/active/8376299c-audit-correctness/completion-report.md"
     }
   ],
+  "done_at": "2026-10-21T15:39:00.205305844Z",
   "first_ready_at": "2026-10-20T19:42:10.383077581Z",
   "gates_required": [
     "repo-validate",
@@ -56,7 +64,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-21T15:38:41.970414570Z"
+  "updated_at": "2026-10-21T15:39:07.802744668Z"
 }
