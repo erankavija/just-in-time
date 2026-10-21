@@ -23,7 +23,7 @@
     "satisfies:df129d9e/REQ-07"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Compile the integration harness once in jit's test-support surface",
-  "updated_at": "2026-10-21T01:17:39.649549205Z"
+  "updated_at": "2026-10-21T01:25:15.062721602Z"
 }

@@ -24,7 +24,7 @@
     "satisfies:df129d9e/REQ-06"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Encode the zero-warning bar in workspace lints",
-  "updated_at": "2026-10-21T01:17:38.043383381Z"
+  "updated_at": "2026-10-21T01:25:14.895154364Z"
 }

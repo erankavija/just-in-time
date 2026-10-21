@@ -22,7 +22,7 @@
     "satisfies:df129d9e/REQ-10"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Record the production-line baseline for crates/jit/src",
-  "updated_at": "2026-10-21T01:17:40.729490652Z"
+  "updated_at": "2026-10-21T01:25:14.808632160Z"
 }

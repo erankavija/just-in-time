@@ -23,7 +23,7 @@
     "satisfies:df129d9e/REQ-11"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Move the error classifier into output::failure",
-  "updated_at": "2026-10-21T01:17:41.906573513Z"
+  "updated_at": "2026-10-21T01:25:14.635833942Z"
 }
