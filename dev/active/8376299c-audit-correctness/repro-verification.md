@@ -153,3 +153,24 @@ Probe: `jit config show --json` enforce_leases vs `jit issue update $id --priori
 | user layer (`~/.config/jit/config.toml` strict via fake HOME), no section | off | succeeds |
 - Reported and enforced mode agree in all states; env var and user layer change neither. configuration.md states the single repo-only rule (lines ~491-495, priority line 29).
 Verdict: CORRECTED.
+
+## Addendum: 16d63038 and b5faef84 (release build from main c0517b5af)
+
+### 16d63038 id resolution
+```sh
+jit issue show|update|gate evaluate <UPPERCASE full id>      # exit 0 on all three
+jit issue show|update|gate evaluate <hyphen-free full id>    # exit 0 on all three
+jit issue show|update|gate evaluate <31-char prefix>         # exit 0 on all three
+jit issue show abc --json                                    # INVALID_ID_PREFIX
+```
+Verdict: CORRECTED. Full ids resolve in any case and hyphenation on every command, and a below-minimum prefix fails with the invalid-prefix error.
+
+### b5faef84 server search over nested `.jit`
+```sh
+jit init && jit issue create --title Hello
+jit-server --bind 127.0.0.1:38931 &
+curl -s '127.0.0.1:38931/api/search?q=Hello'   # total 1, match in .jit/issues/<id>.json
+```
+Verdict: CORRECTED. The search endpoint returns the issue-record match with the default nested data directory.
+
+Overall: 15 CORRECTED, 0 NOT CORRECTED, 1 N/A (6ff14f21).
