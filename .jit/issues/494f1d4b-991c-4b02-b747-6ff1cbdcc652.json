@@ -22,7 +22,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Report load-only cargo-ci failures as infrastructure faults",
-  "updated_at": "2026-10-21T06:15:51.967977576Z"
+  "updated_at": "2026-10-21T10:57:13.473524573Z"
 }

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4da0dbc0b98a3ee315f3e89f740bf75bd31bfdbc",
+  "completed_at": "2026-10-21T10:54:37.630651976Z",
+  "duration_ms": 275364,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are met and the prior rustdoc finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e3863990-8846-4eba-9578-a1addca7c145",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:50:02.265836508Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9fb54cd36, 78684701c, b22cf19b, af530c67, e6e13205, f4507f33, 24790747, b889ecd2\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue); @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed on F1, now resolved\nTruncation recovery: Re-read truncated broad diffs through bounded per-file patches, deleted-test inventories, and current-source searches.\n\nNo findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are met and the prior rustdoc finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

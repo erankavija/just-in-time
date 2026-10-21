@@ -23,7 +23,7 @@
     "satisfies:3d9a0ce3/REQ-02"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Record built-in checker faults as error runs",
-  "updated_at": "2026-10-21T01:07:31.396768699Z"
+  "updated_at": "2026-10-21T10:57:13.386013711Z"
 }
