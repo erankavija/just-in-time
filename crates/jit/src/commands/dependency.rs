@@ -281,7 +281,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let lease_warnings = if enforce_lease {
                 let config = crate::repository_state::assemble_config(&image)?;
                 captured_lease_warnings(
-                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    config.enforcement_mode(),
                     std::slice::from_ref(
                         expected_source
                             .as_ref()
@@ -381,7 +381,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let plan_content = super::validate::plan_content_with_issues(&image, &issues, &issues)?;
             let warning = if enforce_lease {
                 captured_lease_warnings(
-                    self.config_manager.enforcement_mode_from_config(&config)?,
+                    config.enforcement_mode(),
                     &[resolved_request.issue_id().to_string()],
                     &issues,
                     claims_guard.as_ref(),

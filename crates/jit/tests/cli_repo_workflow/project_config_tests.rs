@@ -142,7 +142,6 @@ fn test_config_validate_reports_invalid_project_name() {
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
         .env_remove("JIT_WORKTREE_MODE")
-        .env_remove("JIT_ENFORCE_LEASES")
         .output()
         .expect("failed to run jit config validate");
 
@@ -176,7 +175,6 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
         .env("JIT_WORKTREE_MODE", "not-a-worktree-mode")
-        .env("JIT_ENFORCE_LEASES", "not-an-enforcement-mode")
         .output()
         .expect("failed to run jit config validate --json");
 
@@ -192,8 +190,8 @@ fn test_config_validate_json_envelopes_every_invalid_configuration_finding() {
     let errors = parsed["error"]["details"]["errors"]
         .as_array()
         .expect("validation details carry an errors array");
-    assert_eq!(errors.len(), 3, "every actionable finding is retained");
-    for source in ["repo config", "JIT_WORKTREE_MODE", "JIT_ENFORCE_LEASES"] {
+    assert_eq!(errors.len(), 2, "every actionable finding is retained");
+    for source in ["repo config", "JIT_WORKTREE_MODE"] {
         assert!(
             errors
                 .iter()
@@ -213,7 +211,6 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
         .env_remove("JIT_WORKTREE_MODE")
-        .env_remove("JIT_ENFORCE_LEASES")
         .output()
         .expect("run valid human config validation");
     assert_eq!(human.status.code(), Some(0));
@@ -227,7 +224,6 @@ fn test_config_validate_valid_configuration_keeps_existing_success_output() {
         .current_dir(temp.path())
         .env("HOME", temp.path().join("isolated-home"))
         .env_remove("JIT_WORKTREE_MODE")
-        .env_remove("JIT_ENFORCE_LEASES")
         .output()
         .expect("run valid machine-readable config validation");
     assert_eq!(json.status.code(), Some(0));

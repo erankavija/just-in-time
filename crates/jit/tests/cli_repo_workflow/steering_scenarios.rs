@@ -23,7 +23,7 @@
 //! 2. **env sanitization** — all `jit` invocations are constructed through
 //!    `jit_cmd()`, which calls `.env_remove` on every JIT_* variable that can
 //!    redirect or alter storage (`JIT_DATA_DIR`, `JIT_ALLOW_DELETION`,
-//!    `JIT_WORKTREE_MODE`, `JIT_ENFORCE_LEASES`, `JIT_LOCK_TIMEOUT`) and pins
+//!    `JIT_WORKTREE_MODE`, `JIT_LOCK_TIMEOUT`) and pins
 //!    `JIT_AGENT_ID` to `"agent:steering-harness"` for determinism.
 //!    An absolute `JIT_DATA_DIR` value would otherwise discard the temp cwd and
 //!    write directly to an arbitrary path on the developer's machine.
@@ -136,7 +136,6 @@ fn workspace_root() -> PathBuf {
 /// - `JIT_DATA_DIR` — would redirect `.jit/` to an arbitrary (possibly absolute) path.
 /// - `JIT_ALLOW_DELETION` — would allow destructive operations not expected by tests.
 /// - `JIT_WORKTREE_MODE` — could alter worktree resolution, masking the temp dir.
-/// - `JIT_ENFORCE_LEASES` — could change lease-enforcement behaviour.
 /// - `JIT_LOCK_TIMEOUT` — could slow tests or interact with external lock state.
 fn jit_cmd(dir: &Path) -> Command {
     let mut cmd = Command::new(jit_binary());
@@ -144,7 +143,6 @@ fn jit_cmd(dir: &Path) -> Command {
         .env_remove("JIT_DATA_DIR")
         .env_remove("JIT_ALLOW_DELETION")
         .env_remove("JIT_WORKTREE_MODE")
-        .env_remove("JIT_ENFORCE_LEASES")
         .env_remove("JIT_LOCK_TIMEOUT")
         .env("JIT_AGENT_ID", "agent:steering-harness");
     cmd

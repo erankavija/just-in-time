@@ -55,8 +55,8 @@ touched, mirroring `jit_cmd()` in `steering_scenarios.rs`:
 1. **cwd isolation** — every `jit` invocation runs with `cwd=<tempdir>`, so the
    default `.jit/` resolution anchors inside the temp directory.
 2. **env sanitization** — `JIT_DATA_DIR`, `JIT_ALLOW_DELETION`,
-   `JIT_WORKTREE_MODE`, `JIT_ENFORCE_LEASES`, and `JIT_LOCK_TIMEOUT` are stripped
-   from every child environment (an absolute `JIT_DATA_DIR` would otherwise
+   `JIT_WORKTREE_MODE`, and `JIT_LOCK_TIMEOUT` are stripped from every child
+   environment (an absolute `JIT_DATA_DIR` would otherwise
    discard the temp cwd and write to an arbitrary path), and `JIT_AGENT_ID` is
    pinned to `agent:steering-eval`.
 

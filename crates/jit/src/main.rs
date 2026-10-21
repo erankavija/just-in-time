@@ -6750,7 +6750,7 @@ fn run() -> Result<()> {
                     let output = json!({
                         "worktree": {
                             "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
-                            "enforce_leases": format!("{:?}", config.enforcement_mode().unwrap_or(jit::config::EnforcementMode::Strict)).to_lowercase(),
+                            "enforce_leases": format!("{:?}", config.enforcement_mode()).to_lowercase(),
                         },
                         "coordination": {
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
@@ -6786,12 +6786,7 @@ fn run() -> Result<()> {
                             .worktree_mode()
                             .unwrap_or(jit::config::WorktreeMode::Auto)
                     );
-                    println!(
-                        "  enforce_leases = {:?}",
-                        config
-                            .enforcement_mode()
-                            .unwrap_or(jit::config::EnforcementMode::Strict)
-                    );
+                    println!("  enforce_leases = {:?}", config.enforcement_mode());
                     println!();
                     println!("[coordination]");
                     println!(
@@ -6937,11 +6932,6 @@ fn run() -> Result<()> {
                 if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
                     if let Err(e) = val.parse::<jit::config::WorktreeMode>() {
                         result.errors.push(format!("JIT_WORKTREE_MODE: {e}"));
-                    }
-                }
-                if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
-                    if let Err(e) = val.parse::<jit::config::EnforcementMode>() {
-                        result.errors.push(format!("JIT_ENFORCE_LEASES: {e}"));
                     }
                 }
                 if let Err(e) = jit::config_manager::ConfigManager::invocation_write_override() {

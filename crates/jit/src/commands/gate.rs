@@ -1382,10 +1382,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Ok(AttemptOutcome::Retry);
                 };
                 let config = crate::repository_state::assemble_config(&preflight.image)?;
-                (
-                    preflight.target.id,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
-                )
+                (preflight.target.id, config.enforcement_mode())
             };
             let claims_guard = (expected_mode != crate::config::EnforcementMode::Off)
                 .then(|| super::claims_mutation_guard(self.require_worktree_paths()?))
@@ -1398,7 +1395,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let issues = super::captured_active_issues(&image)?;
             let target = super::resolve_issue_from_capture(&issues, issue_id)?;
             let config = crate::repository_state::assemble_config(&image)?;
-            let mode = self.config_manager.enforcement_mode_from_config(&config)?;
+            let mode = config.enforcement_mode();
             if target != expected_target || mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }

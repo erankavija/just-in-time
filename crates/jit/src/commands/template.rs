@@ -194,8 +194,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         &captured.issues,
                         &captured.derived.lease_targets,
                     ),
-                    self.config_manager
-                        .enforcement_mode_from_config(&captured.config)?,
+                    captured.config.enforcement_mode(),
                 )
             };
             let warnings = template_lease_warnings(
@@ -218,10 +217,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 force,
                 &context,
             )?;
-            if self
-                .config_manager
-                .enforcement_mode_from_config(&captured.config)?
-                != lease_mode
+            if captured.config.enforcement_mode() != lease_mode
                 || existing_template_lease_targets(
                     &captured.issues,
                     &captured.derived.lease_targets,

@@ -2612,7 +2612,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let config = declarations.config();
             let lease_warnings = if request.enforce_lease {
                 captured_lease_warnings(
-                    self.config_manager.enforcement_mode_from_config(config)?,
+                    config.enforcement_mode(),
                     std::slice::from_ref(&target),
                     &issues,
                     claims_guard.as_ref(),
@@ -2783,9 +2783,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                         .find(|issue| issue.id == light.target.id)
                         .ok_or_else(|| crate::storage::IssueNotFoundError::new(&light.target.id))?;
                     let declarations = crate::repository_state::declarations_from_image(&image)?;
-                    let lease_mode = self
-                        .config_manager
-                        .enforcement_mode_from_config(declarations.config())?;
+                    let lease_mode = declarations.config().enforcement_mode();
                     let registry = declarations.gates;
                     // A precheck validating the whole repository runs over
                     // the validation base.
@@ -2905,9 +2903,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 .cloned()
                 .ok_or_else(|| crate::storage::IssueNotFoundError::new(&expected_target))?;
             let declarations = crate::repository_state::declarations_from_image(&image)?;
-            let lease_mode = self
-                .config_manager
-                .enforcement_mode_from_config(declarations.config())?;
+            let lease_mode = declarations.config().enforcement_mode();
             let current_precheck_required = lifecycle_requires_prechecks(&request, &issue);
             if current_precheck_required != expected_precheck_required {
                 return Ok(AttemptOutcome::Retry);
@@ -3396,9 +3392,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         // This legacy preflight is rechecked from captured config by mutation
         // coordinators that enforce leases during publication.
-        let mode = self
-            .config_manager
-            .enforcement_mode_from_config(self.cached_config()?)?;
+        let mode = self.cached_config()?.enforcement_mode();
 
         match mode {
             EnforcementMode::Off => Ok(None),

@@ -2602,6 +2602,9 @@ pub enum ConfigCommands {
     /// 2. User config (~/.config/jit/config.toml)
     /// 3. System config (/etc/jit/config.toml)
     /// 4. Defaults - lowest priority
+    ///
+    /// worktree.enforce_leases is repository policy: it is read from the
+    /// repository config only, exactly as write commands enforce it.
     Show {
         #[arg(long)]
         json: bool,
@@ -2626,7 +2629,6 @@ pub enum ConfigCommands {
     ///
     /// Examples:
     ///   jit config set coordination.max_indefinite_leases_per_agent 3
-    ///   jit config set --global worktree.enforce_leases warn
     Set {
         /// Configuration key (e.g., coordination.max_indefinite_leases_per_agent)
         key: String,
