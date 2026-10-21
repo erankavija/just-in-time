@@ -322,6 +322,13 @@
       "date": "2026-10-21",
       "decision": "@/inv/convention-convergence, @/inv/event-log",
       "summary": "2d10f1dd REQ-02: a refused combined update keeps the transition_blocked audit event. Chosen (A): the event records the refusal, not an issue change, and matches blocked state-only updates. Rejected (B): it makes combined and state-only refusals diverge or drops audit evidence. REQ-02 is amended to say so."
+    },
+    {
+      "container_short_id": "842b0ac6",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-18",
+      "summary": "Plan-review failed three times on REQ-07's clause that this checkout's .jit/issues/ holds no .lock files: one round required a leaf to own deleting them, the next ruled such a leaf out of footprint. Chosen: amend REQ-07 to drop the clause, since gitignored runtime residue is not repository content, and delete the 19 stale sidecars as housekeeping. The 'listing creates no file but the index lock' criterion prevents recurrence. Rejected: keeping a post-merge integrator leaf, which no worktree worker or reviewer can verify."
     }
   ],
   "notes": [
@@ -330,7 +337,6 @@
     "Wave 3: just-in-time-59 started planning 2195c98f early. Its planning node depends on 842b0ac6 through the plan template's upstream move, so it cannot pass its gates until the cutover is done. Investigation can proceed.",
     "Wave 4 planning nodes depend on 2195c98f the same way. Wave 5 is the release epic b80e3c70 containing the tag task bb03df0a.",
     "Session rule from the user (2026-10-20): never ask the user mid-session; block issues needing user input and record the question for the next session; check workers every 30 min; write the handoff when only user-blocked work remains.",
-    "Cutover integration note from 7e: 19 gitignored .jit/issues/*.lock files cannot be removed by a commit; the executing lead deletes them in the primary checkout at integration.",
     "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else.",
     "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up."
   ],
