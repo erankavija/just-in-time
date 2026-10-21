@@ -526,7 +526,8 @@
     "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome.",
     "2026-10-21 ~19:00: f4d9502a planned (53 issues, 92 edges). Re-homing 5f82e09a left f4d9502a unreachable from the tag task, so bb03df0a -> f4d9502a was added. Divergence then flagged 72d89161 and 8673dc5e outside 3d9a0ce3's containment; the 3d9a0ce3 lead is asked to restore it. just-in-time-59 is assigned to plan 9876a23a.",
     "2026-10-21 ~19:30: df129d9e's continuation lead stopped with waves 1-2 done except d8176fd3 (global-json-flag; 6 more tasks done; handoff-3.md). d8176fd3 waits on 3d9a0ce3's 8673dc5e and 3754095f (behind f37d228e). 3d9a0ce3's lead was asked to prioritise them. A fresh df129d9e lead goes out once both are done.",
-    "2026-10-21 ~20:00: dogfood reinstall HELD until 8673dc5e's gates_status run_id conversion merges, because the new engine would otherwise show every legacy status as unrun."
+    "2026-10-21 ~20:00: dogfood reinstall HELD until 8673dc5e's gates_status run_id conversion merges, because the new engine would otherwise show every legacy status as unrun.",
+    "2026-10-21 ~20:30-23:30: fifth shared usage-limit stall; work was resumed at 23:31. Tally: 842b0ac6 26 done; 3d9a0ce3 13 done (8673dc5e conversion pending); df129d9e 11 done (blocked on 3d9a0ce3); c780514e and 9876a23a in planning."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
