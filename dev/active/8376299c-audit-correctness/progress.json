@@ -99,7 +99,7 @@
           "title": "Config show misreports the lease enforcement mode that commands apply",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 1 merged (64e25aaa0); gates running",
+          "status": "done",
           "note": "after d92f54aa: config.rs/config_manager.rs"
         },
         {
@@ -108,7 +108,7 @@
           "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 (opus): code-review F1 cascade triggered by terminal request, not terminal transition (REQ-03)",
+          "status": "done",
           "note": "after 2d10f1dd: commands/issue.rs"
         },
         {
@@ -126,7 +126,7 @@
           "title": "Accept namespace wildcards in issue search label filters",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched (focused checks only; lead runs full gate)",
+          "status": "rework 1 (opus): code-review F1 validator accepts empty value/extra colons, F2 CLI reference flag rules",
           "note": "after 34999aad: search paths"
         }
       ]
@@ -167,7 +167,8 @@
   "rework_counts": {
     "7d1bfe89": 1,
     "bedf0962": 1,
-    "05d1b34e": 1
+    "05d1b34e": 1,
+    "c0d0c8bf": 1
   },
   "surfaced_pitfalls": [
     {
@@ -184,6 +185,11 @@
       "from": "bedf0962 worker",
       "finding": "config show reports [coordination] limits merged with user/system layers while claim acquire applies repo-only",
       "disposition": "owned by 842b0ac6 REQ-26 (steward ruling)"
+    },
+    {
+      "from": "lead",
+      "finding": "cargo-ci suite clock on a quiet host has risen from ~22 s to ~29 s against the 30 s budget across this session's merges (several epics adding tests); the budget will soon fail without load",
+      "disposition": "reported to steward"
     }
   ],
   "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
