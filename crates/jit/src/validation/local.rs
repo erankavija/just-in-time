@@ -413,7 +413,8 @@ fn schema_needs_sections(schema: &serde_json::Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{DocumentReference, Issue};
+    use crate::domain::Issue;
+    use crate::test_utils::document_reference_typed;
 
     fn rules_from(toml: &str) -> RuleSet {
         RuleSet::parse(toml, None, []).unwrap()
@@ -764,7 +765,7 @@ assert = { require-doc-type = { doc-type = "design" } }
             .is_blocking());
 
         task.documents
-            .push(DocumentReference::new("d.md".to_string()).with_type("design".to_string()));
+            .push(document_reference_typed("d.md", "design"));
         assert!(!evaluate_local(&task, &rules, ContentFormat::Markdown)
             .unwrap()
             .is_blocking());

@@ -2504,7 +2504,7 @@ pub enum ConfigCommands {
     ///
     /// Examples:
     ///   jit config get coordination.max_indefinite_leases_per_agent
-    ///   jit config get worktree.mode
+    ///   jit config get worktree.enforce_leases
     Get {
         /// Configuration key (e.g., coordination.max_indefinite_leases_per_agent)
         key: String,

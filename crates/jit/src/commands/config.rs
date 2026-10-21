@@ -192,12 +192,6 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
                 .map_err(|_| anyhow!("Expected numeric value for {}", key))?;
             toml_edit::value(num)
         }
-        k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
-            let b: bool = value
-                .parse()
-                .map_err(|_| anyhow!("Expected boolean (true/false) for {}", key))?;
-            toml_edit::value(b)
-        }
         _ => toml_edit::value(value),
     };
 
@@ -235,9 +229,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// repository writes publish through the mutation session. `value`
     /// is parsed into the expected type BEFORE the write: `project.name` is validated through
     /// [`ProjectName`] so an invalid identity is rejected and the file is left
-    /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) and boolean
-    /// (`enable_*`/`require_*`/`auto_*`) keys are parsed into their TOML types;
-    /// any other key is stored as a string.
+    /// untouched (REQ-03). Numeric (`*_secs`/`*_pct`/`max_*`) keys are parsed
+    /// into TOML integers; any other key is stored as a string.
     pub fn set_config(&self, key: &str, value: &str, global: bool) -> Result<ConfigSetOutcome>
     where
         S: crate::storage::RepositoryStateStore,
@@ -485,9 +478,6 @@ mod tests {
             "projection",
             "worktree",
             "coordination",
-            "global_operations",
-            "locks",
-            "events",
         ] {
             let outcome = executor.get_config(section).unwrap();
             assert!(

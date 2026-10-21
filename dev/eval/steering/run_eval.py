@@ -66,7 +66,6 @@ JIT_AGENT_ID = "agent:steering-eval"
 JIT_ENV_STRIP = (
     "JIT_DATA_DIR",
     "JIT_ALLOW_DELETION",
-    "JIT_WORKTREE_MODE",
     "JIT_LOCK_TIMEOUT",
 )
 

@@ -882,9 +882,10 @@ impl CommandExecutor<JsonFileStorage> {
 mod tests {
     use super::*;
     use crate::domain::artifact_plan::EvidenceCode;
-    use crate::domain::{DocumentReference, State};
+    use crate::domain::State;
     use crate::storage::JsonFileStorage;
     use crate::test_taxonomy::test_taxonomy;
+    use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
@@ -1016,7 +1017,7 @@ mod tests {
                 let mut issue =
                     crate::domain::types::fixture_issue(format!("Owner {index}"), String::new());
                 issue.state = State::Done;
-                let mut document = DocumentReference::new("fixtures/root.md".into());
+                let mut document = document_reference("fixtures/root.md");
                 document.assets.push(crate::document::Asset {
                     original_path: "asset.png".into(),
                     resolved_path: Some("fixtures/asset.png".into()),
@@ -1102,7 +1103,7 @@ mod tests {
         .unwrap();
         let mut issue = crate::domain::types::fixture_issue("Owner".into(), String::new());
         issue.state = State::Done;
-        issue.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        issue.documents = vec![document_reference("fixtures/root.md")];
         seed_archive_issue_precondition(&storage, issue);
         let executor = executor(&repo, storage);
         let citations = |warnings: Vec<crate::domain::artifact_plan::PlanWarning>| {
@@ -1643,10 +1644,7 @@ mod tests {
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(path, source).unwrap();
         });
-        container.documents = sources
-            .iter()
-            .map(|source| DocumentReference::new(source.clone()))
-            .collect();
+        container.documents = sources.iter().map(document_reference).collect();
         let id = container.id.clone();
         seed_archive_issue_precondition(&storage, container);
         let executor = executor(&repo, storage);
@@ -1732,8 +1730,8 @@ mod tests {
         container.state = State::Done;
         container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
         container.documents = vec![
-            DocumentReference::new("fixtures/root.md".into()),
-            DocumentReference::at_commit("fixtures/root.md".into(), commit),
+            document_reference("fixtures/root.md"),
+            document_reference_at("fixtures/root.md", commit),
         ];
         let container_id = container.id.clone();
         seed_archive_issue_precondition(&storage, container);
@@ -1741,7 +1739,7 @@ mod tests {
             crate::domain::types::fixture_issue("Outside active".into(), String::new());
         outside.state = State::InProgress;
         outside.labels = vec![format!("type:{}", taxonomy.type_at_level(4))];
-        outside.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        outside.documents = vec![document_reference("fixtures/root.md")];
         let outside_id = outside.id.clone();
         seed_archive_issue_precondition(&storage, outside);
 
@@ -1822,7 +1820,7 @@ mod tests {
             "fixtures/bundle/image.svg",
         ]
         .into_iter()
-        .map(|path| DocumentReference::new(path.into()))
+        .map(document_reference)
         .collect();
         let id = epic.id.clone();
         seed_archive_issue_precondition(&storage, epic);
@@ -2028,7 +2026,7 @@ mod tests {
             let mut issue =
                 crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
-            issue.documents = vec![DocumentReference::new(path.into())];
+            issue.documents = vec![document_reference(path)];
             seed_archive_issue_precondition(&storage, issue);
         }
         let executor = executor(&repo, storage);
@@ -2086,7 +2084,7 @@ mod tests {
             let mut issue =
                 crate::domain::types::fixture_issue(format!("Owner of {path}"), String::new());
             issue.state = State::Done;
-            issue.documents = vec![DocumentReference::new(path.into())];
+            issue.documents = vec![document_reference(path)];
             seed_archive_issue_precondition(&storage, issue);
         }
         let executor = executor(&repo, storage);
@@ -2377,7 +2375,7 @@ mod tests {
         let mut outside =
             crate::domain::types::fixture_issue("Active outside owner".into(), String::new());
         outside.state = State::InProgress;
-        outside.documents = vec![DocumentReference::new("docs/outside.md".into())];
+        outside.documents = vec![document_reference("docs/outside.md")];
         seed_archive_issue_precondition(&owner_storage, outside);
 
         let owner_plan = executor(&owner_repo, owner_storage)
@@ -2429,7 +2427,7 @@ mod tests {
             format!("type:{epic_type}"),
             format!("{epic_namespace}:directory-link"),
         ];
-        epic.documents = vec![DocumentReference::new("fixtures/index.md".into())];
+        epic.documents = vec![document_reference("fixtures/index.md")];
         let id = epic.id.clone();
         seed_archive_issue_precondition(&storage, epic);
         (repo, storage, id)
@@ -2517,7 +2515,7 @@ mod tests {
         let mut container = crate::domain::types::fixture_issue("Container".into(), String::new());
         container.state = state;
         container.labels = vec![format!("type:{}", taxonomy.type_at_level(1))];
-        container.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        container.documents = vec![document_reference("fixtures/root.md")];
         let id = container.id.clone();
         seed_archive_issue_precondition(&storage, container);
         let executor = executor(&repo, storage);
@@ -2602,7 +2600,7 @@ mod tests {
         let mut container = executor.storage.load_issue(&id).unwrap();
         container
             .documents
-            .push(DocumentReference::new("fixtures/b.md".into()));
+            .push(document_reference("fixtures/b.md"));
         seed_archive_issue_precondition(&executor.storage, container);
 
         let first = executor.execute_archive_container(&id).unwrap();
@@ -2640,7 +2638,7 @@ mod tests {
             crate::domain::types::fixture_issue("Independently archived".into(), String::new());
         archived_owner.state = State::Archived;
         archived_owner.archived_from = Some(State::Done);
-        archived_owner.documents = vec![DocumentReference::new("fixtures/root.md".into())];
+        archived_owner.documents = vec![document_reference("fixtures/root.md")];
         seed_archive_issue_precondition(&executor.storage, archived_owner.clone());
 
         let plan = executor

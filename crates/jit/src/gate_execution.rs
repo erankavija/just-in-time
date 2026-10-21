@@ -589,6 +589,7 @@ mod tests {
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
         RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
     };
+    use crate::test_utils::document_reference;
     use std::collections::HashMap;
 
     #[test]
@@ -1211,7 +1212,7 @@ mod tests {
                 assets: Vec::new(),
             },
             // A doc with no label/doc_type still serializes, as explicit nulls.
-            DocumentReference::new("NOTES.md".to_string()),
+            document_reference("NOTES.md"),
         ];
 
         let json = build_issue_docs_env(&docs);

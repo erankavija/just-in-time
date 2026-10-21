@@ -436,9 +436,8 @@ value = "dev/presentations"
 # authors it in `.jit/config.toml`; a repository that declares none gets the
 # engine's behaviour for all of them.
 #
-# Worktree isolation and lease enforcement for parallel/agent work:
+# Lease enforcement for parallel/agent work:
 #   [worktree]
-#   mode = "auto"              # "auto" | "on" | "off"
 #   enforce_leases = "strict"  # "strict" | "warn" | "off"
 #
 # Multi-agent lease coordination. The default claim TTL and the age at which
@@ -449,14 +448,3 @@ value = "dev/presentations"
 #   [coordination]
 #   max_indefinite_leases_per_agent = 2
 #   max_indefinite_leases_per_repo = 10
-#
-# Branches permitted to modify global config (default: ["main"]):
-#   [global_operations]
-#   require_main_history = true
-#   allowed_branches = ["main"]
-#
-# Low-level tuning (rarely needed):
-#   [locks]
-#   max_age_secs = 3600       # stale lock file threshold
-#   [events]
-#   enable_sequences = true   # sequence numbers in event log

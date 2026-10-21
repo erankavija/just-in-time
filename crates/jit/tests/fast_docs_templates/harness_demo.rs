@@ -410,27 +410,23 @@ fn test_harness_container_progress_and_children() {
     assert_eq!(progress.container.title, "Epic");
     assert!(progress.dangling.is_empty());
     let rollup = &progress.rollup;
-    assert_eq!(rollup.total, 4);
-    assert_eq!(rollup.done, 1);
-    assert_eq!(rollup.rejected, 1);
-    assert_eq!(rollup.open, 2); // in_progress + ready
-    assert_eq!(rollup.percent, 25);
+    assert_eq!(rollup.extras.total, 4);
+    assert_eq!(rollup.extras.done, 1);
+    assert_eq!(rollup.extras.rejected, 1);
+    assert_eq!(rollup.extras.open, 2); // in_progress + ready
+    assert_eq!(rollup.extras.percent, 25);
     // Every state present, zero-count states included.
-    assert_eq!(rollup.by_state.len(), State::all().len());
-    let bucket = |s: State| rollup.by_state.iter().find(|c| c.state == s).unwrap().count;
+    assert_eq!(rollup.items.len(), State::all().len());
+    let bucket = |s: State| rollup.items.iter().find(|c| c.state == s).unwrap().count;
     assert_eq!(bucket(State::Done), 1);
     assert_eq!(bucket(State::Gated), 0);
 
     // children: one compact status per direct child, ascending short id, no
     // dangling edges.
     let children = h.executor.issue_children(&epic).unwrap();
-    assert_eq!(children.count, 4);
-    assert!(children.dangling.is_empty());
-    let short_ids: Vec<&str> = children
-        .issues
-        .iter()
-        .map(|c| c.short_id.as_str())
-        .collect();
+    assert_eq!(children.count(), 4);
+    assert!(children.extras.dangling.is_empty());
+    let short_ids: Vec<&str> = children.items.iter().map(|c| c.short_id.as_str()).collect();
     let mut sorted = short_ids.clone();
     sorted.sort_unstable();
     assert_eq!(short_ids, sorted, "children sorted by short id");
@@ -463,10 +459,10 @@ fn test_harness_empty_container_rollup() {
     use jit::output::StateRollup;
 
     let rollup = StateRollup::from_issues(&[]);
-    assert_eq!(rollup.total, 0);
-    assert_eq!(rollup.percent, 0);
-    assert_eq!(rollup.by_state.len(), State::all().len());
-    assert!(rollup.by_state.iter().all(|c| c.count == 0));
+    assert_eq!(rollup.extras.total, 0);
+    assert_eq!(rollup.extras.percent, 0);
+    assert_eq!(rollup.items.len(), State::all().len());
+    assert!(rollup.items.iter().all(|c| c.count == 0));
 }
 
 /// Candidate reporting is an in-process read: it selects renamed non-leaf

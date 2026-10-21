@@ -3,8 +3,9 @@ use jit::domain::artifact_inventory::{
     PinnedRootEvidenceMap,
 };
 use jit::domain::artifact_plan::{ArtifactVersion, BlockerCode, EvidenceCode, WarningCode};
-use jit::domain::{DocumentReference, Issue, State};
+use jit::domain::{Issue, State};
 use jit::test_taxonomy::{test_taxonomy, TestTaxonomy};
+use jit::test_utils::{document_reference, document_reference_at};
 
 const OID_A: &str = "0123456789abcdef0123456789abcdef01234567";
 const OID_B: &str = "fedcba9876543210fedcba9876543210fedcba98";
@@ -47,12 +48,6 @@ fn issue(id: &str, taxonomy: &TestTaxonomy, level: u8, state: State) -> Issue {
     issue
 }
 
-fn document(path: &str, commit: Option<&str>) -> DocumentReference {
-    let mut document = DocumentReference::new(path.to_string());
-    document.commit = commit.map(str::to_string);
-    document
-}
-
 #[test]
 fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() {
     let taxonomy = test_taxonomy();
@@ -63,10 +58,10 @@ fn test_container_inventory_uses_resolved_children_not_raw_dependency_closure() 
 
     selected.dependencies = vec![local.id.clone(), sequenced_elsewhere.id.clone()];
     other.dependencies = vec![sequenced_elsewhere.id.clone()];
-    local.documents = vec![document("./reports//shared.csv", None)];
+    local.documents = vec![document_reference("./reports//shared.csv")];
     sequenced_elsewhere.documents = vec![
-        document("reports/shared.csv", None),
-        document("reports/outside-only.png", None),
+        document_reference("reports/shared.csv"),
+        document_reference("reports/outside-only.png"),
     ];
 
     let issues = vec![sequenced_elsewhere, local, other, selected];
@@ -109,9 +104,9 @@ fn test_container_inventory_includes_opaque_roots_without_adapters() {
     let mut child = issue("child", &taxonomy, 4, State::Done);
     container.dependencies = vec![child.id.clone()];
     child.documents = vec![
-        document("data/table.csv", None),
-        document("figures/pixels.png", None),
-        document("figures/vector.svg", None),
+        document_reference("data/table.csv"),
+        document_reference("figures/pixels.png"),
+        document_reference("figures/vector.svg"),
     ];
 
     let inventory = inventory_explicit_roots(
@@ -162,14 +157,14 @@ fn test_mixed_pinned_and_unpinned_owners_group_by_canonical_version() {
     let taxonomy = test_taxonomy();
     let mut z_owner = issue("z-owner", &taxonomy, 4, State::Done);
     z_owner.documents = vec![
-        document("docs/report.csv", Some("release-v1")),
-        document("docs/report.csv", None),
-        document("docs/report.csv", Some("release-v2")),
+        document_reference_at("docs/report.csv", "release-v1"),
+        document_reference("docs/report.csv"),
+        document_reference_at("docs/report.csv", "release-v2"),
     ];
     let mut a_owner = issue("a-owner", &taxonomy, 4, State::Rejected);
     a_owner.documents = vec![
-        document("./docs/report.csv", Some("01234567")),
-        document("docs/other.csv", None),
+        document_reference_at("./docs/report.csv", "01234567"),
+        document_reference("docs/other.csv"),
     ];
     let resolver = FakePinnedResolver::default()
         .resolves("release-v1", "docs/report.csv", OID_A)
@@ -213,7 +208,7 @@ fn test_mixed_pinned_and_unpinned_owners_group_by_canonical_version() {
 fn test_pinned_resolution_or_read_failure_blocks_without_working_tree_owner_fallback() {
     let taxonomy = test_taxonomy();
     let mut issue = issue("owner", &taxonomy, 4, State::Done);
-    issue.documents = vec![document("docs/history.md", Some("missing-tag"))];
+    issue.documents = vec![document_reference_at("docs/history.md", "missing-tag")];
     let resolver = FakePinnedResolver::default().fails("missing-tag", "docs/history.md");
 
     let inventory = inventory_explicit_roots(
@@ -246,10 +241,10 @@ fn test_pinned_root_requests_are_target_relevant_and_deduplicated() {
     let mut outside = issue("outside", &taxonomy, 4, State::Done);
     container.dependencies = vec![child.id.clone()];
     child.documents = vec![
-        document("docs/shared.md", Some("release")),
-        document("./docs/shared.md", Some("release")),
+        document_reference_at("docs/shared.md", "release"),
+        document_reference_at("./docs/shared.md", "release"),
     ];
-    outside.documents = vec![document("docs/outside.md", Some("other"))];
+    outside.documents = vec![document_reference_at("docs/outside.md", "other")];
     let issues = [outside, child, container];
     let requests = |target| {
         pinned_root_requests(&issues, &taxonomy.hierarchy_config(), target)

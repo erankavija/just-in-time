@@ -1465,17 +1465,11 @@ fn run_query_all<S: IssueStore>(
         // emitted shape stays in lockstep with the schema derived from the same
         // struct (jit:f40f1b0a).
         let output = if full {
-            let response = IssueListFullResponse {
-                count: issues.len(),
-                issues,
-            };
+            let response = IssueListFullResponse::new(issues);
             JsonOutput::success(serde_json::to_value(response)?)
         } else {
             let minimal: Vec<MinimalIssue> = issues.iter().map(MinimalIssue::from).collect();
-            let response = IssueListResponse {
-                count: minimal.len(),
-                issues: minimal,
-            };
+            let response = IssueListResponse::new(minimal);
             JsonOutput::success(serde_json::to_value(response)?)
         }
         .with_message(msg);
@@ -2481,7 +2475,8 @@ fn run() -> Result<()> {
 
                     if json {
                         use jit::output::{
-                            IssueSearchFullResponse, IssueSearchResponse, JsonOutput,
+                            IssueSearchFullResponse, IssueSearchQuery, IssueSearchResponse,
+                            JsonOutput,
                         };
 
                         let count = issues.len();
@@ -2496,20 +2491,22 @@ fn run() -> Result<()> {
                         // lockstep with the schema derived from the same struct
                         // (jit:f40f1b0a).
                         let output_data = if full {
-                            serde_json::to_value(IssueSearchFullResponse {
-                                query: query.clone(),
+                            serde_json::to_value(IssueSearchFullResponse::with_extras(
                                 issues,
-                                count,
-                            })?
+                                IssueSearchQuery {
+                                    query: query.clone(),
+                                },
+                            ))?
                         } else {
                             use jit::domain::MinimalIssue;
                             let minimal_issues: Vec<MinimalIssue> =
                                 issues.iter().map(MinimalIssue::from).collect();
-                            serde_json::to_value(IssueSearchResponse {
-                                query: query.clone(),
-                                issues: minimal_issues,
-                                count,
-                            })?
+                            serde_json::to_value(IssueSearchResponse::with_extras(
+                                minimal_issues,
+                                IssueSearchQuery {
+                                    query: query.clone(),
+                                },
+                            ))?
                         };
 
                         let output = JsonOutput::success(output_data).with_message(msg);
@@ -2553,10 +2550,7 @@ fn run() -> Result<()> {
                             .map(|id| build_issue_show_response(&executor, id))
                             .collect::<Result<Vec<_>>>()?;
                         let output = jit::output::JsonOutput::success(serde_json::to_value(
-                            jit::output::IssueShowListResponse {
-                                count: responses.len(),
-                                issues: responses,
-                            },
+                            jit::output::IssueShowListResponse::new(responses),
                         )?);
                         println!("{}", output.to_json_string()?);
                         return Ok(());
@@ -2718,10 +2712,7 @@ fn run() -> Result<()> {
                             println!("{}", output.to_json_string()?);
                         } else {
                             let output = jit::output::JsonOutput::success(serde_json::to_value(
-                                jit::output::IssueStatusListResponse {
-                                    count: statuses.len(),
-                                    issues: statuses,
-                                },
+                                jit::output::IssueStatusListResponse::new(statuses),
                             )?);
                             println!("{}", output.to_json_string()?);
                         }
@@ -2742,11 +2733,11 @@ fn run() -> Result<()> {
                                 let output = jit::output::JsonOutput::success(&response);
                                 println!("{}", output.to_json_string()?);
                             } else {
-                                for child in &response.issues {
+                                for child in &response.items {
                                     println!("{}", child.to_line());
                                 }
-                                if !response.dangling.is_empty() {
-                                    println!("dangling: {}", response.dangling.join(","));
+                                if !response.extras.dangling.is_empty() {
+                                    println!("dangling: {}", response.extras.dangling.join(","));
                                 }
                             }
                         }
@@ -3713,10 +3704,7 @@ fn run() -> Result<()> {
                             let gate_defs: Vec<GateDefinition> =
                                 gates.into_iter().map(GateDefinition::from).collect();
                             let count = gate_defs.len();
-                            let response = GateListResponse {
-                                count,
-                                gates: gate_defs,
-                            };
+                            let response = GateListResponse::new(gate_defs);
                             let msg = format!("{} gate definition(s)", count);
                             let output = JsonOutput::success(response).with_message(msg);
                             println!("{}", output.to_json_string()?);
@@ -3977,10 +3965,7 @@ fn run() -> Result<()> {
                         let summaries: Vec<GateRunSummary> =
                             runs.iter().map(GateRunSummary::full).collect();
                         let count = summaries.len();
-                        let response = GateRunHistoryResponse {
-                            results: summaries,
-                            count,
-                        };
+                        let response = GateRunHistoryResponse::new(summaries);
                         let msg = format!("{} gate run(s) listed for issue {}", count, id);
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
@@ -4194,15 +4179,16 @@ fn run() -> Result<()> {
                             status: *status,
                         })
                         .collect();
-                    let response = GateCheckAllResponse {
-                        count: gate_status_entries.len(),
-                        results: summaries,
-                        passed: passed_count,
-                        total,
-                        not_run,
-                        gates: gate_status_entries,
-                        all_passed,
-                    };
+                    let response = GateCheckAllResponse::with_extras(
+                        gate_status_entries,
+                        jit::output::GateCheckSummary {
+                            results: summaries,
+                            passed: passed_count,
+                            total,
+                            not_run,
+                            all_passed,
+                        },
+                    );
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else if total == 0 {
@@ -4482,21 +4468,18 @@ fn run() -> Result<()> {
                 }
 
                 if json {
-                    let response = jit::output::GateEvaluateManyResponse {
-                        count: results.len(),
-                        results,
-                    };
+                    let response = jit::output::GateEvaluateManyResponse::new(results);
                     let passed = response
-                        .results
+                        .items
                         .iter()
                         .filter(|result| result.status == "passed")
                         .count();
                     let message = format!(
                         "Evaluated gate '{}' for {} issue(s): {} passed, {} failed",
                         gate_key,
-                        response.count,
+                        response.count(),
                         passed,
-                        response.count - passed
+                        response.count() - passed
                     );
                     println!(
                         "{}",
@@ -4801,14 +4784,15 @@ fn run() -> Result<()> {
                     let tree = executor.build_dependency_tree(&id, depth)?;
                     let summary = jit::commands::graph::compute_dependency_summary(&tree);
 
-                    let response = GraphDepsTreeResponse {
-                        issue_id: id.clone(),
-                        depth,
-                        count: tree.len(),
-                        nodes: tree,
-                        summary,
-                    };
-                    let msg = format!("{} dependencies", response.summary.total);
+                    let response = GraphDepsTreeResponse::with_extras(
+                        tree,
+                        jit::output::DependencyTreeScope {
+                            issue_id: id.clone(),
+                            depth,
+                            summary,
+                        },
+                    );
+                    let msg = format!("{} dependencies", response.extras.summary.total);
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -4848,11 +4832,12 @@ fn run() -> Result<()> {
 
                     let minimal_issues: Vec<MinimalIssue> =
                         issues.iter().map(MinimalIssue::from).collect();
-                    let response = GraphDownstreamResponse {
-                        issue_id: id.clone(),
-                        dependents: minimal_issues,
-                        count: issues.len(),
-                    };
+                    let response = GraphDownstreamResponse::with_extras(
+                        minimal_issues,
+                        jit::output::IssueScope {
+                            issue_id: id.clone(),
+                        },
+                    );
                     let msg = format!("{} dependents", issues.len());
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
@@ -4872,10 +4857,7 @@ fn run() -> Result<()> {
 
                     let minimal_issues: Vec<MinimalIssue> =
                         issues.iter().map(MinimalIssue::from).collect();
-                    let response = GraphRootsResponse {
-                        roots: minimal_issues,
-                        count: issues.len(),
-                    };
+                    let response = GraphRootsResponse::new(minimal_issues);
                     let msg = format!("{} root issues", issues.len());
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
@@ -4892,19 +4874,19 @@ fn run() -> Result<()> {
 
                 if json {
                     use jit::output::JsonOutput;
-                    let msg = format!("{} nodes", response.count);
+                    let msg = format!("{} nodes", response.count());
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
-                    let scope = match &response.root {
+                    let scope = match &response.extras.root {
                         Some(id) => format!("subtree of {}", &id[..8.min(id.len())]),
                         None => "repository".to_string(),
                     };
                     let _ = output_ctx.print_info(format!("Resolved hierarchy ({}):", scope));
-                    if response.nodes.is_empty() {
+                    if response.items.is_empty() {
                         println!("  (none)");
                     } else {
-                        for node in &response.nodes {
+                        for node in &response.items {
                             let parent = node
                                 .hierarchy
                                 .parent
@@ -5223,13 +5205,13 @@ fn run() -> Result<()> {
                 } else {
                     output_ctx.print_data(format!(
                         "Scanned areas: {}",
-                        if report.areas.is_empty() {
+                        if report.extras.areas.is_empty() {
                             "none declared".to_string()
                         } else {
-                            report.areas.join(", ")
+                            report.extras.areas.join(", ")
                         }
                     ))?;
-                    if report.artifacts.is_empty() {
+                    if report.items.is_empty() {
                         // A finding-free report says so rather than trailing
                         // off after the header, since exit status carries no
                         // verdict here.
@@ -5237,10 +5219,9 @@ fn run() -> Result<()> {
                             "No artifact sits outside its owning issue's canonical directory.",
                         )?;
                     } else {
-                        output_ctx
-                            .print_data(format!("Artifacts ({}):", report.artifacts.len()))?;
+                        output_ctx.print_data(format!("Artifacts ({}):", report.items.len()))?;
                     }
-                    for artifact in &report.artifacts {
+                    for artifact in &report.items {
                         output_ctx.print_data(format!("  {}", artifact.path))?;
                         // The advice: where it belongs, or that nothing can be
                         // said about where it belongs.
@@ -5656,19 +5637,13 @@ fn run() -> Result<()> {
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse {
-                                        count: issues.len(),
-                                        issues,
-                                    },
+                                    jit::output::IssueListFullResponse::new(issues),
                                 )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse {
-                                        count: minimal.len(),
-                                        issues: minimal,
-                                    },
+                                    jit::output::IssueListResponse::new(minimal),
                                 )?)
                             }
                             .with_message(msg);
@@ -5734,10 +5709,7 @@ fn run() -> Result<()> {
                                     .collect();
 
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::BlockedFullListResponse {
-                                        count: blocked_issues.len(),
-                                        issues: blocked_issues,
-                                    },
+                                    jit::output::BlockedFullListResponse::new(blocked_issues),
                                 )?)
                             } else {
                                 use jit::domain::MinimalBlockedIssue;
@@ -5751,10 +5723,7 @@ fn run() -> Result<()> {
                                     .collect();
 
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::BlockedListResponse {
-                                        count: minimal.len(),
-                                        issues: minimal,
-                                    },
+                                    jit::output::BlockedListResponse::new(minimal),
                                 )?)
                             }
                             .with_message(msg);
@@ -5790,19 +5759,13 @@ fn run() -> Result<()> {
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse {
-                                        count: issues.len(),
-                                        issues,
-                                    },
+                                    jit::output::IssueListFullResponse::new(issues),
                                 )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse {
-                                        count: minimal.len(),
-                                        issues: minimal,
-                                    },
+                                    jit::output::IssueListResponse::new(minimal),
                                 )?)
                             }
                             .with_message(msg);
@@ -5835,19 +5798,13 @@ fn run() -> Result<()> {
                             let msg = format!("Found {} issue(s)", issues.len());
                             let output = if full {
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListFullResponse {
-                                        count: issues.len(),
-                                        issues,
-                                    },
+                                    jit::output::IssueListFullResponse::new(issues),
                                 )?)
                             } else {
                                 let minimal: Vec<MinimalIssue> =
                                     issues.iter().map(MinimalIssue::from).collect();
                                 JsonOutput::success(serde_json::to_value(
-                                    jit::output::IssueListResponse {
-                                        count: minimal.len(),
-                                        issues: minimal,
-                                    },
+                                    jit::output::IssueListResponse::new(minimal),
                                 )?)
                             }
                             .with_message(msg);
@@ -5873,7 +5830,7 @@ fn run() -> Result<()> {
                         if json {
                             let msg = format!(
                                 "{}/{} done ({}%)",
-                                rollup.done, rollup.total, rollup.percent
+                                rollup.extras.done, rollup.extras.total, rollup.extras.percent
                             );
                             let output =
                                 jit::output::JsonOutput::success(&rollup).with_message(msg);
@@ -5889,17 +5846,17 @@ fn run() -> Result<()> {
                         let report = executor.detect_divergences()?;
 
                         if json {
-                            let msg = format!("{} divergence(s)", report.count);
+                            let msg = format!("{} divergence(s)", report.count());
                             let output = jit::output::JsonOutput::success(report).with_message(msg);
                             println!("{}", output.to_json_string()?);
-                        } else if report.divergences.is_empty() {
+                        } else if report.items.is_empty() {
                             let _ = output_ctx.print_success("No membership/DAG divergences");
                         } else {
                             let _ = output_ctx.print_info(format!(
                                 "{} membership label(s) not backed by the DAG:",
-                                report.count
+                                report.count()
                             ));
-                            for d in &report.divergences {
+                            for d in &report.items {
                                 println!("  {} | {} | {}", d.short_id, d.label, d.title);
                             }
                         }
@@ -5917,11 +5874,8 @@ fn run() -> Result<()> {
                     use jit::output::{JsonOutput, NamespacesResponse};
                     let namespace_names: Vec<String> =
                         namespaces.namespaces.keys().cloned().collect();
-                    let response = NamespacesResponse {
-                        count: namespace_names.len(),
-                        namespaces: namespace_names,
-                    };
-                    let msg = format!("{} namespace(s)", response.count);
+                    let response = NamespacesResponse::new(namespace_names);
+                    let msg = format!("{} namespace(s)", response.count());
                     let output = JsonOutput::success(response).with_message(msg);
                     println!("{}", output.to_json_string()?);
                 } else {
@@ -6000,24 +5954,11 @@ fn run() -> Result<()> {
 
                     let output = json!({
                         "worktree": {
-                            "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
                             "enforce_leases": format!("{:?}", config.enforcement_mode()).to_lowercase(),
                         },
                         "coordination": {
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
                             "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
-                        },
-                        "global_operations": {
-                            "require_main_history": config.global_operations().require_main_history(),
-                            "allowed_branches": config.global_operations().allowed_branches(),
-                        },
-                        "locks": {
-                            "max_age_secs": config.locks().max_age_secs(),
-                            "enable_metadata": config.locks().enable_metadata(),
-                        },
-                        "events": {
-                            "enable_sequences": config.events().enable_sequences(),
-                            "use_unified_envelope": config.events().use_unified_envelope(),
                         },
                         "namespaces": namespaces_json,
                     });
@@ -6031,12 +5972,6 @@ fn run() -> Result<()> {
                     println!("Effective Configuration:");
                     println!();
                     println!("[worktree]");
-                    println!(
-                        "  mode = {:?}",
-                        config
-                            .worktree_mode()
-                            .unwrap_or(jit::config::WorktreeMode::Auto)
-                    );
                     println!("  enforce_leases = {:?}", config.enforcement_mode());
                     println!();
                     println!("[coordination]");
@@ -6047,30 +5982,6 @@ fn run() -> Result<()> {
                     println!(
                         "  max_indefinite_leases_per_repo = {}",
                         config.coordination().max_indefinite_leases_per_repo()
-                    );
-                    println!();
-                    println!("[global_operations]");
-                    println!(
-                        "  require_main_history = {}",
-                        config.global_operations().require_main_history()
-                    );
-                    println!(
-                        "  allowed_branches = {:?}",
-                        config.global_operations().allowed_branches()
-                    );
-                    println!();
-                    println!("[locks]");
-                    println!("  max_age_secs = {}", config.locks().max_age_secs());
-                    println!("  enable_metadata = {}", config.locks().enable_metadata());
-                    println!();
-                    println!("[events]");
-                    println!(
-                        "  enable_sequences = {}",
-                        config.events().enable_sequences()
-                    );
-                    println!(
-                        "  use_unified_envelope = {}",
-                        config.events().use_unified_envelope()
                     );
                 }
             }
@@ -6148,7 +6059,7 @@ fn run() -> Result<()> {
                 }
             }
             jit::cli::ConfigCommands::Validate { json } => {
-                use jit::config::{ConfigLoader, JitConfig};
+                use jit::config::JitConfig;
                 use serde_json::json;
 
                 #[derive(Default)]
@@ -6158,7 +6069,7 @@ fn run() -> Result<()> {
 
                 let mut result = ValidationResult::default();
 
-                // Check repo config — invalid worktree/enforcement tokens are now
+                // Check repo config — invalid enforcement and write-policy tokens are
                 // caught at TOML parse time, so a successful load implies valid values.
                 let repo_config_path = jit_dir.join("config.toml");
                 if repo_config_path.exists() {
@@ -6178,20 +6089,9 @@ fn run() -> Result<()> {
                     }
                 }
 
-                // Check env vars — use the same FromStr as TOML parsing so
-                // case-handling is identical across both sources.
-                if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-                    if let Err(e) = val.parse::<jit::config::WorktreeMode>() {
-                        result.errors.push(format!("JIT_WORKTREE_MODE: {e}"));
-                    }
-                }
                 if let Err(e) = jit::config_manager::ConfigManager::invocation_write_override() {
                     result.errors.push(format!("{e}"));
                 }
-
-                // Try to build effective config to catch merge issues
-                let loader = ConfigLoader::new();
-                let _ = loader.with_repo_config(&jit_dir);
 
                 let has_errors = !result.errors.is_empty();
 
@@ -6336,11 +6236,10 @@ fn run() -> Result<()> {
                         use jit::output::{JsonOutput, SearchResponse};
 
                         let msg = format!("Found {} result(s)", results.len());
-                        let response = SearchResponse {
-                            query,
-                            count: results.len(),
+                        let response = SearchResponse::with_extras(
                             results,
-                        };
+                            jit::output::SearchQuery { query },
+                        );
                         let output = JsonOutput::success(response).with_message(msg);
                         println!("{}", output.to_json_string()?);
                     } else if results.is_empty() {
@@ -6915,14 +6814,14 @@ fn run() -> Result<()> {
                     } else {
                         "Repository validation passed".to_string()
                     };
-                    let divergences_json = serde_json::to_value(&divergence_report.divergences)?;
+                    let divergences_json = serde_json::to_value(&divergence_report.items)?;
                     let details = json!({
                         "valid": !validation_failed,
                         "integrity_error": integrity_message,
                         "warnings": warnings_json,
                         "warning_count": warnings_json.len(),
                         "membership_divergences": divergences_json,
-                        "divergence_count": divergence_report.count,
+                        "divergence_count": divergence_report.count(),
                         "rule_findings": findings_json,
                         "error_count": rule_report.error_count(),
                         "message": message
@@ -6967,11 +6866,11 @@ fn run() -> Result<()> {
                     }
 
                     // Advisory only — does not affect the exit status.
-                    if divergence_report.count > 0 {
+                    if divergence_report.count() > 0 {
                         println!(
                             "⚠ {} membership label(s) not backed by the DAG \
                              (run `jit query divergence` for details)",
-                            divergence_report.count
+                            divergence_report.count()
                         );
                     }
                 }
@@ -7777,7 +7676,7 @@ fn run() -> Result<()> {
                     Ok((worktrees, warnings)) => {
                         if json {
                             let count = worktrees.len();
-                            let response = WorktreeListResponse { count, worktrees };
+                            let response = WorktreeListResponse::new(worktrees);
                             let mut value = serde_json::to_value(&response)?;
                             if let serde_json::Value::Object(map) = &mut value {
                                 map.insert(
@@ -7830,12 +7729,13 @@ fn run() -> Result<()> {
                     Ok(report) => {
                         let count = report.divergences.len();
                         if json {
-                            let response = WorktreeStoreDivergenceResponse {
-                                count,
-                                checkout_store: report.checkout_store,
-                                reference_store: report.reference_store,
-                                divergences: report.divergences,
-                            };
+                            let response = WorktreeStoreDivergenceResponse::with_extras(
+                                report.divergences,
+                                jit::output::StoreComparison {
+                                    checkout_store: report.checkout_store,
+                                    reference_store: report.reference_store,
+                                },
+                            );
                             let output = JsonOutput::success(serde_json::to_value(&response)?)
                                 .with_message(format!("{} divergence(s)", count));
                             println!("{}", output.to_json_string()?);

@@ -161,7 +161,7 @@
           "title": "Require archived_from on archived issue records",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-dispatched"
+          "status": "done"
         },
         {
           "id": "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
@@ -212,7 +212,7 @@
           "title": "Remove the DocumentReference builder methods",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "d125490a-558d-41d6-bfe6-2270d6bf7cf4",
@@ -239,7 +239,7 @@
           "title": "Remove inert configuration keys",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched"
+          "status": "lead-review-rework"
         }
       ]
     },
@@ -430,7 +430,8 @@
   "rework_counts": {
     "0ec8b001": 1,
     "66bd4b5c": 0,
-    "9aa54649": 1
+    "9aa54649": 1,
+    "af9a5509": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
@@ -441,7 +442,9 @@
     "66bd4b5c code-review read 'every case variant' literally twice (R1, R2 same root cause); rework 2 requires exhaustive 2^k case enumeration. One more same-finding failure escalates (MAX_SAME_FINDING_REPEATS=3).",
     "Intermittent 20 s fixture timeouts: fast_rules cli_warnings_integration_tests (4 tests) and test_utils profiled-repository fixture tests timed out at 72d4990c's first run (load ~5) and during 84745746's half-merge run; a forced rerun passed at load 15-20. Candidate for c780514e or a flakiness bug.",
     "66bd4b5c code-review advisory (low): StatePredicate comment at declarations/rules.rs:365 refers to a removed predicate whitelist.",
-    "66bd4b5c renamed the jit status JSON count field open -> backlog (breaking output change within REQ-05's class); MCP tests updated. Human output still prints Debug state names until 1622756a."
+    "66bd4b5c renamed the jit status JSON count field open -> backlog (breaking output change within REQ-05's class); MCP tests updated. Human output still prints Debug state names until 1622756a.",
+    "af9a5509 worker: config validate's own JIT_WORKTREE_WRITE_POLICY check looks unreachable (a bad value exits 2 before dispatch). Candidate dead code outside 842b0ac6's criteria.",
+    "81e7cdc3: DocumentReference::new gained a production caller (artifact_directory.rs:124, from 66986f88) after planning; lead chose struct literal in production plus one test fixture to meet REQ-01 as written."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",

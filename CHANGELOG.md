@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **Inert configuration keys.** `[worktree] mode`, the `JIT_WORKTREE_MODE`
+  environment variable, and the `[global_operations]`, `[locks]`, and
+  `[events]` tables were parsed but applied by no command. `jit config show`
+  and `jit config get` no longer report them, and `jit config validate` no
+  longer checks `JIT_WORKTREE_MODE`. A `config.toml` that still sets them
+  loads, and the values have no effect.
+
 - **Transaction fields from profile and recover output.** `profile apply`,
   `reconfigure`, and `upgrade` no longer report `plan_hash`, `transaction_id`,
   or the `warnings` list whose only entry was the transaction-cleanup-pending

@@ -233,14 +233,14 @@
           "short_id": "f4d9502a",
           "title": "Reach git through one storage-owned CLI module instead of libgit2",
           "wave": 4,
-          "status": "planning"
+          "status": "planned"
         },
         {
           "id": "9876a23a-8535-45ad-83f8-ca237f017e70",
           "short_id": "9876a23a",
           "title": "Compute one validation report and derive every validation view from it",
           "wave": 4,
-          "status": "pending"
+          "status": "planning"
         },
         {
           "id": "b697a3f7-ef84-4452-9b13-c8274f6abe4a",
@@ -345,9 +345,9 @@
     },
     {
       "container_short_id": "3d9a0ce3",
-      "status": "open",
+      "status": "resolved",
       "date": "2026-10-21",
-      "summary": "Re-home whole-epic edges once their epics are broken down: dbbfcd6c -> 2195c98f's ProfileId task (requested from just-in-time-59), and 5f82e09a -> f4d9502a's git-module task (once f4d9502a is planned). Update 2026-10-21: dbbfcd6c re-homed onto 5c232305 (domain-profile-id). 5f82e09a is still pending f4d9502a's planning."
+      "summary": "Re-home whole-epic edges once their epics are broken down: dbbfcd6c -> 2195c98f's ProfileId task (requested from just-in-time-59), and 5f82e09a -> f4d9502a's git-module task (once f4d9502a is planned). Update 2026-10-21: dbbfcd6c re-homed onto 5c232305 (domain-profile-id). 5f82e09a is still pending f4d9502a's planning. Done: 5f82e09a -> 3a3b86cf (git-dirty-paths)."
     },
     {
       "container_short_id": "3d9a0ce3",
@@ -448,6 +448,38 @@
       "status": "resolved",
       "date": "2026-10-21",
       "summary": "Rework limit exceeded: code review failed 3 times on non-canonical state names in docs (lowercase-only sweeps missed the 'Open' legend). Approved: one counter reset; a sonnet rework does an exhaustive case-insensitive sweep with every hit listed in the task notes. Rejected: the lead fixing it directly (breaks the worker/review separation), and accepting as-is (the finding is [hard])."
+    },
+    {
+      "container_short_id": "0f8efc37",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "When 0f8efc37 is planned: its document-convergence task depends on f4d9502a's 83c8632f (document-history-through-module)."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Flaky 20 s timeouts (two test_utils profiled-fixture tests and four fast_rules cli_warnings tests) at load 5-9 cost reruns three times today. Folded into c780514e planning as an early task, independent of 2195c98f where possible. Forced reruns of these count as load-only meanwhile."
+    },
+    {
+      "container_short_id": "9876a23a",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/inv/convention-convergence",
+      "summary": "1) The REQ-13 task waits on df129d9e's 8b7f2973. 2) The REQ-14 task uses the existing readiness derivation and adds no new one; b697a3f7 REQ-01 converges later. 3) 525bd61a rejected as duplicate of REQ-14 (zero-fix case). 4) No edges from df129d9e's validation facade, handler and renderer to 9876a23a: wave 2 must not wait on wave 4, so the second lander adapts."
+    },
+    {
+      "container_short_id": "b697a3f7",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "When b697a3f7 is planned: its REQ-01 readiness derivation must also cover 9876a23a REQ-14's `validate --fix` single mutation (converging on the one derivation)."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-18, @/inv/shared-test-contracts",
+      "summary": "D1: c780514e's fixture consolidation lands before 2195c98f's eight retype tasks, which get edges onto specific c780514e fixture terminals. Those terminals carry no 2195c98f or 842b0ac6 dependency and run in the first wave. Rejected: c780514e waiting behind 107 retype-chain tasks. D2: c780514e REQ-08 owns the IssueStore conformance suite and 89e7a273 consumes it. D3: REQ-13 added (suite clock measured before and after; no default-suite test over 5 s warm at load <=10; server shutdown test and doctests in scope). D4: REQ-01/04 consolidate after df129d9e's 650e6a56, not after the handler wave."
     }
   ],
   "notes": [
@@ -476,7 +508,8 @@
     "2026-10-21 ~14:10: merge-lock rule. Every git merge into main, and any source edit to main's tree, runs under `flock turnstile flock -x /tmp/jit-full-ci.lock`, so full gates never see a half-merged tree (84745746's gate broke when 719a5501 merged mid-run). Tracker-only writes are exempt.",
     "2026-10-21 14:26: the steward reinstalled the dogfood binary at main HEAD (after 24268b05 and 719a5501 changed the CLI surface) to unstick mcp-ci. Interim rule: reinstall after each CLI-surface merge.",
     "2026-10-21 ~15:30-18:30: fourth shared usage-limit stall; background leads were resumed at 18:31. Tally at resume: 8376299c 15/17 done; 842b0ac6 18 done; 3d9a0ce3 10 done; df129d9e 9 done; f4d9502a in planning.",
-    "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome."
+    "2026-10-21 ~18:40: 8376299c done and accepted (16 bugs; repo-validate and holistic-review passed; archived to dev/archive/8376299c-audit-correctness/). just-in-time-05 is reassigned to plan c780514e (test topology), with the suite clock as a measured outcome.",
+    "2026-10-21 ~19:00: f4d9502a planned (53 issues, 92 edges). Re-homing 5f82e09a left f4d9502a unreachable from the tag task, so bb03df0a -> f4d9502a was added. Divergence then flagged 72d89161 and 8673dc5e outside 3d9a0ce3's containment; the 3d9a0ce3 lead is asked to restore it. just-in-time-59 is assigned to plan 9876a23a."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
@@ -516,6 +549,10 @@
     {
       "date": "2026-10-21",
       "item": "The mcp-ci gate runs the MCP tests against whatever jit is on PATH (the dogfood ~/.cargo/bin/jit), but that binary is not among its declared digest inputs. A stale dogfood binary caused a failure (13 undecided tools from removed verb stubs) that digest reuse now pins until crates/ or mcp-server/ changes. A `--force` rerun was denied by the df129d9e lead's permission check, and the steward did not route around that. Decide: make mcp-ci build and use the workspace jit binary (and/or include it in inputs), or reinstall the dogfood binary as part of the gate. Affected: 719a5501 (gated, waiting). UPDATE 14:25: recurred for 24268b05: 17 undecided tools from the stale binary. The 3d9a0ce3 lead recommends (B): gate checker `cargo build -p jit && PATH=$PWD/target/debug:$PATH npm test` in .jit/gates.toml. Interim (A): the steward reinstalls the dogfood binary after each CLI-surface merge, and leads rerun a stale-binary mcp-ci failure with --force where their permissions allow."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Informational review: f4d9502a's plan adds git to the server Docker image (a consequence of D-21, git through the CLI, applied to document history), touching the D-10 single-image topology. It also deletes the HEAD-read storage tier, which resurrected deleted issues."
     }
   ]
 }

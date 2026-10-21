@@ -5,7 +5,15 @@
   "created_at": "2026-10-21T15:40:49.485551803Z",
   "dependencies": [],
   "description": "Plan Give each test property one owning test on shared fixtures and contracts (c780514e) against every hard success criterion, write the concise design at dev/active/c780514e-test-topology/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "investigation",
+      "format": "markdown",
+      "label": "Investigation",
+      "path": "dev/active/c780514e-test-topology/investigation.md"
+    }
+  ],
   "first_ready_at": "2026-10-21T15:41:03.807437171Z",
   "gates_required": [
     "plan-review"
@@ -31,5 +39,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-21T15:41:03.807437171Z"
+  "updated_at": "2026-10-21T16:08:16.420677084Z"
 }

@@ -16,12 +16,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T12:07:00.101618057Z",
+      "updated_at": "2026-10-21T15:52:15.812267124Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-10-21T12:09:29.917113632Z",
+      "updated_at": "2026-10-21T15:57:53.944578744Z",
       "updated_by": "auto:executor"
     }
   },
@@ -35,5 +35,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate status reports a manual attestation as never run",
-  "updated_at": "2026-10-21T12:09:29.917113632Z"
+  "updated_at": "2026-10-21T15:57:53.944578744Z"
 }
