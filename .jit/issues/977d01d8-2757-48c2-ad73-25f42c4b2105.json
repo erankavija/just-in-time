@@ -2,7 +2,11 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
-  "dependencies": [],
+  "dependencies": [
+    "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
+    "de9a7557-2061-4b63-9c74-6c18ed840c17"
+  ],
   "description": "Give `JitConfig` one accessor for the repository's default content format and one for its validation strictness, each applying the default when `[validation]` or the key is absent, and move the validation layer and projection rendering onto them.\n\n## Background\n\n- `[validation].content_format` and `[validation].strictness` are typed at load: absent means Markdown and loose respectively (`crates/jit/src/config.rs`, `ValidationConfig`).\n- Callers restate the default when `config.validation` is `None`. In the validation layer and repository state: `collect_rule_findings` (`crates/jit/src/validation/repository.rs:561-566`), `collect_item_link_findings` (`validation/repository.rs:707-712`), and `repo_content_format` (`crates/jit/src/repository_state/projection_render.rs:245-260`, called at `:102`), which also re-implements the token match with its own error.\n- Command-layer readers move separately, onto these accessors.\n\n## Success Criteria\n\n- [hard] REQ-01: `JitConfig::content_format()` returns the repository's content format, Markdown when undeclared, and `JitConfig::strictness()` returns its strictness, loose when undeclared; each default is stated once, in its accessor.\n- [hard] REQ-02: The three listed readers read the content format through `JitConfig::content_format()`, and `projection_render.rs` keeps no token matching or default of its own.\n- [hard] REQ-03: Config unit tests show both accessors' result for an absent `[validation]` table, an absent key and a declared value.\n\n## Notes\n\n- Behaviour is unchanged; the projection error variant for an invalid format goes away because loading rejects such a value.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
@@ -24,7 +28,7 @@
     "satisfies:9876a23a/REQ-12"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "Configuration accessors for content format and strictness",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-10-21T20:31:34.112543831Z"
 }

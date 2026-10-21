@@ -2,7 +2,10 @@
   "assignee": null,
   "context": {},
   "created_at": "2026-10-21T20:31:28.613451335Z",
-  "dependencies": [],
+  "dependencies": [
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
+    "de9a7557-2061-4b63-9c74-6c18ed840c17"
+  ],
   "description": "Move the acyclic dependency-graph proptest strategy out of the hierarchy test module into `jit::test_harness`, so other library unit tests can generate issue graphs from the same strategy.\n\n## Background\n\n- `arbitrary_dag` (`crates/jit/src/graph/hierarchy.rs:1121`) is private to the hierarchy test module; it yields acyclic graphs by letting each node depend only on lower-indexed nodes.\n- `jit::test_harness` compiles under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:35-36`). `proptest` is a dev-dependency only (`crates/jit/Cargo.toml:109`), and `jit-server` enables `jit/test-support` for its own tests (`crates/server/Cargo.toml:70`), where jit compiles without `proptest`.\n\n## Success Criteria\n\n- [hard] REQ-01: The strategy is defined once in `jit::test_harness` behind `#[cfg(test)]`, so a build with `test-support` but without the dev-dependencies compiles.\n- [hard] REQ-02: The hierarchy tests generate their graphs from it, keep their assertions and pass, and `graph/hierarchy.rs` defines no strategy of its own.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T20:31:28.613451335Z",
@@ -22,7 +25,7 @@
     "enforces:@/invariant/shared-test-contracts"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "backlog",
   "title": "The acyclic-graph proptest strategy lives in the test harness",
-  "updated_at": "2026-10-21T20:31:28.613451335Z"
+  "updated_at": "2026-10-21T20:31:35.289046483Z"
 }
