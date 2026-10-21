@@ -197,9 +197,8 @@ impl GateRunField {
             }
             GateRunField::Status => {
                 "The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an \
-                 executed checker the exit code decides it — `0` passes; a shell that could not \
-                 run the command (`126`, `127`) and a checker killed by a signal or by its \
-                 timeout are an `error`; any other code fails."
+                 executed checker the exit status decides it, as \
+                 [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines."
                     .to_string()
             }
             GateRunField::StartedAt => {
