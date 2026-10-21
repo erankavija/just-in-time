@@ -1,4 +1,5 @@
 {
+  "archived_from": "done",
   "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T15:34:54.412994171Z",
   "context": {},
@@ -28,14 +29,20 @@
       "doc_type": "verification",
       "format": "markdown",
       "label": "REQ-02 release-build reproduction verification",
-      "path": "dev/active/8376299c-audit-correctness/repro-verification.md"
+      "path": "dev/archive/8376299c-audit-correctness/active/repro-verification.md"
     },
     {
       "commit": null,
       "doc_type": "completion-report",
       "format": "markdown",
       "label": "Completion report",
-      "path": "dev/active/8376299c-audit-correctness/completion-report.md"
+      "path": "dev/archive/8376299c-audit-correctness/active/completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "progress",
+      "label": "Execution progress",
+      "path": "dev/archive/8376299c-audit-correctness/active/progress.json"
     }
   ],
   "done_at": "2026-10-21T15:39:00.205305844Z",
@@ -64,7 +71,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "done",
+  "state": "archived",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-21T15:39:07.802744668Z"
+  "updated_at": "2026-10-21T15:39:30.939165078Z"
 }
