@@ -3160,17 +3160,6 @@ fn run() -> Result<()> {
                         .into());
                     }
 
-                    // Reject malformed label filters up front with a clear,
-                    // argument-classified error rather than silently matching
-                    // nothing.
-                    for label in &labels {
-                        jit::labels::validate_label(label).map_err(|_| {
-                            jit::errors::InvalidArgumentError::new(format!(
-                                "invalid --label filter '{label}'"
-                            ))
-                        })?;
-                    }
-
                     let state_filter = state.map(|s| State::from_str(&s)).transpose()?;
                     let priority_filter = priority.map(|p| Priority::from_str(&p)).transpose()?;
                     let issues = executor.search_issues_with_filters(

@@ -275,7 +275,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 /// `namespace:*`). Shared by [`CommandExecutor::query_by_label`] and
 /// [`CommandExecutor::query_by_labels`] so both single- and multi-pattern
 /// callers reject malformed patterns identically.
-fn validate_label_pattern(pattern: &str) -> Result<()> {
+pub(super) fn validate_label_pattern(pattern: &str) -> Result<()> {
     if !pattern.contains(':') {
         return Err(crate::errors::InvalidLabelPatternError::new(format!(
             "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
@@ -295,9 +295,10 @@ fn validate_label_pattern(pattern: &str) -> Result<()> {
 
     let namespace = parts[0];
 
-    if !namespace
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    if namespace.is_empty()
+        || !namespace
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
     {
         return Err(crate::errors::InvalidLabelPatternError::new(format!(
             "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",

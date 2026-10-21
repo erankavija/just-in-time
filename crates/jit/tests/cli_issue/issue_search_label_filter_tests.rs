@@ -224,3 +224,41 @@ fn test_search_invalid_label_format_is_error() {
         "error should mention label: {stderr}"
     );
 }
+
+#[test]
+fn test_search_label_namespace_wildcard_matches_query_label_set() {
+    let temp = setup_test_repo();
+    let searched = titles(&search_json(temp.path(), &["--label", "type:*"]));
+
+    let out = Command::new(jit_binary())
+        .current_dir(temp.path())
+        .args(["query", "all", "--label", "type:*", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let queried = titles(&serde_json::from_slice(&out.stdout).unwrap());
+
+    let sorted = |mut v: Vec<String>| {
+        v.sort();
+        v
+    };
+    assert_eq!(searched.len(), 3);
+    assert_eq!(sorted(searched), sorted(queried));
+}
+
+#[test]
+fn test_search_malformed_label_patterns_exit_invalid_argument() {
+    let temp = setup_test_repo();
+    for bad in ["type", ":*"] {
+        let out = Command::new(jit_binary())
+            .current_dir(temp.path())
+            .args(["issue", "search", "--label", bad])
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(jit::output::ExitCode::InvalidArgument.code()),
+            "{bad:?} should exit invalid-argument"
+        );
+    }
+}
