@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [],
+  "description": "Compile the criteria patterns of rules once, when declarations load, through one pattern type.\n\n## Background\n\n`criteria-to-check` and `criteria-label-match` compile their regex on each evaluation (`crates/jit/src/validation/graph.rs:1608,1781`), although the comment at `:1606` says the pattern was validated at load; `declarations/rules.rs` compiles none. `regex::Regex` has no `PartialEq`, while `Rule` and `Assertion` derive it (`rules.rs:768`). `ItemKind` stores a source string beside its compiled regex (`domain/item.rs:643-655`). The default criteria pattern is spelled at `graph.rs:72` and `rules.rs:1455`. `RuleConfigError::InvalidAssertion { rule, message }` names the failing rule.\n\n## Success Criteria\n\n- [hard] REQ-01: An `IdPattern` type holds a pattern's source and compiled regex, compares and serializes by source, and fails construction on an invalid source.\n- [hard] REQ-02: The `criteria-to-check` and `criteria-label-match` patterns compile at declaration load, and an invalid pattern fails loading with an error naming the rule.\n- [hard] REQ-03: Evaluating those assertions compiles no regex, and the default pattern is spelled once.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T05:31:58.815538561Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b48d7b2a-74f5-4534-b3eb-944946b08260",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:typed-declarations",
+    "component:validation",
+    "satisfies:2195c98f/REQ-15",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "Rule patterns compile at declaration load",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

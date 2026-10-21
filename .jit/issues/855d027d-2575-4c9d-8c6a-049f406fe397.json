@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "0102769f-e3d8-4cbf-8da5-674aebd71c01"
+  ],
+  "description": "Replace the issue record path spellings in commands and validation with the `VirtualPath` issue-record constructor.\n\n## Background\n\nProduction `issues/{..}.json` spellings remain in `commands/mod.rs` (6), `commands/gate_check.rs` (6), `commands/document.rs` (3), `commands/template.rs` (3), `commands/gate.rs` (2), `commands/snapshot.rs` (2), `commands/validate.rs` (2), `commands/batch_create.rs` (1), `commands/claim.rs` (1) and `validation/repository.rs` (1). Record file names are spelled as `format!(\"{id}.json\")` at `commands/gate.rs:368`, `commands/template.rs:655` and `validation/repository.rs:399`. `VirtualPath::issue_record(&IssueId)` (`repository_state/path.rs`) is the one constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: No production `format!` under `crates/jit/src/commands/` or `crates/jit/src/validation/` spells an issue record path or record file name.\n- [hard] REQ-02: Each such site derives the path, or the file name, from `VirtualPath::issue_record`.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "855d027d-2575-4c9d-8c6a-049f406fe397",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:cli",
+    "satisfies:2195c98f/REQ-07",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Commands take issue record paths from the VirtualPath constructor",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

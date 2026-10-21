@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
+    "c400730c-3c42-47e7-8dc4-5c3d60f1e214"
+  ],
+  "description": "Parse and resolve every user-supplied issue-id argument once in the CLI entry point, before any executor call.\n\n## Background\n\n`main.rs` passes raw issue-id arguments from `cli.rs` to executor methods, which resolve them internally through `resolve_issue_id`. Internal callers such as template application and batch creation already hold full ids. `main.rs` holds 88 production issue-id references and truncates short ids with a literal length at `main.rs:3369,3769`. The short-hash tests at `crates/jit/tests/fast_issue/short_hash_tests.rs:156-220` drive executor methods with prefixes.\n\n## Success Criteria\n\n- [hard] REQ-01: Each plain issue-id argument that `main.rs` passes to the executor is parsed once into `IssueIdPrefix` and resolved once to `IssueId` before the call.\n- [hard] REQ-02: `cli.rs` argument structs keep raw strings only for values `main.rs` parses, and no other module parses a CLI issue-id argument.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found error class and exit code 3.\n- [hard] REQ-04: Short ids rendered by `main.rs` come only from `short_id()`, and no site there truncates an id by length.\n- [hard] REQ-05: Tests that exercise short-prefix input exercise it through the CLI entry point or the resolver, not through executor methods.\n- [hard] REQ-06: `main.rs` holds no interim call-site parse: each issue-id argument is parsed exactly once, at the boundary.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "91081bd3-9996-4f81-a405-a06c7cdcae8b",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:cli",
+    "satisfies:2195c98f/REQ-02",
+    "satisfies:2195c98f/REQ-03",
+    "satisfies:2195c98f/REQ-17",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "The CLI resolves each issue-id argument once at entry",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

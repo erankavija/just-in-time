@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "182350ce-35f1-46aa-8106-1a5a7dca3542"
+  ],
+  "description": "Hold state and priority in validation projections as their enums instead of stringified values.\n\n## Background\n\n`Projection.state` and `Projection.priority` are strings (`crates/jit/src/domain/projection.rs:64,67`), filled by `serde_plain_state` and `serde_plain_priority` (`:164-181`) through `serde_json::Value`. A schema contract test pins both as `{\"type\":\"string\"}` (`projection.rs:409-410`). User `.jit/schemas` validate the serialized values, which do not change.\n\n## Success Criteria\n\n- [hard] REQ-01: `Projection.state` is a `State` and `Projection.priority` a `Priority`, and the two stringifying helpers are gone.\n- [hard] REQ-02: Serialized projections are byte-identical.\n- [hard] REQ-03: The schema contract test asserts the enum schema the typed fields publish.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:validation",
+    "satisfies:2195c98f/REQ-12",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Validation projections hold typed state and priority",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

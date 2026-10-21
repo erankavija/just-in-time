@@ -1,0 +1,47 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "1622756a-d805-40b4-a5af-37dadcc6a683",
+    "179dcef9-71f8-41d0-a871-696c989d0ee4",
+    "1f6d3754-82ee-47fe-9355-79dd599bcfd6",
+    "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
+    "30923ea1-df2e-4b9b-9756-c213d7de5519",
+    "3ae2293a-7f8b-4762-83dd-eca519e0f9da",
+    "42bcaa6e-4764-44fb-b57f-34f673a63f3b",
+    "5d5c5514-7deb-4a7e-9a03-1051c1e23868",
+    "6add7ca6-542e-402b-b99e-0c2e0984b723",
+    "72dfc0d7-6a41-45a6-996f-f3cdb7b2b090",
+    "7383f4ea-39d8-4162-a61c-32d932ec02ee",
+    "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
+    "a4b94a17-3c76-4d94-aa9e-99461d107e9f",
+    "b4fe7887-a14a-4bbd-8b05-3a5953a76102",
+    "b8506ce7-99ba-493d-bcf6-297f81556b18",
+    "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
+  ],
+  "description": "Aggregate the work that delivers this outcome: each closed vocabulary is one macro-declared enum with exact-token parsing and no restated token.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Each closed vocabulary named by the epic is one enum declared through the vocabulary macro, with exact-token parsing.\n- [hard] REQ-02: No token function, token table or mirror enum restates a declared vocabulary.\n- [hard] REQ-03: `Priority` orders through `Ord`, and projections and query value lists use typed vocabularies.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "83d04069-e6ea-4591-a97f-44c2c941aa72",
+  "labels": [
+    "type:story",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:core",
+    "component:cli",
+    "component:gates",
+    "component:validation",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Closed vocabularies state their wire spelling once",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

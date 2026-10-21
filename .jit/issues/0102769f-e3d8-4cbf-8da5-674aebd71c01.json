@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "7abcc22d-c931-4da8-94b0-c9c894333540"
+  ],
+  "description": "Derive each issue record path from a typed `IssueId` through one infallible `VirtualPath` constructor, in storage and repository-state code.\n\n## Background\n\nThe record path `issues/{id}.json` is spelled at 33 production lines in 15 files. Four private helpers build it: `repository_state/mutation.rs:503`, `repository_state/archive.rs:426`, `storage/memory.rs:338-339` and `storage/json.rs:730-731`, which joins the id under `issues/` on the host filesystem. Further host spellings sit at `storage/json.rs:904,940`, and `repository_state/materialize.rs` spells the path once. `VirtualPath` (`repository_state/path.rs:200`) offers `worktree` (`:330`) and `data` (`:337`) constructors. Only its identity module (`path.rs:191-319`) can build a descendant without a fallible check, and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`).\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::issue_record(&IssueId)` is infallible and returns the data-root path of that issue's record.\n- [hard] REQ-02: The four private issue-path helpers are gone. Both storage backends and repository-state code derive issue record paths from the constructor, and host paths from `RepositoryLayout::resolve`.\n- [hard] REQ-03: No `format!` under `crates/jit/src/storage/` or `crates/jit/src/repository_state/` spells an issue record path or record file name.\n- [hard] REQ-04: No `expect` remains on the memory backend's record path.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0102769f-e3d8-4cbf-8da5-674aebd71c01",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:storage",
+    "satisfies:2195c98f/REQ-01",
+    "satisfies:2195c98f/REQ-07",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Issue record paths come from a VirtualPath constructor",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "acb38457-0d4a-47e6-b8ea-cab3a92b7676"
+  ],
+  "description": "Make the graph's id-returning queries return references into the node set, so a typed caller reads the id from the node instead of parsing a string.\n\n## Background\n\n`DependencyGraph` returns owned id strings: `compute_transitive_reduction -> HashSet<String>` (`crates/jit/src/graph/mod.rs:442`), `find_shortest_path -> Vec<String>` (`:475`) and `find_redundant_edges -> Vec<(String, String)>` (`:519`). `GraphError::NodeNotFound { id: String }` (`:61`) names a dangling reference. Callers sit in `graph/hierarchy.rs`, `commands/dependency.rs`, `commands/template.rs`, `commands/validate.rs`, `validation/graph.rs`, `validation/repository.rs` and `main.rs`. Once nodes store typed ids, a caller handed a `String` would have to rebuild an id from it.\n\n## Success Criteria\n\n- [hard] REQ-01: `compute_transitive_reduction`, `find_shortest_path` and `find_redundant_edges` return references to nodes of the graph (or ids borrowed from them), not owned strings.\n- [hard] REQ-02: Each caller reads ids from the returned nodes, and no caller rebuilds an id from a string the graph produced.\n- [hard] REQ-03: `GraphError::NodeNotFound` names the missing reference for display only, and no caller converts it into an id.\n- [hard] REQ-04: `HierarchyConfig::membership_closure` (`graph/hierarchy.rs:296`) returns node references, and `MembershipDivergence.issue_id` (`:575`) holds the node's own id type.\n- [hard] REQ-05: Graph property tests pass with unchanged assertions.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "bf87bbdb-d432-4db0-90d1-b6aa6c4d0d25",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:core",
+    "satisfies:2195c98f/REQ-01",
+    "satisfies:2195c98f/REQ-17",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Graph queries return nodes rather than id strings",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

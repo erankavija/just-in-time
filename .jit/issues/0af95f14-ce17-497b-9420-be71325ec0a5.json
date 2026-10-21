@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "3e353abd-9b73-4da2-a8e7-ea07512f3e3e"
+  ],
+  "description": "Give library unit tests one shared fixture for canonical issue ids, so tests keep compiling and passing once issue ids are validated.\n\n## Background\n\nUnit tests under `crates/jit/src` build issues, events, gate runs and leases with non-UUID ids such as `\"dep1\"` or `\"task-1\"` in about 25 files. The heaviest are `domain/queries.rs` (27 lines), `storage/claim_coordinator.rs` (16), `output.rs` (15), `graph/hierarchy.rs` (9), `repository_state/mutation.rs` (8), `main.rs` (7), `commands/gate_check.rs` (7), `validation/graph.rs` (6), `storage/repository_state_store_tests.rs` (6), `storage/gate_runs.rs` (6) and `commands/worktree.rs` (6); the others are listed in the footprint. Rustdoc examples with non-UUID ids sit at `domain/queries.rs:114-116,416-430`, `graph/hierarchy.rs:110-116` and `storage/claim_coordinator.rs:63-70`. Shared fixtures live in `test_utils.rs`, compiled under `test` or the `test-support` feature (`lib.rs:20`), so integration suites can reach them too.\n\n## Success Criteria\n\n- [hard] REQ-01: `test_utils` provides one fixture that deterministically returns a distinct canonical issue id, typed as `IssueId`, for each distinct seed.\n- [hard] REQ-02: No unit test or rustdoc example under `crates/jit/src` that builds an issue, an issue summary, a gate-run result, an event or a lease uses a non-UUID issue id, and no test assigns an issue id from a string conversion (`to_string`, `into`, `format!`). Each takes its id from the fixture or from a generated id.\n- [hard] REQ-03: Graph test nodes that do not model issues keep their own ids.\n- [hard] REQ-04: A test that asserted a literal id asserts the relationship it cares about instead, such as id equality or the short id of a given id.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "0af95f14-ce17-497b-9420-be71325ec0a5",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:testing",
+    "satisfies:2195c98f/REQ-01",
+    "enforces:@/invariant/shared-test-contracts",
+    "enforces:@/invariant/semantic-test-assertions"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Library unit tests take canonical issue ids from one fixture",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

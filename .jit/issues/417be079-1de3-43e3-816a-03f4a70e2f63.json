@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "488eb3c1-50d1-4c54-bac0-339063d5ef20"
+  ],
+  "description": "Key an issue's required gates and gate states by `GateKey`, and parse gate-key arguments once at the boundary.\n\n## Background\n\n`Issue.gates_required` is a `Vec<String>` (`crates/jit/src/domain/types.rs:429`) and `Issue.gates_status` a `HashMap<String, GateState>` (`:431`). Gate keys travel as strings through `commands/gate.rs`, `commands/gate_check.rs`, `commands/template.rs`, `commands/issue.rs`, `templates.rs`, `output.rs`, `main.rs`, `cli.rs` and `crates/server/src/routes.rs` (288 production references in 31 files).\n\n## Success Criteria\n\n- [hard] REQ-01: `Issue.gates_required` is a `Vec<GateKey>` and `Issue.gates_status` is keyed by `GateKey`.\n- [hard] REQ-02: CLI and server gate-key arguments are parsed once into `GateKey` at the boundary.\n- [hard] REQ-03: No command, template or output code holds a gate key as `String` or `&str`.\n- [hard] REQ-04: Issue records in this repository load and re-serialize byte-identically.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "417be079-1de3-43e3-816a-03f4a70e2f63",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:gates",
+    "component:cli",
+    "satisfies:2195c98f/REQ-01",
+    "satisfies:2195c98f/REQ-17",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Issue gate fields are keyed by GateKey",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

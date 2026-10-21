@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "62a0085a-a0e4-4877-8dbf-2bd8f4a6e1c3"
+  ],
+  "description": "Remove the hierarchy wrappers, so each caller propagates the one constructor's error.\n\n## Background\n\n`repository_state::hierarchy_config` is called at `commands/validate.rs:1445,1955,2291`, `commands/gate_check.rs:495,576`, `commands/template.rs:498`, `commands/mod.rs:1153`, `commands/archive.rs:515` and `validation/repository.rs:590`. `config_manager::get_hierarchy_config` is called at `commands/graph.rs:230,310,398,490,578`, `commands/document.rs:155,214`, `commands/archive.rs:159,180`, `commands/validate.rs:1473` and `crates/server/src/routes.rs:178`.\n\n## Success Criteria\n\n- [hard] REQ-01: The silent empty-hierarchy fallback in `repository_state/default_rules.rs` is gone, together with `repository_state::hierarchy_config`, and `get_hierarchy_config` returns the constructor's error unwrapped.\n- [hard] REQ-02: Each listed caller propagates that error, and the server maps it to an error response.\n- [hard] REQ-03: An invalid hierarchy produces the same `ConfigError` through each command family.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "f8f80eea-1182-4a20-b010-8e1d02d1373f",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:typed-declarations",
+    "component:cli",
+    "component:server",
+    "satisfies:2195c98f/REQ-16",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Hierarchy callers propagate the constructor's error",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

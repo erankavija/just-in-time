@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "3f026bb1-9db7-4c5c-9a74-c6c96d619006"
+  ],
+  "description": "Declare the JSON error-code enum through the vocabulary macro.\n\n## Background\n\n`ErrorCode` hand-writes `ALL`, `as_str` and `FromStr` (`crates/jit/src/output.rs:770-870`, `:1081`), with a schemars test that checks the hand table.\n\n## Success Criteria\n\n- [hard] REQ-01: `ErrorCode` is declared through the macro, and its hand-written `ALL`, `as_str` and `FromStr` are gone, together with the schemars test the macro's owning test supersedes.\n- [hard] REQ-02: JSON error payloads and the generated error-code reference are byte-identical.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "256c8eb1-0f74-47cc-a6f5-79180de8ecfe",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:cli",
+    "satisfies:2195c98f/REQ-10",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Error codes come from one declaration",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

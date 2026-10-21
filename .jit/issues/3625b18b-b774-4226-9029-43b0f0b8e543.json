@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "18bcafb8-88ca-4d1c-9776-2f14e2138b8b"
+  ],
+  "description": "Move event matching in library unit tests onto the body view, so the envelope change touches only definitions and constructors.\n\n## Background\n\nUnit-test modules under `crates/jit/src` match `Event::<Variant>` and build variants with explicit `id` and `timestamp` fields. The heaviest are `domain/types.rs`, `repository_state/mutation.rs`, `storage/repository_state_store_tests.rs` (11 lines), and the test modules of `commands/profile.rs` and `commands/issue.rs` (8 each). Further sites sit in the test modules of `storage/json.rs` (`:1833,2273,2285`), `commands/gate.rs` (`:2197,2323`), `commands/mod.rs` (`:3980,3989`), `commands/worktree.rs` (`:805`), `domain/store_divergence.rs` (`:171`) and `domain/queries.rs` (`:504-521`), among the other files in the footprint. Production code already matches through `Event::body()`, and `test_utils` offers a helper that stamps an id and a timestamp onto a body.\n\n## Success Criteria\n\n- [hard] REQ-01: No unit-test pattern under `crates/jit/src` matches `Event::<Variant>`; each matches `EventBody::<Variant>` on the body view.\n- [hard] REQ-02: In unit tests, no pattern binds `id` or `timestamp` from a variant, and no code outside `domain/types.rs` constructs a variant with those fields; constructions use draft constructors or the `test_utils` helper that stamps both.\n- [hard] REQ-03: Test assertions are otherwise unchanged.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "3625b18b-b774-4226-9029-43b0f0b8e543",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:event-records",
+    "component:testing",
+    "satisfies:2195c98f/REQ-05",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Unit tests match events through the body view",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

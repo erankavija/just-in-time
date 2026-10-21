@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "91081bd3-9996-4f81-a405-a06c7cdcae8b"
+  ],
+  "description": "Resolve the issue inside archive targets, document scopes and snapshot scopes once at entry, and type the issue segment of item addresses.\n\n## Background\n\nSeveral arguments wrap an issue id inside a larger value. `ArchiveTarget::Container(&str)` is resolved inside the executor (`crates/jit/src/commands/archive.rs:188`). `DocumentScope::Issue(String)` (`document/scope.rs:27`) is documented as possibly partial, and `SnapshotScope::Issue(String)` (`snapshot.rs:145`) is loaded directly (`commands/snapshot.rs:103`). Item addresses carry an issue segment as `String` (`domain/item.rs:75,133,467`), resolved inside the executor (`commands/item.rs:356`) and matched by hand with `starts_with` when addresses are decoded from documents (`validation/repository.rs:869`). Item addresses decoded from documents are a file-decoding boundary, so their segment is parsed where they are decoded and resolved where they are used.\n\n## Success Criteria\n\n- [hard] REQ-01: `ArchiveTarget::Container`, `DocumentScope::Issue` and `SnapshotScope::Issue` hold `IssueId`, resolved once in the CLI entry point before the executor call.\n- [hard] REQ-02: Item-address issue segments hold `IssueIdPrefix`, parsed when an address is parsed from input or decoded from a document, and resolved through the shared resolver; the hand-written `starts_with` match is gone, and each consumer of an item-address issue segment, including the scope comparison at `validation/graph.rs:140`, compares through `IssueIdPrefix`.\n- [hard] REQ-03: Too-short prefixes report the invalid-prefix error, and other malformed or unknown ids keep the not-found class and exit code 3.\n- [hard] REQ-04: No production `IssueIdPrefix` parse remains in `commands/archive.rs` or `commands/item.rs`, and the only production `resolve_issue_id` call left in them is the item-address resolution in `commands/item.rs`.\n- [hard] REQ-05: Code in this family, its unit-test modules included, uses issue ids only through `as_str()`, `short_id()`, `Display`, `Debug`, `Clone`, `PartialEq`/`Eq`, `PartialOrd`/`Ord`, `Hash` and serde, so it compiles unchanged once `IssueId` is the validated newtype.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "c1c86312-33aa-42c0-bd9a-d716b52dd9e4",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:cli",
+    "satisfies:2195c98f/REQ-02",
+    "satisfies:2195c98f/REQ-17",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Composite arguments carry their issue as a typed id",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

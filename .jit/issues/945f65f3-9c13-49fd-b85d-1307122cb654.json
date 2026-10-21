@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "18dc6e3e-6597-46cf-999e-c0631a6f064b"
+  ],
+  "description": "Replace literal well-known `.jit` file names in commands with `VirtualPath` constants.\n\n## Background\n\n`VirtualPath` declares well-known data-root files through `declare_well_known_paths!` (`crates/jit/src/repository_state/path.rs:259-310`), and host paths derive through `RepositoryLayout::resolve` (`path.rs:530`). Commands spell them as literals in `commands/validate.rs` (7 lines), `commands/init.rs` (7), and `commands/gate.rs`, `commands/mod.rs`, `commands/config.rs`, `commands/profile.rs`, `commands/claim.rs`, `commands/snapshot.rs` and `commands/project.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: No string literal under `crates/jit/src/commands/`, server control files excepted, builds or matches the path of a well-known `.jit` file; message text that names a file for a reader is not a path site.\n- [hard] REQ-02: Each such site uses a `VirtualPath` constant, and host paths derive through `RepositoryLayout::resolve`.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "945f65f3-9c13-49fd-b85d-1307122cb654",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:repository-paths",
+    "component:cli",
+    "satisfies:2195c98f/REQ-07",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Commands name well-known files through VirtualPath constants",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

@@ -1,0 +1,36 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "417be079-1de3-43e3-816a-03f4a70e2f63",
+    "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
+    "be18da9e-bfe2-4813-a69e-72ee1904c344"
+  ],
+  "description": "Aggregate the work that delivers this outcome: issue identity, prefixes, gate-run ids, gate keys and record paths are typed end to end, with the staging bridge removed.\n\n## Background\n\nThis story groups the tasks of epic 2195c98f that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: `IssueId`, `IssueIdPrefix`, `GateRunId` and `GateKey` are the identity types in domain, storage, commands, tests and the server, the staging alias no longer exists, and prefixes are resolved only at the CLI and server entry points, except dependency removal over an issue's own dependencies and item-address segments decoded from documents.\n- [hard] REQ-02: Outside CLI argument structs, server extractors, serde impls and rendering, no production code carries these identities as raw strings.\n- [hard] REQ-03: Issue and gate-run record paths come only from `VirtualPath` constructors.\n- [hard] REQ-04: Short ids are derived only by `IssueId`, including in the web UI.\n- [hard] REQ-05: Stored issue, index, event and gate-run data loads and re-serializes byte-identically.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "e2651d77-d171-483a-9a21-90c70885a6ae",
+  "labels": [
+    "type:story",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:issue-identity",
+    "component:core",
+    "component:storage",
+    "component:cli",
+    "component:server",
+    "component:web",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Issue identity is one validated type end to end",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

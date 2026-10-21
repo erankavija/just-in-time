@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [
+    "3f026bb1-9db7-4c5c-9a74-c6c96d619006"
+  ],
+  "description": "Declare the evidence, blocker and warning codes of artifact plans through the vocabulary macro.\n\n## Background\n\n`EvidenceCode`, `BlockerCode` and `WarningCode` (`crates/jit/src/domain/artifact_plan.rs:369,408,497`) each pair a kebab-case serde rename with a hand-written `ALL` and `const fn as_str`. Codes are sorted by `as_str` (`artifact_plan.rs:1224,1228`, `domain/artifact_inventory.rs:261-262`, `repository_state/archive.rs:337-338`). The external wire contract is pinned by `crates/jit/tests/fast_docs_templates/artifact_plan_model_tests.rs:343,355,373`.\n\n## Success Criteria\n\n- [hard] REQ-01: The three code enums are declared through the macro, and their hand-written `ALL` and `as_str` are gone.\n- [hard] REQ-02: Code ordering still follows the wire spelling, so plan output order is unchanged.\n- [hard] REQ-03: The artifact-plan wire-contract suite passes unchanged.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "80fe846e-0000-4baf-b544-48f2ef8ab6d1",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:wire-vocabularies",
+    "component:core",
+    "satisfies:2195c98f/REQ-13",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Artifact-plan codes declare their wire spelling once",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}

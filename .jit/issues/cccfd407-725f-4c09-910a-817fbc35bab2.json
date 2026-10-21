@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:31:58.815538561Z",
+  "dependencies": [],
+  "description": "Recognise reserved profile-application targets with one `VirtualPath` predicate applied after classification.\n\n## Background\n\n`reject_reserved_application_targets` (`crates/jit/src/commands/profile.rs:3017-3035`) matches raw `.jit/events.jsonl`, `.jit/profiles`, `.jit/tmp` and `.git` prefixes on package target keys before they are classified (`profile.rs:2062-2069`). It is called at `commands/profile.rs:2054` and `commands/init.rs:400`. Classification already rejects `.jit/tmp` (`repository_state/path.rs:233-242`). `is_bootstrap_lock` (`path.rs:28-31`) is the precedent shape for a `VirtualPath` predicate. No test covers `ReservedApplicationTarget`.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::is_reserved_application_target` recognises the event log, the applied-profile directory and a worktree `.git` component, and is the only reserved-target matcher.\n- [hard] REQ-02: Both call sites classify targets first and apply the predicate to the classified paths, and the raw prefix matcher is gone.\n- [hard] REQ-03: A test shows that applying a package with each reserved target fails with `ReservedApplicationTarget`.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T05:31:58.815538561Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cccfd407-725f-4c09-910a-817fbc35bab2",
+  "labels": [
+    "type:task",
+    "epic:semantic-types",
+    "milestone:v1.0",
+    "story:repository-paths",
+    "component:storage",
+    "satisfies:2195c98f/REQ-08",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/semantic-types"
+  ],
+  "priority": "normal",
+  "state": "ready",
+  "title": "One VirtualPath predicate recognises reserved application targets",
+  "updated_at": "2026-10-21T05:31:58.815538561Z"
+}
