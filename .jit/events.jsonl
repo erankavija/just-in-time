@@ -17895,3 +17895,5 @@
 {"fields":["description"],"id":"db1fc33b-ba1a-43e1-bc01-91962813983f","issue_id":"d125490a-558d-41d6-bfe6-2270d6bf7cf4","timestamp":"2026-10-21T10:50:16.889756275Z","type":"issue_updated","updated_by":"issue-update"}
 {"assignee":"agent:jit-execution-lead","id":"b7f8b7a0-80bc-4e95-bbeb-40c8bc6f322b","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-21T10:50:17.134726166Z","type":"issue_claimed"}
 {"fields":["description"],"id":"df1ed56b-c724-4096-ab2e-246c98748728","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-21T10:50:17.236457825Z","type":"issue_updated","updated_by":"issue-update"}
+{"assignee":"agent:planning-lead-2195c98f","id":"55da4aab-ce72-4bbe-b4fa-6ec13a9c913c","issue_id":"c797b59b-0f5e-4e12-9a36-b3b95d7b92c1","timestamp":"2026-10-21T10:50:27.039884050Z","type":"issue_claimed"}
+{"fields":["description"],"id":"2dc62f00-33c9-40e4-8178-465e5bcbe654","issue_id":"c797b59b-0f5e-4e12-9a36-b3b95d7b92c1","timestamp":"2026-10-21T10:50:27.147623693Z","type":"issue_updated","updated_by":"issue-update"}
