@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "8aab9a5aa1e9d029f78ae1dee1eb8990917edc37",
+  "completed_at": "2026-10-21T06:37:29.687080989Z",
+  "duration_ms": 303390,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The classifier relocation preserves behavior, ownership tests, caller integration, and generated documentation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1874e265-3792-4529-b6e9-2899352258c3",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6c670d09-b261-45e5-9000-9c00d7cf6916",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:32:26.296085217Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e79865ac6, b703fc3b7, e20c3b743 (`jit:1874e265`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-11; @/charter/D-18, @/charter/D-20; @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/single-source-prose\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:21:58Z); code-review pending\nTruncation recovery: recovered initial aggregate-output truncation with per-commit, per-path, and line-range reads; normalized old/new classifier comparison found formatting-only differences\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The classifier relocation preserves behavior, ownership tests, caller integration, and generated documentation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": false
+}

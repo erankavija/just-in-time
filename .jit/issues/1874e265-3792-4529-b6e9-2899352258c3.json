@@ -8,6 +8,7 @@
   ],
   "description": "The error classifier moves from the binary into the library as `jit::output::failure::classify`, so every consumer, the HTTP server included, can share one classification.\n\n## Background\n\n`error_to_error_code` (about 353 lines) and `error_to_exit_code` sit at the top of `crates/jit/src/main.rs`. They downcast about forty typed errors (`errors::*`, `commands::*`, `repository_state::*`, `storage::*`, `GraphError`, `io::Error`, `toml`/`serde_json` errors) and walk `error.chain()` for some; the order is semantic (lock timeout first, batch rejection first, `io::Error` before not-found downcasts, ambiguous id before invalid prefix). The vocabulary they produce (`ErrorCode`, `ExitCode`, `JsonError`, `ErrorDetail`) and the fragment `refine_id_error` already live in `crates/jit/src/output.rs`. Three in-binary test modules own the classifier's behaviour: `exit_code_projection_tests`, `repository_state_classifier_tests` and `lock_timeout_classification_tests`. `errors.rs` is the wrong home because `domain/` imports it.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/output/failure.rs`, declared from `crates/jit/src/output.rs` as the `failure` submodule (the crate's non-`mod.rs` layout, as `gate_presets.rs` with `gate_presets/`), exposes `pub fn classify(error: &anyhow::Error) -> JsonError`; `output.rs` stays the module root.\n- [hard] REQ-02: `classify` returns, for every error, the code `error_to_error_code` returns today, preserving its downcast order, and the failure's exit code is `ErrorCode::exit_code` of that code.\n- [hard] REQ-03: `error_to_error_code` and `error_to_exit_code` no longer exist in `main.rs`; every former caller in `main.rs` calls `classify`.\n- [hard] REQ-04: The three classifier test modules live in `output/failure.rs` as its owning unit tests and pass with their existing assertions; CLI exit-code suites pass unchanged.\n- [hard] REQ-05: No prose in `crates/` or `docs/` names `error_to_error_code` or `error_to_exit_code` or places the classifier or its tests in `main.rs` (including `crates/jit/src/schema.rs`, `errors.rs`, `commands/template_expand.rs` and `commands/issue.rs`), and the generated `docs/reference/exit-codes.md` is regenerated.\n\n## Notes\n\nDetails and suggestions that call sites build today are not yet derived by `classify`. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "done_at": "2026-10-21T06:37:37.439805179Z",
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
   "gates_required": [
     "cargo-ci",
@@ -17,6 +18,11 @@
     "cargo-ci": {
       "status": "passed",
       "updated_at": "2026-10-21T06:22:25.179623811Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:37:29.899737702Z",
       "updated_by": "auto:executor"
     }
   },
@@ -30,7 +36,7 @@
     "satisfies:df129d9e/REQ-11"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Move the error classifier into output::failure",
-  "updated_at": "2026-10-21T06:22:25.179623811Z"
+  "updated_at": "2026-10-21T06:37:37.439805179Z"
 }
