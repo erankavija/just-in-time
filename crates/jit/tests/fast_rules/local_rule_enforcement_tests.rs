@@ -209,7 +209,7 @@ name = "coverage"
 when = { type = "epic" }
 severity = "error"
 enforce = true
-assert = { label-coverage = { source = "req", child-state = "done" } }
+assert = { label-coverage = { child-state = "done" } }
 "#,
     );
     let result = executor.create_issue(
