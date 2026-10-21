@@ -18204,3 +18204,6 @@
 {"fields":["dependencies"],"id":"3ee2092c-d476-48b3-a461-ead1c662a1de","issue_id":"7aafec83-b056-4047-9569-77c9373ba2d3","timestamp":"2026-10-21T15:43:55.829182295Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"d39ebd27-34c6-41b5-a6e5-daf3d80cb2f3","issue_id":"3d93442b-2764-4ada-b924-405220a9e6f4","timestamp":"2026-10-21T15:43:56.117451414Z","type":"issue_updated","updated_by":"dependency-add"}
 {"fields":["dependencies"],"id":"64687283-3a80-4aab-afc9-3ebd444c0399","issue_id":"810e32d4-2922-4837-a100-58ab13ef0161","timestamp":"2026-10-21T15:43:56.415122516Z","type":"issue_updated","updated_by":"dependency-add"}
+{"assignee":"agent:planning-lead-f4d9502a","id":"9abe0ccc-279e-443a-9a6c-d8a3dc779999","issue_id":"b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54","timestamp":"2026-10-21T15:44:17.623682353Z","type":"issue_claimed"}
+{"from":"ready","id":"b39d2629-c986-4681-bacb-2f4a241bcc4d","issue_id":"b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54","timestamp":"2026-10-21T15:44:17.725108249Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"coverage-preview","id":"e99891a2-b2dc-4714-9c5c-cba92a11fb5c","issue_id":"b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54","timestamp":"2026-10-21T15:44:18.609360116Z","type":"gate_passed","updated_by":"auto:executor"}
