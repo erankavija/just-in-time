@@ -1092,44 +1092,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         )
     }
 
-    pub fn add_gate_definition(
-        &self,
-        key: String,
-        title: String,
-        description: String,
-        auto: bool,
-        example_integration: Option<String>,
-        stage: crate::declarations::GateStage,
-    ) -> Result<()>
-    where
-        S: crate::storage::RepositoryStateStore,
-    {
-        // Global operation - enforce common history with main
-        crate::commands::worktree::enforce_main_only_operations()?;
-
-        self.publish_gate_registry_mutation(CapturedGateRegistryMutation::Define(
-            GateDefinition {
-                version: 1,
-                key,
-                title,
-                description,
-                stage,
-                mode: if auto {
-                    GateMode::Auto
-                } else {
-                    GateMode::Manual
-                },
-                checker: None,
-                inputs: None,
-                priority: 100,
-                reserved: std::collections::HashMap::new(),
-                auto,
-                example_integration,
-            },
-        ))?;
-        Ok(())
-    }
-
     /// Define a new gate with full control over stage, mode, and checker.
     ///
     /// `example_integration` is an optional usage snippet stored on the gate

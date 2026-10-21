@@ -4,7 +4,7 @@
 //! these cases exercise capturing one, listing it, showing it, and applying it,
 //! and the audit events an application that writes the gate registry appends.
 
-use jit::declarations::GateStage;
+use jit::declarations::{GateMode, GateStage};
 use jit::domain::Priority;
 use jit::storage::{IssueStore, JsonFileStorage};
 use jit::CommandExecutor;
@@ -33,13 +33,15 @@ fn file_backed_executor(temp: &TempDir) -> CommandExecutor<JsonFileStorage> {
 /// Define `key` as a manual postcheck gate in the repository's own registry.
 fn define_gate(executor: &CommandExecutor<JsonFileStorage>, key: &str) {
     executor
-        .add_gate_definition(
+        .define_gate(
             key.to_string(),
             format!("{key} gate"),
             format!("Repository-declared {key} gate"),
-            false,
-            None,
             GateStage::Postcheck,
+            GateMode::Manual,
+            None,
+            100,
+            None,
         )
         .unwrap_or_else(|error| panic!("define the {key} gate: {error}"));
 }

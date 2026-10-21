@@ -3,6 +3,7 @@
 //! This shows the recommended patterns for using the TestHarness
 //! for fast, reliable in-process testing.
 
+use jit::declarations::GateMode;
 use jit::domain::{Priority, State};
 use jit::test_harness::TestHarness;
 
@@ -151,7 +152,13 @@ fn test_harness_gates() {
     let h = TestHarness::new();
 
     // Add gate definition
-    h.add_gate("review", "Code Review", "Manual review", false);
+    h.add_gate(
+        "review",
+        "Code Review",
+        "Manual review",
+        GateMode::Manual,
+        None,
+    );
 
     // Create issue with gate
     let id = h.create_issue_with_gates("Task", vec!["review".to_string()]);
@@ -188,8 +195,8 @@ fn test_harness_complex_workflow() {
     let h = TestHarness::new();
 
     // Setup gates (use manual gates for this workflow test)
-    h.add_gate("tests", "Tests", "Unit tests", false);
-    h.add_gate("review", "Review", "Code review", false);
+    h.add_gate("tests", "Tests", "Unit tests", GateMode::Manual, None);
+    h.add_gate("review", "Review", "Code review", GateMode::Manual, None);
 
     // Create epic with dependencies
     let dep1 = h.create_issue_with_gates("Dependency 1", vec!["tests".to_string()]);

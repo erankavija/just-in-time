@@ -10,6 +10,7 @@
 //! configuration.
 
 use jit::commands::BatchIssueDef;
+use jit::declarations::GateMode;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -102,7 +103,13 @@ struct Scenario {
 /// Build the bracketed-epic scenario and return the full ids.
 fn build_scenario(h: &TestHarness) -> Scenario {
     configure(h);
-    h.add_gate("code-review", "Code review", "review", false);
+    h.add_gate(
+        "code-review",
+        "Code review",
+        "review",
+        GateMode::Manual,
+        None,
+    );
 
     let e = new_issue(
         h,
@@ -366,7 +373,13 @@ fn test_batch_export_roundtrips_into_fresh_repo() {
 
     let fresh = TestHarness::new();
     configure(&fresh);
-    fresh.add_gate("code-review", "Code review", "review", false);
+    fresh.add_gate(
+        "code-review",
+        "Code review",
+        "review",
+        GateMode::Manual,
+        None,
+    );
 
     let outcome = fresh
         .executor

@@ -1,4 +1,5 @@
 //! Tests for bulk operations (multiple gates, dependencies, labels in single command)
+use jit::declarations::GateMode;
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
 
@@ -9,9 +10,9 @@ use jit::test_harness::TestHarness;
 #[test]
 fn test_add_multiple_gates_at_once() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
-    h.add_gate("clippy", "Clippy", "Run Clippy", false);
-    h.add_gate("fmt", "Format", "Check formatting", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
+    h.add_gate("clippy", "Clippy", "Run Clippy", GateMode::Manual, None);
+    h.add_gate("fmt", "Format", "Check formatting", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
@@ -32,8 +33,8 @@ fn test_add_multiple_gates_at_once() {
 #[test]
 fn test_add_gates_some_already_exist() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
-    h.add_gate("clippy", "Clippy", "Run Clippy", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
+    h.add_gate("clippy", "Clippy", "Run Clippy", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
@@ -56,7 +57,7 @@ fn test_add_gates_some_already_exist() {
 #[test]
 fn test_add_gates_atomic_failure_invalid_gate() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
@@ -80,7 +81,7 @@ fn test_add_gates_atomic_failure_invalid_gate() {
 #[test]
 fn test_add_single_gate_still_works() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
@@ -97,9 +98,9 @@ fn test_add_single_gate_still_works() {
 #[test]
 fn test_remove_multiple_gates() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
-    h.add_gate("clippy", "Clippy", "Run Clippy", false);
-    h.add_gate("fmt", "Format", "Check formatting", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
+    h.add_gate("clippy", "Clippy", "Run Clippy", GateMode::Manual, None);
+    h.add_gate("fmt", "Format", "Check formatting", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
@@ -124,8 +125,8 @@ fn test_remove_multiple_gates() {
 #[test]
 fn test_remove_gates_some_not_present() {
     let h = TestHarness::new();
-    h.add_gate("tests", "Tests", "Run tests", false);
-    h.add_gate("clippy", "Clippy", "Run Clippy", false);
+    h.add_gate("tests", "Tests", "Run tests", GateMode::Manual, None);
+    h.add_gate("clippy", "Clippy", "Run Clippy", GateMode::Manual, None);
 
     let issue_id = h.create_issue("Test Issue");
 
