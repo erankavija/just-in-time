@@ -732,17 +732,6 @@ impl MinimalIssue {
     pub fn is_effectively_terminal(&self) -> bool {
         is_effectively_terminal(self.state, self.archived_from)
     }
-
-    /// Get state symbol for human-readable output
-    /// - ✓ for effectively terminal states (done/rejected, or archived from one)
-    /// - ○ for active states
-    pub fn state_symbol(&self) -> &str {
-        if self.is_effectively_terminal() {
-            "✓"
-        } else {
-            "○"
-        }
-    }
 }
 
 /// Minimal blocked issue for queries - includes blocking reasons

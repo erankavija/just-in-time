@@ -1133,7 +1133,7 @@ fn print_dependency_tree(nodes: &[jit::output::DependencyTreeNode], prefix: &str
         };
 
         // State symbol
-        let state_symbol = node.state_symbol();
+        let state_symbol = jit::output::state_symbol(node.state, node.archived_from);
 
         // Shared indicator
         let shared_marker = if node.shared.unwrap_or(false) {
@@ -1516,7 +1516,7 @@ fn print_issue_show_human(response: &jit::output::IssueShowResponse) {
         for dep in &response.dependencies {
             println!(
                 "  {} {} - {} [{}]",
-                dep.state_symbol(),
+                jit::output::state_symbol(dep.state, dep.archived_from),
                 dep.short_id(),
                 dep.title,
                 format!("{:?}", dep.state).to_lowercase()

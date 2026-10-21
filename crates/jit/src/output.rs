@@ -1449,17 +1449,15 @@ impl DependencyTreeNode {
             children: Vec::new(),
         }
     }
+}
 
-    /// Get state symbol for display
-    ///
-    /// `✓` for effectively terminal nodes — `done`, `rejected`, or `archived`
-    /// from one of those (`jit:45a140ae`) — `○` otherwise.
-    pub fn state_symbol(&self) -> &str {
-        if crate::domain::is_effectively_terminal(self.state, self.archived_from) {
-            "✓"
-        } else {
-            "○"
-        }
+/// Human-output symbol for a lifecycle state: `✓` when effectively terminal
+/// (`done`, `rejected`, or `archived` from one of those), `○` otherwise.
+pub fn state_symbol(state: State, archived_from: Option<State>) -> &'static str {
+    if crate::domain::is_effectively_terminal(state, archived_from) {
+        "✓"
+    } else {
+        "○"
     }
 }
 
@@ -2758,13 +2756,13 @@ mod tests {
         };
         let node = DependencyTreeNode::from_minimal(&issue, 1);
         assert_eq!(node.archived_from, Some(State::Done));
-        assert_eq!(node.state_symbol(), "✓");
+        assert_eq!(state_symbol(node.state, node.archived_from), "✓");
         let serialized = serde_json::to_value(&node).unwrap();
         assert_eq!(serialized["archived_from"], json!("done"));
 
         issue.archived_from = None;
         let legacy = DependencyTreeNode::from_minimal(&issue, 1);
-        assert_eq!(legacy.state_symbol(), "○");
+        assert_eq!(state_symbol(legacy.state, legacy.archived_from), "○");
         let serialized = serde_json::to_value(&legacy).unwrap();
         assert!(serialized.get("archived_from").is_none());
     }
