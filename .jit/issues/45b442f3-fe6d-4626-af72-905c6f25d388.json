@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T06:48:51.797295674Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -25,5 +26,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Collapse container-destination classification to its outcomes",
-  "updated_at": "2026-10-21T01:01:01.582563451Z"
+  "updated_at": "2026-10-21T06:48:53.148002036Z"
 }
