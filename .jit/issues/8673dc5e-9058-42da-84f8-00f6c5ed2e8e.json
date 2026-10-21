@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T12:07:00.101618057Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
   "labels": [
     "type:bug",
@@ -24,5 +30,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Gate status reports a manual attestation as never run",
-  "updated_at": "2026-10-21T11:27:55.037699498Z"
+  "updated_at": "2026-10-21T12:07:00.101618057Z"
 }
