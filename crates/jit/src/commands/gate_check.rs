@@ -685,7 +685,8 @@ impl<S: IssueStore> CommandExecutor<S> {
             .map(|layout| layout.worktree_root().to_path_buf())
     }
 
-    /// The explicit on-disk worktree root, or `None` for a non-file-backed store.
+    /// The explicit on-disk repository layout, or `None` for a non-file-backed
+    /// store.
     ///
     /// Distinct from [`checker_repo_root`](Self::checker_repo_root), which
     /// falls back to the current working directory so the checker process
@@ -694,13 +695,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// this instead, so storage naming no real repository yields `None` rather
     /// than whatever repository the host process happens to be executing
     /// inside.
-    pub(crate) fn real_repo_root(&self) -> Option<std::path::PathBuf> {
+    pub(crate) fn real_repo_layout(&self) -> Option<crate::repository_state::RepositoryLayout> {
         if !self.storage.is_file_backed() {
             return None;
         }
-        self.require_layout()
-            .ok()
-            .map(|layout| layout.worktree_root().to_path_buf())
+        self.require_layout().ok()
     }
 
     /// Capture what evaluating `gate_key` reads, in one round that first
@@ -1023,13 +1022,19 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         gate: &crate::declarations::GateDefinition,
     ) -> Result<Option<crate::domain::InputsDigest>> {
-        let (Some(inputs), Some(root)) = (gate.inputs.as_ref(), self.real_repo_root()) else {
+        let (Some(inputs), Some(layout)) = (gate.inputs.as_ref(), self.real_repo_layout()) else {
             return Ok(None);
         };
         let declaration = gate
             .verdict_declaration()
             .context("Failed to encode the gate declaration the digest is bound to")?;
-        gate_execution::digest_declared_inputs(&root, inputs, &declaration).map(Some)
+        gate_execution::digest_declared_inputs(
+            layout.worktree_root(),
+            inputs,
+            &layout.tracker_written_paths(),
+            &declaration,
+        )
+        .map(Some)
     }
 
     /// The recorded run whose verdict an evaluation of `gate_key` over inputs

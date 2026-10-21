@@ -3,6 +3,7 @@
 //! This module provides deterministic worktree ID generation and persistence
 //! to support parallel multi-agent work with git worktrees.
 
+use crate::repository_state::WORKTREE_IDENTITY_FILE;
 use crate::storage::atomic_write::{sync_directory, write_file_synced};
 use crate::storage::{RepositoryNotFoundError, StorageWarning};
 use anyhow::{Context, Result};
@@ -104,7 +105,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
     }
     let mut warnings = Vec::new();
 
-    let wt_file = paths.local_jit.join("worktree.json");
+    let wt_file = paths.local_jit.join(WORKTREE_IDENTITY_FILE);
 
     if wt_file.exists() {
         // Load existing identity
@@ -120,7 +121,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
                 // In a git worktree with wrong path - could be copied OR moved
                 // Check if old path still exists with the same ID
                 let old_path = PathBuf::from(&identity.root);
-                let old_wt_file = old_path.join(".jit").join("worktree.json");
+                let old_wt_file = old_path.join(".jit").join(WORKTREE_IDENTITY_FILE);
 
                 let is_copy = if old_wt_file.exists() {
                     // Old path exists - check if it has the same ID
@@ -215,7 +216,7 @@ pub fn load_or_create_worktree_identity_with_warnings(
 /// identity yet), `Ok(Some(id))` when present and parseable, and an error only
 /// when the file exists but cannot be read or parsed.
 pub fn read_worktree_id(worktree_root: &Path) -> Result<Option<String>> {
-    let wt_file = worktree_root.join(".jit").join("worktree.json");
+    let wt_file = worktree_root.join(".jit").join(WORKTREE_IDENTITY_FILE);
     if !wt_file.exists() {
         return Ok(None);
     }
@@ -337,7 +338,7 @@ mod tests {
             created_at: Utc::now(),
             relocated_at: None,
         };
-        write_identity_atomic(&jit_dir.join("worktree.json"), &stored).unwrap();
+        write_identity_atomic(&jit_dir.join(WORKTREE_IDENTITY_FILE), &stored).unwrap();
 
         let new_root = temp.path().to_path_buf();
         let paths = crate::storage::worktree_paths::WorktreePaths::detect_for_data_root(
