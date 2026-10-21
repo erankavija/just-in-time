@@ -115,8 +115,6 @@ pub enum EventTag {
     GateDefinitionCreated,
     /// `gate_definition_removed`
     GateDefinitionRemoved,
-    /// `lifecycle_timestamps_backfilled`
-    LifecycleTimestampsBackfilled,
     /// `profile_lifecycle`
     ProfileLifecycle,
     /// `linked_checkout_write_overridden`
@@ -128,7 +126,7 @@ impl EventTag {
     ///
     /// A conformance test compares this list against the variants schemars
     /// derives from the enum, so a tag left out of it fails the suite.
-    pub const ALL: [EventTag; 22] = [
+    pub const ALL: [EventTag; 21] = [
         EventTag::IssueCreated,
         EventTag::IssueClaimed,
         EventTag::IssueStateChanged,
@@ -148,7 +146,6 @@ impl EventTag {
         EventTag::GateDefinitionUpdated,
         EventTag::GateDefinitionCreated,
         EventTag::GateDefinitionRemoved,
-        EventTag::LifecycleTimestampsBackfilled,
         EventTag::ProfileLifecycle,
         EventTag::LinkedCheckoutWriteOverridden,
     ];
@@ -175,7 +172,6 @@ impl EventTag {
             EventTag::GateDefinitionUpdated => "gate_definition_updated",
             EventTag::GateDefinitionCreated => "gate_definition_created",
             EventTag::GateDefinitionRemoved => "gate_definition_removed",
-            EventTag::LifecycleTimestampsBackfilled => "lifecycle_timestamps_backfilled",
             EventTag::ProfileLifecycle => "profile_lifecycle",
             EventTag::LinkedCheckoutWriteOverridden => "linked_checkout_write_overridden",
         }
@@ -203,7 +199,6 @@ impl EventTag {
             | EventTag::GateDefinitionCreated
             | EventTag::GateDefinitionRemoved => EventScope::Registry,
             EventTag::ArtifactArchiveExecuted
-            | EventTag::LifecycleTimestampsBackfilled
             | EventTag::ProfileLifecycle
             | EventTag::LinkedCheckoutWriteOverridden => EventScope::Repository,
         }
@@ -254,10 +249,6 @@ impl EventTag {
             EventTag::GateDefinitionUpdated => "`jit gate update` edited a registered gate.",
             EventTag::GateDefinitionCreated => "`jit gate define` registered a gate.",
             EventTag::GateDefinitionRemoved => "`jit gate remove` unregistered a gate.",
-            EventTag::LifecycleTimestampsBackfilled => {
-                "The one-time `jit migrate lifecycle-timestamps` backfill wrote derived \
-                 lifecycle timestamps; the record carries the number of issues it updated."
-            }
             EventTag::ProfileLifecycle => {
                 "A profile lifecycle operation reached its commit point, the redo record \
                  carrying its writes; the event summarizes per-profile actions and variable \
@@ -413,11 +404,6 @@ impl EventTag {
                 timestamp,
                 gate_key,
             },
-            EventTag::LifecycleTimestampsBackfilled => Event::LifecycleTimestampsBackfilled {
-                id,
-                timestamp,
-                issues_updated: 3,
-            },
             EventTag::ProfileLifecycle => Event::ProfileLifecycle {
                 id,
                 timestamp,
@@ -475,7 +461,6 @@ impl Event {
             Event::GateDefinitionUpdated { .. } => EventTag::GateDefinitionUpdated,
             Event::GateDefinitionCreated { .. } => EventTag::GateDefinitionCreated,
             Event::GateDefinitionRemoved { .. } => EventTag::GateDefinitionRemoved,
-            Event::LifecycleTimestampsBackfilled { .. } => EventTag::LifecycleTimestampsBackfilled,
             Event::ProfileLifecycle { .. } => EventTag::ProfileLifecycle,
             Event::LinkedCheckoutWriteOverridden { .. } => EventTag::LinkedCheckoutWriteOverridden,
         }
@@ -787,7 +772,6 @@ mod tests {
                 "gate_definition_created",
                 "gate_definition_removed",
                 "gate_definition_updated",
-                "lifecycle_timestamps_backfilled",
                 "linked_checkout_write_overridden",
                 "profile_lifecycle",
             ]),

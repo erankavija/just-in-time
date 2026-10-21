@@ -196,8 +196,6 @@ Events are stored as newline-delimited JSON (JSONL):
 **Benefits:**
 
 - **Observability:** Inspect recorded lifecycle transitions for an issue.
-- **Lifecycle timestamps:** `jit migrate lifecycle-timestamps` can backfill
-  selected timestamps from recorded `issue_state_changed` events.
 
 **Query examples:**
 

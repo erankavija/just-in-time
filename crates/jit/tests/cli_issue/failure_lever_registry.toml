@@ -874,16 +874,6 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
-path = "migrate lifecycle-timestamps"
-argv = ["migrate", "lifecycle-timestamps", "--json"]
-setup = ["init", "malformed-events-log"]
-setup_notes = "Replace .jit/events.jsonl with exactly one malformed JSON line after initialization."
-expected_failure = "Lifecycle timestamp migration rejects the malformed event log."
-expected_code = "PARSE_ERROR"
-expected_exit = 1
-confirmation = "invoked"
-
-[[arms]]
 path = "snapshot export"
 argv = ["snapshot", "export", "--format", "zip", "--json"]
 setup = ["init"]

@@ -371,15 +371,6 @@ pub enum MutationIntent {
         /// timestamps are reconciled against the preimage by the finalizer.
         issue: Box<Issue>,
     },
-    /// Repair reconstructed lifecycle history on an existing issue. Unlike an
-    /// ordinary semantic update, the caller-provided lifecycle timestamps are
-    /// authoritative evidence derived from the captured audit log. Creation
-    /// identity and `updated_at` remain byte-for-byte values from the captured
-    /// issue: historical reconstruction changes only the three lifecycle fields.
-    RepairIssueLifecycle {
-        /// Existing issue carrying reconstructed historical lifecycle fields.
-        issue: Box<Issue>,
-    },
     /// Replace the authored gate registry with a structured proposal derived
     /// from the registry in the captured image. The finalizer owns canonical
     /// declaration serialization; callers cannot submit repository bytes.
@@ -967,22 +958,7 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Pass 2c: an explicitly typed lifecycle-history repair is the sole path
-    // that may persist reconstructed historical timestamps. Ordinary updates
-    // above continue to preserve those fields from the captured preimage.
-    for intent in intents {
-        if let MutationIntent::RepairIssueLifecycle { issue } = intent {
-            let preimage = captured_issue(image, &issue.id)?
-                .ok_or_else(|| MutationError::MissingIssue(issue.id.clone()))?;
-            let mut repaired = preimage;
-            repaired.first_ready_at = issue.first_ready_at;
-            repaired.claimed_at = issue.claimed_at;
-            repaired.done_at = issue.done_at;
-            actions.push(write_issue_action(image, &repaired)?);
-        }
-    }
-
-    // Pass 2d: issue deletions remove the captured record and move membership in
+    // Pass 2c: issue deletions remove the captured record and move membership in
     // the same delta. Absence is an error, matching the old delete command
     // contract without turning this into an idempotent or implicit operation.
     for intent in intents {
@@ -2450,57 +2426,6 @@ mod tests {
         assert_eq!(persisted.created_at, created_at);
         assert_eq!(persisted.updated_at, fixed_instant());
         assert_eq!(persisted.done_at, Some(fixed_instant()));
-    }
-
-    #[test]
-    fn test_repair_issue_lifecycle_cannot_mutate_non_lifecycle_fields() {
-        let mut preimage = seeded_issue("33333333-3333-4333-8333-333333333333", None);
-        preimage.first_ready_at = None;
-        preimage.claimed_at = None;
-        preimage.done_at = None;
-        let bytes = serialize_issue(&preimage).unwrap();
-        let image = image_with(vec![(
-            issue_path(&preimage.id).unwrap(),
-            file_entry(&bytes),
-        )]);
-
-        let lifecycle_time = DateTime::parse_from_rfc3339("2021-02-03T04:05:06Z")
-            .unwrap()
-            .with_timezone(&Utc);
-        let mut proposed = preimage.clone();
-        proposed.title = "must not persist".into();
-        proposed.description = "must not persist".into();
-        proposed.state = State::Done;
-        proposed.dependencies = vec!["other".into()];
-        proposed.labels = vec!["type:epic".into()];
-        proposed.first_ready_at = Some(lifecycle_time);
-        proposed.claimed_at = Some(lifecycle_time);
-        proposed.done_at = Some(lifecycle_time);
-
-        let plan = finalize(
-            &layout(),
-            &image,
-            &ctx(),
-            &[MutationIntent::RepairIssueLifecycle {
-                issue: Box::new(proposed),
-            }],
-        )
-        .unwrap();
-        let action = plan
-            .delta()
-            .actions()
-            .iter()
-            .find(|action| action.path() == &issue_path(&preimage.id).unwrap())
-            .unwrap();
-        let RepositoryAction::WriteFile { bytes, .. } = action else {
-            panic!("expected issue write");
-        };
-        let persisted: Issue = serde_json::from_slice(bytes).unwrap();
-        let mut expected = preimage;
-        expected.first_ready_at = Some(lifecycle_time);
-        expected.claimed_at = Some(lifecycle_time);
-        expected.done_at = Some(lifecycle_time);
-        assert_eq!(persisted, expected);
     }
 
     #[test]

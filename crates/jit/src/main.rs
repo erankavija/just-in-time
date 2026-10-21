@@ -18,8 +18,8 @@ use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use jit::cli::{
     ArchiveCommands, ClaimCommands, Cli, Commands, DepCommands, DocCommands, EventCommands,
-    GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, MigrateCommands,
-    ProfileCommands, ProjectCommands,
+    GateCommands, GraphCommands, InvariantCommands, IssueCommands, ItemCommands, ProfileCommands,
+    ProjectCommands,
 };
 use jit::commands::{CommandExecutor, DescriptionUpdate, ProfileSelector, ProfileVariableOptions};
 use jit::domain::{GateRunResult, IssueIdPrefix, Priority, State};
@@ -6901,29 +6901,6 @@ fn run() -> Result<()> {
                 Err(e) => exit_recovery_failed(&e, json),
             }
         }
-        Commands::Migrate(migrate_cmd) => match migrate_cmd {
-            MigrateCommands::LifecycleTimestamps { json } => {
-                let result = executor.backfill_lifecycle_timestamps()?;
-                if json {
-                    use jit::output::JsonOutput;
-                    let output = JsonOutput::success(serde_json::json!({
-                        "issues_scanned": result.issues_scanned,
-                        "issues_updated": result.issues_updated,
-                    }))
-                    .with_message(format!(
-                        "Backfilled lifecycle timestamps on {} of {} issue(s)",
-                        result.issues_updated, result.issues_scanned
-                    ));
-                    println!("{}", output.to_json_string()?);
-                } else {
-                    let output_ctx = OutputContext::new(quiet, false);
-                    let _ = output_ctx.print_success(format!(
-                        "Backfilled lifecycle timestamps on {} of {} issue(s)",
-                        result.issues_updated, result.issues_scanned
-                    ));
-                }
-            }
-        },
         Commands::Serve {
             port,
             stop,

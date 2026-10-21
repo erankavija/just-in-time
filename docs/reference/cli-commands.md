@@ -3705,35 +3705,6 @@ Enforcement strictness is configuration, set in `.jit/config.toml`:
 enforce_leases = "strict"
 ```
 
-## Maintenance Commands
-
-### `jit migrate lifecycle-timestamps`
-
-Backfills the issue [lifecycle
-timestamps](storage-format.md#lifecycle-timestamps) (`first_ready_at`,
-`claimed_at`, `done_at`) for issues whose stored records are missing one or more
-of these fields.
-
-```
-jit migrate lifecycle-timestamps [--json]
-```
-
-For every issue missing one of the fields, the value is derived from
-`.jit/events.jsonl`: the first `issue_state_changed` into `ready`, the first
-`issue_claimed`, and the first `issue_state_changed` into `done`, respectively.
-Only still-absent fields are filled — an existing timestamp is never overwritten,
-preserving first-occurrence semantics. Updated issues and a single
-`lifecycle_timestamps_backfilled` event recording the count publish as one redo
-record.
-
-The command is **idempotent**: when no issue is missing a timestamp it writes
-nothing, appends no event, and reports `issues_updated: 0`. An issue whose event
-log carries no matching transition — for example one auto-promoted straight to
-`ready` at creation, which logs no transition — keeps those fields unset; such a
-timestamp is unrecoverable, not defaulted.
-
-`--json` prints `{ "issues_scanned": N, "issues_updated": M }`.
-
 ## Configuration
 
 ### `jit config get`

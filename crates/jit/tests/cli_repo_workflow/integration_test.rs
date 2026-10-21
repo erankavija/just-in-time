@@ -427,31 +427,6 @@ fn test_export_full_requires_json_format() {
     assert!(stderr.contains("--full is only valid with --format json"));
 }
 
-#[test]
-fn test_migrate_lifecycle_timestamps_runs() {
-    let temp = setup_test_repo();
-    let jit = jit_binary();
-
-    Command::new(jit)
-        .args(["issue", "create", "-t", "Task", "-d", "Desc"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    let output = Command::new(jit)
-        .args(["migrate", "lifecycle-timestamps", "--json"])
-        .current_dir(temp.path())
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let doc: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    // Raw-data envelope carries scan/update counts at the top level.
-    assert!(doc["issues_scanned"].as_u64().is_some());
-    assert!(doc["issues_updated"].as_u64().is_some());
-}
-
 // Test issue lifecycle
 #[test]
 fn test_issue_create_list_show() {

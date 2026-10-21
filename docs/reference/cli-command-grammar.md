@@ -24,7 +24,7 @@ The command line is `jit <noun> <verb> [arguments] [flags]`. The read-only
 - A **noun** is a subcommand group naming a domain entity or subsystem: `issue`,
   `gate`, `gate preset`, `dep`, `doc`, `graph`, `query`, `claim`, `config`,
   `label`, `events`, `archive`, `snapshot`, `worktree`, `hooks`, `item`,
-  `invariant`, `reference`, `migrate`, `profile`, and `apply`'s target. Nouns
+  `invariant`, `reference`, `profile`, and `apply`'s target. Nouns
   are singular (`issue`, not `issues`).
 - A **verb** is the action on that noun: `create`, `show`, `list`, `update`,
   `add`, `remove`, `evaluate`, `define`, `acquire`. Verbs are imperative and shared

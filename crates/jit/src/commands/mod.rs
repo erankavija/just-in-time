@@ -44,7 +44,6 @@ pub mod invariant;
 mod issue;
 pub mod item;
 mod labels;
-pub mod migrate;
 mod profile;
 pub mod project;
 mod query;
@@ -82,7 +81,6 @@ pub use init::FreshInitResult;
 pub use invariant::InvariantCheckResult;
 pub use issue::{DescriptionUpdate, IssueLocalUpdate};
 pub use item::{ItemListResult, ItemShowResult};
-pub use migrate::LifecycleBackfillResult;
 pub use profile::{
     ProfileApplyError, ProfileDependencyError, ProfileResolutionError, ProfileSelector,
     ProfileSelectorError, ProfileVariableOptions,

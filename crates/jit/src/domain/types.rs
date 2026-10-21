@@ -1615,22 +1615,6 @@ pub enum Event {
         /// Registry key of the gate that was removed
         gate_key: String,
     },
-    /// The one-time lifecycle-timestamp backfill migration ran
-    /// (`jit migrate lifecycle-timestamps`).
-    ///
-    /// Repository-scoped, like [`Event::ArtifactArchiveExecuted`]: it carries no issue
-    /// id because it records a whole-repository migration rather than a single
-    /// issue's change. `issues_updated` is the number of issue files the run
-    /// wrote (issues that gained at least one derived timestamp); a re-run over an
-    /// already-migrated repository writes nothing and appends no event.
-    LifecycleTimestampsBackfilled {
-        /// Event ID
-        id: String,
-        /// When this occurred
-        timestamp: DateTime<Utc>,
-        /// Number of issues whose lifecycle timestamps were backfilled
-        issues_updated: usize,
-    },
     /// A complete profile lifecycle mutation reached its durable commit point.
     ///
     /// One record summarizes the requested operation and every profile in the
@@ -1704,7 +1688,6 @@ impl Event {
             | Event::GateDefinitionUpdated { id, .. }
             | Event::GateDefinitionCreated { id, .. }
             | Event::GateDefinitionRemoved { id, .. }
-            | Event::LifecycleTimestampsBackfilled { id, .. }
             | Event::ProfileLifecycle { id, .. }
             | Event::LinkedCheckoutWriteOverridden { id, .. } => id,
         }
@@ -1736,7 +1719,6 @@ impl Event {
             | Event::GateDefinitionUpdated { id, timestamp, .. }
             | Event::GateDefinitionCreated { id, timestamp, .. }
             | Event::GateDefinitionRemoved { id, timestamp, .. }
-            | Event::LifecycleTimestampsBackfilled { id, timestamp, .. }
             | Event::ProfileLifecycle { id, timestamp, .. }
             | Event::LinkedCheckoutWriteOverridden { id, timestamp, .. } => {
                 *id = new_id;
@@ -2005,16 +1987,6 @@ impl Event {
         }
     }
 
-    /// Create a lifecycle-timestamp backfill event recording how many issues the
-    /// one-time migration updated.
-    pub fn draft_lifecycle_timestamps_backfilled(issues_updated: usize) -> Self {
-        Event::LifecycleTimestampsBackfilled {
-            id: String::new(),
-            timestamp: DateTime::UNIX_EPOCH,
-            issues_updated,
-        }
-    }
-
     /// Create the aggregate profile lifecycle audit event.
     pub fn draft_profile_lifecycle(
         operation: ProfileLifecycleOperation,
@@ -2072,7 +2044,6 @@ impl Event {
             Event::GateDefinitionUpdated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionCreated { .. } => "", // No associated issue (registry-scoped)
             Event::GateDefinitionRemoved { .. } => "", // No associated issue (registry-scoped)
-            Event::LifecycleTimestampsBackfilled { .. } => "", // No associated issue (repo-scoped)
             Event::ProfileLifecycle { .. } => "",      // No associated issue (repo-scoped)
             Event::LinkedCheckoutWriteOverridden { .. } => "", // No associated issue (repo-scoped)
         }
