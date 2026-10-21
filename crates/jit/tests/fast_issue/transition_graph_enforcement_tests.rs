@@ -101,7 +101,7 @@ fn test_done_transition_blocked_by_enforcing_graph_rule_exit4_with_findings() {
     let err = result.expect_err("enforcing graph rule should block the done transition");
     let blocked = err
         .downcast_ref::<TransitionBlockedError>()
-        .expect("error must be a TransitionBlockedError (main.rs maps this to exit 4)");
+        .expect("error must be a TransitionBlockedError (classify maps this to exit 4)");
 
     // The finding text (rule name + message) is rendered in the error.
     let rendered = blocked.to_string();

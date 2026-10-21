@@ -2,7 +2,7 @@
 //! documents, so no mapping in the generated reference is hand-authored.
 //!
 //! Each projected fixed-code row is bound here by a real subprocess in both
-//! public invocation forms. The classifier tests in `main.rs` remain useful
+//! public invocation forms. The classifier tests in `output::failure` remain useful
 //! unit coverage, but cannot substitute for a command-level binding because
 //! they do not exercise parsing, dispatch, or `--json` output selection.
 //!

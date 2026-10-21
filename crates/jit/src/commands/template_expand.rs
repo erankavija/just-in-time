@@ -424,7 +424,7 @@ pub fn validate_delta_acyclic(
     let refs: Vec<&ProspectiveNode> = nodes.iter().collect();
     // Propagate the typed `GraphError::CycleDetected` (not a bare message) so the
     // failure classifies as a validation error (exit 4) through the shared
-    // `error_to_exit_code` downcast, matching `dep add`'s cycle rejection.
+    // `output::failure::classify` downcast, matching `dep add`'s cycle rejection.
     crate::graph::DependencyGraph::new(&refs)
         .validate_dag()
         .map_err(anyhow::Error::new)

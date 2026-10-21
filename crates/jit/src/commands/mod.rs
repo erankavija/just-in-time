@@ -239,7 +239,7 @@ pub(super) const CAPTURE_MAX_BYTES: u64 = 512 * 1024 * 1024;
 ///
 /// Replaces the bespoke "did not converge after repeated conflicts" bails: it
 /// names the operation and the number of attempts made, and maps to the generic
-/// exit code through a single arm in `main.rs`.
+/// exit code through a single arm in `output::failure::classify`.
 #[derive(Debug, thiserror::Error)]
 #[error("{operation} did not converge after {attempts} capture conflicts")]
 pub struct MutationSessionExhausted {

@@ -11,6 +11,8 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use thiserror::Error;
 
+pub mod failure;
+
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::{
     GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
