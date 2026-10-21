@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T10:59:52.613936311Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -26,5 +27,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Remove dead taxonomy error and membership types",
-  "updated_at": "2026-10-21T01:01:02.047797145Z"
+  "updated_at": "2026-10-21T10:59:52.690896333Z"
 }
