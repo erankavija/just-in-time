@@ -18337,3 +18337,4 @@
 {"gate_key":"code-review","id":"d0834f6a-79e0-4274-95b9-389490bd35ad","issue_id":"e1af39db-860f-4715-9e68-b9d126a81c12","timestamp":"2026-10-21T16:54:32.751232325Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"ready","id":"b83bb275-ac42-4ed6-b010-5016246400de","issue_id":"e1af39db-860f-4715-9e68-b9d126a81c12","timestamp":"2026-10-21T16:54:51.896003269Z","to":"done","type":"issue_state_changed"}
 {"id":"2bc79c29-0d48-471b-bce7-13d452910b5e","issue_id":"e1af39db-860f-4715-9e68-b9d126a81c12","timestamp":"2026-10-21T16:54:51.896003269Z","type":"issue_completed"}
+{"assignee":"agent:worker","id":"ce1c35d4-8b14-49b9-b5ad-fd89672871ea","issue_id":"d125490a-558d-41d6-bfe6-2270d6bf7cf4","timestamp":"2026-10-21T16:54:57.495450150Z","type":"issue_claimed"}
