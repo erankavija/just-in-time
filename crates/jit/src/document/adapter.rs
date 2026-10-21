@@ -9,7 +9,7 @@ use std::path::Path;
 
 /// Trait for document format adapters
 ///
-/// Adapters handle format-specific operations like asset scanning and link rewriting.
+/// Adapters handle format-specific operations like asset scanning.
 /// Each format (Markdown, AsciiDoc, reStructuredText, MDX) implements this trait.
 ///
 /// # Example
@@ -40,14 +40,6 @@ pub trait DocFormatAdapter {
     /// Includes images and other embedded assets.
     /// Excludes external URLs and anchor-only links.
     fn scan_assets(&self, content: &str) -> HashSet<String>;
-
-    /// Rewrite links when documents or assets move
-    ///
-    /// Updates links in content when files are moved.
-    /// Currently a stub for Phase 2 implementation.
-    fn rewrite_links(&self, _content: &str, _old_path: &str, _new_path: &str) -> String {
-        unimplemented!("Link rewriting not implemented in Phase 1")
-    }
 }
 
 /// HTML format adapter
