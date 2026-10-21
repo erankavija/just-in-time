@@ -68,8 +68,7 @@ pub enum LocalEvalError {
 /// Carries every [`Finding`] produced (across all matching local rules) plus the
 /// `enforce` flag of each rule, so the command layer can decide which findings
 /// block a write. The block/allow decision is modulated by the evaluation's
-/// [`Strictness`] level (defaulting to [`Strictness::Loose`], the pre-strictness
-/// behavior); set the repository's level with [`LocalEvaluation::with_strictness`].
+/// [`Strictness`] level (defaulting to [`Strictness::DEFAULT`]); set the repository's level with [`LocalEvaluation::with_strictness`].
 /// Construct via [`evaluate_local`].
 ///
 /// # Examples
@@ -102,8 +101,7 @@ pub struct LocalEvaluation {
     /// All findings produced by matching local rules, with their severities.
     findings: Vec<EnforcedFinding>,
     /// Repo-wide enforcement modulator applied to the block/allow decision.
-    /// Defaults to [`Strictness::Loose`], so an evaluation built without a level
-    /// keeps the pre-strictness behavior.
+    /// Defaults to [`Strictness::DEFAULT`].
     strictness: Strictness,
 }
 
@@ -120,7 +118,7 @@ impl LocalEvaluation {
     ///
     /// Strictness modulates ONLY the block/allow decision ([`blocking_rules`],
     /// [`is_blocking`], [`warnings`], [`rejection_message`]); it never alters the
-    /// findings themselves. [`Strictness::Loose`] (the default) leaves the
+    /// findings themselves. [`Strictness::Loose`] leaves the
     /// pre-strictness behavior unchanged.
     ///
     /// [`blocking_rules`]: LocalEvaluation::blocking_rules
@@ -156,7 +154,7 @@ impl LocalEvaluation {
     /// evaluation's [`Strictness`] level, in first-seen order. Empty when nothing
     /// blocks.
     ///
-    /// Under [`Strictness::Loose`] (the default) this is exactly the `enforce`
+    /// Under [`Strictness::Loose`] this is exactly the `enforce`
     /// rules with `error` findings; [`Strictness::Strict`] widens it to every
     /// violating rule, and [`Strictness::Permissive`] empties it.
     ///
@@ -333,8 +331,7 @@ pub fn evaluate_local(
     }
 
     // The repo-wide strictness modulator is applied by the caller via
-    // `LocalEvaluation::with_strictness`; default to loose so a bare evaluation
-    // keeps the pre-strictness block/allow behavior.
+    // `LocalEvaluation::with_strictness`; a bare evaluation uses the default.
     Ok(LocalEvaluation {
         findings,
         strictness: Strictness::default(),

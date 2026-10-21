@@ -226,7 +226,10 @@ fn build_namespaces_from_config(
         .collect();
 
     let mut result = LabelNamespaces {
-        schema_version: config.version.as_ref().map(|v| v.schema).unwrap_or(2),
+        schema_version: config
+            .version
+            .as_ref()
+            .map_or(crate::config::VersionConfig::DEFAULT_SCHEMA, |v| v.schema),
         namespaces,
         type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
         label_associations: config

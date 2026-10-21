@@ -130,7 +130,7 @@ You should see:
 ```
 
 The `TTL: 3600 seconds` shown is the default claim lease TTL — see
-[Runtime Coordination Defaults](../reference/runtime-defaults.md), the
+[Runtime Defaults](../reference/runtime-defaults.md), the
 generated source of that value.
 
 The claim creates a **lease** that:

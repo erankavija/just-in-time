@@ -153,7 +153,7 @@ pub enum ContentParserError {
 
 /// Select the [`ContentParser`] for an issue, applying the resolution order:
 /// the issue's own `content_format` → else the repo default → else
-/// [`ContentFormat::Markdown`](crate::domain::ContentFormat::Markdown).
+/// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT).
 ///
 /// This is the SINGLE production seam every projection-with-sections site uses
 /// so the parser dispatch is identical across the write path

@@ -147,11 +147,11 @@ jit claim status
 
 **Policy limits apply:**
 - A per-agent and a per-repository cap on indefinite leases; the defaults are
-  listed in [Runtime Coordination Defaults](../reference/runtime-defaults.md)
+  listed in [Runtime Defaults](../reference/runtime-defaults.md)
   and both are configurable
 
 Indefinite leases are marked **stale** after the built-in claim stale
-threshold ([Runtime Coordination Defaults](../reference/runtime-defaults.md))
+threshold ([Runtime Defaults](../reference/runtime-defaults.md))
 without a heartbeat. Staleness is only a marker: a stale indefinite lease is not
 evicted automatically — it remains until a heartbeat, a `jit claim release`, or
 a `jit claim force-evict`. The threshold is not configurable.
@@ -254,7 +254,7 @@ The two coordination limits apply to `jit claim acquire --ttl 0`. Choose a
 finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 `jit claim heartbeat <lease-id>` explicitly while it is active. An omitted
 `--ttl` falls back to the built-in claim lease TTL listed in
-[Runtime Coordination Defaults](../reference/runtime-defaults.md).
+[Runtime Defaults](../reference/runtime-defaults.md).
 
 Claim timing has no configuration keys.
 

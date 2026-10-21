@@ -10,9 +10,8 @@
 //!
 //! - [`Strictness::Strict`] — ANY violation (warning or error, enforced or not)
 //!   blocks.
-//! - [`Strictness::Loose`] — only an enforced error blocks. This is the default
-//!   and is behaviorally identical to having no strictness modulation at all, so
-//!   an existing repository keeps behaving exactly as before.
+//! - [`Strictness::Loose`] — only an enforced error blocks, which is
+//!   behaviorally identical to having no strictness modulation at all.
 //! - [`Strictness::Permissive`] — NOTHING blocks; every violation is advisory
 //!   (reported as a warning).
 //!
@@ -28,21 +27,35 @@ use crate::errors::InvalidArgumentError;
 
 /// Repository-wide enforcement modulator from `[validation].strictness`.
 ///
-/// See the module documentation for the full semantics. The default is
-/// [`Strictness::Loose`], so an absent key preserves the pre-strictness
-/// block/allow behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// See the module documentation for the full semantics. An absent key resolves
+/// to [`Strictness::DEFAULT`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strictness {
     /// Any violation (warning or error, enforced or not) blocks.
     Strict,
-    /// Only an enforced error blocks (the default; identical to no modulation).
-    #[default]
+    /// Only an enforced error blocks (identical to no modulation).
     Loose,
     /// Nothing blocks; every violation is advisory.
     Permissive,
 }
 
+impl Default for Strictness {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl std::fmt::Display for Strictness {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.token())
+    }
+}
+
 impl Strictness {
+    /// Level applied when `[validation]` omits `strictness`: the pre-strictness
+    /// block/allow behavior.
+    pub const DEFAULT: Self = Self::Loose;
+
     /// Whether a violation from a rule with the given per-rule `enforce` flag and
     /// `severity` blocks the write or transition under this strictness level.
     ///
@@ -76,14 +89,14 @@ impl Strictness {
     }
 
     /// Resolve a strictness level from the optional `[validation].strictness`
-    /// config value, defaulting to [`Strictness::Loose`] when the key is absent.
+    /// config value, defaulting to [`Strictness::DEFAULT`] when the key is absent.
     ///
     /// An invalid value is surfaced as an error rather than silently defaulting,
     /// so a misconfigured `config.toml` cannot quietly pick a strictness the
     /// author did not intend.
     pub fn from_config_value(value: Option<&str>) -> anyhow::Result<Self> {
         match value {
-            None => Ok(Strictness::Loose),
+            None => Ok(Strictness::DEFAULT),
             Some(raw) => Strictness::from_str(raw),
         }
     }
@@ -168,16 +181,16 @@ mod tests {
     }
 
     #[test]
-    fn test_default_is_loose() {
-        assert_eq!(Strictness::default(), Strictness::Loose);
+    fn test_default_impl_is_the_named_default() {
+        assert_eq!(Strictness::default(), Strictness::DEFAULT);
     }
 
     #[test]
     fn test_from_config_value_parses_each_level() {
         assert_eq!(
             Strictness::from_config_value(None).unwrap(),
-            Strictness::Loose,
-            "absent key defaults to loose"
+            Strictness::DEFAULT,
+            "absent key resolves to the default"
         );
         assert_eq!(
             Strictness::from_config_value(Some("strict")).unwrap(),

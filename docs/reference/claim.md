@@ -117,7 +117,7 @@ Indefinite leases have policy limits to prevent deadlocks:
 - **Per-agent limit:** a maximum number of indefinite leases per agent
 - **Per-repo limit:** a maximum number of indefinite leases per repository
 
-Both defaults are listed in [Runtime Coordination Defaults](runtime-defaults.md).
+Both defaults are listed in [Runtime Defaults](runtime-defaults.md).
 Override them in `.jit/config.toml`:
 
 ```toml
@@ -277,7 +277,7 @@ Indefinite leases become **stale** when:
 $$\mathrm{now} - \mathrm{last\_beat} > \text{claim stale threshold}$$
 
 The threshold is a built-in constant listed in
-[Runtime Coordination Defaults](runtime-defaults.md); configuration does not
+[Runtime Defaults](runtime-defaults.md); configuration does not
 change it.
 
 A stale lease is:

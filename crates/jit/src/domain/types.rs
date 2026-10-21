@@ -196,20 +196,46 @@ impl FromStr for Priority {
 ///
 /// Serialized lowercase (`"markdown"`, `"html"`, `"xml"`) so issue JSON stays
 /// human-readable. When absent on an issue the repo default
-/// (`[validation].content_format`) applies; the final fallback is `Markdown`,
-/// which is always compiled in. HTML/XML are only usable when the `html`/`xml`
+/// (`[validation].content_format`) applies; the final fallback is
+/// [`ContentFormat::DEFAULT`]. HTML/XML are only usable when the `html`/`xml`
 /// cargo features are built (see
 /// [`content_parser_for`](crate::document::content_parser_for)).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentFormat {
-    /// Markdown body (the default; always available).
-    #[default]
+    /// Markdown body (always available).
     Markdown,
     /// HTML body (requires the `html` cargo feature to parse).
     Html,
     /// XML body (requires the `xml` cargo feature to parse).
     Xml,
+}
+
+impl ContentFormat {
+    /// Format applied when neither the issue nor `[validation]` declares one.
+    /// It must be a format that is always compiled in.
+    pub const DEFAULT: Self = Self::Markdown;
+
+    /// The token naming this format, matching its serialized form.
+    pub const fn as_token(self) -> &'static str {
+        match self {
+            ContentFormat::Markdown => "markdown",
+            ContentFormat::Html => "html",
+            ContentFormat::Xml => "xml",
+        }
+    }
+}
+
+impl Default for ContentFormat {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl std::fmt::Display for ContentFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_token())
+    }
 }
 
 impl FromStr for ContentFormat {
