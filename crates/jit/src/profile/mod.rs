@@ -40,7 +40,7 @@ pub mod template_region;
 pub use crate::domain::repository_inputs::{DeclaredRoot, ExclusionPattern};
 pub use crate::domain::ProfileOrigin;
 pub use agreement::{
-    claimed_target_divergences, unowned_target_divergences, ProfileAgreement,
+    claimed_target_divergences, unowned_target_divergences, DivergencesKey, ProfileAgreement,
     ProfileAgreementResult, ProfileDivergence,
 };
 pub(crate) use application::SelectionObservation;
@@ -49,7 +49,7 @@ pub use application::{
     ProfileCaptureEntry, ProfileCaptureResult, ProfileCollection, ProfileComposedApplyResult,
     ProfileContributionChange, ProfileListResult, ProfilePackEntry, ProfilePackResult,
     ProfilePlanEntry, ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult,
-    ProfileSummary, ProfileTargetAction, ProfileTargetChange,
+    ProfileSummary, ProfileTargetAction, ProfileTargetChange, ProfilesKey,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,

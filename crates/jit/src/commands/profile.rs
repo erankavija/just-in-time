@@ -1295,7 +1295,7 @@ impl CommandExecutor<JsonFileStorage> {
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         let applied = self.apply_profile_selection(&packages, inputs, &contribution_context)?;
-        selection_profile_results(applied.profiles, &selected)
+        selection_profile_results(applied.items, &selected)
     }
 
     /// Resolve the semantic candidates that every selected package contributes.
@@ -1444,7 +1444,7 @@ impl CommandExecutor<JsonFileStorage> {
             &contribution_context,
             ProfileLifecycleOperation::Reconfigure,
         )?;
-        selection_profile_results(applied.profiles, &selected)
+        selection_profile_results(applied.items, &selected)
     }
 
     /// Preview the exact reconfiguration aggregate without publishing files,
@@ -1494,7 +1494,7 @@ impl CommandExecutor<JsonFileStorage> {
             &contribution_context,
             ProfileLifecycleOperation::Upgrade,
         )?;
-        selection_profile_results(applied.profiles, &selected)
+        selection_profile_results(applied.items, &selected)
     }
 
     /// Preview the exact upgrade aggregate without publishing files,
@@ -3051,12 +3051,8 @@ mod tests {
     use tempfile::TempDir;
 
     fn only_profile<T>(result: crate::profile::ProfileCollection<T>) -> T {
-        assert_eq!(result.count, 1);
-        result
-            .profiles
-            .into_iter()
-            .next()
-            .expect("one profile entry")
+        assert_eq!(result.count(), 1);
+        result.items.into_iter().next().expect("one profile entry")
     }
 
     /// Observe actual publications without coupling the test to
@@ -3698,9 +3694,9 @@ mod tests {
         executor
             .validate_recorded_profiles()
             .expect("the profiles are readable")
-            .profiles
+            .items
             .into_iter()
-            .flat_map(|profile| profile.divergences)
+            .flat_map(|profile| profile.divergences.items)
             .map(|divergence| divergence.message())
             .filter(|message| message.contains(subject))
             .collect()
@@ -3953,7 +3949,7 @@ placement = "append"
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -4064,7 +4060,7 @@ placement = "append"
         assert!(!stale_schema.exists());
         assert_eq!(
             repaired
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -4137,27 +4133,25 @@ placement = "append"
         let (temp, _storage, executor, _package) = fixture();
 
         let before = executor.list_recorded_profiles().unwrap();
-        assert_eq!(before.count, 0);
-        assert!(before.profiles.is_empty());
+        assert!(before.items.is_empty());
 
         let applied = package_read_from(&temp, "vendor/recorded");
         executor.apply_profile_package(&applied).unwrap();
 
         let after = executor.list_recorded_profiles().unwrap();
-        assert_eq!(after.count, after.profiles.len());
         assert_eq!(
             after
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
             vec![fixture_id().as_str()]
         );
         assert_eq!(
-            after.profiles[0].origin,
+            after.items[0].origin,
             ProfileOrigin::Directory(RootRelativePath::parse("vendor/recorded").unwrap())
         );
-        assert!(after.profiles[0].applied);
+        assert!(after.items[0].applied);
     }
 
     #[test]
@@ -4182,10 +4176,10 @@ placement = "append"
 
         let listed = executor.list_recorded_profiles().unwrap();
 
-        assert_eq!(listed.count, 1);
-        assert_eq!(listed.profiles[0].version, rewritten.model().version);
+        assert_eq!(listed.count(), 1);
+        assert_eq!(listed.items[0].version, rewritten.model().version);
         assert!(
-            !listed.profiles[0].applied,
+            !listed.items[0].applied,
             "a record that no longer describes the package at its location is not applied state"
         );
     }
@@ -4745,7 +4739,7 @@ placement = "append"
         // both under the single application of the package naming the other.
         let published_by = |result: &ProfileComposedApplyResult| {
             result
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.clone(), profile.status))
                 .collect::<Vec<_>>()
@@ -5183,10 +5177,10 @@ template = true
             .plan_profiles(&[selector.clone(), selector])
             .unwrap();
 
-        assert_eq!(result.count, 2);
+        assert_eq!(result.count(), 2);
         assert_eq!(
             result
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -5244,16 +5238,16 @@ template = true
         // then the package that declared it.
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-        assert_eq!(applied.count, applied.profiles.len());
+        assert_eq!(applied.count(), applied.items.len());
         assert_eq!(applied.requested().unwrap().id, "workflow");
         assert!(applied
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Applied));
         // What each package publishes is in the repository, and the audit log
@@ -5313,7 +5307,7 @@ template = true
         );
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -5357,7 +5351,7 @@ template = true
 
         assert_eq!(publications.count(), 0);
         assert!(reapplied
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Unchanged));
         assert_eq!(
@@ -5408,7 +5402,7 @@ template = true
             .apply_profile(&selectors)
             .unwrap();
         assert!(retried
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Applied));
         assert_eq!(applied_event_ids(&recovered), vec!["left", "right"]);
@@ -5426,7 +5420,7 @@ template = true
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -5454,7 +5448,7 @@ template = true
         // means, and it is applied before the package that reaches it.
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -5480,7 +5474,7 @@ template = true
         let applied = executor.apply_profile_package(&dependant).unwrap();
 
         let order: Vec<&str> = applied
-            .profiles
+            .items
             .iter()
             .map(|profile| profile.id.as_str())
             .collect();
@@ -6225,11 +6219,11 @@ template = true
         // only the package that was named.
         assert!(
             reapplied
-                .profiles
+                .items
                 .iter()
                 .all(|profile| profile.status == ProfileApplicationStatus::Unchanged),
             "{:?}",
-            reapplied.profiles
+            reapplied.items
         );
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
@@ -6256,7 +6250,7 @@ template = true
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -6402,13 +6396,13 @@ template = true
     ) {
         assert!(
             planned
-                .profiles
+                .items
                 .iter()
                 .flat_map(|plan| &plan.targets)
                 .any(|target| target.action != ProfileTargetAction::Unchanged),
             "a rehearsal that decides nothing proves nothing about the run it precedes"
         );
-        for target in planned.profiles.iter().flat_map(|plan| &plan.targets) {
+        for target in planned.items.iter().flat_map(|plan| &plan.targets) {
             let path = PathBuf::from(&target.path);
             match target.action {
                 ProfileTargetAction::Unchanged => assert_eq!(
@@ -6481,7 +6475,7 @@ template = true
     /// The one entry a report carries for `id`.
     fn reported(report: &ProfilePlanResult, id: &str) -> ProfilePlanEntry {
         report
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == id)
             .unwrap_or_else(|| panic!("the report names profile {id}: {report:?}"))
@@ -6622,7 +6616,7 @@ template = true
             executor
                 .list_recorded_profiles()
                 .expect("the recorded inventory is readable")
-                .profiles
+                .items
                 .iter()
                 .all(|recorded| recorded.id != "unapplied"),
             "the report does not record the package it inspected"
@@ -7349,7 +7343,7 @@ template = true
     /// The repository-relative target paths one rehearsal entry reports.
     fn planned_paths(planned: &ProfilePlanResult, id: &str) -> BTreeSet<String> {
         planned
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == id)
             .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
@@ -7381,7 +7375,7 @@ template = true
 
         assert_eq!(
             planned
-                .profiles
+                .items
                 .iter()
                 .map(|entry| entry.id.as_str())
                 .collect::<Vec<_>>(),
@@ -7438,7 +7432,7 @@ template = true
     /// The entry at `position`, which the occurrence order fixes.
     fn entry_at(planned: &ProfilePlanResult, position: usize) -> &ProfilePlanEntry {
         planned
-            .profiles
+            .items
             .get(position)
             .unwrap_or_else(|| panic!("the rehearsal reports an entry at {position}"))
     }
@@ -7465,7 +7459,7 @@ template = true
 
         assert_eq!(
             planned
-                .profiles
+                .items
                 .iter()
                 .map(|entry| entry.id.as_str())
                 .collect::<Vec<_>>(),
@@ -7540,12 +7534,12 @@ template = true
 
         assert_eq!(
             planned
-                .profiles
+                .items
                 .iter()
                 .map(|entry| entry.id.as_str())
                 .collect::<Vec<_>>(),
             published
-                .profiles
+                .items
                 .iter()
                 .map(|result| result.id.as_str())
                 .collect::<Vec<_>>(),
@@ -7589,7 +7583,7 @@ template = true
 
         let status_of = |id: &str| {
             planned
-                .profiles
+                .items
                 .iter()
                 .find(|entry| entry.id == id)
                 .unwrap_or_else(|| panic!("the rehearsal reports an entry for {id}"))
@@ -7607,7 +7601,7 @@ template = true
              because a peer in the same selection would"
         );
         let unchanged_root = planned
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == "beta")
             .expect("the rehearsal reports an entry for beta");
@@ -7646,9 +7640,9 @@ template = true
             events_before,
             "a rehearsal audits nothing"
         );
-        assert_eq!(planned.count, planned.profiles.len());
+        assert_eq!(planned.count(), planned.items.len());
         assert_eq!(
-            planned.profiles[0].status,
+            planned.items[0].status,
             ProfilePlanStatus::WouldApply,
             "a rehearsal over changed values reports work to publish"
         );
@@ -7697,8 +7691,8 @@ template = true
             "a rehearsal writes no file and leaves every applied record byte-identical"
         );
         assert_eq!(lifecycle_event_count(&storage), events_before);
-        assert_eq!(planned.count, planned.profiles.len());
-        assert_eq!(planned.profiles[0].status, ProfilePlanStatus::WouldApply);
+        assert_eq!(planned.count(), planned.items.len());
+        assert_eq!(planned.items[0].status, ProfilePlanStatus::WouldApply);
 
         executor
             .upgrade_profiles_from_sources(&installed_selector(LIFECYCLE_ID), &supplied_values(&[]))
@@ -8184,7 +8178,7 @@ target = "docs/guide.md"
             .expect("the difference report reads the repository");
 
         let entry = reported
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == "workflow")
             .expect("the selection reports the package");
@@ -8232,7 +8226,7 @@ target = "docs/guide.md"
             .expect("the difference report reads the repository");
 
         let entry = reported
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == "workflow")
             .expect("the selection reports the package");
@@ -8509,7 +8503,7 @@ target = "docs/guide.md"
             .validate_recorded_profiles()
             .expect("a named applied record remains readable regardless of its payload size");
         assert!(
-            agreement.profiles[0].divergences.is_empty(),
+            agreement.items[0].divergences.items.is_empty(),
             "{agreement:?}"
         );
     }
@@ -8555,7 +8549,7 @@ target = "docs/guide.md"
             .validate_recorded_profiles()
             .expect("a named claimed target remains readable regardless of its payload size");
         assert!(
-            agreement.profiles[0].divergences.is_empty(),
+            agreement.items[0].divergences.items.is_empty(),
             "{agreement:?}"
         );
     }

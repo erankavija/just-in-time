@@ -12,7 +12,7 @@
 //! profile-scoped check reports divergences without resolving a package to ask
 //! the question.
 
-use crate::domain::ProfileOrigin;
+use crate::domain::{CollectionKey, ListEnvelope, ProfileOrigin};
 use crate::profile::ProfileCollection;
 use crate::repository_state::{
     claimed_target_state, remedy_suggestions, AppliedProfileRecord, ClaimedTargetState,
@@ -251,11 +251,17 @@ pub struct ProfileAgreement {
     pub record: String,
     /// Where the record says its package was read from.
     pub origin: ProfileOrigin,
-    /// Number of divergences in [`Self::divergences`].
-    pub count: usize,
     /// Every way this profile diverged, package facts before owned targets and
     /// owned targets in canonical claim order.
-    pub divergences: Vec<ProfileDivergence>,
+    #[serde(flatten)]
+    pub divergences: ListEnvelope<DivergencesKey, ProfileDivergence>,
+}
+
+/// Collection key of a [`ProfileAgreement`]'s divergences.
+pub enum DivergencesKey {}
+
+impl CollectionKey for DivergencesKey {
+    const KEY: &'static str = "divergences";
 }
 
 impl ProfileAgreement {
@@ -272,14 +278,13 @@ impl ProfileAgreement {
             version: version.into(),
             record: record.into(),
             origin,
-            count: divergences.len(),
-            divergences,
+            divergences: ListEnvelope::new(divergences),
         }
     }
 
     /// Whether this profile still agrees with its package and the repository.
     pub fn agrees(&self) -> bool {
-        self.divergences.is_empty()
+        self.divergences.items.is_empty()
     }
 }
 
@@ -293,21 +298,21 @@ pub type ProfileAgreementResult = ProfileCollection<ProfileAgreement>;
 impl ProfileCollection<ProfileAgreement> {
     /// Whether every recorded profile agrees.
     pub fn agrees(&self) -> bool {
-        self.profiles.iter().all(ProfileAgreement::agrees)
+        self.items.iter().all(ProfileAgreement::agrees)
     }
 
     /// The profiles that diverged, in report order.
     pub fn diverged(&self) -> impl Iterator<Item = &ProfileAgreement> {
-        self.profiles.iter().filter(|profile| !profile.agrees())
+        self.items.iter().filter(|profile| !profile.agrees())
     }
 
     /// Distinct resolutions across every divergence this report carries,
     /// naming capture only where some divergence's remedy allows it.
     pub fn suggestions(&self) -> Vec<String> {
         remedy_suggestions(
-            self.profiles
+            self.items
                 .iter()
-                .flat_map(|profile| &profile.divergences)
+                .flat_map(|profile| &profile.divergences.items)
                 .map(ProfileDivergence::remedy),
         )
     }
@@ -421,6 +426,39 @@ mod tests {
         assert!(
             schema.to_string().contains("remedy"),
             "the divergence schema describes the remedy beside the finding: {schema}"
+        );
+    }
+
+    #[test]
+    fn test_profile_agreement_serializes_its_divergence_count_beside_its_schema_keys() {
+        let origin = ProfileOrigin::Directory(
+            crate::repository_state::RootRelativePath::parse("packages/captured")
+                .expect("a canonical package location"),
+        );
+        let agreement = ProfileAgreement::new(
+            "captured",
+            "1.0.0",
+            ".jit/profiles/captured.json",
+            origin,
+            vec![ProfileDivergence::AbsentTarget {
+                target: "docs/guide.md".to_string(),
+            }],
+        );
+
+        let serialized = serde_json::to_value(&agreement).expect("an agreement serializes");
+        let schema = schemars::schema_for!(ProfileAgreement)
+            .schema
+            .object
+            .expect("an agreement schema is an object");
+
+        assert_eq!(serialized["count"], agreement.divergences.items.len());
+        assert_eq!(
+            serialized
+                .as_object()
+                .expect("an agreement serializes as an object")
+                .keys()
+                .collect::<std::collections::BTreeSet<_>>(),
+            schema.properties.keys().collect()
         );
     }
 
