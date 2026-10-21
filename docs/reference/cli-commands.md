@@ -3782,7 +3782,7 @@ jit config get coordination.max_indefinite_leases_per_agent
 **Two resolution strategies**, matching how the rest of jit already reads
 these sections — `config get` does not invent a third:
 - `worktree`, `coordination`: the
-  system/user/repo-merged, default-filled view (same as `jit config show`).
+  system/user/repo-merged, default-filled view.
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
   `documentation`, `namespaces`, `item_kinds`, `projection`): read from the
   REPO's `config.toml` only, with no
@@ -3817,8 +3817,9 @@ jit config get documentation.bogus_field
 
 ### `jit config show`
 
-Display the merged, default-filled effective configuration from all sources
-(system, user, repository).
+Display the effective configuration snapshot that `jit config get` resolves
+keys against: the merged, default-filled `worktree` and `coordination` views
+and the repository's other sections.
 
 ```bash
 jit config show [--json]

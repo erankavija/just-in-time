@@ -3,6 +3,7 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1206,12 +1207,32 @@ pub struct WorktreeConfig {
 /// in TOML configuration (`[worktree] enforce_leases = ...`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
-    /// Block operations without active lease (production-safe default).
+    /// Block operations without active lease (production-safe).
     Strict,
     /// Warn but allow operations without lease (development-friendly).
     Warn,
     /// No enforcement - bypass lease checks (backward compatible).
     Off,
+}
+
+impl EnforcementMode {
+    /// Mode a `[worktree]` section applies when it omits `enforce_leases`.
+    pub const DEFAULT: Self = Self::Strict;
+
+    /// The configuration token for this mode.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Strict => "strict",
+            Self::Warn => "warn",
+            Self::Off => "off",
+        }
+    }
+}
+
+impl std::fmt::Display for EnforcementMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 impl std::str::FromStr for EnforcementMode {
@@ -1256,27 +1277,26 @@ impl WorktreeConfig {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinationConfig {
-    /// Maximum concurrent TTL=0 leases per agent (default: 2).
+    /// Maximum concurrent TTL=0 leases per agent (default:
+    /// [`MAX_INDEFINITE_LEASES_PER_AGENT`]).
     pub max_indefinite_leases_per_agent: Option<u32>,
-    /// Maximum concurrent TTL=0 leases per repository (default: 10).
+    /// Maximum concurrent TTL=0 leases per repository (default:
+    /// [`MAX_INDEFINITE_LEASES_PER_REPO`]).
     pub max_indefinite_leases_per_repo: Option<u32>,
 }
 
-impl CoordinationConfig {
-    pub fn max_indefinite_leases_per_agent(&self) -> u32 {
-        self.max_indefinite_leases_per_agent.unwrap_or(2)
-    }
-
-    pub fn max_indefinite_leases_per_repo(&self) -> u32 {
-        self.max_indefinite_leases_per_repo.unwrap_or(10)
-    }
+/// The coordination limits in force after layering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct EffectiveCoordination {
+    pub max_indefinite_leases_per_agent: u32,
+    pub max_indefinite_leases_per_repo: u32,
 }
 
 /// Resolve the lease enforcement mode from a repository's `[worktree]` section:
 /// `off` without the section, `strict` when the section omits the key.
 fn resolve_enforcement_mode(worktree: Option<&WorktreeConfig>) -> EnforcementMode {
     worktree.map_or(EnforcementMode::Off, |wt| {
-        wt.enforce_leases.unwrap_or(EnforcementMode::Strict)
+        wt.enforce_leases.unwrap_or(EnforcementMode::DEFAULT)
     })
 }
 
@@ -1556,21 +1576,30 @@ impl EffectiveConfig {
         std::env::var("JIT_AGENT_ID").ok()
     }
 
-    /// Get effective coordination config with merged values.
-    pub fn coordination(&self) -> MergedCoordinationConfig {
-        MergedCoordinationConfig {
-            repo: self
-                .repo_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
-            user: self
-                .user_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
-            system: self
-                .system_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
+    /// The first value `read` finds in the repository, user, then system layer.
+    fn layered<T>(&self, read: impl Fn(&JitConfig) -> Option<T>) -> Option<T> {
+        [&self.repo_config, &self.user_config, &self.system_config]
+            .into_iter()
+            .flatten()
+            .find_map(read)
+    }
+
+    /// The coordination limits: each key's first layered value, else its
+    /// built-in default.
+    pub fn coordination(&self) -> EffectiveCoordination {
+        let limit = |read: fn(&CoordinationConfig) -> Option<u32>, default| {
+            self.layered(|c| c.coordination.as_ref().and_then(read))
+                .unwrap_or(default)
+        };
+        EffectiveCoordination {
+            max_indefinite_leases_per_agent: limit(
+                |c| c.max_indefinite_leases_per_agent,
+                MAX_INDEFINITE_LEASES_PER_AGENT,
+            ),
+            max_indefinite_leases_per_repo: limit(
+                |c| c.max_indefinite_leases_per_repo,
+                MAX_INDEFINITE_LEASES_PER_REPO,
+            ),
         }
     }
 
@@ -1578,12 +1607,12 @@ impl EffectiveConfig {
     /// its WHOLE surface, for `jit config get`'s generic dotted-path walk
     /// (see [`resolve_dotted_key`](crate::commands::resolve_dotted_key)).
     ///
-    /// Two resolution strategies, matching how the rest of the codebase
-    /// already reads these sections — this method does not invent a THIRD
-    /// merge policy:
-    /// - `worktree`, `coordination`: the accessors above that `jit config
-    ///   show` uses (the merged repo, user, system, default chain, except the
-    ///   repo-only [`Self::enforcement_mode`]).
+    /// `jit config show` renders this same snapshot. Two resolution
+    /// strategies, matching how the rest of the codebase already reads these
+    /// sections — this method does not invent a THIRD merge policy:
+    /// - `worktree`, `coordination`: [`Self::enforcement_mode`] (repo-only) and
+    ///   [`Self::coordination`] (the layered repo, user, system, default
+    ///   chain).
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
@@ -1649,62 +1678,15 @@ impl EffectiveConfig {
         map.insert(
             "worktree".to_string(),
             serde_json::json!({
-                "enforce_leases": format!("{:?}", self.enforcement_mode()).to_lowercase(),
+                "enforce_leases": self.enforcement_mode().as_str(),
             }),
         );
         map.insert(
             "coordination".to_string(),
-            serde_json::json!({
-                "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
-                "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
-            }),
+            serde_json::to_value(self.coordination())?,
         );
 
         Ok(serde_json::Value::Object(map))
-    }
-}
-
-/// Merged coordination config with priority resolution per field.
-#[derive(Debug)]
-pub struct MergedCoordinationConfig {
-    repo: Option<CoordinationConfig>,
-    user: Option<CoordinationConfig>,
-    system: Option<CoordinationConfig>,
-}
-
-impl MergedCoordinationConfig {
-    pub fn max_indefinite_leases_per_agent(&self) -> u32 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.max_indefinite_leases_per_agent)
-            .or_else(|| {
-                self.user
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_agent)
-            })
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_agent)
-            })
-            .unwrap_or(2)
-    }
-
-    pub fn max_indefinite_leases_per_repo(&self) -> u32 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.max_indefinite_leases_per_repo)
-            .or_else(|| {
-                self.user
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_repo)
-            })
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_repo)
-            })
-            .unwrap_or(10)
     }
 }
 
@@ -2912,13 +2894,6 @@ max_indefinite_leases_per_repo = 10
         assert_eq!(coord.max_indefinite_leases_per_repo, Some(10));
     }
 
-    #[test]
-    fn test_coordination_config_defaults() {
-        let coord = CoordinationConfig::default();
-        assert_eq!(coord.max_indefinite_leases_per_agent(), 2);
-        assert_eq!(coord.max_indefinite_leases_per_repo(), 10);
-    }
-
     /// The removed coordination timing keys are rejected as unknown keys.
     #[test]
     fn test_coordination_config_rejects_removed_timing_keys() {
@@ -2956,7 +2931,7 @@ max_indefinite_leases_per_agent = 3
 
         // Verify coordination
         let coord = config.coordination.unwrap();
-        assert_eq!(coord.max_indefinite_leases_per_agent(), 3); // declared above, not the default
+        assert_eq!(coord.max_indefinite_leases_per_agent, Some(3));
     }
 
     // ============================================================
@@ -2968,8 +2943,13 @@ max_indefinite_leases_per_agent = 3
         let loader = ConfigLoader::new();
         let config = loader.build();
 
-        // Should have all defaults
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
+        assert_eq!(
+            config.coordination(),
+            EffectiveCoordination {
+                max_indefinite_leases_per_agent: MAX_INDEFINITE_LEASES_PER_AGENT,
+                max_indefinite_leases_per_repo: MAX_INDEFINITE_LEASES_PER_REPO,
+            }
+        );
     }
 
     #[test]
@@ -2987,9 +2967,12 @@ max_indefinite_leases_per_agent = 5
         let config = loader.build();
 
         // Repo value overrides default
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 5);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 5);
         // Other defaults preserved
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 10);
+        assert_eq!(
+            config.coordination().max_indefinite_leases_per_repo,
+            MAX_INDEFINITE_LEASES_PER_REPO
+        );
     }
 
     #[test]
@@ -3020,9 +3003,9 @@ max_indefinite_leases_per_agent = 6
         let config = loader.build();
 
         // Repo overrides user for the per-agent cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 6);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 6);
         // User value used for the per-repo cap (not in repo config)
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 20);
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 20);
     }
 
     #[test]
@@ -3063,9 +3046,9 @@ max_indefinite_leases_per_repo = 40
         let config = loader.build();
 
         // User wins over system for the per-agent cap (not in repo)
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 7);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 7);
         // Repo wins over system for the per-repo cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 40);
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 40);
     }
 
     #[test]
@@ -3082,8 +3065,10 @@ max_indefinite_leases_per_repo = 40
             .unwrap();
         let config = loader.build();
 
-        // All defaults
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
+        assert_eq!(
+            config.coordination().max_indefinite_leases_per_agent,
+            MAX_INDEFINITE_LEASES_PER_AGENT
+        );
     }
 
     #[test]

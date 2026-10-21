@@ -5913,76 +5913,20 @@ fn run() -> Result<()> {
         },
         Commands::Config(config_cmd) => match config_cmd {
             jit::cli::ConfigCommands::Show { json } => {
-                use jit::config::ConfigLoader;
-                use jit::config_manager::ConfigManager;
                 use jit::output::JsonOutput;
-                use serde_json::json;
 
-                // Build effective config from all sources
-                let mut loader = ConfigLoader::new();
-
-                // Try to load system config
-                let system_path = std::path::Path::new("/etc/jit");
-                if system_path.exists() {
-                    loader = loader.with_system_config(system_path)?;
-                }
-
-                // Try to load user config
-                if let Some(home) = dirs::home_dir() {
-                    let user_path = home.join(".config/jit");
-                    if user_path.exists() {
-                        loader = loader.with_user_config(&user_path)?;
-                    }
-                }
-
-                // Load repo config
-                loader = loader.with_repo_config(&jit_dir)?;
-
-                let config = loader.build();
+                let snapshot = executor.effective_config_snapshot()?;
 
                 if json {
-                    // Namespace registry is sourced from repo-level config.toml
-                    // (same path the server's /config/namespaces endpoint uses,
-                    // so MCP/web consumers see a single canonical shape).
-                    // Propagate load errors rather than silently hiding the registry.
-                    let label_namespaces = ConfigManager::new(&jit_dir).get_namespaces()?;
-                    let mut namespaces_map = serde_json::Map::new();
-                    for (name, cfg) in label_namespaces.namespaces {
-                        namespaces_map.insert(name, serde_json::to_value(cfg)?);
-                    }
-                    let namespaces_json = serde_json::Value::Object(namespaces_map);
-
-                    let output = json!({
-                        "worktree": {
-                            "enforce_leases": format!("{:?}", config.enforcement_mode()).to_lowercase(),
-                        },
-                        "coordination": {
-                            "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
-                            "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
-                        },
-                        "namespaces": namespaces_json,
-                    });
                     println!(
                         "{}",
-                        JsonOutput::success(output)
+                        JsonOutput::success(snapshot)
                             .with_message("Effective configuration")
                             .to_json_string()?
                     );
                 } else {
-                    println!("Effective Configuration:");
-                    println!();
-                    println!("[worktree]");
-                    println!("  enforce_leases = {:?}", config.enforcement_mode());
-                    println!();
-                    println!("[coordination]");
-                    println!(
-                        "  max_indefinite_leases_per_agent = {}",
-                        config.coordination().max_indefinite_leases_per_agent()
-                    );
-                    println!(
-                        "  max_indefinite_leases_per_repo = {}",
-                        config.coordination().max_indefinite_leases_per_repo()
-                    );
+                    println!("Effective Configuration:\n");
+                    print!("{}", jit::output::render_config_snapshot(&snapshot));
                 }
             }
             jit::cli::ConfigCommands::Get { key, json } => {

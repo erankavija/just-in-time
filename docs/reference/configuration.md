@@ -488,8 +488,8 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 | `"off"` | No lease enforcement |
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
-with no `[worktree]` section, `strict` when the section omits the key, and the
-declared value otherwise. `jit config show`, `jit config get`, and write
+with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
+section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; user and system config and environment
 variables do not change it.
 
@@ -562,17 +562,19 @@ indefinite (`--ttl 0`) lease.
 
 ```toml
 [coordination]
-max_indefinite_leases_per_agent = 2
-max_indefinite_leases_per_repo = 10
+max_indefinite_leases_per_agent = 3
+max_indefinite_leases_per_repo = 12
 ```
 
 #### `max_indefinite_leases_per_agent`
 
-Maximum indefinite (TTL=0) leases per agent. Default: `2`.
+Maximum indefinite (TTL=0) leases per agent. The default is listed in
+[Runtime Coordination Defaults](runtime-defaults.md).
 
 #### `max_indefinite_leases_per_repo`
 
-Maximum indefinite leases across entire repository. Default: `10`.
+Maximum indefinite leases across the entire repository. The default is listed in
+[Runtime Coordination Defaults](runtime-defaults.md).
 
 These two limits are the only `[coordination]` keys; a config setting any
 other key in the section fails to load. Claim timing is not configurable: a
@@ -638,7 +640,8 @@ or section fails to load with an error naming it.
 jit config show
 ```
 
-Displays the merged configuration from all sources.
+Renders the snapshot `jit config get` walks: every section, in the form its key
+path resolves to below.
 
 ### Get Single Value
 
@@ -665,8 +668,7 @@ jit config get documentation.development_root
 jit config get namespaces.type.unique
 ```
 
-`worktree` and `coordination` resolve the merged, default-filled view that
-`jit config show` displays. Every other section reads the repository's
+`worktree` and `coordination` resolve the merged, default-filled view. Every other section reads the repository's
 `config.toml` only, with no system/user merge or built-in defaults; an absent
 section resolves to `{}`.
 `templates` and `invariants` are not part of this surface (they load from

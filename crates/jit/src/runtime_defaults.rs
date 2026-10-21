@@ -3,14 +3,17 @@
 //! These constants are the single source of truth for the operational defaults
 //! that govern multi-agent lease coordination and recovery cleanup: the
 //! file-lock acquisition timeout and poll interval, the orphaned temp-file
-//! cleanup threshold, and the claim lease defaults. Call sites reference the
-//! constants here instead of inline literals, so each default value has one
-//! definition.
+//! cleanup threshold, the claim lease defaults, and the indefinite-lease limits.
+//! Call sites reference the constants here instead of inline literals, so each
+//! default value has one definition. The lease enforcement default is
+//! [`EnforcementMode::DEFAULT`], projected alongside them.
 //!
 //! [`render_reference_markdown`] projects these constants into the committed
 //! reference `docs/reference/runtime-defaults.md`; a conformance test asserts the
 //! committed copy matches the projection, so changing a default without
 //! refreshing the reference fails the test suite (`@/inv/single-source-prose`).
+
+use crate::config::EnforcementMode;
 
 /// Maximum time, in seconds, a caller waits to acquire a file lock before
 /// failing. Every production lock resolves its wait through
@@ -40,6 +43,14 @@ pub const CLAIM_TTL_SECS: u64 = 3600;
 /// Seconds without a heartbeat after which an indefinite claim lease is stale
 /// (1 hour).
 pub const CLAIM_STALE_THRESHOLD_SECS: u64 = 3600;
+
+/// Default maximum concurrent indefinite (TTL=0) leases per agent; the
+/// `[coordination] max_indefinite_leases_per_agent` key overrides it.
+pub const MAX_INDEFINITE_LEASES_PER_AGENT: u32 = 2;
+
+/// Default maximum concurrent indefinite leases per repository; the
+/// `[coordination] max_indefinite_leases_per_repo` key overrides it.
+pub const MAX_INDEFINITE_LEASES_PER_REPO: u32 = 10;
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -85,6 +96,21 @@ pub fn render_reference_markdown() -> String {
             "Claim stale threshold",
             format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
             "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer counts as active for lease enforcement and is not evicted automatically.",
+        ),
+        (
+            "Indefinite leases per agent",
+            MAX_INDEFINITE_LEASES_PER_AGENT.to_string(),
+            "Default maximum concurrent indefinite (`--ttl 0`) leases one agent holds; `jit claim acquire` refuses beyond it. Overridden by `[coordination] max_indefinite_leases_per_agent`.",
+        ),
+        (
+            "Indefinite leases per repository",
+            MAX_INDEFINITE_LEASES_PER_REPO.to_string(),
+            "Default maximum concurrent indefinite leases across the repository. Overridden by `[coordination] max_indefinite_leases_per_repo`.",
+        ),
+        (
+            "Lease enforcement mode",
+            EnforcementMode::DEFAULT.to_string(),
+            "Mode applied when the repository's `[worktree]` section omits `enforce_leases`. A repository with no `[worktree]` section enforces no leases.",
         ),
     ];
 
@@ -147,6 +173,9 @@ mod tests {
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
             format!("{CLAIM_TTL_SECS} seconds"),
             format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
+            MAX_INDEFINITE_LEASES_PER_AGENT.to_string(),
+            MAX_INDEFINITE_LEASES_PER_REPO.to_string(),
+            EnforcementMode::DEFAULT.to_string(),
         ] {
             assert!(doc.contains(&expected), "missing {expected} in:\n{doc}");
         }
