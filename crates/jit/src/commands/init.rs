@@ -329,7 +329,7 @@ impl CommandExecutor<JsonFileStorage> {
         result.profile = result
             .profile
             .take()
-            .map(|applied| init_profile_results(&applied.profiles, &roots))
+            .map(|applied| init_profile_results(&applied.items, &roots))
             .transpose()?;
         Ok(result)
     }
@@ -882,7 +882,7 @@ source-of-truth = \"registry-first\"\n";
             .expect("a profiled initialization reports it");
         assert_eq!(
             profile
-                .profiles
+                .items
                 .iter()
                 .map(|applied| (applied.id.as_str(), applied.status))
                 .collect::<Vec<_>>(),
@@ -930,7 +930,7 @@ source-of-truth = \"registry-first\"\n";
             result
                 .profile
                 .expect("profiled init reports its closure")
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -1046,7 +1046,7 @@ source-of-truth = \"registry-first\"\n";
         let profiles = result
             .profile
             .expect("profiled init reports its roots")
-            .profiles;
+            .items;
         assert_eq!(
             profiles
                 .iter()
@@ -1092,7 +1092,7 @@ source-of-truth = \"registry-first\"\n";
             result
                 .profile
                 .expect("a profiled initialization reports it")
-                .profiles
+                .items
                 .iter()
                 .map(|applied| applied.id.as_str())
                 .collect::<Vec<_>>(),
@@ -1153,7 +1153,7 @@ source-of-truth = \"registry-first\"\n";
             result
                 .profile
                 .expect("a profiled initialization reports it")
-                .profiles
+                .items
                 .iter()
                 .map(|applied| (applied.id.as_str(), applied.status))
                 .collect::<Vec<_>>(),

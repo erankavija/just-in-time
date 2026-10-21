@@ -13,6 +13,7 @@
 //! - **gate_findings**: Pure parser extracting structured findings from checker stdout
 //! - **repository_inputs**: Declared root-and-exclusion input sets and the content
 //!   digest taken over one, used by gate input declarations
+//! - **list_envelope**: The generic `{"count", "<collection>"}` list envelope
 //! - **queries**: Pure query operations on issue collections
 //! - **store_divergence**: Pure comparison naming the records two repository
 //!   stores disagree about
@@ -37,6 +38,7 @@ pub mod gate_findings;
 pub mod issue_id;
 pub mod item;
 pub mod key_reference;
+pub mod list_envelope;
 pub mod projection;
 pub mod queries;
 pub mod repository_inputs;
@@ -66,6 +68,9 @@ pub use event_log::{parse_known_events, EventLogError};
 
 // Re-export the projection layer for `use jit::domain::*` ergonomics.
 pub use projection::{project, ProjectedSection, Projection};
+
+// Re-export the list envelope.
+pub use list_envelope::{CollectionKey, ListEnvelope};
 
 // Re-export the issue-id matching rule.
 pub use issue_id::{InvalidIdPrefixError, IssueIdPrefix, MIN_ID_PREFIX_LENGTH};

@@ -1,4 +1,4 @@
-use crate::domain::ProfileOrigin;
+use crate::domain::{CollectionKey, ListEnvelope, ProfileOrigin};
 use crate::profile::ProfilePackageModel;
 use crate::repository_state::{AppliedProfileRecord, FileMode};
 use schemars::JsonSchema;
@@ -17,24 +17,16 @@ pub enum ProfileApplicationStatus {
     Applied,
 }
 
-/// The one count-wrapped collection envelope returned by profile commands.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileCollection<T> {
-    /// Number of entries in [`Self::profiles`].
-    pub count: usize,
-    /// Per-profile entries in the command's documented order.
-    pub profiles: Vec<T>,
+/// Collection key of every profile command's list envelope.
+pub enum ProfilesKey {}
+
+impl CollectionKey for ProfilesKey {
+    const KEY: &'static str = "profiles";
 }
 
-impl<T> ProfileCollection<T> {
-    /// Wrap entries without changing their order.
-    pub fn new(profiles: Vec<T>) -> Self {
-        Self {
-            count: profiles.len(),
-            profiles,
-        }
-    }
-}
+/// The list envelope every profile command returns, with entries in the
+/// command's documented order.
+pub type ProfileCollection<T> = ListEnvelope<ProfilesKey, T>;
 
 /// Internal command-layer profile application result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
@@ -66,7 +58,7 @@ impl ProfileCollection<ProfileApplyResult> {
     ///
     /// `None` only for an empty composition, which application does not produce.
     pub fn requested(&self) -> Option<&ProfileApplyResult> {
-        self.profiles.last()
+        self.items.last()
     }
 }
 
@@ -300,7 +292,7 @@ impl ProfileCollection<ProfilePlanEntry> {
     /// The profiles that decided a target or declaration that cannot be
     /// published, in report order.
     pub fn conflicted(&self) -> impl Iterator<Item = &ProfilePlanEntry> {
-        self.profiles
+        self.items
             .iter()
             .filter(|profile| profile.status == ProfilePlanStatus::WouldConflict)
     }

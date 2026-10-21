@@ -612,7 +612,7 @@ where
 
 /// Render the decisions every profile lifecycle command previews.
 fn print_profile_plans(plans: &jit::profile::ProfilePlanResult) {
-    for plan in &plans.profiles {
+    for plan in &plans.items {
         let status = match plan.status {
             jit::profile::ProfilePlanStatus::Unchanged => "unchanged",
             jit::profile::ProfilePlanStatus::WouldApply => "would apply",
@@ -711,11 +711,11 @@ fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool
     if json {
         let details = serde_json::to_value(plans)?;
         let message = if conflicted == 0 {
-            format!("{} profile(s) can be published", plans.count)
+            format!("{} profile(s) can be published", plans.count())
         } else {
             format!(
                 "{conflicted} of {} profile(s) decided targets that cannot be published",
-                plans.count
+                plans.count()
             )
         };
         return render_validation_json(
@@ -731,7 +731,7 @@ fn render_profile_difference(plans: &jit::profile::ProfilePlanResult, json: bool
     }
     eprintln!(
         "{conflicted} of {} profile(s) decided targets that cannot be published",
-        plans.count
+        plans.count()
     );
     std::process::exit(jit::ExitCode::ValidationFailed.code());
 }
@@ -742,7 +742,7 @@ fn print_profile_applications(
     applied: jit::profile::ProfileComposedApplyResult,
     changed_status: &str,
 ) {
-    for profile in applied.profiles {
+    for profile in applied.items {
         let status = match profile.status {
             jit::profile::ProfileApplicationStatus::Unchanged => "unchanged",
             jit::profile::ProfileApplicationStatus::WouldApply => "would apply",
@@ -2096,7 +2096,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            for result in result.profiles {
+                            for result in result.items {
                                 let profile = &result.manifest;
                                 print_profile_heading(
                                     &result.id,
@@ -2193,7 +2193,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            for profile in result.profiles {
+                            for profile in result.items {
                                 let status = match profile.status {
                                     jit::profile::ProfileApplicationStatus::Unchanged => {
                                         "unchanged"
@@ -2248,7 +2248,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            for profile in result.profiles {
+                            for profile in result.items {
                                 let status = match profile.status {
                                     jit::profile::ProfileApplicationStatus::WouldApply => {
                                         "would pack"
@@ -2300,7 +2300,7 @@ fn run() -> Result<()> {
                             let output = JsonOutput::success(&result);
                             println!("{}", output.to_json_string()?);
                         } else {
-                            for profile in result.profiles {
+                            for profile in result.items {
                                 let status = match profile.status {
                                     jit::profile::ProfileApplicationStatus::WouldApply => {
                                         "would add"
