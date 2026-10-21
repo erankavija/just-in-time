@@ -186,18 +186,11 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
     // Add nodes with state styling
     for issue in &all_nodes {
         let label = format!("{}:<br/>{}", issue.id, issue.title);
-        let style_class = match issue.state {
-            State::Backlog => "backlog",
-            State::Ready => "ready",
-            State::InProgress => "inprogress",
-            State::Gated => "gated",
-            State::Done => "done",
-            State::Rejected => "rejected",
-            State::Archived => "archived",
-        };
         output.push_str(&format!(
             "  {}[\"{}\"]:::{}\n",
-            issue.id, label, style_class
+            issue.id,
+            label,
+            issue.state.as_str()
         ));
     }
 
@@ -213,14 +206,35 @@ pub fn export_mermaid(graph: &DependencyGraph<Issue>) -> String {
         }
     }
 
-    // Add style classes
-    output.push_str("\n  classDef open fill:#e0e0e0,stroke:#333\n");
-    output.push_str("  classDef ready fill:#add8e6,stroke:#333\n");
-    output.push_str("  classDef inprogress fill:#ffff99,stroke:#333\n");
-    output.push_str("  classDef done fill:#90ee90,stroke:#333\n");
-    output.push_str("  classDef archived fill:#808080,stroke:#333\n");
+    // One class per lifecycle state, named by its canonical token
+    output.push('\n');
+    output.push_str(
+        &State::all()
+            .into_iter()
+            .map(|state| {
+                format!(
+                    "  classDef {} fill:{},stroke:#333\n",
+                    state.as_str(),
+                    mermaid_fill(state)
+                )
+            })
+            .collect::<String>(),
+    );
 
     output
+}
+
+/// Fill colour for a state's mermaid class; exhaustive so a new state cannot go unstyled.
+fn mermaid_fill(state: State) -> &'static str {
+    match state {
+        State::Backlog => "#e0e0e0",
+        State::Ready => "#add8e6",
+        State::InProgress => "#ffff99",
+        State::Gated => "#ffd8a8",
+        State::Done => "#90ee90",
+        State::Rejected => "#ffc0cb",
+        State::Archived => "#808080",
+    }
 }
 
 /// Export Issue dependency graph as JSON for programmatic analysis (summary shape)
@@ -384,7 +398,46 @@ mod tests {
         assert!(mermaid.contains("Setup"));
         assert!(mermaid.contains("Deploy"));
         assert!(mermaid.contains(&format!("{} --> {}", issue2.id, issue1.id)));
-        assert!(mermaid.contains("classDef open"));
+    }
+
+    #[test]
+    fn test_export_mermaid_declares_one_class_per_state_and_every_node_class() {
+        let issues: Vec<Issue> = State::all()
+            .into_iter()
+            .enumerate()
+            .map(|(i, state)| {
+                let mut issue = crate::domain::types::fixture_issue(
+                    format!("Issue {i}"),
+                    "State fixture".to_string(),
+                );
+                issue.state = state;
+                issue
+            })
+            .collect();
+        let refs: Vec<&Issue> = issues.iter().collect();
+        let graph = DependencyGraph::new(&refs);
+
+        let mermaid = export_mermaid(&graph);
+
+        let mut declared: Vec<&str> = mermaid
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("classDef "))
+            .filter_map(|rest| rest.split_whitespace().next())
+            .collect();
+        let mut expected: Vec<&str> = State::all().iter().map(|s| s.as_str()).collect();
+        declared.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(declared, expected);
+
+        let node_classes = mermaid
+            .lines()
+            .filter_map(|line| line.rsplit_once(":::").map(|(_, class)| class.trim()));
+        for class in node_classes {
+            assert!(
+                declared.contains(&class),
+                "node class {class} is not declared"
+            );
+        }
     }
 
     #[test]
