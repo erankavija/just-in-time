@@ -8,6 +8,7 @@
   ],
   "description": "Thirteen hidden clap stubs duplicate the wrong-verb hint table and keep the parser-level hint from firing. Deleting them leaves one hint path that needs no argv scan.\n\n## Background\n\n`crates/jit/src/cli.rs` declares 13 `#[command(hide = true, trailing_var_arg = true)]` stubs: `IssueCommands::{Rm, Remove, Complete, Edit}`, `DepCommands::{Remove, Delete}`, `GateCommands::{Rm, Delete}`, `DocCommands::{Rm, Delete}` and `LabelCommands::{Add, Rm, Remove}`. Their arms in `run()` call `verb_hint_error` (`crates/jit/src/main.rs`), which scans the captured arguments for `--json` and returns the hint as an `INVALID_ARGUMENT` error. Dispatch runs after repository validation, so a stub invoked outside a repository reports `REPOSITORY_NOT_FOUND` instead of its hint. Because the stubs claim those verbs, `unknown_subcommand_hint`, which looks the verb up in `COMMAND_HINTS`, prints `Hint: ...` to stderr before clap's error and exits 2, serves only `(\"invariant\", \"list\")` today. `mcp-server/curated-tools.json` excludes each stub as an \"Alias stub\", and `crates/jit/tests/cli_issue/verb_hint_tests.rs` asserts the hint inside the `--json` failure envelope.\n\nThe contract this establishes: clap parse failures, including a wrong-verb guess, stay outside the failure envelope. A wrong verb prints its hint and clap's diagnostic on stderr and exits 2, with or without `--json`. Recovering `--json` after a failed parse would need an argv scan, which the single global output flag forbids, and clap yields no partial matches.\n\n## Success Criteria\n\n- [hard] REQ-01: `cli.rs` declares no verb-hint stub, and `main.rs` contains no `verb_hint_error` and no arm dispatching to it.\n- [hard] REQ-02: Invoking any `COMMAND_HINTS` wrong verb prints that entry's hint and clap's diagnostic on stderr, writes nothing to stdout and exits 2, with and without `--json` and inside or outside a repository; `verb_hint_tests.rs` states this contract in place of the JSON-envelope hint assertions.\n- [hard] REQ-03: `mcp-server/curated-tools.json` names no removed stub, and the MCP curation coverage test passes.\n- [hard] REQ-04: Apart from the replaced wrong-verb envelope assertions, the existing suites pass without weakened assertions.\n\n## Notes\n\nThe hidden `validate --divergence` flag is not a verb stub and is out of scope.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "documents": [],
+  "done_at": "2026-10-21T11:20:20.212326891Z",
   "first_ready_at": "2026-10-21T01:17:17.724444903Z",
   "gates_required": [
     "cargo-ci",
@@ -21,8 +22,8 @@
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T11:11:50.641327312Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T11:20:14.045339088Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -43,7 +44,7 @@
     "satisfies:df129d9e/REQ-09"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "Wrong-verb hints come only from the parser-level path",
-  "updated_at": "2026-10-21T11:15:42.107921975Z"
+  "updated_at": "2026-10-21T11:20:20.212326891Z"
 }
