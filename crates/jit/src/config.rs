@@ -1215,7 +1215,7 @@ pub enum EnforcementModeError {
 pub struct WorktreeConfig {
     /// Worktree mode (default: [`WorktreeMode::Auto`]).
     pub mode: Option<WorktreeMode>,
-    /// Lease enforcement mode (default: [`EnforcementMode::Strict`]).
+    /// Lease enforcement mode; resolved by [`JitConfig::enforcement_mode`].
     pub enforce_leases: Option<EnforcementMode>,
     /// Write-policy stance for state-mutating commands run inside a linked
     /// non-primary checkout (default:
@@ -1263,10 +1263,8 @@ impl<'de> serde::Deserialize<'de> for WorktreeMode {
 
 /// Enforcement mode for lease requirements.
 ///
-/// Parsed (case-insensitively) from the tokens `"strict"` / `"warn"` / `"off"` by
-/// both TOML configuration (`[worktree] enforce_leases = ...`) and the
-/// `JIT_ENFORCE_LEASES` environment variable, so the two sources share one
-/// case-handling rule.
+/// Parsed (case-insensitively) from the tokens `"strict"` / `"warn"` / `"off"`
+/// in TOML configuration (`[worktree] enforce_leases = ...`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
     /// Block operations without active lease (production-safe default).
@@ -1307,14 +1305,6 @@ impl WorktreeConfig {
     /// this method is infallible.
     pub fn worktree_mode(&self) -> WorktreeMode {
         self.mode.unwrap_or(WorktreeMode::Auto)
-    }
-
-    /// Get the enforcement mode, defaulting to [`EnforcementMode::Strict`] when unset.
-    ///
-    /// The field is typed — invalid tokens are rejected at TOML parse time, so
-    /// this method is infallible.
-    pub fn enforcement_mode(&self) -> EnforcementMode {
-        self.enforce_leases.unwrap_or(EnforcementMode::Strict)
     }
 
     /// Get the write-policy stance, defaulting to
@@ -1463,7 +1453,23 @@ impl AgentConfig {
     }
 }
 
+/// Resolve the lease enforcement mode from a repository's `[worktree]` section:
+/// `off` without the section, `strict` when the section omits the key.
+fn resolve_enforcement_mode(worktree: Option<&WorktreeConfig>) -> EnforcementMode {
+    worktree.map_or(EnforcementMode::Off, |wt| {
+        wt.enforce_leases.unwrap_or(EnforcementMode::Strict)
+    })
+}
+
 impl JitConfig {
+    /// The lease enforcement mode write commands apply and `jit config` reports.
+    ///
+    /// Lease enforcement is repository policy, so only this repository config
+    /// decides it; user/system layers and the environment do not.
+    pub fn enforcement_mode(&self) -> EnforcementMode {
+        resolve_enforcement_mode(self.worktree.as_ref())
+    }
+
     /// Load configuration from `.jit/config.toml` if it exists.
     ///
     /// Returns an empty config (all fields None) if the file doesn't exist.
@@ -1763,43 +1769,10 @@ impl EffectiveConfig {
         Ok(WorktreeMode::Auto)
     }
 
-    /// Get the effective enforcement mode.
-    /// Priority: env var > repo > user > system > default
-    ///
-    /// Both the env-var and TOML paths share the same
-    /// [`EnforcementMode::from_str`] implementation (case-insensitive), so the
-    /// two sources handle case identically.
-    pub fn enforcement_mode(&self) -> Result<EnforcementMode> {
-        // Check env var first (highest priority). Uses the same FromStr as TOML.
-        if let Ok(val) = std::env::var("JIT_ENFORCE_LEASES") {
-            return val.parse::<EnforcementMode>().map_err(|e| {
-                crate::errors::InvalidArgumentError::new(format!("invalid JIT_ENFORCE_LEASES: {e}"))
-                    .into()
-            });
-        }
-
-        if let Some(ref cfg) = self.repo_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.enforce_leases.is_some() {
-                    return Ok(wt.enforcement_mode());
-                }
-            }
-        }
-        if let Some(ref cfg) = self.user_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.enforce_leases.is_some() {
-                    return Ok(wt.enforcement_mode());
-                }
-            }
-        }
-        if let Some(ref cfg) = self.system_config {
-            if let Some(ref wt) = cfg.worktree {
-                if wt.enforce_leases.is_some() {
-                    return Ok(wt.enforcement_mode());
-                }
-            }
-        }
-        Ok(EnforcementMode::Strict)
+    /// Get the effective enforcement mode: the repository config's
+    /// [`JitConfig::enforcement_mode`].
+    pub fn enforcement_mode(&self) -> EnforcementMode {
+        resolve_enforcement_mode(self.repo_config.as_ref().and_then(|c| c.worktree.as_ref()))
     }
 
     /// Get the effective agent ID from environment variable.
@@ -1870,9 +1843,9 @@ impl EffectiveConfig {
     /// already reads these sections — this method does not invent a THIRD
     /// merge policy:
     /// - `worktree`, `coordination`, `global_operations`, `locks`, `events`:
-    ///   the existing system/user/repo-merged accessors above (env var, then
-    ///   repo, then user, then system, then default), unchanged from `jit
-    ///   config show`.
+    ///   the accessors above that `jit config show` uses (the merged
+    ///   env var, repo, user, system, default chain, except the repo-only
+    ///   [`Self::enforcement_mode`]).
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
@@ -1943,11 +1916,7 @@ impl EffectiveConfig {
                     self.worktree_mode().unwrap_or(WorktreeMode::Auto)
                 )
                 .to_lowercase(),
-                "enforce_leases": format!(
-                    "{:?}",
-                    self.enforcement_mode().unwrap_or(EnforcementMode::Strict)
-                )
-                .to_lowercase(),
+                "enforce_leases": format!("{:?}", self.enforcement_mode()).to_lowercase(),
             }),
         );
         map.insert(
@@ -3148,25 +3117,6 @@ types = { task = 1 }
     }
 
     #[test]
-    fn test_enforcement_mode_case_sensitivity_divergence_is_gone() {
-        // Same divergence test for EnforcementMode / JIT_ENFORCE_LEASES.
-        let mut env = EnvGuard::acquire();
-
-        env.set("JIT_ENFORCE_LEASES", "WARN");
-        let via_env = ConfigLoader::new().build().enforcement_mode().unwrap();
-
-        let toml_cfg: JitConfig =
-            toml::from_str("[worktree]\nenforce_leases = \"warn\"\n").unwrap();
-        let via_toml = toml_cfg.worktree.unwrap().enforcement_mode();
-
-        assert_eq!(
-            via_env, via_toml,
-            "TOML and env-var must resolve identically"
-        );
-        assert_eq!(via_env, EnforcementMode::Warn);
-    }
-
-    #[test]
     fn test_parse_full_schema_v2_config() {
         let config_toml = r#"
 [version]
@@ -3219,15 +3169,19 @@ unique = false
     }
 
     #[test]
+    fn test_enforcement_mode_off_without_worktree_section() {
+        let config: JitConfig = toml::from_str("").unwrap();
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Off);
+    }
+
+    #[test]
     fn test_enforcement_mode_default_to_strict() {
         let config_toml = r#"
 [worktree]
 # No enforce_leases specified
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        // enforcement_mode() is now infallible — the field is typed.
-        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Strict);
     }
 
     #[test]
@@ -3237,8 +3191,7 @@ unique = false
 enforce_leases = "strict"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Strict);
     }
 
     #[test]
@@ -3248,8 +3201,7 @@ enforce_leases = "strict"
 enforce_leases = "warn"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Warn);
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Warn);
     }
 
     #[test]
@@ -3259,8 +3211,7 @@ enforce_leases = "warn"
 enforce_leases = "off"
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let worktree = config.worktree.unwrap();
-        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Off);
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Off);
     }
 
     #[test]
@@ -3545,10 +3496,9 @@ use_unified_envelope = true
         assert!(config.locks.is_some());
         assert!(config.events.is_some());
 
-        // Verify worktree — both methods are infallible since fields are typed.
+        assert_eq!(config.enforcement_mode(), EnforcementMode::Strict);
         let worktree = config.worktree.unwrap();
         assert_eq!(worktree.worktree_mode(), WorktreeMode::Auto);
-        assert_eq!(worktree.enforcement_mode(), EnforcementMode::Strict);
 
         // Verify coordination
         let coord = config.coordination.unwrap();
@@ -3797,7 +3747,6 @@ enforce_leases = "warn"
         let config = loader.build();
 
         assert_eq!(config.worktree_mode().unwrap(), WorktreeMode::On);
-        assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
     }
 
     // ============================================================
@@ -3813,11 +3762,55 @@ enforce_leases = "warn"
     }
 
     #[test]
-    fn test_env_override_enforce_leases() {
+    fn test_enforcement_mode_reported_matches_enforced_in_every_configuration_state() {
+        const NO_SECTION: &str = "";
+        const SECTION_WITHOUT_KEY: &str = "[worktree]\n";
+        let explicit = |mode: &str| format!("[worktree]\nenforce_leases = \"{mode}\"\n");
+        // (repo, user, system) config.toml contents; `None` leaves the layer absent.
+        let states: Vec<(String, Option<String>, Option<String>)> = vec![
+            (NO_SECTION.into(), None, None),
+            (SECTION_WITHOUT_KEY.into(), None, None),
+            (explicit("strict"), None, None),
+            (explicit("warn"), None, None),
+            (explicit("off"), None, None),
+            (NO_SECTION.into(), Some(explicit("strict")), None),
+            (SECTION_WITHOUT_KEY.into(), Some(explicit("off")), None),
+            (NO_SECTION.into(), None, Some(explicit("warn"))),
+            (SECTION_WITHOUT_KEY.into(), None, Some(explicit("off"))),
+        ];
         let mut env = EnvGuard::acquire();
-        env.set("JIT_ENFORCE_LEASES", "warn");
-        let config = ConfigLoader::new().build();
-        assert_eq!(config.enforcement_mode().unwrap(), EnforcementMode::Warn);
+        for (repo, user, system) in &states {
+            let layer = |content: &Option<String>| {
+                content.as_ref().map(|toml| {
+                    let dir = TempDir::new().unwrap();
+                    std::fs::write(dir.path().join("config.toml"), toml).unwrap();
+                    dir
+                })
+            };
+            let repo_dir = layer(&Some(repo.clone())).unwrap();
+            let (user_dir, system_dir) = (layer(user), layer(system));
+            for env_value in [None, Some("strict"), Some("warn"), Some("off")] {
+                match env_value {
+                    Some(value) => env.set("JIT_ENFORCE_LEASES", value),
+                    None => env.remove("JIT_ENFORCE_LEASES"),
+                };
+                let mut loader = ConfigLoader::new();
+                if let Some(dir) = &system_dir {
+                    loader = loader.with_system_config(dir.path()).unwrap();
+                }
+                if let Some(dir) = &user_dir {
+                    loader = loader.with_user_config(dir.path()).unwrap();
+                }
+                let effective = loader.with_repo_config(repo_dir.path()).unwrap().build();
+                let enforced = JitConfig::load(repo_dir.path()).unwrap().enforcement_mode();
+                let reported = effective.enforcement_mode();
+                assert_eq!(
+                    reported, enforced,
+                    "repo {repo:?}, user {user:?}, system {system:?}, \
+                     JIT_ENFORCE_LEASES {env_value:?}"
+                );
+            }
+        }
     }
 
     #[test]

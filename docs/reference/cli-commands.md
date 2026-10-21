@@ -4034,7 +4034,6 @@ untouched).
 jit config set <KEY> <VALUE> [--global] [--json]
 
 jit config set coordination.max_indefinite_leases_per_agent 3
-jit config set --global worktree.enforce_leases warn
 ```
 
 ### `jit config validate`

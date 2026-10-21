@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 ///
 /// It is the per-invocation counterpart of the repository's declared
 /// `[worktree] write_policy`, named after that key the way
-/// `JIT_ENFORCE_LEASES` and `JIT_WORKTREE_MODE` are named after theirs.
+/// `JIT_WORKTREE_MODE` is named after `mode`.
 pub const LINKED_CHECKOUT_WRITE_STANCE_ENV: &str = "JIT_WORKTREE_WRITE_POLICY";
 
 /// Manages configuration loading and access.
@@ -73,45 +73,6 @@ impl ConfigManager {
         namespaces_from_config(config)
     }
 
-    /// Get the enforcement mode for lease requirements.
-    ///
-    /// Returns the configured enforcement mode from `.jit/config.toml`,
-    /// defaulting to `EnforcementMode::Off` if not configured.
-    ///
-    /// **Default Behavior:**
-    /// - Single-agent development: Enforcement OFF (no friction)
-    /// - Multi-agent coordination: Explicitly enable `strict` or `warn` in config
-    ///
-    /// # Enforcement Modes
-    ///
-    /// - `Off`: No lease enforcement (default for single-agent work)
-    /// - `Warn`: Log warnings but allow operations without lease
-    /// - `Strict`: Block operations without active lease (for multi-agent teams)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if config.toml exists but has an invalid enforcement mode.
-    pub fn get_enforcement_mode(&self) -> Result<crate::config::EnforcementMode> {
-        let config = self.load()?;
-        self.enforcement_mode_from_config(&config)
-    }
-
-    /// Resolve the lease enforcement mode from an ALREADY-loaded config, without
-    /// re-reading `config.toml` from disk.
-    ///
-    /// Callers on a write path that already hold a cached [`JitConfig`] should use
-    /// this so a single command parses `config.toml` at most once.
-    pub fn enforcement_mode_from_config(
-        &self,
-        config: &JitConfig,
-    ) -> Result<crate::config::EnforcementMode> {
-        match config.worktree.as_ref() {
-            Some(worktree_config) => Ok(worktree_config.enforcement_mode()),
-            // No worktree section - default to Off for single-agent development.
-            None => Ok(crate::config::EnforcementMode::Off),
-        }
-    }
-
     /// Get the worktree write-policy stance for state-mutating commands run
     /// inside a linked non-primary checkout.
     ///
@@ -119,11 +80,9 @@ impl ConfigManager {
     /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] (refuse) if not
     /// configured.
     ///
-    /// Unlike [`Self::get_enforcement_mode`], an absent `write_policy` key in
+    /// Unlike [`JitConfig::enforcement_mode`], an absent `write_policy` key in
     /// a present `[worktree]` section and an absent `[worktree]` section
-    /// altogether resolve identically — both refuse. This method states that
-    /// symmetry explicitly rather than inheriting the section-presence
-    /// asymmetry `enforce_leases` has.
+    /// altogether resolve identically — both refuse.
     ///
     /// # Errors
     ///
@@ -562,64 +521,6 @@ unique = false
     }
 
     #[test]
-    fn test_get_enforcement_mode_default_when_missing() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_mgr = ConfigManager::new(&jit_dir);
-        let mode = config_mgr.get_enforcement_mode().unwrap();
-
-        // Default to Off when no config exists (single-agent development)
-        assert_eq!(mode, crate::config::EnforcementMode::Off);
-    }
-
-    #[test]
-    fn test_get_enforcement_mode_from_config() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = r#"
-[worktree]
-enforce_leases = "warn"
-"#;
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(&jit_dir);
-        let mode = config_mgr.get_enforcement_mode().unwrap();
-
-        assert_eq!(mode, crate::config::EnforcementMode::Warn);
-    }
-
-    #[test]
-    fn test_get_enforcement_mode_invalid() {
-        let temp_dir = setup_test_dir();
-        let jit_dir = temp_dir.path().join(".jit");
-        fs::create_dir(&jit_dir).unwrap();
-
-        let config_toml = r#"
-[worktree]
-enforce_leases = "invalid"
-"#;
-        fs::write(jit_dir.join("config.toml"), config_toml).unwrap();
-
-        let config_mgr = ConfigManager::new(&jit_dir);
-        let result = config_mgr.get_enforcement_mode();
-
-        // Invalid tokens are now rejected at TOML parse time (via the typed
-        // EnforcementMode field), so the error propagates through load().
-        assert!(result.is_err());
-        // Use the full error chain (anyhow's `{:#}`) to see through the
-        // "Failed to parse config.toml" context wrapper.
-        let msg = format!("{:#}", result.unwrap_err());
-        assert!(
-            msg.contains("invalid"),
-            "error chain must mention invalidity: {msg}"
-        );
-    }
-
-    #[test]
     fn test_get_write_policy_default_when_missing() {
         let temp_dir = setup_test_dir();
         let jit_dir = temp_dir.path().join(".jit");
@@ -764,7 +665,7 @@ enforce_leases = "invalid"
 
         // Invalid tokens are rejected at TOML parse time (via the typed
         // ProjectName field), so the error propagates through load(), mirroring
-        // test_get_enforcement_mode_invalid.
+        // test_enforcement_mode_invalid.
         assert!(result.is_err());
         let msg = format!("{:#}", result.unwrap_err());
         assert!(

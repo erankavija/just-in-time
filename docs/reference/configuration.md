@@ -26,7 +26,7 @@ or customize individual settings.
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
 
-Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. Some execution paths (structural lease enforcement, claim coordination limits) read the repository `.jit/config.toml` directly rather than through this merge.
+Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) and [`write_policy`](#write_policy) are repository-scoped and resolve from `.jit/config.toml` alone, for `jit config` and command execution alike. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
 
 ---
 
@@ -479,8 +479,11 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 | `"warn"` | Warn if no lease but allow operation |
 | `"off"` | No lease enforcement |
 
-With no `[worktree]` section, command execution uses `off`. If the section is
-present but `enforce_leases` is omitted, it resolves to `strict`.
+The mode is read from the repository's own `.jit/config.toml` only: `off`
+with no `[worktree]` section, `strict` when the section omits the key, and the
+declared value otherwise. `jit config show`, `jit config get`, and write
+commands all resolve it by this rule; user and system config and environment
+variables do not change it.
 
 #### `write_policy`
 
@@ -690,8 +693,11 @@ jit config get bogus_section
 jit config set worktree.enforce_leases warn
 
 # Set in user config
-jit config set worktree.enforce_leases warn --global
+jit config set <section.field> <value> --global
 ```
+
+A repository-scoped key such as `worktree.enforce_leases` takes effect only in
+the repository config.
 
 ### Validate Config
 

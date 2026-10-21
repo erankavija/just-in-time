@@ -607,10 +607,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return Ok(AttemptOutcome::Retry);
                 };
                 let config = crate::repository_state::assemble_config(&preflight.image)?;
-                (
-                    preflight.target.id,
-                    self.config_manager.enforcement_mode_from_config(&config)?,
-                )
+                (preflight.target.id, config.enforcement_mode())
             };
             // Claims coordination is acquired before repository serialization;
             // the target and policy are then re-resolved from the held image.
@@ -626,7 +623,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             };
             let target_id = resolve_issue_from_capture(&issues, id)?;
             let config = crate::repository_state::assemble_config(&image)?;
-            let current_mode = self.config_manager.enforcement_mode_from_config(&config)?;
+            let current_mode = config.enforcement_mode();
             if target_id != expected_target || current_mode != expected_mode {
                 return Ok(AttemptOutcome::Retry);
             }

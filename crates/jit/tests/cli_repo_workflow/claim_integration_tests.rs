@@ -1515,3 +1515,60 @@ fn test_claim_release_help_cross_references_assignment_commands() {
         "claim release --help should cross-reference jit issue claim, got: {help}"
     );
 }
+
+#[test]
+fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
+    // Each state once diverged: `config show` honoured the env var and user
+    // layer while write commands read only the repository config.
+    let states = [
+        ("", "strict", None),
+        (
+            "[worktree]\n",
+            "off",
+            Some("[worktree]\nenforce_leases = \"off\"\n"),
+        ),
+    ];
+    for (worktree_section, env_mode, user_config) in states {
+        let repo = setup_repo();
+        let issue_id = create_issue(repo.path(), "Lease enforcement probe");
+        let config_path = repo.path().join(".jit/config.toml");
+        let mut config = fs::read_to_string(&config_path).unwrap();
+        config.push_str(&format!("\n{worktree_section}"));
+        fs::write(&config_path, config).unwrap();
+        let home = repo.path().join("isolated-home");
+        fs::create_dir_all(home.join(".config/jit")).unwrap();
+        if let Some(user_config) = user_config {
+            fs::write(home.join(".config/jit/config.toml"), user_config).unwrap();
+        }
+        let jit = |args: &[&str]| {
+            Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+                .current_dir(repo.path())
+                .env("HOME", &home)
+                .env("JIT_ENFORCE_LEASES", env_mode)
+                .env("JIT_AGENT_ID", "agent:enforcement-probe")
+                .args(args)
+                .output()
+                .unwrap()
+        };
+
+        let show = jit(&["config", "show", "--json"]);
+        assert!(show.status.success(), "config show failed: {show:?}");
+        let reported: Value = serde_json::from_slice(&show.stdout).unwrap();
+        let reported_strict = reported["worktree"]["enforce_leases"] == "strict";
+        let update = jit(&["issue", "update", &issue_id, "--priority", "high"]);
+
+        assert_eq!(
+            !update.status.success(),
+            reported_strict,
+            "section {worktree_section:?}, JIT_ENFORCE_LEASES={env_mode}: config show \
+             reported {} but a lease-less update {}: {}",
+            reported["worktree"]["enforce_leases"],
+            if update.status.success() {
+                "succeeded"
+            } else {
+                "was refused"
+            },
+            String::from_utf8_lossy(&update.stderr)
+        );
+    }
+}
