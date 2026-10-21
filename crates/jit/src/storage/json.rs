@@ -1830,40 +1830,6 @@ mod tests {
     }
 
     #[test]
-    fn test_read_events_skips_structurally_valid_retired_tags_but_keeps_strict_records() {
-        let (_temp, storage) = setup_storage();
-        let known = Event::IssueCreated {
-            id: "known-event".to_string(),
-            issue_id: "issue-id".to_string(),
-            timestamp: chrono::Utc::now(),
-            title: "Known".to_string(),
-            priority: crate::domain::Priority::Normal,
-        };
-        let unknown = concat!(
-            "{\"type\":\"retired_",
-            "event\",\"id\":\"historical\",",
-            "\"timestamp\":\"2025-01-01T00:00:00Z\"}"
-        );
-        fs::write(
-            storage.root.join(EVENTS_FILE),
-            format!("{unknown}\n{}\n", serde_json::to_string(&known).unwrap()),
-        )
-        .unwrap();
-
-        assert_eq!(storage.read_events().unwrap(), vec![known]);
-
-        fs::write(
-            storage.root.join(EVENTS_FILE),
-            "{\"type\":\"issue_created\"}\n",
-        )
-        .unwrap();
-        assert!(storage.read_events().is_err());
-
-        fs::write(storage.root.join(EVENTS_FILE), "{not-json}\n").unwrap();
-        assert!(storage.read_events().is_err());
-    }
-
-    #[test]
     fn test_read_repo_file_present_absent_and_path_safety() {
         // Repo root is the parent of the .jit dir, so create storage at temp/.jit.
         let temp = TempDir::new().unwrap();

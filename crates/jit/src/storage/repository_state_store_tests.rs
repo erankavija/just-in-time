@@ -641,6 +641,54 @@ fn semantic_view(image: &RepositoryImage) -> BTreeMap<VirtualPath, SemanticEntry
         .collect()
 }
 
+fn read_events_for_log<S: IssueStore>(store: &S) -> Option<Vec<Event>> {
+    store.read_events().ok()
+}
+
+#[test]
+fn test_conformance_event_log_skips_retired_tags_and_rejects_malformed_known_records() {
+    let known = |id: &str| Event::IssueCreated {
+        id: id.to_string(),
+        issue_id: "issue-id".to_string(),
+        timestamp: chrono::Utc::now(),
+        title: "Known".to_string(),
+        priority: crate::domain::Priority::Normal,
+    };
+    let (first, second) = (known("first"), known("second"));
+    let retired = concat!(
+        "{\"type\":\"retired_",
+        "event\",\"id\":\"historical\",\"timestamp\":\"2025-01-01T00:00:00Z\"}"
+    );
+    let line = |event: &Event| serde_json::to_string(event).unwrap();
+    let logs = [
+        format!(
+            "{retired}\n{}\n{retired}\n{}\n",
+            line(&first),
+            line(&second)
+        ),
+        "{\"type\":\"issue_created\"}\n".to_string(),
+        "{not-json}\n".to_string(),
+    ];
+    let expected = [Some(vec![first, second]), None, None];
+
+    for (log, expected) in logs.iter().zip(expected) {
+        let worktree = TempDir::new().unwrap();
+        let data = worktree.path().join(".jit");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(data.join("events.jsonl"), log).unwrap();
+        let json = JsonFileStorage::new(&data);
+        json.configure_repository_layout(
+            &discover_repository_layout(worktree.path(), &data).unwrap(),
+        );
+
+        let memory = InMemoryStorage::new();
+        seed_memory_existing(&memory, &[(VirtualPath::EVENTS, log.as_bytes())]);
+
+        assert_eq!(read_events_for_log(&json), expected, "json log {log:?}");
+        assert_eq!(read_events_for_log(&memory), expected, "memory log {log:?}");
+    }
+}
+
 #[test]
 fn test_conformance_absent_root_publishes_identically_across_topologies() {
     for disjoint in [false, true] {
