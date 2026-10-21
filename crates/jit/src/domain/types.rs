@@ -111,8 +111,7 @@ impl State {
 /// - `archived_from` for an `Archived` issue, but only when that recorded
 ///   pre-archive state was itself terminal (`Done`/`Rejected`),
 /// - `None` otherwise — including an `Archived` issue parked from a non-terminal
-///   state and a legacy `Archived` record whose `archived_from` was never
-///   recorded (conservative default: it does not start satisfying dependents).
+///   state.
 ///
 /// `state` is the issue's lifecycle state and `archived_from` its
 /// [`Issue::archived_from`]; passing `archived_from` for a non-`Archived` `state`
@@ -402,6 +401,7 @@ pub struct GateState {
 
 /// An issue representing a unit of work
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(try_from = "IssueWire")]
 pub struct Issue {
     /// Unique identifier (UUID)
     pub id: String,
@@ -470,15 +470,76 @@ pub struct Issue {
     /// (`jit:45a140ae`).
     ///
     /// Set when the issue transitions into `Archived` (recording the state it
-    /// left) and cleared on revive, so it is `Some` only while `state ==
-    /// Archived`. It drives the issue's effective terminal state
-    /// ([`Issue::effective_terminal_state`]) and constrains revive to the
-    /// recorded origin. Absent (`None`) for every non-`Archived` issue and for a
-    /// legacy record archived before this field existed; a legacy `Archived`
-    /// issue is treated as non-terminal (the pre-change behavior). Skipped on
-    /// serialize when absent, so old issue files round-trip unchanged.
+    /// left) and cleared on revive. It drives the issue's effective terminal
+    /// state ([`Issue::effective_terminal_state`]) and constrains revive to the
+    /// recorded origin. Absent (`None`) for every non-`Archived` issue; decoding
+    /// an `Archived` record without it fails. Skipped on serialize when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_from: Option<State>,
+}
+
+/// Decode-boundary mirror of [`Issue`]; [`TryFrom`] enforces that an `Archived`
+/// record carries `archived_from`.
+#[derive(Deserialize)]
+struct IssueWire {
+    id: String,
+    title: String,
+    description: String,
+    state: State,
+    priority: Priority,
+    assignee: Option<Assignee>,
+    dependencies: Vec<String>,
+    gates_required: Vec<String>,
+    gates_status: HashMap<String, GateState>,
+    context: HashMap<String, String>,
+    documents: Vec<DocumentReference>,
+    labels: Vec<String>,
+    #[serde(default)]
+    content_format: Option<ContentFormat>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    #[serde(default)]
+    first_ready_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    claimed_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    done_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    archived_from: Option<State>,
+}
+
+impl TryFrom<IssueWire> for Issue {
+    type Error = String;
+
+    fn try_from(wire: IssueWire) -> std::result::Result<Self, Self::Error> {
+        if wire.state == State::Archived && wire.archived_from.is_none() {
+            return Err(format!(
+                "missing field `archived_from` on archived issue {}",
+                wire.id
+            ));
+        }
+        Ok(Self {
+            id: wire.id,
+            title: wire.title,
+            description: wire.description,
+            state: wire.state,
+            priority: wire.priority,
+            assignee: wire.assignee,
+            dependencies: wire.dependencies,
+            gates_required: wire.gates_required,
+            gates_status: wire.gates_status,
+            context: wire.context,
+            documents: wire.documents,
+            labels: wire.labels,
+            content_format: wire.content_format,
+            created_at: wire.created_at,
+            updated_at: wire.updated_at,
+            first_ready_at: wire.first_ready_at,
+            claimed_at: wire.claimed_at,
+            done_at: wire.done_at,
+            archived_from: wire.archived_from,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -2045,6 +2106,32 @@ impl Event {
 mod tests {
     use super::*;
 
+    fn issue_record(state: State, archived_from: Option<State>) -> serde_json::Value {
+        let mut issue = fixture_issue("Archived".to_string(), String::new());
+        issue.state = state;
+        issue.archived_from = archived_from;
+        serde_json::to_value(&issue).unwrap()
+    }
+
+    #[test]
+    fn test_issue_decode_rejects_archived_record_without_archived_from() {
+        let error = serde_json::from_value::<Issue>(issue_record(State::Archived, None))
+            .expect_err("an archived record without an origin must not decode");
+        assert!(error.to_string().contains("archived_from"), "{error}");
+
+        let decoded =
+            serde_json::from_value::<Issue>(issue_record(State::Archived, Some(State::Done)))
+                .unwrap();
+        assert_eq!(decoded.archived_from, Some(State::Done));
+        assert!(serde_json::from_value::<Issue>(issue_record(State::Done, None)).is_ok());
+    }
+
+    #[test]
+    fn test_issue_schema_describes_archived_from() {
+        let schema = serde_json::to_value(schemars::schema_for!(Issue)).unwrap();
+        assert!(schema["properties"].get("archived_from").is_some());
+    }
+
     #[test]
     fn test_is_reusable_for_rejects_an_attestation_over_a_matching_digest() {
         let digest = crate::domain::InputsDigestBuilder::new(b"gate declaration").finish();
@@ -2729,19 +2816,16 @@ mod tests {
         assert!(!is_dependency_met(State::Ready, None));
         assert!(!is_dependency_met(State::InProgress, None));
         assert!(!is_dependency_met(State::Gated, None));
-        // Legacy archived (no recorded origin) stays non-terminal.
-        assert!(!is_dependency_met(State::Archived, None));
     }
 
     #[test]
     fn test_effective_terminality_preserves_archived_origin() {
         // Archived is terminality-preserving: a dependency archived from a
-        // terminal state stays met; one archived from a non-terminal state or
-        // with no recorded origin (legacy) does not.
+        // terminal state stays met; one archived from a non-terminal state does
+        // not.
         assert!(is_dependency_met(State::Archived, Some(State::Done)));
         assert!(is_dependency_met(State::Archived, Some(State::Rejected)));
         assert!(!is_dependency_met(State::Archived, Some(State::InProgress)));
-        assert!(!is_dependency_met(State::Archived, None));
 
         assert_eq!(
             effective_terminal_state(State::Archived, Some(State::Done)),
@@ -2755,7 +2839,6 @@ mod tests {
             effective_terminal_state(State::Archived, Some(State::Gated)),
             None
         );
-        assert_eq!(effective_terminal_state(State::Archived, None), None);
         // A non-archived state ignores any archived_from value.
         assert_eq!(
             effective_terminal_state(State::Done, None),
