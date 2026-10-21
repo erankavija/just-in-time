@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "16d63038-c08b-4d2d-9a77-1a75fe48ef20",
     "2d10f1dd-64c6-4eaf-8e67-836ed80c23d9",
     "3754095f-d396-40b7-b2f1-e7624aacd6a6",
     "719a5501-d611-4a81-8728-1634a8c35b7c",
@@ -31,5 +30,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "One global --json flag carried as OutputMode",
-  "updated_at": "2026-10-21T01:18:01.743664674Z"
+  "updated_at": "2026-10-21T10:40:10.777988526Z"
 }

@@ -3,7 +3,6 @@
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
-    "91081bd3-9996-4f81-a405-a06c7cdcae8b",
     "985c2b15-b57f-47d5-b21e-6ca6b979667b",
     "abe555e9-0b95-474b-bf80-a9c23f33dbfa"
   ],
@@ -32,5 +31,5 @@
   "priority": "normal",
   "state": "backlog",
   "title": "Document commands move to library handlers",
-  "updated_at": "2026-10-21T05:32:38.537091683Z"
+  "updated_at": "2026-10-21T10:40:10.777988526Z"
 }
