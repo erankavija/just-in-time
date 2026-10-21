@@ -1,0 +1,39 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5cc462fc7f929806c7bddbef9043422fcdf39f7f",
+  "completed_at": "2026-10-21T07:21:26.818268661Z",
+  "duration_ms": 71988,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/custom-gates.md",
+        "id": "F1",
+        "line": 643,
+        "origin": "issue-impact",
+        "severity": "medium",
+        "summary": "The AI-review example repeats the wrapper's 0/1/75 exit-code mapping already explained earlier on the page."
+      }
+    ],
+    "summary": "One issue-authored duplicate exit-code explanation remains in the custom-gates how-to.",
+    "verdict": "fail"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "4cc4a065-6736-4dad-afe9-4470dadfcc28",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T07:20:14.829727834Z",
+  "status": "failed",
+  "stderr": "grep: /tmp/tmp.6vEFSgH8wR: binary file matches\n--- agent stderr (first 12 of 3294 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d55-03b4-7282-a395-cc1e8744e321\n--------\n--- 3282 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `task` is a leaf (level 4) with no resolved children. I inspected the five current-branch `jit:fd9bfab8` commits individually; the prior storage-reference finding is resolved at `docs/reference/storage-records.md:128`. Uncommitted changes were excluded.\n\n1. **F1 — blocking, issue-impact:** `docs/how-to/custom-gates.md:643` repeats the AI-review wrapper’s `0`/`1`/`75` mapping already stated at lines 445–448. Replace the parenthetical mapping with `See [Exit Codes](#exit-codes).` to retain discoverability without duplication.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"One issue-authored duplicate exit-code explanation remains in the custom-gates how-to.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The AI-review example repeats the wrapper's 0/1/75 exit-code mapping already explained earlier on the page.\",\"file\":\"docs/how-to/custom-gates.md\",\"line\":643}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

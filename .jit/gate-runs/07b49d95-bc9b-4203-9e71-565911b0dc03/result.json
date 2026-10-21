@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "aecbd2f3df521247fe53f0465c2f018b326705b3",
+  "completed_at": "2026-10-21T07:16:15.956642495Z",
+  "duration_ms": 256648,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "45b442f3-fe6d-4626-af72-905c6f25d388",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "07b49d95-bc9b-4203-9e71-565911b0dc03",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T07:11:59.307995087Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 2e77bc1cb, edfa85f6e (both `jit:45b442f3`; merge duplicates parent change)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-21 (issue description); @/invariant/semantic-types, @/invariant/architecture-dependency-direction, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T07:09:44Z); code-review pending (no recorded run)\nTruncation recovery: narrowed reads of classifier, plan, storage evidence producer, archive callers, tests, and gate result after broad impact search truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "5cc462fc7f929806c7bddbef9043422fcdf39f7f",
+  "completed_at": "2026-10-21T07:20:14.320834860Z",
+  "duration_ms": 375823,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/repository_state/profile_apply.rs",
+        "id": "F1",
+        "line": 1210,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "Rustdoc still says repository validation reads applied-profile records or emits profile-claim findings, contrary to the current validation path."
+      }
+    ],
+    "summary": "Two retained rustdoc claims still describe removed repository profile validation behavior.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "d113148c-5779-4f71-9bfb-ab85ede84adb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T07:13:58.497797685Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12295 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d4f-463e-7d20-963c-c3b555ad6bc8\n--------\nuser\n--- 12282 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: `jit:d6bbe05f` commits 9fb54cd36, 78684701c, b22cf19bd, af530c678, e6e132057, f4507f330\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/charter/D-8 (dev/vision/9db27a3a-charter.md, markdown-first); @/issue/3d9a0ce3/requirement/REQ-04 (issue markdown); @/invariant/essential-code-prose (.jit/invariants.toml, registry-first); @/gate/cargo-ci (.jit/gates.toml, registry-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T07:12:47Z)\nTruncation recovery: Re-read truncated commits by affected path and current source, test, configuration, and documentation ranges; historical gate and benchmark records were outside the impact cone.\n\n1. [blocking][issue-impact][medium] F1 — Two retained rustdoc claims describe repository validation behavior that this change removes. `crates/jit/src/commands/profile.rs:2628` says validation and repair resolve an applied-profile record, while `crates/jit/src/repository_state/profile_apply.rs:1210` says repository-wide validation reports profile-claim findings. Current validation deliberately captures no profile records and supplies no profile repair claims. Remove or narrow these stale claims. References: @/charter/D-8, @/invariant/essential-code-prose.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two retained rustdoc claims still describe removed repository profile validation behavior.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Rustdoc still says repository validation reads applied-profile records or emits profile-claim findings, contrary to the current validation path.\",\"file\":\"crates/jit/src/repository_state/profile_apply.rs\",\"line\":1210,\"references\":[\"@/charter/D-8\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

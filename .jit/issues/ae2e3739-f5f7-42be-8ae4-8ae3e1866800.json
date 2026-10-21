@@ -26,8 +26,8 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:44:59.630284961Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T07:25:10.123332195Z",
       "updated_by": "auto:executor"
     }
   },
@@ -43,5 +43,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Accept the worktree root as a gate input root",
-  "updated_at": "2026-10-21T06:44:59.630284961Z"
+  "updated_at": "2026-10-21T07:25:10.123332195Z"
 }

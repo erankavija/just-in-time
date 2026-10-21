@@ -26,8 +26,8 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:47:52.993856377Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T07:27:56.808382835Z",
       "updated_by": "auto:executor"
     }
   },
@@ -42,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive an issue's documents from its artifact directory",
-  "updated_at": "2026-10-21T06:47:52.993856377Z"
+  "updated_at": "2026-10-21T07:27:56.808382835Z"
 }
