@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6a430a7c44eeaa9a9e5e27a3a1e406199f2014cb",
+  "completed_at": "2026-10-21T16:33:06.739424969Z",
+  "duration_ms": 66364,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The implementation exits successfully for warning-only link checks, preserves warnings in both output forms, and updates the generated exit-code reference.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f37d228e-f3dd-412f-87c7-364f64da2f07",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6df458a4-4e0a-4f74-9797-4c4b3d7691e2",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:32:00.375372181Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b024d1d34; 6a430a7c4 merge integration (jit:f37d228e)\nPolicy sources: AGENTS.md\nResolved items: @/issue/f37d228e/requirement/REQ-01–REQ-03 (issue Markdown); @/invariant/canonical-cutover, @/invariant/architecture-dependency-direction, @/invariant/essential-code-prose, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/charter/D-20 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:30:20.468505240Z)\nTruncation recovery: narrowed registry/source, current implementation, test, and documentation reads after an over-broad policy search truncated\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The implementation exits successfully for warning-only link checks, preserves warnings in both output forms, and updates the generated exit-code reference.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
