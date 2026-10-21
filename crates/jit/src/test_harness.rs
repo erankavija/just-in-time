@@ -197,16 +197,25 @@ source-of-truth = \"registry-first\"
         id
     }
 
-    /// Add a gate definition to the registry
-    pub fn add_gate(&self, key: &str, title: &str, description: &str, auto: bool) {
+    /// Define a postcheck gate through the production definition path.
+    pub fn add_gate(
+        &self,
+        key: &str,
+        title: &str,
+        description: &str,
+        mode: crate::declarations::GateMode,
+        checker: Option<crate::declarations::GateChecker>,
+    ) {
         self.executor
-            .add_gate_definition(
+            .define_gate(
                 key.to_string(),
                 title.to_string(),
                 description.to_string(),
-                auto,
-                None,
                 crate::declarations::GateStage::Postcheck,
+                mode,
+                checker,
+                100,
+                None,
             )
             .unwrap();
     }

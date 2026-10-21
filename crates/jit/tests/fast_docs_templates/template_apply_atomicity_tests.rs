@@ -12,7 +12,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use jit::declarations::{GateRegistry, GateStage};
+use jit::declarations::{GateChecker, GateMode, GateRegistry, GateStage};
 use jit::domain::{Event, Issue, Priority};
 use jit::gate_presets::{GatePresetDefinition, PresetInfo};
 use jit::repository_state::{CaptureBudget, CaptureSpec, RepositoryImage, VirtualPath};
@@ -396,13 +396,15 @@ fn fixture<S: IssueStore + RepositoryStateStore>(
             .unwrap();
     let executor = CommandExecutor::new(store.clone()).with_layout(layout);
     executor
-        .add_gate_definition(
+        .define_gate(
             "repo-validate".to_string(),
             "Repo Validate".to_string(),
             "Whole-repository validation must pass".to_string(),
-            true,
-            None,
             GateStage::Postcheck,
+            GateMode::Auto,
+            Some(GateChecker::RepositoryValidation),
+            100,
+            None,
         )
         .unwrap();
     let (upstream, _) = executor

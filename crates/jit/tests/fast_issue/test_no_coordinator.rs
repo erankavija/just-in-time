@@ -5,6 +5,7 @@
 //! - All issue commands work
 //! - No coordinator commands exist
 //! - Core functionality is intact
+use jit::declarations::GateMode;
 use jit::domain::{Priority, State};
 use jit::storage::IssueStore;
 use jit::test_harness::TestHarness;
@@ -114,7 +115,13 @@ fn test_gates_work_without_coordinator() {
     let h = TestHarness::new();
 
     // Register a gate
-    h.add_gate("test-gate", "Test Gate", "A test gate", false);
+    h.add_gate(
+        "test-gate",
+        "Test Gate",
+        "A test gate",
+        GateMode::Manual,
+        None,
+    );
 
     // Create ready issue then add gate requirement
     let id = h.create_ready_issue("Task");

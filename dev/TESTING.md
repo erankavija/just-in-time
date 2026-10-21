@@ -111,7 +111,7 @@ impl TestHarness {
     pub fn create_issue_with_gates(&self, title: &str, gates: Vec<String>) -> String;
 
     // Gate setup
-    pub fn add_gate(&self, key: &str, title: &str, description: &str, auto: bool);
+    pub fn add_gate(&self, key: &str, title: &str, description: &str, mode: GateMode, checker: Option<GateChecker>);
 
     // Queries
     pub fn all_issues(&self) -> Vec<Issue>;

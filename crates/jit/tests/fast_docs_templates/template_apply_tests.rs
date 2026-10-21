@@ -14,6 +14,7 @@
 //! pre-apply upstream deps move onto P), yielding the acyclic, transitively
 //! reduced spine C→B→P→upstream.
 
+use jit::declarations::{GateChecker, GateMode};
 use jit::domain::Priority;
 use jit::labels::parse_label;
 use jit::storage::{IssueStore, JsonFileStorage, PresetNotFoundError};
@@ -120,7 +121,8 @@ fn create_epic(h: &TestHarness, title: &str) -> String {
             &key,
             &format!("{key} gate"),
             &format!("Repository-declared {key} gate"),
-            true,
+            GateMode::Auto,
+            Some(GateChecker::RepositoryValidation),
         );
     }
     let (id, _) = h
@@ -705,7 +707,8 @@ fn test_apply_attaches_registry_gate_key_not_preset() {
         "deploy-check",
         "Deploy Check",
         "A config-declared gate with no preset of that name",
-        true,
+        GateMode::Auto,
+        Some(GateChecker::RepositoryValidation),
     );
     // Guard: the name must NOT also be a preset, so the test exercises the
     // registry-key branch and not the preset branch.
@@ -952,13 +955,15 @@ fn test_apply_propagates_malformed_preset_error_instead_of_falling_back_to_regis
     // `repo-validate` is a config-declared REGISTRY gate with no preset of that
     // name, so the registry-key fallback WOULD match it.
     executor
-        .add_gate_definition(
+        .define_gate(
             "repo-validate".to_string(),
             "Repo Validate".to_string(),
             "Whole-repository validation".to_string(),
-            true,
-            None,
             jit::declarations::GateStage::Postcheck,
+            GateMode::Auto,
+            Some(GateChecker::RepositoryValidation),
+            100,
+            None,
         )
         .unwrap();
 
