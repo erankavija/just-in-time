@@ -24,6 +24,11 @@
       "status": "passed",
       "updated_at": "2026-10-21T06:24:49.641091664Z",
       "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T06:42:39.976348789Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
@@ -37,5 +42,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Record a checker infrastructure fault as an error",
-  "updated_at": "2026-10-21T06:24:49.641091664Z"
+  "updated_at": "2026-10-21T06:42:39.976348789Z"
 }
