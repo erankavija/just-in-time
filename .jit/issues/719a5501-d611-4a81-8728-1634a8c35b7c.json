@@ -26,8 +26,8 @@
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T11:08:00.493509321Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T11:15:42.107921975Z",
       "updated_by": "auto:executor"
     }
   },
@@ -45,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Wrong-verb hints come only from the parser-level path",
-  "updated_at": "2026-10-21T11:11:50.641327312Z"
+  "updated_at": "2026-10-21T11:15:42.107921975Z"
 }

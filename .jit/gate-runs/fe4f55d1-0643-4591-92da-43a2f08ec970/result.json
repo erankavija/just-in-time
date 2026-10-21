@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "40aaec18110192b240b41ca6709ea92b8e6b09a1",
+  "completed_at": "2026-10-21T11:09:57.681489189Z",
+  "duration_ms": 265957,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The deletion-only change satisfies all hard criteria; the surviving repository validation owns the required checks and their existing tests remain.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "84745746-91d9-41d0-b120-f1e5e806a9d2",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "fe4f55d1-0643-4591-92da-43a2f08ec970",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:05:31.723742704Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fbadb46c6 and merge 6672b0d65 (same deletion footprint)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-4, @/charter/D-18, @/charter/D-21 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover ( .jit/invariants.toml); @/issue/842b0ac6/requirement/REQ-01 (parent issue)\nGate evidence: cargo-ci failed, exit 1, recorded at bb6a146a; unrelated to the attributable deletion\nTruncation recovery: narrowed source, caller, and test reads after broad searches truncated\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The deletion-only change satisfies all hard criteria; the surviving repository validation owns the required checks and their existing tests remain.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -16,7 +16,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T11:15:20.300874686Z",
+      "updated_at": "2026-10-21T11:16:02.369572624Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,5 +31,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Report load-only cargo-ci failures as infrastructure faults",
-  "updated_at": "2026-10-21T11:15:20.300874686Z"
+  "updated_at": "2026-10-21T11:16:02.369572624Z"
 }
