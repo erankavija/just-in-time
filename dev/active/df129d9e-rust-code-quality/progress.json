@@ -12,7 +12,7 @@
           "short_id": "9ca31c64",
           "title": "Encode the zero-warning bar in workspace lints",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "shared-test-harness",
@@ -28,7 +28,7 @@
           "short_id": "83e6cb8d",
           "title": "Record the production-line baseline for crates/jit/src",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "failure-classifier-library",
@@ -36,7 +36,7 @@
           "short_id": "1874e265",
           "title": "Move the error classifier into output::failure",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-1874e265, worktree agent-1874e265)"
         },
         {
           "key": "mcp-global-json-injection",
@@ -44,7 +44,7 @@
           "short_id": "bc7eb715",
           "title": "MCP bridge injects --json from the schema's global options",
           "classification": "implementation",
-          "status": "pending"
+          "status": "done"
         },
         {
           "key": "verb-hint-stub-removal",
