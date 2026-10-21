@@ -120,7 +120,7 @@ Initialization and scaffolding
 - jit init
 Issue management
 - jit issue create --title "..." [--desc "..."] [--priority high] [--gate review --gate unit-tests]
-- jit query all [--state open|ready|done] [--assignee agent-x] [--priority high]
+- jit query all [--state backlog|ready|done] [--assignee agent-x] [--priority high]
 - jit issue show <id>
 - jit issue update <id> [--title ...] [--desc ...] [--priority ...]
 - jit issue delete <id>

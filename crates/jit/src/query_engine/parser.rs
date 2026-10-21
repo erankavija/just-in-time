@@ -2,7 +2,7 @@
 //!
 //! Builds an abstract syntax tree (AST) from tokens.
 
-use super::error::{QueryParseError, PRIORITY_VALUES, STATE_VALUES};
+use super::error::{state_values, QueryParseError, PRIORITY_VALUES};
 use super::lexer::{FilterField, Token};
 use crate::domain::{Priority, State};
 use std::str::FromStr;
@@ -187,7 +187,7 @@ impl Parser {
 fn parse_state(value: &str) -> Result<State> {
     State::from_str(value).map_err(|_| QueryParseError::InvalidState {
         value: value.to_string(),
-        valid: STATE_VALUES.to_string(),
+        valid: state_values(),
     })
 }
 
@@ -263,13 +263,18 @@ mod tests {
         let tokens = Lexer::tokenize("state:notastate").unwrap();
         let result = Parser::parse(tokens);
 
-        assert_eq!(
-            result.unwrap_err(),
-            QueryParseError::InvalidState {
-                value: "notastate".to_string(),
-                valid: STATE_VALUES.to_string(),
-            }
-        );
+        let err = result.unwrap_err();
+        assert!(matches!(
+            &err,
+            QueryParseError::InvalidState { value, .. } if value == "notastate"
+        ));
+        let message = err.to_string();
+        for state in crate::domain::State::all() {
+            assert!(
+                message.contains(state.as_str()),
+                "missing {state:?}: {message}"
+            );
+        }
     }
 
     #[test]

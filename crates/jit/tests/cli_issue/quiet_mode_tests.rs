@@ -72,7 +72,9 @@ fn test_quiet_mode_suppresses_success_messages() {
     // Quiet mode should suppress success message
     Command::new(assert_cmd::cargo::cargo_bin!("jit"))
         .current_dir(temp_dir.path())
-        .args(["issue", "update", &issue_id, "--state", "open", "--quiet"])
+        .args([
+            "issue", "update", &issue_id, "--state", "backlog", "--quiet",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("Updated").not())
