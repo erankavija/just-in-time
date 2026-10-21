@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2f2693d8041247bd3a35c09acec38f9887a69e0",
+  "completed_at": "2026-10-21T20:51:02.748408420Z",
+  "duration_ms": 385875,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Manual attestations are recorded and projected consistently across latest-run, history, and readiness views.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "74e1d5d8-2b72-42b1-b91b-b5a1bb27a07e",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:44:36.873398444Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 0179a682, a8bf8916, e98f5e03, 8849930a, d9f1d644, 74394675, e2f2693d (`jit:8673dc5e`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8673dc5e/requirement/REQ-01–REQ-04 (.jit issue, markdown-first); @/invariant/derived-state-coherence, @/invariant/gate-semantics, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); prior code-review failed (exit 1), with its blocking finding verified addressed\nTruncation recovery: re-read tagged patches by path; checked conversion sample and all 1,589 issue / 5,127 run projections\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Manual attestations are recorded and projected consistently across latest-run, history, and readiness views.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

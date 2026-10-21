@@ -14,7 +14,26 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "run_id": "9358316a-a120-487e-8455-352bf1a97f50",
+      "status": "passed",
+      "updated_at": "2026-10-21T20:50:21.230132989Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "bdbd0609-4298-403b-a3d6-8ccd5cd00ccc",
+      "status": "failed",
+      "updated_at": "2026-10-21T20:55:06.529197639Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "2b970cb0-4cb2-47b2-badd-d0d86a1237d9",
+      "status": "failed",
+      "updated_at": "2026-10-21T20:55:15.509616161Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "1a989754-d48c-409a-a796-dee1671f800a",
   "labels": [
     "type:task",
@@ -28,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the profile selector tags",
-  "updated_at": "2026-10-21T16:51:33.226673586Z"
+  "updated_at": "2026-10-21T20:55:15.509616161Z"
 }

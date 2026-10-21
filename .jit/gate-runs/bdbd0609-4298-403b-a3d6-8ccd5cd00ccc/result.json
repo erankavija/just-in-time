@@ -1,0 +1,40 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f0561f31090e4294c18ab8f5cb2e8ca8eefd1065",
+  "completed_at": "2026-10-21T20:55:06.312838943Z",
+  "duration_ms": 270588,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "id": "F1",
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/3d9a0ce3/requirement/REQ-04",
+          "@/gate/mcp-ci"
+        ],
+        "severity": "high",
+        "summary": "The latest required mcp-ci result failed with exit 1, leaving REQ-04's MCP-test requirement unmet."
+      }
+    ],
+    "summary": "The required MCP CI gate is failing, leaving REQ-04 unmet.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "1a989754-d48c-409a-a796-dee1671f800a",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "bdbd0609-4298-403b-a3d6-8ccd5cd00ccc",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:50:35.724721718Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 6760 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a1603a-e8ce-7372-8ada-a4a3fabab31c\n--------\nuser\n--- 6747 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: f059dee4 (merge, patch-equivalent to 549c80df) and 549c80df\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/charter/D-8, @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue description); @/gate/mcp-ci, @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T20:48:41Z); code-review pending; mcp-ci failed (exit 1, 2026-10-21T20:50:21Z)\nTruncation recovery: narrowed reads of policy/item sources, merge equivalence, selector implementation/tests, MCP scenario, and exact legacy-selector searches\n\n1. **[blocking][issue-impact] F1 — MCP validation is not passing.** The latest required `mcp-ci` result failed with exit 1. REQ-04 explicitly requires the MCP tests to pass, so the changed MCP integration path remains materially unverified. References: @/issue/3d9a0ce3/requirement/REQ-04, @/gate/mcp-ci.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The required MCP CI gate is failing, leaving REQ-04 unmet.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The latest required mcp-ci result failed with exit 1, leaving REQ-04's MCP-test requirement unmet.\",\"references\":[\"@/issue/3d9a0ce3/requirement/REQ-04\",\"@/gate/mcp-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
