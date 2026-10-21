@@ -314,6 +314,14 @@
       "date": "2026-10-20",
       "decision": "@/charter/D-18, @/charter/D-20",
       "summary": "Profile typing vs the 3d9a0ce3 rework. Chosen (b): 2195c98f REQ-09 narrows to the domain ProfileId. The ProfilePackageId deletion and semver typing move to 3d9a0ce3 (its REQ-14/REQ-15) and build on ProfileId. Rejected (a), gating 2195c98f's profile tasks on 3d9a0ce3: it serialises all eight wave-4 epics behind an unplanned epic. Rejected (c), typing now: churn against code the rework rewrites."
+    },
+    {
+      "container_short_id": "8376299c",
+      "issue": "2d10f1dd",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/inv/convention-convergence, @/inv/event-log",
+      "summary": "2d10f1dd REQ-02: a refused combined update keeps the transition_blocked audit event. Chosen (A): the event records the refusal, not an issue change, and matches blocked state-only updates. Rejected (B): it makes combined and state-only refusals diverge or drops audit evidence. REQ-02 is amended to say so."
     }
   ],
   "notes": [
@@ -323,7 +331,8 @@
     "Wave 4 planning nodes depend on 2195c98f the same way. Wave 5 is the release epic b80e3c70 containing the tag task bb03df0a.",
     "Session rule from the user (2026-10-20): never ask the user mid-session; block issues needing user input and record the question for the next session; check workers every 30 min; write the handoff when only user-blocked work remains.",
     "Cutover integration note from 7e: 19 gitignored .jit/issues/*.lock files cannot be removed by a commit; the executing lead deletes them in the primary checkout at integration.",
-    "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else."
+    "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else.",
+    "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up."
   ],
   "started_at": "2026-07-03"
 }
