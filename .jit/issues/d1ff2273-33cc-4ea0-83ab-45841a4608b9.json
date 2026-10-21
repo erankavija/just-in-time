@@ -24,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Produce the shipped workflow package by packing its directory",
-  "updated_at": "2026-10-21T01:07:37.751787861Z"
+  "updated_at": "2026-10-21T01:16:04.305583358Z"
 }

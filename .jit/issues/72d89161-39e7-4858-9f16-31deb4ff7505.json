@@ -24,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-01"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Reuse gate verdicts only by declared-input digest",
-  "updated_at": "2026-10-21T01:07:49.507507304Z"
+  "updated_at": "2026-10-21T01:16:00.637862201Z"
 }

@@ -24,7 +24,7 @@
     "satisfies:3d9a0ce3/REQ-03"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Derive an issue's documents from its artifact directory",
-  "updated_at": "2026-10-21T01:07:56.194401124Z"
+  "updated_at": "2026-10-21T01:15:59.295408354Z"
 }

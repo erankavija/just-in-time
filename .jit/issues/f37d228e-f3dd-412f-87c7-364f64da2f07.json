@@ -22,7 +22,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Exit successfully from link checking on warnings alone",
-  "updated_at": "2026-10-21T01:07:59.192552372Z"
+  "updated_at": "2026-10-21T01:16:07.384835961Z"
 }

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d72582b298e3cbb5b522b3f70daca31979b50747",
+  "completed_at": "2026-10-21T01:15:45.033086031Z",
+  "duration_ms": 259182,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All required checks passed; the 35-entry breakdown exactly matches the authoritative manifest and approved graph contract.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "a3437bab-d2b7-44cc-9ec5-347a0df971c5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "69eaa66c-2358-47ec-9922-7ac3a5421a28",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:11:25.850988177Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Mechanical checks passed: manifest validation, renderer `--check`, native batch dry-run (35 issues, 32 edges), and `jit validate`. Stored fields and graph geometry exactly match the authoritative manifest. No `planning` metadata was persisted or exported, and no warning overrides exist.\n\n| Key / issue | One outcome | Bounded consumer family | Observable test boundary | Footprint credible | Focused cycle | No inner decomposition | No mixed deliverables | Result |\n|---|---|---|---|---|---|---|---|---|\n| digest-input-scope | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| repo-gate-inputs-whole-tree | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| builtin-checker-faults | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| derived-document-archival | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| inside-link-cleanup | Yes | Yes | Yes | Yes, bounded uncertainty | Yes | Yes | Yes | Pass |\n| status-word-docs | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-record-commands-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| release-pack-migration | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-capture-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-id-selector-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-validation-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-three-way-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-record-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-lifecycle-event | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-replace-rendering | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-dependent-wins | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-selection-path | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-dirty-target-refusal | Yes | Yes | Yes | Yes, named uncertainty | Yes | Yes | Yes | Pass |\n| profile-entrypoint-pruning | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-unified-result | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-derived-wire | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-conflict-origin | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-graph-error-merge | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-package-type-merge | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-package-source-unwrap | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-selector-unwrap | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-origin-unwrap | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-registry-declaration | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-show-target-set | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| canonical-json-single | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-semver-model | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-package-id-removal | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-reference-docs | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-cli-docs | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n| profile-refusal-docs | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Pass |\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All required checks passed; the 35-entry breakdown exactly matches the authoritative manifest and approved graph contract.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
