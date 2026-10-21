@@ -519,8 +519,10 @@ pub struct ErrorDetail {
 /// Standardized exit codes for the JIT CLI
 ///
 /// These codes follow Unix conventions and provide consistent error reporting
-/// for automation and scripting.
+/// for automation and scripting. [`ExitCode::ALL`] is checked against this
+/// enum's test-only derived schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(JsonSchema))]
 #[repr(i32)]
 pub enum ExitCode {
     /// Command succeeded (0)
@@ -3557,23 +3559,22 @@ mod tests {
     }
 
     #[test]
-    fn test_exit_code_all_lists_every_variant_with_a_distinct_described_status() {
-        // Exhaustive match: adding a variant fails compilation here until listed.
-        fn is_listed(code: ExitCode) -> bool {
-            match code {
-                ExitCode::Success
-                | ExitCode::GenericError
-                | ExitCode::InvalidArgument
-                | ExitCode::NotFound
-                | ExitCode::ValidationFailed
-                | ExitCode::PermissionDenied
-                | ExitCode::AlreadyExists
-                | ExitCode::ExternalError
-                | ExitCode::LockTimeout
-                | ExitCode::BrokenPipe => ExitCode::ALL.contains(&code),
-            }
-        }
-        assert!(ExitCode::ALL.into_iter().all(is_listed));
+    fn test_exit_code_all_lists_every_derived_variant() {
+        let schema =
+            serde_json::to_value(schema_for!(ExitCode)).expect("ExitCode schema should serialize");
+        let derived = schema_accepted_strings(&schema);
+        assert!(!derived.is_empty(), "derived schema should list variants");
+
+        let listed: BTreeSet<String> = ExitCode::ALL
+            .iter()
+            .map(|code| format!("{code:?}"))
+            .collect();
+
+        assert_eq!(listed, derived, "ExitCode::ALL must list every variant");
+    }
+
+    #[test]
+    fn test_exit_code_all_members_have_distinct_described_statuses() {
         let statuses: BTreeSet<i32> = ExitCode::ALL.iter().map(|c| c.code()).collect();
         assert_eq!(statuses.len(), ExitCode::ALL.len());
         assert!(ExitCode::ALL.iter().all(|c| !c.description().is_empty()));
