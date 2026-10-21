@@ -368,6 +368,13 @@
       "date": "2026-10-21",
       "category": "project-wide infrastructure",
       "summary": "CI clippy bar mismatch: GitHub CI runs clippy with --all-features and the cargo-ci gate does not. Decide which bar is authoritative and align the other. This is outside df129d9e REQ-06."
+    },
+    {
+      "container_short_id": "2195c98f",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-18",
+      "summary": "Ordering of 2195c98f cli-issue-id-boundary against df129d9e's handler migrations. Chosen (c): df129d9e's handler tasks depend on cli-issue-id-boundary, so handlers move typed code and the IssueId flip lands early for wave 4. Rejected (a), boundary after the handlers: it serialises the IssueId flip and all of wave 4 behind df129d9e's command-dispatch story. Rejected (b), no edge: a large main.rs conflict. Edges are wired at 2195c98f's breakdown, together with 0eca332a -> error-code-vocabulary."
     }
   ],
   "notes": [
