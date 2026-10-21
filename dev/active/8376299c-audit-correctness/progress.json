@@ -1,7 +1,7 @@
 {
   "epic_id": "8376299c-f9e1-4b7b-be62-27af493f6969",
   "epic_short_id": "8376299c",
-  "current_wave": 2,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -126,7 +126,7 @@
           "title": "Accept namespace wildcards in issue search label filters",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 (opus): code-review F1 validator accepts empty value/extra colons, F2 CLI reference flag rules",
+          "status": "rework 1 merged; code-review passed; cargo-ci load-failure --force rerun queued",
           "note": "after 34999aad: search paths"
         }
       ]
@@ -140,7 +140,7 @@
           "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending",
+          "status": "dispatched (opus)",
           "note": "after all others: touches many resolvers"
         }
       ]
@@ -192,7 +192,7 @@
       "disposition": "reported to steward"
     }
   ],
-  "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review.",
+  "notes": "Waves are file-overlap sequencing; the children have no sibling dependencies. Escalate a worker one model tier if its first attempt fails review. Wave 3 dispatched while c0d0c8bf awaited only a load-only cargo-ci rerun: its code and reviews were final and every overlapping file had merged.",
   "started_at": "2026-10-20T19:52:54+00:00",
   "session_instructions": "User (2026-10-20): do not stop to ask questions; block issues needing user input in jit and record the question in the issue and handoff; send project-level escalations to steward session just-in-time-24 (milestone 9db27a3a); write handoff and tell the steward when nothing more can proceed; check workers every 30 min.",
   "traps": [
