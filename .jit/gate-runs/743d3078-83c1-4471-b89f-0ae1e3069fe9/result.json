@@ -1,0 +1,38 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c6753aea5c5cb55dd4a371c262b7848e07d7ac88",
+  "completed_at": "2026-10-21T16:46:25.821337823Z",
+  "duration_ms": 92294,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "docs/how-to/troubleshooting.md",
+        "id": "F1",
+        "line": 332,
+        "origin": "pre-existing",
+        "severity": "low",
+        "summary": "Two troubleshooting examples show an invalid id-only agent.toml; replace them with the required [agent], id, created_at, and description fields."
+      }
+    ],
+    "summary": "Issue-authored agent configuration documentation matches the current strict schema; one pre-existing troubleshooting example remains stale.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "5e846743-174b-4385-9c95-a700a8df6587",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "743d3078-83c1-4471-b89f-0ae1e3069fe9",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:44:53.527054111Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task with no resolved children. I inspected all four reachable `jit:5e846743` commits individually; two content commits and their merge commits. The current tree confirms the strict three-field `agent.toml` schema and unknown-key rejection.\n\nDocumentation impact: the issue-authored updates accurately document the removed TTL field, required fields, and unknown-key behavior. No issue-impact blockers found.\n\n1. [Advisory, pre-existing] `docs/how-to/troubleshooting.md:332` and `:466` show an invalid `agent.toml` containing only `id`, without `[agent]`, `created_at`, or `description`. These examples predate this issue’s schema behavior, so they are existing drift. Replace each with the complete required `[agent]` example.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Issue-authored agent configuration documentation matches the current strict schema; one pre-existing troubleshooting example remains stale.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"Two troubleshooting examples show an invalid id-only agent.toml; replace them with the required [agent], id, created_at, and description fields.\",\"file\":\"docs/how-to/troubleshooting.md\",\"line\":332}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

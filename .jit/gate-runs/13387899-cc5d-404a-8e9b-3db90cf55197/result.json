@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c6753aea5c5cb55dd4a371c262b7848e07d7ac88",
+  "completed_at": "2026-10-21T16:44:52.570928552Z",
+  "duration_ms": 71581,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All five hard criteria are satisfied; the prior unknown-key diagnostic and stale example were addressed.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5e846743-174b-4385-9c95-a700a8df6587",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "13387899-cc5d-404a-8e9b-3db90cf55197",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:43:40.989406309Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c6753aea5, 4ab561073, 38e817597, abc794762 (all `jit:5e846743`)\nPolicy sources: AGENTS.md\nResolved items: issue REQ-01–REQ-05 and 842b0ac6 REQ-04–REQ-05 (issue Markdown); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/single-source-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:43:16Z); doc-review pending; docs-mechanical pending\nTruncation recovery: none\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All five hard criteria are satisfied; the prior unknown-key diagnostic and stale example were addressed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

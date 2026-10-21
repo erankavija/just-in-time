@@ -203,7 +203,7 @@
           "title": "Keep one enforcement drift function",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "awaiting-merge"
         },
         {
           "id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
@@ -230,7 +230,7 @@
           "title": "Keep one agent configuration type",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-dispatched"
+          "status": "done"
         },
         {
           "id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
@@ -455,7 +455,8 @@
     "Wave 1a dispatched at main 23d4f5526; worker prompts are built by a scratchpad generator from the live issue text.",
     "Resource policy (steward): dispatch only with >=60 GB free on /, max 2 live worktrees, remove worktrees at merge, CARGO_INCREMENTAL=0, full gates via turnstile+exclusive flock, other cargo via turnstile+shared flock.",
     "Foreign leaks into main (df129d9e lints, 3d9a0ce3 profile.rs test fix) blocked merges/gates twice; steward routed both.",
-    "mkprompt.py read a non-existent gates field until 4c216a28's dispatch; earlier prompts named no gates. Fixed; lead evaluated the real gates on every issue."
+    "mkprompt.py read a non-existent gates field until 4c216a28's dispatch; earlier prompts named no gates. Fixed; lead evaluated the real gates on every issue.",
+    "fbb661f2 dispatch note: JitConfig::load hides the serde cause (config.rs ~1335, printed with {} at main.rs ~1663). 5e846743 folded the cause into AgentConfig::load_from's message; fbb661f2 must converge on one convention for both loaders (DEC-config-errors)."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }
