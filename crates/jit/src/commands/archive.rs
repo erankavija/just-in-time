@@ -962,15 +962,14 @@ mod tests {
                 Some(State::Done),
                 Some("portfolio"),
             ),
-            // Archived from a non-terminal state (and a legacy record with no
-            // recorded origin) is not effectively terminal, so it is excluded.
+            // Archived from a non-terminal state is not effectively terminal, so
+            // it is excluded.
             issue(
                 "archived-from-active",
                 State::Archived,
                 Some(State::InProgress),
                 Some("portfolio"),
             ),
-            issue("archived-legacy", State::Archived, None, Some("portfolio")),
             issue("done-leaf", State::Done, None, Some("unit")),
             issue("done-unknown", State::Done, None, Some("epic")),
             issue("done-untyped", State::Done, None, None),

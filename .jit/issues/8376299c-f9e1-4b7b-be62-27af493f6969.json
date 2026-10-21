@@ -1,5 +1,7 @@
 {
-  "assignee": null,
+  "archived_from": "done",
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-21T15:34:54.412994171Z",
   "context": {},
   "created_at": "2026-10-20T19:42:10.383077581Z",
   "dependencies": [
@@ -27,15 +29,40 @@
       "doc_type": "verification",
       "format": "markdown",
       "label": "REQ-02 release-build reproduction verification",
-      "path": "dev/active/8376299c-audit-correctness/repro-verification.md"
+      "path": "dev/archive/8376299c-audit-correctness/active/repro-verification.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "completion-report",
+      "format": "markdown",
+      "label": "Completion report",
+      "path": "dev/archive/8376299c-audit-correctness/active/completion-report.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "progress",
+      "label": "Execution progress",
+      "path": "dev/archive/8376299c-audit-correctness/active/progress.json"
     }
   ],
+  "done_at": "2026-10-21T15:39:00.205305844Z",
   "first_ready_at": "2026-10-20T19:42:10.383077581Z",
   "gates_required": [
     "repo-validate",
     "holistic-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "holistic-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:38:41.970414570Z",
+      "updated_by": "auto:executor"
+    },
+    "repo-validate": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:34:56.054517614Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8376299c-f9e1-4b7b-be62-27af493f6969",
   "labels": [
     "epic:audit-correctness",
@@ -44,7 +71,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "archived",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-21T15:31:53.765731984Z"
+  "updated_at": "2026-10-21T15:39:30.939165078Z"
 }

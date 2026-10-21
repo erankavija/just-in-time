@@ -1908,12 +1908,10 @@ mod tests {
     fn test_owner_effective_terminality_preserves_archived_origin() {
         // An owner archived from a terminal state is effectively terminal (its
         // documents can be archived); one archived from a non-terminal state, or
-        // a legacy archived owner with no recorded origin, is not — it still
-        // counts as an active owner.
+        // is not — it still counts as an active owner.
         assert!(archived_owner("owner", Some(State::Done), true).is_effectively_terminal());
         assert!(archived_owner("owner", Some(State::Rejected), true).is_effectively_terminal());
         assert!(!archived_owner("owner", Some(State::InProgress), true).is_effectively_terminal());
-        assert!(!archived_owner("owner", None, true).is_effectively_terminal());
         assert!(owner("owner", State::Done, true).is_effectively_terminal());
         assert!(!owner("owner", State::InProgress, true).is_effectively_terminal());
     }

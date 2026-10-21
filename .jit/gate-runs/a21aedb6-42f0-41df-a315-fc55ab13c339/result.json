@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "c0517b5afddd8347889c2f97a825d3586f94ee82",
+  "completed_at": "2026-10-21T15:35:55.347685100Z",
+  "duration_ms": 136328,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/declarations/rules.rs",
+        "id": "F1",
+        "line": 365,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "StatePredicate still refers to a removed predicate whitelist instead of the canonical State parser."
+      }
+    ],
+    "summary": "Canonical state parsing and derived state lists meet the hard criteria; one isolated stale comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a21aedb6-42f0-41df-a315-fc55ab13c339",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:33:39.019344965Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: jit:66bd4b5c — 5947203ab, b41a28ee9, dc2519638, 1bc26b089, 2f2ebd3dc, f43b4af4a, f7340f63f, e1377f5f4, 6adb7935e, d6c5285b0\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-09 (.jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci, @/gate/mcp-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T15:32:00Z); mcp-ci pending/unrun; prior code-review failed, and its web-legend finding is fixed at dev/architecture/web-ui-architecture.md:42\nTruncation recovery: recovered affected current files and merge first-parent paths separately; omitted only truncated historical records and opposite-parent merge integration, which do not evidence current attributable behavior.\n\n1. [advisory][issue-impact][low] `StatePredicate` still says recognized states are parsed through a “predicate whitelist,” although the tagged change removed that separate parser and now delegates to `State::from_str`. Update the stale term to describe the canonical parser. [`crates/jit/src/declarations/rules.rs:365`](crates/jit/src/declarations/rules.rs:365) (`@/invariant/essential-code-prose`)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Canonical state parsing and derived state lists meet the hard criteria; one isolated stale comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"StatePredicate still refers to a removed predicate whitelist instead of the canonical State parser.\",\"file\":\"crates/jit/src/declarations/rules.rs\",\"line\":365,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "34851181-7812-4cef-9347-9b80c7fd288f",
+    "d5cae9e3-5cfd-40ff-bf1d-5dfcc83a03dd"
+  ],
+  "description": "Route every branch, commit, worktree listing, base comparison and identity lookup through one operation each in the git module, run against the selected worktree, with claims failing typed when git is missing.\n\n## Success Criteria\n\n- [hard] REQ-01: One head lookup serves claims, worktree commands, init, gate evidence and snapshots.\n- [hard] REQ-02: Worktree listing, base comparison and the release actor's `user.name` each have one module operation, and lease validation lists worktrees once per run.\n- [hard] REQ-03: Claim commands fail with the typed git-requirement error outside git and with no git executable, and tests cover both conditions.\n- [hard] REQ-04: Among production sources only the git module starts git, and it exposes only operations production code calls.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "d28888f0-d189-49f5-899a-7e687bc219db",
+  "labels": [
+    "type:story",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:git-operations",
+    "component:storage",
+    "component:cli",
+    "component:gates",
+    "component:validation",
+    "per:@/charter/D-21"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Branch, worktree and base facts come from one module",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}
