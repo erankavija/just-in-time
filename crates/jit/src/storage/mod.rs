@@ -219,15 +219,13 @@ pub trait IssueStore: Clone {
         self.load_issue(id).map_err(PathReadError::Other)
     }
 
-    /// Resolve an issue id or unique id prefix, matched by
-    /// [`IssueIdPrefix`], to the stored id.
+    /// Resolve an issue id or unique id prefix to the stored id.
     ///
     /// # Errors
     ///
-    /// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
-    /// read, [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
+    /// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
     /// several.
-    fn resolve_issue_id(&self, partial_id: &str) -> Result<String>;
+    fn resolve_issue_id(&self, prefix: &IssueIdPrefix) -> Result<String>;
 
     /// List all issues in the repository.
     ///

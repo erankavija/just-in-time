@@ -834,10 +834,9 @@ impl IssueStore for InMemoryStorage {
             .ok_or_else(|| PathReadError::NotFound(format!("Issue not found: {}", id)))
     }
 
-    fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
-        let prefix = crate::domain::IssueIdPrefix::parse(partial_id)?;
+    fn resolve_issue_id(&self, prefix: &crate::domain::IssueIdPrefix) -> Result<String> {
         crate::storage::resolve_issue_id_among(
-            &prefix,
+            prefix,
             &Self::load_issues(&self.repository_state())?,
         )
     }

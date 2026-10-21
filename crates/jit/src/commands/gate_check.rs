@@ -695,7 +695,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     fn capture_gate_evaluation_image(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        requested: &str,
+        prefix: &crate::domain::IssueIdPrefix,
         gate_key: &str,
         run_paths: &[crate::repository_state::VirtualPath],
     ) -> Result<Option<(crate::repository_state::RepositoryImage, String)>>
@@ -706,7 +706,6 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
         use std::collections::BTreeMap;
 
-        let prefix = crate::domain::IssueIdPrefix::parse(requested)?;
         let mut candidates = Vec::new();
         let spec = CaptureSpec::new(
             [VirtualPath::INDEX],
@@ -735,7 +734,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
             })
             .collect::<Result<Vec<_>>>()?;
-        let target_id = crate::storage::resolve_issue_id_among(&prefix, &issues)?;
+        let target_id = crate::storage::resolve_issue_id_among(prefix, &issues)?;
         let mut paths = vec![
             VirtualPath::INDEX,
             VirtualPath::data(format!("issues/{target_id}.json"))?,
@@ -844,6 +843,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::repository_state::{finalize, MutationIntent, VirtualPath};
 
+        let requested = IssueIdPrefix::parse(issue_id)?;
         let layout = self.require_layout()?;
         let mutation = super::production_mutation_context();
         let run_id = mutation.identifier_at(0);
@@ -862,7 +862,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 let mut session = self.storage.open_mutation_session(layout.clone())?;
                 let Some((image, target_id)) = self.capture_gate_evaluation_image(
                     session.as_mut(),
-                    issue_id,
+                    &requested,
                     gate_key,
                     &run_paths,
                 )?
@@ -925,7 +925,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             let mut session = self.storage.open_mutation_session(layout.clone())?;
             let Some((final_image, _)) = self.capture_gate_evaluation_image(
                 session.as_mut(),
-                &target_id,
+                &IssueIdPrefix::of_stored(&target_id),
                 gate_key,
                 &run_paths,
             )?
@@ -1067,8 +1067,11 @@ impl<S: IssueStore> CommandExecutor<S> {
                 )
             }
             GateChecker::RuleValidation { rule } => {
-                let report =
-                    super::validate::rule_validation_report(repository_image, issue_id, rule)?;
+                let report = super::validate::rule_validation_report(
+                    repository_image,
+                    &IssueIdPrefix::of_stored(issue_id),
+                    rule,
+                )?;
                 let failed = report.has_errors();
                 (
                     "builtin:rule_validation",
@@ -1115,7 +1118,10 @@ impl<S: IssueStore> CommandExecutor<S> {
                         true,
                     )
                 } else {
-                    let target = super::resolve_issue_from_capture(&captured_issues, targets[0])?;
+                    let target = super::resolve_issue_from_capture(
+                        &captured_issues,
+                        &IssueIdPrefix::parse(targets[0])?,
+                    )?;
                     let report: RuleReport = captured_scope_rule_report(repository_image, &target)?;
                     let failed = report.has_errors();
                     (
@@ -1232,7 +1238,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         gate_key: &str,
     ) -> Result<Option<GateRunResult>> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let mut runs = self.storage.list_gate_runs_for_issue(&full_id)?;
         runs.retain(|r| r.gate_key == gate_key);
         runs.sort_by_key(|r| r.started_at);
@@ -1351,7 +1359,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
     ) -> Result<(Vec<GateRunResult>, Vec<String>)> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1413,7 +1423,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
     ) -> Result<Vec<(String, GateStatus)>> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -1572,7 +1584,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let registry = self.storage.load_gate_registry()?;
 
@@ -2605,7 +2619,12 @@ assert = {{ require-section = {{ heading = "Summary" }} }}
         ];
         let mut session = executor.storage.open_mutation_session(layout).unwrap();
         let image = executor
-            .capture_gate_evaluation_image(session.as_mut(), issue_id, gate_key, &run_paths)
+            .capture_gate_evaluation_image(
+                session.as_mut(),
+                &crate::domain::IssueIdPrefix::parse(issue_id).unwrap(),
+                gate_key,
+                &run_paths,
+            )
             .unwrap()
             .unwrap()
             .0;

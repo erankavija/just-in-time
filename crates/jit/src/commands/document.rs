@@ -105,7 +105,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
@@ -236,7 +238,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
     ) -> Result<crate::commands::DocumentListResult> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documents = self
             .with_issue_documents(vec![issue])?
@@ -273,7 +277,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: &str,
         area: &str,
     ) -> Result<crate::output::ArtifactDirectoryResponse> {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let documentation = self
             .config_manager
@@ -374,7 +380,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         self.publish_document_remove(&full_id, path)
     }
 
@@ -494,7 +502,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<DocumentContentResult> {
         use git2::Repository;
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         let doc = self.require_issue_document(issue, path)?;
 
@@ -550,7 +560,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<crate::commands::DocumentHistory> {
         use git2::Repository;
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -575,7 +587,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<DocumentDiffResult> {
         use git2::Repository;
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
         self.require_issue_document(issue, path)?;
 
@@ -902,7 +916,9 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut warnings = Vec::new();
 
-        let full_id = self.storage.resolve_issue_id(issue_id)?;
+        let full_id = self
+            .storage
+            .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
         let issue = self.storage.load_issue(&full_id)?;
 
         // Find the document in the issue
@@ -1084,7 +1100,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         let issues = match scope {
             DocumentScope::All => self.storage.list_issues()?,
             DocumentScope::Issue(issue_id) => {
-                let full_id = self.storage.resolve_issue_id(issue_id)?;
+                let full_id = self
+                    .storage
+                    .resolve_issue_id(&IssueIdPrefix::parse(issue_id)?)?;
                 let issue = self.storage.load_issue(&full_id)?;
                 vec![issue]
             }

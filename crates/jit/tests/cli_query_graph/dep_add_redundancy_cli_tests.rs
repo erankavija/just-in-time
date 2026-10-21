@@ -196,13 +196,13 @@ fn test_cli_dep_add_variadic_redundant_among_valid_exits_nonzero() {
     assert_eq!(deps_b, vec![c.as_str()]);
 }
 
-/// jit:c8518f2a: a batch mixing a usage/resolution failure (too-short id
-/// prefix) with a graph-validation failure (a self-redundant edge) exits with
-/// the usage error's code (2), not the validation error's (4) — resolution
+/// jit:c8518f2a: a batch mixing a resolution failure (an id naming no issue)
+/// with a graph-validation failure (a self-redundant edge) exits with the
+/// resolution error's code (3), not the validation error's (4) — resolution
 /// runs before graph validation, so it wins the batch's dominant
 /// classification. Both edges are still named in the error output.
 #[test]
-fn test_cli_dep_add_mixed_error_classes_prefix_wins_over_redundant() {
+fn test_cli_dep_add_mixed_error_classes_resolution_wins_over_redundant() {
     let temp = setup_test_repo();
     let dir = temp.path();
     let a = create_issue(dir, "A");
@@ -213,40 +213,40 @@ fn test_cli_dep_add_mixed_error_classes_prefix_wins_over_redundant() {
     assert!(dep_add(dir, &a, &b, &[]).status.success());
     assert!(dep_add(dir, &b, &c, &[]).status.success());
 
-    // Text mode: exit 2 (usage/prefix), not 4 (validation).
+    // Text mode: exit 3 (not found), not 4 (validation).
     let out = Command::new(jit_binary())
-        .args(["dep", "add", &a, &c, "ab"])
+        .args(["dep", "add", &a, &c, "zzzz"])
         .current_dir(dir)
         .output()
         .unwrap();
     assert!(!out.status.success());
     assert_eq!(
         out.status.code(),
-        Some(2),
-        "a bad id prefix must dominate a sibling redundant-edge failure: stdout={} stderr={}",
+        Some(3),
+        "an unresolved id must dominate a sibling redundant-edge failure: stdout={} stderr={}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("at least 4 characters"),
-        "must name the bad prefix: {stderr}"
+        stderr.contains("zzzz"),
+        "must name the unresolved id: {stderr}"
     );
     assert!(
         stderr.contains(&c[..8]),
         "must ALSO name the redundant edge, not only the dominant failure: {stderr}"
     );
 
-    // JSON mode: same exit code, INVALID_ID_PREFIX at top level, both edges
+    // JSON mode: same exit code, ISSUE_NOT_FOUND at top level, both edges
     // present in details.rejected.
     let out_json = Command::new(jit_binary())
-        .args(["dep", "add", &a, &c, "ab", "--json"])
+        .args(["dep", "add", &a, &c, "zzzz", "--json"])
         .current_dir(dir)
         .output()
         .unwrap();
-    assert_eq!(out_json.status.code(), Some(2));
+    assert_eq!(out_json.status.code(), Some(3));
     let json: serde_json::Value = serde_json::from_slice(&out_json.stdout).unwrap();
-    assert_eq!(json["error"]["code"], "INVALID_ID_PREFIX");
+    assert_eq!(json["error"]["code"], "ISSUE_NOT_FOUND");
 
     let rejected = json["error"]["details"]["rejected"].as_array().unwrap();
     assert_eq!(rejected.len(), 2, "both edges must be named: {rejected:?}");
@@ -254,7 +254,7 @@ fn test_cli_dep_add_mixed_error_classes_prefix_wins_over_redundant() {
         .iter()
         .map(|r| r["code"].as_str().unwrap())
         .collect();
-    assert!(codes.contains(&"INVALID_ID_PREFIX"));
+    assert!(codes.contains(&"ISSUE_NOT_FOUND"));
     assert!(codes.contains(&"VALIDATION_FAILED"));
 
     // Nothing was written.

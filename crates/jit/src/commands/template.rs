@@ -159,6 +159,11 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let container_id = &IssueIdPrefix::parse(container_id)?;
+        let anchor_bindings = &anchor_bindings
+            .iter()
+            .map(|(anchor, id)| Ok((anchor.clone(), IssueIdPrefix::parse(id)?)))
+            .collect::<Result<BTreeMap<_, _>>>()?;
         let layout = self.require_layout()?;
         let context = super::production_mutation_context();
         with_mutation_attempts("template apply", || {
@@ -245,14 +250,14 @@ impl<S: IssueStore> CommandExecutor<S> {
 fn captured_anchor_bindings(
     request: &TemplateRequest<'_>,
     config: &crate::config::JitConfig,
-    container_id: &str,
-    explicit: &BTreeMap<String, String>,
-) -> BTreeMap<String, String> {
+    container_id: &IssueIdPrefix,
+    explicit: &BTreeMap<String, IssueIdPrefix>,
+) -> BTreeMap<String, IssueIdPrefix> {
     let mut bindings = explicit.clone();
     if matches!(request, TemplateRequest::Named(_)) {
         bindings
             .entry(config.templates.anchors.container_anchor().to_string())
-            .or_insert_with(|| container_id.to_string());
+            .or_insert_with(|| container_id.clone());
     }
     bindings
 }
@@ -325,8 +330,8 @@ struct CapturedTemplateApply {
 fn derive_captured_template_apply(
     image: &RepositoryImage,
     request: &TemplateRequest<'_>,
-    container_id: &str,
-    anchor_bindings: &BTreeMap<String, String>,
+    container_id: &IssueIdPrefix,
+    anchor_bindings: &BTreeMap<String, IssueIdPrefix>,
     force: bool,
     context: &MutationContext,
 ) -> Result<CapturedTemplateApply> {
@@ -383,7 +388,7 @@ fn capture_template_image(
     session: &mut dyn crate::storage::RepositoryMutationSession,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
-    container_id: &str,
+    container_id: &IssueIdPrefix,
 ) -> Result<Option<RepositoryImage>> {
     let presets_dir = VirtualPath::GATE_PRESETS;
     let mut spec = CaptureSpec::new(template_fixed_paths(), TEMPLATE_CAPTURE_BUDGET)?;
@@ -425,7 +430,7 @@ fn template_operation_capture_paths(
     image: &RepositoryImage,
     context: &MutationContext,
     request: &TemplateRequest<'_>,
-    container_id: &str,
+    container_id: &IssueIdPrefix,
 ) -> Result<Vec<VirtualPath>> {
     let config = template_config_from_image(image)?;
     let template = request.resolve(&config)?;
@@ -701,8 +706,8 @@ fn parse_template_presets(
 #[allow(clippy::too_many_arguments)]
 fn derive_template_apply(
     template: &GraphTemplate,
-    container_id: &str,
-    anchor_bindings: &BTreeMap<String, String>,
+    container_id: &IssueIdPrefix,
+    anchor_bindings: &BTreeMap<String, IssueIdPrefix>,
     force: bool,
     roles: &RoleBindings,
     issues: &[Issue],
@@ -747,8 +752,8 @@ fn derive_template_apply(
             })?;
             let full = super::resolve_issue_from_capture(issues, bound).with_context(|| {
                 format!(
-                    "template '{}' anchor '{}' is bound to '{bound}', which does not resolve to an existing issue",
-                    template.name, anchor.name
+                    "template '{}' anchor '{}' is bound to '{}', which does not resolve to an existing issue",
+                    template.name, anchor.name, bound.requested()
                 )
             })?;
             Ok((anchor.name.clone(), full))

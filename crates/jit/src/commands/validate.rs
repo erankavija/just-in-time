@@ -243,7 +243,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&str>,
+        precheck_target: Option<&crate::domain::IssueIdPrefix>,
     ) -> Result<Option<MutationBase>> {
         self.capture_proposed_base_inner(
             session,
@@ -260,22 +260,21 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
 
     /// What a mutation decides before taking the claims guard: the
     /// configuration that sets the lease mode, the index, and the issue
-    /// `requested` names.
+    /// `prefix` names.
     ///
-    /// Only issues whose ids match `requested` are read, and the target is
+    /// Only issues whose ids match `prefix` are read, and the target is
     /// resolved among them exactly as a full capture resolves it. When
     /// `needs_base` holds for the target, the same round grows to the
     /// [`capture_mutation_base`](Self::capture_mutation_base) read, with
-    /// `requested` as its precheck target.
+    /// `prefix` as its precheck target.
     pub(crate) fn capture_mutation_preflight(
         &self,
         session: &mut (dyn crate::storage::RepositoryMutationSession + '_),
-        requested: &str,
+        prefix: &crate::domain::IssueIdPrefix,
         needs_base: impl FnOnce(&Issue) -> bool,
     ) -> Result<Option<MutationPreflight>> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
 
-        let prefix = crate::domain::IssueIdPrefix::parse(requested)?;
         let mut candidates = Vec::new();
         let spec = CaptureSpec::new(
             [VirtualPath::CONFIG, VirtualPath::INDEX],
@@ -305,7 +304,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
              repo_rel: &str|
              -> Result<Option<Vec<u8>>> { super::image_repo_bytes(image, repo_rel) };
         let issues = effective_issues(&image, &candidates, &effective)?;
-        let target_id = crate::storage::resolve_issue_id_among(&prefix, &issues)?;
+        let target_id = crate::storage::resolve_issue_id_among(prefix, &issues)?;
         let target = issues
             .into_iter()
             .find(|issue| issue.id == target_id)
@@ -322,7 +321,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Some(image),
             &std::collections::BTreeMap::new(),
             &[],
-            Some(requested),
+            Some(prefix),
             true,
             false,
             true,
@@ -372,7 +371,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             Option<Vec<u8>>,
         >,
         extra_paths: &[crate::repository_state::VirtualPath],
-        precheck_target: Option<&str>,
+        precheck_target: Option<&crate::domain::IssueIdPrefix>,
         mutation: bool,
         archive_scan: bool,
         applied_records: bool,
@@ -850,7 +849,7 @@ fn discover_issue_closure(
     issues: &[Issue],
     config: &JitConfig,
     effective: &Effective<'_>,
-    precheck_target: Option<&str>,
+    precheck_target: Option<&crate::domain::IssueIdPrefix>,
 ) -> Result<bool> {
     use crate::declarations::{GateChecker, GateMode, GateStage};
 
@@ -1072,7 +1071,7 @@ pub(crate) fn plan_content_with_issues(
 /// This is the shared report boundary for the live CLI and native gate checker.
 pub(super) fn rule_validation_report(
     image: &crate::repository_state::RepositoryImage,
-    requested_issue_id: &str,
+    requested_issue_id: &crate::domain::IssueIdPrefix,
     rule_name: &str,
 ) -> Result<crate::validation::report::RuleReport> {
     use crate::declarations::rules::Severity;
@@ -1084,7 +1083,7 @@ pub(super) fn rule_validation_report(
     let issue = issues
         .iter()
         .find(|issue| issue.id == issue_id)
-        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id))?;
+        .ok_or_else(|| crate::storage::IssueNotFoundError::new(requested_issue_id.requested()))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
     let repo_format = config
@@ -1245,7 +1244,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let new_label = label_utils::type_label(new_type);
 
         self.publish_captured_field_update(CapturedFieldUpdate::label_edit(
-            issue_id.to_string(),
+            crate::domain::IssueIdPrefix::of_stored(issue_id),
             CapturedLabelEdit::ReplaceExact {
                 old: old_label,
                 new: new_label,
@@ -1603,6 +1602,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     {
         use crate::validation::report::{ReportedFinding, RuleReport};
 
+        let id = id.map(crate::domain::IssueIdPrefix::parse).transpose()?;
         // If the rule SOURCE is unloadable, do NOT crash the whole report: the
         // enforcement-drift pass still reports a declared-but-unenforced finding
         // for a binding into the unloadable source (REQ-01), and the parse problem
@@ -1639,12 +1639,10 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let mut findings: Vec<ReportedFinding> = Vec::new();
 
-        match id {
-            Some(partial) => {
-                // `load_issue` keys on the FULL id, so the caller's id — which may
-                // be a short-id prefix, as every other command accepts — is put
-                // through the store's prefix resolver first.
-                let full_id = self.storage.resolve_issue_id(partial)?;
+        match &id {
+            Some(prefix) => {
+                // `load_issue` keys on the FULL id.
+                let full_id = self.storage.resolve_issue_id(prefix)?;
                 let issue = self.storage.load_issue(&full_id)?;
 
                 // Local rules for this issue only.
@@ -1801,11 +1799,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::{RuleScope, Severity};
         use crate::validation::report::{ReportedFinding, RuleReport};
 
+        let container_id = crate::domain::IssueIdPrefix::parse(container_id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
 
         // Resolve the container (partial ids accepted) and build the slice.
-        let container_full_id = self.storage.resolve_issue_id(container_id)?;
+        let container_full_id = self.storage.resolve_issue_id(&container_id)?;
         let all = self.storage.list_issues()?;
 
         // The breakdown boundary type is template-driven: resolve the container's
@@ -1926,8 +1925,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     where
         S: crate::storage::RepositoryStateStore,
     {
+        let issue_id = crate::domain::IssueIdPrefix::parse(issue_id)?;
         let image = self.capture_validation_image()?;
-        rule_validation_report(&image, issue_id, rule_name)
+        rule_validation_report(&image, &issue_id, rule_name)
     }
 
     /// Build the `--explain` report for one issue: EVERY rule in the ruleset,
@@ -1958,10 +1958,11 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::declarations::rules::RuleScope;
         use crate::validation::report::{ExplainReport, RuleOutcome};
 
+        let id = crate::domain::IssueIdPrefix::parse(id)?;
         let ruleset = self.effective_rules()?;
         let repo_format = self.repo_content_format()?;
         // `load_issue` keys on the FULL id; resolve a short-id prefix first.
-        let full_id = self.storage.resolve_issue_id(id)?;
+        let full_id = self.storage.resolve_issue_id(&id)?;
         let issue = self.storage.load_issue(&full_id)?;
         let issues = self.storage.list_issues()?;
 
@@ -3492,7 +3493,7 @@ description = \"Full Rust CI pipeline must pass.\"
         let mut session = executor.storage().open_mutation_session(layout).unwrap();
 
         let preflight = executor
-            .capture_mutation_preflight(session.as_mut(), &target_id[..8], |_| false)
+            .capture_mutation_preflight(session.as_mut(), &prefix(&target_id[..8]), |_| false)
             .unwrap()
             .expect("a settled capture");
 
@@ -3505,35 +3506,8 @@ description = \"Full Rust CI pipeline must pass.\"
         assert!(!spec.contains_path(&VirtualPath::data(format!("issues/{other_id}.json")).unwrap()));
     }
 
-    /// A prefix below the minimum is refused before any issue record is read:
-    /// an unreadable record every short prefix matches never surfaces.
-    #[test]
-    fn test_capture_mutation_preflight_rejects_a_short_prefix_before_reading_records() {
-        use crate::commands::test_helpers::{seed_issue, setup};
-        use crate::storage::RepositoryStateStore;
-
-        let executor = setup();
-        let issue = crate::domain::types::fixture_issue("Unreadable".to_string(), String::new());
-        let id = issue.id.clone();
-        seed_issue(executor.storage(), issue);
-        executor
-            .storage()
-            .add_data_file(format!("issues/{id}.json"), "not an issue record");
-        let layout = executor.require_layout().unwrap();
-        let mut session = executor.storage().open_mutation_session(layout).unwrap();
-
-        for requested in ["", &id[..crate::domain::MIN_ID_PREFIX_LENGTH - 1]] {
-            let error = executor
-                .capture_mutation_preflight(session.as_mut(), requested, |_| false)
-                .err()
-                .expect("a short prefix is refused");
-            assert!(
-                error
-                    .downcast_ref::<crate::domain::InvalidIdPrefixError>()
-                    .is_some(),
-                "{requested:?}: {error:?}"
-            );
-        }
+    fn prefix(id: &str) -> crate::domain::IssueIdPrefix {
+        crate::domain::IssueIdPrefix::parse(id).unwrap()
     }
 
     /// A session counting the capture rounds it opens.
@@ -3605,7 +3579,7 @@ description = \"Full Rust CI pipeline must pass.\"
         let (executor, target_id, mut counter) = counted_session();
 
         let base = executor
-            .capture_mutation_base(&mut counter, &[], Some(&target_id))
+            .capture_mutation_base(&mut counter, &[], Some(&prefix(&target_id)))
             .unwrap()
             .expect("a settled capture");
 
@@ -3618,7 +3592,7 @@ description = \"Full Rust CI pipeline must pass.\"
         let (executor, target_id, mut counter) = counted_session();
 
         executor
-            .capture_mutation_preflight(&mut counter, &target_id[..8], |_| false)
+            .capture_mutation_preflight(&mut counter, &prefix(&target_id[..8]), |_| false)
             .unwrap()
             .expect("a settled capture");
 
@@ -3631,7 +3605,7 @@ description = \"Full Rust CI pipeline must pass.\"
     fn test_capture_mutation_preflight_precheck_transition_reads_base_in_one_round() {
         let (executor, target_id, mut counter) = counted_session();
         let start = crate::commands::CapturedLifecycleMutation::State {
-            issue_id: target_id.clone(),
+            issue_id: prefix(&target_id),
             target: crate::domain::State::InProgress,
             force: false,
             divert_unpassed_gates: false,
@@ -3639,7 +3613,7 @@ description = \"Full Rust CI pipeline must pass.\"
         };
 
         let preflight = executor
-            .capture_mutation_preflight(&mut counter, &target_id, |target| {
+            .capture_mutation_preflight(&mut counter, &prefix(&target_id), |target| {
                 crate::commands::lifecycle_requires_prechecks(&start, target)
             })
             .unwrap()

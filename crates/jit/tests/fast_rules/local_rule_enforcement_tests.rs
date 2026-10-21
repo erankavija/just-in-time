@@ -850,8 +850,8 @@ impl IssueStore for FailingMutationStorage {
         self.inner.load_issue(id)
     }
 
-    fn resolve_issue_id(&self, partial_id: &str) -> anyhow::Result<String> {
-        self.inner.resolve_issue_id(partial_id)
+    fn resolve_issue_id(&self, prefix: &jit::domain::IssueIdPrefix) -> anyhow::Result<String> {
+        self.inner.resolve_issue_id(prefix)
     }
 
     fn list_issues(&self) -> anyhow::Result<Vec<Issue>> {

@@ -61,6 +61,15 @@ impl IssueIdPrefix {
             .ok_or_else(|| InvalidIdPrefixError::new(requested))
     }
 
+    /// The prefix naming `id`, an id the repository already stores; the
+    /// minimum applies only to requested input.
+    pub fn of_stored(id: &str) -> Self {
+        Self {
+            requested: id.to_string(),
+            normalised: normalise(id),
+        }
+    }
+
     /// The input as given, for error messages.
     pub fn requested(&self) -> &str {
         &self.requested
