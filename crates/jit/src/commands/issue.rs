@@ -553,7 +553,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// is left to the caller — mirroring `resolve_gate_key`'s
     /// already-resolved-input pattern — so this stays a pure decision, testable
     /// without mutating global process state. Returns
-    /// [`DeletionNotConfirmedError`] (classified by `error_to_exit_code` as
+    /// [`DeletionNotConfirmedError`] (classified by `output::failure::classify` as
     /// `ExitCode::InvalidArgument`, exit code 2) rather than performing the
     /// delete when `allowed` is `false`; `id` is echoed verbatim in the
     /// refusal's example remediation command, so it need not be a resolved

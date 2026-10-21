@@ -226,10 +226,10 @@ impl AlreadyExistsError {
 /// Deletion is a destructive, discouraged operation (Phase 3 safety): the
 /// caller's process environment must set `JIT_ALLOW_DELETION=1` or the delete
 /// is refused before anything is written (jit:0daba57d). Refusing used to
-/// `anyhow::bail!` a plain string, which fell through `error_to_exit_code` to
+/// `anyhow::bail!` a plain string, which fell through the failure classifier to
 /// the generic-error code; a caller checking for `exit 0` (or treating any
 /// nonzero as equivalent) had no reliable way to branch on the refusal. This
-/// typed wrapper is downcastable in `error_to_exit_code` (→
+/// typed wrapper is downcastable in `output::failure::classify` (→
 /// `ExitCode::InvalidArgument`, exit `2`) and renders as `DELETION_NOT_CONFIRMED`
 /// under `--json`, so both output modes let a script distinguish "refused" from
 /// "deleted" reliably.
@@ -436,7 +436,7 @@ pub enum GitRequirementGap {
 /// Error returned when a claim or lease command is run outside a git repository.
 ///
 /// Claims and leases require git for worktree identity and branch tracking.
-/// This typed wrapper is downcastable in `error_to_exit_code` (→
+/// This typed wrapper is downcastable in `output::failure::classify` (→
 /// `ExitCode::ExternalError`) so the CLI reports exit code 10 rather than the
 /// generic error exit code.
 #[derive(Debug, thiserror::Error)]
@@ -486,7 +486,7 @@ impl ClaimRequiresGitError {
 /// by default, any edge that shadows an existing direct edge or is itself already
 /// reachable through other dependencies — the exact property `jit validate`
 /// enforces — so a silent write can no longer resurface as a distant validation
-/// error. Downcastable in `error_to_exit_code` (→ `ExitCode::ValidationFailed`,
+/// error. Downcastable in `output::failure::classify` (→ `ExitCode::ValidationFailed`,
 /// exit 4), matching both cycle detection and the read-time validator. Re-run
 /// `jit dep add --reduce` to drop the now-redundant edge(s) in the same operation.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -537,7 +537,7 @@ impl RedundantDependencyError {
 ///
 /// Each rejected edge keeps its own originating typed error so a caller (the
 /// CLI) can still classify it individually — by downcast, never by message
-/// text — for a per-edge JSON `code`, while the binary's exit-code classifier
+/// text — for a per-edge JSON `code`, while `output::failure::classify`
 /// can downcast this wrapper directly and pick a single dominant exit code
 /// across the whole batch.
 #[derive(Debug, thiserror::Error)]

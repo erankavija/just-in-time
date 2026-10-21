@@ -134,9 +134,9 @@ pub struct ExitCodeDoc {
 /// ordinary error classification.
 ///
 /// The classification rows derive from the typed-error classifier
-/// (`error_to_exit_code` in `crates/jit/src/main.rs`); the exception rows derive
-/// from the direct-exit sites in the same dispatch. A test in `main.rs` verifies
-/// the classification rows against `error_to_exit_code`, and
+/// ([`classify`](crate::output::failure::classify)); the exception rows derive
+/// from the direct-exit sites in the CLI dispatch. The classifier's unit tests
+/// verify the classification rows against it, and
 /// [`CommandExitCode::code`] is verified against the global taxonomy in
 /// `schema.rs` tests, so this projection cannot silently drift from runtime
 /// behavior (@/inv/single-source-prose).
@@ -849,8 +849,8 @@ impl CommandSchema {
     /// specific to a command family, and exceptions — codes a completed run
     /// emits to signal findings, or codes whose meaning departs from the global
     /// taxonomy. Classification rows mirror the typed-error classifier
-    /// (`error_to_exit_code`, `crates/jit/src/main.rs`); exception rows mirror
-    /// the direct process-exit sites in the same dispatch. Both are verified by
+    /// (`output::failure::classify`); exception rows mirror
+    /// the direct process-exit sites in the CLI dispatch. Both are verified by
     /// test rather than hand-copied (@/inv/single-source-prose).
     fn generate_command_exit_codes() -> Vec<CommandExitCode> {
         let row = |command: &str, code: i32, condition: &str, exception: bool| CommandExitCode {
@@ -1104,8 +1104,8 @@ pub fn render_exit_code_reference() -> String {
          agents can branch on outcomes without parsing output. This page is \
          projected from the exit-code taxonomy and the command mappings in \
          `jit --schema`. Each emitted mapping is bound by a test to the runtime \
-         that produces it: the shared classifier (`error_to_exit_code` in \
-         `crates/jit/src/main.rs`) for codes raised as typed errors, and the \
+         that produces it: the shared classifier (`classify` in \
+         `crates/jit/src/output/failure.rs`) for codes raised as typed errors, and the \
          command's own `std::process::exit` site for codes a completed run emits \
          directly (the findings signals and the `serve --fg` pass-through).\n\n",
     );
