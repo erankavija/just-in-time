@@ -112,7 +112,7 @@
           "title": "Gate status reports a manual attestation as never run",
           "classification": "implementation",
           "model": "opus",
-          "status": "rework 1 (opus) dispatched: code-review F1 retried attestation timestamp ordering vs readiness"
+          "status": "rework 2 queued (last before escalation): code-review R2 concurrent automated runs ordering (same class as R1)"
         },
         {
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
@@ -120,7 +120,7 @@
           "title": "Remove the record-reading profile subcommands",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework 1 merged a080f00e6 (docs for removed commands); mcp-ci passed after binary reinstall; code-review re-run pending"
+          "status": "done"
         },
         {
           "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
@@ -142,7 +142,7 @@
           "title": "Remove profile capture",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "dispatched (sonnet) at 8849930aa"
         },
         {
           "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
@@ -525,7 +525,7 @@
     "ae2e3739": 1,
     "66986f88": 1,
     "24268b05": 1,
-    "8673dc5e": 1
+    "8673dc5e": 2
   },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock"
