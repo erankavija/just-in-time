@@ -418,7 +418,7 @@
     },
     {
       "container_short_id": "b697a3f7",
-      "status": "open",
+      "status": "resolved",
       "date": "2026-10-21",
       "summary": "When b697a3f7 is planned: its REQ-06 (archive preview through the execute planner) task must depend on f8a6b298's archive-preview-reads-evidence."
     },
@@ -470,7 +470,7 @@
     },
     {
       "container_short_id": "b697a3f7",
-      "status": "open",
+      "status": "resolved",
       "date": "2026-10-21",
       "summary": "When b697a3f7 is planned: its REQ-01 readiness derivation must also cover 9876a23a REQ-14's `validate --fix` single mutation (converging on the one derivation)."
     },
@@ -495,6 +495,13 @@
       "date": "2026-10-21",
       "decision": "@/inv/canonical-cutover",
       "summary": "Rework limit reached on REQ-03: gates_status entries lacking the new run_id show as unrun (92 legacy manual statuses). Chosen (A): an idempotent one-time conversion of this repo's records through jit's publication path. Each entry is pointed at its run, or gets a run published from the entry's own fields; counts are reported; no engine compatibility code. Rejected (B), narrowing REQ-03: leaves the views disagreeing. Rejected (C), re-attesting: fabricates attestations. REFINED: the scan found 2393 passed + 6 failed entries with runs (backfill run_id), 210 passed entries with no run (publish a run carrying only status, updated_by verbatim including auto:executor, updated_at, origin attested; no exit code or output), and 19 pending (untouched). Rejected: reverting rework 2. The dogfood reinstall is held until the conversion merges."
+    },
+    {
+      "container_short_id": "b697a3f7",
+      "status": "resolved",
+      "date": "2026-10-22",
+      "decision": "@/charter/D-18, @/charter/D-20, @/inv/convention-convergence",
+      "summary": "REQ-05: the dead bulk preview is deleted and the requirement reworded (rejected: a new --dry-run feature). REQ-10 and REQ-12: 'once per captured image'. REQ-17: lease records and the claims sequence counter, waiting on f8a6b298's 2f563673 and 53d19851. REQ-04 scope: every user-requested write, bulk update and dep add/rm included, checks the lease in-session (a stated behaviour change). Edges: b697a3f7 waits on fbb661f2, 0bd2c797, c3e3e2ff, e1a6c8c2, d9ba0029 and f8's archive-preview task; no df129d9e facade edges. Authorised: narrowing 977d01d8, 6add7ca6 and 96bb0941/42bcaa6e after 459bb995."
     }
   ],
   "notes": [
