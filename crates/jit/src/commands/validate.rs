@@ -1189,17 +1189,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                             issue_id, unknown_type
                         ));
                     }
-                    ValidationIssue::InvalidMembershipReference {
-                        issue_id,
-                        label,
-                        reason,
-                        ..
-                    } => {
-                        messages.push(format!(
-                            "  • Issue {} has invalid membership label '{}': {}",
-                            issue_id, label, reason
-                        ));
-                    }
                 }
             }
             return Ok((0, messages));

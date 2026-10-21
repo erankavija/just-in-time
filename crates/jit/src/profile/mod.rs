@@ -44,7 +44,7 @@ pub use application::{
     ProfileCaptureEntry, ProfileCaptureResult, ProfileCollection, ProfileComposedApplyResult,
     ProfileContributionChange, ProfilePackEntry, ProfilePackResult, ProfilePlanEntry,
     ProfilePlanResult, ProfilePlanStatus, ProfileShowEntry, ProfileShowResult, ProfileTargetAction,
-    ProfileTargetChange,
+    ProfileTargetChange, ProfilesKey,
 };
 pub use apply_claims::{
     build_profile_claims, build_profile_claims_from_resolved, build_profile_repair_claims,

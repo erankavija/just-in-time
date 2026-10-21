@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-10-21T11:49:14.069628177Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -7,6 +8,7 @@
   ],
   "description": "The generated command schema stops advertising clap-hidden commands and flags as ordinary surface.\n\n## Background\n\n`CommandSchema::generate()` in `crates/jit/src/schema.rs` walks `Cli::command()` through `extract_command_with_path_hidden` and builds flags with `extract_flag`. Neither consults clap's `Command::is_hide_set` / `Arg::is_hide_set` (clap 4.5). As a result the verb-hint stubs declared `hide = true` in `crates/jit/src/cli.rs` appear as leaves described \"Hidden stub: …\" with the generic `CommandResponse`, and the hidden `validate --divergence` flag appears in `validate`'s flags. The schema's own `hidden` field is unrelated: `hidden_commands()` marks paths hidden from the default MCP tool listing and must keep working. The MCP server (`mcp-server/lib/tool-generator.js`) turns every schema leaf and flag into tool input, and `mcp-server/curated-tools.json` lists 13 \"Alias stub\" exclusions that a curation-coverage test in `mcp-server/test-unit.js` checks against the schema.\n\n## Success Criteria\n\n- [hard] REQ-01: `extract_command_with_path_hidden` skips every subcommand whose `is_hide_set()` is true, and `extract_flag`'s caller skips every argument whose `is_hide_set()` is true.\n- [hard] REQ-02: A schema unit test derives the hidden set from `Cli::command()` and asserts none of it appears in the generated schema, and the hidden `validate --divergence` flag is absent.\n- [hard] REQ-03: `hidden_commands()` and `builtin_global_flags()` keep their current effect on the schema, and `generate()` remains the schema's derivation authority.\n- [hard] REQ-04: The MCP unit and integration tests pass against the reduced schema.\n\n## Notes\n\nThe verb-hint stubs themselves are removed separately; this change keeps the schema correct whether or not hidden items exist. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
   "documents": [],
+  "first_ready_at": "2026-10-21T11:20:20.314749582Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -24,7 +26,7 @@
     "satisfies:df129d9e/REQ-05"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Omit clap-hidden commands and flags from the generated schema",
-  "updated_at": "2026-10-21T01:17:17.724444903Z"
+  "updated_at": "2026-10-21T11:49:14.069628177Z"
 }

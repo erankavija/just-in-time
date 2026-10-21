@@ -13,6 +13,8 @@ use thiserror::Error;
 
 pub mod failure;
 
+pub use crate::domain::list_envelope::{CollectionKey, ListEnvelope};
+
 use crate::declarations::{GateMode, GateStage};
 use crate::domain::{
     GateFindings, GateRunResult, GateRunStatus, GateState, GateStatus, Issue, MinimalBlockedIssue,
@@ -1358,22 +1360,6 @@ pub struct IssueStatusListResponse {
     pub count: usize,
 }
 
-/// Ready-issue list envelope built on [`query_ready`](crate::domain::queries::query_ready)
-/// (no dedicated CLI subcommand emits it; `query available` layers the
-/// unassigned filter on the same readiness test).
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ReadyQueryResponse {
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query blocked` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct BlockedQueryResponse {
-    pub issues: Vec<MinimalBlockedIssue>,
-    pub count: usize,
-}
-
 /// Response for `query blocked --full`: reason-enriched entries. Neither
 /// blocked shape carries the issue's gate-list fields — a blocking gate
 /// appears only as a structured reason — so this command belongs to neither
@@ -1406,52 +1392,6 @@ pub struct BlockedReason {
 pub enum BlockedReasonType {
     Dependency,
     Gate,
-}
-
-/// Response for `query assignee` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct AssigneeQueryResponse {
-    pub assignee: String,
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query state` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct StateQueryResponse {
-    pub state: State,
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query priority` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct PriorityQueryResponse {
-    pub priority: Priority,
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query label` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct LabelQueryResponse {
-    pub pattern: String,
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query strategic` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct StrategicQueryResponse {
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
-
-/// Response for `query closed` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct ClosedQueryResponse {
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
 }
 
 // ============================================================================
@@ -3719,117 +3659,6 @@ mod tests {
     // ========================================================================
     // Query Response Tests
     // ========================================================================
-
-    /// Create a test MinimalIssue
-    fn test_minimal_issue() -> MinimalIssue {
-        MinimalIssue {
-            id: "test-id".to_string(),
-            title: "Issue 1".to_string(),
-            state: State::Ready,
-            priority: Priority::Normal,
-            assignee: None,
-            labels: Vec::new(),
-            archived_from: None,
-        }
-    }
-
-    #[test]
-    fn test_ready_query_response_serialization() {
-        let issues = vec![test_minimal_issue()];
-        let response = ReadyQueryResponse { issues, count: 1 };
-
-        let json_output = JsonOutput::success(response);
-        let serialized = json_output.to_json_string().unwrap();
-
-        assert!(serialized.contains("\"count\": 1"));
-        // Envelope fields removed - raw data only
-        assert!(!serialized.contains("\"success\""));
-        assert!(!serialized.contains("\"metadata\""));
-        assert!(!serialized.contains("\"command\""));
-    }
-
-    #[test]
-    fn test_blocked_query_response_serialization() {
-        let blocked_issue = MinimalBlockedIssue {
-            id: "test-id".to_string(),
-            title: "Issue 1".to_string(),
-            state: State::Ready,
-            priority: Priority::Normal,
-            assignee: None,
-            labels: vec![],
-            blocked_reasons: vec!["dep:abc123".to_string()],
-        };
-
-        let response = BlockedQueryResponse {
-            issues: vec![blocked_issue],
-            count: 1,
-        };
-
-        let json_output = JsonOutput::success(response);
-        let serialized = json_output.to_json_string().unwrap();
-
-        assert!(serialized.contains("\"blocked_reasons\""));
-        // Envelope fields removed - raw data only
-        assert!(!serialized.contains("\"success\""));
-        assert!(!serialized.contains("\"command\""));
-    }
-
-    #[test]
-    fn test_assignee_query_response() {
-        let issues = vec![test_minimal_issue()];
-
-        let response = AssigneeQueryResponse {
-            assignee: "copilot:session-1".to_string(),
-            issues,
-            count: 1,
-        };
-
-        let json_output = JsonOutput::success(response);
-        let serialized = json_output.to_json_string().unwrap();
-
-        assert!(serialized.contains("\"assignee\""));
-        assert!(serialized.contains("copilot:session-1"));
-        // Envelope fields removed - raw data only
-        assert!(!serialized.contains("\"command\""));
-    }
-
-    #[test]
-    fn test_state_query_response() {
-        let issues = vec![test_minimal_issue()];
-
-        let response = StateQueryResponse {
-            state: State::Ready,
-            issues,
-            count: 1,
-        };
-
-        let json_output = JsonOutput::success(response);
-        let serialized = json_output.to_json_string().unwrap();
-
-        assert!(serialized.contains("\"state\""));
-        assert!(serialized.contains("\"ready\""));
-        // Envelope fields removed - raw data only
-        assert!(!serialized.contains("\"command\""));
-    }
-
-    #[test]
-    fn test_priority_query_response() {
-        let issues = vec![test_minimal_issue()];
-
-        let response = PriorityQueryResponse {
-            priority: Priority::High,
-            issues,
-            count: 1,
-        };
-
-        let json_output = JsonOutput::success(response);
-        let serialized = json_output.to_json_string().unwrap();
-
-        assert!(serialized.contains("\"priority\""));
-        assert!(serialized.contains("\"high\""));
-        // Envelope fields removed - raw data only
-        assert!(!serialized.contains("\"command\""));
-    }
 
     #[test]
     fn test_blocked_reason_types() {

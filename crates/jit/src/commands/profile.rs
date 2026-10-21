@@ -1153,7 +1153,7 @@ impl CommandExecutor<JsonFileStorage> {
         validate_variable_inputs(&packages, inputs)?;
         let contribution_context = self.profile_contribution_candidates(&packages, inputs)?;
         let applied = self.apply_profile_selection(&packages, inputs, &contribution_context)?;
-        selection_profile_results(applied.profiles, &selected)
+        selection_profile_results(applied.items, &selected)
     }
 
     /// Resolve the semantic candidates that every selected package contributes.
@@ -2473,12 +2473,8 @@ mod tests {
     use tempfile::TempDir;
 
     fn only_profile<T>(result: crate::profile::ProfileCollection<T>) -> T {
-        assert_eq!(result.count, 1);
-        result
-            .profiles
-            .into_iter()
-            .next()
-            .expect("one profile entry")
+        assert_eq!(result.count(), 1);
+        result.items.into_iter().next().expect("one profile entry")
     }
 
     /// Observe actual publications without coupling the test to
@@ -3252,7 +3248,7 @@ placement = "append"
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -3363,7 +3359,7 @@ placement = "append"
         assert!(!stale_schema.exists());
         assert_eq!(
             repaired
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -3966,7 +3962,7 @@ placement = "append"
         // both under the single application of the package naming the other.
         let published_by = |result: &ProfileComposedApplyResult| {
             result
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.clone(), profile.status))
                 .collect::<Vec<_>>()
@@ -4404,10 +4400,10 @@ template = true
             .plan_profiles(&[selector.clone(), selector])
             .unwrap();
 
-        assert_eq!(result.count, 2);
+        assert_eq!(result.count(), 2);
         assert_eq!(
             result
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -4465,16 +4461,16 @@ template = true
         // then the package that declared it.
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
             vec!["base", "workflow"]
         );
-        assert_eq!(applied.count, applied.profiles.len());
+        assert_eq!(applied.count(), applied.items.len());
         assert_eq!(applied.requested().unwrap().id, "workflow");
         assert!(applied
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Applied));
         // What each package publishes is in the repository, and the audit log
@@ -4534,7 +4530,7 @@ template = true
         );
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -4578,7 +4574,7 @@ template = true
 
         assert_eq!(publications.count(), 0);
         assert!(reapplied
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Unchanged));
         assert_eq!(
@@ -4629,7 +4625,7 @@ template = true
             .apply_profile(&selectors)
             .unwrap();
         assert!(retried
-            .profiles
+            .items
             .iter()
             .all(|profile| profile.status == ProfileApplicationStatus::Applied));
         assert_eq!(applied_event_ids(&recovered), vec!["left", "right"]);
@@ -4647,7 +4643,7 @@ template = true
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -4675,7 +4671,7 @@ template = true
         // means, and it is applied before the package that reaches it.
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| profile.id.as_str())
                 .collect::<Vec<_>>(),
@@ -4701,7 +4697,7 @@ template = true
         let applied = executor.apply_profile_package(&dependant).unwrap();
 
         let order: Vec<&str> = applied
-            .profiles
+            .items
             .iter()
             .map(|profile| profile.id.as_str())
             .collect();
@@ -5446,11 +5442,11 @@ template = true
         // only the package that was named.
         assert!(
             reapplied
-                .profiles
+                .items
                 .iter()
                 .all(|profile| profile.status == ProfileApplicationStatus::Unchanged),
             "{:?}",
-            reapplied.profiles
+            reapplied.items
         );
         assert_eq!(
             fs::read(temp.path().join(".jit/events.jsonl")).unwrap(),
@@ -5477,7 +5473,7 @@ template = true
 
         assert_eq!(
             applied
-                .profiles
+                .items
                 .iter()
                 .map(|profile| (profile.id.as_str(), profile.status))
                 .collect::<Vec<_>>(),
@@ -5623,13 +5619,13 @@ template = true
     ) {
         assert!(
             planned
-                .profiles
+                .items
                 .iter()
                 .flat_map(|plan| &plan.targets)
                 .any(|target| target.action != ProfileTargetAction::Unchanged),
             "a rehearsal that decides nothing proves nothing about the run it precedes"
         );
-        for target in planned.profiles.iter().flat_map(|plan| &plan.targets) {
+        for target in planned.items.iter().flat_map(|plan| &plan.targets) {
             let path = PathBuf::from(&target.path);
             match target.action {
                 ProfileTargetAction::Unchanged => assert_eq!(
@@ -5702,7 +5698,7 @@ template = true
     /// The one entry a report carries for `id`.
     fn reported(report: &ProfilePlanResult, id: &str) -> ProfilePlanEntry {
         report
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == id)
             .unwrap_or_else(|| panic!("the report names profile {id}: {report:?}"))
@@ -6581,7 +6577,7 @@ target = "docs/guide.md"
             .expect("the difference report reads the repository");
 
         let entry = reported
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == "workflow")
             .expect("the selection reports the package");
@@ -6625,7 +6621,7 @@ target = "docs/guide.md"
             .expect("the difference report reads the repository");
 
         let entry = reported
-            .profiles
+            .items
             .iter()
             .find(|entry| entry.id == "workflow")
             .expect("the selection reports the package");

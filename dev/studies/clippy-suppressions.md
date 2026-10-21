@@ -56,14 +56,12 @@ Clippy suggests `.iter_mut().enumerate()`, but this only provides mutable access
 **Locations:**
 - `crates/jit/src/commands/document.rs`: `read_document_content`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`
 - `crates/jit/src/commands/labels.rs`: `get_issue`
-- `crates/jit/src/domain/type_taxonomy.rs`: `ConfigError::DuplicateType`
 
 **Reason:** These are public API methods that form part of the library interface but are not currently called by the CLI binary itself.
 
 **Usage:**
 - Document methods: Used by `jit-server` for REST API endpoints
 - Label methods: Part of public API for external consumers
-- `DuplicateType` variant: Reserved for future validation enhancements
 
 **Why not remove:**
 - Library crate provides API beyond just the CLI binary

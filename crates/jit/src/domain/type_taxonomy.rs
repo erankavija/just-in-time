@@ -48,8 +48,8 @@
 //! .unwrap();
 //!
 //! // Extract and validate type labels
-//! assert_eq!(extract_type("type:task"), Ok("task".to_string()));
-//! assert_eq!(extract_type("type:epic"), Ok("epic".to_string()));
+//! assert_eq!(extract_type("type:task"), Some("task".to_string()));
+//! assert_eq!(extract_type("type:epic"), Some("epic".to_string()));
 //! assert!(config.contains_type("task"));
 //! assert!(!config.contains_type("unknown"));
 //!
@@ -57,20 +57,9 @@
 //! assert!(!HierarchyConfig::empty().contains_type("task"));
 //! ```
 
-use crate::labels::{is_type_label, type_label, type_value_of};
+use crate::labels::is_type_label;
 use std::collections::HashMap;
 use thiserror::Error;
-
-/// Errors that can occur during hierarchy validation.
-#[derive(Debug, Error, PartialEq)]
-pub enum HierarchyError {
-    #[error("Unknown type: '{0}'")]
-    #[allow(dead_code)] // Used in validation logic, may be used by external consumers
-    UnknownType(String),
-
-    #[error("Invalid label format: '{0}' (expected 'type:value')")]
-    InvalidLabel(String),
-}
 
 /// Represents a validation issue found in the repository.
 #[derive(Debug, Clone, PartialEq)]
@@ -80,15 +69,6 @@ pub enum ValidationIssue {
         issue_id: String,
         unknown_type: String,
         suggested_fix: Option<String>,
-    },
-    /// An issue has a membership label referencing a non-existent issue
-    #[allow(dead_code)] // Reserved for future membership validation feature
-    InvalidMembershipReference {
-        issue_id: String,
-        label: String,
-        namespace: String,
-        value: String,
-        reason: String,
     },
 }
 
@@ -119,14 +99,6 @@ pub enum ValidationWarning {
 /// Errors that can occur during configuration validation.
 #[derive(Debug, Error, PartialEq)]
 pub enum ConfigError {
-    /// Duplicate type at a hierarchy level.
-    ///
-    /// Note: Currently unused but kept for future validation enhancements
-    /// where we may want to detect duplicate types across levels.
-    #[allow(dead_code)]
-    #[error("Duplicate type '{0}' at level {1}")]
-    DuplicateType(String, u8),
-
     #[error("Empty type name at level {0}")]
     EmptyTypeName(u8),
 
@@ -223,12 +195,11 @@ impl HierarchyConfig {
 
 /// Extracts the type value from a label with format "type:value".
 ///
-/// Returns the normalized type name (lowercase, trimmed) or an error.
-pub fn extract_type(label: &str) -> Result<String, HierarchyError> {
+/// Returns the normalized type name (lowercase, trimmed), or `None` for a non-type or empty label.
+pub fn extract_type(label: &str) -> Option<String> {
     crate::labels::type_value_of(label)
         .map(|v| v.trim().to_lowercase())
         .filter(|s| !s.is_empty())
-        .ok_or_else(|| HierarchyError::InvalidLabel(label.to_string()))
 }
 
 /// Calculates the Levenshtein distance between two strings.
@@ -326,27 +297,17 @@ pub fn detect_validation_issues(
     // Check if issue has a type label
     let type_label = labels.iter().find(|l| is_type_label(l));
 
-    if let Some(type_label) = type_label {
-        match extract_type(type_label) {
-            Ok(type_name) => {
-                // Check if type is known
-                if !config.contains_type(&type_name) {
-                    let suggested_fix = suggest_type_fix(config, &type_name);
-                    issues.push(ValidationIssue::UnknownType {
-                        issue_id: issue_id.to_string(),
-                        unknown_type: type_name.clone(),
-                        suggested_fix,
-                    });
-                }
-                // Note: We do NOT check dependencies here. Type hierarchy is orthogonal to DAG.
-                // A task can depend on an epic, milestone can depend on task, etc.
-                // The hierarchy only describes organizational grouping, not work flow.
-            }
-            Err(_) => {
-                // Invalid type label format - skip for now
-                // This should be caught by label validation
-            }
-        }
+    // An invalid type label format is caught by label validation.
+    // Type hierarchy is orthogonal to the dependency DAG, so dependencies are not checked here.
+    if let Some(type_name) = type_label
+        .and_then(|l| extract_type(l))
+        .filter(|t| !config.contains_type(t))
+    {
+        issues.push(ValidationIssue::UnknownType {
+            issue_id: issue_id.to_string(),
+            suggested_fix: suggest_type_fix(config, &type_name),
+            unknown_type: type_name,
+        });
     }
 
     issues
@@ -375,8 +336,8 @@ pub fn validate_strategic_labels(
     let type_label = issue.labels.iter().find(|l| is_type_label(l));
     let type_name = match type_label {
         Some(label) => match extract_type(label) {
-            Ok(t) => t,
-            Err(_) => return warnings, // Invalid type label, handled by other validation
+            Some(t) => t,
+            None => return warnings, // Invalid type label, handled by other validation
         },
         None => return warnings, // No type label, handled by other validation
     };
@@ -424,8 +385,8 @@ pub fn validate_orphans(
     let type_label = issue.labels.iter().find(|l| is_type_label(l));
     let type_name = match type_label {
         Some(label) => match extract_type(label) {
-            Ok(t) => t,
-            Err(_) => return warnings, // Invalid type label, handled by other validation
+            Some(t) => t,
+            None => return warnings, // Invalid type label, handled by other validation
         },
         None => return warnings, // No type label, handled by other validation
     };
@@ -460,117 +421,6 @@ pub fn validate_orphans(
     warnings
 }
 
-/// Detects membership validation issues for an issue.
-///
-/// Checks that membership labels (epic:*, milestone:*, etc.) reference actual issues
-/// with matching types.
-///
-/// # Arguments
-///
-/// * `config` - The hierarchy configuration
-/// * `issue` - The issue to validate
-/// * `all_issues` - All issues in the repository (for reference lookup)
-///
-/// # Returns
-///
-/// A vector of validation issues found (empty if no issues)
-#[allow(dead_code)] // Reserved for future membership validation feature
-pub fn detect_membership_issues(
-    config: &HierarchyConfig,
-    issue: &crate::domain::Issue,
-    all_issues: &[crate::domain::Issue],
-) -> Vec<ValidationIssue> {
-    use crate::labels::parse_label;
-
-    let mut issues = Vec::new();
-
-    // Build reverse map: namespace -> expected_type
-    // e.g., "epic" -> "epic", "milestone" -> "milestone"
-    let namespace_to_type: HashMap<&str, Vec<&str>> = {
-        let mut map: HashMap<&str, Vec<&str>> = HashMap::new();
-        for (type_name, namespace) in config.membership_namespaces() {
-            map.entry(namespace.as_str())
-                .or_default()
-                .push(type_name.as_str());
-        }
-        map
-    };
-
-    for label in &issue.labels {
-        // Parse the label
-        let (namespace, value) = match parse_label(label) {
-            Ok(pair) => pair,
-            Err(_) => continue, // Invalid format, skip (handled by label validation)
-        };
-
-        // Check if this namespace is a configured membership namespace
-        if let Some(expected_types) = namespace_to_type.get(namespace.as_str()) {
-            // Find issues with matching label that have one of the expected types
-            let matching_with_correct_type: Vec<_> = all_issues
-                .iter()
-                .filter(|i| {
-                    i.labels.contains(&label.clone())
-                        && i.labels
-                            .iter()
-                            .any(|l| type_value_of(l).is_some_and(|v| expected_types.contains(&v)))
-                })
-                .collect();
-
-            if matching_with_correct_type.is_empty() {
-                // Check if ANY issues have this label (for better error message)
-                let any_matches = all_issues
-                    .iter()
-                    .any(|i| i.id != issue.id && i.labels.contains(&label.clone()));
-
-                if !any_matches {
-                    // No other issue found with this label at all
-                    issues.push(ValidationIssue::InvalidMembershipReference {
-                        issue_id: issue.id.clone(),
-                        label: label.clone(),
-                        namespace: namespace.clone(),
-                        value: value.clone(),
-                        reason: format!(
-                            "No issue found with label '{}'. Expected an issue with type: {}",
-                            label,
-                            expected_types
-                                .iter()
-                                .map(|&t| type_label(t))
-                                .collect::<Vec<_>>()
-                                .join(" or ")
-                        ),
-                    });
-                } else {
-                    // Found issues but none have the correct type
-                    let found_types: Vec<String> = all_issues
-                        .iter()
-                        .filter(|i| i.id != issue.id && i.labels.contains(&label.clone()))
-                        .filter_map(|i| i.labels.iter().find(|l| is_type_label(l)).cloned())
-                        .collect();
-
-                    issues.push(ValidationIssue::InvalidMembershipReference {
-                        issue_id: issue.id.clone(),
-                        label: label.clone(),
-                        namespace: namespace.clone(),
-                        value: value.clone(),
-                        reason: format!(
-                            "Issue(s) with label '{}' have type {:?}, expected type: {}",
-                            label,
-                            found_types,
-                            expected_types
-                                .iter()
-                                .map(|&t| type_label(t))
-                                .collect::<Vec<_>>()
-                                .join(" or ")
-                        ),
-                    });
-                }
-            }
-        }
-    }
-
-    issues
-}
-
 /// Generates fixes for validation issues.
 ///
 /// Currently only generates fixes for unknown type labels with suggested replacements.
@@ -596,7 +446,6 @@ pub fn generate_fixes(issues: &[ValidationIssue]) -> Vec<ValidationFix> {
                 new_type: suggested.clone(),
             }),
             ValidationIssue::UnknownType { .. } => None, // No suggestion available
-            ValidationIssue::InvalidMembershipReference { .. } => None, // No auto-fix for membership issues
         })
         .collect()
 }
@@ -646,33 +495,27 @@ mod tests {
     fn test_extract_type_valid() {
         let action = test_type(4);
         let initiative = test_type(2);
-        assert_eq!(extract_type(&format!("type:{action}")), Ok(action.clone()));
-        assert_eq!(extract_type(&format!("type:{initiative}")), Ok(initiative));
-        assert_eq!(extract_type("type:Action"), Ok(action)); // normalized to lowercase
+        assert_eq!(
+            extract_type(&format!("type:{action}")),
+            Some(action.clone())
+        );
+        assert_eq!(
+            extract_type(&format!("type:{initiative}")),
+            Some(initiative)
+        );
+        assert_eq!(extract_type("type:Action"), Some(action)); // normalized to lowercase
     }
 
     #[test]
     fn test_extract_type_invalid_format() {
-        assert!(matches!(
-            extract_type(&format!("{}:v1.0", test_type(1))),
-            Err(HierarchyError::InvalidLabel(_))
-        ));
+        assert_eq!(extract_type(&format!("{}:v1.0", test_type(1))), None);
 
-        assert!(matches!(
-            extract_type("type"),
-            Err(HierarchyError::InvalidLabel(_))
-        ));
+        assert_eq!(extract_type("type"), None);
 
-        assert!(matches!(
-            extract_type("type:"),
-            Err(HierarchyError::InvalidLabel(_))
-        ));
+        assert_eq!(extract_type("type:"), None);
 
         // Spaces are not valid in label values per the label format regex.
-        assert!(matches!(
-            extract_type("type:  TASK  "),
-            Err(HierarchyError::InvalidLabel(_))
-        ));
+        assert_eq!(extract_type("type:  TASK  "), None);
     }
 
     #[test]
@@ -771,7 +614,6 @@ mod tests {
                 assert_eq!(unknown_type, "acton");
                 assert_eq!(suggested_fix, &Some(test_type(4)));
             }
-            _ => panic!("Expected UnknownType issue"),
         }
     }
 
@@ -894,7 +736,7 @@ mod proptests {
             prop_assume!(namespace != "type"); // Must not be "type"
 
             let label = format!("{}:{}", namespace, value);
-            prop_assert!(extract_type(&label).is_err());
+            prop_assert!(extract_type(&label).is_none());
         }
     }
 }

@@ -15,7 +15,23 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:27:34.762310918Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T11:33:23.432824646Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:37:48.034070329Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
   "labels": [
     "type:task",
@@ -28,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the record-reading profile subcommands",
-  "updated_at": "2026-10-21T07:13:50.211180886Z"
+  "updated_at": "2026-10-21T11:37:48.034070329Z"
 }

@@ -291,26 +291,23 @@ async fn search_issues<S: IssueStore>(
         tracing::error!("Search has no repository layout: {:?}", error);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let nested_data = layout.data_root().strip_prefix(layout.worktree_root()).ok();
-    let mut file_patterns = document_paths;
-    if let Some(relative) = nested_data {
-        file_patterns.push(format!("{}/issues/*.json", relative.display()));
-    }
-
-    let options = SearchOptions {
-        case_sensitive: params.case_sensitive,
-        regex: params.regex,
-        max_results: Some(params.limit),
-        file_patterns,
-        ..Default::default()
-    };
-
-    let mut results =
+    // An empty glob list would search every worktree file, so documents are searched only when linked.
+    let mut results = if document_paths.is_empty() {
+        Vec::new()
+    } else {
+        let options = SearchOptions {
+            case_sensitive: params.case_sensitive,
+            regex: params.regex,
+            max_results: Some(params.limit),
+            file_patterns: document_paths,
+            ..Default::default()
+        };
         jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
             tracing::error!("Search failed: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    if nested_data.is_none() && results.len() < params.limit {
+        })?
+    };
+    if results.len() < params.limit {
         let remaining = params.limit - results.len();
         let data_options = SearchOptions {
             case_sensitive: params.case_sensitive,
@@ -1764,6 +1761,35 @@ pattern = '^v\d+\.\d+$'
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         (server, id, doc_rel.to_string())
+    }
+
+    async fn search_hits(server: &axum_test::TestServer, query: &str) -> Vec<SearchResult> {
+        let response = server.get("/search").add_query_param("q", query).await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::OK,
+            "{}",
+            response.text()
+        );
+        response.json::<SearchResponse>().results
+    }
+
+    #[tokio::test]
+    async fn test_search_nested_data_root_returns_issue_record_match() {
+        let (server, id, _) = create_test_app_with_html_doc();
+        let hits = search_hits(&server, "Test issue").await;
+        assert!(
+            hits.iter().any(|hit| hit.issue_id.as_deref() == Some(&id)),
+            "{hits:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_nested_data_root_keeps_linked_documents_and_excludes_other_files() {
+        let (server, _, doc) = create_test_app_with_html_doc();
+        let hits = search_hits(&server, "hello").await;
+        assert!(hits.iter().any(|hit| hit.path.ends_with(&doc)), "{hits:?}");
+        assert!(search_hits(&server, "enforce_leases").await.is_empty());
     }
 
     #[tokio::test]

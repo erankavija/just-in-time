@@ -1,7 +1,7 @@
 {
   "epic_id": "df129d9e-c795-4d92-9ee5-ffd776339252",
   "epic_short_id": "df129d9e",
-  "current_wave": 1,
+  "current_wave": 2,
   "waves": [
     {
       "wave_number": 1,
@@ -52,7 +52,7 @@
           "short_id": "719a5501",
           "title": "Wrong-verb hints come only from the parser-level path",
           "classification": "implementation",
-          "status": "merged 40aaec181; cargo-ci passed; mcp-ci failed on stale PATH jit (reused by digest, --force denied); code-review R1 failed only on that (run 0c6a655f). Retry mcp-ci with fresh target/debug/jit on PATH once crates/ or mcp-server/ digest changes, then code-review."
+          "status": "done"
         },
         {
           "key": "list-envelope-type",
@@ -60,7 +60,7 @@
           "short_id": "f7f01654",
           "title": "Introduce the generic ListEnvelope type",
           "classification": "implementation",
-          "status": "in_progress (worker w-f7f01654, opus, worktree agent-f7f01654)"
+          "status": "done (REQ-04 void per steward ruling, D-25)"
         }
       ]
     },
@@ -89,7 +89,7 @@
           "short_id": "233f4a09",
           "title": "Omit clap-hidden commands and flags from the generated schema",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-233f4a09, sonnet, worktree agent-233f4a09)"
         }
       ]
     },
@@ -701,6 +701,13 @@
       "issue": "9fa12e75",
       "summary": "REQ-01/REQ-03 narrowed after 72d89161 (plan D-24); a24b11aa real_repo_root->real_repo_layout",
       "status": "applied b6002519c"
+    },
+    {
+      "date": "2026-10-21",
+      "kind": "steward-ruling",
+      "issue": "f7f01654",
+      "summary": "REQ-04 void: ProfileAgreement deleted by 24268b05 (plan D-25)",
+      "status": "applied 3778a65fe"
     }
   ],
   "rework_counts": {

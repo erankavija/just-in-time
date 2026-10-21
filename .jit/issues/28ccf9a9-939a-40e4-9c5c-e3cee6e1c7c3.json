@@ -11,6 +11,38 @@
       "format": "markdown",
       "label": null,
       "path": "dev/active/f4d9502a-git-cli-module/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "079a971784750c11fcdbad616e6d3774ba1eee1ef29904be9616f931e7040e51",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "83ee24d94ecb270dc24ab8b2d9c25e9adfe677347673f24021973ea2ebf4926a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/f4d9502a-git-cli-module/investigation.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "plan",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f4d9502a-git-cli-module/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "breakdown-manifest",
+      "format": "markdown",
+      "label": null,
+      "path": "dev/active/f4d9502a-git-cli-module/breakdown.json"
     }
   ],
   "first_ready_at": "2026-10-21T10:46:13.738810598Z",
@@ -39,5 +71,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "planning: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T10:57:12.842326102Z"
+  "updated_at": "2026-10-21T11:39:41.910665675Z"
 }

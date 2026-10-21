@@ -1,0 +1,55 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "77cfcd1f452a7a063c38582ebc610fd3f25a081c",
+  "completed_at": "2026-10-21T11:34:01.948291947Z",
+  "duration_ms": 381939,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/types.rs",
+        "id": "F1",
+        "line": 2892,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/66bd4b5c/requirement/REQ-01",
+          "@/issue/66bd4b5c/requirement/REQ-04",
+          "@/invariant/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "The owning parser test omits mixed-case variants, so it does not prove every canonical-token case variant is rejected."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/architecture/cli-and-mcp-strategy.md",
+        "id": "F2",
+        "line": 77,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/66bd4b5c/requirement/REQ-05"
+        ],
+        "severity": "high",
+        "summary": "An architecture example still presents open as a lifecycle-state token."
+      }
+    ],
+    "summary": "Two hard success criteria remain unmet: exhaustive case-variant test coverage and retired alias prose cleanup.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "257e94f4-a72e-424f-a7d9-683b39fb7e0c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:27:40.009024278Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5737 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e37-8884-7560-997c-7e9ad9ed3e84\n--------\nuser\n--- 5724 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5947203ab, b41a28ee9 (merge integration; first-parent patch duplicates implementation)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/charter/D-18 (charter); @/issue/842b0ac6/requirement/REQ-09 and @/issue/66bd4b5c/requirement/REQ-01, REQ-04, REQ-05 (issue descriptions); @/invariant/canonical-cutover, semantic-types, orthogonal-tests, essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T11:25:58Z); code-review pending\nTruncation recovery: per-file implementation patches, full AGENTS.md, line-bounded current sources, and scoped prose searches excluding historical benchmark/archive records\n\n1. **F1 — blocking, issue-impact:** `test_state_from_str_accepts_only_serde_tokens` checks only uppercase and initial-capital variants. It omits mixed variants such as `bAcklog` and `in_Progress`, so it does not prove that every case variant is rejected as required. `crates/jit/src/domain/types.rs:2892`. References: `@/issue/66bd4b5c/requirement/REQ-01`, `@/issue/66bd4b5c/requirement/REQ-04`, `@/invariant/orthogonal-tests`.\n\n2. **F2 — blocking, issue-impact:** A current architecture example still documents `\"state\": \"open\"` as an issue-state value, leaving retired alias prose despite the hard cleanup criterion. `dev/architecture/cli-and-mcp-strategy.md:77`. References: `@/issue/66bd4b5c/requirement/REQ-05`.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two hard success criteria remain unmet: exhaustive case-variant test coverage and retired alias prose cleanup.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The owning parser test omits mixed-case variants, so it does not prove every canonical-token case variant is rejected.\",\"file\":\"crates/jit/src/domain/types.rs\",\"line\":2892,\"references\":[\"@/issue/66bd4b5c/requirement/REQ-01\",\"@/issue/66bd4b5c/requirement/REQ-04\",\"@/invariant/orthogonal-tests\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"An architecture example still presents open as a lifecycle-state token.\",\"file\":\"dev/architecture/cli-and-mcp-strategy.md\",\"line\":77,\"references\":[\"@/issue/66bd4b5c/requirement/REQ-05\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

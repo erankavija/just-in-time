@@ -434,6 +434,13 @@
       "status": "open",
       "date": "2026-10-21",
       "summary": "When 0f8efc37 is planned: its REQ-08 domain-search migration supersedes b5faef84's interim rg fix. Remove the interim fix there."
+    },
+    {
+      "container_short_id": "df129d9e",
+      "issue": "f7f01654",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "f7f01654 REQ-04 (ProfileAgreement count through ListEnvelope) is void because 24268b05 deleted the type. It stays visible as superseded; plan row D-25. Rejected: retargeting to another type, since 650e6a56 owns them."
     }
   ],
   "notes": [
@@ -459,14 +466,15 @@
     "2026-10-21 ~10:00-13:30: third shared usage-limit stall; leads were resumed at 13:31. 8376299c is at 14/15 with 16d63038 running last.",
     "2026-10-21: f8a6b298 planned (62 issues, 84 edges; P 5e615dc2 and B b06cee74 done). Roots are wired to specific 2195c98f tasks. Execution waits on 2195c98f. just-in-time-59 was assigned to plan f4d9502a next.",
     "2026-10-21 14:00: the steward reinstalled the dogfood binary (~/.cargo/bin/jit) from main 582b1cc92 under the exclusive CI lock, at 3d9a0ce3's request: gate-engine changes merged today (ae2e3739, 72d89161, fd9bfab8) and 5a3a886f's '.' gate roots need it. The previous binary is backed up in the steward scratchpad as jit-2026-10-03.bak. Reinstall after each further gate-engine merge.",
-    "2026-10-21 ~14:10: merge-lock rule. Every git merge into main, and any source edit to main's tree, runs under `flock turnstile flock -x /tmp/jit-full-ci.lock`, so full gates never see a half-merged tree (84745746's gate broke when 719a5501 merged mid-run). Tracker-only writes are exempt."
+    "2026-10-21 ~14:10: merge-lock rule. Every git merge into main, and any source edit to main's tree, runs under `flock turnstile flock -x /tmp/jit-full-ci.lock`, so full gates never see a half-merged tree (84745746's gate broke when 719a5501 merged mid-run). Tracker-only writes are exempt.",
+    "2026-10-21 14:26: the steward reinstalled the dogfood binary at main HEAD (after 24268b05 and 719a5501 changed the CLI surface) to unstick mcp-ci. Interim rule: reinstall after each CLI-surface merge."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
     {
       "date": "2026-10-21",
       "priority": "urgent",
-      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier."
+      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier. Additional data: fast_rules cli_warnings_integration_tests take ~6.3 s each alone and hit the 20 s per-test timeout under any concurrency. This is the recurring 'load' timeout pattern and a test-topology candidate (c780514e)."
     },
     {
       "date": "2026-10-21",
@@ -498,7 +506,7 @@
     },
     {
       "date": "2026-10-21",
-      "item": "The mcp-ci gate runs the MCP tests against whatever jit is on PATH (the dogfood ~/.cargo/bin/jit), but that binary is not among its declared digest inputs. A stale dogfood binary caused a failure (13 undecided tools from removed verb stubs) that digest reuse now pins until crates/ or mcp-server/ changes. A `--force` rerun was denied by the df129d9e lead's permission check, and the steward did not route around that. Decide: make mcp-ci build and use the workspace jit binary (and/or include it in inputs), or reinstall the dogfood binary as part of the gate. Affected: 719a5501 (gated, waiting)."
+      "item": "The mcp-ci gate runs the MCP tests against whatever jit is on PATH (the dogfood ~/.cargo/bin/jit), but that binary is not among its declared digest inputs. A stale dogfood binary caused a failure (13 undecided tools from removed verb stubs) that digest reuse now pins until crates/ or mcp-server/ changes. A `--force` rerun was denied by the df129d9e lead's permission check, and the steward did not route around that. Decide: make mcp-ci build and use the workspace jit binary (and/or include it in inputs), or reinstall the dogfood binary as part of the gate. Affected: 719a5501 (gated, waiting). UPDATE 14:25: recurred for 24268b05: 17 undecided tools from the stale binary. The 3d9a0ce3 lead recommends (B): gate checker `cargo build -p jit && PATH=$PWD/target/debug:$PATH npm test` in .jit/gates.toml. Interim (A): the steward reinstalls the dogfood binary after each CLI-surface merge, and leads rerun a stale-binary mcp-ci failure with --force where their permissions allow."
     }
   ]
 }

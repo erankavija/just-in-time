@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "1bc26b089d572867577c5ae83b30a03d8e24ea97",
+  "completed_at": "2026-10-21T11:47:35.551564858Z",
+  "duration_ms": 114909,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/domain/types.rs",
+        "id": "F1",
+        "line": 2909,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/66bd4b5c/requirement/REQ-01",
+          "@/issue/66bd4b5c/requirement/REQ-04"
+        ],
+        "severity": "high",
+        "summary": "The state parser test omits mixed case variants such as bACklog, so it does not prove every canonical-token case variant is rejected."
+      }
+    ],
+    "summary": "The state parser test does not exhaustively prove rejection of every case variant.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0fd51ae3-a90c-4c65-a003-bc404c0ee98c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:45:40.642487591Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 3769 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e48-05aa-7a40-aa86-15c99d844178\n--------\nuser\n--- 3756 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 5947203ab, b41a28ee9, dc2519638, 1bc26b089 (all `jit:66bd4b5c`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/66bd4b5c/requirement/REQ-01–REQ-06 (.jit/issues/66bd4b5c-bfbc-4ec9-aca4-049525a11700.json); @/issue/842b0ac6/requirement/REQ-09 (.jit issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/canonical-cutover, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T11:25:58Z); code-review previously failed (exit 1, run 257e94f4)\nTruncation recovery: none\n\n1. [blocking][issue-impact][high] `test_state_from_str_accepts_only_serde_tokens` does not exhaustively cover case variants. For example, `bACklog` is neither uppercase, alternating, nor a single-letter flip, so it is not tested. The test therefore does not prove REQ-01/REQ-04’s every-case-variant requirement. Exhaustively generate each token’s case permutations. [`crates/jit/src/domain/types.rs:2909`](@/issue/66bd4b5c/requirement/REQ-01) [`@/issue/66bd4b5c/requirement/REQ-04`](.jit/issues/66bd4b5c-bfbc-4ec9-aca4-049525a11700.json)\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The state parser test does not exhaustively prove rejection of every case variant.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The state parser test omits mixed case variants such as bACklog, so it does not prove every canonical-token case variant is rejected.\",\"file\":\"crates/jit/src/domain/types.rs\",\"line\":2909,\"references\":[\"@/issue/66bd4b5c/requirement/REQ-01\",\"@/issue/66bd4b5c/requirement/REQ-04\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

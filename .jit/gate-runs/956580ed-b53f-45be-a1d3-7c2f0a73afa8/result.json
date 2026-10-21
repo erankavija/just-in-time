@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e9779e8295b494fe982f9605510d02d658460ff5",
+  "completed_at": "2026-10-21T11:48:18.256286584Z",
+  "duration_ms": 262940,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped success criteria are met; no blocking or advisory findings.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f7f01654-690c-4293-b72a-869f16e0fa6c",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "956580ed-b53f-45be-a1d3-7c2f0a73afa8",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:43:55.316200407Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 9d165d822, 1aa825fad, 6d24ab6ee (jit:f7f01654)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-04 and REQ-18 (issue Markdown); @/charter/D-18 and D-20 (dev/vision/9db27a3a-charter.md); @/invariant/architecture-dependency-direction, orthogonal-tests, and essential-code-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, latest run 2026-10-21T11:43:21Z)\nTruncation recovery: Re-read core patches and current sources by path; inspected merge-resolution diffs; excluded unrelated main-merge deltas outside the envelope impact cone.\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped success criteria are met; no blocking or advisory findings.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

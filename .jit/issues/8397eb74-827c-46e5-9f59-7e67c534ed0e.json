@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-21T11:38:59.617217823Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -7,12 +8,24 @@
   ],
   "description": "`FileLocker` repeats one poll loop three times, and keeps test-only non-blocking variants and a lock-path accessor under `allow(dead_code)`.\n\n## Background\n\nIn `crates/jit/src/storage/lock.rs`, `lock_exclusive` (`:213-241`), `lock_shared` (`:254-281`) and `lock_exclusive_with_metadata` (`:347-395`) each carry their own poll loop. `try_lock_exclusive` (`:292-302`) and `try_lock_shared` (`:313-325`) are called only from in-crate unit tests: `lock.rs:532-749` and `storage/claim_coordinator.rs:1589,2698,2700`, all under `#[cfg(test)]`. `LockGuard::path()` (`:145-148`) and its field `path` (`:113`), both under `allow(dead_code)`, are read only by tests (`lock.rs:512,807,827`). `Drop` does not read `path`. `lock_cleanup.rs:98` calls fs4's `File::try_lock_exclusive`, not `FileLocker`'s.\n\n## Success Criteria\n\n- [hard] REQ-01: `FileLocker` acquires exclusive, shared and metadata-writing locks through one private poll loop.\n- [hard] REQ-02: `try_lock_exclusive`, `try_lock_shared`, `LockGuard::path` and the guard's path field exist only in test builds and carry no `allow(dead_code)`.\n- [hard] REQ-03: The existing lock tests pass, including timeout and contention behaviour.\n\n## Notes\n\nThe metadata-writing lock writes its metadata after the shared loop returns.\n",
   "documents": [],
+  "done_at": "2026-10-21T11:56:02.231705475Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:52:01.810604761Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:55:46.225206907Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "8397eb74-827c-46e5-9f59-7e67c534ed0e",
   "labels": [
     "type:task",
@@ -23,7 +36,7 @@
     "satisfies:842b0ac6/REQ-23"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Give the file lock one poll loop",
-  "updated_at": "2026-10-21T01:01:02.327246579Z"
+  "updated_at": "2026-10-21T11:56:02.231705475Z"
 }
