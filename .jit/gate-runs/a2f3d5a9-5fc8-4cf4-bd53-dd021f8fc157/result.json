@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "4d7b416e564f69b5206154faeccd05375049697f",
+  "completed_at": "2026-10-21T10:49:34.797837276Z",
+  "duration_ms": 94418,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "ef9897ab-87d9-4721-a607-801b5d866394",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a2f3d5a9-5fc8-4cf4-bd53-dd021f8fc157",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:48:00.379651910Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: fed2a4f2c; b0617bb52 and 6470711b tagged merge commits\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md\nResolved items: @/issue/df129d9e/requirement/REQ-07 (.jit/issues/df129d9e-c795-4d92-9ee5-ffd776339252.json); @/invariant/bounded-rust-build-footprint, @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/charter/D-18, @/charter/D-20 (dev/vision/9db27a3a-charter.md)\nGate evidence: cargo-ci passed, exit 0, 2026-10-21T10:47:33Z; code-review pending\nTruncation recovery: re-read the implementation patch by suite and path; checked current source, documentation, feature wiring, target budget evidence, and merge metadata in bounded reads\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

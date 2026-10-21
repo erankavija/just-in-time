@@ -46,14 +46,15 @@
       "path": "dev/active/f8a6b298-history-independent-reads/breakdown.json"
     }
   ],
+  "done_at": "2026-10-21T10:39:42.241423648Z",
   "first_ready_at": "2026-10-21T05:40:18.475115916Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:54:26.719764364Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T10:39:31.460342990Z",
       "updated_by": "auto:executor"
     }
   },
@@ -71,7 +72,7 @@
     "type:planning"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-10-21T06:54:26.719764364Z"
+  "updated_at": "2026-10-21T10:39:42.241423648Z"
 }

@@ -87,7 +87,7 @@ fn dep_add_batch_json_error(
         {
             ErrorCode::IssueNotFound.as_str()
         } else if err
-            .downcast_ref::<jit::storage::InvalidIdPrefixError>()
+            .downcast_ref::<jit::domain::InvalidIdPrefixError>()
             .is_some()
         {
             ErrorCode::InvalidIdPrefix.as_str()
@@ -773,15 +773,10 @@ fn profile_result<T>(result: anyhow::Result<T>, json: bool) -> anyhow::Result<T>
 }
 
 /// Wrong-command guess -> canonical-command hint, keyed by (group, guessed verb).
-/// Backs the hidden stub subcommands in `cli.rs` (`IssueCommands::Rm`,
-/// `DepCommands::Remove`, ...): each stub always fails through
-/// [`verb_hint_error`], which looks itself up here. Adding a newly observed
-/// wrong guess is a one-line addition: wire a hidden stub variant in `cli.rs`,
-/// add its match arm below, and add the mapping here. Parser-level rejected
-/// subcommands can use the same mapping directly. See
-/// docs/reference/cli-commands.md's "Command and flag aliases" section for
-/// the user-facing writeup — these are hints, not aliases: the wrong verb
-/// still fails, it just names the right one.
+/// Consulted only when clap rejects a subcommand, so a wrong verb prints its
+/// hint and clap's diagnostic on stderr and exits 2, outside the failure
+/// envelope. See docs/reference/cli-commands.md's "Command and flag aliases"
+/// section: these are hints, not aliases.
 const COMMAND_HINTS: &[(&str, &str, &str)] = &[
     ("dep", "remove", "jit dep rm"),
     ("dep", "delete", "jit dep rm"),
@@ -820,9 +815,7 @@ fn canonical_command_hint(group: &str, verb: &str) -> Option<&'static str> {
 }
 
 /// Return the canonical command for a parser-level unknown subcommand, if the
-/// rejected command is one of the known first-guess residuals. The lookup is
-/// deliberately shared with the hidden-stub dispatch hints so a wrong command
-/// has one source of guidance regardless of where clap rejects it.
+/// rejected command is one of the known first-guess residuals.
 fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<String> {
     if error.kind() != clap::error::ErrorKind::InvalidSubcommand {
         return None;
@@ -835,25 +828,6 @@ fn unknown_subcommand_hint(error: &clap::Error, args: &[String]) -> Option<Strin
     let group = positional.next()?;
     let verb = positional.next()?;
     canonical_command_hint(group, verb).map(|canonical| format!("Hint: use '{canonical}' instead."))
-}
-
-/// Fail fast on an observed wrong-verb guess (`jit <group> <verb>`) with a
-/// hint naming the canonical command, instead of executing (there is nothing
-/// to execute — these are hidden stubs) or falling through to clap's generic
-/// "unrecognized subcommand" error. `args` is the wrong subcommand's raw
-/// trailing argv (positionals and flags alike, captured verbatim by the
-/// stub); it is inspected only for a literal `--json` so the hint renders
-/// through the same JSON error envelope the real command would have used.
-/// Always returns an error; never used as a fallible operation.
-fn verb_hint_error(group: &str, verb: &str, args: &[String]) -> anyhow::Error {
-    let json = args.iter().any(|a| a == "--json");
-    let canonical = canonical_command_hint(group, verb)
-        .unwrap_or_else(|| panic!("no verb hint registered for 'jit {group} {verb}'"));
-    let command = format!("{group} {verb}");
-    invalid_argument(
-        format!("'jit {command}' is not a jit command. Use '{canonical}' instead."),
-        json,
-    )
 }
 
 /// Read description content for `--description-file` / `--append-description-file`.
@@ -3148,16 +3122,6 @@ fn run() -> Result<()> {
                         let _ = output_ctx.print_success(format!("Deleted issue: {}", id));
                     }
                 }
-                IssueCommands::Rm { args } => return Err(verb_hint_error("issue", "rm", &args)),
-                IssueCommands::Remove { args } => {
-                    return Err(verb_hint_error("issue", "remove", &args))
-                }
-                IssueCommands::Complete { args } => {
-                    return Err(verb_hint_error("issue", "complete", &args))
-                }
-                IssueCommands::Edit { args } => {
-                    return Err(verb_hint_error("issue", "edit", &args))
-                }
                 IssueCommands::Assign { id, assignee, json } => {
                     let output_ctx = OutputContext::new(quiet, json);
                     let full_id = storage.resolve_issue_id(&id)?;
@@ -3529,8 +3493,6 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            DepCommands::Remove { args } => return Err(verb_hint_error("dep", "remove", &args)),
-            DepCommands::Delete { args } => return Err(verb_hint_error("dep", "delete", &args)),
         },
         Commands::Gate(gate_cmd) => match gate_cmd {
             GateCommands::Define {
@@ -3924,8 +3886,6 @@ fn run() -> Result<()> {
                     }
                 }
             }
-            GateCommands::Rm { args } => return Err(verb_hint_error("gate", "rm", &args)),
-            GateCommands::Delete { args } => return Err(verb_hint_error("gate", "delete", &args)),
             GateCommands::Status {
                 id,
                 gate_key,
@@ -5218,8 +5178,6 @@ fn run() -> Result<()> {
                     );
                 }
             }
-            DocCommands::Rm { args } => return Err(verb_hint_error("doc", "rm", &args)),
-            DocCommands::Delete { args } => return Err(verb_hint_error("doc", "delete", &args)),
             DocCommands::Show { id, path, at, json } => {
                 let result = executor.show_document_content(&id, &path, at.as_deref())?;
 
@@ -5279,7 +5237,7 @@ fn run() -> Result<()> {
                             .downcast_ref::<jit::storage::IssueNotFoundError>()
                             .is_some()
                             || e.downcast_ref::<jit::storage::AmbiguousIdError>().is_some()
-                            || e.downcast_ref::<jit::storage::InvalidIdPrefixError>()
+                            || e.downcast_ref::<jit::domain::InvalidIdPrefixError>()
                                 .is_some()
                         {
                             JsonError::issue_not_found(&id)
@@ -6039,15 +5997,6 @@ fn run() -> Result<()> {
                     }
                     let _ = output_ctx.print_info(format!("\nTotal: {}", values.len()));
                 }
-            }
-            jit::cli::LabelCommands::Add { args } => {
-                return Err(verb_hint_error("label", "add", &args))
-            }
-            jit::cli::LabelCommands::Rm { args } => {
-                return Err(verb_hint_error("label", "rm", &args))
-            }
-            jit::cli::LabelCommands::Remove { args } => {
-                return Err(verb_hint_error("label", "remove", &args))
             }
         },
         Commands::Config(config_cmd) => match config_cmd {
@@ -7540,11 +7489,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_renew::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    &lease_id,
-                    extension,
-                ) {
+                match execute_claim_renew(&worktree_paths, &lease_id, extension) {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -7615,11 +7560,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_status::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    issue.as_deref(),
-                    agent.as_deref(),
-                ) {
+                match execute_claim_status(&worktree_paths, issue.as_deref(), agent.as_deref()) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
@@ -7781,11 +7722,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_force_evict::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    &lease_id,
-                    &reason,
-                ) {
+                match execute_claim_force_evict(&worktree_paths, &lease_id, &reason) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({

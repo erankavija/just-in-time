@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "6c0f8739-f103-4b20-91c4-9990fd0473a0"
+  ],
+  "description": "Delete `domain::latest_gate_run`, whose only caller was the run-scanning reuse lookup.\n\n## Background\n\n`domain::latest_gate_run` (`crates/jit/src/domain/types.rs:1030-1040`) picks the most recently started run from a list. Its only callers were the backends' reuse scans, which reuse no longer runs: reuse reads one verdict record.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::latest_gate_run` and its tests no longer exist, and no selection of a latest run over a list of runs remains in `domain/types.rs`.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "be45195f-4d01-4bfe-85df-dc43b2e9f894",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-gate-runs",
+    "component:core",
+    "per:@/charter/D-18",
+    "satisfies:f8a6b298/REQ-02"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The run-scanning latest selection is gone",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

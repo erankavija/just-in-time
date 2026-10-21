@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "47dcf8560c5d8d97f72eb08da6393fbd587354cf",
+  "completed_at": "2026-10-21T11:02:19.317727215Z",
+  "duration_ms": 237991,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The sole removed metadata-free in-directory link is derived from the retained artifact, while all other qualifying links remain outside configured artifact areas.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "f9ab44aa-1df9-49f7-a335-2a3c2880ac06",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ac96e371-c8a5-4061-a4df-ea81723ddb49",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:58:21.326688961Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 47dcf8560c5d8d97f72eb08da6393fbd587354cf (one reachable `jit:f9ab44aa` commit)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/issue/f9ab44aa/requirement/REQ-01–REQ-04 and @/issue/3d9a0ce3/requirement/REQ-03 (issue descriptions, markdown-first); @/gate/repo-validate (.jit/gates.toml, registry-first)\nGate evidence: repo-validate passed (exit 0, 2026-10-21T10:58:18Z); code-review pending with no prior run\nTruncation recovery: recovered combined-output truncation through bounded per-path commit patches, resolver/caller line reads, configuration/gate slices, and explicit-link classifications\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The sole removed metadata-free in-directory link is derived from the retained artifact, while all other qualifying links remain outside configured artifact areas.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

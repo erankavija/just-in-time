@@ -119,7 +119,7 @@ A non-history command reaches the event log only through `CaptureSpec::discover_
 | lease-read-api | Storage offers one lock-free lease read path and one activeness rule | task | Storage offers one lease activeness predicate and three lock-free lease reads. | — | REQ-05, DEC-09, DEC-01 | touches 1 | — | — |
 | lease-reader-migration | Lock-free lease readers use the storage read path | task | Lock-free lease readers in the commands use the storage read path. | lease-read-api | REQ-05, DEC-09 | touches 4 | — | lease-read-api |
 | lease-lock-handle | A held lease lock loads, lists and applies lease changes | task | A held lease lock offers load, list and apply over the current claims store. | — | REQ-06, DEC-10, DEC-02 | touches 1 | — | lease-test-only-api-removal, lease-status-computed-stale |
-| lease-ops-through-lock | Lease operations run through the lease lock | task | Acquire, renew, heartbeat, force-evict and listing use the held lease lock. | lease-sequence | REQ-06, DEC-02, DEC-10 | touches 1 | — | lease-lock-handle |
+| lease-ops-through-lock | Lease operations run through the lease lock | task | Acquire, renew, heartbeat, force-evict and listing use the held lease lock. | lease-sequence, lease-read-api | REQ-06, DEC-02, DEC-10 | touches 1 | — | lease-lock-handle, lease-read-api |
 | lease-mutation-guard-through-lock | The repository-mutation lease check reads through the held lease lock | task | The repository-mutation lease check reads its targets through one held lease lock. | lease-sequence | REQ-05, REQ-06, DEC-10 | touches 2 | — | lease-lock-handle |
 | lease-recover-through-lock | Recovery evicts and reclaims leases through the lease lock | task | Recovery's lease passes run through the held lease lock. | lease-sequence | REQ-06, DEC-03 | touches 2 | — | lease-ops-through-lock |
 | lease-store-fixtures | CLI tests reach lease storage through one test helper | task | CLI tests reach lease storage only through one shared test helper. | — | REQ-05, DEC-09 | creates 1, touches 7 | — | lease-hooks-status |
@@ -128,7 +128,7 @@ A non-history command reaches the event log only through `CaptureSpec::discover_
 | lease-index-validation-removal | Repository validation stops checking the claims index | task | Repository validation holds no claims-index check and the index type is gone. | — | REQ-12, DEC-09 | touches 5 | — | lease-index-machinery-removal, validation-skips-event-log |
 | lease-issue-addressed-ops | Renew, heartbeat and force-evict address a lease by issue | task | Renew, heartbeat and force-evict find the lease from the issue id directly. | lease-sequence, lease-id-scan-bridge | REQ-05, DEC-11, DEC-03 | touches 8 | — | lease-index-validation-removal |
 | lease-interruption-matrix | An interrupted lease operation leaves the prior or the next lease | task | One matrix test proves an interrupted lease operation leaves the prior or the next lease. | lease-sequence, lease-record-layout | REQ-07, DEC-09 | touches 1 | — | lease-issue-addressed-ops |
-| lease-records-rewrite | This checkout's leases are rewritten into lease records | task | This checkout's active leases are lease records and its claims index is gone. | lease-record-layout | REQ-05, DEC-14 | creates 1, touches 3 | lease-cutover | lease-per-issue-records |
+| lease-records-rewrite | This checkout's leases are rewritten into lease records | task | This checkout's active leases are lease records and its claims index is gone. | lease-record-layout | REQ-05, DEC-14 | creates 3, touches 1 | lease-cutover | lease-per-issue-records |
 | claim-acquire-event-from-assignee | Claim acquire emits its event exactly when the assignee changes | task | Claim acquire decides its claim event from the issue's assignee and parses no event-log record. | event-append-probe | REQ-08, DEC-04, DEC-12, DEC-16, DEC-01 | touches 2 | — | — |
 | issue-claim-event-from-assignee | Issue claim emits its event exactly when the assignee changes | task | Issue claim appends its claim event only when the assignee changes. | — | REQ-08, DEC-12 | touches 2 | — | claim-acquire-event-from-assignee |
 | committed-length-append | Event appends land at the log's committed length | task | Event appends land at the log's committed length and overwrite an uncommitted tail. | event-log-rule | REQ-10, REQ-12, DEC-21, DEC-01 | touches 2 | — | — |
@@ -143,7 +143,7 @@ A non-history command reaches the event log only through `CaptureSpec::discover_
 | archive-execute-reads-evidence | Archive execute reads the per-target evidence record | task | Archive execute reads a target's evidence from its record once. | archive-evidence-record, event-append-probe | REQ-09, DEC-17 | touches 4 | archive-evidence-cutover | archive-evidence-writes |
 | archive-preview-reads-evidence | Archive preview reads the per-target evidence record | task | Archive preview reads each target's evidence record once through storage. | archive-evidence-record | REQ-09, DEC-17, DEC-03 | touches 6 | archive-evidence-cutover | archive-execute-reads-evidence |
 | archive-event-reader-removal | Archive event-log readers are gone | task | No archive reader of the event log remains, and the file backend's second parser is gone. | — | REQ-09, REQ-10, DEC-15, DEC-17 | touches 3 | — | archive-preview-reads-evidence |
-| archive-evidence-seeding | This repository's archived targets get evidence records | task | This repository's archived targets each have an evidence record matching the event log. | archive-evidence-record | REQ-09, DEC-17 | creates 1, touches 1 | archive-evidence-cutover | archive-evidence-writes |
+| archive-evidence-seeding | This repository's archived targets get evidence records | task | This repository's archived targets each have an evidence record matching the event log. | archive-evidence-record | REQ-09, DEC-17 | creates 2 | archive-evidence-cutover | archive-evidence-writes |
 | history-commands-skip-retired-tags | History commands report a log holding retired-tag records | task | History commands succeed over a log holding retired-tag records and omit them. | event-log-rule | REQ-10, DEC-15 | touches 1 | — | event-log-read-rule |
 | event-log-test-captures-tail | Test images capture the event log as a tail | task | The listed test images capture the event log through the end-of-log probe. | — | REQ-13, DEC-19 | touches 9 | — | archive-event-reader-removal, claim-acquire-event-from-assignee, committed-length-restatements |
 | capture-refuses-whole-event-log | Captures refuse a whole read of the event log | task | The capture layer admits only the end-of-log probe on the event log. | event-append-probe | REQ-13, DEC-19 | touches 1 | — | event-log-test-captures-tail |
@@ -248,6 +248,7 @@ flowchart LR
     N19 --> N22
     N16 --> N22
     N22 --> N23
+    N20 --> N23
     N22 --> N24
     N23 --> N25
     N17 --> N26

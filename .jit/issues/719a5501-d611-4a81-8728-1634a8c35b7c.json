@@ -14,7 +14,23 @@
     "code-review",
     "mcp-ci"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:07:20.499462069Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T11:11:50.641327312Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:15:42.107921975Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "719a5501-d611-4a81-8728-1634a8c35b7c",
   "labels": [
     "type:task",
@@ -29,5 +45,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Wrong-verb hints come only from the parser-level path",
-  "updated_at": "2026-10-21T01:29:07.446998941Z"
+  "updated_at": "2026-10-21T11:15:42.107921975Z"
 }

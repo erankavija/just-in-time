@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "08f96e5f0b0c5f9d0b0515c3bb147e8f1dce9194",
+  "completed_at": "2026-10-21T10:49:02.949763547Z",
+  "duration_ms": 192297,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "crates/jit/src/commands/claim.rs",
+        "id": "F1",
+        "line": 510,
+        "origin": "pre-existing",
+        "references": [
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "low",
+        "summary": "execute_claim_list documents a nonexistent _storage argument."
+      }
+    ],
+    "summary": "Both hard criteria are met; one pre-existing stale rustdoc comment remains.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "d759d606-cf7b-4548-9fbe-bcf48793856e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "3f32e397-cdf2-49b8-ab0f-89a76a22d1d3",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:45:50.652070703Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: c9b98d518 (implementation); f1c74fa1 (first-parent merge integration)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-19 (issue description); @/invariant/canonical-cutover, @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review pending (no completed run)\nTruncation recovery: none\n\n1. [advisory][pre-existing] `crates/jit/src/commands/claim.rs:510` documents a nonexistent `_storage` argument for `execute_claim_list`. The misleading rustdoc predates the attributable patch and should be removed or corrected. References: `@/invariant/essential-code-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Both hard criteria are met; one pre-existing stale rustdoc comment remains.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"execute_claim_list documents a nonexistent _storage argument.\",\"file\":\"crates/jit/src/commands/claim.rs\",\"line\":510,\"references\":[\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

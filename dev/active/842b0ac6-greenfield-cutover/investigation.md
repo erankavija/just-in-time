@@ -741,7 +741,7 @@ Small, one worker:
   - `example_integration` is not inert. It is wired to `gate define --example` (`cli.rs:1368-1370`, `main.rs:4225,4305`), printed by `gate show` (`main.rs:4525-4527`), and emitted in JSON (`output.rs:2731,2753`; documented at `docs/reference/cli-commands.md:1924`). Removing the field removes that CLI and JSON surface.
 - "`add_gate_definition` is reached only by tests": **valid**.
   - Definition: `commands/gate.rs:1155-1191`.
-  - Callers: `tests/common/harness.rs:209-220` (the `add_gate` wrapper), `fast_docs_templates/{planning_preset_tests.rs:36, template_apply_atomicity_tests.rs:399, template_apply_tests.rs:955}`.
+  - Callers: `src/test_harness.rs:209-220` (the `add_gate` wrapper), `fast_docs_templates/{planning_preset_tests.rs:36, template_apply_atomicity_tests.rs:399, template_apply_tests.rs:955}`.
 
 #### 2. Consumer sweep
 Production writers of `auto` and `example_integration`:
@@ -790,7 +790,7 @@ None. `auto` is mechanism vocabulary.
 
 #### 7. Overlap and sequencing
 - The dogfood manifest is shared with REQ-06 (above).
-- `.agents/worktrees/agent-6ff14f21` (uncommitted) edits `commands/gate.rs`, `gate_cli_tests.rs`, `test_helpers.rs` and `tests/common/harness.rs`. Sequence (b) after it.
+- `.agents/worktrees/agent-6ff14f21` (uncommitted) edits `commands/gate.rs`, `gate_cli_tests.rs`, `test_helpers.rs` and `src/test_harness.rs`. Sequence (b) after it.
 - REQ-20 (another slice) edits `commands/gate.rs:822,1039` and `gate_check.rs`, so same-file contention is possible.
 
 ### REQ-11: `archived_from` required on archived records

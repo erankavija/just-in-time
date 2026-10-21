@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-f8a6b298",
+  "claimed_at": "2026-10-21T10:40:27.401638027Z",
   "context": {},
   "created_at": "2026-10-21T05:40:14.218828181Z",
   "dependencies": [
@@ -7,20 +8,22 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Restructure storage so reads never scale with project history (f8a6b298) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-21T10:44:54.996871164Z",
+  "first_ready_at": "2026-10-21T10:39:42.322568741Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T05:40:14.218828181Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T10:44:10.648896408Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-21T05:40:14.218828181Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T10:40:28.364533796Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b06cee74-7635-49c0-bc13-448bcfa28324",
@@ -38,7 +41,7 @@
     "brackets:f8a6b298"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "done",
   "title": "breakdown: Restructure storage so reads never scale with project history",
-  "updated_at": "2026-10-21T05:40:14.218828181Z"
+  "updated_at": "2026-10-21T10:44:54.996871164Z"
 }

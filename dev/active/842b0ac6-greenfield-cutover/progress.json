@@ -1,7 +1,7 @@
 {
   "epic_id": "842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b",
   "epic_short_id": "842b0ac6",
-  "current_wave": 1,
+  "current_wave": 3,
   "waves": [
     {
       "wave_number": 1,
@@ -23,7 +23,7 @@
           "title": "Remove linked-worktree evidence from repository capture",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged-gate-pending"
+          "status": "done"
         },
         {
           "id": "0ec8b001-ef0b-49c8-82a9-536ca896996c",
@@ -32,7 +32,7 @@
           "title": "Prune the uncalled output surface",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-pending"
+          "status": "done"
         },
         {
           "id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
@@ -74,7 +74,7 @@
           "title": "Remove the bracket breakdown module",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "45b442f3-fe6d-4626-af72-905c6f25d388",
@@ -83,7 +83,7 @@
           "title": "Collapse container-destination classification to its outcomes",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "4c216a28-9362-4e0d-9ccd-e5cd43f9093b",
@@ -92,7 +92,7 @@
           "title": "Remove the unimplemented link-rewrite adapter method",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "d759d606-cf7b-4548-9fbe-bcf48793856e",
@@ -101,7 +101,7 @@
           "title": "Drop the unused storage type parameter from claim commands",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "4251137e-6a16-402c-ad97-91889cea4978",
@@ -110,7 +110,7 @@
           "title": "Remove the read-lock sidecar sweep",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         },
         {
           "id": "47a082ef-f1c5-4874-910f-ae1057a8579f",
@@ -119,7 +119,7 @@
           "title": "Parse in-memory event logs through the shared event parser",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "done"
         }
       ]
     },
@@ -134,7 +134,7 @@
           "title": "Remove the silent integrity validator",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "72d4990c-0fe7-4a8c-815e-c8ab158fcb11",
@@ -188,7 +188,7 @@
           "title": "Parse lifecycle states from canonical tokens only",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -418,11 +418,13 @@
   ],
   "escalations": [],
   "rework_counts": {
-    "0ec8b001": 0
+    "0ec8b001": 1
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
-    "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns)."
+    "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns).",
+    "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass.",
+    "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
@@ -430,7 +432,8 @@
     "just-in-time-05: bedf0962 lands in ~2-3h; 16d63038 later and rebases onto our read_issues/load_events changes, so those land in 1b.",
     "Wave 1a dispatched at main 23d4f5526; worker prompts are built by a scratchpad generator from the live issue text.",
     "Resource policy (steward): dispatch only with >=60 GB free on /, max 2 live worktrees, remove worktrees at merge, CARGO_INCREMENTAL=0, full gates via turnstile+exclusive flock, other cargo via turnstile+shared flock.",
-    "Foreign leaks into main (df129d9e lints, 3d9a0ce3 profile.rs test fix) blocked merges/gates twice; steward routed both."
+    "Foreign leaks into main (df129d9e lints, 3d9a0ce3 profile.rs test fix) blocked merges/gates twice; steward routed both.",
+    "mkprompt.py read a non-existent gates field until 4c216a28's dispatch; earlier prompts named no gates. Fixed; lead evaluated the real gates on every issue."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }

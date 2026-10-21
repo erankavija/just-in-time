@@ -1,0 +1,25 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./scripts/cargo-ci.sh",
+  "commit": "6470711b433d500a0bbea38b46c6ade557df97a5",
+  "completed_at": "2026-10-21T10:44:00.346654739Z",
+  "duration_ms": 100721,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "gate_key": "cargo-ci",
+  "inputs_digest": "188b2b8236ddbf8bdc275d951baf5d24069cdbbc1794eb2557666582dbeaf31a",
+  "issue_id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0010c941-7a5f-4083-bbdf-7c759611f224",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:42:19.624762857Z",
+  "status": "failed",
+  "stderr": "",
+  "stdout": "--- clippy diagnostics ---\nerror[E0283]: type annotations needed\nerror: could not compile `jit` (bin \"jit\" test) due to 1 previous error\nwarning: build failed, waiting for other jobs to finish...\nerror: could not compile `jit` (bin \"jit\") due to 1 previous error\n  ✓ fmt: ok (1637 ms)\n  ✗ clippy: FAILED (exit 101) (28547 ms)\n  ✓ suite-build: built in 44648 ms, warmed 17 executables (2045594184 bytes) in 73 ms (44724 ms)\n  ✓ test: 4726 passed, 0 failed, 0 skipped (21156 ms)\n  ✓ doctest: 61 passed, 0 failed, 0 ignored (4428 ms)\n  ✓ suite-clock: 25602 ms\n  ✓ excluded-tests: excluded-tests: nextest skipped=0, doctest ignored=0 (8 ms)\n  ✓ budget: integration-targets=10/12 active-executables=14 bytes=1716339048/2147483648 profile=line-tables-only dep-features=pruned suite-duration=25602ms (81 ms)\n\n",
+  "tree_dirty": true
+}

@@ -1299,27 +1299,16 @@ enum ContainerMatch<'a> {
     None,
 }
 
-/// Resolve a `container-from-label` value against the in-memory `issues` slice,
-/// mirroring storage's full-id-or-unique-prefix semantics but purely over the
-/// slice (graph.rs stays I/O-free). Preference order:
-///   1. exact full-id match,
-///   2. exact short-id match (`i.short_id() == value`); two issues sharing the
-///      same short id is ambiguous (the `brackets:<C-short-id>` convention must
-///      surface a collision, never silently resolve the first match),
-///   3. unique id-prefix match (`i.id.starts_with(value)`); more than one prefix
-///      match is ambiguous.
+/// Resolve a `container-from-label` value against the in-memory `issues` slice
+/// by [`IssueIdPrefix`](crate::domain::IssueIdPrefix). Two issues sharing a
+/// short id are ambiguous: the `brackets:<C-short-id>` convention must surface
+/// a collision, never silently resolve the first match.
 fn resolve_container<'a>(value: &str, issues: &'a [Issue]) -> ContainerMatch<'a> {
-    if let Some(c) = issues.iter().find(|i| i.id == value) {
-        return ContainerMatch::Unique(c);
-    }
-    let mut short = issues.iter().filter(|i| i.short_id() == value);
-    match (short.next(), short.next()) {
-        (Some(c), None) => return ContainerMatch::Unique(c),
-        (Some(_), Some(_)) => return ContainerMatch::Ambiguous,
-        _ => {}
-    }
-    let mut prefix = issues.iter().filter(|i| i.id.starts_with(value));
-    match (prefix.next(), prefix.next()) {
+    let Ok(prefix) = crate::domain::IssueIdPrefix::parse(value) else {
+        return ContainerMatch::None;
+    };
+    let mut matches = issues.iter().filter(|i| prefix.matches(&i.id));
+    match (matches.next(), matches.next()) {
         (Some(c), None) => ContainerMatch::Unique(c),
         (Some(_), Some(_)) => ContainerMatch::Ambiguous,
         _ => ContainerMatch::None,

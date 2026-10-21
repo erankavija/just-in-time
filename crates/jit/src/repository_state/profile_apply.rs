@@ -1203,8 +1203,7 @@ impl AppliedProfileClaimIdentity {
 ///
 /// A semantic declaration is named by its own canonical identity, which already
 /// begins with its registry path; an asset by the repository path it occupies;
-/// and a managed region by its document and region id. Every message about a
-/// claim, including repository-wide validation's finding, names it this way.
+/// and a managed region by its document and region id.
 impl std::fmt::Display for AppliedProfileClaimIdentity {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

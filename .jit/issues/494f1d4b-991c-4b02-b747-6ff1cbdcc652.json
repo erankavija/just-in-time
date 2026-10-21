@@ -1,18 +1,25 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T10:58:31.571723985Z",
   "context": {},
   "created_at": "2026-10-21T06:15:46.346932994Z",
   "dependencies": [
     "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d"
   ],
-  "description": "Make this repository's cargo-ci checker report a load-only failure as an infrastructure fault, so that digest reuse never carries a load-induced failure across issues as a verdict.\n\n## Background\n\n`scripts/cargo-ci.sh` exits 1 for any failing step. Under host load, nextest test timeouts and the suite-duration budget fail on an unchanged tree, and the run is recorded `failed`, a verdict on repository content. A gate that declares inputs reuses a prior verdict over the same digest, failed ones included, so one lead's load-induced failure was reused as another issue's verdict twice on 2026-10-21 (source runs f021435e and 7000b013). After fd9bfab8, an exec checker exiting 75 records an `error` run, and an `error` run is never reused. The epic's REQ-02 requires every gate-run record to distinguish a fault from a verdict; this applies it to this repository's own cargo-ci checker. The milestone steward approved the wording below.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/cargo-ci.sh` exits 75 when every failing step is environment-sensitive: test TIMEOUT results with no FAIL result, or a suite-duration budget overrun. A run that also has a failing test, a fmt or clippy failure, or a footprint budget failure exits 1.\n- [hard] REQ-02: The checker's header and the cargo-ci gate description state the convention, and the gate description notes that a persistent budget overrun at low load is a real regression to investigate rather than retry.\n- [hard] REQ-03: A test owns each exit path: the script's self-test or a Rust test over the classifier.\n\n## Notes\n\n- An `error` run never passes, so a real slowdown still blocks completion; it is rerun rather than cached.\n- This edits a gate checker and the repository's gate registry; it goes through review and the gates like any task.\n",
+  "description": "Make this repository's cargo-ci checker report a load-only failure as an infrastructure fault, so that digest reuse never carries a load-induced failure across issues as a verdict.\n\n## Background\n\n`scripts/cargo-ci.sh` exits 1 for any failing step. Under host load, nextest test timeouts and the suite-duration budget fail on an unchanged tree, and the run is recorded `failed`, a verdict on repository content. A gate that declares inputs reuses a prior verdict over the same digest, failed ones included, so one lead's load-induced failure was reused as another issue's verdict twice on 2026-10-21 (source runs f021435e and 7000b013). After fd9bfab8, an exec checker exiting 75 records an `error` run, and an `error` run is never reused. The epic's REQ-02 requires every gate-run record to distinguish a fault from a verdict; this applies it to this repository's own cargo-ci checker. The milestone steward approved the wording below, and narrowed REQ-01 so that a quiet-host budget overrun stays a real finding against the change that crossed it.\n\n## Success Criteria\n\n- [hard] REQ-01: `scripts/cargo-ci.sh` exits 75 when every failing step is environment-sensitive and the host was loaded while the suite ran: test TIMEOUT results with no FAIL result, or a suite-duration budget overrun. The run output records the observed host load and the threshold that classified it. A suite-duration overrun on a quiet host is a verdict and exits 1, as does a run that also has a failing test, a fmt or clippy failure, or a footprint budget failure.\n- [hard] REQ-02: The checker's header and the cargo-ci gate description state the convention, and the gate description notes that a persistent budget overrun at low load is a real regression to investigate rather than retry.\n- [hard] REQ-03: A test owns each exit path: the script's self-test or a Rust test over the classifier.\n\n## Notes\n\n- An `error` run never passes, so a real slowdown still blocks completion; it is rerun rather than cached.\n- This edits a gate checker and the repository's gate registry; it goes through review and the gates like any task.\n",
   "documents": [],
   "first_ready_at": "2026-10-21T06:15:46.346932994Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:16:02.369572624Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
   "labels": [
     "epic:lead-friction",
@@ -22,7 +29,7 @@
     "type:task"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Report load-only cargo-ci failures as infrastructure faults",
-  "updated_at": "2026-10-21T06:15:51.967977576Z"
+  "updated_at": "2026-10-21T11:16:02.369572624Z"
 }

@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T06:59:55.973781634Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,13 +8,30 @@
   ],
   "description": "`DocFormatAdapter::rewrite_links` defaults to `unimplemented!()`. No adapter overrides it and nothing calls it.\n\n## Background\n\n`crates/jit/src/document/adapter.rs:48-50` declares `rewrite_links` with an `unimplemented!()` body (`:49`). It is the only `unimplemented!` or `todo!` in workspace Rust. `HtmlAdapter`, `MarkdownAdapter` and the feature-gated parser adapters (`document/mod.rs:29,31`) do not override it. The trait doc (`adapter.rs:12`) mentions \"asset scanning and link rewriting\", and the method doc is at `:44-47`.\n\n## Success Criteria\n\n- [hard] REQ-01: `DocFormatAdapter` declares no link-rewrite method, and library code contains no `unimplemented!()`.\n- [hard] REQ-02: The trait doc does not mention link rewriting.\n- [hard] REQ-03: Every adapter, including those behind the `html` and `xml` features, compiles.\n",
   "documents": [],
+  "done_at": "2026-10-21T10:42:28.844728165Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "cargo-ci-features",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:36:41.145855063Z",
+      "updated_by": "auto:executor"
+    },
+    "cargo-ci-features": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:40:53.731639825Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:42:19.829319560Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "4c216a28-9362-4e0d-9ccd-e5cd43f9093b",
   "labels": [
     "type:task",
@@ -25,7 +42,7 @@
     "satisfies:842b0ac6/REQ-17"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove the unimplemented link-rewrite adapter method",
-  "updated_at": "2026-10-21T06:59:56.598975173Z"
+  "updated_at": "2026-10-21T10:42:28.844728165Z"
 }

@@ -2177,10 +2177,6 @@ fn supplied_package(location: &Path, layout: &RepositoryLayout) -> Result<Profil
 /// names is resolved against this repository's worktree root. A failure there
 /// names the record, so a repository whose package moved or was deleted reports
 /// the record that outlived it rather than an absent profile.
-///
-/// Validation and repair resolve a recorded profile through this same route,
-/// which is why it is reachable from the whole command layer rather than
-/// private to the profile commands.
 pub(super) fn recorded_package(
     record: &AppliedProfileRecord,
     record_path: &VirtualPath,

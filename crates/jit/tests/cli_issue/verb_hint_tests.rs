@@ -5,9 +5,10 @@
 //! a failed command plus a retry. Policy: hints only, no new aliases — every
 //! wrong guess still fails, but with a message naming the canonical spelling
 //! instead of clap's generic "unrecognized subcommand" error. These tests
-//! pin, for each wrong guess: exit code 2, a human-readable hint naming the
-//! canonical command, the same hint in the `--json` error envelope, and that
-//! the canonical spelling in the same group is completely unaffected.
+//! pin, for each wrong guess: exit code 2, the hint naming the canonical command
+//! and clap's diagnostic on stderr with empty stdout (parse failures stay
+//! outside the `--json` envelope), and that the canonical spelling in the same
+//! group is completely unaffected.
 
 use std::process::Command;
 use tempfile::TempDir;
@@ -37,66 +38,37 @@ fn json_issue_id(output: &std::process::Output) -> String {
     json["id"].as_str().expect("id should exist").to_string()
 }
 
-/// Assert a wrong-verb guess fails with exit 2, names `expect_in_hint` on
-/// stderr, and (under `--json`) carries the same substring in the JSON error
-/// envelope's message or suggestions.
+/// Assert a wrong-verb guess is a parse failure: exit 2, the hint and clap's
+/// diagnostic on stderr, empty stdout, with and without `--json` and inside
+/// or outside a repository.
 fn assert_wrong_verb_hint(args: &[&str], expect_in_hint: &str) {
-    let temp_dir = setup_test_env();
+    let repo = setup_test_env();
+    let outside = TempDir::new().unwrap();
+    let json_args: Vec<&str> = args.iter().copied().chain(["--json"]).collect();
 
-    let output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(args)
-        .output()
-        .unwrap();
-    assert_eq!(
-        output.status.code(),
-        Some(2),
-        "args {:?} should exit 2, stderr: {}",
-        args,
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains(expect_in_hint),
-        "args {:?}: expected stderr to contain {:?}, got: {}",
-        args,
-        expect_in_hint,
-        stderr
-    );
-
-    let mut json_args: Vec<&str> = args.to_vec();
-    json_args.push("--json");
-    let json_output = Command::new(jit_binary())
-        .current_dir(&temp_dir)
-        .args(&json_args)
-        .output()
-        .unwrap();
-    assert_eq!(
-        json_output.status.code(),
-        Some(2),
-        "args {:?} --json should exit 2",
-        args
-    );
-    let json: serde_json::Value = serde_json::from_slice(&json_output.stdout)
-        .unwrap_or_else(|e| panic!("args {:?} --json: stdout not JSON: {}", args, e));
-    let message = json["error"]["message"]
-        .as_str()
-        .unwrap_or_else(|| panic!("args {:?} --json: no error.message", args));
-    let suggestions: Vec<&str> = json["error"]["suggestions"]
-        .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str()).collect())
-        .unwrap_or_default();
-    assert!(
-        message.contains(expect_in_hint) || suggestions.iter().any(|s| s.contains(expect_in_hint)),
-        "args {:?} --json: expected hint {:?} in message or suggestions, got: {}",
-        args,
-        expect_in_hint,
-        json_output_pretty(&json)
-    );
-}
-
-fn json_output_pretty(json: &serde_json::Value) -> String {
-    serde_json::to_string_pretty(json).unwrap_or_default()
+    for (dir, argv) in [
+        (&repo, args),
+        (&repo, json_args.as_slice()),
+        (&outside, args),
+        (&outside, json_args.as_slice()),
+    ] {
+        let output = Command::new(jit_binary())
+            .current_dir(dir)
+            .args(argv)
+            .output()
+            .unwrap();
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(output.status.code(), Some(2), "{argv:?}: {stderr}");
+        assert!(output.stdout.is_empty(), "{argv:?}: stdout must be empty");
+        assert!(
+            stderr.contains("Hint:") && stderr.contains(expect_in_hint),
+            "{argv:?}: expected hint {expect_in_hint:?}, got: {stderr}"
+        );
+        assert!(
+            stderr.contains("unrecognized subcommand"),
+            "{argv:?}: expected clap diagnostic, got: {stderr}"
+        );
+    }
 }
 
 // ============================================================================

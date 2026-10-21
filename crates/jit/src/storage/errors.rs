@@ -240,44 +240,6 @@ impl RepositoryFormatTooNewError {
     }
 }
 
-/// Shortest issue-id prefix the storage layer resolves, counted after
-/// normalization (lowercased, hyphens removed).
-///
-/// The single definition of the minimum: both
-/// [`IssueStore::resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id)
-/// implementations reject a shorter prefix with [`InvalidIdPrefixError`], whose
-/// message reads the length from here, and the storage reference projects it
-/// (`crate::storage::reference`).
-pub const MIN_ID_PREFIX_LENGTH: usize = 4;
-
-/// Error raised when an id prefix is shorter than [`MIN_ID_PREFIX_LENGTH`].
-///
-/// Returned by the storage layer's [`resolve_issue_id`](crate::storage::IssueStore::resolve_issue_id)
-/// and by `jit dep rm`'s per-target prefix matching. The CLI downcasts to this
-/// type to classify the failure as an argument error (exit code `2`) and to
-/// render an `INVALID_ID_PREFIX` JSON error, rather than scanning the message
-/// text. The offending prefix is carried separately for the JSON `details`
-/// field.
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
-#[error("Issue ID prefix must be at least {MIN_ID_PREFIX_LENGTH} characters")]
-pub struct InvalidIdPrefixError {
-    prefix: String,
-}
-
-impl InvalidIdPrefixError {
-    /// Build an [`InvalidIdPrefixError`] carrying the too-short prefix.
-    pub fn new(prefix: impl Into<String>) -> Self {
-        Self {
-            prefix: prefix.into(),
-        }
-    }
-
-    /// The offending (too-short) prefix.
-    pub fn prefix(&self) -> &str {
-        &self.prefix
-    }
-}
-
 /// Error raised when an id prefix matches more than one candidate.
 ///
 /// Two origins share this type: resolving an issue-id prefix against the repo
@@ -467,19 +429,6 @@ mod tests {
         let typed = err.downcast_ref::<RepositoryFormatTooNewError>();
         assert!(typed.is_some());
         assert_eq!(typed.unwrap().repository_version(), 3);
-    }
-
-    #[test]
-    fn test_invalid_id_prefix_message_accessor_and_downcast() {
-        let err = InvalidIdPrefixError::new("ab");
-        // Message preserved verbatim from the previous `anyhow!` origin.
-        assert_eq!(
-            err.to_string(),
-            "Issue ID prefix must be at least 4 characters"
-        );
-        assert_eq!(err.prefix(), "ab");
-        let any: anyhow::Error = err.into();
-        assert!(any.downcast_ref::<InvalidIdPrefixError>().is_some());
     }
 
     #[test]

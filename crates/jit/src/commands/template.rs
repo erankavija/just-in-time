@@ -21,9 +21,7 @@ use crate::repository_state::{
     finalize, finalize_gate_registry_edit, render_capture_closure, CaptureBudget, CaptureSpec,
     MutationContext, MutationIntent, RepositoryEntry, RepositoryImage, VirtualPath,
 };
-use crate::storage::{
-    AmbiguousIdError, InvalidIdPrefixError, IssueNotFoundError, MIN_ID_PREFIX_LENGTH,
-};
+use crate::storage::IssueNotFoundError;
 use crate::templates::{GraphTemplate, RoleBindings};
 use serde::Serialize;
 
@@ -432,7 +430,7 @@ fn template_operation_capture_paths(
     let config = template_config_from_image(image)?;
     let template = request.resolve(&config)?;
     let issues = parse_template_issues(image)?;
-    let full_container_id = resolve_template_issue_id(&issues, container_id)?;
+    let full_container_id = super::resolve_issue_from_capture(&issues, container_id)?;
     let container = template_issue(&issues, &full_container_id)?;
     let mut paths = template_document_paths(
         &template,
@@ -715,7 +713,7 @@ fn derive_template_apply(
     context: &MutationContext,
 ) -> Result<DerivedTemplateApply> {
     let original_registry = registry.clone();
-    let full_container_id = resolve_template_issue_id(issues, container_id)?;
+    let full_container_id = super::resolve_issue_from_capture(issues, container_id)?;
     let container = template_issue(issues, &full_container_id)?.clone();
     match label_utils::type_label_value(&container.labels) {
         Some(ty) if template.applies_to.iter().any(|allowed| allowed == ty) => {}
@@ -747,7 +745,7 @@ fn derive_template_apply(
                     anchor.name
                 )
             })?;
-            let full = resolve_template_issue_id(issues, bound).with_context(|| {
+            let full = super::resolve_issue_from_capture(issues, bound).with_context(|| {
                 format!(
                     "template '{}' anchor '{}' is bound to '{bound}', which does not resolve to an existing issue",
                     template.name, anchor.name
@@ -892,34 +890,6 @@ fn derive_template_apply(
         intents,
         lease_targets,
     })
-}
-
-fn resolve_template_issue_id(issues: &[Issue], partial: &str) -> Result<String> {
-    let normalized = partial.to_lowercase().replace('-', "");
-    if normalized.len() < MIN_ID_PREFIX_LENGTH {
-        return Err(InvalidIdPrefixError::new(partial).into());
-    }
-    let matches = issues
-        .iter()
-        .filter(|issue| {
-            issue
-                .id
-                .replace('-', "")
-                .to_lowercase()
-                .starts_with(&normalized)
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Err(IssueNotFoundError::new(partial).into()),
-        [issue] => Ok(issue.id.clone()),
-        _ => Err(AmbiguousIdError::issue(
-            partial,
-            matches
-                .iter()
-                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
-        )
-        .into()),
-    }
 }
 
 fn template_issue<'a>(issues: &'a [Issue], id: &str) -> Result<&'a Issue> {

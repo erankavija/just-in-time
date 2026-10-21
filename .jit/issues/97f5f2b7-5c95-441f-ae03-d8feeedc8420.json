@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "84e1e27a-8272-4885-84af-8e667cbad57e"
+  ],
+  "description": "Delete the profile-lifecycle torn-tail marker and the finalizer code that wrote and ordered it, which no reader consults any more.\n\n## Background\n\nThe profile-lifecycle event carries `isolated_torn_tail` (`crates/jit/src/domain/types.rs:1585,1963`, catalog sample `domain/event_catalog.rs:437`). The finalizer stamps it and moves the marker to the first appended line over a torn tail (`repository_state/mutation.rs:1195-1235`), detects the tail with `prefix_has_torn_tail` (`:606`, re-exported at `repository_state/mod.rs:102`, tested at `:2426`) and declares `MutationError::UncertifiedTornTail` (`:477`). No reader consults the marker, and no mutation refuses an unterminated tail. Tests naming the marker: `mutation.rs:2532-2580`, `commands/profile.rs:5219-5240,6365-6395`, `storage/repository_state_store_tests.rs`. No line of this repository's event log carries the field.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileLifecycle.isolated_torn_tail`, the finalizer's marker stamping and reordering, `prefix_has_torn_tail` and `UncertifiedTornTail` no longer exist, and no test names them.\n- [hard] REQ-02: The generated event reference and this repository's event log decode and re-serialize unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "97f5f2b7-5c95-441f-ae03-d8feeedc8420",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:history-boundary",
+    "component:core",
+    "per:@/charter/D-18",
+    "enforces:@/invariant/canonical-cutover",
+    "satisfies:f8a6b298/REQ-10"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "The profile torn-tail marker is gone",
+  "updated_at": "2026-10-21T10:39:53.980326737Z"
+}

@@ -163,12 +163,13 @@ Each command group has exactly one canonical spelling for removal: `jit issue
 delete`, `jit dep rm`, `jit gate remove`, `jit doc remove`. Other groups'
 spellings are NOT aliased onto each other — `dep remove`, `dep delete`, `issue
 rm`, `issue remove`, `gate rm`, `gate delete`, `doc rm`, and `doc delete` all
-fail (exit code 2). The error names the group's canonical command instead of
-clap's generic "unrecognized subcommand" message, e.g.:
+fail (exit code 2). The parser prints a hint naming the group's canonical
+command on stderr ahead of clap's diagnostic, e.g.:
 
 ```
 $ jit dep remove abc123 def456
-Error: 'jit dep remove' is not a jit command. Use 'jit dep rm' instead.
+Hint: use 'jit dep rm' instead.
+error: unrecognized subcommand 'remove'
 ```
 
 The same applies to two guesses at editing an issue and to labeling an issue
@@ -193,8 +194,8 @@ Error: `--divergence` is not a `jit validate` flag. Use `jit validate --branch-d
 namespaces`, `jit label values`) — it never touches an issue's labels. See
 `jit label --help`.
 
-Under `--json`, the same hint is in `error.message` with code
-`INVALID_ARGUMENT`, exit code 2 — identical to any other usage error.
+A wrong verb is a parse failure: with or without `--json`, stdout stays empty
+and the hint and diagnostic go to stderr, outside the JSON failure envelope.
 
 ## Archive planning and execution
 

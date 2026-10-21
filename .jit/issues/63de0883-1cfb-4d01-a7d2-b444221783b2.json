@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "855d027d-2575-4c9d-8c6a-049f406fe397",
+    "b06cee74-7635-49c0-bc13-448bcfa28324",
+    "e98ae5a4-595a-4d49-9c88-2d2422198e9e"
+  ],
+  "description": "Decide whether `jit claim acquire` appends `IssueClaimed` from the issue record's assignee alone, so a claim parses no event-log record.\n\n## Background\n\n`jit claim acquire` synchronizes the issue through `MutationIntent::ClaimIssue` (`crates/jit/src/commands/claim.rs:170-212`). Its capture requests the whole event log (`:189-197`). The finalizer parses it (`captured_events`, `repository_state/mutation.rs:675-688`) and asks whether the log's tail already shows this claim (`event_tail_reflects_claim`, `:693-708`) before deciding at `:851-888`. Acquire, unassign, acquire again therefore reassigns the issue with no event, and an issue assigned outside jit gets a repair event. Every event append already reads only the log's bounded end (`CaptureSpec::discover_tail`, `repository_state/image.rs:581-589`), and the issue write and its events publish in one redo record. Tests asserting today's rule: `mutation.rs:2021-2160`, `commands/claim.rs:1780-1830`.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim acquire` captures the issue record and the log's tail only. It appends `IssueClaimed` exactly when the captured issue's assignee differs from the claimant, in the same redo record as the issue write, and appends nothing otherwise.\n- [hard] REQ-02: `captured_events` and `event_tail_reflects_claim` no longer exist, and the claim decision reads no event-log record.\n- [hard] REQ-03: Tests show that acquire, unassign, acquire appends two claim events; that a repeated claim appends nothing; and that a claim of an issue already assigned to the claimant outside jit appends nothing.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- This reverses the earlier rule that a claim repairs a missing claim event for an assignment made outside jit.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T10:39:53.980326737Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "63de0883-1cfb-4d01-a7d2-b444221783b2",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-leases",
+    "component:core",
+    "per:@/charter/D-19",
+    "per:@/charter/D-17",
+    "enforces:@/invariant/event-log",
+    "satisfies:f8a6b298/REQ-08"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Claim acquire emits its event exactly when the assignee changes",
+  "updated_at": "2026-10-21T10:40:07.723087612Z"
+}

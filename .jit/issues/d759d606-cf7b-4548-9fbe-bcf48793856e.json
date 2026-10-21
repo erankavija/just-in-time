@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T07:08:48.198390099Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,24 @@
   ],
   "description": "Three claim commands declare a storage type parameter they never use, which forces turbofish calls, and an uncalled lease check sits beside them.\n\n## Background\n\n`execute_claim_renew<S>` (`crates/jit/src/commands/claim.rs:421`), `execute_claim_status<S>` (`:469`) and `execute_claim_force_evict<S>` (`:618`) declare `<S: IssueStore>` but take no `S` argument. Their only callers use turbofish (`main.rs:8275-8278,8350-8353,8516-8519`). `execute_claim_release_by_issue<S>` (`:334`) takes `storage: &S` and stays. `check_issue_lease` (`claim.rs:542-605`, with its doc) has no caller.\n\n## Success Criteria\n\n- [hard] REQ-01: The renew, status and force-evict claim commands carry no storage type parameter, and their callers use no turbofish.\n- [hard] REQ-02: `check_issue_lease` no longer exists.\n",
   "documents": [],
+  "done_at": "2026-10-21T10:49:11.611334438Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:45:34.434086131Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:49:03.156373223Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d759d606-cf7b-4548-9fbe-bcf48793856e",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:842b0ac6/REQ-19"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Drop the unused storage type parameter from claim commands",
-  "updated_at": "2026-10-21T07:08:48.252058008Z"
+  "updated_at": "2026-10-21T10:49:11.611334438Z"
 }

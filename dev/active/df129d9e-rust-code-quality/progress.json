@@ -20,7 +20,7 @@
           "short_id": "ef9897ab",
           "title": "Compile the integration harness once in jit's test-support surface",
           "classification": "implementation",
-          "status": "in_progress (worker w-ef9897ab, sonnet, worktree agent-ef9897ab)"
+          "status": "done"
         },
         {
           "key": "production-line-baseline",
@@ -36,7 +36,7 @@
           "short_id": "1874e265",
           "title": "Move the error classifier into output::failure",
           "classification": "implementation",
-          "status": "merged e20c3b743; gates pending"
+          "status": "done"
         },
         {
           "key": "mcp-global-json-injection",
@@ -52,7 +52,7 @@
           "short_id": "719a5501",
           "title": "Wrong-verb hints come only from the parser-level path",
           "classification": "implementation",
-          "status": "pending"
+          "status": "merged 40aaec181; cargo-ci passed; mcp-ci failed on stale PATH jit (reused by digest, --force denied); code-review R1 failed only on that (run 0c6a655f). Retry mcp-ci with fresh target/debug/jit on PATH once crates/ or mcp-server/ digest changes, then code-review."
         },
         {
           "key": "list-envelope-type",
@@ -60,7 +60,7 @@
           "short_id": "f7f01654",
           "title": "Introduce the generic ListEnvelope type",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-f7f01654, opus, worktree agent-f7f01654)"
         }
       ]
     },
@@ -694,8 +694,18 @@
     }
   ],
   "created_during_execution": [],
-  "escalations": [],
-  "rework_counts": {},
+  "escalations": [
+    {
+      "date": "2026-10-21",
+      "kind": "steward-ruling",
+      "issue": "9fa12e75",
+      "summary": "REQ-01/REQ-03 narrowed after 72d89161 (plan D-24); a24b11aa real_repo_root->real_repo_layout",
+      "status": "applied b6002519c"
+    }
+  ],
+  "rework_counts": {
+    "719a5501": 0
+  },
   "surfaced_pitfalls": [],
   "external_blockers": {
     "d8176fd3": [

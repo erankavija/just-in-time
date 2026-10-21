@@ -69,8 +69,8 @@ fn test_validate_fails_on_error_severity_graph_rule_violation() {
     // check, so make the story depend on the task. This does NOT satisfy the
     // shape rule (which requires task -> story), so the graph rule still fires.
     story.dependencies = vec![task.id.clone()];
-    crate::harness::seed_memory_issue(&storage, &story);
-    crate::harness::seed_memory_issue(&storage, &task);
+    jit::test_harness::seed_memory_issue(&storage, &story);
+    jit::test_harness::seed_memory_issue(&storage, &task);
 
     let executor = executor_for(storage);
     let result = executor.validate_silent();
@@ -100,8 +100,8 @@ fn test_validate_passes_when_graph_rule_is_satisfied() {
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     task.dependencies = vec![story.id.clone()];
-    crate::harness::seed_memory_issue(&storage, &story);
-    crate::harness::seed_memory_issue(&storage, &task);
+    jit::test_harness::seed_memory_issue(&storage, &story);
+    jit::test_harness::seed_memory_issue(&storage, &task);
 
     let executor = executor_for(storage);
     let result = executor.validate_silent();
@@ -129,8 +129,8 @@ assert = { dependency-shape = { target = { type = "story" }, mode = "should" } }
     let mut task = crate::fixture_issue("a task".to_string(), String::new());
     task.labels = vec!["type:task".to_string()];
     story.dependencies = vec![task.id.clone()]; // connect, but don't satisfy rule
-    crate::harness::seed_memory_issue(&storage, &story);
-    crate::harness::seed_memory_issue(&storage, &task);
+    jit::test_harness::seed_memory_issue(&storage, &story);
+    jit::test_harness::seed_memory_issue(&storage, &task);
 
     let executor = executor_for(storage);
     let result = executor.validate_silent();
@@ -162,8 +162,8 @@ assert = { label-coverage = { } }
     let mut child = crate::fixture_issue("child".to_string(), String::new());
     child.labels = vec!["type:task".to_string()];
     child.dependencies = vec![epic.id.clone()];
-    crate::harness::seed_memory_issue(&storage, &epic);
-    crate::harness::seed_memory_issue(&storage, &child);
+    jit::test_harness::seed_memory_issue(&storage, &epic);
+    jit::test_harness::seed_memory_issue(&storage, &child);
 
     let executor = executor_for(storage);
     let result = executor.validate_silent();
@@ -198,7 +198,7 @@ assert = { label-coverage = { child-link = "bogus" } }
         "## Success Criteria\n\n- [hard] REQ-01: x\n".to_string(),
     );
     epic.labels = vec!["type:epic".to_string()];
-    crate::harness::seed_memory_issue(&storage, &epic);
+    jit::test_harness::seed_memory_issue(&storage, &epic);
 
     let executor = executor_for(storage);
     let result = executor.validate_silent();

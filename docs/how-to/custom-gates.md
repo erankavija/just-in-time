@@ -640,7 +640,7 @@ jit gate define ai-review \
   --timeout 120
 ```
 
-`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and determines the checker exit code from the terminal verdict (`0` pass, `1` defects found, `75` cannot judge); jit parses and persists the structured findings block from the checker output. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
+`REVIEWER_AGENT` is tool-agnostic: configure any prompt-consuming reviewer in its inspection-only mode. The wrapper supplies the prompt and context and determines the checker exit code from the terminal verdict; jit parses and persists the structured findings block from the checker output. Put repository policy discovery and judgment in the repository-specific prompt, not in this shared wrapper.
 
 ### Prompt Library
 

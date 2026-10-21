@@ -296,15 +296,12 @@ impl ClaimsMutationGuard {
         canonical_issue_id: &str,
         resolve_issue_id: impl Fn(&str) -> Result<String>,
     ) -> Result<Vec<&'a Lease>> {
-        let requested = canonical_issue_id.to_lowercase().replace('-', "");
         self.index
             .leases
             .iter()
             .filter(|lease| !lease.is_expired(self.now) && !lease.is_stale(self.now))
             .filter(|lease| {
-                let stored = lease.issue_id.to_lowercase().replace('-', "");
-                stored.len() >= crate::storage::MIN_ID_PREFIX_LENGTH
-                    && requested.starts_with(&stored)
+                ClaimCoordinator::is_issue_identity_candidate(&lease.issue_id, canonical_issue_id)
             })
             .map(|lease| resolve_issue_id(&lease.issue_id).map(|resolved| (lease, resolved)))
             .collect::<Result<Vec<_>>>()
@@ -804,9 +801,7 @@ impl ClaimCoordinator {
     /// issue id. This is only a resolver-call shortlist: canonical equality after
     /// `resolve_issue_id` remains the identity decision.
     fn is_issue_identity_candidate(stored: &str, requested: &str) -> bool {
-        let stored = stored.to_lowercase().replace('-', "");
-        let requested = requested.to_lowercase().replace('-', "");
-        stored.len() >= crate::storage::MIN_ID_PREFIX_LENGTH && requested.starts_with(&stored)
+        crate::domain::IssueIdPrefix::parse(stored).is_ok_and(|stored| stored.matches(requested))
     }
 
     /// Send a heartbeat for an indefinite lease.

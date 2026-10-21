@@ -290,7 +290,7 @@ fn classify_code(error: &anyhow::Error) -> ErrorCode {
         .downcast_ref::<crate::storage::AmbiguousIdError>()
         .is_some()
         || error
-            .downcast_ref::<crate::storage::InvalidIdPrefixError>()
+            .downcast_ref::<crate::domain::InvalidIdPrefixError>()
             .is_some()
     {
         return if error
@@ -597,7 +597,7 @@ mod exit_code_projection_tests {
                 "*",
             ),
             (
-                crate::storage::InvalidIdPrefixError::new("ab").into(),
+                crate::domain::InvalidIdPrefixError::new("ab").into(),
                 2,
                 "*",
             ),

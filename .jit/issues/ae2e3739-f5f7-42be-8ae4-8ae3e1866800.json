@@ -8,6 +8,7 @@
   ],
   "description": "Gate input declarations accept `.` as a root covering the whole worktree, and the files jit itself writes during a mutation never enter an input digest, so recording gate results can never invalidate a reusable verdict.\n\n## Background\n\nA gate verdict is reused when its verdict declaration and the bytes under its declared input roots are unchanged (`crates/jit/src/domain/repository_inputs.rs`; the walker in `crates/jit/src/gate_execution.rs:387-497`). Two gaps make that reuse fragile.\n\n`.` is rejected as a root: `DeclaredRoot::try_from` (`repository_inputs.rs:80-92`) applies the safe-relative-path predicate that profile package paths share (`:451-477`), so acceptance belongs in `DeclaredRoot` and in its `covers` method (`:59-63`), not in the shared predicate. The walker already handles an empty prefix (`gate_execution.rs:483`). Without `.`, a repository keeps a hand-written list of top-level roots, and a new top-level file silently escapes the digest.\n\nThe walker skips only `.git`. A data root nested in the worktree is digested whenever a root covers it, so each tracker write changes the digest unless the repository excludes record paths by hand. Excluding the whole data root is unsound: it also holds configuration that checkers read (gate, rule, invariant and template registries, schemas, reference pages), and a configuration edit would then reuse a stale verdict. The sound exclusion is the set of paths jit writes during a mutation: issue records, the event log, gate-run records, the index, locks, the record scratch directory, worktree state, and the worktree-root bootstrap lock. The storage layout constants already name them (`crates/jit/src/repository_state/path.rs`, e.g. `RECORD_SCRATCH_DIR` and `BOOTSTRAP_LOCK_FILE`) and follow a relocated data root. The nested-data offset (`path.rs:443,468-473`) is private and needs a crate-visible accessor. The walker receives the excluded prefixes as data, so the domain stays pure.\n\n## Success Criteria\n\n- [hard] REQ-01: An input declaration with root `.` is accepted, and its digest covers each worktree file that neither the declaration nor the mechanism excludes.\n- [hard] REQ-02: Writing an issue record, an event, a gate-run record, the index, a lock, the record scratch directory, or worktree state leaves each gate's input digest unchanged.\n- [hard] REQ-03: Editing a configuration file under the data root changes the digest of a gate whose roots cover it.\n- [hard] REQ-04: The excluded set derives from the storage layout's path constants and follows a relocated data root; the walker hard-codes no data-root spelling.\n- [hard] REQ-05: The custom-gates how-to states that `.` is a valid root and that tracker-written paths never enter a digest.\n- [hard] REQ-06: Unit tests over the declared-root type and the digest walker own these properties.\n\n## Notes\n\nWith these properties, gating several issues over unchanged checker inputs executes each checker once, whatever the tracker commits between evaluations. Removing the commit-based skip and the dirty-tree field is separate work that edits other functions of the same execution module.\n",
   "documents": [],
+  "done_at": "2026-10-21T10:48:13.872682183Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "cargo-ci",
@@ -17,7 +18,7 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T06:10:41.010738419Z",
+      "updated_at": "2026-10-21T10:46:14.104948615Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -26,8 +27,8 @@
       "updated_by": "auto:executor"
     },
     "doc-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:44:59.630284961Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T07:25:10.123332195Z",
       "updated_by": "auto:executor"
     }
   },
@@ -41,7 +42,7 @@
     "satisfies:3d9a0ce3/REQ-01"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Accept the worktree root as a gate input root",
-  "updated_at": "2026-10-21T06:44:59.630284961Z"
+  "updated_at": "2026-10-21T10:48:13.872682183Z"
 }

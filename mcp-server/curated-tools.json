@@ -113,19 +113,6 @@
     "jit_gate_preset_apply": "Bulk-writes gates onto issues; a maintainer decision.",
     "jit_gate_preset_create": "Preset authoring is a maintainer chore.",
     "jit_project_render": "Projects configured item registries into documentation; a maintainer chore.",
-    "jit_invariant_check": "Enforcement-drift report for maintainers; validate covers agent-facing integrity.",
-    "jit_doc_delete": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_doc_rm": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_issue_complete": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_issue_edit": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_issue_remove": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_issue_rm": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_label_add": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_label_remove": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_label_rm": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_dep_delete": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_dep_remove": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_gate_rm": "Alias stub carried by the CLI to hint the canonical spelling.",
-    "jit_gate_delete": "Alias stub carried by the CLI to hint the canonical spelling."
+    "jit_invariant_check": "Enforcement-drift report for maintainers; validate covers agent-facing integrity."
   }
 }

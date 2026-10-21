@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T10:39:53.980326737Z",
+  "dependencies": [
+    "79aa3aa7-31bd-4740-9939-02b73ca63fd0",
+    "b06cee74-7635-49c0-bc13-448bcfa28324"
+  ],
+  "description": "Make a reused gate verdict name the issue its source run belongs to as well as the run, so the source record is addressable without searching.\n\n## Background\n\n`GateVerdictOrigin::Reused(String)` (`crates/jit/src/domain/types.rs:1046-1063`, accessor `source_run()` at `:1085-1090`) names the source run by id alone and serializes adjacently tagged as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`. Under per-issue run records the id alone does not locate the record.\n\nProducers and readers: `reused_gate_run` (`commands/gate_check.rs:36-60`, called at `:921`); the human render at `main.rs:1190-1191`; the generated storage-record reference (`storage/reference.rs:264` prose and `:363` sample), whose committed output `docs/reference/storage-records.md:100-101,142` is checked by `test_committed_reference_matches_projection` (`reference.rs:817`); tests at `commands/gate_check.rs:2334-2491`. This repository holds 123 reused run records in the old shape. Kept as one change for a golden-test reason: the reference sample constructs the variant, so the committed reference is regenerated in the same commit.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateVerdictOrigin::Reused` carries `source_issue: IssueId` and `source_run: GateRunId` and serializes as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}`. A record without `source_issue` fails to decode.\n- [hard] REQ-02: Reuse sets `source_issue` to the issue the source run belongs to, and the human gate-status render names both.\n- [hard] REQ-03: The reference sample and its prose show the new shape, and the committed reference matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Stored reused records in the old shape are rewritten by the repository's one-time gate-run rewrite, which lands with this change.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T10:39:53.980326737Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "93b7f1dd-109a-4b89-a0e5-0427b3b645e1",
+  "labels": [
+    "type:task",
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "story:per-key-gate-runs",
+    "component:gates",
+    "component:core",
+    "per:@/charter/D-19",
+    "satisfies:f8a6b298/REQ-01"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Reused verdicts name their source issue and source run",
+  "updated_at": "2026-10-21T10:40:06.137184343Z"
+}

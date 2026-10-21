@@ -1,0 +1,48 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "d202e67eb387936af550f3733b0d1aac99f250cf",
+  "completed_at": "2026-10-21T10:44:10.443199968Z",
+  "duration_ms": 217288,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F1",
+        "line": 1601,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "lease-records-rewrite classifies newly created lease paths as touches instead of creates"
+      },
+      {
+        "disposition": "advisory",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F2",
+        "line": 2312,
+        "origin": "issue-impact",
+        "severity": "low",
+        "summary": "archive-evidence-seeding classifies its newly created evidence directory as a touch instead of a create"
+      }
+    ],
+    "summary": "The 62-issue breakdown faithfully matches the manifest and graph; two advisory footprint classifications should be corrected.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "b06cee74-7635-49c0-bc13-448bcfa28324",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1f99246c-f0a7-4e12-9d4c-fe260c4a283b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T10:40:33.154230412Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Required checks passed: manifest validation, renderer check, batch dry-run (62 issues/84 edges), and `jit validate`. All 59 finest-tier assignment simulations passed.\n\n1. **F1 — Advisory; issue-impact.** `lease-records-rewrite` classifies the absent, newly created `.git/jit/leases` and `.git/jit/claims.seq` paths as `touches`. They should be listed under `creates`. This does not affect graph correctness or worker sizing.\n2. **F2 — Advisory; issue-impact.** `archive-evidence-seeding` classifies the absent, newly created `.jit/archive-evidence` path as `touches`. It should be listed under `creates`. This does not affect graph correctness or worker sizing.\n\nTotal findings: 2\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The 62-issue breakdown faithfully matches the manifest and graph; two advisory footprint classifications should be corrected.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"lease-records-rewrite classifies newly created lease paths as touches instead of creates\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":1601},{\"id\":\"F2\",\"severity\":\"low\",\"disposition\":\"advisory\",\"origin\":\"issue-impact\",\"summary\":\"archive-evidence-seeding classifies its newly created evidence directory as a touch instead of a create\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":2312}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

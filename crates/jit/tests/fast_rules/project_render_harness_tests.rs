@@ -282,7 +282,7 @@ fn test_rules_and_gates_projection_parity_with_typed_render() {
         "cargo-ci".to_string(),
         manual_gate("cargo-ci", "Cargo CI", "fmt + clippy"),
     );
-    crate::harness::seed_memory_gate_registry(&storage, &registry);
+    jit::test_harness::seed_memory_gate_registry(&storage, &registry);
 
     let executor = render_executor(&storage);
     executor.project_render(Some("rules-and-gates")).unwrap();

@@ -418,7 +418,7 @@ pub fn execute_claim_release_by_issue<S: IssueStore>(
 ///
 /// Returns an error if the selected worktree's branch cannot be resolved or the
 /// lease cannot be renewed (e.g. it does not exist).
-pub fn execute_claim_renew<S: IssueStore>(
+pub fn execute_claim_renew(
     paths: &WorktreePaths,
     lease_id: &str,
     extension_secs: u64,
@@ -466,7 +466,7 @@ pub fn execute_claim_renew<S: IssueStore>(
 ///
 /// Returns an error if the selected worktree's branch cannot be resolved or the
 /// leases cannot be read.
-pub fn execute_claim_status<S: IssueStore>(
+pub fn execute_claim_status(
     paths: &WorktreePaths,
     issue_id: Option<&str>,
     agent_id: Option<&str>,
@@ -539,65 +539,6 @@ pub fn execute_claim_list(paths: &WorktreePaths) -> Result<(Vec<Lease>, Vec<Stor
     Ok((leases, warnings))
 }
 
-/// Check if an issue has an active lease held by another agent.
-///
-/// This is an internal helper with no output of its own; it returns any
-/// non-fatal [`StorageWarning`]s (e.g. a worktree relocation observed while
-/// loading the identity) alongside the lease so the calling command can surface
-/// them at its own boundary.
-///
-/// # Returns
-///
-/// `(None, _)` if no conflicting lease exists, `(Some(lease), _)` if a lease is
-/// held by a different agent. Identity/branch detection failures degrade to
-/// `(None, _)` (no lease system active) rather than erroring.
-///
-/// # Errors
-///
-/// Returns an error only if active leases cannot be read once the coordinator
-/// is initialized.
-pub fn check_issue_lease(
-    paths: &WorktreePaths,
-    issue_id: &str,
-    current_agent: Option<&str>,
-) -> Result<(Option<Lease>, Vec<StorageWarning>)> {
-    // Get current branch for identity
-    let branch = match get_current_branch(&paths.worktree_root) {
-        Ok(b) => b,
-        Err(_) => return Ok((None, Vec::new())), // Can't determine branch, skip lease check
-    };
-
-    // Load worktree identity, surfacing relocation as a warning
-    let (identity, warnings) = match load_or_create_worktree_identity_with_warnings(paths, &branch)
-    {
-        Ok(loaded) => loaded,
-        Err(_) => return Ok((None, Vec::new())), // Can't load identity, skip lease check
-    };
-
-    // Create coordinator to check leases
-    let agent = current_agent.unwrap_or("system:check").to_string();
-    let locker = FileLocker::with_configured_timeout();
-    let coordinator =
-        ClaimCoordinator::new(paths.clone(), locker, identity.worktree_id, agent.clone());
-
-    // Don't fail if control plane doesn't exist yet
-    if coordinator.init().is_err() {
-        return Ok((None, warnings));
-    }
-
-    // Get leases for this issue
-    let leases = coordinator.get_active_leases(Some(issue_id), None)?;
-
-    // Check if any lease is held by a different agent
-    for lease in leases {
-        if current_agent.is_none() || Some(lease.agent_id.as_str()) != current_agent {
-            return Ok((Some(lease), warnings));
-        }
-    }
-
-    Ok((None, warnings))
-}
-
 /// Force-evicts a lease (admin operation).
 ///
 /// # Arguments
@@ -615,7 +556,7 @@ pub fn check_issue_lease(
 ///
 /// Returns an error if the selected worktree's branch cannot be resolved or the
 /// lease cannot be evicted.
-pub fn execute_claim_force_evict<S: IssueStore>(
+pub fn execute_claim_force_evict(
     paths: &WorktreePaths,
     lease_id: &str,
     reason: &str,
