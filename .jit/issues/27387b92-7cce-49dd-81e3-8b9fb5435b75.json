@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Dispatch layering, executor surface, and build hygiene in crates/jit (df129d9e) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-21T01:25:14.493917847Z",
   "first_ready_at": "2026-10-21T01:17:04.341330883Z",
   "gates_required": [
     "coverage-preview",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-20T20:38:39.166228363Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T01:25:03.197483178Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
       "status": "passed",
@@ -37,7 +38,7 @@
     "brackets:df129d9e"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-10-21T01:18:25.727354493Z"
+  "updated_at": "2026-10-21T01:25:14.493917847Z"
 }

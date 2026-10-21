@@ -32,7 +32,7 @@
           "title": "Prune the uncalled output surface",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched"
+          "status": "awaiting-merge"
         },
         {
           "id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
@@ -50,7 +50,7 @@
           "title": "Derive mermaid state classes from the state enumeration",
           "classification": "implementation",
           "model": "haiku",
-          "status": "dispatched"
+          "status": "merged-gate-pending"
         },
         {
           "id": "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
@@ -59,7 +59,7 @@
           "title": "Remove the orphaned web hierarchy module",
           "classification": "implementation",
           "model": "haiku",
-          "status": "dispatched"
+          "status": "done"
         }
       ]
     },
@@ -403,7 +403,10 @@
   "created_during_execution": [],
   "escalations": [],
   "rework_counts": {},
-  "surfaced_pitfalls": [],
+  "surfaced_pitfalls": [
+    "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
+    "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns)."
+  ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
     "Config tasks wait for bedf0962 (8376299c, just-in-time-05).",
