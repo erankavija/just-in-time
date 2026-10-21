@@ -17833,3 +17833,6 @@
 {"id":"c2509cbb-9dfb-4dd0-a388-a43ab35daea7","issue_id":"d8176fd3-5ed6-4e3f-8fac-6a7fd1438c9e","new_count":5,"old_count":6,"removed_deps":["16d63038-c08b-4d2d-9a77-1a75fe48ef20"],"timestamp":"2026-10-21T10:40:10.777988526Z","type":"dependency_reduced"}
 {"fields":["dependencies"],"id":"daf0dfec-ad1a-43d0-b485-568ee5c4b34f","issue_id":"f8a6b298-e6b5-4d62-b73c-3f7b217c1a01","timestamp":"2026-10-21T10:40:11.158489212Z","type":"issue_updated","updated_by":"dependency-add"}
 {"id":"74e69073-7ded-4814-9bda-854e7405d32f","issue_id":"b80e3c70-cf7d-4f72-b53d-6e556363be58","new_count":16,"old_count":17,"removed_deps":["5b37a806-043c-4b42-bbf6-ebc06941db59"],"timestamp":"2026-10-21T10:40:11.158489212Z","type":"dependency_reduced"}
+{"assignee":"agent:planning-lead-f8a6b298","id":"95a4db8e-3423-4268-9350-50205011ff12","issue_id":"b06cee74-7635-49c0-bc13-448bcfa28324","timestamp":"2026-10-21T10:40:27.401638027Z","type":"issue_claimed"}
+{"from":"ready","id":"23c5584b-312e-488a-8c79-cc6a4021c65f","issue_id":"b06cee74-7635-49c0-bc13-448bcfa28324","timestamp":"2026-10-21T10:40:27.483780986Z","to":"in_progress","type":"issue_state_changed"}
+{"gate_key":"coverage-preview","id":"f0c75954-7614-4149-b15d-027e82ff311c","issue_id":"b06cee74-7635-49c0-bc13-448bcfa28324","timestamp":"2026-10-21T10:40:28.364533796Z","type":"gate_passed","updated_by":"auto:executor"}
