@@ -49,7 +49,7 @@ fn setup_test_repo() -> TempDir {
     jit::test_utils::capture_repository_package("jit-default", &temp.path().join(location))
         .expect("this repository's default package captures");
     let output = Command::new(jit_binary())
-        .args(["init", "--profile", &format!("path:{location}")])
+        .args(["init", "--profile", location])
         .current_dir(temp.path())
         .output()
         .expect("failed to run jit init");

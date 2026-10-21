@@ -79,7 +79,7 @@ Runs before every workflow. Do not skip.
    archive to the worktree, then initialize against the added directory. The
    procedure is in
    [Repository Profiles](https://github.com/erankavija/just-in-time/blob/main/docs/reference/profiles.md);
-   `--profile` takes `id:ID` or `path:DIR`, never a bare package name.
+   `--profile` takes the package directory path.
 
 2. Run `jit recover` to clean stale locks from crashed processes.
 

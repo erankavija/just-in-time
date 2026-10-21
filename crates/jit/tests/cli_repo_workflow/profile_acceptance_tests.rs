@@ -237,7 +237,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     // the end differ only in how the profile got there.
     let fresh_location = crate::repository_package_at(&fresh.path, "jit-dogfood");
     let existing_location = crate::repository_package_at(&existing.path, "jit-dogfood");
-    let fresh_selector = format!("path:{fresh_location}");
+    let fresh_selector = fresh_location.to_string();
     assert_eq!(fresh_location, existing_location);
     let fresh_init = success_json(
         &fresh.path,
@@ -252,7 +252,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
     // A preview is derived over one package, so the self-contained one is what
     // a repository declaring nothing can be shown. It writes nothing.
     let existing_default_location = crate::repository_package_at(&existing.path, "jit-default");
-    let existing_default_selector = format!("path:{existing_default_location}");
+    let existing_default_selector = existing_default_location.to_string();
     let preview = success_json(
         &existing.path,
         &[
@@ -274,7 +274,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "profile",
             "apply",
             "--profile",
-            &format!("path:{existing_location}"),
+            &existing_location,
             "--json",
         ],
     );
@@ -285,7 +285,7 @@ fn test_profile_fresh_init_and_existing_apply_are_equivalent_without_git() {
             "profile",
             "apply",
             "--profile",
-            "id:jit-dogfood",
+            &existing_location,
             "--dry-run",
             "--json",
         ],
@@ -373,7 +373,7 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
             "profile",
             "apply",
             "--profile",
-            "path:packages/workflow",
+            "packages/workflow",
             "--json",
         ],
     );
@@ -407,7 +407,7 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
             "profile",
             "apply",
             "--profile",
-            "path:packages/workflow",
+            "packages/workflow",
             "--json",
         ],
     );
@@ -431,7 +431,7 @@ fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
 
     let failure = failed_json_with_path(
         &repo.path,
-        &["init", "--profile", "path:packages/workflow", "--json"],
+        &["init", "--profile", "packages/workflow", "--json"],
         1,
         None,
     );
@@ -465,7 +465,7 @@ fn test_profile_apply_reports_a_dependency_that_cannot_be_resolved() {
             "profile",
             "apply",
             "--profile",
-            "path:packages/workflow",
+            "packages/workflow",
             "--json",
         ],
         1,
@@ -489,7 +489,7 @@ fn test_profile_application_contributes_workflow_invariants_to_scaffolded_regist
 
     success_json(&repo.path, &["init", "--json"]);
     let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
-    let dogfood_selector = format!("path:{dogfood_location}");
+    let dogfood_selector = dogfood_location.to_string();
     let applied = success_json(
         &repo.path,
         &["profile", "apply", "--profile", &dogfood_selector, "--json"],
@@ -525,7 +525,7 @@ fn test_offline_public_cli_profile_reaches_implementation_ready_breakdown() {
     let checker_path = checker_path_without_jq();
     let path = Some(checker_path.value.as_path());
     let dogfood_location = crate::repository_package_at(&repo.path, "jit-dogfood");
-    let dogfood_selector = format!("path:{dogfood_location}");
+    let dogfood_selector = dogfood_location.to_string();
     success_json_with_path(
         &repo.path,
         &["init", "--profile", &dogfood_selector, "--json"],
@@ -804,7 +804,6 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
     assert_eq!(
         property_keys(show_schema, "ProfileShowEntry"),
         expected_keys(&[
-            "applied",
             "byte_size",
             "file_count",
             "id",
@@ -831,42 +830,15 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         ])
     );
     assert_eq!(
-        property_keys(show_schema, "AppliedProfileRecord"),
-        expected_keys(&[
-            "claims",
-            "compatible_jit",
-            "id",
-            "origin",
-            "package_hash",
-            "record_version",
-            "variables",
-            "version",
-        ])
+        show_schema["definitions"]["ProfilePackageModel"]["additionalProperties"], false,
+        "ProfilePackageModel must reject undeclared lifecycle fields"
     );
-    assert_eq!(
-        property_keys(show_schema, "ResolvedVariable"),
-        expected_keys(&["source", "value"])
+    assert!(
+        show_schema["definitions"]
+            .get("AppliedProfileRecord")
+            .is_none(),
+        "profile show carries no applied-record provenance"
     );
-    assert_eq!(
-        show_schema["definitions"]["AppliedProfileRecord"]["properties"]["variables"]
-            ["additionalProperties"]["$ref"],
-        "#/definitions/ResolvedVariable"
-    );
-    assert_eq!(
-        show_schema["definitions"]["AppliedProfileRecord"]["properties"]["claims"]["items"]["$ref"],
-        "#/definitions/AppliedProfileClaim"
-    );
-    for definition in [
-        "ProfilePackageModel",
-        "AppliedProfileRecord",
-        "AppliedProfileClaim",
-        "ResolvedVariable",
-    ] {
-        assert_eq!(
-            show_schema["definitions"][definition]["additionalProperties"], false,
-            "{definition} must reject undeclared lifecycle fields"
-        );
-    }
 
     let apply_schemas = commands["apply"]["output"]["success_schema"]["oneOf"]
         .as_array()
@@ -938,12 +910,13 @@ fn test_release_profile_dry_run_smoke_uses_count_wrapped_result_contract() {
         .unwrap_or_else(|error| panic!("read {workflow_path:?}: {error}"));
 
     assert!(
-        workflow.contains("jit init --profile path:packages/jit-dogfood --json > init.json"),
+        workflow.contains("jit init --profile packages/jit-dogfood --json > init.json"),
         "release smoke must use the repeatable selector syntax for init"
     );
     assert!(
-        workflow
-            .contains("jit profile apply --profile id:jit-dogfood --dry-run --json > plan.json"),
+        workflow.contains(
+            "jit profile apply --profile packages/jit-dogfood --dry-run --json > plan.json"
+        ),
         "release smoke must use the repeatable selector syntax for dry-run"
     );
     assert!(
@@ -1016,7 +989,7 @@ fn test_shipped_profile_archive_bootstraps_a_repository_without_jit_state() {
 
     let profiled = super::profile_cli_tests::jit(
         &repo.path,
-        &["init", "--profile", "path:packages/jit-dogfood", "--json"],
+        &["init", "--profile", "packages/jit-dogfood", "--json"],
     );
     assert!(
         profiled.status.success(),
@@ -1122,7 +1095,7 @@ fn test_profile_diff_reports_an_unapplied_package_without_writing() {
     let before = snapshot_tree(&repo.path);
     let events = normalized_events(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "path:packages/planner");
+    let (status, report) = profile_difference(&repo.path, "packages/planner");
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
@@ -1157,7 +1130,7 @@ fn test_profile_diff_exits_on_an_unpublishable_target_it_still_reports() {
     fs::write(&authored, b"authored by hand\n").expect("author the target by hand");
     let before = snapshot_tree(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "path:packages/planner");
+    let (status, report) = profile_difference(&repo.path, "packages/planner");
 
     assert_eq!(
         status,
@@ -1270,7 +1243,7 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
         "The workflow meaning.",
     );
 
-    let (status, report) = profile_difference(&repo.path, "path:packages/base");
+    let (status, report) = profile_difference(&repo.path, "packages/base");
 
     assert_eq!(status, Some(0), "a publishable selection is a clean check");
     assert!(
@@ -1285,17 +1258,11 @@ fn test_profile_diff_states_the_declarations_a_selection_would_publish() {
 
     success_json(
         &repo.path,
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            "path:packages/base",
-            "--json",
-        ],
+        &["profile", "apply", "--profile", "packages/base", "--json"],
     );
     let before = snapshot_tree(&repo.path);
 
-    let (status, report) = profile_difference(&repo.path, "path:packages/workflow");
+    let (status, report) = profile_difference(&repo.path, "packages/workflow");
 
     assert_eq!(
         status,

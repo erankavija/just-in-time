@@ -159,7 +159,7 @@ try:
             assembled,
         )
         shown = json.loads(
-            run("jit", "profile", "show", "--quiet", "--profile", f"path:{assembled}", "--json")
+            run("jit", "profile", "show", "--quiet", "--profile", str(assembled), "--json")
         )
         manifest = shown["profiles"][0]["manifest"]
 

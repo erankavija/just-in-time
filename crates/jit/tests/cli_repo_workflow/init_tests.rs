@@ -41,7 +41,7 @@ fn jit_init_with_default_package(dir: &Path) -> std::process::Output {
     let location = format!("{PACKAGE_LOCATION}/{DEFAULT_PACKAGE}");
     jit::test_utils::capture_repository_package(DEFAULT_PACKAGE, &dir.join(&location))
         .expect("this repository's default package captures");
-    let selector = format!("path:{location}");
+    let selector = location.to_string();
     jit_init(dir, &["--profile", &selector])
 }
 

@@ -93,8 +93,8 @@ cp -R "$root/$package_source/." "$tmp/scaffold/$package_location/" ||
 # `JIT_DATA_DIR` is cleared so discovery cannot reach out of the temporary
 # directory.
 (cd "$tmp/scaffold" &&
-  env -u JIT_DATA_DIR jit init --profile "path:$package_location" --quiet) >/dev/null 2>&1 ||
-  die "'jit init --profile path:$package_location' failed in the throwaway repository"
+  env -u JIT_DATA_DIR jit init --profile "$package_location" --quiet) >/dev/null 2>&1 ||
+  die "'jit init --profile $package_location' failed in the throwaway repository"
 
 scaffold_config="$tmp/scaffold/.jit/config.toml"
 [ -f "$scaffold_config" ] || die "'jit init' wrote no $scaffold_config"

@@ -1310,7 +1310,10 @@ source-of-truth = \"registry-first\"\n";
         let again = reinit
             .initialize_profiled_repository(
                 repo.path(),
-                &[ProfileSelector::id("jit-dogfood").unwrap()],
+                &[ProfileSelector::path(format!(
+                    "{}/jit-dogfood",
+                    crate::test_utils::PROFILE_PACKAGE_SOURCES
+                ))],
             )
             .unwrap();
 
@@ -1344,7 +1347,7 @@ source-of-truth = \"registry-first\"\n";
         let repaired = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                &[ProfileSelector::id("jit-default").unwrap()],
+                &[ProfileSelector::path("packages/jit-default")],
             )
             .unwrap();
 
@@ -1363,7 +1366,7 @@ source-of-truth = \"registry-first\"\n";
         let again = executor_with_layout(&storage, repo.path())
             .initialize_profiled_repository(
                 repo.path(),
-                &[ProfileSelector::id("jit-default").unwrap()],
+                &[ProfileSelector::path("packages/jit-default")],
             )
             .unwrap();
         assert_eq!(

@@ -126,8 +126,8 @@ require = [
   "Ordinary `jit init` does not install it",
   "profile-installed workflow policy",
   "repositories that use plain initialization",
-  "`jit init --profile path:packages/jit-dogfood`",
-  "`jit profile apply --profile path:packages/jit-dogfood`",
+  "`jit init --profile packages/jit-dogfood`",
+  "`jit profile apply --profile packages/jit-dogfood`",
   "[Repository Profiles](profiles.md)",
 ]
 forbid = ["does not expose a public profile-install command"]

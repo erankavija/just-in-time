@@ -439,7 +439,7 @@ pub fn profile_json_error(error: &anyhow::Error) -> anyhow::Result<JsonError> {
         .is_some()
     {
         return Ok(command_json_error(error, ErrorCode::ProfileNotFound)
-            .with_suggestion("Select a package with --profile path:DIR"));
+            .with_suggestion("Select a package with --profile DIR"));
     }
     if error
         .downcast_ref::<crate::profile::ProfileClaimError>()

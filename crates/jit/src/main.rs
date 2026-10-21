@@ -477,35 +477,6 @@ fn parse_profile_selectors(values: &[String], json: bool) -> Result<Vec<ProfileS
         .collect()
 }
 
-/// Parse profile show selectors, including its one bare profile-id shorthand.
-fn parse_profile_show_selectors(
-    id: Option<&str>,
-    profiles: &[String],
-    json: bool,
-) -> Result<Vec<ProfileSelector>> {
-    match (id, profiles.is_empty()) {
-        (Some(_), false) => Err(invalid_argument(
-            "profile show accepts either a bare ID or --profile id:ID or path:DIR selectors, not both"
-                .to_string(),
-            json,
-        )),
-        (Some(id), true) => ProfileSelector::id(id).map(|selector| vec![selector]).map_err(|error| {
-            invalid_argument(
-                format!(
-                    "invalid positional profile ID '{id}'; accepted selector forms are a bare ID or --profile id:ID or path:DIR: {error}"
-                ),
-                json,
-            )
-        }),
-        (None, false) => parse_profile_selectors(profiles, json),
-        (None, true) => Err(invalid_argument(
-            "profile show requires a bare ID or at least one --profile id:ID or path:DIR selector"
-                .to_string(),
-            json,
-        )),
-    }
-}
-
 /// Parse command-line profile assignments before entering command orchestration.
 fn parse_profile_variable_assignments(
     values: &[String],
@@ -584,7 +555,7 @@ where
     let assignments = parse_profile_variable_assignments(set, json)?;
     if selectors.is_empty() {
         return Err(invalid_argument(
-            format!("{command} requires at least one --profile id:ID or path:DIR selector"),
+            format!("{command} requires at least one --profile DIR selector"),
             json,
         ));
     }
@@ -2089,8 +2060,8 @@ fn run() -> Result<()> {
             // Already handled above
         }
         Commands::Profile(profile_cmd) => match profile_cmd {
-            ProfileCommands::Show { id, profile, json } => {
-                let selectors = parse_profile_show_selectors(id.as_deref(), &profile, json)?;
+            ProfileCommands::Show { profile, json } => {
+                let selectors = parse_profile_selectors(&profile, json)?;
                 match executor.show_profiles(&selectors) {
                     Ok(result) => {
                         if json {
@@ -2112,14 +2083,6 @@ fn run() -> Result<()> {
                                     result.file_count, result.byte_size
                                 );
                                 println!("Targets: {}", result.target_hashes.len());
-                                println!(
-                                    "Applied: {}",
-                                    if result.applied.is_some() {
-                                        "yes"
-                                    } else {
-                                        "no"
-                                    }
-                                );
                             }
                         }
                     }
@@ -2141,8 +2104,7 @@ fn run() -> Result<()> {
                 let assignments = parse_profile_variable_assignments(&set, json)?;
                 if selectors.is_empty() {
                     return Err(invalid_argument(
-                        "profile diff requires at least one --profile id:ID or path:DIR selector"
-                            .to_string(),
+                        "profile diff requires at least one --profile DIR selector".to_string(),
                         json,
                     ));
                 }

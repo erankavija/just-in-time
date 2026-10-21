@@ -124,7 +124,7 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
 }
 
 #[test]
-fn test_schema_exposes_a_bare_show_id_and_tagged_lifecycle_selectors() {
+fn test_schema_exposes_path_selectors_on_show_and_lifecycle_commands() {
     let output = cmd!().arg("--schema").output().unwrap();
     let parsed: Value = serde_json::from_slice(&output.stdout).unwrap();
     let profile = &parsed["commands"]["profile"]["subcommands"];
@@ -135,17 +135,9 @@ fn test_schema_exposes_a_bare_show_id_and_tagged_lifecycle_selectors() {
         .find(|flag| flag["name"] == "profile")
         .expect("profile show must expose --profile");
     assert_eq!(show_selector["type"], "array<string>");
-    assert_eq!(show_selector["required"], false);
+    assert_eq!(show_selector["required"], true);
     assert!(!show_flags.iter().any(|flag| flag["name"] == "from"));
-    assert_eq!(
-        profile["show"]["args"],
-        serde_json::json!([{
-            "name": "id",
-            "type": "string",
-            "required": false,
-            "description": "Select one recorded profile by its bare canonical id"
-        }])
-    );
+    assert!(profile["show"]["args"].as_array().unwrap().is_empty());
 
     let flags = profile["apply"]["flags"].as_array().unwrap();
     let selector = flags

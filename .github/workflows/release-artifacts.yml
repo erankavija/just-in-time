@@ -268,9 +268,9 @@ jobs:
           # resolver reads the published package bytes in place.
           workspace="$prefix"
           cd "$workspace"
-          jit init --profile path:packages/jit-dogfood --json > init.json
+          jit init --profile packages/jit-dogfood --json > init.json
           jit validate
-          jit profile apply --profile id:jit-dogfood --dry-run --json > plan.json
+          jit profile apply --profile packages/jit-dogfood --dry-run --json > plan.json
           python3 - <<'PY'
           import json
 

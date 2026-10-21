@@ -1,6 +1,6 @@
 use crate::domain::{CollectionKey, ListEnvelope, ProfileOrigin};
 use crate::profile::ProfilePackageModel;
-use crate::repository_state::{AppliedProfileRecord, FileMode};
+use crate::repository_state::FileMode;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -125,9 +125,6 @@ pub struct ProfileShowEntry {
     pub file_count: usize,
     /// Total package byte size.
     pub byte_size: usize,
-    /// Stored provenance record when the selected repository has one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub applied: Option<AppliedProfileRecord>,
 }
 
 /// Count-wrapped, occurrence-ordered package inspection response.
@@ -301,6 +298,7 @@ impl ProfileCollection<ProfilePlanEntry> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::repository_state::AppliedProfileRecord;
     use crate::repository_state::RootRelativePath;
 
     /// A record naming the package at the worktree-relative `location`.
