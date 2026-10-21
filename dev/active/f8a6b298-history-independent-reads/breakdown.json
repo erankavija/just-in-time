@@ -94,7 +94,7 @@
    "terminal": {
     "consumer_family": "gate-run capture sites",
     "test_boundary": "gate evaluation capture tests",
-    "worker_sized_reason": "Three capture sites switch to one per-gate path request built from the issue record.",
+    "worker_sized_reason": "Three capture sites switch to one per-gate path request; the listing helpers they leave without callers go with them, since unused crate-private code fails the zero-warning build.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/gate_check.rs",
@@ -159,9 +159,56 @@
   }
  },
  {
+  "key": "gate-latest-run-accessor",
+  "title": "An executor accessor loads an issue's latest run of each gate",
+  "description": "Add one executor accessor that returns, for one issue, the run each of its gate states names, so latest-run readers have one direct lookup to call.\n\n## Background\n\nThree readers select an issue's latest run of a gate from a listing of all its runs and break ties differently (`crates/jit/src/commands/gate_check.rs:1241-1252` `get_last_gate_run`, `:1361-1395` `get_last_gate_runs_for_issue`, and `output.rs:1710-1725` `GateView::build`). Each issue's gate state names the latest run of that gate (`GateState.last_run`), and a run record loads by `(issue, run)` through `IssueStore::load_gate_run_result`.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor` has one accessor that, for an issue, returns the run each gate state's `last_run` names, one per gate, loading each by `(issue, run)` and listing no runs.\n- [hard] REQ-02: Unit tests show that the accessor returns the named run when older runs of the gate exist, and returns nothing for a gate whose state has no `last_run` even when runs of it exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:gates",
+   "per:@/charter/D-19",
+   "per:@/charter/D-20",
+   "satisfies:f8a6b298/REQ-02"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-state-last-run",
+   "gate-run-load-by-issue"
+  ],
+  "planning": {
+   "outcome": "One executor accessor loads the run each of an issue's gate states names.",
+   "contract_refs": [
+    "gate-state-last-run"
+   ],
+   "produces_contracts": [
+    "latest-run-accessor"
+   ],
+   "source_refs": [
+    "REQ-02",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "latest-run lookup",
+    "test_boundary": "executor gate tests",
+    "worker_sized_reason": "One accessor over existing loaders, with its own unit tests.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/gate_check.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "gate-latest-run-reads",
-  "title": "Latest-run readers load the run their gate state names",
-  "description": "Make every reader of an issue's latest run of a gate load the one record its gate state names, so showing an issue or its gate status opens one run per gate instead of every run of the issue.\n\n## Background\n\nThree readers select an issue's latest run of a gate from a listing of all its runs, and they break ties differently:\n\n- `get_last_gate_run` (`crates/jit/src/commands/gate_check.rs:1241-1252`, stable sort, last wins), called by `main.rs:4125,4235,4330` (gate status) and `commands/gate.rs:1005`;\n- `get_last_gate_runs_for_issue` (`commands/gate_check.rs:1361-1395`, keeps the first on a tie), called by `main.rs:4373`;\n- `GateView::build` (`output.rs:1710-1725`, `max_by_key`), fed by `IssueShowResponse::from_issue` with every run of the issue from the show and status builders at `main.rs:1267,2573,2821,2872` and `commands/issue.rs:308`.\n\n`tests/cli_gate/gate_cli_integration_test.rs:169-200` (`test_issue_show_errors_on_corrupt_gate_run`) plants a corrupt run record that belongs to no issue and requires `issue show` to fail; a show that loads only named runs never opens it.\n\nThe issue's gate state now names the latest run of each gate (`GateState.last_run`), and a run loads directly by `(issue, run)`.\n\n## Success Criteria\n\n- [hard] REQ-01: An executor accessor returns, for one issue, the runs its gate states name, one per gate, loading each by `(issue, run)`. `get_last_gate_run`, `get_last_gate_runs_for_issue` and the show, status, create and children responses use it, and none of them lists the issue's runs.\n- [hard] REQ-02: `IssueShowResponse::from_issue` receives the latest run of each gate, and `GateView::build` selects nothing.\n- [hard] REQ-03: History views (`gate status --all` and `--limit`, the server's run list) still list the issue's runs.\n- [hard] REQ-04: A gate with no `last_run` reports no latest run, even when runs of it exist. A test pins this behaviour.\n- [hard] REQ-05: A test shows that `issue show` and `gate status` for one gate succeed while every other run record of the same issue is unparseable.\n- [hard] REQ-06: `test_issue_show_errors_on_corrupt_gate_run` corrupts the run record that the shown issue's `last_run` names, and `issue show` still fails on it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "title": "Latest-run readers use the gate-state accessor",
+  "description": "Move every reader of an issue's latest run of a gate onto the gate-state accessor, so showing an issue or its gate status opens one run per gate instead of every run of the issue.\n\n## Background\n\nThree readers select an issue's latest run of a gate from a listing of all its runs:\n\n- `get_last_gate_run` (`crates/jit/src/commands/gate_check.rs:1241-1252`, stable sort, last wins), called by `main.rs:4125,4235,4330` (gate status) and `commands/gate.rs:1005`;\n- `get_last_gate_runs_for_issue` (`commands/gate_check.rs:1361-1395`, keeps the first on a tie), called by `main.rs:4373`;\n- `GateView::build` (`output.rs:1710-1725`, `max_by_key`), fed by `IssueShowResponse::from_issue` with every run of the issue from the show and status builders at `main.rs:1267,2573,2821,2872` and `commands/issue.rs:308`.\n\nAn executor accessor returns the run each gate state names. `tests/cli_gate/gate_cli_integration_test.rs:169-200` (`test_issue_show_errors_on_corrupt_gate_run`) plants a corrupt run record that belongs to no issue and requires `issue show` to fail; a show that loads only named runs never opens it.\n\n## Success Criteria\n\n- [hard] REQ-01: `get_last_gate_run`, `get_last_gate_runs_for_issue` and the show, status, create and children responses take latest runs from the gate-state accessor, and none of them lists the issue's runs.\n- [hard] REQ-02: `IssueShowResponse::from_issue` receives the latest run of each gate, and `GateView::build` selects nothing.\n- [hard] REQ-03: History views (`gate status --all` and `--limit`, the server's run list) still list the issue's runs.\n- [hard] REQ-04: `test_issue_show_errors_on_corrupt_gate_run` corrupts the run record that the shown issue's `last_run` names, locating it through the public `VirtualPath::gate_run_record` constructor, and `issue show` still fails on it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -180,13 +227,12 @@
    "code-review"
   ],
   "depends_on": [
-   "gate-state-last-run",
-   "gate-run-load-by-issue"
+   "gate-latest-run-accessor"
   ],
   "planning": {
-   "outcome": "Readers of an issue's latest gate runs load one record per gate, named by its gate state.",
+   "outcome": "Readers of an issue's latest gate runs load one record per gate through the accessor.",
    "contract_refs": [
-    "gate-state-last-run"
+    "latest-run-accessor"
    ],
    "produces_contracts": [],
    "source_refs": [
@@ -196,8 +242,8 @@
    ],
    "terminal": {
     "consumer_family": "latest-run readers",
-    "test_boundary": "executor gate tests",
-    "worker_sized_reason": "One accessor replaces three selections at nine call sites.",
+    "test_boundary": "CLI gate integration tests",
+    "worker_sized_reason": "Nine call sites move to one existing accessor.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/gate_check.rs",
@@ -216,7 +262,7 @@
  {
   "key": "gate-verdict-provenance",
   "title": "Reused verdicts name their source issue and source run",
-  "description": "Make a reused gate verdict name the issue its source run belongs to as well as the run, so the source record is addressable without searching.\n\n## Background\n\n`GateVerdictOrigin::Reused(String)` (`crates/jit/src/domain/types.rs:1046-1063`, accessor `source_run()` at `:1085-1090`) names the source run by id alone and serializes adjacently tagged as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`. Under per-issue run records the id alone does not locate the record.\n\nProducers and readers: `reused_gate_run` (`commands/gate_check.rs:36-60`, called at `:921`); the human render at `main.rs:1190-1191`; the web client's hand-written type (`web/src/types/models.ts:46-49`); the generated storage-record reference (`storage/reference.rs:264` prose and `:363` sample, rendered into `docs/reference/storage-records.md:100-101,142`); tests at `commands/gate_check.rs:2334-2491`. This repository holds 123 reused run records in the old shape.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateVerdictOrigin::Reused` carries `source_issue: IssueId` and `source_run: GateRunId` and serializes as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}`. A record without `source_issue` fails to decode.\n- [hard] REQ-02: Reuse sets `source_issue` to the issue the source run belongs to, and the human gate-status render names both.\n- [hard] REQ-03: The web client's `GateVerdictOrigin` type carries `source_issue` beside `source_run`.\n- [hard] REQ-04: The storage-record reference source documents the new shape, and `docs/reference/storage-records.md` is regenerated from it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Stored reused records in the old shape are rewritten by the repository's one-time gate-run rewrite, which lands with this change.\n",
+  "description": "Make a reused gate verdict name the issue its source run belongs to as well as the run, so the source record is addressable without searching.\n\n## Background\n\n`GateVerdictOrigin::Reused(String)` (`crates/jit/src/domain/types.rs:1046-1063`, accessor `source_run()` at `:1085-1090`) names the source run by id alone and serializes adjacently tagged as `{\"derivation\": \"reused\", \"source_run\": \"<run-id>\"}`. Under per-issue run records the id alone does not locate the record.\n\nProducers and readers: `reused_gate_run` (`commands/gate_check.rs:36-60`, called at `:921`); the human render at `main.rs:1190-1191`; the generated storage-record reference (`storage/reference.rs:264` prose and `:363` sample), whose committed output `docs/reference/storage-records.md:100-101,142` is checked by `test_committed_reference_matches_projection` (`reference.rs:817`); tests at `commands/gate_check.rs:2334-2491`. This repository holds 123 reused run records in the old shape.\n\n## Success Criteria\n\n- [hard] REQ-01: `GateVerdictOrigin::Reused` carries `source_issue: IssueId` and `source_run: GateRunId` and serializes as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}`. A record without `source_issue` fails to decode.\n- [hard] REQ-02: Reuse sets `source_issue` to the issue the source run belongs to, and the human gate-status render names both.\n- [hard] REQ-03: The reference sample and its prose show the new shape, and the committed reference matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Stored reused records in the old shape are rewritten by the repository's one-time gate-run rewrite, which lands with this change.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -225,7 +271,6 @@
    "story:per-key-gate-runs",
    "component:gates",
    "component:core",
-   "component:web",
    "per:@/charter/D-19",
    "satisfies:f8a6b298/REQ-01"
   ],
@@ -233,8 +278,7 @@
    "cargo-ci",
    "code-review",
    "doc-review",
-   "docs-mechanical",
-   "npm-ci"
+   "docs-mechanical"
   ],
   "depends_on": [],
   "planning": {
@@ -259,8 +303,7 @@
       "crates/jit/src/main.rs",
       "crates/jit/src/output.rs",
       "crates/jit/src/storage/reference.rs",
-      "docs/reference/storage-records.md",
-      "web/src/types/models.ts"
+      "docs/reference/storage-records.md"
      ]
     }
    },
@@ -268,9 +311,52 @@
   }
  },
  {
-  "key": "gate-verdict-records",
-  "title": "Reusable verdicts are found through a per-key verdict record",
-  "description": "Record, for each gate and inputs digest, which run holds the reusable verdict, so reuse reads one record instead of every run.\n\n## Background\n\n`IssueStore::find_reusable_gate_run(gate_key, digest)` (`crates/jit/src/storage/mod.rs:272-291`) scans every recorded run and selects one with `domain::latest_gate_run` (`domain/types.rs:1030-1040`; `storage/json.rs:1483-1490`, `storage/memory.rs:938-946`), its only caller. Gate evaluation calls `self.storage.find_reusable_gate_run` directly (today through the one-line `reusable_verdict`, `commands/gate_check.rs:916`, `:1037-1043`, which the gate dead-code removal 86d3625d deletes), outside the mutation image. Both test wrappers that implement `IssueStore` forward it (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\nRuns are written by the finalizer's gate-run pass (`repository_state/mutation.rs:1052-1095`). A run is a reuse source when it executed its own checker, carries an inputs digest and passed or failed (`domain/types.rs:1020-1028`). Everything under `gate-runs/` is already excluded from input digests (`repository_state/path.rs:537-560`).\n\n## Success Criteria\n\n- [hard] REQ-01: When a recorded run executed its checker, carries an inputs digest and passed or failed, the same redo record that writes the run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming the run's issue and run id. A later such run over the same key replaces the record. The record type derives `JsonSchema`.\n- [hard] REQ-02: Reuse reads that one record from the mutation image and loads the run it names. It reads no other run and no other verdict record, and a run that no verdict record names is never a reuse source.\n- [hard] REQ-03: Two evaluations racing to replace one verdict record get a retryable conflict, not a lost write.\n- [hard] REQ-04: `domain::latest_gate_run` no longer exists.\n- [hard] REQ-05: A test proves that reuse succeeds while every other run record and every other verdict record is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "key": "web-verdict-provenance-type",
+  "title": "The web client types reused-verdict provenance with its source issue",
+  "description": "Bring the web client's hand-written verdict-origin type in line with the served shape, which names the source issue beside the source run.\n\n## Background\n\nThe server serves a gate run's `origin` as `{\"derivation\": \"reused\", \"source_issue\": \"<issue-id>\", \"source_run\": \"<run-id>\"}` for a reused verdict. The web client's type `web/src/types/models.ts:46-49` declares `{ derivation: 'reused'; source_run: string }`, and `web/src/components/Issue/IssueDetail.tsx` renders gate runs.\n\n## Success Criteria\n\n- [hard] REQ-01: The web client's `GateVerdictOrigin` type carries `source_issue` beside `source_run`, and the web tests, lint and build pass.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:web",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "npm-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-verdict-provenance"
+  ],
+  "planning": {
+   "outcome": "The web client's verdict-origin type matches the served shape.",
+   "contract_refs": [
+    "reused-verdict-provenance"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-01",
+    "DEC-07"
+   ],
+   "terminal": {
+    "consumer_family": "web gate-run types",
+    "test_boundary": "web test suite",
+    "worker_sized_reason": "One type declaration in one web module.",
+    "footprint": {
+     "touches": [
+      "web/src/types/models.ts"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-verdict-record-writes",
+  "title": "Recorded runs write their per-key verdict record",
+  "description": "Write, with each run that holds a reusable verdict, a record keyed by its gate and inputs digest that names the run, so reuse can later read one record.\n\n## Background\n\nRuns are written by the finalizer's gate-run pass (`crates/jit/src/repository_state/mutation.rs:1052-1095`). A run is a reuse source when it executed its own checker, carries an inputs digest and passed or failed (`domain/types.rs:1020-1028`). Gate keys are lowercase-kebab and digests 64 lowercase hex, so both are safe path components. Everything under `gate-runs/` is already excluded from input digests (`repository_state/path.rs:537-560`). The gate evaluation's record attempt captures its image in a second session (`commands/gate_check.rs:944-1004`), after the digest is known.\n\n## Success Criteria\n\n- [hard] REQ-01: When a recorded run executed its checker, carries an inputs digest and passed or failed, the same redo record that writes the run writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming the run's issue and run id, built by one `VirtualPath` constructor. A later such run over the same key replaces the record. The record type derives `JsonSchema`.\n- [hard] REQ-02: The record attempt captures the verdict record's path, so two evaluations racing to replace one record get a retryable conflict, not a lost write.\n- [hard] REQ-03: Finalizer unit tests show which runs write or replace a verdict record and which write none.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -290,11 +376,58 @@
   ],
   "depends_on": [
    "gate-verdict-provenance",
-   "gate-run-load-by-issue",
    "gate-run-latest-captures"
   ],
   "planning": {
-   "outcome": "Gate reuse reads one per-key verdict record written with the run that holds the verdict.",
+   "outcome": "Each run holding a reusable verdict writes its per-key verdict record in the same redo record.",
+   "contract_refs": [
+    "gate-verdict-record"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-03",
+    "DEC-06"
+   ],
+   "terminal": {
+    "consumer_family": "gate-run finalizer",
+    "test_boundary": "mutation finalizer unit tests",
+    "worker_sized_reason": "One record type written by one finalizer pass.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/repository_state/path.rs",
+      "crates/jit/src/commands/gate_check.rs"
+     ]
+    }
+   },
+   "landing_group": "gate-run-cutover"
+  }
+ },
+ {
+  "key": "gate-verdict-reuse-lookup",
+  "title": "Gate reuse reads one verdict record",
+  "description": "Find a reusable verdict by reading the one verdict record for its gate and digest, so reuse never scans recorded runs.\n\n## Background\n\n`IssueStore::find_reusable_gate_run(gate_key, digest)` (`crates/jit/src/storage/mod.rs:272-291`) scans every recorded run and selects one with `domain::latest_gate_run` (`storage/json.rs:1483-1490`, `storage/memory.rs:938-946`). Gate evaluation calls it on `self.storage` (`commands/gate_check.rs:916`), outside the mutation image; the one-line `reusable_verdict` wrapper (`:1037-1043`) is deleted by the gate dead-code removal 86d3625d. Both integration-test `IssueStore` wrappers forward the method (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\nEach reusable run now writes `gate-runs/verdicts/<gate-key>/<inputs-digest>.json` naming its issue and run, and a run loads by `(issue, run)`.\n\n## Success Criteria\n\n- [hard] REQ-01: Reuse reads the verdict record for `(gate, digest)` from the mutation image and loads the run it names. It reads no other run and no other verdict record, and a run that no verdict record names is never a reuse source.\n- [hard] REQ-02: `IssueStore::find_reusable_gate_run` and its implementations, including both test wrappers, no longer exist.\n- [hard] REQ-03: A test proves that reuse succeeds while every other run record and every other verdict record is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:gates",
+   "component:storage",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-verdict-record-writes",
+   "gate-run-load-by-issue"
+  ],
+  "planning": {
+   "outcome": "Gate reuse reads one per-key verdict record and the run it names.",
    "contract_refs": [
     "gate-verdict-record",
     "reused-verdict-provenance"
@@ -307,16 +440,13 @@
    "terminal": {
     "consumer_family": "gate reuse lookup",
     "test_boundary": "gate reuse unit tests",
-    "worker_sized_reason": "One record type written by one finalizer pass and read by one lookup.",
+    "worker_sized_reason": "One lookup moves from a storage scan to one image read.",
     "footprint": {
      "touches": [
-      "crates/jit/src/repository_state/mutation.rs",
-      "crates/jit/src/repository_state/path.rs",
+      "crates/jit/src/commands/gate_check.rs",
       "crates/jit/src/storage/mod.rs",
       "crates/jit/src/storage/json.rs",
       "crates/jit/src/storage/memory.rs",
-      "crates/jit/src/commands/gate_check.rs",
-      "crates/jit/src/domain/types.rs",
       "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
       "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
      ]
@@ -326,9 +456,138 @@
   }
  },
  {
-  "key": "gate-run-per-issue-layout",
-  "title": "Gate-run records live under their issue",
-  "description": "Store each gate run at `gate-runs/<issue-id>/<run-id>.json`, so an issue's run history is one directory and no reader enumerates other issues' runs.\n\n## Background\n\nRuns are stored flat at `gate-runs/<run-id>/result.json`. Today the path is built by `gate_run_result_relative_path` (`crates/jit/src/repository_state/mutation.rs:512-520`, test `:1400-1410`) and spelled again at `storage/gate_runs.rs:34-38` and `commands/mod.rs:2863-2871`; the semantic-types epic replaces all three with `VirtualPath::gate_run_record(&GateRunId)` as the only builder, called by the finalizer's gate-run pass, the evaluation and precheck new-run captures (`commands/gate_check.rs:860`, `commands/mod.rs:2863-2871`), both backends' loaders and the reference projection. Readers enumerate the whole root and parse every record: `storage/json.rs:38,959-1043` (`read_gate_runs`) and `:1395-1490`, `storage/memory.rs:343-380,766-800,909-946`. The JSON and memory readers duplicate their no-follow and clutter logic, and paired backend tests assert that a corrupt run of an unrelated issue fails every lookup (`json.rs:1932-2105`, `memory.rs:1069-1160`). `tests/cli_gate/gate_cli_integration_test.rs:169-200` plants a run record at a literal flat path.\n\nOther users of the flat path: `commands/gate_check.rs:860,2614-2616,2722`, `commands/mod.rs:4362`, `gate_execution.rs:705,1127`, `repository_state/mod.rs:99-102`, `storage/repository_state_store_tests.rs:2159-2234,2326-2391`, the generated reference (`storage/reference.rs:21,36,184-188,449-462,549-556,797`, rendered into `docs/reference/storage-records.md`), whose prose calls the flat layout deliberate, and the `GateRunResult` rustdoc (`domain/types.rs:923-929`), which names `gate-runs/<run-id>/result.json`.\n\nEvery reader of one run or the latest runs already addresses records by `(issue, run)`; only the path and the history listing change.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::gate_run_record` takes `(&IssueId, &GateRunId)` and names `gate-runs/<issue-id>/<run-id>.json`; every caller passes the run's issue.\n- [hard] REQ-02: Listing one issue's runs reads one directory, `gate-runs/<issue-id>/`, and parses only its records. Both backends share one listing reader built on `read_repository_file_nofollow`, and the flat-root enumeration no longer exists.\n- [hard] REQ-03: One backend conformance test owns the clutter and symlink rules for an issue's run directory and replaces the paired backend tests. A corrupt record of another issue fails no lookup.\n- [hard] REQ-04: The storage-record reference source and the `GateRunResult` rustdoc describe the per-issue layout without the flat-layout rationale, and `docs/reference/storage-records.md` is regenerated from the source.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "key": "latest-gate-run-removal",
+  "title": "The run-scanning latest selection is gone",
+  "description": "Delete `domain::latest_gate_run`, whose only caller was the run-scanning reuse lookup.\n\n## Background\n\n`domain::latest_gate_run` (`crates/jit/src/domain/types.rs:1030-1040`) picks the most recently started run from a list. Its only callers were the backends' reuse scans, which reuse no longer runs: reuse reads one verdict record.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::latest_gate_run` and its tests no longer exist, and no selection of a latest run over a list of runs remains in `domain/types.rs`.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:core",
+   "per:@/charter/D-18",
+   "satisfies:f8a6b298/REQ-02"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-verdict-reuse-lookup"
+  ],
+  "planning": {
+   "outcome": "The run-scanning latest selection no longer exists.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-02",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "latest-run selection",
+    "test_boundary": "domain unit tests",
+    "worker_sized_reason": "One function and its tests are deleted.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/domain/types.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-run-shared-reader",
+  "title": "Both storage backends read gate-run records through one reader",
+  "description": "Give the two storage backends one gate-run record reader, with one set of no-follow and clutter rules owned by one conformance test, so the per-issue layout later changes one reader.\n\n## Background\n\nThe JSON and memory backends each enumerate the `gate-runs/` root and parse run records with their own no-follow and clutter logic: `crates/jit/src/storage/json.rs:38,959-1043` (`read_gate_runs`) and `:1395-1490`, against `storage/memory.rs:343-380,766-800,909-946`. A repository-file no-follow read already exists (`read_repository_file_nofollow`, `storage/repository_state_store.rs:1810`). The cross-backend conformance suite is `storage/repository_state_store_tests.rs`. Private helpers left without a caller would fail the zero-warning build, so they go with the switch.\n\n## Success Criteria\n\n- [hard] REQ-01: Both backends list and load gate-run records through one shared reader built on `read_repository_file_nofollow`; neither backend keeps its own enumeration or no-follow code.\n- [hard] REQ-02: One conformance case, run against both backends, owns the clutter and symlink rules for run records and plants records through `VirtualPath::gate_run_record`.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:storage",
+   "per:@/charter/D-19",
+   "enforces:@/invariant/convention-convergence",
+   "enforces:@/invariant/shared-test-contracts",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-verdict-reuse-lookup"
+  ],
+  "planning": {
+   "outcome": "Both backends read gate-run records through one shared reader under one conformance case.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-01",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "gate-run record readers",
+    "test_boundary": "storage conformance tests",
+    "worker_sized_reason": "Two private readers converge on one storage-internal reader.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/storage/memory.rs",
+      "crates/jit/src/storage/repository_state_store.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-run-backend-clutter-tests-removal",
+  "title": "Per-backend gate-run clutter tests are gone",
+  "description": "Delete the paired per-backend gate-run clutter tests that the shared reader's conformance case supersedes.\n\n## Background\n\nPaired backend tests assert gate-run clutter, symlink and corruption rules on each backend separately, including that a corrupt run of an unrelated issue fails every lookup: `crates/jit/src/storage/json.rs:1932-2105` and `storage/memory.rs:1069-1160`. One conformance case in `storage/repository_state_store_tests.rs` owns the clutter and symlink rules for both backends.\n\n## Success Criteria\n\n- [hard] REQ-01: The paired gate-run clutter tests in `json.rs` and `memory.rs` no longer exist, and no test asserts that another issue's corrupt run fails a lookup.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:testing",
+   "enforces:@/invariant/orthogonal-tests",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-run-shared-reader"
+  ],
+  "planning": {
+   "outcome": "Per-backend gate-run clutter tests superseded by the conformance case are deleted.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-01",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "backend gate-run tests",
+    "test_boundary": "storage unit tests",
+    "worker_sized_reason": "Two test blocks are deleted.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/storage/memory.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-run-record-issue-argument",
+  "title": "The gate-run record path constructor takes the run's issue",
+  "description": "Make every caller of the gate-run record path constructor pass the run's issue, so the per-issue layout later changes only the constructor's body.\n\n## Background\n\nThe semantic-types epic makes `VirtualPath::gate_run_record(&GateRunId)` the only builder of a run record path, replacing `gate_run_result_relative_path` (`crates/jit/src/repository_state/mutation.rs:512-520`) and its spellings at `storage/gate_runs.rs:34-38` and `commands/mod.rs:2863-2871`. Its callers are the finalizer's gate-run pass (`mutation.rs:1052-1095`), the evaluation and precheck new-run captures (`commands/gate_check.rs:860`, `commands/mod.rs:2863-2871`), the latest-run captures, both backends' loaders, the storage reference projection (`storage/reference.rs:462,797`), the tracker-written paths test (`gate_execution.rs:705,1127`) and the corrupt-run CLI test (`tests/cli_gate/gate_cli_integration_test.rs:169-200`). Every caller has the run's issue at hand.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::gate_run_record` takes `(&IssueId, &GateRunId)`, and every caller passes the run's issue. The produced path is unchanged; the issue argument is `gate-run-flat-path-bridge`, an interim step whose removal is the per-issue layout.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -338,9 +597,160 @@
    "component:storage",
    "component:gates",
    "per:@/charter/D-19",
-   "enforces:@/invariant/shared-test-contracts",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-latest-run-reads",
+   "gate-run-shared-reader"
+  ],
+  "planning": {
+   "outcome": "Gate-run record paths are built from the run's issue and run id.",
+   "contract_refs": [
+    "gate-run-record-layout"
+   ],
+   "produces_contracts": [
+    "gate-run-flat-path-bridge"
+   ],
+   "source_refs": [
+    "REQ-01",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "gate-run path callers",
+    "test_boundary": "storage conformance tests",
+    "worker_sized_reason": "One signature change propagated to a listed caller set.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/repository_state/path.rs",
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/storage/memory.rs",
+      "crates/jit/src/storage/repository_state_store.rs",
+      "crates/jit/src/storage/gate_runs.rs",
+      "crates/jit/src/storage/reference.rs",
+      "crates/jit/src/gate_execution.rs",
+      "crates/jit/tests/cli_gate/gate_cli_integration_test.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-run-record-fixture-paths",
+  "title": "Gate-run test fixtures build record paths through the constructor",
+  "description": "Make every test that plants or names a gate-run record build its path through `VirtualPath::gate_run_record`, so no test spells the record layout.\n\n## Background\n\nTests spell the flat run layout literally: `crates/jit/src/commands/gate_check.rs:2614-2616` (`gate-runs/evidence-probe`) and `:2722` (`gate-runs/corrupt/result.json` in an error message), `commands/mod.rs:4362` (`gate-runs/prior-run/result.json`), `storage/gate_runs.rs:34-38` (a run directory) and `storage/repository_state_store_tests.rs:2159-2234,2326-2391` (run directories and result files). The constructor takes `(&IssueId, &GateRunId)`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed test builds every gate-run record path through `VirtualPath::gate_run_record` and asserts on paths it builds, and no test outside the constructor's own test spells `gate-runs/<run>` or `result.json`.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:testing",
+   "enforces:@/invariant/semantic-test-assertions",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-run-record-issue-argument"
+  ],
+  "planning": {
+   "outcome": "Gate-run test fixtures take record paths from the path constructor.",
+   "contract_refs": [
+    "gate-run-record-layout"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-01",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "gate-run test fixtures",
+    "test_boundary": "storage unit tests",
+    "worker_sized_reason": "A bounded list of test fixtures switches to one constructor.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/storage/gate_runs.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "gate-run-per-issue-layout",
+  "title": "Gate-run records live under their issue",
+  "description": "Store each gate run at `gate-runs/<issue-id>/<run-id>.json`, so an issue's run history is one directory and no reader enumerates other issues' runs.\n\n## Background\n\n`VirtualPath::gate_run_record(&IssueId, &GateRunId)` (`crates/jit/src/repository_state/path.rs`) is the only builder of a run record path and still produces the flat `gate-runs/<run-id>/result.json`; its issue argument is unused. Its own test pins that path (`repository_state/mutation.rs:1400-1410` today). Both backends list an issue's runs through one shared reader that enumerates the whole `gate-runs/` root and filters by `issue_id`. The storage reference renders the path from the constructor (`storage/reference.rs:462,797`), and `test_committed_reference_matches_projection` (`:817`) requires `docs/reference/storage-records.md` to match the projection. Every test fixture builds run paths through the constructor.\n\n## Success Criteria\n\n- [hard] REQ-01: `VirtualPath::gate_run_record` names `gate-runs/<issue-id>/<run-id>.json`; its own test pins that path, and `gate-run-flat-path-bridge` no longer exists.\n- [hard] REQ-02: The shared reader lists one issue's runs by reading `gate-runs/<issue-id>/` only and parses only its records. The conformance case shows that a corrupt record of another issue fails no lookup and applies its clutter rules inside the issue's directory.\n- [hard] REQ-03: The committed storage-record reference is regenerated by its script and matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- The regenerated reference is mechanical output; its prose is revised separately.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:storage",
+   "per:@/charter/D-19",
    "enforces:@/invariant/canonical-cutover",
-   "satisfies:f8a6b298/REQ-01",
+   "satisfies:f8a6b298/REQ-01"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "gate-run-record-fixture-paths",
+   "gate-run-backend-clutter-tests-removal"
+  ],
+  "planning": {
+   "outcome": "Gate-run records are stored per issue, and an issue's run history is one directory listing.",
+   "contract_refs": [
+    "gate-run-record-layout",
+    "gate-run-flat-path-bridge"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-01",
+    "DEC-05"
+   ],
+   "terminal": {
+    "consumer_family": "gate-run record storage",
+    "test_boundary": "storage conformance tests",
+    "worker_sized_reason": "One constructor body and one shared listing change.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/repository_state/path.rs",
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/storage/repository_state_store.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs",
+      "docs/reference/storage-records.md"
+     ]
+    }
+   },
+   "landing_group": "gate-run-cutover"
+  }
+ },
+ {
+  "key": "gate-run-layout-reference-prose",
+  "title": "Gate-run layout prose describes per-issue records",
+  "description": "Rewrite the storage-record reference prose and the `GateRunResult` rustdoc so they describe per-issue run records instead of the flat layout's rationale.\n\n## Background\n\nThe generated storage-record reference explains that \"`gate-runs/` is flat rather than nested per issue\" (`crates/jit/src/storage/reference.rs:184-188,549-556`, rendered into `docs/reference/storage-records.md:60-65,126`), and the `GateRunResult` rustdoc names `gate-runs/<run-id>/result.json` (`domain/types.rs:923-929`). Runs are stored at `gate-runs/<issue-id>/<run-id>.json`, and an issue's history is one directory listing.\n\n## Success Criteria\n\n- [hard] REQ-01: The reference source and the `GateRunResult` rustdoc describe `gate-runs/<issue-id>/<run-id>.json` and the per-issue history listing, with no flat-layout rationale.\n- [hard] REQ-02: The committed reference is regenerated and matches the projection.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-gate-runs",
+   "component:docs",
+   "per:@/charter/D-19",
+   "enforces:@/invariant/single-source-prose",
    "satisfies:f8a6b298/REQ-15"
   ],
   "gates": [
@@ -350,45 +760,30 @@
    "docs-mechanical"
   ],
   "depends_on": [
-   "gate-latest-run-reads",
-   "gate-verdict-records"
+   "gate-run-per-issue-layout"
   ],
   "planning": {
-   "outcome": "Gate-run records are stored per issue, and an issue's run history is one directory listing.",
+   "outcome": "The gate-run reference prose and rustdoc describe per-issue records.",
    "contract_refs": [
-    "gate-run-record-layout",
-    "gate-state-last-run"
+    "gate-run-record-layout"
    ],
    "produces_contracts": [],
    "source_refs": [
-    "REQ-01",
     "REQ-15",
     "DEC-05"
    ],
    "terminal": {
-    "consumer_family": "gate-run record storage",
-    "test_boundary": "storage conformance tests",
-    "worker_sized_reason": "The path builder and the history listing change in one storage module family.",
+    "consumer_family": "gate-run layout prose",
+    "test_boundary": "reference golden test",
+    "worker_sized_reason": "Two prose passages and one rustdoc block.",
     "footprint": {
      "touches": [
-      "crates/jit/src/repository_state/mutation.rs",
-      "crates/jit/src/repository_state/path.rs",
-      "crates/jit/src/repository_state/mod.rs",
-      "crates/jit/src/storage/json.rs",
-      "crates/jit/src/storage/memory.rs",
-      "crates/jit/src/storage/gate_runs.rs",
-      "crates/jit/src/storage/repository_state_store_tests.rs",
-      "crates/jit/src/commands/gate_check.rs",
-      "crates/jit/src/commands/mod.rs",
-      "crates/jit/src/gate_execution.rs",
       "crates/jit/src/storage/reference.rs",
       "crates/jit/src/domain/types.rs",
-      "docs/reference/storage-records.md",
-      "crates/jit/tests/cli_gate/gate_cli_integration_test.rs"
+      "docs/reference/storage-records.md"
      ]
     }
-   },
-   "landing_group": "gate-run-cutover"
+   }
   }
  },
  {
@@ -442,9 +837,51 @@
   }
  },
  {
+  "key": "lease-status-computed-stale",
+  "title": "Lease status reports staleness computed at read time",
+  "description": "Make `jit claim status` and `jit claim list` report each lease's staleness as computed when they read it, so consumers of their JSON need no stored flag.\n\n## Background\n\n`jit claim status` and `jit claim list` return leases from `ClaimCoordinator::get_active_leases` (`crates/jit/src/storage/claim_coordinator.rs:1188-1230`, called from `commands/claim.rs:469-535`). Each lease's `stale` field is whatever the index stored; it is computed only when the index is rebuilt from the log (`claim_coordinator.rs:1334`). `Lease::is_stale(now)` (`:105`) computes it. The human render reads the field at `main.rs:7811`.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim status` and `claim list` report each lease's `stale` as `Lease::is_stale(now)` at the time of the read, in JSON and human output.\n- [hard] REQ-02: A coordinator unit test shows that a lease whose heartbeat lapsed after it was stored is reported stale.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:storage",
+   "component:cli",
+   "per:@/charter/D-19",
+   "per:@/charter/D-20",
+   "satisfies:f8a6b298/REQ-05"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [],
+  "planning": {
+   "outcome": "Claim status and list report lease staleness computed at read time.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-05",
+    "DEC-09",
+    "DEC-01"
+   ],
+   "terminal": {
+    "consumer_family": "lease listing output",
+    "test_boundary": "claim coordinator unit tests",
+    "worker_sized_reason": "One listing function computes one field at read time.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/claim_coordinator.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "lease-hooks-status",
   "title": "Git hooks check leases through the claim status command",
-  "description": "Make the shipped pre-commit and pre-push hooks ask `jit claim status` whether an issue's lease is held, so they depend on no claims file layout.\n\n## Background\n\nThe strict-mode lease checks in `scripts/hooks/pre-commit:94-102` and `scripts/hooks/pre-push:76-89` read `.git/jit/claims.index.json` with `jq` and test its stored `stale` field; pre-push matches the issue by prefix (`startswith`). The scripts are embedded through `include_str!` (`crates/jit/src/commands/hooks.rs:7-8`). Their tests (`commands/hooks.rs:284-325`) plant an index file by hand (`grant_lease`) and run the hook in a scratch git repository.\n\n`jit claim status --issue <id> --json` reports one issue's active leases through `ClaimCoordinator::get_active_leases` (`crates/jit/src/storage/claim_coordinator.rs:1188-1230`), but each lease's `stale` field is whatever the index stored; it is computed only when the index is rebuilt from the log (`:1334`). `Lease::is_stale(now)` (`:105`) computes it.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim status` and `claim list` report each lease's `stale` as `Lease::is_stale(now)` at the time of the read.\n- [hard] REQ-02: The pre-commit and pre-push hooks decide lease ownership from `jit claim status --issue <id> --json` and read no file under `.git/jit/`.\n- [hard] REQ-03: A held, non-stale lease of the committing agent allows the commit; no lease, another agent's lease or a stale lease blocks it.\n- [hard] REQ-04: The hook lease tests run in a CLI integration suite against the built binary, acquire the lease through `jit claim acquire`, and plant no claims file.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make the shipped pre-commit and pre-push hooks ask `jit claim status` whether an issue's lease is held, so they depend on no claims file layout.\n\n## Background\n\nThe strict-mode lease checks in `scripts/hooks/pre-commit:94-102` and `scripts/hooks/pre-push:76-89` read `.git/jit/claims.index.json` with `jq` and test its stored `stale` field; pre-push matches the issue by prefix (`startswith`). The scripts are embedded through `include_str!` (`crates/jit/src/commands/hooks.rs:7-8`). Their tests (`commands/hooks.rs:284-325`) plant an index file by hand (`grant_lease`) and run the hook in a scratch git repository; they run inside the library's unit tests, where no built binary is on the path. `jit claim status --issue <id> --json` reports one issue's leases with `stale` computed at read time. The CLI suite `crates/jit/tests/cli_repo_workflow/` runs the built binary.\n\n## Success Criteria\n\n- [hard] REQ-01: The pre-commit and pre-push hooks decide lease ownership from `jit claim status --issue <id> --json` and read no file under `.git/jit/`.\n- [hard] REQ-02: A held, non-stale lease of the committing agent allows the commit; no lease, another agent's lease or a stale lease blocks it.\n- [hard] REQ-03: The hook lease tests run in the CLI suite against the built binary and acquire the lease through `jit claim acquire`; `commands/hooks.rs` holds no lease test and plants no claims file.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -460,20 +897,21 @@
    "cargo-ci",
    "code-review"
   ],
-  "depends_on": [],
+  "depends_on": [
+   "lease-status-computed-stale"
+  ],
   "planning": {
    "outcome": "The shipped git hooks decide lease ownership through the claim status command.",
    "contract_refs": [],
    "produces_contracts": [],
    "source_refs": [
     "REQ-12",
-    "DEC-09",
-    "DEC-01"
+    "DEC-09"
    ],
    "terminal": {
     "consumer_family": "git hook lease checks",
     "test_boundary": "CLI hook integration tests",
-    "worker_sized_reason": "Two shell checks and three tests move to one command call.",
+    "worker_sized_reason": "Two shell checks move to one command, and their tests must move with them.",
     "footprint": {
      "creates": [
       "crates/jit/tests/cli_repo_workflow/hook_lease_tests.rs"
@@ -482,7 +920,6 @@
       "scripts/hooks/pre-commit",
       "scripts/hooks/pre-push",
       "crates/jit/src/commands/hooks.rs",
-      "crates/jit/src/storage/claim_coordinator.rs",
       "crates/jit/tests/cli_repo_workflow/main.rs"
      ]
     }
@@ -492,16 +929,14 @@
  {
   "key": "lease-production-acquire-tests",
   "title": "Claim tests acquire leases through the production path",
-  "description": "Remove the lease APIs that only tests call, so the claim unit tests and property tests exercise the acquisition and release code that commands run.\n\n## Background\n\n`ClaimCoordinator::acquire_claim` (`crates/jit/src/storage/claim_coordinator.rs:450`), `acquire_claim_with_reason` (`:527`) and `release_lease` (`:1087`) have no production caller. `jit claim acquire` uses `acquire_claim_synchronized` (`:659`, called at `commands/claim.rs:138`), and `jit claim release` evicts through `execute_claim_release_by_issue` (`commands/claim.rs:334-395`). The test-only methods are called by about 40 coordinator tests, by the property tests in `storage/claim_coordinator_proptests.rs` (including the concurrency props through `acquire_claim_when_reached`, `claim_coordinator.rs:1430-1470`), and by tests in `commands/claim.rs`, `commands/worktree.rs` and `commands/mod.rs`. The test-only acquire also leaks an eviction (`:460-470`): it evicts and then returns without persisting.\n\n## Success Criteria\n\n- [hard] REQ-01: `ClaimCoordinator::acquire_claim`, `acquire_claim_with_reason` and `release_lease` no longer exist.\n- [hard] REQ-02: Every coordinator test and property test acquires through `acquire_claim_synchronized` and releases through the production release path. The concurrency property tests race the production acquire.\n- [hard] REQ-03: The property tests still prove exclusive acquisition under concurrency and monotonically increasing sequence numbers.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make every claim unit test and property test acquire and release leases through the entry points that commands use.\n\n## Background\n\n`ClaimCoordinator::acquire_claim` (`crates/jit/src/storage/claim_coordinator.rs:450`), `acquire_claim_with_reason` (`:527`) and `release_lease` (`:1087`) have no production caller. `jit claim acquire` uses `acquire_claim_synchronized` (`:659`, called at `commands/claim.rs:138`), and `jit claim release` evicts through `execute_claim_release_by_issue` (`commands/claim.rs:334-395`). The test-only methods are called by about 40 coordinator tests, by the property tests in `storage/claim_coordinator_proptests.rs` (including the concurrency props through `acquire_claim_when_reached`, `claim_coordinator.rs:1430-1470`), and by tests in `commands/claim.rs:867,1733`, `commands/worktree.rs:725-726` and `commands/mod.rs:4412`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test calls `acquire_claim`, `acquire_claim_with_reason` or `release_lease`: every coordinator test and property test acquires through `acquire_claim_synchronized` and releases through the production release path, and the concurrency property tests race the production acquire.\n- [hard] REQ-02: The property tests still prove exclusive acquisition under concurrency and monotonically increasing sequence numbers.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
    "epic:history-independent-reads",
    "milestone:v1.0",
    "story:per-key-leases",
-   "component:storage",
    "component:testing",
-   "per:@/charter/D-18",
    "enforces:@/invariant/convention-convergence",
    "satisfies:f8a6b298/REQ-06"
   ],
@@ -536,9 +971,9 @@
   }
  },
  {
-  "key": "lease-read-api",
-  "title": "Lease readers share one read path and one activeness rule",
-  "description": "Route every lock-free reader of active leases through one storage read path with one activeness predicate, so the lease file layout has one reader to change.\n\n## Background\n\nFour commands read `claims.index.json` directly through `ClaimsIndex::load` (`crates/jit/src/storage/claim_coordinator.rs:210-231`), outside the claims lock, each with its own expiry rule:\n\n- `check_active_lease` / `require_active_lease` (`commands/mod.rs:3331-3395`, expiry `:3355-3361`), called from `commands/gate.rs` and `commands/issue.rs`;\n- template lease warnings (`commands/template.rs:290-320`, `expires > now` at `:303`), a parallel copy of `captured_lease_warnings` (`commands/mod.rs:741-776`);\n- `worktree list` claim counts (`commands/worktree.rs:142-150,252`, `Lease::is_expired`);\n- `validate --leases` (`commands/validate.rs:2488-2505`, `expires_at < now`), which reports expired and orphaned leases and so needs every stored lease, not only active ones (asserted at `tests/cli_item_validate/validation_lease_tests.rs:229,420`).\n\nThe worktree unit tests build a `ClaimsIndex` by hand (`commands/worktree.rs:550-560,625-635`).\n\n`Lease::is_expired` (`claim_coordinator.rs:92`) and `Lease::is_stale` (`:105`) exist; the four rules disagree at `now == expires_at`, and some ignore staleness.\n\n## Success Criteria\n\n- [hard] REQ-01: `Lease::is_active(now)` is the one activeness predicate: a lease is active when it is neither expired nor stale. No other expiry or staleness comparison exists outside `Lease`.\n- [hard] REQ-02: The storage module offers `read_leases(&WorktreePaths)` (every stored lease), `read_active_leases(&WorktreePaths, now)` and `read_active_lease(&WorktreePaths, &IssueId, now)`. `validate --leases` uses `read_leases`; the other three readers use the active reads. No command calls `ClaimsIndex::load`.\n- [hard] REQ-03: Template lease warnings come from the same function as the guarded mutation lease warnings.\n- [hard] REQ-04: One unit test owns the activeness predicate's boundaries. The worktree unit tests build leases without a `ClaimsIndex`, and the lease-validation CLI tests pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "key": "lease-test-only-api-removal",
+  "title": "Test-only lease APIs are gone",
+  "description": "Delete the three lease APIs that no production code calls.\n\n## Background\n\n`ClaimCoordinator::acquire_claim` (`crates/jit/src/storage/claim_coordinator.rs:450`), `acquire_claim_with_reason` (`:527`) and `release_lease` (`:1087`) have no production caller, and no test calls them: tests acquire through `acquire_claim_synchronized` and release through the production release path. The test-only `acquire_claim` evicts and then returns without persisting the eviction (`:460-470`).\n\n## Success Criteria\n\n- [hard] REQ-01: `ClaimCoordinator::acquire_claim`, `acquire_claim_with_reason` and `release_lease` no longer exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -546,9 +981,48 @@
    "milestone:v1.0",
    "story:per-key-leases",
    "component:storage",
-   "component:cli",
+   "per:@/charter/D-18",
+   "satisfies:f8a6b298/REQ-06"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-production-acquire-tests"
+  ],
+  "planning": {
+   "outcome": "The three test-only lease APIs no longer exist.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-06",
+    "DEC-10"
+   ],
+   "terminal": {
+    "consumer_family": "claim coordinator API",
+    "test_boundary": "claim coordinator unit tests",
+    "worker_sized_reason": "Three unused methods are deleted.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/claim_coordinator.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-read-api",
+  "title": "Storage offers one lock-free lease read path and one activeness rule",
+  "description": "Add one activeness predicate on `Lease` and three lock-free lease reads in storage, so every lease reader has one path to call.\n\n## Background\n\nLease activeness is decided in four places with four rules that disagree at `now == expires_at`, and some ignore staleness (`crates/jit/src/commands/mod.rs:3355-3361`, `commands/template.rs:303`, `commands/validate.rs:2495-2496`, and `Lease::is_expired` at `storage/claim_coordinator.rs:92`). `Lease::is_stale` exists at `:105`. Lock-free readers load the whole index through `ClaimsIndex::load` (`claim_coordinator.rs:210-231`).\n\n## Success Criteria\n\n- [hard] REQ-01: `Lease::is_active(now)` is true when a lease is neither expired nor stale, and one unit test owns its boundaries.\n- [hard] REQ-02: `storage/claim_coordinator.rs` offers `read_leases(&WorktreePaths)` (every stored lease), `read_active_leases(&WorktreePaths, now)` and `read_active_lease(&WorktreePaths, &IssueId, now)`, reading without the claims lock, with unit tests.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:storage",
    "per:@/charter/D-19",
-   "enforces:@/invariant/convention-convergence",
    "satisfies:f8a6b298/REQ-05"
   ],
   "gates": [
@@ -557,7 +1031,7 @@
   ],
   "depends_on": [],
   "planning": {
-   "outcome": "Lock-free lease readers use one storage read path and one activeness predicate.",
+   "outcome": "Storage offers one lease activeness predicate and three lock-free lease reads.",
    "contract_refs": [],
    "produces_contracts": [
     "lease-read-api"
@@ -568,12 +1042,55 @@
     "DEC-01"
    ],
    "terminal": {
-    "consumer_family": "lock-free lease readers",
+    "consumer_family": "lease read path",
     "test_boundary": "lease reader unit tests",
-    "worker_sized_reason": "Four readers converge on three read functions and one predicate.",
+    "worker_sized_reason": "One predicate and three read functions in one module.",
     "footprint": {
      "touches": [
-      "crates/jit/src/storage/claim_coordinator.rs",
+      "crates/jit/src/storage/claim_coordinator.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-reader-migration",
+  "title": "Lock-free lease readers use the storage read path",
+  "description": "Move every lock-free lease reader in the commands onto the storage read path and its activeness predicate.\n\n## Background\n\nFour commands read `claims.index.json` directly through `ClaimsIndex::load`, outside the claims lock, each with its own expiry rule:\n\n- `check_active_lease` / `require_active_lease` (`crates/jit/src/commands/mod.rs:3331-3395`, expiry `:3355-3361`), called from `commands/gate.rs` and `commands/issue.rs`;\n- template lease warnings (`commands/template.rs:290-320`, `expires > now` at `:303`), a parallel copy of `captured_lease_warnings` (`commands/mod.rs:741-776`);\n- `worktree list` claim counts (`commands/worktree.rs:142-150,252`), whose unit tests build a `ClaimsIndex` by hand (`:550-560,625-635`);\n- `validate --leases` (`commands/validate.rs:2488-2505`), which reports expired and orphaned leases and so needs every stored lease (asserted at `tests/cli_item_validate/validation_lease_tests.rs:229,420`).\n\nStorage offers `read_leases`, `read_active_leases`, `read_active_lease` and `Lease::is_active(now)`.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate --leases` reads through `read_leases`; the other three readers read through the active reads and decide activeness only through `Lease::is_active`. No command calls `ClaimsIndex::load`, and no command compares a lease's expiry or heartbeat itself.\n- [hard] REQ-02: Template lease warnings come from the same function as the guarded mutation lease warnings.\n- [hard] REQ-03: The worktree unit tests build leases without a `ClaimsIndex`, and the lease-validation CLI tests pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:cli",
+   "per:@/charter/D-19",
+   "enforces:@/invariant/convention-convergence",
+   "satisfies:f8a6b298/REQ-05"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-read-api"
+  ],
+  "planning": {
+   "outcome": "Lock-free lease readers in the commands use the storage read path.",
+   "contract_refs": [
+    "lease-read-api"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-05",
+    "DEC-09"
+   ],
+   "terminal": {
+    "consumer_family": "lock-free lease readers",
+    "test_boundary": "lease validation CLI tests",
+    "worker_sized_reason": "Four readers move to existing read functions.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/commands/mod.rs",
       "crates/jit/src/commands/template.rs",
       "crates/jit/src/commands/worktree.rs",
@@ -584,9 +1101,55 @@
   }
  },
  {
-  "key": "lease-per-issue-records",
-  "title": "Each lease is one record under one lease sequence",
-  "description": "Store each issue's lease in its own file, published by one lock-load-change-publish sequence, so reading or changing one lease reads only that file and an interruption leaves the prior or the next lease.\n\n## Background\n\nThe claims control plane keeps every lease in one file, `.git/jit/claims.index.json`, which the storage reference calls a derived cache of `.git/jit/claims.jsonl` but which is a second authority: renew, release, heartbeat, force-evict and lease listing read only the index, while synchronized acquisition and the repository-mutation guard replay the whole log (`crates/jit/src/storage/claim_coordinator.rs:413-432`, `:659-760`, replay `:1252-1360`). Each append rescans the log for the next sequence number (`get_next_seq`, `:959-976`). An operation appends to the log and then rewrites the index through a fixed temp name with no directory sync (`write_index_atomic`, `:877-895`), so an interruption between the two leaves them disagreeing. `ClaimCoordinator` repeats the lock, load, evict, append and write steps by hand in each operation (`heartbeat` `:824`, `renew_lease` `:1016`, `force_evict_lease` `:1142`, `get_active_leases` `:1188`), with differences: `renew_lease` evicts and then returns an error without persisting the eviction (`:1025-1046`). `jit recover` verifies and rebuilds the index from the log (`commands/claim.rs:733-749`; help text `cli.rs:424`), then evicts expired leases and, after the recovery reclaim change 5b37a806, reclaims stale indefinite leases, reports `index_rebuilt` (`main.rs:7762,7775`), and raises `StorageWarning::IndexRebuilt`; replay raises `SequenceGap` and `DuplicateLease` (`storage/warnings.rs:37-48`). The indefinite-lease limits count every lease (`claim_coordinator.rs:744-771`).\n\nThe atomic-write primitives `write_file_synced`, `create_file_synced` and `sync_directory` (`storage/atomic_write.rs:55-95`) are visible to the storage module. A lease read API (`read_active_lease`, `read_active_leases`) already fronts every lock-free reader.\n\nTests that plant or read the index: `tests/cli_repo_workflow/claim_integration_tests.rs:51,177,302,750-785`, `tests/cli_item_validate/validation_lease_tests.rs:112-125` (fixture for `validate --leases`), `tests/cli_issue/failure_lever_registry.toml:51-98` with `tests/cli_issue/failure_probe_fixture.rs:637` (`malformed-claim-index`), and `tests/cli_issue/command_exit_code_projection_tests.rs:755-760`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each active lease is the file `.git/jit/leases/<issue-id>.json`, named by one path constructor on `WorktreePaths`. An absent file means no lease. `claims.index.json` is neither written nor read by any lease operation. A lease record stores no `stale` field; `claim status` and `claim list` (rendered at `main.rs:7854`) report it from `Lease::is_stale(now)`.\n- [hard] REQ-02: Every lease operation holds one `LeaseLock` (coordination-order guard plus `claims.lock`, released on drop) and reads and changes leases only through it: `load(&IssueId)`, `list()` and `apply(&IssueId, op)`. `apply` evicts an expired lease, applies a pure change, publishes the lease file by synced temp file, rename and directory sync (or unlink and directory sync), then takes the next number from `.git/jit/claims.seq` and appends the operation's history lines to `claims.jsonl` in one write. Every change, an eviction included, is persisted before `apply` returns.\n- [hard] REQ-03: The repository-mutation guard takes the `LeaseLock` before its repository session opens, as `claims_mutation_guard` does today (`commands/mod.rs:2600-2607`), holds it across the session, and reads each target through `load` without writing, taking no second lock and entering no second coordination guard. Acquire checks the indefinite-lease limits through `list()` and runs its repository synchronization under the held lock.\n- [hard] REQ-04: No lease operation reads `claims.jsonl`. Reading or changing one issue's lease reads only that issue's lease file; only the indefinite-lease limit check and lease listing read the lease directory.\n- [hard] REQ-05: `rebuild_index_from_log`, `verify_index_consistency`, `write_index_atomic`, `get_next_seq`, `evict_expired`, `load_claims_index`, `StorageWarning::SequenceGap`, `StorageWarning::DuplicateLease`, `StorageWarning::IndexRebuilt` and `RecoveryReport.index_rebuilt` no longer exist. `jit recover` cleans stale locks and, under one `LeaseLock`, evicts expired leases and reclaims stale indefinite leases over the lease directory; its help text names exactly these passes.\n- [hard] REQ-06: A malformed lease record makes `claim status` and `claim list` fail with `PARSE_ERROR` and exit 1, and makes `validate --leases` exit 1. The failure-lever registry and the exit-code projection test plant a malformed lease record instead of a malformed index.\n- [hard] REQ-07: Renew, heartbeat and force-evict keep their lease-id argument and find the lease by listing the lease directory. This lookup is an interim step with a tracked removal: the commands move to issue addressing.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Leases active when this lands are carried over by the checkout's one-time lease rewrite, which lands with it.\n",
+  "key": "lease-lock-handle",
+  "title": "A held lease lock loads, lists and applies lease changes",
+  "description": "Add a lease lock handle that holds the claims lock and offers load, list and apply over the current claims store, so every lease operation can share one lock-load-change-publish sequence.\n\n## Background\n\n`ClaimCoordinator` repeats the lock, load, evict, append and write steps by hand in each operation (`crates/jit/src/storage/claim_coordinator.rs`: `acquire_claim_synchronized` `:659`, `heartbeat` `:824`, `renew_lease` `:1016`, `force_evict_lease` `:1142`, `get_active_leases` `:1188`), with differences between them. Today's store is the index `claims.index.json` plus the log `claims.jsonl`; writes go through `write_index_atomic` (`:877-895`) and `append_claim_op` (`:928-956`). `CoordinationOrderGuard::enter` refuses while a repository order guard is held (`storage/guard_order.rs:52-62`), and the claims lock is `locks/claims.lock`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ClaimCoordinator::lock()` returns a `LeaseLock` that enters `CoordinationOrderGuard` and holds `claims.lock` until dropped.\n- [hard] REQ-02: `LeaseLock` offers `load(&IssueId)`, `list()` and `apply(&IssueId, op)`, where `op(current, now)` is pure and returns keep, put or remove. `apply` evicts an expired lease, publishes the change through the current store, and appends the operation's history lines in one write. Every change, an eviction included, is persisted before `apply` returns.\n- [hard] REQ-03: Unit tests cover load, list, apply's keep, put, remove and eviction cases, and that a second `lock()` on the same thread inside a repository order guard fails.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:storage",
+   "per:@/charter/D-19",
+   "enforces:@/invariant/convention-convergence",
+   "satisfies:f8a6b298/REQ-06"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-test-only-api-removal",
+   "lease-status-computed-stale"
+  ],
+  "planning": {
+   "outcome": "A held lease lock offers load, list and apply over the current claims store.",
+   "contract_refs": [],
+   "produces_contracts": [
+    "lease-sequence"
+   ],
+   "source_refs": [
+    "REQ-06",
+    "DEC-10",
+    "DEC-02"
+   ],
+   "terminal": {
+    "consumer_family": "lease lock primitive",
+    "test_boundary": "claim coordinator unit tests",
+    "worker_sized_reason": "One handle type with three methods over existing store writes.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/claim_coordinator.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-ops-through-lock",
+  "title": "Lease operations and the mutation guard run through the lease lock",
+  "description": "Move acquire, renew, heartbeat, force-evict, lease listing and the repository-mutation lease check onto the held lease lock, so no operation repeats the lock and publish steps by hand.\n\n## Background\n\nEach lease operation in `crates/jit/src/storage/claim_coordinator.rs` hand-rolls its lock, load, evict, append and write steps (`acquire_claim_synchronized` `:659`, `heartbeat` `:824`, `renew_lease` `:1016`, `force_evict_lease` `:1142`, `get_active_leases` `:1188`). `renew_lease` evicts and then returns an error without persisting the eviction (`:1025-1046`). The indefinite-lease limits count every lease (`:744-771`). The repository-mutation guard `lock_claims_for_repository_mutation` (`:413-432`) takes the claims lock and replays the log; `claims_mutation_guard` (`commands/mod.rs:720-739`) takes it before the repository session opens (`commands/mod.rs:2600-2607`), and `captured_lease_warnings` and `ensure_claim_available` (`commands/mod.rs:741-800`) read it. `ClaimCoordinator::lock()` returns a `LeaseLock` with `load`, `list` and `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: Acquire, renew, heartbeat, force-evict and lease listing each take one `LeaseLock` and change leases only through `apply`. Acquire checks the indefinite-lease limits through `list()` and runs its repository synchronization while holding the lock.\n- [hard] REQ-02: The repository-mutation guard takes its `LeaseLock` before the repository session opens, holds it across the session and reads targets only through `load`; it writes nothing, takes no second claims lock and enters no second coordination guard, and an expired lease counts as inactive.\n- [hard] REQ-03: Renew, heartbeat and force-evict, still addressed by lease id, find the lease through `list()`; this is `lease-id-scan-bridge`, an interim lookup whose removal is issue addressing.\n- [hard] REQ-04: Renewing an expired lease persists its eviction before reporting not found, and a test pins it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -596,11 +1159,209 @@
    "component:storage",
    "component:cli",
    "per:@/charter/D-19",
-   "per:@/charter/D-18",
-   "enforces:@/invariant/atomic-writes",
    "enforces:@/invariant/convention-convergence",
+   "satisfies:f8a6b298/REQ-06"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-lock-handle"
+  ],
+  "planning": {
+   "outcome": "Lease operations and the mutation guard use the held lease lock.",
+   "contract_refs": [
+    "lease-sequence"
+   ],
+   "produces_contracts": [
+    "lease-id-scan-bridge"
+   ],
+   "source_refs": [
+    "REQ-06",
+    "DEC-02",
+    "DEC-10"
+   ],
+   "terminal": {
+    "consumer_family": "claim coordinator operations",
+    "test_boundary": "claim coordinator unit tests",
+    "worker_sized_reason": "Five operations and one guard move onto an existing handle.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/claim_coordinator.rs",
+      "crates/jit/src/commands/mod.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-recover-through-lock",
+  "title": "Recovery evicts and reclaims leases through the lease lock",
+  "description": "Run `jit recover`'s lease eviction and stale-lease reclaim through the held lease lock, so recovery changes leases the same way every other operation does.\n\n## Background\n\n`jit recover` (`crates/jit/src/commands/claim.rs:700-750`) cleans stale locks, verifies and rebuilds the index from the log, then evicts expired leases by hand (`load_claims_index`, `evict_expired`, `write_index_atomic` at `:743-748`). The recovery reclaim change 5b37a806 adds a pass that reclaims indefinite leases whose heartbeat lapsed. `ClaimCoordinator::lock()` returns a `LeaseLock` with `list` and `apply`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit recover` evicts expired leases and reclaims stale indefinite leases under one `LeaseLock`, through `list()` and `apply`, and reports both counts.\n- [hard] REQ-02: Recovery's existing tests pass, and a test shows that an expired lease and a stale indefinite lease are both removed and logged once.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:cli",
+   "component:storage",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-06"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-ops-through-lock"
+  ],
+  "planning": {
+   "outcome": "Recovery's lease passes run through the held lease lock.",
+   "contract_refs": [
+    "lease-sequence"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-06",
+    "DEC-03"
+   ],
+   "terminal": {
+    "consumer_family": "lease recovery",
+    "test_boundary": "claim CLI integration tests",
+    "worker_sized_reason": "Two recovery passes move onto an existing handle.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/commands/claim.rs",
+      "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-store-fixtures",
+  "title": "CLI tests reach lease storage through one test helper",
+  "description": "Route every CLI test that plants, reads or corrupts lease storage through one shared test helper, so the lease store layout is spelled once in the test tree.\n\n## Background\n\nCLI tests reach the claims index directly:\n\n- `tests/cli_item_validate/validation_lease_tests.rs:112-125` (`write_claims_index`, used by the `validate --leases` tests) and `:180-190` (a malformed index);\n- `tests/cli_repo_workflow/claim_integration_tests.rs:177` (reads a lease from the index) and `:302-304` (removes the index's permissions);\n- `tests/cli_issue/failure_probe_fixture.rs:636-640` (`malformed-claim-index` writes invalid JSON over the index);\n- `tests/cli_issue/command_exit_code_projection_tests.rs:755-760` (corrupts the index).\n\nShared test code lives in `tests/common/` and is included per suite through `#[path]` (`tests/fast_issue/main.rs:6`).\n\n## Success Criteria\n\n- [hard] REQ-01: One helper module under `crates/jit/tests/common/` plants a lease, reads a lease, names an issue's lease storage path and corrupts lease storage, and the listed tests use it; no CLI test names `claims.index.json` outside the helper.\n- [hard] REQ-02: The listed tests pass unchanged in what they assert.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:testing",
+   "enforces:@/invariant/shared-test-contracts",
+   "satisfies:f8a6b298/REQ-05"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-hooks-status"
+  ],
+  "planning": {
+   "outcome": "CLI tests reach lease storage only through one shared test helper.",
+   "contract_refs": [],
+   "produces_contracts": [
+    "lease-store-test-helper"
+   ],
+   "source_refs": [
+    "REQ-05",
+    "DEC-09"
+   ],
+   "terminal": {
+    "consumer_family": "lease storage fixtures",
+    "test_boundary": "claim CLI integration tests",
+    "worker_sized_reason": "Six fixture sites move to one helper module.",
+    "footprint": {
+     "creates": [
+      "crates/jit/tests/common/lease_store.rs"
+     ],
+     "touches": [
+      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs",
+      "crates/jit/tests/cli_item_validate/main.rs",
+      "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
+      "crates/jit/tests/cli_repo_workflow/main.rs",
+      "crates/jit/tests/cli_issue/failure_probe_fixture.rs",
+      "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs",
+      "crates/jit/tests/cli_issue/main.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "lease-per-issue-records",
+  "title": "Each lease is one record under the lease lock",
+  "description": "Store each issue's lease in its own file, published by the lease lock's apply, so reading or changing one lease reads only that file and an interruption leaves the prior or the next lease.\n\n## Background\n\nThe lease lock (`LeaseLock`: `load`, `list`, `apply` in `crates/jit/src/storage/claim_coordinator.rs`) and the lock-free reads (`read_leases`, `read_active_leases`, `read_active_lease`) are the only access to lease state. They store every lease in `.git/jit/claims.index.json`, rebuilt from `claims.jsonl` when the lock is taken (`:1252-1360`), and take each sequence number by rescanning the log (`get_next_seq`, `:959-976`, private). The index publish has a fixed temp name and no directory sync (`write_index_atomic`, `:877-895`). The atomic-write primitives `write_file_synced`, `create_file_synced` and `sync_directory` (`storage/atomic_write.rs:55-95`) are visible to the storage module. CLI tests reach lease storage only through the shared helper `tests/common/lease_store.rs`, and the failure-lever registry expects `PARSE_ERROR: Failed to parse claims index` for a malformed store (`tests/cli_issue/failure_lever_registry.toml:70-88`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each active lease is the file `.git/jit/leases/<issue-id>.json`, named by one path constructor on `WorktreePaths`; an absent file means no lease, and a record stores no `stale` field. `LeaseLock` and the lock-free reads read and write only these files, and no lease operation reads or writes `claims.index.json` or reads `claims.jsonl`.\n- [hard] REQ-02: `apply` publishes by synced temp file, rename and directory sync (or unlink and directory sync), then takes the next number from `.git/jit/claims.seq`, then appends the operation's history lines; `get_next_seq` no longer exists. Reading or changing one issue's lease reads only that file, and only the limit check and listing read the lease directory.\n- [hard] REQ-03: The shared lease test helper plants, reads and corrupts lease records, and the failure levers expect a malformed lease record to fail `claim status` and `claim list` with `PARSE_ERROR` and exit 1.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Leases active when this lands are carried over by the checkout's one-time lease rewrite, which lands with it.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:storage",
+   "per:@/charter/D-19",
+   "enforces:@/invariant/atomic-writes",
    "satisfies:f8a6b298/REQ-05",
-   "satisfies:f8a6b298/REQ-06",
+   "satisfies:f8a6b298/REQ-07"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "lease-recover-through-lock",
+   "lease-store-fixtures",
+   "lease-reader-migration"
+  ],
+  "planning": {
+   "outcome": "Leases are per-issue records read and changed only through the lease lock.",
+   "contract_refs": [
+    "lease-record-layout",
+    "lease-read-api",
+    "lease-sequence",
+    "lease-store-test-helper"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-05",
+    "REQ-07",
+    "DEC-09",
+    "DEC-13"
+   ],
+   "terminal": {
+    "consumer_family": "lease store",
+    "test_boundary": "claim coordinator unit tests",
+    "worker_sized_reason": "One store behind an existing handle and read API, with one test helper retargeted.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/claim_coordinator.rs",
+      "crates/jit/src/storage/worktree_paths.rs",
+      "crates/jit/tests/common/lease_store.rs",
+      "crates/jit/tests/cli_issue/failure_lever_registry.toml"
+     ]
+    }
+   },
+   "landing_group": "lease-cutover"
+  }
+ },
+ {
+  "key": "lease-index-machinery-removal",
+  "title": "Claims-index rebuild machinery is gone",
+  "description": "Delete the claims-index rebuild, verification and index-write machinery and the recovery step and warnings that used it, now that leases are per-issue records.\n\n## Background\n\nLeases are stored one file per issue under the lease lock, and no lease operation reads the index or the log. What remains of the index model: `rebuild_index_from_log`, `rebuild_index_from_log_at`, `verify_index_consistency`, `write_index_atomic`, `evict_expired` and `load_claims_index` (`crates/jit/src/storage/claim_coordinator.rs:872-1360`); `jit recover`'s verify-and-rebuild step (`commands/claim.rs:733-741`), its `index_rebuilt` report field (`main.rs:7246,7259`) and help text (`cli.rs:424`); `StorageWarning::SequenceGap`, `DuplicateLease` and `IndexRebuilt` (`storage/warnings.rs:37-48,98-106,156-175`); the rebuild property tests in `storage/claim_coordinator_proptests.rs` (`prop_index_rebuild_idempotent`, `prop_no_data_loss_in_rebuild`, `prop_staleness_computed_during_rebuild`); and the recovery tests that remove the index (`tests/cli_repo_workflow/claim_integration_tests.rs:750-785`).\n\n## Success Criteria\n\n- [hard] REQ-01: The listed functions, the three warnings, `RecoveryReport.index_rebuilt` and recovery's verify-and-rebuild step no longer exist, and no command rebuilds lease state from the claims log.\n- [hard] REQ-02: `jit recover`'s help names exactly its passes: stale-lock cleanup, expired-lease eviction and stale indefinite-lease reclaim.\n- [hard] REQ-03: The rebuild property tests and the index-removal recovery tests no longer exist.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:storage",
+   "component:cli",
+   "per:@/charter/D-18",
+   "enforces:@/invariant/canonical-cutover",
    "satisfies:f8a6b298/REQ-07",
    "satisfies:f8a6b298/REQ-12"
   ],
@@ -609,54 +1370,33 @@
    "code-review"
   ],
   "depends_on": [
-   "lease-production-acquire-tests",
-   "lease-read-api",
-   "lease-hooks-status"
+   "lease-per-issue-records"
   ],
   "planning": {
-   "outcome": "Leases are per-issue records read and changed only through one held lease lock.",
-   "contract_refs": [
-    "lease-record-layout",
-    "lease-read-api"
-   ],
-   "produces_contracts": [
-    "lease-sequence",
-    "lease-id-scan-bridge"
-   ],
+   "outcome": "No index rebuild, verification or recovery step over the claims log remains.",
+   "contract_refs": [],
+   "produces_contracts": [],
    "source_refs": [
-    "REQ-05",
-    "REQ-06",
     "REQ-07",
     "REQ-12",
-    "DEC-02",
-    "DEC-03",
-    "DEC-09",
-    "DEC-10",
-    "DEC-13"
+    "DEC-09"
    ],
    "terminal": {
-    "consumer_family": "claim coordinator operations",
-    "test_boundary": "claim coordinator unit tests",
-    "worker_sized_reason": "One coordinator rewrite behind an existing read API, with its fixtures retargeted.",
+    "consumer_family": "claims index machinery",
+    "test_boundary": "claim CLI integration tests",
+    "worker_sized_reason": "A listed set of functions, warnings and tests is deleted.",
     "footprint": {
      "touches": [
       "crates/jit/src/storage/claim_coordinator.rs",
       "crates/jit/src/storage/claim_coordinator_proptests.rs",
-      "crates/jit/src/storage/worktree_paths.rs",
       "crates/jit/src/storage/warnings.rs",
       "crates/jit/src/commands/claim.rs",
-      "crates/jit/src/commands/mod.rs",
       "crates/jit/src/main.rs",
       "crates/jit/src/cli.rs",
-      "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
-      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs",
-      "crates/jit/tests/cli_issue/failure_lever_registry.toml",
-      "crates/jit/tests/cli_issue/failure_probe_fixture.rs",
-      "crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs"
+      "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs"
      ]
     }
-   },
-   "landing_group": "lease-cutover"
+   }
   }
  },
  {
@@ -680,7 +1420,7 @@
    "code-review"
   ],
   "depends_on": [
-   "lease-per-issue-records",
+   "lease-index-machinery-removal",
    "validation-skips-event-log"
   ],
   "planning": {
@@ -727,7 +1467,7 @@
    "code-review"
   ],
   "depends_on": [
-   "lease-per-issue-records"
+   "lease-index-validation-removal"
   ],
   "planning": {
    "outcome": "Renew, heartbeat and force-evict find the lease from the issue id directly.",
@@ -856,9 +1596,9 @@
   }
  },
  {
-  "key": "claim-event-from-assignee",
-  "title": "A claim emits its event exactly when the assignee changes",
-  "description": "Decide whether a claim appends `IssueClaimed` from the issue record's assignee alone, so a claim parses no event-log record.\n\n## Background\n\n`jit claim acquire` synchronizes the issue through `MutationIntent::ClaimIssue` (`crates/jit/src/commands/claim.rs:170-212`). Its capture requests the whole event log (`:189-197`). The finalizer parses it (`captured_events`, `repository_state/mutation.rs:675-688`) and asks whether the log's tail already shows this claim (`event_tail_reflects_claim`, `:693-708`) before deciding at `:851-888`. Two consequences: the claim's cost grows with the log, and acquire, unassign, acquire again reassigns the issue with no event, because the tail still ends at the first claim. An issue assigned outside jit gets the missing event emitted as a repair.\n\n`jit issue claim` (lifecycle `Claim`, `commands/mod.rs:3158-3168`) pushes `IssueClaimed` unconditionally, including when a Ready issue already assigned to the claimant is promoted and the assignment does not change. `issue assign` emits it only when the assignee changes (`commands/mod.rs:1600-1611`).\n\nEvery event append already reads only the bounded end of the log (`CaptureSpec::discover_tail`, `repository_state/image.rs:581-589`), and the issue write and its events publish in one redo record.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim acquire` captures the issue record and the log's tail only. It appends `IssueClaimed` exactly when the captured issue's assignee differs from the claimant, in the same redo record as the issue write, and appends nothing otherwise.\n- [hard] REQ-02: `issue claim` appends `IssueClaimed` exactly when the assignee changes; a same-assignee promotion appends only the state change.\n- [hard] REQ-03: `captured_events` and `event_tail_reflects_claim` no longer exist, and the claim decision reads no event-log record.\n- [hard] REQ-04: Tests show that acquire, unassign, acquire appends two claim events; that a repeated claim appends nothing; and that a claim of an issue already assigned to the claimant outside jit appends nothing.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- This reverses the earlier rule that a claim repairs a missing claim event for an assignment made outside jit.\n",
+  "key": "claim-acquire-event-from-assignee",
+  "title": "Claim acquire emits its event exactly when the assignee changes",
+  "description": "Decide whether `jit claim acquire` appends `IssueClaimed` from the issue record's assignee alone, so a claim parses no event-log record.\n\n## Background\n\n`jit claim acquire` synchronizes the issue through `MutationIntent::ClaimIssue` (`crates/jit/src/commands/claim.rs:170-212`). Its capture requests the whole event log (`:189-197`). The finalizer parses it (`captured_events`, `repository_state/mutation.rs:675-688`) and asks whether the log's tail already shows this claim (`event_tail_reflects_claim`, `:693-708`) before deciding at `:851-888`. Acquire, unassign, acquire again therefore reassigns the issue with no event, and an issue assigned outside jit gets a repair event. Every event append already reads only the log's bounded end (`CaptureSpec::discover_tail`, `repository_state/image.rs:581-589`), and the issue write and its events publish in one redo record. Tests asserting today's rule: `mutation.rs:2021-2160`, `commands/claim.rs:1780-1830`.\n\n## Success Criteria\n\n- [hard] REQ-01: `claim acquire` captures the issue record and the log's tail only. It appends `IssueClaimed` exactly when the captured issue's assignee differs from the claimant, in the same redo record as the issue write, and appends nothing otherwise.\n- [hard] REQ-02: `captured_events` and `event_tail_reflects_claim` no longer exist, and the claim decision reads no event-log record.\n- [hard] REQ-03: Tests show that acquire, unassign, acquire appends two claim events; that a repeated claim appends nothing; and that a claim of an issue already assigned to the claimant outside jit appends nothing.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- This reverses the earlier rule that a claim repairs a missing claim event for an assignment made outside jit.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -866,7 +1606,6 @@
    "milestone:v1.0",
    "story:per-key-leases",
    "component:core",
-   "component:storage",
    "per:@/charter/D-19",
    "per:@/charter/D-17",
    "enforces:@/invariant/event-log",
@@ -878,7 +1617,7 @@
   ],
   "depends_on": [],
   "planning": {
-   "outcome": "Claims decide their claim event from the issue's assignee and parse no event-log record.",
+   "outcome": "Claim acquire decides its claim event from the issue's assignee and parses no event-log record.",
    "contract_refs": [
     "event-append-probe"
    ],
@@ -891,13 +1630,55 @@
     "DEC-01"
    ],
    "terminal": {
-    "consumer_family": "claim event decisions",
+    "consumer_family": "claim acquire event",
     "test_boundary": "mutation finalizer unit tests",
-    "worker_sized_reason": "One finalizer pass and one lifecycle branch adopt one rule.",
+    "worker_sized_reason": "One finalizer pass and its capture adopt one rule.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/claim.rs",
-      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/repository_state/mutation.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "issue-claim-event-from-assignee",
+  "title": "Issue claim emits its event exactly when the assignee changes",
+  "description": "Make `jit issue claim` append `IssueClaimed` only when the assignee changes, the same rule `claim acquire` and `issue assign` follow.\n\n## Background\n\n`jit issue claim` (lifecycle `Claim`, `crates/jit/src/commands/mod.rs:3158-3168`) pushes `IssueClaimed` unconditionally, including when a Ready issue already assigned to the claimant is promoted and the assignment does not change. `issue assign` emits it only when the assignee changes (`commands/mod.rs:1600-1611`).\n\n## Success Criteria\n\n- [hard] REQ-01: `issue claim` appends `IssueClaimed` exactly when the assignee changes; a same-assignee promotion appends only the state change, and a test pins it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:per-key-leases",
+   "component:core",
+   "per:@/charter/D-19",
+   "per:@/charter/D-20",
+   "enforces:@/invariant/event-log",
+   "satisfies:f8a6b298/REQ-08"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "claim-acquire-event-from-assignee"
+  ],
+  "planning": {
+   "outcome": "Issue claim appends its claim event only when the assignee changes.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-08",
+    "DEC-12"
+   ],
+   "terminal": {
+    "consumer_family": "issue claim event",
+    "test_boundary": "executor lifecycle tests",
+    "worker_sized_reason": "One lifecycle branch gains one condition.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/commands/mod.rs",
       "crates/jit/src/commands/issue.rs"
      ]
@@ -906,9 +1687,9 @@
   }
  },
  {
-  "key": "event-torn-line-rule",
-  "title": "An unterminated final event line is an uncommitted append",
-  "description": "Give the event log one torn-line rule: a final line without a terminating newline is an uncommitted append, which readers ignore and the next append overwrites, and any other malformed line is an error. Remove the profile-marker certification protocol it replaces.\n\n## Background\n\nTorn lines are handled by three rules today. `domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a malformed line only when the next line is a profile-lifecycle record whose `isolated_torn_tail` is true (`certifies_preceding_torn_tail`, `:78`). The finalizer refuses every append over an unterminated, unparseable final line unless the mutation writes that marker (`prefix_has_torn_tail`, `repository_state/mutation.rs:606`; `MutationError::UncertifiedTornTail`, `:477`, raised at `:1199-1232`). The file backend's archive reader accepts any brace-prefixed line that hits end of input anywhere in the file (`is_torn_event_prefix`, `storage/json.rs:1388,1595-1605`).\n\nUnder redo records a jit process cannot leave a torn line: the record commits before the append, and replay rewrites the appended range. The marker has no producer left except profile apply. The marker field is `ProfileLifecycle.isolated_torn_tail` (`domain/types.rs:1585,1963`, catalog sample `domain/event_catalog.rs:437`). The appender separates an unterminated final line with a newline (`compose_events`, `repository_state/mutation.rs:615-630`; offset at `:1241`), which would turn the fragment into a permanent malformed middle line. Both backends already apply an event append at its offset and truncate to the offset plus its bytes (`storage/redo_apply.rs:302-320`, `storage/memory.rs:692-712`, overlay `repository_state/overlay.rs:120-126`), and the end-of-log probe already holds the final line (owner decision @/issue/c88822a5/decision/D-1). The architecture note `dev/architecture/repository-state-materialization.md:271-275` describes the append at the captured log length and the refusal of an \"uncertified torn final line\". `@/inv/atomic-writes` says the log grows by a positioned append at the length the mutation read. Several restatements say only \"the log's length\" or \"the captured length\": `storage/redo_record.rs:39`, `repository_state/image.rs:1113`, `repository_state/initialize.rs:401,422`, `repository_state/mutation.rs:617,632,1769,2485`, `storage/repository_state_store_tests.rs:2817` and `docs/reference/storage-format.md:99`. Tests: `event_log.rs:96-145`, `mutation.rs:2426-2560`, `commands/profile.rs:5219-5240,6365-6395`, `commands/archive.rs:1298-1340`, `storage/repository_state_store_tests.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` ignores a final line that has no terminating newline, skips blank lines and records with a retired tag, and returns an error naming the line for any other line that is not a well-formed event record.\n- [hard] REQ-02: The length a mutation reads from the event log is its committed length: the end of its last newline-terminated line, which the end-of-log probe determines. Every event append is positioned at that length, so an unterminated final line is overwritten and never becomes a middle line, and no separator newline is written. Every mutation succeeds over such a tail, and `UncertifiedTornTail` and `prefix_has_torn_tail` no longer exist.\n- [hard] REQ-03: `ProfileLifecycle.isolated_torn_tail`, `certifies_preceding_torn_tail`, the marker reordering in the finalizer and `is_torn_event_prefix` no longer exist. The file backend's archive reader parses through `parse_known_events`.\n- [hard] REQ-04: One parser unit test owns the read rule (unterminated final line ignored, malformed middle line rejected), and one finalizer unit test shows that an append over an unterminated final line starts at that line's offset and leaves a log every line of which parses.\n- [hard] REQ-05: The architecture note, the rustdoc and comments at the listed restatements, and `storage-format.md:99` say that an append is positioned at the log's committed length.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n- Keeps the owner decision @/issue/c88822a5/decision/D-1: the append probe reads back to the final line.\n",
+  "key": "committed-length-append",
+  "title": "Event appends land at the log's committed length",
+  "description": "Position every event append at the end of the log's last newline-terminated line, so an unterminated final line is an uncommitted append that the next append overwrites instead of a fragment it buries.\n\n## Background\n\nThe finalizer appends at the captured log length and, when the log ends in an unterminated final line, prefixes a separator newline (`compose_events`, `crates/jit/src/repository_state/mutation.rs:615-630`; offset at `:1241`; `captured_log_end` at `:639`). That turns the fragment into a permanent malformed middle line. To avoid corrupting the log, the finalizer refuses every append over an unterminated, unparseable final line unless the mutation writes a profile marker (`:1195-1206`, `MutationError::UncertifiedTornTail`). `finalize_audit_append` (`:1258`) shares the same path. Both backends already apply an event append at its offset and truncate to the offset plus its bytes (`storage/redo_apply.rs:302-320`, `storage/memory.rs:692-712`; the overlay at `repository_state/overlay.rs:120-126`), and the end-of-log probe already holds the final line (owner decision @/issue/c88822a5/decision/D-1). Tests pinning today's behaviour: `mutation.rs:1772-1810,2449-2560` and `commands/profile.rs:5219-5240,6365-6395`.\n\n## Success Criteria\n\n- [hard] REQ-01: The length a mutation reads from the event log is its committed length: the end of its last newline-terminated line, which the end-of-log probe determines. Every event append, `finalize_audit_append` included, is positioned at that length and writes no separator newline.\n- [hard] REQ-02: No mutation refuses to append over an unterminated final line, and a finalizer unit test shows that an append over one starts at that line's offset and leaves a log every line of which is newline-terminated.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -916,21 +1697,65 @@
    "milestone:v1.0",
    "story:history-boundary",
    "component:core",
-   "component:storage",
+   "per:@/charter/D-17",
+   "enforces:@/invariant/atomic-writes",
+   "satisfies:f8a6b298/REQ-10",
+   "satisfies:f8a6b298/REQ-12"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [],
+  "planning": {
+   "outcome": "Event appends land at the log's committed length and overwrite an uncommitted tail.",
+   "contract_refs": [
+    "event-log-rule"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-10",
+    "REQ-12",
+    "DEC-21",
+    "DEC-01"
+   ],
+   "terminal": {
+    "consumer_family": "event-log appends",
+    "test_boundary": "mutation finalizer unit tests",
+    "worker_sized_reason": "One offset rule in one composer, with its pinned tests updated.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/commands/profile.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "event-log-read-rule",
+  "title": "Event-log readers ignore an unterminated final line",
+  "description": "Give the event-log parser one torn-line rule: ignore a final line without a terminating newline and reject any other malformed line.\n\n## Background\n\n`domain::parse_known_events` (`crates/jit/src/domain/event_log.rs:42-80`) skips a malformed line only when the next line is a profile-lifecycle record whose `isolated_torn_tail` is true (`certifies_preceding_torn_tail`, `:78`). Event appends now land at the committed length, so an unterminated final line is an uncommitted append that never becomes a middle line. The parser's tests are at `event_log.rs:96-160`.\n\n## Success Criteria\n\n- [hard] REQ-01: `parse_known_events` ignores a final line that has no terminating newline, skips blank lines and records with a retired tag, and returns an error naming the line for any other line that is not a well-formed event record.\n- [hard] REQ-02: No reader certifies a malformed line by the record that follows it, and `certifies_preceding_torn_tail` no longer exists.\n- [hard] REQ-03: One parser unit test owns the rule: an unterminated final line is ignored, and a malformed middle line is rejected.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:core",
    "per:@/charter/D-18",
    "enforces:@/invariant/convention-convergence",
-   "enforces:@/invariant/canonical-cutover",
    "satisfies:f8a6b298/REQ-10"
   ],
   "gates": [
    "cargo-ci",
-   "code-review",
-   "doc-review",
-   "docs-mechanical"
+   "code-review"
   ],
-  "depends_on": [],
+  "depends_on": [
+   "committed-length-append"
+  ],
   "planning": {
-   "outcome": "The event log has one torn-line rule, appends overwrite an uncommitted tail, and the marker protocol is gone.",
+   "outcome": "The event-log parser ignores only an unterminated final line and rejects other malformed lines.",
    "contract_refs": [
     "event-log-rule"
    ],
@@ -938,28 +1763,112 @@
    "source_refs": [
     "REQ-10",
     "DEC-15",
-    "DEC-21",
-    "DEC-01"
+    "DEC-21"
    ],
    "terminal": {
-    "consumer_family": "event-log torn-line handling",
-    "test_boundary": "event-log unit tests",
-    "worker_sized_reason": "One parser rule replaces three, and the marker protocol is removed.",
+    "consumer_family": "event-log parser",
+    "test_boundary": "event-log parser unit tests",
+    "worker_sized_reason": "One parser rule with its unit test.",
     "footprint": {
      "touches": [
-      "crates/jit/src/domain/event_log.rs",
+      "crates/jit/src/domain/event_log.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "torn-tail-marker-removal",
+  "title": "The profile torn-tail marker is gone",
+  "description": "Delete the profile-lifecycle torn-tail marker and the finalizer code that wrote and ordered it, which no reader consults any more.\n\n## Background\n\nThe profile-lifecycle event carries `isolated_torn_tail` (`crates/jit/src/domain/types.rs:1585,1963`, catalog sample `domain/event_catalog.rs:437`). The finalizer stamps it and moves the marker to the first appended line over a torn tail (`repository_state/mutation.rs:1195-1235`), detects the tail with `prefix_has_torn_tail` (`:606`, re-exported at `repository_state/mod.rs:102`, tested at `:2426`) and declares `MutationError::UncertifiedTornTail` (`:477`). No reader consults the marker, and no mutation refuses an unterminated tail. Tests naming the marker: `mutation.rs:2532-2580`, `commands/profile.rs:5219-5240,6365-6395`, `storage/repository_state_store_tests.rs`. No line of this repository's event log carries the field.\n\n## Success Criteria\n\n- [hard] REQ-01: `ProfileLifecycle.isolated_torn_tail`, the finalizer's marker stamping and reordering, `prefix_has_torn_tail` and `UncertifiedTornTail` no longer exist, and no test names them.\n- [hard] REQ-02: The generated event reference and this repository's event log decode and re-serialize unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:core",
+   "per:@/charter/D-18",
+   "enforces:@/invariant/canonical-cutover",
+   "satisfies:f8a6b298/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "event-log-read-rule"
+  ],
+  "planning": {
+   "outcome": "No torn-tail marker field, stamping or refusal remains.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-10",
+    "DEC-15"
+   ],
+   "terminal": {
+    "consumer_family": "torn-tail marker",
+    "test_boundary": "mutation finalizer unit tests",
+    "worker_sized_reason": "One field, one helper and one error variant are deleted with their tests.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/domain/types.rs",
       "crates/jit/src/domain/event_catalog.rs",
       "crates/jit/src/repository_state/mutation.rs",
       "crates/jit/src/repository_state/mod.rs",
-      "crates/jit/src/repository_state/image.rs",
       "crates/jit/src/commands/profile.rs",
-      "crates/jit/src/storage/json.rs",
-      "crates/jit/src/storage/mod.rs",
-      "crates/jit/src/commands/archive.rs",
-      "crates/jit/src/storage/repository_state_store_tests.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "committed-length-restatements",
+  "title": "Append-position prose says committed length",
+  "description": "Correct every rustdoc, comment and document that states where an event append lands, so each says the log's committed length.\n\n## Background\n\nEvent appends land at the log's committed length, the end of its last newline-terminated line. Restatements still say \"the log's length\", \"the captured length\" or describe a torn-tail refusal: `crates/jit/src/storage/redo_record.rs:39`, `repository_state/image.rs:138-147,1113`, `repository_state/initialize.rs:401,422`, `repository_state/mutation.rs:617,632,1769,2485`, `storage/repository_state_store_tests.rs:2817`, `dev/architecture/repository-state-materialization.md:271-275` and `docs/reference/storage-format.md:99`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed rustdoc, comment and document says that an event append is positioned at the log's committed length, and none describes a torn-tail certification or refusal.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:docs",
+   "per:@/charter/D-17",
+   "enforces:@/invariant/single-source-prose",
+   "satisfies:f8a6b298/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "doc-review",
+   "docs-mechanical"
+  ],
+  "depends_on": [
+   "torn-tail-marker-removal",
+   "log-rewrite-publish-branch-removal"
+  ],
+  "planning": {
+   "outcome": "The listed append-position restatements say committed length.",
+   "contract_refs": [
+    "event-log-rule"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-10",
+    "DEC-21"
+   ],
+   "terminal": {
+    "consumer_family": "append-position prose",
+    "test_boundary": "docs review",
+    "worker_sized_reason": "A listed set of comments and two documents are reworded.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/storage/redo_record.rs",
+      "crates/jit/src/repository_state/image.rs",
       "crates/jit/src/repository_state/initialize.rs",
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs",
       "dev/architecture/repository-state-materialization.md",
       "docs/reference/storage-format.md"
      ]
@@ -968,9 +1877,9 @@
   }
  },
  {
-  "key": "validation-skips-event-log",
-  "title": "Repository validation reads no event log",
-  "description": "Stop repository validation from parsing the event log, so `jit validate` and broad built-in prechecks read only the log's bounded end.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `crates/jit/src/validation/repository.rs:58,86,98,175,198,319-325,355,405-413`); nothing reads the count. To feed it, the non-mutation validation base captures the log whole (`commands/validate.rs:415-416`, `mutation=false`), and `discover_issue_closure` requests it whole for broad built-in prechecks (`commands/validate.rs:884`). Mutation bases already capture only the tail (`validate.rs:415`). Event-log integrity stays observable through `jit events`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in repository validation no longer exist.\n- [hard] REQ-02: Every validation capture, mutation or not, requests the event log as a tail, and `discover_issue_closure` requests no whole log.\n- [hard] REQ-03: A test shows that `jit validate` succeeds with an unparseable event log.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "key": "validation-event-count-removal",
+  "title": "Repository validation stops parsing the event log",
+  "description": "Delete repository validation's parse of the event log, which exists only to count records that nothing reads.\n\n## Background\n\nRepository validation parses the whole event log only to count its records (`event_count`, `crates/jit/src/validation/repository.rs:58,86,98,175,198,319-325,355,405-413`); nothing outside the module reads the count. A malformed log therefore fails `jit validate`. Event-log integrity stays observable through `jit events`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RepositoryValidationReport.event_count` and the event-log parse in repository validation no longer exist.\n- [hard] REQ-02: A test shows that repository validation succeeds over an image whose event log is unparseable.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -988,10 +1897,8 @@
   ],
   "depends_on": [],
   "planning": {
-   "outcome": "Repository validation and broad prechecks read only the event log's bounded end.",
-   "contract_refs": [
-    "event-append-probe"
-   ],
+   "outcome": "Repository validation no longer parses the event log.",
+   "contract_refs": [],
    "produces_contracts": [],
    "source_refs": [
     "REQ-13",
@@ -999,12 +1906,54 @@
     "DEC-01"
    ],
    "terminal": {
-    "consumer_family": "validation captures",
+    "consumer_family": "repository validation",
     "test_boundary": "validation unit tests",
-    "worker_sized_reason": "One unused count and two capture requests are removed.",
+    "worker_sized_reason": "One unused count and its parse are deleted.",
     "footprint": {
      "touches": [
-      "crates/jit/src/validation/repository.rs",
+      "crates/jit/src/validation/repository.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "validation-skips-event-log",
+  "title": "Validation captures read only the event log's end",
+  "description": "Make every validation capture request the event log through the end-of-log probe, so `jit validate` and broad built-in prechecks never read the whole log.\n\n## Background\n\nRepository validation no longer parses the event log. The non-mutation validation base still captures the log whole (`crates/jit/src/commands/validate.rs:415-416`, `mutation=false`), and `discover_issue_closure` requests it whole for broad built-in prechecks (`commands/validate.rs:884`). Mutation bases already capture only the tail (`validate.rs:415`), asserted at `:3712-3722`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every validation capture, mutation or not, requests the event log through `discover_tail`, and `discover_issue_closure` requests no whole log; a unit test pins the read mode for both.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:validation",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-13"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "validation-event-count-removal"
+  ],
+  "planning": {
+   "outcome": "Validation captures read only the event log's bounded end.",
+   "contract_refs": [
+    "event-append-probe"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-13",
+    "DEC-19"
+   ],
+   "terminal": {
+    "consumer_family": "validation captures",
+    "test_boundary": "validation unit tests",
+    "worker_sized_reason": "Two capture requests switch to one existing tail mode.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/commands/validate.rs"
      ]
     }
@@ -1032,7 +1981,7 @@
    "code-review"
   ],
   "depends_on": [
-   "event-torn-line-rule"
+   "torn-tail-marker-removal"
   ],
   "planning": {
    "outcome": "Event-appending mutations capture only the event log's bounded end.",
@@ -1080,9 +2029,7 @@
    "cargo-ci",
    "code-review"
   ],
-  "depends_on": [
-   "event-torn-line-rule"
-  ],
+  "depends_on": [],
   "planning": {
    "outcome": "Archive evidence folds read one domain execution record type shared with the event.",
    "contract_refs": [],
@@ -1097,7 +2044,7 @@
    "terminal": {
     "consumer_family": "archive evidence folds",
     "test_boundary": "archive domain unit tests",
-    "worker_sized_reason": "One payload struct and three fold signatures change.",
+    "worker_sized_reason": "One payload struct whose extraction changes three fold signatures the compiler forces together.",
     "footprint": {
      "touches": [
       "crates/jit/src/domain/artifact_execution.rs",
@@ -1114,9 +2061,9 @@
   }
  },
  {
-  "key": "archive-evidence-records",
-  "title": "Archive evidence is a per-target record",
-  "description": "Store each archive target's execution evidence in its own record, written with the execution, so archive preview and execute read that target's evidence once and never read the event log.\n\n## Background\n\nArchive planning finds prior executions by reading the event log. Preview and `archive candidates` read it once per target through `IssueStore::read_artifact_archive_events` (`crates/jit/src/commands/archive.rs:178,248`; trait default `storage/mod.rs:249-256`; file backend `storage/json.rs:1357-1393`). Execute captures the whole log (`capture_archive_base`, `commands/validate.rs:343`) and parses it twice from the image: in the planner (`commands/archive.rs:713`) and in the finalizer (`repository_state/archive.rs:31`), both through `captured_archive_events` (`repository_state/archive.rs:456-466`, re-exported at `repository_state/mod.rs:27`, failing as `ArchiveExecutionError::EventLog`). The archived issue record, the `.jit-container` marker and document targets hold no evidence.\n\n`finalize_archive_execution` already merges its own writes with the issue and event actions into one delta (`repository_state/archive.rs`), so one more write joins the same redo record. A new data-root directory must join `RepositoryLayout::tracker_written_paths` (`repository_state/path.rs:537-560`), whose test lists every tracker-written path (`gate_execution.rs:1122-1135`). Tests calling the archive reader: `commands/archive.rs:1050-2226` (about 15 sites). Both integration-test `IssueStore` wrappers implement the trait (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each archive execution writes `archive-evidence/<target-key>.json`, holding the target and its ordered `ArchiveExecution` list, in the same redo record as its `ArtifactArchiveExecuted` event. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor, and the directory is a tracker-written path. The record type derives `JsonSchema`.\n- [hard] REQ-02: Execute reads the target's evidence record once from its image, and the finalizer receives it from the planner. Preview and `archive candidates` read each target's record once through `IssueStore`.\n- [hard] REQ-03: `IssueStore::read_artifact_archive_events`, `captured_archive_events` and `ArchiveExecutionError::EventLog` no longer exist, and the archive base captures the event log as a tail.\n- [hard] REQ-04: A test shows that preview and execute of a re-archived target succeed with an unparseable event log and produce the same coverage and residue identities as before.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "key": "archive-evidence-writes",
+  "title": "Archive executions write a per-target evidence record",
+  "description": "Write, with each archive execution, a record holding that target's executions, so evidence is addressable by target without the event log.\n\n## Background\n\n`finalize_archive_execution` (`crates/jit/src/repository_state/archive.rs`) merges its own writes with the issue and event actions into one delta, so one more write joins the same redo record. Executions are `domain::artifact_execution::ArchiveExecution` values, and the event `ArtifactArchiveExecuted` wraps one. Execute captures its base through `capture_archive_base` (`commands/validate.rs:343`). A new data-root directory must join `RepositoryLayout::tracker_written_paths` (`repository_state/path.rs:537-560`), whose test lists every tracker-written path (`gate_execution.rs:1122-1135`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each archive execution writes `archive-evidence/<target-key>.json`, holding the target and its ordered `ArchiveExecution` list (the captured prior list plus this execution), in the same redo record as its event. The key is `container/<issue-id>` or `document/<sha256 of the normalized path>`, built by one `VirtualPath` constructor; the record type derives `JsonSchema`; the directory is a tracker-written path; and execute's capture includes the target's record.\n- [hard] REQ-02: Finalizer unit tests show the first execution creating the record and a re-execution appending to it.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1139,10 +2086,59 @@
    "gate-run-per-issue-layout"
   ],
   "planning": {
-   "outcome": "Archive preview and execute read a target's evidence from its per-target record once.",
+   "outcome": "Each archive execution writes its target's evidence record in the same redo record.",
    "contract_refs": [
     "archive-evidence-record",
-    "archive-execution-record",
+    "archive-execution-record"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-09",
+    "DEC-17"
+   ],
+   "terminal": {
+    "consumer_family": "archive execution finalizer",
+    "test_boundary": "archive finalizer unit tests",
+    "worker_sized_reason": "One record type written by one finalizer.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/domain/artifact_execution.rs",
+      "crates/jit/src/repository_state/path.rs",
+      "crates/jit/src/repository_state/archive.rs",
+      "crates/jit/src/commands/validate.rs",
+      "crates/jit/src/gate_execution.rs"
+     ]
+    }
+   },
+   "landing_group": "archive-evidence-cutover"
+  }
+ },
+ {
+  "key": "archive-evidence-reads",
+  "title": "Archive preview and execute read the per-target evidence record",
+  "description": "Make archive preview and execute read prior executions from the target's evidence record, once each, instead of from the event log.\n\n## Background\n\nArchive planning finds prior executions in the event log. Preview and `archive candidates` read it once per target through `IssueStore::read_artifact_archive_events` (`crates/jit/src/commands/archive.rs:178,248`). Execute captures the whole log (`capture_archive_base`, `commands/validate.rs:343`) and parses it twice from the image: in the planner (`commands/archive.rs:713`) and in the finalizer (`repository_state/archive.rs:31`), both through `captured_archive_events` (`:456-466`). Each target's executions are now in `archive-evidence/<target-key>.json`, captured by execute. Command tests plant prior executions as events (`commands/archive.rs:1050-2226`). Both integration-test `IssueStore` wrappers implement the trait (`tests/fast_docs_templates/template_apply_atomicity_tests.rs`, `tests/fast_rules/local_rule_enforcement_tests.rs`).\n\n## Success Criteria\n\n- [hard] REQ-01: Execute reads the target's evidence record once from its image, and the finalizer receives it from the planner. Preview and `archive candidates` read each target's record once through a new `IssueStore` method implemented by both backends and both test wrappers.\n- [hard] REQ-02: The archive base captures the event log as a tail, and command tests plant prior executions as evidence records.\n- [hard] REQ-03: A test shows that preview and execute of a re-archived target succeed with an unparseable event log and produce the same coverage and residue identities as before.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:core",
+   "component:storage",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-09"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "archive-evidence-writes"
+  ],
+  "planning": {
+   "outcome": "Archive preview and execute read a target's evidence from its record once.",
+   "contract_refs": [
+    "archive-evidence-record",
     "event-append-probe"
    ],
    "produces_contracts": [],
@@ -1154,25 +2150,70 @@
    "terminal": {
     "consumer_family": "archive evidence readers",
     "test_boundary": "archive command unit tests",
-    "worker_sized_reason": "One record type replaces one event-log reader for one command family.",
+    "worker_sized_reason": "Three read sites move to one record read.",
     "footprint": {
      "touches": [
-      "crates/jit/src/domain/artifact_execution.rs",
-      "crates/jit/src/repository_state/path.rs",
-      "crates/jit/src/repository_state/archive.rs",
-      "crates/jit/src/repository_state/mod.rs",
       "crates/jit/src/commands/archive.rs",
+      "crates/jit/src/repository_state/archive.rs",
       "crates/jit/src/commands/validate.rs",
       "crates/jit/src/storage/mod.rs",
       "crates/jit/src/storage/json.rs",
       "crates/jit/src/storage/memory.rs",
-      "crates/jit/src/gate_execution.rs",
       "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
       "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs"
      ]
     }
    },
    "landing_group": "archive-evidence-cutover"
+  }
+ },
+ {
+  "key": "archive-event-reader-removal",
+  "title": "Archive event-log readers are gone",
+  "description": "Delete the archive readers that found prior executions in the event log, including the file backend's second parser.\n\n## Background\n\nArchive preview and execute read prior executions from per-target evidence records. Left over: `IssueStore::read_artifact_archive_events` (`crates/jit/src/storage/mod.rs:245-256`) and its file-backend override (`storage/json.rs:1328-1364`), a second event-log parser with its own torn-prefix rule (`is_torn_event_prefix`, `:1566`) and a raw `\"artifact_archive_executed\"` literal; `captured_archive_events` (`repository_state/archive.rs:456-466`, re-exported at `repository_state/mod.rs:27`); `ArchiveExecutionError::EventLog`; and the command tests that call the reader directly (`commands/archive.rs:1050-2226`, including `test_archive_event_reader_accepts_final_and_multiple_nested_brace_torn_prefixes` at `:1298`).\n\n## Success Criteria\n\n- [hard] REQ-01: `read_artifact_archive_events`, `is_torn_event_prefix`, `captured_archive_events` and `ArchiveExecutionError::EventLog` no longer exist, and no test calls them.\n- [hard] REQ-02: No event-log parser exists outside `domain::parse_known_events`.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:storage",
+   "per:@/charter/D-18",
+   "enforces:@/invariant/convention-convergence",
+   "satisfies:f8a6b298/REQ-09",
+   "satisfies:f8a6b298/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "archive-evidence-reads"
+  ],
+  "planning": {
+   "outcome": "No archive reader of the event log remains, and the file backend's second parser is gone.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-09",
+    "REQ-10",
+    "DEC-15",
+    "DEC-17"
+   ],
+   "terminal": {
+    "consumer_family": "archive event-log readers",
+    "test_boundary": "archive command unit tests",
+    "worker_sized_reason": "Two readers, one helper and one error variant are deleted with their tests.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/mod.rs",
+      "crates/jit/src/storage/json.rs",
+      "crates/jit/src/repository_state/archive.rs",
+      "crates/jit/src/repository_state/mod.rs",
+      "crates/jit/src/commands/archive.rs"
+     ]
+    }
+   }
   }
  },
  {
@@ -1193,7 +2234,7 @@
    "repo-validate"
   ],
   "depends_on": [
-   "archive-evidence-records"
+   "archive-evidence-writes"
   ],
   "planning": {
    "outcome": "This repository's archived targets each have an evidence record matching the event log.",
@@ -1241,7 +2282,7 @@
    "code-review"
   ],
   "depends_on": [
-   "event-torn-line-rule"
+   "event-log-read-rule"
   ],
   "planning": {
    "outcome": "History commands succeed over a log holding retired-tag records and omit them.",
@@ -1266,9 +2307,60 @@
   }
  },
  {
+  "key": "event-log-test-captures-tail",
+  "title": "Test images capture the event log as a tail",
+  "description": "Make every test image and test capture spec request the event log through the end-of-log probe, so no test depends on a whole read of the log.\n\n## Background\n\nEvery production mutation captures the event log through `CaptureSpec::discover_tail` (`crates/jit/src/repository_state/image.rs:581-589`). Test images still put it into `CaptureSpec::new` or `discover_paths` whole:\n\n- `repository_state/mutation.rs`: the `image_with` helper (`:1414`), used with the log at `:1507,1571,1724,1760,1763,1816,1870,2034,2077,2114,2129,2139,2188,2294,2475,2528`;\n- `repository_state/archive.rs:628-640` (`image_with` adds an absent log by default);\n- `repository_state/overlay.rs:213-222`;\n- `repository_state/mod.rs:1550-1556`;\n- `repository_state/materialize.rs:710-727` (the `image` helper, given the log at `:1023`);\n- `commands/document.rs:1978`;\n- `commands/mod.rs:3700-3735` (`captured_issue_spec` and `captured_gate_issue_spec`);\n- `commands/gate.rs:2213-2225`;\n- `storage/repository_state_store_tests.rs` (about 60 references between `:678` and `:3387`, among them `:1137` and the conformance cases at `:2843-3170`).\n\n## Success Criteria\n\n- [hard] REQ-01: Every listed test image and test spec captures the event log through `discover_tail`, and the tests' assertions are unchanged.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:testing",
+   "per:@/charter/D-19",
+   "satisfies:f8a6b298/REQ-13"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "archive-event-reader-removal",
+   "claim-acquire-event-from-assignee",
+   "committed-length-restatements"
+  ],
+  "planning": {
+   "outcome": "The listed test images capture the event log through the end-of-log probe.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-13",
+    "DEC-19"
+   ],
+   "terminal": {
+    "consumer_family": "test capture helpers",
+    "test_boundary": "repository-state unit tests",
+    "worker_sized_reason": "A listed set of test helpers switches to one capture mode.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/repository_state/mutation.rs",
+      "crates/jit/src/repository_state/archive.rs",
+      "crates/jit/src/repository_state/overlay.rs",
+      "crates/jit/src/repository_state/mod.rs",
+      "crates/jit/src/repository_state/materialize.rs",
+      "crates/jit/src/commands/document.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/commands/gate.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "capture-refuses-whole-event-log",
   "title": "Captures refuse a whole read of the event log",
-  "description": "Make the capture layer refuse a whole read of the event log, so a mutation can only probe the log's end.\n\n## Background\n\n`CaptureSpec::discover_paths` (`crates/jit/src/repository_state/image.rs:566-578`), and `CaptureSpec::new` through it, accept `VirtualPath::EVENTS` as a whole path; only `discover_tail` (`:581-589`) reads its bounded end. Every production mutation captures only the tail. Test images still capture the log whole:\n\n- `repository_state/mutation.rs`: the `image_with` helper (`:1414`), used with the log at `:1507,1571,1724,1760,1763,1816,1870,2034,2077,2114,2129,2139,2188,2294,2475,2528`;\n- `repository_state/archive.rs:628-640` (`image_with` adds an absent log by default);\n- `repository_state/overlay.rs:213-222`;\n- `repository_state/mod.rs:1550-1556`;\n- `commands/document.rs:1978`;\n- `commands/mod.rs:3700-3735` (`captured_issue_spec` and `captured_gate_issue_spec`);\n- `commands/gate.rs:2213-2225` (a test spec listing the log among the registries);\n- `repository_state/materialize.rs:710-727` (the `image` helper over `CaptureSpec::new`, given the log at `:1023`);\n- `storage/repository_state_store_tests.rs` (about 60 references between `:678` and `:3387`, among them `:1137` and the conformance cases at `:2843-3170`).\n\n## Success Criteria\n\n- [hard] REQ-01: `CaptureSpec::new` and `discover_paths` return a capture error for `VirtualPath::EVENTS`; the log is captured only through `discover_tail`.\n- [hard] REQ-02: Every listed test image and test spec, including `captured_issue_spec`, `captured_gate_issue_spec`, the gate test spec and the materialization `image` helper, captures the event log as a tail, and one test owns the refusal.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make the capture layer refuse a whole read of the event log, so a mutation can only probe the log's end.\n\n## Background\n\n`CaptureSpec::discover_paths` (`crates/jit/src/repository_state/image.rs:566-578`), and `CaptureSpec::new` through it, accept `VirtualPath::EVENTS` as a whole path; only `discover_tail` (`:581-589`) reads its bounded end. Every production capture and every test image already captures the log through `discover_tail`.\n\n## Success Criteria\n\n- [hard] REQ-01: `CaptureSpec::new` and `discover_paths` return a capture error for `VirtualPath::EVENTS`, and one unit test owns the refusal.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1277,7 +2369,6 @@
    "story:history-boundary",
    "component:storage",
    "per:@/charter/D-19",
-   "per:@/charter/D-17",
    "satisfies:f8a6b298/REQ-13"
   ],
   "gates": [
@@ -1285,8 +2376,7 @@
    "code-review"
   ],
   "depends_on": [
-   "claim-event-from-assignee",
-   "archive-evidence-records"
+   "event-log-test-captures-tail"
   ],
   "planning": {
    "outcome": "The capture layer admits only the end-of-log probe on the event log.",
@@ -1301,19 +2391,10 @@
    "terminal": {
     "consumer_family": "event-log capture requests",
     "test_boundary": "capture spec unit tests",
-    "worker_sized_reason": "One refusal plus a mechanical retarget of test image helpers.",
+    "worker_sized_reason": "One refusal in two constructors with one test.",
     "footprint": {
      "touches": [
-      "crates/jit/src/repository_state/image.rs",
-      "crates/jit/src/repository_state/mutation.rs",
-      "crates/jit/src/repository_state/archive.rs",
-      "crates/jit/src/repository_state/overlay.rs",
-      "crates/jit/src/repository_state/mod.rs",
-      "crates/jit/src/commands/document.rs",
-      "crates/jit/src/commands/mod.rs",
-      "crates/jit/src/commands/gate.rs",
-      "crates/jit/src/repository_state/materialize.rs",
-      "crates/jit/src/storage/repository_state_store_tests.rs"
+      "crates/jit/src/repository_state/image.rs"
      ]
     }
    }
@@ -1322,7 +2403,7 @@
  {
   "key": "redo-record-refuses-log-rewrite",
   "title": "Redo records refuse a rewrite of the event log",
-  "description": "Make a redo record refuse a put or delete at the event log, so the log changes only by its positioned append.\n\n## Background\n\nRepository deltas reject any non-append action on the event log (`crates/jit/src/repository_state/image.rs:1297`), but `RedoRecord::new` (`storage/redo_record.rs:110-130`) checks only path overlap, so a record could put or delete the log. The publish check therefore still handles a put or delete at the log (`storage/repository_state_store.rs:925-934`). Record tests: `storage/redo_record.rs:600-630`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::new` returns an error for a put or delete at the event log, and one test owns the refusal.\n- [hard] REQ-02: The publish check's branch for a put or delete at the event log no longer exists.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "description": "Make a redo record refuse a put or delete at the event log, so the log changes only by its positioned append.\n\n## Background\n\nRepository deltas reject any non-append action on the event log (`crates/jit/src/repository_state/image.rs:1297`), but `RedoRecord::new` (`storage/redo_record.rs:110-130`) checks only path overlap, so a record could put or delete the log. Record tests: `storage/redo_record.rs:600-630`.\n\n## Success Criteria\n\n- [hard] REQ-01: `RedoRecord::new` returns an error for a put or delete at the event log, and one test owns the refusal.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -1340,7 +2421,7 @@
    "code-review"
   ],
   "depends_on": [
-   "event-torn-line-rule"
+   "committed-length-append"
   ],
   "planning": {
    "outcome": "A redo record can change the event log only by its positioned append.",
@@ -1355,10 +2436,50 @@
    "terminal": {
     "consumer_family": "redo record construction",
     "test_boundary": "redo record unit tests",
-    "worker_sized_reason": "One constructor gains one refusal and one dead branch goes.",
+    "worker_sized_reason": "One constructor gains one refusal and one test.",
     "footprint": {
      "touches": [
-      "crates/jit/src/storage/redo_record.rs",
+      "crates/jit/src/storage/redo_record.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "log-rewrite-publish-branch-removal",
+  "title": "The publish check's event-log rewrite branch is gone",
+  "description": "Delete the publish check's handling of a put or delete at the event log, which no redo record can carry.\n\n## Background\n\n`RedoRecord::new` refuses a put or delete at the event log. The publish check still treats either as touching the log (`crates/jit/src/storage/repository_state_store.rs:925-934`).\n\n## Success Criteria\n\n- [hard] REQ-01: The publish check decides whether a record touches the event log from its event append alone, and no code path handles a put or delete at the log.\n\n## Notes\n\n- Written against the code as it stands after the semantic-types epic (2195c98f): issue ids are `IssueId`, gate-run ids `GateRunId`, gate keys `GateKey`, lease ids `LeaseId`, events are an `Event` envelope around a tagged `EventBody`, and record paths come from `VirtualPath` constructors. Line citations name current code, which that epic retypes.\n",
+  "type": "task",
+  "priority": "high",
+  "labels": [
+   "epic:history-independent-reads",
+   "milestone:v1.0",
+   "story:history-boundary",
+   "component:storage",
+   "per:@/charter/D-18",
+   "satisfies:f8a6b298/REQ-12"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "redo-record-refuses-log-rewrite"
+  ],
+  "planning": {
+   "outcome": "The publish check has no branch for a put or delete at the event log.",
+   "contract_refs": [],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-12",
+    "DEC-19"
+   ],
+   "terminal": {
+    "consumer_family": "redo publish check",
+    "test_boundary": "storage conformance tests",
+    "worker_sized_reason": "One dead branch is deleted.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/storage/repository_state_store.rs"
      ]
     }
@@ -1432,7 +2553,8 @@
    "docs-mechanical"
   ],
   "depends_on": [
-   "archive-evidence-records"
+   "archive-evidence-writes",
+   "gate-run-layout-reference-prose"
   ],
   "planning": {
    "outcome": "The generated storage-record reference covers verdict and archive-evidence records.",
@@ -1531,10 +2653,8 @@
   ],
   "depends_on": [
    "gate-run-records-relayout",
-   "lease-index-validation-removal",
    "lease-issue-addressed-ops",
    "capture-refuses-whole-event-log",
-   "redo-record-refuses-log-rewrite",
    "history-commands-skip-retired-tags",
    "search-excludes-history",
    "storage-records-per-key-reference"
@@ -1589,8 +2709,7 @@
    "docs-mechanical"
   ],
   "depends_on": [
-   "lease-interruption-matrix",
-   "lease-index-validation-removal"
+   "lease-interruption-matrix"
   ],
   "planning": {
    "outcome": "Lease command, recovery and testing pages match issue-addressed lease commands and lease records.",
@@ -1693,7 +2812,10 @@
    "holistic-review"
   ],
   "depends_on": [
-   "gate-run-records-relayout"
+   "gate-run-records-relayout",
+   "gate-run-layout-reference-prose",
+   "latest-gate-run-removal",
+   "web-verdict-provenance-type"
   ],
   "planning": {
    "outcome": "Gate-run records are stored and read per issue, per gate and per inputs digest.",
@@ -1728,7 +2850,7 @@
   "depends_on": [
    "lease-records-rewrite",
    "lease-operator-docs",
-   "claim-event-from-assignee"
+   "issue-claim-event-from-assignee"
   ],
   "planning": {
    "outcome": "Leases are per-issue records under one held lease lock, and claims decide their event from the assignee.",
