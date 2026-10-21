@@ -1594,12 +1594,12 @@
     "worker_sized_reason": "One idempotent script run over one machine-local directory.",
     "footprint": {
      "creates": [
-      "dev/active/f8a6b298-history-independent-reads/rewrite-lease-records.py"
-     ],
-     "touches": [
-      ".git/jit/claims.index.json",
+      "dev/active/f8a6b298-history-independent-reads/rewrite-lease-records.py",
       ".git/jit/leases",
       ".git/jit/claims.seq"
+     ],
+     "touches": [
+      ".git/jit/claims.index.json"
      ]
     }
    },
@@ -2306,9 +2306,7 @@
     "worker_sized_reason": "One idempotent script run over fifty targets, verified by counts.",
     "footprint": {
      "creates": [
-      "dev/active/f8a6b298-history-independent-reads/seed-archive-evidence.py"
-     ],
-     "touches": [
+      "dev/active/f8a6b298-history-independent-reads/seed-archive-evidence.py",
       ".jit/archive-evidence"
      ]
     }
