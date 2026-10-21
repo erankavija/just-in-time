@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e257fd9696b0ca141258a7d55f48741d2e5b2da0",
+  "completed_at": "2026-10-21T15:57:53.723990539Z",
+  "duration_ms": 337445,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/gate_check.rs",
+        "id": "F1",
+        "line": 1237,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/8673dc5e/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "Latest-run selects checker start time while readiness reflects last publication, so overlapping automated evaluations can disagree."
+      }
+    ],
+    "summary": "Concurrent automatic gate evaluations can still make latest-run disagree with readiness.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "8673dc5e-9058-42da-84f8-00f6c5ed2e8e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "ad4ed36b-4d9e-4c46-99f3-ab558d37c590",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:52:16.278281900Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7716 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15f29-c91d-7620-8bb5-9affa176d786\n--------\nuser\n--- 7703 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 0179a6820, a8bf89160, e98f5e036, 8849930a (jit:8673dc5e)\nPolicy sources: AGENTS.md\nResolved items: @/issue/8673dc5e/requirement/REQ-01, REQ-02, REQ-03, REQ-04 (issue description; markdown-first); @/invariant/derived-state-coherence, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/atomic-writes, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/gate-semantics, @/invariant/canonical-cutover (.jit/invariants.toml; registry-first); @/charter/D-1 (dev/vision/9db27a3a-charter.md; markdown-first)\nGate evidence: cargo-ci: passed (exit 0, 2026-10-21T15:50:38Z)\nTruncation recovery: Re-read merge patches, mutation finalization, gate evaluation/publication, latest-run selection, storage enumeration, and race tests in narrower path/line ranges.\n\n1. [blocking][issue-impact] **F1 (high):** Concurrent automated evaluations can still make latest-run disagree with readiness. The checker executes before the record-publication session, so an earlier-started evaluation can publish after a later-started one and overwrite `gates_status` ([gate_check.rs:900](crates/jit/src/commands/gate_check.rs:900)). The latest-run view instead selects the greatest checker `started_at` ([gate_check.rs:1237](crates/jit/src/commands/gate_check.rs:1237)), selecting the earlier-published result in that schedule. This violates REQ-03; use a publication-order authority shared by the run selection and readiness projection, with a concurrent automated-run test. References: `@/issue/8673dc5e/requirement/REQ-03`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Concurrent automatic gate evaluations can still make latest-run disagree with readiness.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Latest-run selects checker start time while readiness reflects last publication, so overlapping automated evaluations can disagree.\",\"file\":\"crates/jit/src/commands/gate_check.rs\",\"line\":1237,\"references\":[\"@/issue/8673dc5e/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
