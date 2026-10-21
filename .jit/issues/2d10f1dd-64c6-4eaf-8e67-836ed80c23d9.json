@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:41:40.640068689Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:55:49.044270876Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "2d10f1dd-64c6-4eaf-8e67-836ed80c23d9",
   "labels": [
     "epic:audit-correctness",
@@ -23,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Issue update and reject apply all requested changes atomically or none",
-  "updated_at": "2026-10-21T00:38:14.281577279Z"
+  "updated_at": "2026-10-21T00:55:49.044270876Z"
 }

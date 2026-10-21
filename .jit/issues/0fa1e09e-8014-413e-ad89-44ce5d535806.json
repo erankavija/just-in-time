@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T19:52:15.269981434Z",
   "context": {},
   "created_at": "2026-10-20T19:42:11.096807925Z",
@@ -11,7 +11,18 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:48:08.643491346Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:54:18.310683944Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "0fa1e09e-8014-413e-ad89-44ce5d535806",
   "labels": [
     "epic:audit-correctness",
@@ -23,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Server serves storage reads when started with a relative data directory",
-  "updated_at": "2026-10-20T19:52:15.269981434Z"
+  "updated_at": "2026-10-21T00:54:18.310683944Z"
 }
