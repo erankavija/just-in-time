@@ -52,9 +52,10 @@
   ],
   "gates_status": {
     "plan-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T15:40:49.485551803Z",
-      "updated_by": null
+      "run_id": "1a0afa99-d751-4982-a614-4ca2b7c6f4ee",
+      "status": "failed",
+      "updated_at": "2026-10-21T20:47:33.585196635Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "7c885165-89de-45a0-a867-e621c96867d1",
@@ -69,7 +70,7 @@
     "type:planning"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "in_progress",
   "title": "planning: Give each test property one owning test on shared fixtures and contracts",
-  "updated_at": "2026-10-21T16:35:39.808213119Z"
+  "updated_at": "2026-10-21T20:47:33.585196635Z"
 }

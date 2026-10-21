@@ -1,0 +1,81 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2f2693d8041247bd3a35c09acec38f9887a69e0",
+  "completed_at": "2026-10-21T20:47:33.217729459Z",
+  "duration_ms": 169647,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F1",
+        "line": 114,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/orthogonal-tests",
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "shared-fixture-issue combines a fixture foundation with roughly 499 caller migrations across 42 files and lacks a boundary for its integration-suite footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F2",
+        "line": 195,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/architecture-dependency-direction",
+          "@/inv/orthogonal-tests"
+        ],
+        "severity": "high",
+        "summary": "shared-memory-executor mixes generic product initialization, fixture consolidation, and fast_rules migration while its stated boundary excludes its integration footprint."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/breakdown.json",
+        "id": "F3",
+        "line": 2749,
+        "origin": "issue-impact",
+        "references": [
+          "@/inv/orthogonal-tests",
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "The file-backed and memory-backed setup consolidation leaves mix shared-constructor foundation work with multi-target migrations beyond one focused worker cycle."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/c780514e-test-topology/plan.md",
+        "id": "F4",
+        "line": 56,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-2",
+          "@/inv/no-ignored-tests"
+        ],
+        "severity": "medium",
+        "summary": "The plan-fixed each-shell-script-self-test gate contract has no manifest owner for docs-check-selftest, so the manifest does not implement its stated contract."
+      }
+    ],
+    "summary": "Four issue-impact blocking findings: oversized mixed foundation/migration leaves and an unimplemented global self-test gate contract.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "7c885165-89de-45a0-a867-e621c96867d1",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1a0afa99-d751-4982-a614-4ca2b7c6f4ee",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:44:43.570000097Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 7858 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16035-893c-7a20-be5b-db511ff88aaf\n--------\nuser\n--- 7845 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **[blocking][issue-impact]** `shared-fixture-issue` is not worker-sized: it combines creating the shared fixture with migrating about 499 callers across 42 source and integration files, while naming only the library-unit boundary. This mixes foundation and migration work and cannot be completed/reviewed in one focused cycle. Split it into a fixture producer and bounded library/suite consumer migrations with matching test boundaries. (`breakdown.json:114`, `breakdown.json:139-186`; `investigation.md:58`, `investigation.md:103`)\n\n2. **[blocking][issue-impact]** `shared-memory-executor` combines a generic product-initialization change, fixture consolidation, and fast-rules consumer migration in one leaf with four acceptance clusters. Its stated library-unit boundary does not cover the listed `fast_rules` integration changes. Split generic store initialization from fixture adoption/migrations, and give each leaf a boundary that observes its complete footprint. (`breakdown.json:195`, `breakdown.json:223-237`)\n\n3. **[blocking][issue-impact]** The file-backed and memory-backed setup consolidation leaves each mix shared-constructor foundation work with broad multi-target migrations. The overrides only acknowledge multiple targets; they do not make three constructors/nine helpers or one new seam/fourteen helpers across three targets a single focused implementation/review cycle. Create constructor/seam producer leaves, then one bounded migration leaf per affected integration target. (`breakdown.json:2751`, `breakdown.json:2779-2795`; `breakdown.json:2802`, `breakdown.json:2831-2854`)\n\n4. **[blocking][issue-impact]** The plan-fixed `script-self-test-gates` contract says *each* shell-script self-test becomes a declared gate, but the manifest only creates gates for cargo-ci, suite profiling, and build-budget tests; it has no owner for `scripts/docs-check-selftest.sh`. The existing configured documentation gate runs `docs-mechanical.sh`, not this self-test. Either scope the contract explicitly to the three default-suite self-tests (with corpus-script deletion), or add a leaf and declared gate for every remaining intended self-test. (`plan.md:56-58`; `scripts/docs-check-selftest.sh:5-30`; `.jit/gates.toml:222-234`)\n\nTotal findings: 4\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Four issue-impact blocking findings: oversized mixed foundation/migration leaves and an unimplemented global self-test gate contract.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"shared-fixture-issue combines a fixture foundation with roughly 499 caller migrations across 42 files and lacks a boundary for its integration-suite footprint.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":114,\"references\":[\"@/inv/orthogonal-tests\",\"@/inv/shared-test-contracts\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"shared-memory-executor mixes generic product initialization, fixture consolidation, and fast_rules migration while its stated boundary excludes its integration footprint.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":195,\"references\":[\"@/inv/architecture-dependency-direction\",\"@/inv/orthogonal-tests\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The file-backed and memory-backed setup consolidation leaves mix shared-constructor foundation work with multi-target migrations beyond one focused worker cycle.\",\"file\":\"dev/active/c780514e-test-topology/breakdown.json\",\"line\":2749,\"references\":[\"@/inv/orthogonal-tests\",\"@/inv/shared-test-contracts\"]},{\"id\":\"F4\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The plan-fixed each-shell-script-self-test gate contract has no manifest owner for docs-check-selftest, so the manifest does not implement its stated contract.\",\"file\":\"dev/active/c780514e-test-topology/plan.md\",\"line\":56,\"references\":[\"@/charter/D-2\",\"@/inv/no-ignored-tests\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}
