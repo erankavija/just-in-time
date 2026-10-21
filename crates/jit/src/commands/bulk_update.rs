@@ -204,6 +204,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Applies operations to all matched issues with per-issue atomicity.
     /// Best-effort: continues on errors, tracks successes and failures.
+    /// A batch that moves issues to a terminal state ends with one dependent-readiness
+    /// cascade, as the single-issue update runs.
     ///
     /// Only opens per-issue preflight/publication sessions for matched issues
     /// that are not confirmed no-ops. [`UpdateOperations::is_provable_noop`]
@@ -283,6 +285,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     result.errors.push((issue.id.clone(), e.to_string()));
                 }
             }
+        }
+
+        // One cascade after the batch, as the single-issue update runs after
+        // its terminal change.
+        if !result.modified.is_empty() && operations.state.is_some_and(State::is_terminal) {
+            self.check_auto_transitions()?;
         }
 
         result.compute_summary();
@@ -1958,5 +1966,85 @@ mod tests {
         assert_eq!(result.summary.total_modified, 1);
         assert_eq!(result.summary.total_errors, 0);
         assert_eq!(executor.get_issue("noop").unwrap().priority, Priority::High);
+    }
+
+    /// Seeds blocker `bbbb2222` (Ready) and backlog dependent `aaaa1111`
+    /// depending on it; returns an executor plus a reader over the same storage.
+    fn blocked_dependent_fixture() -> (
+        CommandExecutor<crate::storage::InMemoryStorage>,
+        crate::storage::InMemoryStorage,
+    ) {
+        let storage = crate::storage::InMemoryStorage::new();
+        let mut dependent = create_test_issue("aaaa1111", State::Backlog, vec!["type:task"]);
+        dependent.dependencies = vec!["bbbb2222".to_string()];
+        crate::commands::test_helpers::seed_issue(&storage, dependent);
+        crate::commands::test_helpers::seed_issue(
+            &storage,
+            create_test_issue("bbbb2222", State::Ready, vec!["type:task"]),
+        );
+        let reader = storage.clone();
+        (
+            crate::commands::test_helpers::memory_executor(storage),
+            reader,
+        )
+    }
+
+    /// REQ-01, REQ-02, REQ-04: a bulk move to either terminal state promotes the
+    /// unblocked dependent exactly as the per-issue update by id does.
+    #[test]
+    fn test_apply_bulk_update_terminal_state_promotes_unblocked_dependent_like_per_issue() {
+        use crate::storage::IssueStore;
+
+        for target in [State::Done, State::Rejected] {
+            let (mut bulk, bulk_reader) = blocked_dependent_fixture();
+            let filter = QueryFilter::parse("state:ready").unwrap();
+            let ops = UpdateOperations {
+                state: Some(target),
+                ..Default::default()
+            };
+            let result = bulk.apply_bulk_update(&filter, &ops, false).unwrap();
+            assert_eq!(result.modified, vec!["bbbb2222".to_string()]);
+
+            let (single, single_reader) = blocked_dependent_fixture();
+            single
+                .update_issue(
+                    "bbbb2222",
+                    None,
+                    None,
+                    None,
+                    Some(target),
+                    vec![],
+                    vec![],
+                    None,
+                    None,
+                    false,
+                )
+                .unwrap();
+
+            let bulk_state = bulk_reader.load_issue("aaaa1111").unwrap().state;
+            assert_eq!(bulk_state, State::Ready, "dependent after bulk {target:?}");
+            assert_eq!(
+                bulk_state,
+                single_reader.load_issue("aaaa1111").unwrap().state,
+                "bulk and per-issue {target:?} diverge"
+            );
+        }
+    }
+
+    /// REQ-03: a bulk update that moves nothing to a terminal state leaves
+    /// dependents untouched.
+    #[test]
+    fn test_apply_bulk_update_non_terminal_state_leaves_dependent_unchanged() {
+        use crate::storage::IssueStore;
+
+        let (mut executor, reader) = blocked_dependent_fixture();
+        let filter = QueryFilter::parse("state:ready").unwrap();
+        let ops = UpdateOperations {
+            state: Some(State::InProgress),
+            ..Default::default()
+        };
+        executor.apply_bulk_update(&filter, &ops, false).unwrap();
+
+        assert_eq!(reader.load_issue("aaaa1111").unwrap().state, State::Backlog);
     }
 }
