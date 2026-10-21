@@ -7,6 +7,7 @@
   ],
   "description": "`repository_state` re-exports items twice under opposite `cfg` conditions, and holds an uncalled scaffold and a test-only membership-diff function.\n\n## Background\n\n- `crates/jit/src/repository_state/mod.rs` holds `cfg` re-export twins at `:34-51` (membership diff), `:80-99` (capture closure) and `:214-230` (`serialize_ruleset`, `SchemaFile`, `SerializedRuleSet`). Consumers include `commands/validate.rs` and the integration tests `tests/fast_rules/derived_state_repair_tests.rs:3,147`. Public items in a public module raise no unused lint, so an unconditional `pub use` serves both.\n- `neutral_files` (`repository_state/initialize.rs:325-344`) has no caller.\n- `default_rule_membership_diff` (`repository_state/default_rules.rs:404-421`, `allow(dead_code)`) and `DefaultRuleMembershipDiff::is_empty` (`:336-344`) are called only by their own tests and a doctest. Production uses `default_rule_membership_diff_from_identities` (`:434`).\n\n## Success Criteria\n\n- [hard] REQ-01: `repository_state/mod.rs` re-exports each item once, unconditionally, with no twin under opposite `test` or `test-support` conditions.\n- [hard] REQ-02: `neutral_files`, `default_rule_membership_diff` and `DefaultRuleMembershipDiff::is_empty` no longer exist.\n- [hard] REQ-03: No public item in `repository_state/` carries `allow(dead_code)`.\n\n## Notes\n\nThe `pub(crate)` allows at `repository_state/index.rs:100,118` mark code that is live in other build configurations, and they stay.\n",
   "documents": [],
+  "first_ready_at": "2026-10-21T06:04:50.570686219Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:842b0ac6/REQ-24"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove cfg twins in repository_state",
-  "updated_at": "2026-10-21T00:54:09.217003678Z"
+  "updated_at": "2026-10-21T06:04:50.570686219Z"
 }

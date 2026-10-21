@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T01:04:38.143184006Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,24 @@
   ],
   "description": "Repository capture records linked-worktree evidence that only tests request. Every JSON capture still resolves worktree paths for it, and that resolution can spawn git.\n\n## Background\n\nOnly tests request linked-worktree evidence: `CaptureSpec::discover_linked_worktree` (`crates/jit/src/repository_state/image.rs:719`) is called from `storage/repository_state_store_tests.rs:160` and `image.rs:1746`. Even so, `capture_over` calls `configured_worktree_paths()` on every JSON capture (`storage/repository_state_store.rs:597`). The value is threaded into `capture_capability_image` (`:1108`) and then `capture_linked_evidence` (`:1583`), its only use. `JsonFileStorage::configured_worktree_paths` (`storage/json.rs:560`) reaches `WorktreePaths::detect_for_data_root`, which runs `git` (`worktree_paths.rs:64`).\n\nThe evidence spans these sites:\n\n- Capture spec: `CaptureSpec.linked_worktree` (`image.rs:630,645`), `discover_linked_worktree` (`:719-722`), `linked_worktree()` (`:752`).\n- Image: `RepositoryImage.linked_worktree` (`image.rs:816`), the `close` parameter (`:827`, checks `:891-904`), `linked_worktree_evidence()` (`:972`), `CapturedAnswers.linked_worktree` (`:805`), `into_answers` (`:984,994`), `captured_byte_count` (`:1065,1083`).\n- Types: `LinkedWorktreeSourceClass` (`image.rs:503-515`), `LinkedWorktreeEvidence` (`:517-584`), five `CaptureError` variants (`:1541-1550`), re-exported at `repository_state/mod.rs:60-61`.\n- Gate evidence: `GateEvaluationEvidence.linked` (`commands/gate_check.rs:91-94`), filled at `:412-417,425`.\n- Store: `repository_state_store.rs:597-601`, `:1218-1228`, `:1283-1307`, `capture_linked_evidence` at `:1580-1659`.\n- 21 `RepositoryImage::close` call sites, one argument each. The investigation lists them.\n- Prose: `dev/architecture/repository-state-materialization.md:89`.\n\n## Success Criteria\n\n- [hard] REQ-01: `CaptureSpec` has no linked-worktree entry, `RepositoryImage` and `CapturedAnswers` have no linked-worktree field, and `RepositoryImage::close` takes no linked-worktree argument.\n- [hard] REQ-02: `LinkedWorktreeSourceClass`, `LinkedWorktreeEvidence`, the linked-evidence `CaptureError` variants and their re-exports no longer exist.\n- [hard] REQ-03: `GateEvaluationEvidence` has no linked-worktree field.\n- [hard] REQ-04: Capturing a repository image never resolves worktree paths, and `capture_capability_image` takes no worktree-paths parameter.\n- [hard] REQ-05: The repository-state materialization architecture note does not describe linked-worktree evidence.\n\n## Notes\n\n`configured_worktree_paths` stays for its other callers (`storage/json.rs:870,935`). `GitRevisionResolver::read_pinned_path` stays for `commands/archive.rs:99`. Tests of the removed evidence are deleted.\n",
   "documents": [],
+  "done_at": "2026-10-21T06:04:50.466042761Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:00:41.432481243Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:04:40.788988115Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "f11514dd-ad2a-4a76-a2d0-c0eb9da9e150",
   "labels": [
     "type:task",
@@ -24,7 +36,7 @@
     "satisfies:842b0ac6/REQ-02"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Remove linked-worktree evidence from repository capture",
-  "updated_at": "2026-10-21T01:04:38.805587055Z"
+  "updated_at": "2026-10-21T06:04:50.466042761Z"
 }

@@ -15,8 +15,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T05:48:25.223099475Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:03:02.182907401Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove profile checks from repository validation",
-  "updated_at": "2026-10-21T05:48:25.223099475Z"
+  "updated_at": "2026-10-21T06:03:02.182907401Z"
 }

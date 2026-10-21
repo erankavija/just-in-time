@@ -13,8 +13,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T05:46:14.085237049Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:03:18.425326440Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -34,5 +34,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Apply the claim-next filter when choosing which issue to claim",
-  "updated_at": "2026-10-21T05:50:30.109406059Z"
+  "updated_at": "2026-10-21T06:03:18.425326440Z"
 }

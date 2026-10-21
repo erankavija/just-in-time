@@ -15,8 +15,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:00:01.669062556Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
       "status": "failed",
-      "updated_at": "2026-10-21T05:44:09.932159746Z",
+      "updated_at": "2026-10-21T06:01:01.000742904Z",
       "updated_by": "auto:executor"
     }
   },
@@ -33,5 +38,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Encode the zero-warning bar in workspace lints",
-  "updated_at": "2026-10-21T05:44:09.932159746Z"
+  "updated_at": "2026-10-21T06:01:01.000742904Z"
 }
