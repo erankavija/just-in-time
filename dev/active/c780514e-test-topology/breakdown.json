@@ -762,7 +762,7 @@
   {
     "key": "harness-demo-case-moves",
     "title": "Unique harness demonstration cases move beside their owners",
-    "description": "Move the harness demonstration cases that no other test owns beside the code they exercise.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/harness_demo.rs` (527 lines, 14 tests) is a self-described demonstration of `TestHarness`. It re-proves queries, blocking, cycle rejection and gates. Six of its cases have no other owner: item list and resolve (`:291`), kind and label coverage (`:314`), container progress (`:377`), status projection (`:442`), an empty rollup (`:462`) and archive candidates (`:475`). Shared test support derives shipped item kinds from the default profile package.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six cases has an owning test at the cheapest layer that observes it, beside the tests of the code it exercises, with the same assertion.\n- [hard] REQ-02: A moved case that needs shipped item kinds takes them from the shared derivation.\n- [hard] REQ-03: `harness_demo.rs` no longer holds the moved cases.\n",
+    "description": "Copy the harness demonstration cases that no other test owns into the library test modules of the code they exercise, so the demonstration suite can be deleted without losing coverage.\n\n## Background\n\n`crates/jit/tests/fast_docs_templates/harness_demo.rs` (527 lines, 14 tests) is a self-described demonstration of `TestHarness` (`crate::test_harness`, compiled into the library under test support). It re-proves queries, blocking, cycle rejection and gates. Six of its cases have no other owner:\n\n- `:291` item list and resolve, through `list_items` and `show_item` (`crates/jit/src/commands/item.rs`).\n- `:314` item-kind compatibility with label coverage, through `resolve_link_label` (`commands/item.rs`).\n- `:377` container progress and children, through `issue_progress` and `issue_children` (`crates/jit/src/commands/issue.rs`).\n- `:442` the issue status response projection, through `issue_status_response` (`commands/issue.rs`).\n- `:462` an empty container rollup, through `StateRollup::from_issues` (`crates/jit/src/output.rs`).\n- `:475` archive candidates being complete and non-mutating, through `archive_candidates` (`crates/jit/src/commands/archive.rs`).\n\nShared test support derives shipped item kinds from the default profile package.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six cases has an owning test, with the same assertions, in the test module of the file the Background names for it: `commands/item.rs` for `:291` and `:314`, `commands/issue.rs` for `:377` and `:442`, `output.rs` for `:462` and `commands/archive.rs` for `:475`.\n- [hard] REQ-02: A moved case that needs shipped item kinds takes them from the shared derivation.\n- [hard] REQ-03: A behaviour an existing test in those modules already owns is not duplicated.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -780,10 +780,11 @@
     ],
     "depends_on": [
       "harness-shipped-item-kinds",
-      "shared-memory-executor"
+      "shared-memory-executor",
+      "unit-test-shipped-item-kinds"
     ],
     "planning": {
-      "outcome": "The six harness-demonstration cases with no other owner live beside the code they exercise.",
+      "outcome": "The six harness-demonstration cases with no other owner have owning tests in the library modules they exercise.",
       "contract_refs": [
         "shipped-item-kinds-fixture"
       ],
@@ -794,12 +795,14 @@
       "terminal": {
         "consumer_family": "harness demonstration cases",
         "test_boundary": "library unit tests",
-        "worker_sized_reason": "Six cases move with their assertions to existing test modules.",
+        "worker_sized_reason": "Six cases move with their assertions into four existing test modules.",
         "footprint": {
           "touches": [
-            "crates/jit/tests/fast_docs_templates/harness_demo.rs"
-          ],
-          "uncertainty": "Destination modules are chosen per case by the code each exercises (item, validation, rollup, status and archive tests)."
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/issue.rs",
+            "crates/jit/src/output.rs",
+            "crates/jit/src/commands/archive.rs"
+          ]
         }
       }
     }
@@ -1363,7 +1366,7 @@
       ],
       "terminal": {
         "consumer_family": "cargo-ci self-test",
-        "test_boundary": "declared script gate",
+        "test_boundary": "scratch_build integration target with its declared script gate",
         "worker_sized_reason": "One gate declaration replaces one wrapper test file.",
         "footprint": {
           "touches": [
@@ -1410,7 +1413,7 @@
       ],
       "terminal": {
         "consumer_family": "suite profiler self-test",
-        "test_boundary": "declared script gate",
+        "test_boundary": "scratch_build integration target with its declared script gate",
         "worker_sized_reason": "One gate declaration replaces one wrapper test.",
         "footprint": {
           "touches": [
@@ -1455,7 +1458,7 @@
       ],
       "terminal": {
         "consumer_family": "build-budget checker self-test",
-        "test_boundary": "declared script gate",
+        "test_boundary": "scratch_build integration target with its declared script gate",
         "worker_sized_reason": "Ports one file of fixture cases into the script it tests.",
         "footprint": {
           "touches": [
@@ -1541,7 +1544,11 @@
       "profile-suite-selftest-gate",
       "build-budget-selftest-gate",
       "dependency-policy-tool-failure",
-      "mcp-parity-tool-failure"
+      "mcp-parity-tool-failure",
+      "docs-check-selftest-gate",
+      "shipped-policy-regions-selftest-gate",
+      "workflow-contract-selftest-gate",
+      "session-cost-benchmark-selftest-gate"
     ],
     "planning": {
       "outcome": "A benchmark note records integration targets and active test-executable bytes before and after.",
@@ -3995,6 +4002,182 @@
           "touches": [
             "crates/jit/tests/cli_repo_workflow/integration_test.rs"
           ]
+        }
+      }
+    }
+  },
+  {
+    "key": "docs-check-selftest-gate",
+    "title": "Documentation checker self-test runs as a declared gate",
+    "description": "Run the `scripts/docs-check-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. The `docs-mechanical` gate runs the checkers over the tree, not their self-test.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/docs-check-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:tooling",
+      "component:gates",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "per:@/charter/D-2",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The documentation checker self-test runs as its own gate over the checkers.",
+      "contract_refs": [
+        "script-self-test-gates"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "docs-check-selftest.sh self-test",
+        "test_boundary": "declared script gate",
+        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "footprint": {
+          "touches": [
+            ".jit/gates.toml"
+          ],
+          "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
+        }
+      }
+    }
+  },
+  {
+    "key": "shipped-policy-regions-selftest-gate",
+    "title": "Shipped-policy region generator self-test runs as a declared gate",
+    "description": "Run the `scripts/generate-shipped-policy-regions-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/generate-shipped-policy-regions-selftest.sh` is a re-runnable self-test of `scripts/generate-shipped-policy-regions.sh`: idempotence on a current tree, restoration of a corrupted region with every byte outside its markers kept, and failure on malformed markers. It exits 2 when `git` or `jit` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/generate-shipped-policy-regions-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:tooling",
+      "component:gates",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "per:@/charter/D-2",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The shipped-policy region generator self-test runs as its own gate over the generator.",
+      "contract_refs": [
+        "script-self-test-gates"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "generate-shipped-policy-regions-selftest.sh self-test",
+        "test_boundary": "declared script gate",
+        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "footprint": {
+          "touches": [
+            ".jit/gates.toml"
+          ],
+          "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
+        }
+      }
+    }
+  },
+  {
+    "key": "workflow-contract-selftest-gate",
+    "title": "Workflow-contract harness self-test runs as a declared gate",
+    "description": "Run the `scripts/workflow-contract-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/workflow-contract-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:tooling",
+      "component:gates",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "per:@/charter/D-2",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The workflow-contract self-test runs as its own gate over the harness and its vectors.",
+      "contract_refs": [
+        "script-self-test-gates"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "workflow-contract-selftest.sh self-test",
+        "test_boundary": "declared script gate",
+        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "footprint": {
+          "touches": [
+            ".jit/gates.toml"
+          ],
+          "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
+        }
+      }
+    }
+  },
+  {
+    "key": "session-cost-benchmark-selftest-gate",
+    "title": "Session-cost benchmark self-test runs as a declared gate",
+    "description": "Run the `scripts/benchmark-session-cost-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/benchmark-session-cost-selftest.sh` is a re-runnable self-test of `scripts/benchmark-session-cost.sh`, run against a fake `jit` and checked against the benchmark's output contract. It exits 2 when `cmp`, `find`, `git`, `grep`, `jq` or `sha256sum` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/benchmark-session-cost-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:tooling",
+      "component:gates",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "per:@/charter/D-2",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The session-cost benchmark self-test runs as its own gate over the benchmark script.",
+      "contract_refs": [
+        "script-self-test-gates"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "benchmark-session-cost-selftest.sh self-test",
+        "test_boundary": "declared script gate",
+        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "footprint": {
+          "touches": [
+            ".jit/gates.toml"
+          ],
+          "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
         }
       }
     }

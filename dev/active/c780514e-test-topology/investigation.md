@@ -221,7 +221,7 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
   - `crates/jit/src/test_mode.rs`.
   - Suite roots `crates/jit/tests/*/main.rs` hold local fixtures (`fixture_issue`, `TaxonomyRepo`, `memory_executor`).
 - **Build budget** (`scripts/rust-build-budget.sh:41-43`, `dev/benchmarks/rust-build-budgets/README.md`): targets 10/12; active test executables 14, 1,723,670,208/2,147,483,648 B; suite-duration limit 30 s. The latest `suite-build` line warmed 17 executables totalling 2,051,867,776 B in 73 ms.
-- **Script self-test gates.** None. `.jit/gates.toml` declares `cargo-ci` (`./scripts/cargo-ci.sh`), `cargo-ci-features`, `clippy`, `docs-mechanical`, `fmt`, `jit-validate`, `mcp-ci`, `npm-ci`, `repo-validate`, `secret-detection`, `tests`, `dependency-audit`, and the AI-review gates. All four script self-tests run inside the default Rust suite.
+- **Script self-test gates.** None. `.jit/gates.toml` declares `cargo-ci` (`./scripts/cargo-ci.sh`), `cargo-ci-features`, `clippy`, `docs-mechanical`, `fmt`, `jit-validate`, `mcp-ci`, `npm-ci`, `repo-validate`, `secret-detection`, `tests`, `dependency-audit`, and the AI-review gates. Four script self-tests run inside the default Rust suite, and four more run nowhere or only in CI (§D.7).
 
 ## D. Re-proof and fixture sweeps
 
@@ -347,3 +347,21 @@ Memory-backed setups. These are functions that build an `InMemoryStorage` or a m
 - `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.
 
 Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.
+
+### D.7 Shell-script self-tests
+
+Every committed shell script with a self-test, either a `*-selftest.sh` file or a `--self-test` mode (`git ls-files '*.sh'`):
+
+| Self-test | Exercises | Tools it requires (exit 2 when missing) | Runs today |
+| --- | --- | --- | --- |
+| `scripts/cargo-ci-selftest.sh` | `scripts/cargo-ci.sh` gate behaviour over six fixture crates | git, cargo, jq | default suite (`merged_tree_gate_verification_tests.rs`) |
+| `scripts/profile-test-suite.sh --self-test` | the suite profiler | — | default suite (`build_profile_policy_tests.rs:332`) |
+| `scripts/rust-build-budget.sh` (14 Rust-driven cases) | the build-budget checker | jq | default suite (`rust_build_budget_checker_tests.rs`) |
+| `scripts/setup-recorded-failure-corpus.sh --self-test` | the corpus setup script | — | default suite (`failure_probe_fixture.rs:1060`) |
+| `scripts/docs-check-selftest.sh` | `scripts/docs-mechanical.sh` and the seven `scripts/docs-check-*.sh` checkers | jit, jq | nowhere |
+| `scripts/generate-shipped-policy-regions-selftest.sh` | `scripts/generate-shipped-policy-regions.sh` | git, jit | nowhere |
+| `scripts/workflow-contract-selftest.sh` | `scripts/workflow-contract.sh` with `test-vectors/workflow-contract/` | python3 | `.github/workflows/ci.yml:54` only |
+| `scripts/benchmark-session-cost-selftest.sh` | `scripts/benchmark-session-cost.sh` against a fake `jit` | cmp, find, git, grep, jq, sha256sum | nowhere |
+
+No `.jit/gates.toml` gate runs any of them. `dev/benchmarks/nextest-concurrency-934985ca/validate_selftest.py` is a Python helper archived with a benchmark, not a shell-script self-test.
+
