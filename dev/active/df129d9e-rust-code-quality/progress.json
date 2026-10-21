@@ -73,7 +73,7 @@
           "short_id": "d8176fd3",
           "title": "One global --json flag carried as OutputMode",
           "classification": "implementation",
-          "status": "pending"
+          "status": "blocked: waits on external 3754095f, 8673dc5e"
         },
         {
           "key": "list-envelope-adoption",
@@ -81,7 +81,7 @@
           "short_id": "650e6a56",
           "title": "Express output-module count structs as ListEnvelope instantiations",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-650e6a56, sonnet, worktree agent-650e6a56)"
         },
         {
           "key": "schema-omits-hidden",
@@ -89,7 +89,7 @@
           "short_id": "233f4a09",
           "title": "Omit clap-hidden commands and flags from the generated schema",
           "classification": "implementation",
-          "status": "in_progress (worker w-233f4a09, sonnet, worktree agent-233f4a09)"
+          "status": "done"
         }
       ]
     },

@@ -258,8 +258,7 @@ effectively terminal issue — `Done`, `Rejected`, or `Archived` from one of tho
 `[type_hierarchy]`; it does not hardcode type names. This is the same predicate
 the direct archive path gates coupled retirement on, so an Archived-from-terminal
 container it would reconcile also appears here. Active, untyped, unknown-type,
-leaf, and Archived issues whose pre-archive state was non-terminal (or a legacy
-archived record with no recorded origin) are excluded. Each selected container is
+leaf, and Archived issues whose pre-archive state was non-terminal are excluded. Each selected container is
 fully evaluated through the same resolved-hierarchy planner as `archive
 container`, including zero-document containers and ineligible plans. Ordinary
 sequencing edges do not enlarge a candidate's resolved subtree.
@@ -1471,8 +1470,7 @@ jit issue progress epic123 --json
   are reported separately because a rejected child is terminal but **not
   delivered**. `archived` is terminality-preserving, so a child archived from
   `done` folds into `done` and one archived from `rejected` folds into
-  `rejected`; a child archived from a non-terminal state (or a legacy archived
-  record) counts as `open`. `open` is every child that is not effectively
+  `rejected`; a child archived from a non-terminal state counts as `open`. `open` is every child that is not effectively
   terminal (`total − done − rejected`). The exact `by state` counts still show
   `archived` as its own bucket. The `done/total` ratio and `percent` (rounded;
   `0` when `total` is `0`) measure delivery — `done` against `total`.
@@ -3013,10 +3011,9 @@ spelling of `jit graph rdeps <id>`.
 Show what an issue depends on: the issues that must become effectively terminal
 (done, rejected, or archived from one of those) before it can proceed. In
 `--json` output each dependency node carries its `state`; an `archived` node
-whose pre-archive state was recorded also carries it as `archived_from`. The
-origin determines whether the archived dependency still satisfies: a terminal
-origin satisfies, a non-terminal origin blocks, and a legacy archived node that
-omits the field blocks.
+also carries its pre-archive state as `archived_from`. The origin determines
+whether the archived dependency still satisfies: a terminal origin satisfies,
+and a non-terminal origin blocks.
 
 ```bash
 jit graph deps <ID> [--depth <N>] [--json]
@@ -3802,7 +3799,7 @@ timestamp is unrecoverable, not defaulted.
 Resolve a dotted key against the WHOLE configuration surface — type
 hierarchy, label namespaces, item kinds, documentation paths, validation
 settings, project identity, schema version, and the system/user/repo-layered
-worktree/coordination/lock/event settings — via a generic path walk over the
+worktree and coordination settings — via a generic path walk over the
 config, not a hand-maintained list of recognised keys.
 
 **Usage:**
@@ -3834,14 +3831,15 @@ jit config get documentation --json
 # {"key": "documentation", "value": {"development_root": "dev", ...}}
 
 # The layered settings resolve through their precedence chain
-# (env var, then repo, then user, then system, then default).
-jit config get worktree.mode
+# (repo, then user, then system, then default); worktree.enforce_leases
+# reads the repo config only.
+jit config get worktree.enforce_leases
 jit config get coordination.max_indefinite_leases_per_agent
 ```
 
 **Two resolution strategies**, matching how the rest of jit already reads
 these sections — `config get` does not invent a third:
-- `worktree`, `coordination`, `global_operations`, `locks`, `events`: the
+- `worktree`, `coordination`: the
   system/user/repo-merged, default-filled view (same as `jit config show`).
 - Every other section (`version`, `project`, `type_hierarchy`, `validation`,
   `documentation`, `namespaces`, `item_kinds`, `projection`): read from the
@@ -3867,9 +3865,8 @@ segment and its resolved parent path.
 ```bash
 jit config get bogus_section
 # Error: unknown config key 'bogus_section'; valid top-level sections:
-# coordination, documentation, events, global_operations,
-# item_kinds, locks, namespaces, project, projection,
-# type_hierarchy, validation, version, worktree
+# coordination, documentation, item_kinds, namespaces, project,
+# projection, type_hierarchy, validation, version, worktree
 
 jit config get documentation.bogus_field
 # Error: unknown config key 'documentation.bogus_field': no 'bogus_field'

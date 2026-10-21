@@ -9,6 +9,7 @@
   ],
   "description": "The `profile list`, `profile validate`, `profile reconfigure` and `profile upgrade` subcommands are removed, because each exists to read or reconcile applied-profile records that charter decision D-8 deletes.\n\n## Background\n\nProfile packages apply once, and from then on the repository owns every value (`@/charter/D-8`). The ownership lifecycle that D-8 rejects surfaces as four subcommands:\n\n- `profile list` and `profile validate` read applied-profile records and render their agreement with the installed package (`list_recorded_profiles` and `validate_recorded_profiles` at `crates/jit/src/commands/profile.rs:614,654`; `render_profile_agreement` at `crates/jit/src/main.rs:1192-1250`).\n- `profile reconfigure` and `profile upgrade` re-derive a selection from the records (`profile.rs:1427-1621`, through `lifecycle_selection_from_sources` at `:1540`).\n\nTheir surfaces are:\n\n- CLI variants (`crates/jit/src/cli.rs:2966-3330`) and dispatch arms (`main.rs:2623-2981`).\n- Command-schema arms (`crates/jit/src/schema.rs:478-530`).\n- MCP curated entries (`mcp-server/curated-tools.json:56-63`) and their tests.\n- The failure-lever registry arms for these subcommands (`crates/jit/tests/cli_issue/failure_lever_registry.toml`, within 674-762), which the failure-probe coverage test checks against the command surface (`crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs:258`).\n- The release workflow's `profile list --json` smoke step (`.github/workflows/release-artifacts.yml:269`, asserted at `:280-294`).\n\nLine numbers are at the investigation baseline. The records themselves and the lifecycle vocabulary are removed separately.\n\n## Success Criteria\n\n- [hard] REQ-01: The `profile list`, `profile validate`, `profile reconfigure` and `profile upgrade` subcommands no longer parse, and the published command schema has no entry for them.\n- [hard] REQ-02: Their executor functions, dispatch arms, renderers and the record-driven lifecycle selection are gone from the source.\n- [hard] REQ-03: The MCP curated tool list names none of them, and the MCP tests pass.\n- [hard] REQ-04: The failure-lever registry holds no arm for a removed subcommand, and the failure-probe coverage test passes.\n- [hard] REQ-05: No release workflow step invokes a removed subcommand.\n- [hard] REQ-06: Tests that exercised only the removed subcommands are deleted, and no surviving test invokes them.\n",
   "documents": [],
+  "done_at": "2026-10-21T15:38:34.810368529Z",
   "first_ready_at": "2026-10-21T01:06:58.361882571Z",
   "gates_required": [
     "cargo-ci",
@@ -18,12 +19,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T11:27:34.762310918Z",
+      "updated_at": "2026-10-21T15:38:30.469243065Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T11:33:23.432824646Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T15:36:17.123763663Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
@@ -42,7 +43,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Remove the record-reading profile subcommands",
-  "updated_at": "2026-10-21T11:37:48.034070329Z"
+  "updated_at": "2026-10-21T15:38:34.810368529Z"
 }

@@ -78,8 +78,7 @@ facts compose:
    terminal* (`Issue::is_blocked`). The terminal states are `Done` and
    `Rejected`, so a rejected dependency counts as met; `Archived` is
    terminality-preserving, so a dependency archived from `Done` or `Rejected`
-   also counts as met, while one archived from a non-terminal state (or a legacy
-   archived record with no recorded origin) does not.
+   also counts as met, while one archived from a non-terminal state does not.
 3. A blocked issue never becomes workable: `jit query available` returns only
    unassigned issues in state `Ready` that are unblocked, and a `Backlog` issue
    auto-promotes to `Ready` exactly when it stops being blocked.

@@ -254,8 +254,7 @@ finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 `--ttl` falls back to the built-in claim lease TTL listed in
 [Runtime Coordination Defaults](../reference/runtime-defaults.md).
 
-`worktree.mode` is parsed and shown by configuration commands but does not
-control the current claim runtime. Claim timing has no configuration keys.
+Claim timing has no configuration keys.
 
 ### Agent Config (`~/.config/jit/agent.toml`)
 

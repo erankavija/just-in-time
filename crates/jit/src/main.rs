@@ -6006,24 +6006,11 @@ fn run() -> Result<()> {
 
                     let output = json!({
                         "worktree": {
-                            "mode": format!("{:?}", config.worktree_mode().unwrap_or(jit::config::WorktreeMode::Auto)).to_lowercase(),
                             "enforce_leases": format!("{:?}", config.enforcement_mode()).to_lowercase(),
                         },
                         "coordination": {
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
                             "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
-                        },
-                        "global_operations": {
-                            "require_main_history": config.global_operations().require_main_history(),
-                            "allowed_branches": config.global_operations().allowed_branches(),
-                        },
-                        "locks": {
-                            "max_age_secs": config.locks().max_age_secs(),
-                            "enable_metadata": config.locks().enable_metadata(),
-                        },
-                        "events": {
-                            "enable_sequences": config.events().enable_sequences(),
-                            "use_unified_envelope": config.events().use_unified_envelope(),
                         },
                         "namespaces": namespaces_json,
                     });
@@ -6037,12 +6024,6 @@ fn run() -> Result<()> {
                     println!("Effective Configuration:");
                     println!();
                     println!("[worktree]");
-                    println!(
-                        "  mode = {:?}",
-                        config
-                            .worktree_mode()
-                            .unwrap_or(jit::config::WorktreeMode::Auto)
-                    );
                     println!("  enforce_leases = {:?}", config.enforcement_mode());
                     println!();
                     println!("[coordination]");
@@ -6053,30 +6034,6 @@ fn run() -> Result<()> {
                     println!(
                         "  max_indefinite_leases_per_repo = {}",
                         config.coordination().max_indefinite_leases_per_repo()
-                    );
-                    println!();
-                    println!("[global_operations]");
-                    println!(
-                        "  require_main_history = {}",
-                        config.global_operations().require_main_history()
-                    );
-                    println!(
-                        "  allowed_branches = {:?}",
-                        config.global_operations().allowed_branches()
-                    );
-                    println!();
-                    println!("[locks]");
-                    println!("  max_age_secs = {}", config.locks().max_age_secs());
-                    println!("  enable_metadata = {}", config.locks().enable_metadata());
-                    println!();
-                    println!("[events]");
-                    println!(
-                        "  enable_sequences = {}",
-                        config.events().enable_sequences()
-                    );
-                    println!(
-                        "  use_unified_envelope = {}",
-                        config.events().use_unified_envelope()
                     );
                 }
             }
@@ -6154,7 +6111,7 @@ fn run() -> Result<()> {
                 }
             }
             jit::cli::ConfigCommands::Validate { json } => {
-                use jit::config::{ConfigLoader, JitConfig};
+                use jit::config::JitConfig;
                 use serde_json::json;
 
                 #[derive(Default)]
@@ -6164,7 +6121,7 @@ fn run() -> Result<()> {
 
                 let mut result = ValidationResult::default();
 
-                // Check repo config — invalid worktree/enforcement tokens are now
+                // Check repo config — invalid enforcement and write-policy tokens are
                 // caught at TOML parse time, so a successful load implies valid values.
                 let repo_config_path = jit_dir.join("config.toml");
                 if repo_config_path.exists() {
@@ -6184,20 +6141,9 @@ fn run() -> Result<()> {
                     }
                 }
 
-                // Check env vars — use the same FromStr as TOML parsing so
-                // case-handling is identical across both sources.
-                if let Ok(val) = std::env::var("JIT_WORKTREE_MODE") {
-                    if let Err(e) = val.parse::<jit::config::WorktreeMode>() {
-                        result.errors.push(format!("JIT_WORKTREE_MODE: {e}"));
-                    }
-                }
                 if let Err(e) = jit::config_manager::ConfigManager::invocation_write_override() {
                     result.errors.push(format!("{e}"));
                 }
-
-                // Try to build effective config to catch merge issues
-                let loader = ConfigLoader::new();
-                let _ = loader.with_repo_config(&jit_dir);
 
                 let has_errors = !result.errors.is_empty();
 

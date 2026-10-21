@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "7aafec83-b056-4047-9569-77c9373ba2d3"
+  ],
+  "description": "Move the one integration test that builds a repository through libgit2 onto the shared git repository fixture.\n\n## Background\n\n- `test_add_pinned_document_uses_pinned_document_and_asset_bytes` (`crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:253`) builds its commit through libgit2 (`git2::Repository::init` at `:259`, `git2::Signature` at `:272`), reaching the crate's normal `git2` dependency.\n- `jit::test_harness` offers a git repository fixture that initializes, writes and commits through the git CLI.\n\n## Success Criteria\n\n- [hard] REQ-01: The test builds its commit with the repository fixture, names no `git2` item, and asserts what it asserts today.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "cb01a945-4421-41c7-8909-32fb4b8fc585",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:libgit2-removal",
+    "component:testing",
+    "per:@/charter/D-21",
+    "enforces:@/invariant/shared-test-contracts",
+    "satisfies:f4d9502a/REQ-01"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Pinned-document test builds its commit through the git fixture",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

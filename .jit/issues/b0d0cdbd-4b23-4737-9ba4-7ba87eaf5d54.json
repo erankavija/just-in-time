@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-f4d9502a",
+  "claimed_at": "2026-10-21T15:44:17.623682353Z",
   "context": {},
   "created_at": "2026-10-21T10:46:10.226099400Z",
   "dependencies": [
@@ -7,20 +8,22 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Reach git through one storage-owned CLI module instead of libgit2 (f4d9502a) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-21T15:50:41.541978324Z",
+  "first_ready_at": "2026-10-21T15:43:27.333985673Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T10:46:10.226099400Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T15:50:26.385476493Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
-      "status": "pending",
-      "updated_at": "2026-10-21T10:46:10.226099400Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T15:44:18.609360116Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54",
@@ -37,7 +40,7 @@
     "brackets:f4d9502a"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "done",
   "title": "breakdown: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T10:46:10.226099400Z"
+  "updated_at": "2026-10-21T15:50:41.541978324Z"
 }

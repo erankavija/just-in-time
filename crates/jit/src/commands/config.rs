@@ -192,12 +192,6 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
                 .map_err(|_| anyhow!("Expected numeric value for {}", key))?;
             toml_edit::value(num)
         }
-        k if k.contains("enable_") || k.contains("require_") || k.contains("auto_") => {
-            let b: bool = value
-                .parse()
-                .map_err(|_| anyhow!("Expected boolean (true/false) for {}", key))?;
-            toml_edit::value(b)
-        }
         _ => toml_edit::value(value),
     };
 
@@ -485,9 +479,6 @@ mod tests {
             "projection",
             "worktree",
             "coordination",
-            "global_operations",
-            "locks",
-            "events",
         ] {
             let outcome = executor.get_config(section).unwrap();
             assert!(

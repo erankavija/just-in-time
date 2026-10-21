@@ -1,5 +1,5 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T15:32:15.971454996Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
@@ -8,12 +8,36 @@
   ],
   "description": "An archived issue record may omit `archived_from`, and revive logic keeps a fallback for that legacy shape. Every archived record in this repository carries the field.\n\n## Background\n\n- The `archived_from` field doc (`crates/jit/src/domain/types.rs:475-489`) names legacy records.\n- Revive keeps an explicit fallback: the `None` arm at `commands/mod.rs:1030-1045` warns \"archived before its pre-archive state was recorded\".\n- `effective_terminal_state` (`types.rs:120-126`) has no special branch, but its doc (`:113-115`) mentions legacy records.\n- All 41 archived records here carry the field, and no non-archived record does.\n- Writers: `commands/mod.rs:1212-1216` and `repository_state/archive.rs:208-211`.\n\nEvery issue load path goes through the derived `Deserialize` on `Issue` (`types.rs:411`): `storage/json.rs:132,920`, `storage/memory.rs:463,473`, `validation/repository.rs:377`. A plain required field cannot express the rule, because the field is absent on non-archived issues. The check therefore belongs at the decode boundary, through `serde(try_from)` or a hand `Deserialize`. schemars 0.8 ignores `serde(try_from)` (its `SERDE_KEYWORDS` in `schemars_derive-0.8.22/src/attr/schemars_to_serde.rs` omit it), so the derived `Issue` schema keeps describing the struct's own fields, `archived_from` included.\n\nTests that construct archived issues without the field:\n\n- `commands/archive.rs:965,2572` and `domain/artifact_classifier.rs:1916,1923`.\n- `tests/fast_issue/archived_semantics_tests.rs` builds legacy records on purpose (`save_legacy_archived` at `:30`; legacy dependency and revive tests at `:89,190`). Those legacy-record tests are deleted.\n- `tests/fast_docs_templates/harness_demo.rs:502` seeds an archived issue without the field, decoded by `InMemoryStorage` through `serde_json::from_slice::<Issue>` (`storage/memory.rs:463`). It is rewritten to carry an origin state.\n\n## Success Criteria\n\n- [hard] REQ-01: Decoding an archived issue record without `archived_from` fails with an error naming the field, on every load path.\n- [hard] REQ-02: Revive logic and `effective_terminal_state` hold no legacy-record branch, and their docs do not mention legacy records.\n- [hard] REQ-03: Tests construct archived issues with an origin state, and the issue JSON schema still describes `archived_from`.\n- [hard] REQ-04: One owning domain test proves the decode rejection.\n\n## Notes\n\nThe decode check stays pure and I/O-free in the domain layer.\n",
   "documents": [],
+  "done_at": "2026-10-21T15:52:51.074189567Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:49:13.954304592Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:50:28.840600180Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:52:33.448999670Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-21T15:52:36.808130809Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "9aa54649-ae13-46da-bc35-6ec20f085b78",
   "labels": [
     "type:task",
@@ -24,7 +48,7 @@
     "satisfies:842b0ac6/REQ-11"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Require archived_from on archived issue records",
-  "updated_at": "2026-10-21T15:32:16.006536331Z"
+  "updated_at": "2026-10-21T15:52:51.074189567Z"
 }

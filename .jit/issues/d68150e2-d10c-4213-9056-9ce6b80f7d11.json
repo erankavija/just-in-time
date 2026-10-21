@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "c5062e21-331d-4ab8-8468-3535d16d634f",
+    "d7cce445-436d-43d7-9ac9-7c21251b19fa"
+  ],
+  "description": "Remove the lazy layout detection inside storage and the command executor, so each handle uses the layout its constructor's caller supplied and never starts git to find one.\n\n## Background\n\n- `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) runs `WorktreePaths::detect_for_data_root` when no paths were configured. Its callers are the primary-checkout read tier, `load_index_from_main_worktree` (`crates/jit/src/storage/json.rs:866-880`) and `load_issue_from_main_worktree` (`crates/jit/src/storage/json.rs:931-945`).\n- `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2240-2256`) detects lazily when `with_worktree_paths` (`crates/jit/src/commands/mod.rs:2234-2237`) was not called. Its callers are the lease guard of guarded mutations, `claims_mutation_guard` (`crates/jit/src/commands/mod.rs:755-774`, called from `commands/dependency.rs`, `commands/issue.rs`, `commands/gate.rs` and `commands/mod.rs`), template lease warnings (`crates/jit/src/commands/template.rs:194`) and `validate --leases` (`crates/jit/src/commands/validate.rs:2228`).\n- Production handles receive their paths at construction: the CLI configures storage and the executor from its one detection, and the server does the same from its data root. `jit recover` builds an executor without paths (`crates/jit/src/commands/claim.rs:732`), but derived-state repair reaches none of the callers above.\n- A grep of in-process tests that build a git repository and a storage handle or executor finds one group that relies on the lazy detection through a caller above: the primary-checkout tier tests (`crates/jit/src/storage/json.rs:2381`, `:2577`, `:2619`). The tests in `commands/mod.rs` supply their paths, and the claim tests build theirs by hand. The other in-process tests over git repositories read git through libgit2 or the layout, not through these callers.\n\n## Success Criteria\n\n- [hard] REQ-01: A `JsonFileStorage` with no configured paths reads only its own data root: it has no primary-checkout tier and starts no git process to find one.\n- [hard] REQ-02: An executor built without `with_worktree_paths` answers `require_worktree_paths` with non-git paths derived from its layout, or from its storage root when it has no layout, without starting a process. A guarded mutation on such an executor takes no lease guard.\n- [hard] REQ-03: No production code in `storage/json.rs` or `commands/mod.rs` calls a `WorktreePaths` detection function.\n- [hard] REQ-04: Two unit tests fail on today's code, and the three primary-checkout tier tests configure their storage's paths and pass. Storage over a linked checkout's data root with no configured paths does not list an issue only the primary checkout holds, and lists it once the paths are configured. `require_worktree_paths` on an executor over a git repository built without paths reports a non-git checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "d68150e2-d10c-4213-9056-9ce6b80f7d11",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:git-layout-once",
+    "component:storage",
+    "component:core",
+    "per:@/charter/D-21",
+    "satisfies:f4d9502a/REQ-04"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Storage and executor stop re-detecting the layout",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

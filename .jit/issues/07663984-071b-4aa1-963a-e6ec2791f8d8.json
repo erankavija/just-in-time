@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:43:27.849030738Z",
+  "dependencies": [
+    "81664a6a-958e-4e4d-9403-7b6210dc9d6c"
+  ],
+  "description": "Make `WorktreePaths` detection classify the selected data root with the git module's one probe, replacing its own three `git rev-parse` processes.\n\n## Background\n\n- `detect_from_with_non_git_root` (`crates/jit/src/storage/worktree_paths.rs:58-141`) starts `--is-inside-work-tree` at `:64`, `--git-common-dir` at `:87` and `--show-toplevel` at `:112`, each naming the literal `git`. Measured with a logging `git` on `PATH`: `jit query available` and `jit issue show` each start exactly these three.\n- Inside a `.git` directory, `--is-inside-work-tree` prints `false` with exit status 0. The current check tests only the exit status, so it reads a repository there, and detection then fails on `--show-toplevel`.\n- `Git::probe(dir)` returns the common directory and top-level path with one process, or no checkout.\n- Unit tests: `crates/jit/src/storage/worktree_paths.rs:255`, `:322`.\n\n## Success Criteria\n\n- [hard] REQ-01: `WorktreePaths` detection runs one probe and builds its paths from the probe's answer, and `storage/worktree_paths.rs` starts no process. Detected paths are unchanged for primary, linked and non-git data roots.\n- [hard] REQ-02: A unit test shows that a data root inside a `.git` directory is classified as outside version control; today `WorktreePaths::detect_for_data_root` fails there with `git rev-parse --show-toplevel`, so the test fails.\n\n## Notes\n\n- Behaviour change: a directory git places inside a repository but outside any work tree (a `.git` directory, a bare repository) is classified as outside version control instead of failing detection.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "07663984-071b-4aa1-963a-e6ec2791f8d8",
+  "labels": [
+    "type:task",
+    "epic:git-cli-module",
+    "milestone:v1.0",
+    "story:git-layout-once",
+    "component:storage",
+    "per:@/charter/D-21",
+    "satisfies:f4d9502a/REQ-02",
+    "satisfies:f4d9502a/REQ-04"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "Layout detection uses the module's one-process probe",
+  "updated_at": "2026-10-21T15:43:27.849030738Z"
+}

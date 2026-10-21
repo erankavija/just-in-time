@@ -170,7 +170,7 @@ Each issue is stored as `issues/<uuid>.json`:
 | `first_ready_at` | timestamp? | When the issue FIRST entered `ready` (see below) |
 | `claimed_at` | timestamp? | When the issue was FIRST claimed/assigned |
 | `done_at` | timestamp? | When the issue FIRST reached `done` |
-| `archived_from` | enum? | The state the issue held before entering `archived`, making `archived` terminality-preserving. Present only while `state` is `archived` and the origin was recorded; cleared on revive. Omitted from JSON when absent, so records predating the field round-trip unchanged and read as a legacy archive (treated as non-terminal) |
+| `archived_from` | enum? | The state the issue held before entering `archived`, making `archived` terminality-preserving. Required while `state` is `archived`, absent otherwise; cleared on revive. Loading an `archived` record without it fails |
 
 #### Gate fields in command output
 

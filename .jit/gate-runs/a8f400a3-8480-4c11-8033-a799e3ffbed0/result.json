@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "b973d3016542931496daa05a1ed0af4b49b49773",
+  "completed_at": "2026-10-21T15:50:25.556918031Z",
+  "duration_ms": 366568,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "advisory",
+        "file": ".jit/issues/5f82e09a-2b31-4f51-acf3-7d4c87501ab2.json",
+        "id": "F1",
+        "line": 8,
+        "origin": "pre-existing",
+        "references": [
+          "@/charter/D-21"
+        ],
+        "severity": "medium",
+        "summary": "The steward still needs to re-home 5f82e09a from the whole epic to the git-dirty-paths producer."
+      }
+    ],
+    "summary": "The instantiated breakdown matches its 53-entry, 92-edge manifest; one explicitly deferred cross-epic re-home remains advisory.",
+    "verdict": "pass"
+  },
+  "gate_key": "breakdown-review",
+  "issue_id": "b0d0cdbd-4b23-4737-9ba4-7ba87eaf5d54",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a8f400a3-8480-4c11-8033-a799e3ffbed0",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:44:18.988422563Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. **F1 — advisory, pre-existing (medium):** `5f82e09a` still depends on the entire `f4d9502a` epic rather than `git-dirty-paths` (`3a3b86cf`). DEC-04 explicitly assigns this cross-epic re-home to the steward and excludes it from this breakdown, so no manifest correction is required and it does not fail the `jit-breakdown` review. The steward should eventually replace the broad dependency with `5f82e09a → 3a3b86cf`. [.jit/issues/5f82e09a-2b31-4f51-acf3-7d4c87501ab2.json](/home/vkaskivuo/Projects/just-in-time/.jit/issues/5f82e09a-2b31-4f51-acf3-7d4c87501ab2.json:8)\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The instantiated breakdown matches its 53-entry, 92-edge manifest; one explicitly deferred cross-epic re-home remains advisory.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"advisory\",\"origin\":\"pre-existing\",\"summary\":\"The steward still needs to re-home 5f82e09a from the whole epic to the git-dirty-paths producer.\",\"file\":\".jit/issues/5f82e09a-2b31-4f51-acf3-7d4c87501ab2.json\",\"line\":8,\"references\":[\"@/charter/D-21\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

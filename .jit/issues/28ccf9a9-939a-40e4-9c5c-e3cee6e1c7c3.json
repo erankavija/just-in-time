@@ -46,14 +46,15 @@
       "path": "dev/active/f4d9502a-git-cli-module/breakdown.json"
     }
   ],
+  "done_at": "2026-10-21T15:43:27.226344832Z",
   "first_ready_at": "2026-10-21T10:46:13.738810598Z",
   "gates_required": [
     "plan-review"
   ],
   "gates_status": {
     "plan-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T12:15:05.841875641Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T15:43:12.951176888Z",
       "updated_by": "auto:executor"
     }
   },
@@ -70,7 +71,7 @@
     "type:planning"
   ],
   "priority": "normal",
-  "state": "ready",
+  "state": "done",
   "title": "planning: Reach git through one storage-owned CLI module instead of libgit2",
-  "updated_at": "2026-10-21T12:15:05.841875641Z"
+  "updated_at": "2026-10-21T15:43:27.226344832Z"
 }

@@ -14,7 +14,7 @@ or customize individual settings.
 - [Example config.toml](example-config.toml) - Full annotated example with all options
 - [Schema Configuration](#schema-configuration) - Issue types, validation, namespaces
 - [`[documentation]`](#documentation) - Development-area classification and issue artifact directories
-- [Runtime Configuration](#runtime-configuration) - Lease enforcement and compatibility fields
+- [Runtime Configuration](#runtime-configuration) - Lease enforcement, linked-checkout write policy, and claim coordination limits
 
 ## Configuration Files
 
@@ -26,7 +26,7 @@ or customize individual settings.
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
 
-Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
+Priority (how the merged effective configuration is resolved, e.g. for `jit config`): repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
 
 ---
 
@@ -590,16 +590,6 @@ unit and operational scope, are listed in
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
 
-### Parsed compatibility fields
-
-`worktree.mode`, `[global_operations]`, `[locks]`, and `[events]` values are
-accepted and available to `jit config get` / `jit config show`, but no current
-command applies them as runtime controls. Do not use them to change worktree
-handling, branch policy, lock recovery, or event format.
-
-`worktree.write_policy` is not one of them: it is applied as a runtime control,
-and [`write_policy`](#write_policy) above is its reference.
-
 ## Agent Config (`~/.config/jit/agent.toml`)
 
 Agent-specific configuration for persistent identity.
@@ -659,7 +649,7 @@ jit config get <dotted.key> [--json]
 Resolves a dotted key against the WHOLE configuration surface — type
 hierarchy, label namespaces, item kinds, documentation paths, validation
 settings, project identity, schema version, and the system/user/repo-layered
-worktree/coordination/lock/event settings below — via a generic path walk,
+worktree and coordination settings below — via a generic path walk,
 not a hand-maintained list of recognised keys. A dotted path mirrors
 `config.toml`'s own structure, including a section's kebab-case keys (e.g.
 `item_kinds.<name>.id-pattern`) and a user-declared map's own entries (e.g.
@@ -675,11 +665,10 @@ jit config get documentation.development_root
 jit config get namespaces.type.unique
 ```
 
-`worktree`, `coordination`, `global_operations`, `locks`, and `events` resolve
-the merged, default-filled view that `jit config show` displays. Every other
-section reads the repository's `config.toml` only, with no system/user merge or
-built-in defaults; an absent section resolves to `{}`. This visibility does
-not make the parsed compatibility fields above active runtime controls.
+`worktree` and `coordination` resolve the merged, default-filled view that
+`jit config show` displays. Every other section reads the repository's
+`config.toml` only, with no system/user merge or built-in defaults; an absent
+section resolves to `{}`.
 `templates` and `invariants` are not part of this surface (they load from
 sibling files, not `config.toml`); read the graph templates in
 `.jit/templates.toml`, and see `jit item list --kind invariant`.

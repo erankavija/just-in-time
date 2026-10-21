@@ -2,10 +2,10 @@
 //!
 //! `Archived` preserves what was true before it: an issue archived from a
 //! terminal state keeps satisfying dependents; one archived from a non-terminal
-//! state (or a legacy record with no recorded origin) does not. Reviving restores
+//! state does not. Reviving restores
 //! the recorded pre-archive state exactly, closing the `done → archived → ready`
 //! resurrection loophole. These tests exercise the dependency, readiness,
-//! transition, rollup, revive, event-log, and compatibility surfaces.
+//! transition, rollup, revive, and event-log surfaces.
 use jit::domain::{Issue, State};
 use jit::output::StateRollup;
 use jit::storage::IssueStore;
@@ -23,15 +23,6 @@ fn drive_to_done(h: &TestHarness, id: &str) {
 /// Park an issue into `Archived` the way `jit issue update --state archived` does.
 fn archive(h: &TestHarness, id: &str) {
     h.executor.update_issue_state(id, State::Archived).unwrap();
-}
-
-/// Persist a legacy `Archived` record: state `Archived` with no recorded origin,
-/// as an issue file written before `archived_from` existed would deserialize.
-fn save_legacy_archived(h: &TestHarness, id: &str) {
-    let mut issue = h.get_issue(id);
-    issue.state = State::Archived;
-    issue.archived_from = None;
-    jit::test_harness::seed_memory_issue(&h.storage, &issue);
 }
 
 fn count_state_changes(h: &TestHarness, id: &str) -> usize {
@@ -82,23 +73,6 @@ fn test_archived_from_non_terminal_does_not_satisfy_dependents() {
     assert!(
         result.is_err(),
         "a dependency archived from a non-terminal state must still block"
-    );
-}
-
-#[test]
-fn test_legacy_archived_without_origin_does_not_satisfy_dependents() {
-    let h = TestHarness::new();
-    let dependent = h.create_issue("Dependent");
-    let dependency = h.create_issue("Legacy parked");
-    h.executor.add_dependency(&dependent, &dependency).unwrap();
-    save_legacy_archived(&h, &dependency);
-
-    // Conservative compatibility default: a legacy Archived record (no recorded
-    // origin) is not effectively terminal, matching the pre-change behavior.
-    let result = h.executor.update_issue_state(&dependent, State::Ready);
-    assert!(
-        result.is_err(),
-        "a legacy archived dependency (no recorded origin) must not unblock dependents"
     );
 }
 
@@ -184,24 +158,6 @@ fn test_archive_from_ready_records_origin_and_revives_to_ready() {
     h.executor.update_issue_state(&id, State::Ready).unwrap();
     assert_eq!(h.get_issue(&id).state, State::Ready);
     assert_eq!(h.get_issue(&id).archived_from, None);
-}
-
-#[test]
-fn test_legacy_archived_revive_is_unconstrained_but_warns() {
-    let h = TestHarness::new();
-    let id = h.create_issue("Legacy parked");
-    save_legacy_archived(&h, &id);
-
-    // A legacy record with no recorded origin keeps the prior unconstrained
-    // revive, with an advisory warning naming the missing origin.
-    let warnings = h.executor.update_issue_state(&id, State::Ready).unwrap();
-    assert_eq!(h.get_issue(&id).state, State::Ready);
-    assert!(
-        warnings
-            .iter()
-            .any(|warning| warning.contains("pre-archive state was recorded")),
-        "legacy revive should warn about the unrecorded origin: {warnings:?}"
-    );
 }
 
 #[test]

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "bbf3ec507edd015d73bcdd48434983396ac324da",
+  "completed_at": "2026-10-21T15:50:28.591206165Z",
+  "duration_ms": 74195,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are satisfied; the prior stale output documentation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9aa54649-ae13-46da-bc35-6ec20f085b78",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e37ea47f-a0bf-4f96-9f70-e475a2f93e6a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T15:49:14.395923030Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: b057e03d6, a3d36f0fb, 49d6e40ee, 91b94c27a, bbf3ec507 (`jit:9aa54649`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/invariants.toml; dev/vision/9db27a3a-charter.md; .jit/issues/842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b.json\nResolved items: @/issue/842b0ac6/requirement/REQ-11; @/charter/D-1; @/charter/D-18; @/invariant/canonical-cutover; @/invariant/architecture-dependency-direction; @/invariant/essential-code-prose; @/invariant/orthogonal-tests; @/invariant/gate-semantics\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T15:47:36Z); doc-review pending; docs-mechanical pending\nTruncation recovery: narrowed deserialization/load-path, policy-source, current-code, documentation, and merge-diff reads after broad search output truncated\n\n1. No findings.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are satisfied; the prior stale output documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

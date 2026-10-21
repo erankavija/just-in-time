@@ -509,13 +509,11 @@ fn test_command_exit_codes_invariant_check_emits_4() {
 #[test]
 fn test_command_exit_codes_config_validate_invalid_value_emits_4() {
     let temp = setup();
+    fs::write(temp.path().join(".jit/config.toml"), "not = valid = toml").unwrap();
 
     assert_projected_exit_status_in_both_forms("config validate", 4, false, |json| {
         let mut command = Command::new(jit_binary());
-        command
-            .current_dir(&temp)
-            .args(["config", "validate"])
-            .env("JIT_WORKTREE_MODE", "definitely-not-a-mode");
+        command.current_dir(&temp).args(["config", "validate"]);
         if json {
             command.arg("--json");
         }
