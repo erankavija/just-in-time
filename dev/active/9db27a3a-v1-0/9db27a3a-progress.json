@@ -534,7 +534,7 @@
     {
       "date": "2026-10-21",
       "priority": "urgent",
-      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier. Additional data: fast_rules cli_warnings_integration_tests take ~6.3 s each alone and hit the 20 s per-test timeout under any concurrency. This is the recurring 'load' timeout pattern and a test-topology candidate (c780514e)."
+      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier. Additional data: fast_rules cli_warnings_integration_tests take ~6.3 s each alone and hit the 20 s per-test timeout under any concurrency. This is the recurring 'load' timeout pattern and a test-topology candidate (c780514e). UPDATE 23:40: d125490a hit 31.6 s on a quiet host; it is being measured to see whether the change itself causes the overrun."
     },
     {
       "date": "2026-10-21",
@@ -575,6 +575,10 @@
     {
       "date": "2026-10-21",
       "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Skill prose drift: .agents/skills/jit-execution-lead/references/worktree-dispatch-protocol.md:51 restates the linked-checkout write default '(refusing by default)'. Since 459bb995 that default is stated once (LinkedCheckoutWriteStance::DEFAULT, projected in docs/reference/runtime-defaults.md). Suggested fix: drop the parenthetical or cite the reference page. Left for you because skills are shared infrastructure and may be packaged profile assets (see OD-9)."
     }
   ]
 }
