@@ -12,6 +12,7 @@
     "6ff14f21-2150-4e48-9dc6-5c4e2f7ac2d1",
     "7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6",
     "aa423d02-85bd-4e57-ac43-660a4ebdc55b",
+    "b5faef84-fd5b-477d-be87-2cf020e93fa4",
     "bedf0962-dcb6-4c72-bd88-a4125e1a69d6",
     "c0d0c8bf-679f-463b-87ca-25cae8945646",
     "cd2ed136-84ce-46c7-9741-b4d167ed540d",
@@ -20,7 +21,15 @@
     "d92f54aa-761e-4049-b1aa-d5efc32f17c6"
   ],
   "description": "Fix the correctness defects that a repository-wide simplification and performance audit surfaced, so v1.0 ships without them.\n\n## Background\n\nA read-only audit of the workspace on 2026-10-15 (20 area auditors and a synthesis pass) collected simplification, abstraction and performance findings. Along the way it surfaced correctness defects, and each was then re-verified against current code and, where possible, reproduced in a scratch repository. They span:\n\n- **Mutation integrity:** multi-step updates that commit partially, and bulk terminal updates that skip the dependent-readiness cascade.\n- **Coordination:** lease reads that re-evict the same expired lease on every call, an ignored stale threshold, a misreported enforcement mode, a claim filter that is accepted but ignored, and a pre-commit hook guarding paths from an obsolete storage layout.\n- **Input handling:** a query lexer that panics on non-ASCII text, a malformed ripgrep command line, inconsistent issue-id resolution, and search label filters that reject wildcards.\n- **Surfaces:** a server that fails every storage read under its default relative data directory, a graph export that drops in-scope issues, orphan validation that reads the type-to-namespace mapping backwards, and a test that races the process environment.\n\nEach child issue is standalone, with its own reproduction and criteria. The refactoring themes from the same audit are out of scope here.\n\n## Success Criteria\n\n- [hard] REQ-01: Every defect filed under this epic is fixed, and each fix is covered by a regression test that fails on the pre-fix code.\n- [hard] REQ-02: Every documented reproduction in the child issues produces the corrected behaviour on the release build.\n- [hard] REQ-03: No fix introduces a parallel variant of an existing mechanism; where a defect stems from duplicated logic, the fix converges it on one source (`@/inv/convention-convergence`).\n\n## Notes\n\nThe audit's ranked report of simplification, abstraction and performance opportunities is a separate input for later epics.\n",
-  "documents": [],
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "verification",
+      "format": "markdown",
+      "label": "REQ-02 release-build reproduction verification",
+      "path": "dev/active/8376299c-audit-correctness/repro-verification.md"
+    }
+  ],
   "first_ready_at": "2026-10-20T19:42:10.383077581Z",
   "gates_required": [
     "repo-validate",
@@ -37,5 +46,5 @@
   "priority": "high",
   "state": "backlog",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-20T19:42:13.005793443Z"
+  "updated_at": "2026-10-21T11:23:44.024359492Z"
 }

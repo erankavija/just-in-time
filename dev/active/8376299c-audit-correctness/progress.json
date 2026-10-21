@@ -144,9 +144,25 @@
           "note": "after all others: touches many resolvers"
         }
       ]
+    },
+    {
+      "wave_number": 4,
+      "issues": [
+        {
+          "id": "b5faef84-fd5b-477d-be87-2cf020e93fa4",
+          "short_id": "b5faef84",
+          "title": "Search endpoint returns no issue matches for the default nested data directory",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "dispatched",
+          "note": "found by the REQ-02 release reproduction run; filed by the lead under the epic"
+        }
+      ]
     }
   ],
-  "created_during_execution": [],
+  "created_during_execution": [
+    "b5faef84"
+  ],
   "escalations": [
     {
       "issue": "d92f54aa",

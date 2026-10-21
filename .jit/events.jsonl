@@ -17937,3 +17937,10 @@
 {"from":"ready","id":"5780614c-4c8c-4300-957f-c13385ca6946","issue_id":"719a5501-d611-4a81-8728-1634a8c35b7c","timestamp":"2026-10-21T11:20:20.212326891Z","to":"done","type":"issue_state_changed"}
 {"id":"dda62226-5d23-4977-8b3f-4e55f47c6d6d","issue_id":"719a5501-d611-4a81-8728-1634a8c35b7c","timestamp":"2026-10-21T11:20:20.212326891Z","type":"issue_completed"}
 {"from":"backlog","id":"55d3d6b7-5d7a-44da-864d-f0a98adee832","issue_id":"233f4a09-7764-470b-867f-c816b4b9589d","timestamp":"2026-10-21T11:20:20.314749582Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"cargo-ci","id":"cc3fb70e-b3d2-40a7-9466-827b489f5969","issue_id":"84745746-91d9-41d0-b120-f1e5e806a9d2","timestamp":"2026-10-21T11:21:08.467079159Z","type":"gate_passed","updated_by":"auto:executor"}
+{"assignee":"agent:jit-execution-lead","id":"21e262a8-6b10-4e1c-b15a-38b0a88f8132","issue_id":"66bd4b5c-bfbc-4ec9-aca4-049525a11700","timestamp":"2026-10-21T11:22:26.776025025Z","type":"issue_claimed"}
+{"id":"7ec77225-45c7-4119-ad8e-3492dbb67319","issue_id":"b5faef84-fd5b-477d-be87-2cf020e93fa4","priority":"normal","timestamp":"2026-10-21T11:23:16.576647698Z","title":"Search endpoint returns no issue matches for the default nested data directory","type":"issue_created"}
+{"fields":["dependencies"],"id":"098560f3-08b1-45bf-af4e-1c4bf9269d4f","issue_id":"8376299c-f9e1-4b7b-be62-27af493f6969","timestamp":"2026-10-21T11:23:22.154063490Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["documents"],"id":"3c2e93bc-2ee7-4496-a8ad-89e81937eb42","issue_id":"8376299c-f9e1-4b7b-be62-27af493f6969","timestamp":"2026-10-21T11:23:44.024359492Z","type":"issue_updated","updated_by":"doc-add"}
+{"from":"ready","id":"5231afc3-0fe4-4a15-b5f2-06d4d02ed651","issue_id":"b5faef84-fd5b-477d-be87-2cf020e93fa4","timestamp":"2026-10-21T11:23:44.212591846Z","to":"in_progress","type":"issue_state_changed"}
+{"assignee":"agent:worker","id":"45e9e291-3fc6-4aa5-b25b-56aa3dd1fced","issue_id":"b5faef84-fd5b-477d-be87-2cf020e93fa4","timestamp":"2026-10-21T11:23:44.212591846Z","type":"issue_claimed"}
