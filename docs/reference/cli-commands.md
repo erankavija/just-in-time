@@ -3517,7 +3517,7 @@ failure's typed classification: an unsafe repair uses `VALIDATION_FAILED`, a
 permission failure uses `PERMISSION_DENIED`, and other failures keep the
 registered code selected by the shared classifier. That code determines the
 process status. Its `error.message` retains the complete actionable cause chain,
-including ambiguous managed-region delimiters or mismatched profile provenance.
+including ambiguous managed-region delimiters.
 The human error reports the same cause, and no repair target is written.
 
 ### `jit recover`

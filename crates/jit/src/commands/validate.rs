@@ -104,8 +104,7 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     /// [`validate_repository`](crate::validation::repository::validate_repository),
     /// so every pass reads only image-projected content and no ambient filesystem or
     /// Git I/O. The same canonical repair plan supplies derived-state expectations
-    /// for validation and `--fix`, including exactly proven installed-profile assets
-    /// and regions.
+    /// for validation and `--fix`.
     pub fn validate_silent(&self) -> Result<()> {
         let report = self.capture_validation_report()?.0?;
         if report.rule_report.has_errors() {
@@ -362,9 +361,10 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
     ///
     /// The round reads the registries, the event log (as its length and tail
     /// for a `mutation`, which also parses issues strictly), the profile
-    /// records, and the caller's paths; then the validation closure those
-    /// registries plan; then what the captured issues name: the plan
-    /// documents, and a precheck target's prompt files and gate-run results.
+    /// records when `applied_records` is set, and the caller's paths; then the
+    /// validation closure those registries plan; then what the captured issues
+    /// name: the plan documents, and a precheck target's prompt files and
+    /// gate-run results.
     #[allow(clippy::too_many_arguments)]
     fn capture_proposed_base_inner(
         &self,
@@ -623,9 +623,9 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
             let plan = captured.plan.ok_or_else(|| {
                 anyhow!("derived-state repair has no plan for loadable declarations")
             })?;
-            // One message per changed owned target. Include mode-only drift: an
-            // executable profile asset can have correct bytes but still require a
-            // publication, and treating that delta as empty would skip repair.
+            // One message per changed owned target. Include mode-only drift: a
+            // target can have correct bytes but the wrong mode, and treating that
+            // delta as empty would skip repair.
             let changed = plan
                 .delta()
                 .actions()

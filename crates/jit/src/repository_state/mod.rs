@@ -780,8 +780,8 @@ pub enum MaterializationRequest<'a> {
     RepairDerivedState {
         /// Parsed declarations captured from the image.
         declarations: RepositoryDeclarations<'a>,
-        /// Neutral claims for every installed profile whose exact package
-        /// identity was proven from repository provenance.
+        /// Profile claims layered over the declared state; validation repair
+        /// supplies none.
         profiles: Vec<ProfileClaims>,
     },
     /// Derive a fresh or missing-file repository scaffold.
