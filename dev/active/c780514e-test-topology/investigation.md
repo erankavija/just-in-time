@@ -350,18 +350,33 @@ Helpers that act on a `TestHarness` or executor they are given (for example `con
 
 ### D.7 Shell-script self-tests
 
-Every committed shell script with a self-test, either a `*-selftest.sh` file or a `--self-test` mode (`git ls-files '*.sh'`):
+The sweep covered every committed shell file outside `dev/archive`: `*.sh`, `*.bash` and `*.bats` files under `scripts/`, `contrib/`, `.agents/`, `web/`, `mcp-server/`, `crates/`, `dev/` and `test-vectors/`, plus extensionless files with a shell shebang. It matched `test-*.sh`, `*-test.sh`, `*selftest*`, `--self-test` and `self_test`, then classified each match by what it tests. The tree has no bats files.
 
-| Self-test | Exercises | Tools it requires (exit 2 when missing) | Runs today |
+Shell suites that test a repository script. No `.jit/gates.toml` gate runs any of them.
+
+| Self-test | Exercises | Tools it requires | Runs today |
 | --- | --- | --- | --- |
-| `scripts/cargo-ci-selftest.sh` | `scripts/cargo-ci.sh` gate behaviour over six fixture crates | git, cargo, jq | default suite (`merged_tree_gate_verification_tests.rs`) |
+| `scripts/cargo-ci-selftest.sh` | `scripts/cargo-ci.sh` gate behaviour over six fixture crates | git, cargo, jq (exit 2) | default suite (`merged_tree_gate_verification_tests.rs`) |
 | `scripts/profile-test-suite.sh --self-test` | the suite profiler | — | default suite (`build_profile_policy_tests.rs:332`) |
 | `scripts/rust-build-budget.sh` (14 Rust-driven cases) | the build-budget checker | jq | default suite (`rust_build_budget_checker_tests.rs`) |
 | `scripts/setup-recorded-failure-corpus.sh --self-test` | the corpus setup script | — | default suite (`failure_probe_fixture.rs:1060`) |
-| `scripts/docs-check-selftest.sh` | `scripts/docs-mechanical.sh` and the seven `scripts/docs-check-*.sh` checkers | jit, jq | nowhere |
-| `scripts/generate-shipped-policy-regions-selftest.sh` | `scripts/generate-shipped-policy-regions.sh` | git, jit | nowhere |
-| `scripts/workflow-contract-selftest.sh` | `scripts/workflow-contract.sh` with `test-vectors/workflow-contract/` | python3 | `.github/workflows/ci.yml:54` only |
-| `scripts/benchmark-session-cost-selftest.sh` | `scripts/benchmark-session-cost.sh` against a fake `jit` | cmp, find, git, grep, jq, sha256sum | nowhere |
+| `scripts/docs-check-selftest.sh` | `scripts/docs-mechanical.sh` and the seven `scripts/docs-check-*.sh` checkers | jit, jq (exit 2) | nowhere |
+| `scripts/generate-shipped-policy-regions-selftest.sh` | `scripts/generate-shipped-policy-regions.sh` | git, jit (exit 2) | nowhere |
+| `scripts/workflow-contract-selftest.sh` | `scripts/workflow-contract.sh` with `test-vectors/workflow-contract/` | python3 (exit 2) | `.github/workflows/ci.yml:54` only |
+| `scripts/benchmark-session-cost-selftest.sh` | `scripts/benchmark-session-cost.sh` against a fake `jit` | cmp, find, git, grep, jq, sha256sum (exit 2) | nowhere |
+| `.agents/skills/jit-project-lead/scripts/test-standards-scan.sh` | `standards-scan.sh` over a seeded `jit init` fixture | jit, jq, gawk (exit 2) | nowhere (gate-run logs show ad hoc runs) |
+| `.agents/skills/jit-project-lead/scripts/test-standards-fix.sh` | `standards-fix.sh` between two scans | jit, jq, gawk (exit 2) | nowhere |
+| `.agents/skills/jit-planning-lead/evals/test-manifest-tool.sh` | `scripts/breakdown_manifest.py` over `evals/fixtures/` | python3 (`set -e`) | nowhere |
 
-No `.jit/gates.toml` gate runs any of them. `dev/benchmarks/nextest-concurrency-934985ca/validate_selftest.py` is a Python helper archived with a benchmark, not a shell-script self-test.
+Matches that are not suites testing a repository script:
 
+| File | What it is | Why REQ-10 does not cover it |
+| --- | --- | --- |
+| `mcp-server/test-with-env.sh` | runs `npm test` with an isolated `JIT_DATA_DIR` | a runner for the MCP JavaScript suite, which the `mcp-ci` gate runs |
+| `scripts/test-ci-local.sh`, `scripts/test-ci-manual.sh` | replay GitHub Actions locally (`act` + podman, or the same commands by hand) | CI runners whose steps the `cargo-ci`, `npm-ci` and `mcp-ci` gates already run; they test no script |
+| `scripts/test-concurrent-mcp.sh`, `scripts/test-label-hierarchy-walkthrough.sh` | manual exercises of the `jit` binary (lock contention, a label-hierarchy walkthrough) | they test the product, not a script; the Rust suites own those properties |
+| `scripts/test-podman.sh` | builds the server image and smoke-tests it with Podman | a deployment smoke of the Dockerfile, not a script self-test |
+| `scripts/validate-setup.sh`, `.agents/skills/jit-execution-lead/scripts/check-leak-into-main.sh` | file-presence and worktree-leak checks | operational checks, not tests of a script |
+| `*/evals/setup-test-repo.sh`, `dev/active/9c9ac88e/*.sh`, `crates/jit/tests/fixtures/**/check.sh`, `scripts/hooks/pre-*` | eval setup, benchmark harnesses, test fixture data, git hooks | none tests a script |
+
+Python tests of scripts (`scripts/release_version_contract_test.py`, `scripts/rust_version_policy_test.py`, `test-vectors/container-image/test_image_contract.py`, `dev/eval/steering/test_run_eval.py`, `dev/benchmarks/nextest-concurrency-934985ca/validate_selftest.py`) are not shell-script self-tests. The first three run in `.github/workflows/`.
