@@ -1,9 +1,10 @@
 {
   "assignee": null,
+  "claimed_at": "2026-10-21T00:59:07.231861376Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.011897709Z",
   "dependencies": [],
-  "description": "Let a checker report an infrastructure fault so that the run is recorded as an error rather than as a verdict on the repository.\n\n## Background\n\nA gate run's status already distinguishes `error` (the checker never reached a verdict: timeout, missing command) from `failed`. An exec checker, however, has no way to say \"I could not judge\": every nonzero exit becomes `failed`. Downstream, a stale build-cache server, a lost host lock and a review agent that produced no output were all recorded as gate failures, indistinguishable from findings, and a lead had to read each report to tell them apart. jit's own review checker (`contrib/gates/ai-review.sh`) exits 1 when the agent produces no output or its verdict cannot be parsed.\n\nExit status 75 (`EX_TEMPFAIL` in `sysexits.h`) is the conventional \"temporary failure, retry later\" code, and downstream wrappers already use it for \"this says nothing about the tree\".\n\nAn evaluation terminated before it records a run (for example a killed process) records nothing, which is correct: no verdict is fabricated. That behavior is undocumented.\n\n## Success Criteria\n\n- [hard] REQ-01: An exec checker that exits 75 produces a run with status `error`; the evaluation exits with the runner-error code and its JSON verdict is `error`.\n- [hard] REQ-02: Every other nonzero checker exit is recorded as `failed`, unchanged.\n- [hard] REQ-03: `contrib/gates/ai-review.sh` exits 75 when the review agent produces no output, its verdict cannot be parsed, or a required tool is missing, and 1 only for a review that found defects.\n- [hard] REQ-04: The gate documentation states the exit-75 convention and that an evaluation terminated before recording leaves no run.\n\n## Notes\n\n- Downstream profile packages that copy `ai-review.sh` (gf2 `sim-research`) adopt the change by re-copying it.\n",
+  "description": "Let an exec checker report an infrastructure fault so that the run is recorded as an error rather than as a verdict on the repository.\n\n## Background\n\nA gate run's status already distinguishes `error` (the checker never reached a verdict) from `failed`. Exit statuses 126 and 127 (command not executable or not found), a timeout, and termination by a signal already map to `error` (`crates/jit/src/gate_execution.rs:148-155`). Any other nonzero exit becomes `failed`, so an exec checker has no way to say \"I could not judge\". Downstream, a stale build-cache server, a lost host lock and a review agent that produced no output were all recorded as gate failures, indistinguishable from findings, and a lead had to read each report to tell them apart.\n\njit's own review checker (`contrib/gates/ai-review.sh`) exits 1 when the agent produces no output (`:142-147`) or its verdict cannot be parsed: under `set -euo pipefail` the verdict `grep` at `:156` fails and exits the script. The reviewer invocation is wrapped in `|| true` (`:103`), so a missing reviewer tool surfaces only as \"no output\".\n\nExit status 75 (`EX_TEMPFAIL` in `sysexits.h`) is the conventional \"temporary failure, retry later\" code. An errored run is never reused, so the next evaluation retries it.\n\nWhich process is terminated decides what is recorded. If the jit process is killed during an evaluation, no run is recorded, because the run is published in the evaluation's final mutation; no verdict is fabricated. If the checker process is killed, jit records an `error` run. Neither behaviour is documented.\n\n## Success Criteria\n\n- [hard] REQ-01: An exec checker that exits 75 produces a run with status `error`; the evaluation exits with the runner-error code and its JSON verdict is `error`.\n- [hard] REQ-02: Every other checker exit keeps its current status.\n- [hard] REQ-03: `contrib/gates/ai-review.sh` exits 75 when the review agent produces no output, its verdict cannot be parsed, or a required tool is missing, and 1 only for a review that found defects.\n- [hard] REQ-04: The gate documentation states the exit-75 convention, that a killed jit process records no run, and that a killed checker records an `error` run.\n\n## Notes\n\n- Downstream profile packages that copy `ai-review.sh` (gf2 `sim-research`) adopt the change by re-copying it.\n- The exit-code reference (`docs/reference/exit-codes.md`) and the custom-gates how-to, which says any nonzero exit means the gate failed, both need the correction.\n",
   "documents": [],
   "first_ready_at": "2026-10-15T11:05:37.011897709Z",
   "gates_required": [
@@ -17,10 +18,11 @@
     "type:task",
     "component:core",
     "epic:lead-friction",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "satisfies:3d9a0ce3/REQ-02"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Record a checker infrastructure fault as an error",
-  "updated_at": "2026-10-15T11:05:37.011897709Z"
+  "updated_at": "2026-10-21T00:59:27.798720624Z"
 }

@@ -9,7 +9,6 @@
     "16c53cc2-f324-4e1e-8881-039bce61d96d",
     "3d9a0ce3-de69-4a99-ac98-9cf4d4852194",
     "4b7c06d0-0436-4dd3-b3c8-52595da3e342",
-    "5f71a48d-16d4-442d-96e4-1fa10f4aed80",
     "8376299c-f9e1-4b7b-be62-27af493f6969",
     "985ab96d-7ad4-4f0d-b6ab-083d2dbfe3d3",
     "9876a23a-8535-45ad-83f8-ca237f017e70",
@@ -52,5 +51,5 @@
   "priority": "critical",
   "state": "backlog",
   "title": "Cut the v1.0.0 tag and verify the published release",
-  "updated_at": "2026-10-20T20:12:43.203597044Z"
+  "updated_at": "2026-10-21T00:59:22.274296414Z"
 }

@@ -1,9 +1,10 @@
 {
   "assignee": null,
+  "claimed_at": "2026-10-21T00:59:47.202605633Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.577670150Z",
   "dependencies": [],
-  "description": "Study the authoring model for changing a declaration an applied profile owns, and recommend a single short path.\n\n## Background\n\nAdding an input table to one profile-owned gate in a downstream repository took five steps and two wrong turns:\n\n1. Editing the gate in the gate registry made validation fail: the applied profile no longer held the value it published.\n2. The remedy the error suggested, capturing the repository into the profile's own package directory, rewrote the gate's contribution as a single-line inline table and left the applied-profile record naming the old package hash, so validation then failed with a repository integrity error.\n3. Upgrading from the edited package alone was refused with \"defined differently by package sim-research\", naming the same package as both sides of the conflict.\n4. What worked was editing the registry and the package to identical values, bumping the package version, and upgrading.\n\nNothing in the registry marks which entries a profile owns, so the first step gives no warning.\n\n## Success Criteria\n\n- [hard] REQ-01: A design note states which side (repository or package) is the source when editing a profile-owned value, and the single command sequence for each supported edit.\n- [hard] REQ-02: The note accounts for each failure above, naming the behavior to remove or change, including the remedy text, the capture output format, the stale record after capture, and the self-conflict on upgrade.\n- [hard] REQ-03: The note recommends what to delete, and the implementation issues are filed from it after the maintainer's ruling.\n",
+  "description": "Study the authoring model for changing a declaration an applied profile owns, and recommend a single short path.\n\n## Background\n\nAdding an input table to one profile-owned gate in a downstream repository took five steps and two wrong turns:\n\n1. Editing the gate in the gate registry made validation fail: the applied profile no longer held the value it published.\n2. The remedy the error suggested, capturing the repository into the profile's own package directory, rewrote the gate's contribution as a single-line inline table and left the applied-profile record naming the old package hash, so validation then failed with a repository integrity error.\n3. Upgrading from the edited package alone was refused with \"defined differently by package sim-research\", naming the same package as both sides of the conflict.\n4. What worked was editing the registry and the package to identical values, bumping the package version, and upgrading.\n\nNothing in the registry marks which entries a profile owns, so the first step gives no warning.\n\n## Success Criteria\n\n- [hard] REQ-01: A design note states which side (repository or package) is the source when editing a profile-owned value, and the single command sequence for each supported edit.\n- [hard] REQ-02: The note accounts for each failure above, naming the behavior to remove or change, including the remedy text, the capture output format, the stale record after capture, and the self-conflict on upgrade.\n- [hard] REQ-03: The note recommends what to delete, and the implementation issues are filed from it after the maintainer's ruling.\n\n\nResolution (2026-10-21, planning of 3d9a0ce3): charter D-8 (revised 2026-10-15) is the maintainer's ruling this study awaited. The repository is the source of every value and package authors edit the manifest directly; each failure above is removed by a named D-8 deletion, mapped in dev/active/3d9a0ce3-lead-friction/investigation-profile.md section 1.5. The implementation issues are filed under 3d9a0ce3.",
   "documents": [],
   "first_ready_at": "2026-10-15T11:05:37.577670150Z",
   "gates_required": [
@@ -15,10 +16,11 @@
     "type:task",
     "component:core",
     "epic:lead-friction",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "resolution:obsolete"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "rejected",
   "title": "Study the authoring path for profile-owned declarations",
-  "updated_at": "2026-10-15T11:05:37.577670150Z"
+  "updated_at": "2026-10-21T00:59:47.508606175Z"
 }

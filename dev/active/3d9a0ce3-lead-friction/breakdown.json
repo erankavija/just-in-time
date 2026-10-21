@@ -200,6 +200,50 @@
     }
   },
   {
+    "key": "status-word-docs",
+    "title": "Show word status markers in documented command output",
+    "description": "Documentation examples of command output show the word status markers the CLI prints, with no emoji or pictographic marker.\n\n## Background\n\nHuman-readable CLI status output uses words (`error`, `warning`, `ok`) in place of emoji and pictographic markers. Several pages still quote the old output (line numbers at the investigation baseline):\n\n- `docs/how-to/dependency-management.md:134-141,216-220,420-426`\n- `docs/reference/worktree-validate.md:378-390`\n- `docs/how-to/troubleshooting.md:139,313,344`\n- `docs/reference/claim.md:363`\n- `docs/tutorials/parallel-work-worktrees.md:127`\n- `docs/concepts/core-model.md:638-645`, which shows output the code never prints\n- `docs/concepts/design-philosophy.md:344-346`\n- `docs/concepts/guarantees.md:541`\n- `docs/how-to/custom-gates.md:53`\n- `dev/authoring-conventions.md:323,342,364`\n\nProse do/don't lists are not output examples, and the type-icon example configuration stays.\n\n## Success Criteria\n\n- [hard] REQ-01: Each output example on these pages matches the text the command prints, with word status markers.\n- [hard] REQ-02: No output example in the documentation contains an emoji or pictographic status marker.\n- [hard] REQ-03: Type-icon examples are unchanged.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:lead-friction",
+      "milestone:v1.0",
+      "component:docs",
+      "satisfies:3d9a0ce3/REQ-05"
+    ],
+    "gates": [
+      "doc-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Documented command output shows word status markers in place of emoji.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-05"
+      ],
+      "terminal": {
+        "consumer_family": "documented command output examples",
+        "test_boundary": "documentation review",
+        "worker_sized_reason": "One known list of output examples on ten pages, edited against settled output.",
+        "footprint": {
+          "touches": [
+            "docs/how-to/dependency-management.md",
+            "docs/reference/worktree-validate.md",
+            "docs/how-to/troubleshooting.md",
+            "docs/reference/claim.md",
+            "docs/tutorials/parallel-work-worktrees.md",
+            "docs/concepts/core-model.md",
+            "docs/concepts/design-philosophy.md",
+            "docs/concepts/guarantees.md",
+            "docs/how-to/custom-gates.md",
+            "dev/authoring-conventions.md"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "profile-record-commands-removal",
     "title": "Remove the record-reading profile subcommands",
     "description": "The `profile list`, `profile validate`, `profile reconfigure` and `profile upgrade` subcommands are removed, because each exists to read or reconcile applied-profile records that charter decision D-8 deletes.\n\n## Background\n\nProfile packages apply once, and from then on the repository owns every value (`@/charter/D-8`). The ownership lifecycle that D-8 rejects surfaces as four subcommands:\n\n- `profile list` and `profile validate` read applied-profile records and render their agreement with the installed package (`list_recorded_profiles` and `validate_recorded_profiles` at `crates/jit/src/commands/profile.rs:614,654`; `render_profile_agreement` at `crates/jit/src/main.rs:1192-1250`).\n- `profile reconfigure` and `profile upgrade` re-derive a selection from the records (`profile.rs:1427-1621`, through `lifecycle_selection_from_sources` at `:1540`).\n\nTheir surfaces are:\n\n- CLI variants (`crates/jit/src/cli.rs:2966-3330`) and dispatch arms (`main.rs:2623-2981`).\n- Command-schema arms (`crates/jit/src/schema.rs:478-530`).\n- MCP curated entries (`mcp-server/curated-tools.json:56-63`) and their tests.\n- The failure-lever registry arms for these subcommands (`crates/jit/tests/cli_issue/failure_lever_registry.toml`, within 674-762), which the failure-probe coverage test checks against the command surface (`crates/jit/tests/cli_issue/failure_probe_coverage_tests.rs:258`).\n- The release workflow's `profile list --json` smoke step (`.github/workflows/release-artifacts.yml:269`, asserted at `:280-294`).\n\nLine numbers are at the investigation baseline. The records themselves and the lifecycle vocabulary are removed separately.\n\n## Success Criteria\n\n- [hard] REQ-01: The `profile list`, `profile validate`, `profile reconfigure` and `profile upgrade` subcommands no longer parse, and the published command schema has no entry for them.\n- [hard] REQ-02: Their executor functions, dispatch arms, renderers and the record-driven lifecycle selection are gone from the source.\n- [hard] REQ-03: The MCP curated tool list names none of them, and the MCP tests pass.\n- [hard] REQ-04: The failure-lever registry holds no arm for a removed subcommand, and the failure-probe coverage test passes.\n- [hard] REQ-05: No release workflow step invokes a removed subcommand.\n- [hard] REQ-06: Tests that exercised only the removed subcommands are deleted, and no surviving test invokes them.\n",
@@ -250,9 +294,49 @@
     }
   },
   {
+    "key": "release-pack-migration",
+    "title": "Produce the shipped workflow package by packing its directory",
+    "description": "The release workflow and the package-content documentation check produce the shipped workflow package by packing its source directory, so neither depends on profile capture.\n\n## Background\n\nPackage authors edit a package manifest directly (`@/charter/D-8`), and pack turns a package directory into an archive. Two scripts still produce the package through capture, which rewrites a package from the repository:\n\n- The release workflow builds the release package with capture (`.github/workflows/release-artifacts.yml:122-140`).\n- The package-content documentation check runs capture and then shows the result (`scripts/docs-check-package-content.sh:141-151`). It is wired into the mechanical documentation checks (`scripts/docs-mechanical.sh:103`), and its self-test exercises that path (`scripts/docs-check-selftest.sh:43,84,100,420`).\n\nLine numbers are at the investigation baseline. Capture still exists while these scripts move; it is removed afterwards.\n\n## Success Criteria\n\n- [hard] REQ-01: The release workflow produces its package archive by packing the package directory, and no workflow step invokes capture.\n- [hard] REQ-02: The package-content documentation check verifies package content through pack without invoking capture.\n- [hard] REQ-03: The documentation-check self-test passes over the changed check.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:lead-friction",
+      "milestone:v1.0",
+      "component:release",
+      "per:@/charter/D-8",
+      "satisfies:3d9a0ce3/REQ-04"
+    ],
+    "gates": [
+      "code-review",
+      "docs-mechanical"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The release workflow and the package-content check produce the package with pack instead of capture.",
+      "contract_refs": [
+        "apply-once-semantics"
+      ],
+      "source_refs": [
+        "REQ-04"
+      ],
+      "terminal": {
+        "consumer_family": "package-producing scripts",
+        "test_boundary": "documentation-check self-test",
+        "worker_sized_reason": "Two scripts and one workflow step switched to an existing subcommand, with no Rust change.",
+        "footprint": {
+          "touches": [
+            ".github/workflows/release-artifacts.yml",
+            "scripts/docs-check-package-content.sh",
+            "scripts/docs-check-selftest.sh"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "profile-capture-removal",
     "title": "Remove profile capture",
-    "description": "`profile capture` and its contribution reconciliation are removed: package authors edit the manifest directly, and the shipped workflow package is produced by packing its source directory.\n\n## Background\n\nCharter decision D-8 deletes capture's reconciliation: the repository owns its values, and a package author edits the package manifest. Capture (`crates/jit/src/commands/profile.rs:744-854`) rewrites a package from the repository through the reconciliation in `crates/jit/src/profile/package_capture.rs` (`refresh_contributions` 439, `published_identities` 505, `read_registry` 558, `republished_manifest` 594, `write_contribution_values` 667, the `CapturedContribution*` types 101-130). That path rewrites a contribution as a single-line inline table and leaves package identity out of step, both reported by a downstream lead.\n\nThe package tree reader (`capture_package_tree`) serves pack and add and stays.\n\nTwo scripts use capture today. The release workflow builds the release package with it (`.github/workflows/release-artifacts.yml:122-140`). The package-content documentation check runs it (`scripts/docs-check-package-content.sh:141-151`), and its self-test exercises that path (`scripts/docs-check-selftest.sh:43,84,100,420`). The failure-lever registry holds a capture arm (`crates/jit/tests/cli_issue/failure_lever_registry.toml`, within 674-762) that the failure-probe coverage test checks against the command surface. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: The `profile capture` subcommand no longer parses and has no command-schema or MCP curated entry.\n- [hard] REQ-02: Capture's contribution reconciliation is gone from the package-capture module, and the package tree reader used by pack and add remains.\n- [hard] REQ-03: The release workflow produces its package archive by packing the package directory, and no workflow step invokes capture.\n- [hard] REQ-04: The package-content documentation check verifies package content without capture, and its self-test passes.\n- [hard] REQ-05: The failure-lever registry holds no capture arm, and the failure-probe coverage test passes.\n- [hard] REQ-06: Capture tests are deleted, and pack and add tests pass unchanged.\n",
+    "description": "`profile capture` and its contribution reconciliation are removed: package authors edit the manifest directly, and pack produces an archive from the package directory.\n\n## Background\n\nCharter decision D-8 deletes capture's reconciliation: the repository owns its values, and a package author edits the package manifest. Capture (`crates/jit/src/commands/profile.rs:744-854`) rewrites a package from the repository through the reconciliation in `crates/jit/src/profile/package_capture.rs` (`refresh_contributions` 439, `published_identities` 505, `read_registry` 558, `republished_manifest` 594, `write_contribution_values` 667, the `CapturedContribution*` types 101-130). That path rewrites a contribution as a single-line inline table and leaves package identity out of step, both reported by a downstream lead. No script or workflow invokes capture any longer.\n\nThe package tree reader (`capture_package_tree`) serves pack and add and stays.\n\nCapture's surfaces are its CLI variant (`crates/jit/src/cli.rs`), dispatch arm (`crates/jit/src/main.rs`), command-schema arm (`crates/jit/src/schema.rs`), MCP curated entry (`mcp-server/curated-tools.json`), and a failure-lever arm (`crates/jit/tests/cli_issue/failure_lever_registry.toml`, within 674-762) that the failure-probe coverage test checks against the command surface. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: The `profile capture` subcommand no longer parses and has no command-schema or MCP curated entry.\n- [hard] REQ-02: Capture's contribution reconciliation is gone from the package-capture module, and the package tree reader used by pack and add remains.\n- [hard] REQ-03: The failure-lever registry holds no capture arm, and the failure-probe coverage test passes.\n- [hard] REQ-04: Capture tests are deleted, and pack and add tests pass unchanged.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -268,10 +352,11 @@
       "mcp-ci"
     ],
     "depends_on": [
-      "profile-record-commands-removal"
+      "profile-record-commands-removal",
+      "release-pack-migration"
     ],
     "planning": {
-      "outcome": "No capture path exists; the shipped workflow package is produced by packing its source directory.",
+      "outcome": "No capture path exists; package authors edit the manifest and pack produces the archive.",
       "contract_refs": [
         "apply-once-semantics"
       ],
@@ -281,7 +366,7 @@
       "terminal": {
         "consumer_family": "package capture path",
         "test_boundary": "profile CLI integration suite",
-        "worker_sized_reason": "One subcommand and its reconciliation helpers, plus two scripts switched to the surviving pack path.",
+        "worker_sized_reason": "One subcommand and its reconciliation helpers, removed after its last script caller moved.",
         "footprint": {
           "touches": [
             "crates/jit/src/commands/profile.rs",
@@ -290,10 +375,8 @@
             "crates/jit/src/main.rs",
             "crates/jit/src/schema.rs",
             "mcp-server/curated-tools.json",
-            ".github/workflows/release-artifacts.yml",
-            "scripts/docs-check-package-content.sh",
-            "scripts/docs-check-selftest.sh",
-            "crates/jit/tests/cli_issue/failure_lever_registry.toml"
+            "crates/jit/tests/cli_issue/failure_lever_registry.toml",
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs"
           ]
         }
       }
@@ -449,7 +532,7 @@
   {
     "key": "profile-record-removal",
     "title": "Remove applied-profile records",
-    "description": "Applying a profile writes no applied-profile record, and the profile lifecycle event records what was applied: the package id, its version and the variable values.\n\n## Background\n\nCharter decision D-8 deletes applied-profile records. No released record format exists, so a repository holding records drops them with no migration (`@/inv/canonical-cutover`). Record code remains in several modules:\n\n- `crates/jit/src/repository_state/profile_apply.rs`: `AppliedProfileRecord` (1395) and record handling (1057-1510).\n- `crates/jit/src/repository_state/initialize.rs`: profiles directory creation (1057-1063), `InstalledRecordConflict` (152), `profile_record_changed` (637), `serialize_profile_record` (1141), and record status classification in `profile_lifecycle_profile` (1081).\n- The data-root layout constant `VirtualPath::PROFILES` (`crates/jit/src/repository_state/path.rs:305`).\n- `crates/jit/src/commands/profile.rs`: the record readers (`applied_record_path` 2466, `read_applied_profile_record` 2191, `read_applied_record` 2986, 2377-2600, 2631-2812), and the applied-package graph candidates (`resolve_applied_profile_packages` 1679, `resolve_profile_graph_with_applied` 1640, the record fallback in `resolve_dependency_package_from` 1757-1790).\n- `crates/jit/src/profile/variables.rs`: record-based resolution (`resolve_package_from_record` 324 and its helpers).\n- `crates/jit/src/profile/agreement.rs`: the agreement report over records.\n\nThe lifecycle vocabulary carries reconfigure and upgrade members (`crates/jit/src/domain/types.rs:1143-1166`). Its installed status is defined as \"no prior record existed\", so it needs a record-free derivation. The event payload (`ProfileLifecycleProfile`, `types.rs:1181`) holds id, status and variables but no version. Sample lifecycle events are built in `crates/jit/src/domain/event_log.rs:101`, `crates/jit/src/repository_state/mutation.rs:2522` and `crates/jit/src/storage/repository_state_store_tests.rs:2360`. The event catalog (`crates/jit/src/domain/event_catalog.rs:264`) describes the payload as \"without resolved values\", and the generated events reference (`docs/reference/events.md`) is rendered from that catalog.\n\nFailure-injection fixtures name a malformed record (`crates/jit/tests/cli_issue/failure_lever_registry.toml:674-762`, `crates/jit/tests/cli_issue/failure_probe_fixture.rs`). A cutover test holds a record-authority guard (`crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`) that another stream also edits. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No code path reads or writes applied-profile records, and the data-root layout declares no profiles directory.\n- [hard] REQ-02: The lifecycle status is derived without a record, and re-applying identical content reports no change.\n- [hard] REQ-03: The profile lifecycle event records the package id, its version and the variable values applied; the event catalog describes that payload, and the generated events reference is regenerated from it.\n- [hard] REQ-04: The lifecycle operation and status vocabularies hold no reconfigure or upgrade member.\n- [hard] REQ-05: A dependency resolves only from the selection's own package closure; previously applied packages are no longer candidates.\n",
+    "description": "Profile application and selection neither write nor read applied-profile records: the record type, its writes under the data root, its layout constant, record conflicts and record-driven dependency resolution are removed.\n\n## Background\n\nCharter decision D-8 deletes applied-profile records. No released record format exists, so a repository holding records drops them with no migration (`@/inv/canonical-cutover`). Record code remains in several modules (line numbers at the investigation baseline):\n\n- `crates/jit/src/repository_state/profile_apply.rs`: `AppliedProfileRecord` (1395) and record handling (1057-1510).\n- `crates/jit/src/repository_state/initialize.rs`: profiles directory creation (1057-1063), `InstalledRecordConflict` (152), `profile_record_changed` (637) and `serialize_profile_record` (1141).\n- The data-root layout constant `VirtualPath::PROFILES` (`crates/jit/src/repository_state/path.rs:305`).\n- `crates/jit/src/commands/profile.rs`: the record readers (`applied_record_path` 2466, `read_applied_profile_record` 2191, `read_applied_record` 2986, 2377-2600, 2631-2812), and the applied-package graph candidates (`resolve_applied_profile_packages` 1679, `resolve_profile_graph_with_applied` 1640, the record fallback in `resolve_dependency_package_from` 1757-1790).\n- `crates/jit/src/profile/variables.rs`: record-based resolution (`resolve_package_from_record` 324 and its helpers).\n- `crates/jit/src/profile/agreement.rs`: the agreement report over records.\n\nThe lifecycle event's status is classified today by whether a record existed (`profile_lifecycle_profile`, `initialize.rs:1081`). Here that classification stops reading a record and is computed from what the apply publishes; redefining the status vocabulary is separate work.\n\nFailure-injection fixtures name a malformed record (`crates/jit/tests/cli_issue/failure_lever_registry.toml:674-762`, `crates/jit/tests/cli_issue/failure_probe_fixture.rs`). A cutover test holds a record-authority guard (`crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`) that another stream also edits.\n\n## Success Criteria\n\n- [hard] REQ-01: No code path reads or writes applied-profile records, and the data-root layout declares no profiles directory.\n- [hard] REQ-02: A dependency resolves only from the selection's own package closure; previously applied packages are no longer candidates.\n- [hard] REQ-03: The lifecycle event's status is computed without reading a record, and re-applying identical content reports no change.\n- [hard] REQ-04: Failure-injection fixtures and tests name no record, and the failure-probe coverage test passes.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -467,16 +550,15 @@
       "profile-three-way-removal"
     ],
     "planning": {
-      "outcome": "Applying a profile writes no record under the data root, and its event names the id, version and variables applied.",
+      "outcome": "Profile application and selection neither write nor read applied-profile records.",
       "contract_refs": [
         "apply-once-semantics"
       ],
       "source_refs": [
-        "REQ-04",
-        "OD-8"
+        "REQ-04"
       ],
       "terminal": {
-        "consumer_family": "profile application lifecycle",
+        "consumer_family": "applied-profile record consumers",
         "test_boundary": "profile apply harness",
         "worker_sized_reason": "The last consumers of one record type, removed together so the build stays green.",
         "footprint": {
@@ -487,18 +569,59 @@
             "crates/jit/src/repository_state/materialize.rs",
             "crates/jit/src/repository_state/mod.rs",
             "crates/jit/src/repository_state/path.rs",
-            "crates/jit/src/domain/types.rs",
-            "crates/jit/src/domain/event_catalog.rs",
-            "crates/jit/src/domain/event_log.rs",
-            "crates/jit/src/repository_state/mutation.rs",
-            "crates/jit/src/storage/repository_state_store_tests.rs",
-            "docs/reference/events.md",
             "crates/jit/src/profile/variables.rs",
             "crates/jit/src/profile/agreement.rs",
             "crates/jit/src/commands/init.rs",
             "crates/jit/tests/cli_issue/failure_lever_registry.toml",
             "crates/jit/tests/cli_issue/failure_probe_fixture.rs",
             "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-lifecycle-event",
+    "title": "Record what was applied in the profile lifecycle event",
+    "description": "The profile lifecycle event records what an apply did: the package id, its version and the variable values applied, with a status vocabulary that no longer refers to records, reconfigure or upgrade.\n\n## Background\n\nCharter decision D-8: \"The profile operation's event records what was applied.\" The lifecycle vocabulary (`crates/jit/src/domain/types.rs:1143-1166`) carries reconfigure and upgrade operations and statuses, and its installed status is defined as \"no prior record existed\". The event payload (`ProfileLifecycleProfile`, `types.rs:1181`) holds id, status and variables but no version. Line numbers are at the investigation baseline.\n\nStruct literals of the event are built in `crates/jit/src/domain/event_log.rs:101`, `crates/jit/src/repository_state/mutation.rs:2522` and `crates/jit/src/storage/repository_state_store_tests.rs:2360`, and the event is assembled in `crates/jit/src/repository_state/initialize.rs` (`profile_lifecycle_profile`). The event catalog (`crates/jit/src/domain/event_catalog.rs:264`) describes the payload as \"without resolved values\"; the generated events reference (`docs/reference/events.md`) is rendered from that catalog.\n\n## Success Criteria\n\n- [hard] REQ-01: The lifecycle operation and status vocabularies hold no reconfigure or upgrade member, and no status is defined by a record's presence.\n- [hard] REQ-02: The profile lifecycle event records the package id, its version and the variable values applied.\n- [hard] REQ-03: The event catalog describes that payload, and the generated events reference is regenerated from it.\n- [hard] REQ-04: Unit tests over event construction own the payload properties.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:lead-friction",
+      "milestone:v1.0",
+      "component:core",
+      "per:@/charter/D-8",
+      "satisfies:3d9a0ce3/REQ-04"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-record-removal"
+    ],
+    "planning": {
+      "outcome": "The lifecycle event names the package id, version and variables applied, with a record-free status vocabulary.",
+      "contract_refs": [
+        "apply-once-semantics"
+      ],
+      "source_refs": [
+        "REQ-04",
+        "OD-8"
+      ],
+      "terminal": {
+        "consumer_family": "profile lifecycle event",
+        "test_boundary": "event catalog unit suite",
+        "worker_sized_reason": "One event payload and its two vocabularies, with a handful of literal construction sites.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/domain/types.rs",
+            "crates/jit/src/domain/event_catalog.rs",
+            "crates/jit/src/domain/event_log.rs",
+            "crates/jit/src/repository_state/mutation.rs",
+            "crates/jit/src/repository_state/initialize.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "docs/reference/events.md"
           ]
         }
       }
@@ -610,7 +733,7 @@
       "code-review"
     ],
     "depends_on": [
-      "profile-record-removal"
+      "profile-lifecycle-event"
     ],
     "planning": {
       "outcome": "Plan, apply, diff and init resolve selectors, the package graph and variable inputs once through one selection value.",
@@ -954,9 +1077,98 @@
     }
   },
   {
-    "key": "profile-single-variant-enums",
-    "title": "Unwrap the single-variant profile enums",
-    "description": "`ProfilePackageSource`, `ProfileOrigin` and `ProfileSelector` are replaced by the value each wraps, because each has one variant once records and selector tags are gone.\n\n## Background\n\nThree enums carry one variant:\n\n- `ProfilePackageSource` (`crates/jit/src/profile/package.rs:45`, only `Directory`), destructured irrefutably at `crates/jit/src/commands/profile.rs:1762,2310`.\n- `ProfileOrigin` (`crates/jit/src/domain/types.rs:1130`, only `Directory`), destructured irrefutably at `crates/jit/src/main.rs:1176`. It serializes as a tagged object (`{\"source\": \"directory\", \"location\": ...}`) in profile results and the lifecycle event, and is read across the composition, application, difference, initialization, materialization, init and validate modules.\n- `ProfileSelector` (`profile.rs:120`), which holds only a package directory path now that selectors carry no tag. It is read by init, the command module, validate, test helpers and two test suites.\n\nLine numbers are at the investigation baseline. The wire change for `origin` needs no migration: no released format exists (`@/inv/canonical-cutover`).\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfilePackageSource`, `ProfileOrigin` or `ProfileSelector` enum remains; each former use holds the value the variant wrapped.\n- [hard] REQ-02: A package origin serializes as its worktree-relative directory path, and the published schemas say so.\n- [hard] REQ-03: The MCP integration tests and the profile publication tests pass over the new origin shape.\n",
+    "key": "profile-package-source-unwrap",
+    "title": "Unwrap the single-variant package source enum",
+    "description": "`ProfilePackageSource` is replaced by the directory path it wraps, because its only variant is `Directory`.\n\n## Background\n\n`ProfilePackageSource` (`crates/jit/src/profile/package.rs:45`) has one variant, `Directory(PathBuf)`, destructured irrefutably at `crates/jit/src/commands/profile.rs:1762,2310`. It is re-exported from `crates/jit/src/profile/mod.rs` and named in `crates/jit/tests/scratch_build/repository_state_cutover_tests.rs`. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfilePackageSource` type remains; each former use holds the package directory path.\n- [hard] REQ-02: Package loading behaves as before for each caller, shown by the existing package tests.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:lead-friction",
+      "milestone:v1.0",
+      "component:core",
+      "per:@/charter/D-18",
+      "satisfies:3d9a0ce3/REQ-09"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-package-type-merge"
+    ],
+    "planning": {
+      "outcome": "Package loading takes the package directory path with no single-variant source enum.",
+      "contract_refs": [],
+      "source_refs": [
+        "REQ-09"
+      ],
+      "terminal": {
+        "consumer_family": "profile package loading",
+        "test_boundary": "package unit suite",
+        "worker_sized_reason": "One single-variant enum unwrapped at a handful of call sites.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/profile/package.rs",
+            "crates/jit/src/profile/mod.rs",
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-selector-unwrap",
+    "title": "Make the profile selector a package path",
+    "description": "`ProfileSelector` is replaced by the package directory path it holds, because a selector carries no tag.\n\n## Background\n\nA `--profile` selector is a bare package directory path, with no `id:` or `path:` tag (`@/charter/D-18`). `ProfileSelector` (`crates/jit/src/commands/profile.rs:120`) is left with one variant holding that path. It is read by `crates/jit/src/commands/init.rs`, `crates/jit/src/commands/mod.rs`, `crates/jit/src/commands/validate.rs`, `crates/jit/src/main.rs`, `crates/jit/src/test_utils.rs`, `crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs` and `crates/jit/tests/fast_rules/derived_state_repair_tests.rs`. Line numbers are at the investigation baseline.\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfileSelector` enum remains; each former use holds the package directory path.\n- [hard] REQ-02: Selector parsing, its error for a tagged argument, and selection behave as before, shown by the existing profile CLI tests.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:lead-friction",
+      "milestone:v1.0",
+      "component:core",
+      "per:@/charter/D-18",
+      "satisfies:3d9a0ce3/REQ-09"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "profile-package-source-unwrap"
+    ],
+    "planning": {
+      "outcome": "A profile selector is the package directory path, with no single-variant selector enum.",
+      "contract_refs": [
+        "apply-once-semantics"
+      ],
+      "source_refs": [
+        "REQ-09",
+        "OD-17"
+      ],
+      "terminal": {
+        "consumer_family": "profile selector consumers",
+        "test_boundary": "profile CLI integration suite",
+        "worker_sized_reason": "One single-variant enum unwrapped along its bounded set of readers.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/profile.rs",
+            "crates/jit/src/commands/init.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/validate.rs",
+            "crates/jit/src/main.rs",
+            "crates/jit/src/test_utils.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs",
+            "crates/jit/tests/fast_rules/derived_state_repair_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "profile-origin-unwrap",
+    "title": "Serialize a profile origin as its directory path",
+    "description": "`ProfileOrigin` is replaced by the worktree-relative directory path it wraps, and a package origin serializes as that path in results, events and schemas.\n\n## Background\n\n`ProfileOrigin` (`crates/jit/src/domain/types.rs:1130`) has one variant, `Directory(RootRelativePath)`, and serializes as a tagged object (`{\"source\": \"directory\", \"location\": ...}`). It is destructured irrefutably at `crates/jit/src/main.rs:1176` and read across the composition, application, difference, package-capture, initialization, materialization, init and validate modules, and in the derived-state repair and cutover tests. Profile results that carry an origin reach the published schemas, human-readable output and the MCP integration tests (`mcp-server/test-integration.js`). Line numbers are at the investigation baseline. The wire change needs no migration: no released format exists (`@/inv/canonical-cutover`).\n\n## Success Criteria\n\n- [hard] REQ-01: No `ProfileOrigin` enum remains; each former use holds the worktree-relative directory path.\n- [hard] REQ-02: A package origin serializes as its worktree-relative directory path, and the published schemas say so.\n- [hard] REQ-03: Human-readable output names the origin directory as before.\n- [hard] REQ-04: The MCP integration tests and the profile publication tests pass over the new origin shape.\n",
     "type": "task",
     "priority": "high",
     "labels": [
@@ -972,30 +1184,25 @@
       "mcp-ci"
     ],
     "depends_on": [
-      "profile-package-type-merge"
+      "profile-selector-unwrap"
     ],
     "planning": {
-      "outcome": "Package source, origin and selector are the paths they wrap, with no single-variant enum left.",
-      "contract_refs": [
-        "apply-once-semantics"
-      ],
+      "outcome": "A package origin is its worktree-relative directory path, with no single-variant origin enum.",
+      "contract_refs": [],
       "source_refs": [
-        "REQ-09",
-        "OD-17"
+        "REQ-09"
       ],
       "terminal": {
-        "consumer_family": "profile wrapper enums",
+        "consumer_family": "profile origin consumers",
         "test_boundary": "profile command harness",
-        "worker_sized_reason": "A mechanical unwrap of three enums whose consumers follow the compiler, with one wire change.",
+        "worker_sized_reason": "One single-variant enum unwrapped through compiler-guided readers, with one wire change.",
         "footprint": {
           "touches": [
-            "crates/jit/src/profile/package.rs",
             "crates/jit/src/domain/types.rs",
-            "crates/jit/src/commands/profile.rs",
             "crates/jit/src/repository_state/profile_apply.rs",
+            "crates/jit/src/commands/profile.rs",
             "crates/jit/src/main.rs",
             "crates/jit/src/commands/init.rs",
-            "crates/jit/src/commands/mod.rs",
             "crates/jit/src/commands/validate.rs",
             "crates/jit/src/profile/mod.rs",
             "crates/jit/src/profile/application.rs",
@@ -1003,10 +1210,10 @@
             "crates/jit/src/profile/package_capture.rs",
             "crates/jit/src/repository_state/initialize.rs",
             "crates/jit/src/repository_state/materialize.rs",
-            "crates/jit/src/test_utils.rs",
-            "crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs",
+            "crates/jit/src/schema.rs",
             "crates/jit/tests/fast_rules/derived_state_repair_tests.rs",
             "crates/jit/tests/scratch_build/repository_state_cutover_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_publication_tests.rs",
             "mcp-server/test-integration.js"
           ]
         }
@@ -1075,7 +1282,7 @@
       "code-review"
     ],
     "depends_on": [
-      "profile-single-variant-enums"
+      "profile-origin-unwrap"
     ],
     "planning": {
       "outcome": "Profile show prints the target set; per-target value hashing is gone while the package identity hash stays.",

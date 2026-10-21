@@ -1,9 +1,10 @@
 {
   "assignee": null,
+  "claimed_at": "2026-10-21T00:59:07.817475964Z",
   "context": {},
   "created_at": "2026-10-15T11:05:37.293933075Z",
   "dependencies": [],
-  "description": "Treat a file under an issue's resolved artifact directory as that issue's document by location, so that artifacts need an explicit link only when they live elsewhere.\n\n## Background\n\nEvery durable artifact must be linked to its issue to be discoverable and to pass artifact-layout review. Workers in linked worktrees cannot write tracker state, so each worker reports a list of paths and the lead links them after merging; a forgotten link costs a review round. The artifact directory an issue owns is already resolved by the repository's layout, so location alone already says which issue a file belongs to.\n\n## Success Criteria\n\n- [hard] REQ-01: Listing an issue's documents includes every file under its resolved artifact directory without an explicit link.\n- [hard] REQ-02: Link checking, validation and artifact-layout conformance treat such a file as tracked.\n- [hard] REQ-03: An explicit link is required only for a path outside the issue's artifact directory, and explicit links to paths inside it are removed from existing records.\n- [hard] REQ-04: Artifacts a worker commits in a linked worktree under the issue's artifact directory are linked once the branch merges, with no tracker write.\n\n## Notes\n\n- Open design point: explicit links carry a document type and label; whether a derived document's type comes from its name or location, or whether the field is dropped, is decided in planning.\n",
+  "description": "Treat a file under an issue's resolved artifact directory as that issue's document by location, so that artifacts need an explicit link only when they live elsewhere or need metadata.\n\n## Background\n\nAn issue's documents are discoverable today only when linked. `doc list` returns the issue's explicit links verbatim, the link checker's tracked set is built from those links, and the server's document content, history, diff and search routes require a link. Workers in linked worktrees therefore report a list of paths, and the lead links them after merging; a forgotten link costs a review round.\n\nThe artifact directory an issue owns is already resolved by the repository's layout, through a pure, configuration-driven resolver (`crates/jit/src/domain/artifact_directory.rs:62-108`; `[documentation].issue_scoped_areas`). An issue owns one directory per declared documentation area, so location alone says which issue a file belongs to. A repository that declares no areas derives nothing. A git-free recursive walk of a directory already exists (`crates/jit/src/storage/artifact_planning.rs`).\n\nArtifact-layout conformance already attributes a path to an issue by its short-id prefix, without a link (`crates/jit/src/domain/artifact_conformance.rs:207-243`).\n\nThe design is one pure domain function that returns an issue's derived documents: the files under its resolved artifact directory in each declared area. Document listing, link checking and server document reads consume it. A derived document carries no type and no label. An explicit link remains the way to attach a path outside the directory, and the way to attach metadata such as the plan label to any path.\n\n## Success Criteria\n\n- [hard] REQ-01: Listing an issue's documents includes every file under its resolved artifact directories without an explicit link.\n- [hard] REQ-02: Link checking and the server's document reads treat such a file as tracked.\n- [hard] REQ-04: Artifacts a worker commits in a linked worktree under the issue's artifact directory are listed as its documents once the branch merges, with no tracker write.\n- [hard] REQ-05: One pure domain function returns an issue's derived documents, and a derived document carries no type or label.\n\n## Notes\n\n- Criterion ID REQ-03 is retired here. Removing redundant explicit links from existing records, and archiving derived documents with their issue, are separate work.\n- Displaying an unpinned document reads it from the committed tree when a repository exists, so an uncommitted derived file is listed but cannot be displayed until it is committed.\n",
   "documents": [],
   "first_ready_at": "2026-10-15T11:05:37.293933075Z",
   "gates_required": [
@@ -17,10 +18,11 @@
     "type:task",
     "component:core",
     "epic:lead-friction",
-    "milestone:v1.0"
+    "milestone:v1.0",
+    "satisfies:3d9a0ce3/REQ-03"
   ],
   "priority": "normal",
   "state": "ready",
   "title": "Derive an issue's documents from its artifact directory",
-  "updated_at": "2026-10-15T11:05:37.293933075Z"
+  "updated_at": "2026-10-21T00:59:28.939857023Z"
 }
