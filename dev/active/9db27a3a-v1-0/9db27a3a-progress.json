@@ -424,6 +424,11 @@
   "user_actions": [
     {
       "date": "2026-10-21",
+      "priority": "urgent",
+      "item": "cargo-ci suite budget (30 s) is becoming structurally tight. On a quiet host the suite clock rose from ~22 s at session start to 27.5-29.05 s as epics add tests. Interim steward rule: a quiet-host overrun is a real finding against the change that crossed it (trim re-proving tests, move tests down a layer, speed fixtures), never --forced; a change that cannot fit is blocked with timings. Decide: raise the budget, change what it measures, or pull test-suite trimming (epic c780514e, currently wave 4 after semantic types) earlier."
+    },
+    {
+      "date": "2026-10-21",
       "item": "Delete 19 stale 0-byte gitignored read-lock sidecars in the primary checkout. Command: find .jit/issues -maxdepth 1 -name '*.lock' -size 0 -delete. lsof showed no holders. A session's permission classifier blocked the deletion, so it is left to the user. It gates nothing."
     },
     {
