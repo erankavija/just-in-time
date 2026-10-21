@@ -11,7 +11,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T05:57:50.006227243Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bedf0962-dcb6-4c72-bd88-a4125e1a69d6",
   "labels": [
     "epic:audit-correctness",
@@ -23,5 +29,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Config show misreports the lease enforcement mode that commands apply",
-  "updated_at": "2026-10-21T05:53:16.662374551Z"
+  "updated_at": "2026-10-21T05:57:50.006227243Z"
 }

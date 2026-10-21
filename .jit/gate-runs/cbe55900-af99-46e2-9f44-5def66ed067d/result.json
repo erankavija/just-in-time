@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e22a5e3070fd9c64ced0e028b6266fe60b3dcd26",
+  "completed_at": "2026-10-21T05:57:47.585041437Z",
+  "duration_ms": 269300,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/configuration.md",
+        "id": "F1",
+        "line": 29,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-13"
+        ],
+        "severity": "medium",
+        "summary": "The new documentation says write_policy resolves for jit config, but config show and config get do not expose it."
+      }
+    ],
+    "summary": "The lease-enforcement resolver change is coherent, but the newly added write_policy documentation claim is false for jit config.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bedf0962-dcb6-4c72-bd88-a4125e1a69d6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "cbe55900-af99-46e2-9f44-5def66ed067d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T05:53:18.284098780Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 4709 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d05-6c6b-78f3-8085-0d74ebff688c\n--------\nuser\n--- 4696 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: dcf6f5ddd, ffb25059b, c593cd5d2, 4d409adf3 (jit:bedf0962)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/orthogonal-tests (.jit/invariants.toml); @/invariant/essential-code-prose (.jit/invariants.toml); @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/invariant/canonical-cutover (.jit/invariants.toml); @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci pending (no recorded run or exit code)\nTruncation recovery: narrowed truncated repository-wide searches and merge output to current resolver/output paths, source-only references, and the tagged merge’s first-parent file list\n\n1. **[blocking][issue-impact]** [docs/reference/configuration.md:29](/home/vkaskivuo/Projects/just-in-time/docs/reference/configuration.md:29) newly states that `write_policy` resolves repository-scoped “for `jit config` and command execution alike,” but `jit config show` emits only `mode` and `enforce_leases` ([main.rs:6750](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/main.rs:6750)) and `config get`’s snapshot likewise omits `write_policy` ([config.rs:1911](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/config.rs:1911)). The same reference calls it a runtime control outside that config surface at line 592. Restrict the new claim to command execution/runtime policy, or expose it consistently. References: @/charter/D-13.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The lease-enforcement resolver change is coherent, but the newly added write_policy documentation claim is false for jit config.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The new documentation says write_policy resolves for jit config, but config show and config get do not expose it.\",\"file\":\"docs/reference/configuration.md\",\"line\":29,\"references\":[\"@/charter/D-13\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

@@ -99,7 +99,7 @@
           "title": "Config show misreports the lease enforcement mode that commands apply",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (focused checks only; lead runs full gate)",
+          "status": "merged; code-review FAILED R1 (F1 docs/reference/configuration.md:29 write_policy not exposed by config show/get); rework queued behind worktree cap",
           "note": "after d92f54aa: config.rs/config_manager.rs"
         },
         {
@@ -108,7 +108,7 @@
           "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending: dispatch frozen by steward resource policy",
+          "status": "dispatched (sonnet)",
           "note": "after 2d10f1dd: commands/issue.rs"
         },
         {
@@ -117,7 +117,7 @@
           "title": "Apply the claim-next filter when choosing which issue to claim",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched (focused checks only; lead runs full gate)",
+          "status": "merged; code-review passed; cargo-ci re-running",
           "note": "after 2d10f1dd: commands/issue.rs, main.rs"
         },
         {
@@ -165,7 +165,8 @@
     }
   ],
   "rework_counts": {
-    "7d1bfe89": 1
+    "7d1bfe89": 1,
+    "bedf0962": 1
   },
   "surfaced_pitfalls": [
     {
