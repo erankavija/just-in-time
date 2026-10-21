@@ -150,6 +150,8 @@ pub fn execute_gate_checker_with_context(
         // Shell could not execute the command: 127 = command not found,
         // 126 = found but not executable. Runner/infra error, not a checker verdict.
         Some(126) | Some(127) => GateRunStatus::Error,
+        // The checker reports it could not judge (EX_TEMPFAIL).
+        Some(CHECKER_TEMPFAIL_EXIT) => GateRunStatus::Error,
         Some(_) => GateRunStatus::Failed,
         None => GateRunStatus::Error, // killed by signal / timeout
     };
@@ -182,6 +184,10 @@ pub fn execute_gate_checker_with_context(
         evaluation_stability: crate::domain::GateEvaluationStability::Stable,
     })
 }
+
+/// Exit status (`EX_TEMPFAIL`) by which an exec checker reports an
+/// infrastructure fault instead of a verdict on the repository.
+const CHECKER_TEMPFAIL_EXIT: i32 = 75;
 
 /// Result of command execution
 struct CommandExecutionResult {

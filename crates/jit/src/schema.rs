@@ -971,8 +971,8 @@ impl CommandSchema {
             row(
                 "gate evaluate, gate evaluate-all, gate evaluate-many",
                 10,
-                "A checker could not run to a verdict (timeout, crash, or \
-                 command not found).",
+                "A checker could not run to a verdict (timeout, crash, command \
+                 not found, or exit status 75).",
                 true,
             ),
             // Findings signalled by a completed run via a non-zero exit code.

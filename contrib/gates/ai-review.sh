@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+CANNOT_JUDGE=75
+
 # AI-powered review gate checker for jit.
 #
 # Pipes a structured review prompt (issue context + gate instructions) into an
@@ -8,7 +10,10 @@ set -euo pipefail
 #
 # Contract:
 #   exit 0  — gate passed
-#   exit 1  — gate failed (or verdict could not be parsed)
+#   exit 1  — gate failed: the review found defects
+#   exit 75 — could not judge (EX_TEMPFAIL): missing configuration or reviewer
+#             tool, no agent output, or an unparseable verdict; jit records an
+#             error run and the next evaluation retries
 #   stdout  — full review text, captured by jit in gate run results
 #   stderr  — errors, shown by jit on failure
 #
@@ -39,24 +44,24 @@ set -euo pipefail
 
 if [ -z "${JIT_CONTEXT_FILE:-}" ]; then
   echo "ERROR: JIT_CONTEXT_FILE not set. This gate requires --pass-context." >&2
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
 
 if [ ! -f "$JIT_CONTEXT_FILE" ]; then
   echo "ERROR: Context file not found: $JIT_CONTEXT_FILE" >&2
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
 
 if [ -z "${REVIEWER_AGENT:-}" ]; then
   echo "ERROR: REVIEWER_AGENT not set." >&2
   echo "  Set it to a command that reads a prompt from stdin and writes to stdout." >&2
   echo "  Example: REVIEWER_AGENT='your-reviewer-command'" >&2
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
 
 if ! grep -Eq '"prompt"[[:space:]]*:[[:space:]]*"[^"]+' "$JIT_CONTEXT_FILE"; then
   echo "ERROR: No prompt defined for this gate. Set --prompt or --prompt-file when defining the gate." >&2
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
 
 # Capture agent stderr to a temp file so we can surface it on errors.
@@ -66,6 +71,7 @@ trap 'rm -f "$AGENT_STDERR"' EXIT
 # Feed the complete context directly. The JSON contains the resolved `prompt`
 # plus the issue, gate, and prior-run data, so no external JSON parser is
 # required on the adopter host.
+REVIEW_STATUS=0
 REVIEW_OUTPUT=$(
   {
     cat <<'EOF'
@@ -100,7 +106,7 @@ VERDICT: FAIL
 No text may follow the verdict line.
 EOF
   } | eval "$REVIEWER_AGENT" 2>"$AGENT_STDERR"
-) || true
+) || REVIEW_STATUS=$?
 
 # A reviewer agent's stderr can be enormous -- it may echo its entire prompt and
 # context back (observed: thousands of lines per run). jit stores this verbatim
@@ -139,11 +145,20 @@ show_agent_stderr() {
   fi
 }
 
+# The shell reports 126/127 when the reviewer command is not executable or
+# not found: a missing tool, not a review.
+if [ "$REVIEW_STATUS" -eq 126 ] || [ "$REVIEW_STATUS" -eq 127 ]; then
+  echo "---" >&2
+  echo "ERROR: Reviewer tool is missing or not executable (exit $REVIEW_STATUS): $REVIEWER_AGENT" >&2
+  show_agent_stderr
+  exit "$CANNOT_JUDGE"
+fi
+
 if [ -z "$REVIEW_OUTPUT" ]; then
   echo "---" >&2
   echo "ERROR: Agent produced no output." >&2
   show_agent_stderr
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
 
 echo "$REVIEW_OUTPUT"
@@ -152,8 +167,8 @@ echo "$REVIEW_OUTPUT"
 # works on BSD and GNU). Scanning for the last *matching* line rather than the
 # last non-blank line makes the parser robust to reviewer prose that follows the
 # verdict line. Rule: if both PASS and FAIL appear, the last verdict line wins.
-# No matching line → verdict-unparseable → treated as failure.
-VERDICT=$(echo "$REVIEW_OUTPUT" | grep -E 'VERDICT:[[:space:]]*(PASS|FAIL)' | tail -1 | sed -n 's/.*VERDICT:[[:space:]]*\(PASS\|FAIL\).*/\1/p')
+# No matching line → verdict-unparseable → cannot judge.
+VERDICT=$(echo "$REVIEW_OUTPUT" | { grep -E 'VERDICT:[[:space:]]*(PASS|FAIL)' || true; } | tail -1 | sed -n 's/.*VERDICT:[[:space:]]*\(PASS\|FAIL\).*/\1/p')
 
 if [ "$VERDICT" = "PASS" ]; then
   echo "---"
@@ -166,7 +181,7 @@ elif [ "$VERDICT" = "FAIL" ]; then
   exit 1
 else
   echo "---" >&2
-  echo "ERROR: Could not extract VERDICT from review output. Treating as failure." >&2
+  echo "ERROR: Could not extract VERDICT from review output. Cannot judge." >&2
   show_agent_stderr
-  exit 1
+  exit "$CANNOT_JUDGE"
 fi
