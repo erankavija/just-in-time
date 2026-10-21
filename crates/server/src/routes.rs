@@ -291,40 +291,37 @@ async fn search_issues<S: IssueStore>(
         tracing::error!("Search has no repository layout: {:?}", error);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    let nested_data = layout.data_root().strip_prefix(layout.worktree_root()).ok();
-    let mut file_patterns = document_paths;
-    if let Some(relative) = nested_data {
-        file_patterns.push(format!("{}/issues/*.json", relative.display()));
-    }
-
-    let options = SearchOptions {
-        case_sensitive: params.case_sensitive,
-        regex: params.regex,
-        max_results: Some(params.limit),
-        file_patterns,
-        ..Default::default()
-    };
-
-    let mut results =
-        jit::search::search(layout.worktree_root(), &params.q, options).map_err(|e| {
+    let search_under = |root: &std::path::Path, file_patterns: Vec<String>, max: usize| {
+        jit::search::search(
+            root,
+            &params.q,
+            SearchOptions {
+                case_sensitive: params.case_sensitive,
+                regex: params.regex,
+                max_results: Some(max),
+                file_patterns,
+                ..Default::default()
+            },
+        )
+        .map_err(|e| {
             tracing::error!("Search failed: {:?}", e);
             StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    if nested_data.is_none() && results.len() < params.limit {
-        let remaining = params.limit - results.len();
-        let data_options = SearchOptions {
-            case_sensitive: params.case_sensitive,
-            regex: params.regex,
-            max_results: Some(remaining),
-            file_patterns: vec!["issues/*.json".to_string()],
-            ..Default::default()
-        };
-        let mut data_results = jit::search::search(layout.data_root(), &params.q, data_options)
-            .map_err(|e| {
-                tracing::error!("Data-root search failed: {:?}", e);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-        results.append(&mut data_results);
+        })
+    };
+
+    // Issue records live under the data root, hidden or not; an empty glob
+    // list would search every file, so documents are searched only when linked.
+    let mut results = search_under(
+        layout.data_root(),
+        vec!["issues/*.json".to_string()],
+        params.limit,
+    )?;
+    if !document_paths.is_empty() && results.len() < params.limit {
+        results.append(&mut search_under(
+            layout.worktree_root(),
+            document_paths,
+            params.limit - results.len(),
+        )?);
     }
 
     let duration_ms = start.elapsed().as_millis();
@@ -1764,6 +1761,35 @@ pattern = '^v\d+\.\d+$'
         };
         let server = TestServer::new(create_routes(state)).unwrap();
         (server, id, doc_rel.to_string())
+    }
+
+    async fn search_hits(server: &axum_test::TestServer, query: &str) -> Vec<SearchResult> {
+        let response = server.get("/search").add_query_param("q", query).await;
+        assert_eq!(
+            response.status_code(),
+            StatusCode::OK,
+            "{}",
+            response.text()
+        );
+        response.json::<SearchResponse>().results
+    }
+
+    #[tokio::test]
+    async fn test_search_nested_data_root_returns_issue_record_match() {
+        let (server, id, _) = create_test_app_with_html_doc();
+        let hits = search_hits(&server, "Test issue").await;
+        assert!(
+            hits.iter().any(|hit| hit.issue_id.as_deref() == Some(&id)),
+            "{hits:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_search_nested_data_root_keeps_linked_documents_and_excludes_other_files() {
+        let (server, _, doc) = create_test_app_with_html_doc();
+        let hits = search_hits(&server, "hello").await;
+        assert!(hits.iter().any(|hit| hit.path.ends_with(&doc)), "{hits:?}");
+        assert!(search_hits(&server, "enforce_leases").await.is_empty());
     }
 
     #[tokio::test]
