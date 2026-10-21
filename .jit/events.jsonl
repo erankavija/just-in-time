@@ -17558,3 +17558,11 @@
 {"gate_key":"cargo-ci","id":"ab78b2a8-7d3c-4c8f-b209-0f28e846962e","issue_id":"ae2e3739-f5f7-42be-8ae4-8ae3e1866800","timestamp":"2026-10-21T06:10:41.010738419Z","type":"gate_passed","updated_by":"auto:executor"}
 {"from":"in_progress","id":"de42f528-ad6d-4e12-bfa6-6396cec4fb34","issue_id":"7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6","timestamp":"2026-10-21T06:10:41.435338892Z","to":"done","type":"issue_state_changed"}
 {"id":"cff2a050-0662-486b-a718-12126741bcff","issue_id":"7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6","timestamp":"2026-10-21T06:10:41.435338892Z","type":"issue_completed"}
+{"assignee":"agent:jit-execution-lead","id":"696d05a1-f71c-4390-acf1-87001bf7e3a9","issue_id":"05d1b34e-3174-411e-851b-86b5223a6841","timestamp":"2026-10-21T06:10:48.507379285Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"2dde2add-7f76-47c0-b647-7a0381d1e917","issue_id":"05d1b34e-3174-411e-851b-86b5223a6841","timestamp":"2026-10-21T06:13:40.420817509Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"9e9d2943-4d7a-4a84-b5e9-8354222b02f1","issue_id":"66986f88-b4fb-402a-9d2c-d643033c94a7","timestamp":"2026-10-21T06:13:55.322515132Z","type":"gate_failed","updated_by":"auto:executor"}
+{"gate_key":"cargo-ci","id":"fd1d7e02-b6ca-49e5-befb-591657ef5385","issue_id":"66986f88-b4fb-402a-9d2c-d643033c94a7","timestamp":"2026-10-21T06:15:01.510035793Z","type":"gate_passed","updated_by":"auto:executor"}
+{"id":"631eed8e-2335-4d85-b3b5-a5fefaa40eff","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","priority":"high","timestamp":"2026-10-21T06:15:46.346932994Z","title":"Report load-only cargo-ci failures as infrastructure faults","type":"issue_created"}
+{"from":"ready","id":"a69ec9f1-2610-4c58-ab2c-89b0374456b4","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T06:15:51.967977576Z","to":"backlog","type":"issue_state_changed"}
+{"fields":["dependencies"],"id":"adb25db2-7fc3-41eb-bbc6-bf62abd3daca","issue_id":"494f1d4b-991c-4b02-b747-6ff1cbdcc652","timestamp":"2026-10-21T06:15:51.967977576Z","type":"issue_updated","updated_by":"dependency-add"}
+{"fields":["dependencies"],"id":"f1cec4bf-a6bd-4bf0-9406-8a9ca4293b3c","issue_id":"3d9a0ce3-de69-4a99-ac98-9cf4d4852194","timestamp":"2026-10-21T06:15:52.263945149Z","type":"issue_updated","updated_by":"dependency-add"}

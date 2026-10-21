@@ -12,7 +12,7 @@
           "title": "Accept the worktree root as a gate input root",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (base b4907be95)"
+          "status": "merged a51913ccd; cargo-ci passed; code-review/doc-review pending"
         },
         {
           "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
@@ -20,7 +20,7 @@
           "title": "Record a checker infrastructure fault as an error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched (base b4907be95)"
+          "status": "merged 131e5080c; cargo-ci passed; code-review/doc-review pending"
         },
         {
           "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
@@ -28,7 +28,7 @@
           "title": "Derive an issue's documents from its artifact directory",
           "classification": "implementation",
           "model": "opus",
-          "status": "dispatched (base b4907be95)"
+          "status": "merged 428147948; cargo-ci passed (forced rerun after budget-only load failure); code-review/doc-review pending"
         },
         {
           "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
@@ -36,7 +36,7 @@
           "title": "Remove profile checks from repository validation",
           "classification": "implementation",
           "model": "haiku",
-          "status": "dispatched (base b4907be95)"
+          "status": "merged 78684701c + lead fix af530c678 (stale tests); cargo-ci passed; code-review pending"
         },
         {
           "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
@@ -44,7 +44,7 @@
           "title": "Produce the shipped workflow package by packing its directory",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "dispatched (base b4907be95)"
+          "status": "merged 48999bd25; docs-mechanical passed; code-review pending"
         }
       ],
       "note": "1a: disk-bounded (51G free) sub-wave"
@@ -118,6 +118,14 @@
           "id": "24268b05-2ab4-4864-87fe-e8ff35945191",
           "short_id": "24268b05",
           "title": "Remove the record-reading profile subcommands",
+          "classification": "implementation",
+          "model": "sonnet",
+          "status": "pending"
+        },
+        {
+          "id": "494f1d4b-991c-4b02-b747-6ff1cbdcc652",
+          "short_id": "494f1d4b",
+          "title": "Report load-only cargo-ci failures as infrastructure faults",
           "classification": "implementation",
           "model": "sonnet",
           "status": "pending"
@@ -476,9 +484,26 @@
       ]
     }
   ],
-  "created_during_execution": [],
-  "escalations": [],
-  "surfaced_pitfalls": [],
+  "created_during_execution": [
+    {
+      "short_id": "494f1d4b",
+      "reason": "steward-approved option A: load-only cargo-ci failures reused by digest as verdicts",
+      "approved_by": "milestone steward"
+    }
+  ],
+  "escalations": [
+    {
+      "topic": "load-induced cargo-ci failures reused by digest",
+      "resolution": "steward approved new task 494f1d4b (option A)"
+    }
+  ],
+  "surfaced_pitfalls": [
+    "66986f88: JIT_ISSUE_DOCS for gates, `issue show`, and the issue JSON the web UI reads still list explicit links only; derived documents are invisible there. Reconcile against epic REQ-03 before the epic gate.",
+    "ae2e3739: server.log and server.pid.json are not in the tracker-written set (the issue list omits them); a running server changes a `.` gate's digest. Relevant to 5a3a886f.",
+    "d6bbe05f: docs/reference/profiles.md 'Derived state and managed regions' still describes validation over profile-owned targets; ae85c6ce rewrites it.",
+    "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root."
+  ],
   "rework_counts": {},
-  "started_at": "2026-10-21T04:21:37+03:00"
+  "started_at": "2026-10-21T04:21:37+03:00",
+  "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock"
 }
