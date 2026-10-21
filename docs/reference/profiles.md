@@ -6,8 +6,7 @@ Repository profiles install a coherent JIT workflow as one explicit operation.
 A profile is a package: a directory holding a manifest, the assets that
 manifest declares, and the managed-region sources it owns. This is the
 canonical adopter reference for the profile lifecycle: authoring and capture,
-offline exchange, composition, variables and ownership, drift recovery,
-reconfiguration, and upgrade. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
+offline exchange, composition, variables and ownership, and drift recovery. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
 to inspect the exact packages a release or a repository currently carries.
 
 ## Obtaining a package
@@ -217,21 +216,12 @@ treating repository-local vocabulary as an engine default.
 
 ## Commands
 
-List the profiles this repository's own records name, and inspect one or more —
-either profiles those records name, or packages at locations:
+Inspect one or more profiles — either profiles this repository's own records
+name, or packages at locations:
 
 ```bash
-jit profile list
 jit profile show --profile id:jit-dogfood
 jit profile show --profile path:packages/jit-dogfood
-```
-
-Check every recorded profile against the package it came from and the content it
-owns, which is what says whether a repository needs reconfiguring, upgrading, or
-capturing:
-
-```bash
-jit profile validate
 ```
 
 Report what a selection would change here, including the targets and registry
@@ -269,9 +259,8 @@ the bytes of a live asset, and the value of a declared contribution. An adopter
 who changes a contributed value in its registry captures the package that
 published it and applies the result; the registry keeps the value they chose,
 and the package and its applied-profile record agree with it again. Until they
-do, [`jit profile diff`](cli-commands.md#jit-profile-diff),
-[`jit profile validate`](cli-commands.md#jit-profile-validate), and `jit
-validate` all name that declaration, and an application is refused rather than
+do, [`jit profile diff`](cli-commands.md#jit-profile-diff) and `jit validate`
+both name that declaration, and an application is refused rather than
 reporting nothing to do.
 
 Pack a package into one portable file to hand to somebody, and place one
@@ -335,34 +324,24 @@ Use `jit profile diff` before a change to see every target and semantic
 declaration a selection would create, update, retain, remove, or conflict on.
 Each decision identifies every package that owns it; an empty owner list is
 repository-authored content, while several owners identify shared content.
-`jit profile validate` checks every applied-profile record against its package
-and the content it owns, and reports drift without changing files.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
-validation as its corresponding `apply`, `reconfigure`, `upgrade`, `capture`,
-`pack`, or `add` command, but writes no target, provenance record, or lifecycle
+validation as its corresponding `apply`, `capture`, `pack`, or `add` command, but writes no target, provenance record, or lifecycle
 event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
 operator can identify the conflicting target or declaration and its owner.
 
 Choose the recovery action from the reported ownership and intended authority:
 
-- Reconfigure an unchanged installed package when a declared variable needs a
-  different value: `jit profile reconfigure --profile id:<PROFILE_ID> --set NAME=VALUE --dry-run`,
-  then repeat without `--dry-run`.
 - Capture a package when its owner intentionally adopts a changed declared live
   asset or semantic contribution from the repository: `jit profile capture --source <DIR> --destination <DIR>`.
   Capture refreshes every declared contribution it owns from the registry and
   leaves repository-authored declarations out of the package.
-- Upgrade when the package directory contains a newer version: `jit profile upgrade --profile path:<DIR> --dry-run`,
-  then repeat without `--dry-run`. Upgrade preserves shared content another
-  installed package still owns and removes unchanged content the replaced
-  package solely owned but no longer contributes.
 
-An owned target that has drifted is a conflict for reconfigure or upgrade; the
-conflict publishes nothing. Restore the intended owner’s content, or capture
-the intended package change before applying or upgrading it. Do not use a
+An owned target that has drifted is a conflict that publishes nothing. Restore
+the intended owner’s content, or capture the intended package change before
+applying it. Do not use a
 profile operation to overwrite repository-authored or another profile’s
-conflicting content. Every conflict and divergence carries this choice as a
+conflicting content. Every conflict carries this choice as a
 typed remedy; see [the remedy contract](#the-remedy-contract) for the
 vocabulary and its machine-readable form.
 
@@ -393,8 +372,8 @@ tools.
 
 ## The remedy contract
 
-A refused publication and a `jit profile validate` divergence both carry a
-typed remedy: the resolutions that apply to that finding, drawn from one
+A refused publication carries a typed remedy: the resolutions that apply to
+that finding, drawn from one
 fixed vocabulary rather than composed per command. The restore-versus-capture
 guidance above is that vocabulary read as prose; this section is its data
 contract.
@@ -421,28 +400,14 @@ depends on who holds it:
 | Diverged | — | `restore-recorded-content`, `capture-repository-content` |
 | Contested | — | `make-definitions-identical`, `apply-only-one-declaring-package` |
 
-A `jit profile validate` divergence is one of six classes, each carrying a
-fixed remedy:
-
-| Divergence class | Remedy |
-|---|---|
-| Unreadable package, unresolved values, or unowned target | `restore-recorded-package` |
-| Changed package identity, changed target, or absent target | `restore-recorded-content`, `capture-repository-content` |
-
 The remedy reaches machine-readable output as part of the [standard `--json`
-error envelope](cli-commands.md#cli-json-contracts):
-
-- A refused publication's `PROFILE_CONFLICT` error carries
-  `error.details.conflicts[]`, one entry per refused target or declaration as
-  `{owner, subject, conflict}`. `conflict.kind` names the conflict class and
-  `conflict.remedy.resolutions` carries its remedy from the vocabulary above.
-  `error.suggestions` carries the distinct resolution messages across every
-  conflict in the refusal, in first-occurrence order, naming
-  `jit profile capture` only where some conflict's remedy allows it.
-- `jit profile validate --json` reports divergence the same way, under
-  `error.details.profiles[].divergences[]`: each divergence carries its
-  `kind` and `remedy.resolutions`, and `error.suggestions` is the same
-  distinct, first-occurrence list over the whole report.
+error envelope](cli-commands.md#cli-json-contracts): a refused publication's
+`PROFILE_CONFLICT` error carries `error.details.conflicts[]`, one entry per
+refused target or declaration as `{owner, subject, conflict}`. `conflict.kind`
+names the conflict class and `conflict.remedy.resolutions` carries its remedy
+from the vocabulary above. `error.suggestions` carries the distinct resolution
+messages across every conflict in the refusal, in first-occurrence order, naming
+`jit profile capture` only where some conflict's remedy allows it.
 
 `jit --schema` is the field-level contract for both shapes.
 
@@ -541,9 +506,8 @@ provenance record stores the profile ID, version, origin, package hash,
 resolved public variable values with their source kinds, and sorted ownership
 claims. Each claim names one semantic declaration, file target, or managed
 region together with its published-base fingerprint and retention intent. That fingerprint is what
-[`jit profile validate`](cli-commands.md#jit-profile-validate) holds the
-repository's current content against, so it names the profile that diverged and
-the contribution that did. A managed region whose published body encloses a
+a later application holds the repository's current content against, so a
+diverged conflict names the profile and the contribution that diverged. A managed region whose published body encloses a
 region another owner manages — a package's guidance region around a configured
 projection — is checked for presence rather than content: that nested body is
 rendered from what its own owner declares, so the enclosing profile's recorded

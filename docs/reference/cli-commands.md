@@ -654,27 +654,6 @@ One obtained directory of packages therefore applies as a set:
 and applied in their occurrence order, including interleaved `id:` and `path:`
 selectors.
 
-### `jit profile list`
-
-List the profiles this repository records from repository package locations:
-
-```bash
-jit profile list [--json]
-```
-
-Human output shows each profile's ID, version, compatible JIT range, origin, and
-whether the stored record still matches the package at its location. That check
-compares records, not installed target bytes. JSON uses the standard list
-envelope `{"count": N, "profiles": [...]}`. Each profile entry carries `id`,
-`version`, `origin`, `jit`, and `applied`. What the command reports, and when it
-fails, follows the applied-profile records alone: a repository that has applied
-nothing reports no profile, and a recorded location that no longer holds a
-readable package fails the command by naming the record and the location.
-
-The resolved package is authoritative for the live values; scripts should inspect
-the returned fields rather than copy package identity or compatibility values
-from prose.
-
 ### `jit profile show`
 
 Show one or more profile manifests and package identities from repository packages:
@@ -695,46 +674,8 @@ each entry carries `id`, `version`, the complete parsed manifest, `origin`, `pac
 `target_hashes`, `file_count`, `byte_size`, and the parseable stored `applied`
 provenance record when one is present. Entries preserve every `--profile`
 occurrence in order, including repeated selectors. `show` does not compare that
-record with current target bytes; use `jit profile validate` to check every
-recorded profile against its package and the content it owns, or `jit profile
-apply --profile <SELECTOR> --dry-run` to rehearse one package's application.
-
-### `jit profile validate`
-
-Check the profiles this repository records against their packages and its own
-content:
-
-```bash
-jit profile validate [--json]
-```
-
-The applied-profile records are the whole inventory, exactly as they are for
-[`jit profile list`](#jit-profile-list): a repository that has applied nothing
-reports no profile and succeeds. For each recorded profile the check reports
-whether its package is still readable at the location the record names, whether
-that package is still the one the record identifies, and whether each target the
-record's ownership claims name still holds the value the profile published. A
-claimed target that is no longer in the repository is reported in its own right,
-as is every target claimed by a record whose package is gone.
-
-Human output shows one line per profile with its ID, version, and origin, followed by one
-line per divergence. JSON uses the standard list envelope
-`{"count": N, "profiles": [...]}`; each entry carries `id`, `version`, the `record` path,
-the recorded `origin`, and its own count-wrapped `divergences`, each naming its
-`kind` and the target or package fact it reports.
-
-The check writes nothing: no target, no provenance record, and no audit event.
-It exits `0` when every recorded profile agrees and `4` when any diverged, so it
-serves as a repository check. A repository that cannot be read — an unreadable
-record, or a claimed registry that is not a regular file — is an error rather
-than a divergence, and uses the shared typed error envelope.
-
-Whole-repository [`jit validate`](#jit-validate) does not report these
-divergences: an edit to a value a package contributed is an ordinary repository
-change. What each divergence means for the package that owns it, and which of
-[`reconfigure`](#jit-profile-reconfigure), [`upgrade`](#jit-profile-upgrade), and
-[`capture`](#jit-profile-capture) resolves it, is described in
-[Repository Profiles](profiles.md#publication-and-recovery).
+record with current target bytes; use `jit profile apply --profile <SELECTOR>
+--dry-run` to rehearse one package's application.
 
 ### `jit profile diff`
 
@@ -829,84 +770,6 @@ package state, final-state validation failures, filesystem failures, and
 recovery-required conditions use the shared typed error envelope and exit-code
 taxonomy. The [Repository Profiles reference](profiles.md) defines what
 application may change.
-
-### `jit profile reconfigure`
-
-Republish an installed profile from newly supplied values, keeping the package
-it carries:
-
-```bash
-jit profile reconfigure --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
-```
-
-Selectors follow the [profile selector rules](#profile-commands) above, so an
-`id:` selector reads the location the applied-profile record names and every
-occurrence is preserved in order. Each selected profile and the packages it
-declares a dependency on must already be installed, and each must still be the
-package its record describes; a selection whose package identity changed is
-refused, which is what [`jit profile upgrade`](#jit-profile-upgrade) is for.
-
-The record's stored values are the baseline for every variable the package
-declares, so a value an earlier run resolved is never re-derived from the
-manifest or from ambient process state. Supplied values override that baseline
-in values-file, declared-environment, then `--set` order, with the last `--set`
-occurrence winning. Reconfiguring without supplying a value therefore changes
-nothing and reports the profile `unchanged`. The content a changed value feeds
-is republished; every other owned target keeps its exact bytes.
-
-`--dry-run` reports the decisions publication would make and writes nothing: no
-target, no provenance record, and no audit event. JSON returns the count-wrapped
-`ProfilePlanResult` collection `{"count": N, "profiles": [...]}` in the entry
-shape [`jit profile apply`](#jit-profile-apply) documents. A rehearsal reports
-the same profiles in the same order its run reports, so the two compare entry
-for entry: each entry carries the targets its own profile decides and a `status`
-of `would_apply` only when that profile would publish. A repeated selector's
-later occurrences report `unchanged` and carry no target decisions, because the
-first occurrence accounts for the publication they observe. Without `--dry-run`,
-JSON returns `ProfileComposedApplyResult` in the standard count-wrapped envelope
-`{"count": N, "profiles": [...]}`, one `ProfileApplyResult` per corresponding
-rehearsal observation. A published run publishes one redo record, as
-`jit profile apply` does, and appends one profile-lifecycle audit event
-naming the operation and each profile's outcome.
-
-An owned target whose content diverged from what this profile recorded is
-reported as a conflict naming that target, its owning package, and its recorded,
-current, and resolved values. A conflict publishes nothing and exits `4` with
-the shared typed error envelope under `PROFILE_CONFLICT`.
-
-### `jit profile upgrade`
-
-Replace an installed profile's package with a newer version of that package:
-
-```bash
-jit profile upgrade --profile <SELECTOR>... [--values-file <PATH>] [--set NAME=VALUE]... [--dry-run] [--json]
-```
-
-Selectors follow the [profile selector rules](#profile-commands) above. Each
-selected profile must already be installed, and every package in the resolved
-selection that has a record must declare a newer semantic version than that
-record carries; re-running against an installed package itself is an exact
-no-op.
-
-Stored values carry forward for every variable the replacement still declares,
-and supplied values override them in the same values-file,
-declared-environment, then `--set` order. A variable the replacement declares
-for the first time takes that package's default. A stored value that came from
-the installed package's own default follows the replacement's default rather
-than carrying forward, so a package that revises a default it owns delivers that
-revision while a value an adopter supplied survives the upgrade. A variable the
-replacement does not declare is dropped.
-
-Each owned target is decided against the content this profile recorded: a target
-that still holds that content takes the replacement's content, and content
-another applied profile also owns survives when this package stops contributing
-it. The replacement is settled against every applied profile that survives the
-upgrade before anything is written, so a version outside a range another
-profile's manifest requires, or one another profile declares an incompatibility
-with, fails the upgrade with nothing published.
-
-`--dry-run`, the JSON envelopes, and conflict reporting match
-[`jit profile reconfigure`](#jit-profile-reconfigure).
 
 ### `jit profile capture`
 
