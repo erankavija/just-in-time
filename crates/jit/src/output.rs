@@ -1259,13 +1259,52 @@ pub struct StatusResponse {
     pub total: usize,
 }
 
+/// The query an issue search echoes beside its matches.
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct IssueSearchQuery {
+    pub query: Option<String>,
+}
+
+/// Declares the [`CollectionKey`] marker for each list-envelope collection key.
+macro_rules! collection_keys {
+    ($($(#[$meta:meta])* $marker:ident = $key:literal;)+) => {$(
+        $(#[$meta])*
+        pub enum $marker {}
+
+        impl CollectionKey for $marker {
+            const KEY: &'static str = $key;
+        }
+    )+};
+}
+
+collection_keys! {
+    /// `issues`
+    IssuesKey = "issues";
+    /// `dependents`
+    DependentsKey = "dependents";
+    /// `roots`
+    RootsKey = "roots";
+    /// `nodes`
+    NodesKey = "nodes";
+    /// `divergences`
+    DivergencesKey = "divergences";
+    /// `by_state`
+    ByStateKey = "by_state";
+    /// `gates`
+    GatesKey = "gates";
+    /// `results`
+    ResultsKey = "results";
+    /// `artifacts`
+    ArtifactsKey = "artifacts";
+    /// `namespaces`
+    NamespacesKey = "namespaces";
+    /// `worktrees`
+    WorktreesKey = "worktrees";
+}
+
 /// Generic response for issue list queries (available, all, ready, etc.)
 /// Uses MinimalIssue for efficiency - contains only id, title, state, priority
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueListResponse {
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
+pub type IssueListResponse = ListEnvelope<IssuesKey, MinimalIssue>;
 
 /// Full-record response for `jit query … --full --json`.
 ///
@@ -1276,22 +1315,13 @@ pub struct IssueListResponse {
 /// carries. The two shapes are declared side by side in `jit --schema`
 /// (@/inv/single-source-prose: the full arm is derived from the [`Issue`]
 /// struct, not a hand-written mirror).
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueListFullResponse {
-    pub issues: Vec<Issue>,
-    pub count: usize,
-}
+pub type IssueListFullResponse = ListEnvelope<IssuesKey, Issue>;
 
 /// Summary response for `jit issue search … --json` (no `--full`).
 ///
 /// The [`IssueListResponse`] shape plus the echoed `query`: lean
 /// [`MinimalIssue`] entries with no gate fields.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueSearchResponse {
-    pub query: Option<String>,
-    pub issues: Vec<MinimalIssue>,
-    pub count: usize,
-}
+pub type IssueSearchResponse = ListEnvelope<IssuesKey, MinimalIssue, IssueSearchQuery>;
 
 /// Full-record response for `jit issue search … --full --json`.
 ///
@@ -1299,12 +1329,7 @@ pub struct IssueSearchResponse {
 /// [`Issue`] records (gate list under the storage names `gates_required` /
 /// `gates_status`) plus the echoed `query`. Declared alongside
 /// [`IssueSearchResponse`] in `jit --schema`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueSearchFullResponse {
-    pub query: Option<String>,
-    pub issues: Vec<Issue>,
-    pub count: usize,
-}
+pub type IssueSearchFullResponse = ListEnvelope<IssuesKey, Issue, IssueSearchQuery>;
 
 /// Response for `jit issue claim` and `jit issue claim-next --json`.
 ///
@@ -1338,37 +1363,21 @@ pub struct TemplateApplyResponse {
 }
 
 /// Response for blocked query with reasons (minimal issue + reasons)
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct BlockedListResponse {
-    pub issues: Vec<MinimalBlockedIssue>,
-    pub count: usize,
-}
+pub type BlockedListResponse = ListEnvelope<IssuesKey, MinimalBlockedIssue>;
 
 /// Multi-id envelope for `issue show <id> <id> …` — full show projections in
 /// argument order.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueShowListResponse {
-    pub issues: Vec<IssueShowResponse>,
-    pub count: usize,
-}
+pub type IssueShowListResponse = ListEnvelope<IssuesKey, IssueShowResponse>;
 
 /// Multi-id envelope for `issue status <id> <id> …` — status projections in
 /// argument order.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueStatusListResponse {
-    pub issues: Vec<IssueStatusResponse>,
-    pub count: usize,
-}
+pub type IssueStatusListResponse = ListEnvelope<IssuesKey, IssueStatusResponse>;
 
 /// Response for `query blocked --full`: reason-enriched entries. Neither
 /// blocked shape carries the issue's gate-list fields — a blocking gate
 /// appears only as a structured reason — so this command belongs to neither
 /// gate-field rule in the storage reference.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct BlockedFullListResponse {
-    pub issues: Vec<BlockedIssue>,
-    pub count: usize,
-}
+pub type BlockedFullListResponse = ListEnvelope<IssuesKey, BlockedIssue>;
 
 /// Issue with blocking reasons (minimal version for lists)
 #[derive(Debug, Serialize, JsonSchema)]
@@ -1399,11 +1408,12 @@ pub enum BlockedReasonType {
 // ============================================================================
 
 /// Response for `graph downstream` command
+pub type GraphDownstreamResponse = ListEnvelope<DependentsKey, MinimalIssue, IssueScope>;
+
+/// The issue a graph traversal starts from.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphDownstreamResponse {
+pub struct IssueScope {
     pub issue_id: String,
-    pub dependents: Vec<MinimalIssue>,
-    pub count: usize,
 }
 
 /// Tree node for hierarchical dependency display
@@ -1463,20 +1473,17 @@ pub fn state_symbol(state: State, archived_from: Option<State>) -> &'static str 
 
 /// Response for `graph deps` with tree structure.
 ///
-/// List envelope: `count` is the number of top-level entries in `nodes` (the
-/// immediate dependency nodes; each may carry nested `children`). This differs
-/// from `summary.total`, which counts every unique dependency across the whole
-/// tree. The node collection was renamed from `tree` to `nodes` when the
-/// envelope landed.
+/// `count` is the number of top-level entries in `nodes` (the immediate
+/// dependency nodes; each may carry nested `children`). This differs from
+/// `summary.total`, which counts every unique dependency across the whole tree.
+pub type GraphDepsTreeResponse = ListEnvelope<NodesKey, DependencyTreeNode, DependencyTreeScope>;
+
+/// Fields of [`GraphDepsTreeResponse`] beside its `nodes`.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphDepsTreeResponse {
+pub struct DependencyTreeScope {
     pub issue_id: String,
     /// Depth of traversal (1 = immediate, 0 = unlimited)
     pub depth: u32,
-    /// Number of top-level entries in `nodes` (list envelope `count`).
-    pub count: usize,
-    /// Dependency nodes, each of which may carry nested `children`.
-    pub nodes: Vec<DependencyTreeNode>,
     /// Summary statistics
     pub summary: DependencySummary,
 }
@@ -1491,11 +1498,7 @@ pub struct DependencySummary {
 }
 
 /// Response for `graph roots` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphRootsResponse {
-    pub roots: Vec<MinimalIssue>,
-    pub count: usize,
-}
+pub type GraphRootsResponse = ListEnvelope<RootsKey, MinimalIssue>;
 
 /// One node's resolved hierarchy facts, as rendered by `graph tree`.
 ///
@@ -1549,20 +1552,18 @@ pub struct HierarchyNodeView {
 
 /// Response for `graph tree` command.
 ///
-/// List envelope: `count` is the number of entries in `nodes`. `root` echoes the
-/// optional root id the view was scoped to (`null` for the whole repository).
-/// Each node carries its DAG-resolved parent, children, cluster, and rank.
+/// `count` is the number of entries in `nodes`. `root` echoes the optional root
+/// id the view was scoped to (`null` for the whole repository). Each node
+/// carries its DAG-resolved parent, children, cluster, and rank.
 ///
 /// # Examples
 ///
 /// ```
 /// use jit::graph::hierarchy::NodeHierarchy;
-/// use jit::output::{GraphTreeResponse, HierarchyNodeView};
+/// use jit::output::{GraphTreeResponse, HierarchyNodeView, TreeRoot};
 ///
-/// let response = GraphTreeResponse {
-///     root: None,
-///     count: 1,
-///     nodes: vec![HierarchyNodeView {
+/// let response = GraphTreeResponse::with_extras(
+///     vec![HierarchyNodeView {
 ///         id: "task-1234".into(),
 ///         short_id: "task-123".into(),
 ///         title: "A task".into(),
@@ -1574,20 +1575,20 @@ pub struct HierarchyNodeView {
 ///             rank: 0,
 ///         },
 ///     }],
-/// };
+///     TreeRoot { root: None },
+/// );
 /// let json = serde_json::to_value(&response).unwrap();
 /// assert_eq!(json["count"], 1);
 /// assert_eq!(json["root"], serde_json::Value::Null);
 /// assert_eq!(json["nodes"][0]["parent"], "epic-1");
 /// ```
+pub type GraphTreeResponse = ListEnvelope<NodesKey, HierarchyNodeView, TreeRoot>;
+
+/// The scope of a [`GraphTreeResponse`]. `nodes` are ordered by ascending short id.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct GraphTreeResponse {
+pub struct TreeRoot {
     /// The root id the tree was scoped to, or `null` for the whole repository.
     pub root: Option<String>,
-    /// Number of entries in `nodes`.
-    pub count: usize,
-    /// Resolved hierarchy per node, ordered by ascending short id.
-    pub nodes: Vec<HierarchyNodeView>,
 }
 
 /// One reported membership-vs-DAG divergence, as rendered by `query divergence`.
@@ -1609,16 +1610,10 @@ pub struct DivergenceView {
 
 /// Response for `query divergence` command.
 ///
-/// List envelope: `count` is the number of entries in `divergences`. Each entry
-/// is a membership label whose claim the dependency DAG does not back (the issue
-/// carries the label but is not in the closure of the container that owns it).
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct DivergenceResponse {
-    /// Number of entries in `divergences`.
-    pub count: usize,
-    /// The reported divergences, ordered by `(issue_id, label)`.
-    pub divergences: Vec<DivergenceView>,
-}
+/// Each entry in `divergences` is a membership label whose claim the dependency
+/// DAG does not back (the issue carries the label but is not in the closure of
+/// the container that owns it), ordered by `(issue_id, label)`.
+pub type DivergenceResponse = ListEnvelope<DivergencesKey, DivergenceView>;
 
 // ============================================================================
 // Issue Show Response
@@ -1949,7 +1944,7 @@ pub struct StateCount {
 /// `by_state` has one [`StateCount`] per [`State`] variant in [`State::all`]
 /// order, zero-count states included, so the shape is stable and complete
 /// (@/inv/domain-agnostic — the state list is enumerated, never hardcoded).
-/// `count` is `by_state.len()` (the list-envelope count, one entry per state).
+/// `count` is `by_state.len()` (one entry per state).
 ///
 /// Effective-terminal semantics ([`Issue::effective_terminal_state`],
 /// `Done`/`Rejected`): `done` and `rejected` are reported separately because a
@@ -1959,13 +1954,11 @@ pub struct StateCount {
 /// non-terminal origin is not effectively terminal and counts as `open`. `open` is every issue that is not effectively terminal
 /// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
 /// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
+pub type StateRollup = ListEnvelope<ByStateKey, StateCount, RollupTotals>;
+
+/// Delivery tallies of a [`StateRollup`] beside its `by_state` buckets.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct StateRollup {
-    /// Length of `by_state` (list-envelope count); equals the number of
-    /// [`State`] variants.
-    pub count: usize,
-    /// One entry per state, zero-count states included, in [`State::all`] order.
-    pub by_state: Vec<StateCount>,
+pub struct RollupTotals {
     /// Total issues aggregated.
     pub total: usize,
     /// Issues in `Done`.
@@ -1978,7 +1971,7 @@ pub struct StateRollup {
     pub percent: u32,
 }
 
-impl StateRollup {
+impl ListEnvelope<ByStateKey, StateCount, RollupTotals> {
     /// Aggregate a slice of issues into the counts-by-state rollup.
     ///
     /// `by_state` is [`count_by_state`](crate::domain::queries::count_by_state)
@@ -2011,15 +2004,16 @@ impl StateRollup {
             ((done as f64 / total as f64) * 100.0).round() as u32
         };
 
-        Self {
-            count: by_state.len(),
+        Self::with_extras(
             by_state,
-            total,
-            done,
-            rejected,
-            open,
-            percent,
-        }
+            RollupTotals {
+                total,
+                done,
+                rejected,
+                open,
+                percent,
+            },
+        )
     }
 
     /// Render the two-line greppable text form:
@@ -2034,7 +2028,7 @@ impl StateRollup {
     /// are fixed regardless of which states are populated.
     pub fn to_lines(&self) -> Vec<String> {
         let by_state = self
-            .by_state
+            .items
             .iter()
             .map(|c| format!("{}={}", c.state.as_str(), c.count))
             .collect::<Vec<_>>()
@@ -2043,7 +2037,11 @@ impl StateRollup {
             format!("by state: {by_state}"),
             format!(
                 "done {}/{} ({}%)  open {}  rejected {}",
-                self.done, self.total, self.percent, self.open, self.rejected
+                self.extras.done,
+                self.extras.total,
+                self.extras.percent,
+                self.extras.open,
+                self.extras.rejected
             ),
         ]
     }
@@ -2077,21 +2075,22 @@ impl From<&Issue> for ContainerHeader {
 /// dependencies, depth 1), and the ids of any child edges that no longer
 /// resolve.
 ///
-/// `issues` and `count` form the standard `{count, issues}` list envelope
-/// (`count == issues.len()`), with `container` added on top. `dangling` follows
+/// `issues` and `count` form the standard `{count, issues}` list envelope, with
+/// `container` added on top. `dangling` follows
 /// the [`IssueShowResponse::dangling_dependency_ids`] precedent: a dependency id
 /// that points at no stored issue is surfaced here rather than silently dropped,
 /// and is omitted from the JSON when empty. Children are ordered by ascending
 /// short id (stored dependency order is set-derived and not meaningful).
+///
+/// `issues` holds one compact status projection per resolvable direct child,
+/// ascending short id.
+pub type IssueChildrenResponse = ListEnvelope<IssuesKey, IssueStatusResponse, ChildrenScope>;
+
+/// Fields of [`IssueChildrenResponse`] beside its `issues`.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct IssueChildrenResponse {
+pub struct ChildrenScope {
     /// `{short_id, title, state}` of the queried container.
     pub container: ContainerHeader,
-    /// Number of resolvable direct children (equals `issues.len()`).
-    pub count: usize,
-    /// One compact status projection per resolvable direct child, ascending
-    /// short id.
-    pub issues: Vec<IssueStatusResponse>,
     /// Dependency ids that resolve to no stored issue (dangling edges), omitted
     /// when empty. `count`/`issues` cover resolvable children only.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -2444,18 +2443,18 @@ impl GateStatusEntry {
 /// `passed` how many are green, and `not_run` the keys still pending.
 /// `all_passed` mirrors the strict exit contract (0 iff true, else 4).
 ///
-/// List envelope: `count` is the length of the `gates` collection (one
-/// entry per required gate). It equals `total` whenever every required gate has
-/// a status entry; `total`/`passed` remain the readiness tallies.
+/// `count` is the length of the `gates` collection (one entry per required
+/// gate). It equals `total` whenever every required gate has a status entry;
+/// `total`/`passed` remain the readiness tallies.
+pub type GateCheckAllResponse = ListEnvelope<GatesKey, GateStatusEntry, GateCheckSummary>;
+
+/// Fields of [`GateCheckAllResponse`] beside its `gates`.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct GateCheckAllResponse {
-    /// Length of `gates` (list envelope `count`).
-    pub count: usize,
+pub struct GateCheckSummary {
     pub results: Vec<GateRunSummary>,
     pub passed: usize,
     pub total: usize,
     pub not_run: Vec<String>,
-    pub gates: Vec<GateStatusEntry>,
     pub all_passed: bool,
 }
 
@@ -2480,13 +2479,9 @@ pub struct GateEvaluateManyResult {
 }
 
 /// JSON payload of `jit gate evaluate-many --json`.
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GateEvaluateManyResponse {
-    /// Number of issue results returned.
-    pub count: usize,
-    /// One result per requested issue, in argument order.
-    pub results: Vec<GateEvaluateManyResult>,
-}
+///
+/// `results` holds one entry per requested issue, in argument order.
+pub type GateEvaluateManyResponse = ListEnvelope<ResultsKey, GateEvaluateManyResult>;
 
 /// JSON payload of `jit gate status --all` / `--limit` (the history view).
 ///
@@ -2494,11 +2489,7 @@ pub struct GateEvaluateManyResponse {
 /// any `--gate` / `--status` filtering and `--limit` capping. Each summary is the
 /// full form (stdout/stderr included) so history inspection never loses report
 /// text. `count` is `results.len()` (the number returned, after filtering).
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GateRunHistoryResponse {
-    pub results: Vec<GateRunSummary>,
-    pub count: usize,
-}
+pub type GateRunHistoryResponse = ListEnvelope<ResultsKey, GateRunSummary>;
 
 /// JSON payload of `jit gate status`'s flat report-text view
 /// (`--stdout` / `--stderr` / `--tail`).
@@ -2547,11 +2538,7 @@ pub struct GateFindingsResponse {
 // ============================================================================
 
 /// Response for `gate list` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct GateListResponse {
-    pub gates: Vec<GateDefinition>,
-    pub count: usize,
-}
+pub type GateListResponse = ListEnvelope<GatesKey, GateDefinition>;
 
 /// Gate definition structure (for registry responses)
 ///
@@ -2625,22 +2612,22 @@ pub struct ArtifactDirectoryResponse {
 
 /// Response for `doc conformance`, the advisory artifact-location report.
 ///
-/// A list envelope: `count` is the length of `artifacts`. `areas` states the
-/// registry that was walked, which is exactly
+/// `count` is the length of `artifacts`, which are ordered by area and then by
+/// path. `areas` states the registry that was walked, which is exactly
 /// [`DocumentationConfig::issue_scoped_areas`](crate::config::DocumentationConfig::issue_scoped_areas),
 /// so a machine caller reads the scanned set instead of assuming one.
 ///
 /// The report is advice (`@/issue/8e071e18/decision/D-7`): an entry states
 /// where an artifact sits and where its owner's directory is, and blocks
 /// nothing.
+pub type ArtifactConformanceResponse =
+    ListEnvelope<ArtifactsKey, ArtifactConformanceEntry, ConformanceScope>;
+
+/// Fields of [`ArtifactConformanceResponse`] beside its `artifacts`.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct ArtifactConformanceResponse {
+pub struct ConformanceScope {
     /// Declared issue-scoped areas the report walked.
     pub areas: Vec<String>,
-    /// Reported artifacts, ordered by area and then by path.
-    pub artifacts: Vec<ArtifactConformanceEntry>,
-    /// Number of reported artifacts.
-    pub count: usize,
 }
 
 /// One artifact `doc conformance` names.
@@ -2699,39 +2686,33 @@ impl From<crate::domain::artifact_conformance::ReportedArtifact> for ArtifactCon
 // ============================================================================
 
 /// Response for `label namespaces` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct NamespacesResponse {
-    pub namespaces: Vec<String>,
-    pub count: usize,
-}
+pub type NamespacesResponse = ListEnvelope<NamespacesKey, String>;
 
 /// Response for top-level `search` command
+pub type SearchResponse = ListEnvelope<ResultsKey, crate::search::SearchResult, SearchQuery>;
+
+/// The query a [`SearchResponse`] echoes.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct SearchResponse {
+pub struct SearchQuery {
     pub query: String,
-    pub results: Vec<crate::search::SearchResult>,
-    pub count: usize,
 }
 
 /// Response for `worktree list` command
-#[derive(Debug, Serialize, JsonSchema)]
-pub struct WorktreeListResponse {
-    pub worktrees: Vec<crate::commands::worktree::WorktreeListEntry>,
-    pub count: usize,
-}
+pub type WorktreeListResponse =
+    ListEnvelope<WorktreesKey, crate::commands::worktree::WorktreeListEntry>;
 
-/// Response for `worktree store-divergence`, wrapping the findings in the
-/// list envelope beside the two stores that were compared.
+/// Response for `worktree store-divergence`: every record the two stores
+/// disagree about, beside the stores that were compared.
+pub type WorktreeStoreDivergenceResponse =
+    ListEnvelope<DivergencesKey, StoreDivergence, StoreComparison>;
+
+/// The stores a [`WorktreeStoreDivergenceResponse`] compared.
 #[derive(Debug, Serialize, JsonSchema)]
-pub struct WorktreeStoreDivergenceResponse {
-    /// Number of divergences reported.
-    pub count: usize,
+pub struct StoreComparison {
     /// The store the inspected checkout owns.
     pub checkout_store: String,
     /// The store it was compared against, absent when the checkout has none.
     pub reference_store: Option<String>,
-    /// Every record the two stores disagree about.
-    pub divergences: Vec<StoreDivergence>,
 }
 
 #[cfg(test)]
@@ -2740,6 +2721,53 @@ mod tests {
     use schemars::schema_for;
     use serde_json::json;
     use std::collections::BTreeSet;
+
+    fn schema_property_names<T: JsonSchema>() -> BTreeSet<String> {
+        schema_for!(T)
+            .schema
+            .object
+            .expect("a response schema is an object")
+            .properties
+            .into_keys()
+            .collect()
+    }
+
+    fn serialized_keys(value: &impl Serialize) -> BTreeSet<String> {
+        serde_json::to_value(value)
+            .expect("a response serializes")
+            .as_object()
+            .expect("a response serializes as an object")
+            .keys()
+            .cloned()
+            .collect()
+    }
+
+    #[test]
+    fn test_envelope_responses_schema_names_the_serialized_keys() {
+        let search = IssueSearchResponse::with_extras(Vec::new(), IssueSearchQuery { query: None });
+        assert_eq!(
+            schema_property_names::<IssueSearchResponse>(),
+            serialized_keys(&search)
+        );
+
+        let comparison = WorktreeStoreDivergenceResponse::with_extras(
+            Vec::new(),
+            StoreComparison {
+                checkout_store: "a".to_string(),
+                reference_store: None,
+            },
+        );
+        assert_eq!(
+            schema_property_names::<WorktreeStoreDivergenceResponse>(),
+            serialized_keys(&comparison)
+        );
+
+        let rollup = StateRollup::from_issues(&[]);
+        assert_eq!(
+            schema_property_names::<StateRollup>(),
+            serialized_keys(&rollup)
+        );
+    }
 
     /// jit:45a140ae REQ-02: a dependency-tree node archived from a terminal
     /// state renders and serializes as effectively terminal; one archived from a
