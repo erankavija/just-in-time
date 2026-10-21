@@ -1,40 +1,42 @@
 {
-  "id": "57f52018-cbc2-4b1f-9d9d-1c64ab942517",
-  "title": "Reseed the existing empty planning-node descriptions",
-  "description": "Manually reseed the descriptions of the existing empty planning nodes so they match what the template now produces. This is a one-time manual data repair, not an engine feature.\n\n## Success Criteria\n- [ ] [hard] RESEED-01: the existing empty planning-node descriptions (`1eb0bdfd`, `2937919f`) are reseeded from their containers.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:project-lead",
+  "claimed_at": "2026-06-23T20:18:41.632859811Z",
+  "context": {},
+  "created_at": "2026-06-22T22:45:23.760866019Z",
   "dependencies": [
     "96fc8cd8-3c83-4733-aa18-3ca100f2a1f1"
   ],
+  "description": "Manually reseed the descriptions of the existing empty planning nodes so they match what the template now produces. This is a one-time manual data repair, not an engine feature.\n\n## Success Criteria\n- [ ] [hard] RESEED-01: the existing empty planning-node descriptions (`1eb0bdfd`, `2937919f`) are reseeded from their containers.",
+  "documents": [],
+  "done_at": "2026-06-23T21:29:37.836113501Z",
+  "first_ready_at": "2026-06-22T22:51:54.755295233Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T21:27:43.220844379Z"
-    },
     "cargo-ci": {
+      "run_id": "5a3fdeab-54e0-495c-a0d0-e5c4618b1528",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T21:26:56.872413959Z"
+      "updated_at": "2026-06-23T21:26:56.872413959Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dd0234b2-fe2c-4586-b8d1-971646187eab",
+      "status": "passed",
+      "updated_at": "2026-06-23T21:27:43.220844379Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "57f52018-cbc2-4b1f-9d9d-1c64ab942517",
   "labels": [
     "type:task",
     "story:template-testing-dogfood",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:45:23.760866019Z",
-  "updated_at": "2026-07-05T19:51:12.973841196Z",
-  "first_ready_at": "2026-06-22T22:51:54.755295233Z",
-  "claimed_at": "2026-06-23T20:18:41.632859811Z",
-  "done_at": "2026-06-23T21:29:37.836113501Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Reseed the existing empty planning-node descriptions",
+  "updated_at": "2026-07-05T19:51:12.973841196Z"
 }

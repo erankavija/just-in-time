@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "145b4d57-5949-4d0b-9e8f-12b3d21978de",
+    "8b7f2973-a1da-45c0-be2a-226318330d10"
+  ],
+  "description": "Derive the new issue's advisory findings inside the creation mutation, from the image it captured, and return them with the created issue.\n\n## Background\n\n- `publish_issue_creation` (`crates/jit/src/commands/mod.rs:2417-2502`) captures a mutation base holding the image and every issue, discards the issues (`:2432`), evaluates local rules through `derive_write_validation` (`:1048-1084`) and returns its warnings. `create_issue` (`crates/jit/src/commands/issue.rs:167-225`) returns the created issue with those warnings.\n- Graph-rule findings for a new issue are computed only by the CLI's human path after the commit, through `evaluate_graph_rules` over a fresh issue list and a whole validation capture (the `IssueCommands::Create` arm of `crates/jit/src/main.rs`).\n- The transition path already evaluates graph rules purely from captured evidence with the mutation timestamp (`derive_state_transition`, `commands/mod.rs:1085-1215`). The mutation base captures plan documents, so `plan_content_with_issues` (`commands/validate.rs:1008`) supplies plan content. Issue-linked documents are not part of a mutation image, so document-reading passes are not evaluated here.\n- Readers of the returned warnings: the `issue create` arm in `main.rs` and `tests/fast_rules/local_rule_enforcement_tests.rs:143`.\n\n## Success Criteria\n\n- [hard] REQ-01: Creation returns `findings`, in the wire `ReportedFinding` shape: the new issue's local-rule findings and the graph-rule findings attributed to it, evaluated over the captured issues plus the new record with the mutation's timestamp and plan content from the mutation image. It replaces the returned warnings.\n- [hard] REQ-02: A harness test over `InMemoryStorage` shows that creating an orphan leaf returns its `orphan-leaf` finding and creating a compliant issue returns none.\n- [hard] REQ-03: The listed readers read `findings`, and `issue create` prints today's warning lines from them.\n\n## Notes\n\n- Behaviour is unchanged in this change; output changes land with the CLI rendering.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "5d5a1794-c98e-41d9-8329-344d1ae8b316",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-side-paths",
+    "component:core",
+    "per:@/charter/D-20",
+    "satisfies:9876a23a/REQ-13"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Issue creation derives its findings inside its mutation",
+  "updated_at": "2026-10-21T20:31:38.109993970Z"
+}

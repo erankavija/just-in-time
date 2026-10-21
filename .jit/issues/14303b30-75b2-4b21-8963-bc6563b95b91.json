@@ -43,6 +43,7 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "0c766ac6-d13f-4471-b822-18257d97d4f4",
       "status": "passed",
       "updated_at": "2026-02-19T19:07:18.207764525Z",
       "updated_by": "agent:claude"

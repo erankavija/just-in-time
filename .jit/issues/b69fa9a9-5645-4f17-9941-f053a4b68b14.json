@@ -1,11 +1,11 @@
 {
-  "id": "b69fa9a9-5645-4f17-9941-f053a4b68b14",
-  "title": "Implement WorktreePaths detection",
-  "description": "Implement `WorktreePaths::detect()` to identify git worktree context using `git rev-parse --git-common-dir` and `--show-toplevel`. Handle main worktree vs secondary worktrees, and gracefully fall back when not in a git repository. See design doc section \"Path Resolution\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:36:59.225616719Z",
   "dependencies": [],
+  "description": "Implement `WorktreePaths::detect()` to identify git worktree context using `git rev-parse --git-common-dir` and `--show-toplevel`. Handle main worktree vs secondary worktrees, and gracefully fall back when not in a git repository. See design doc section \"Path Resolution\".",
+  "documents": [],
+  "done_at": "2026-01-06T20:28:17.739300026Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,41 +14,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-06T20:25:56.433094025Z"
-    },
     "clippy": {
+      "run_id": "9ee21b7d-73c6-4a7e-8fd1-d9f50135b37d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:28:00.433364538Z"
+      "updated_at": "2026-01-06T20:28:00.433364538Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "5bf4b32e-7f1e-4f1c-ae57-7810ddcfde30",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-06T20:28:17.735824957Z"
+      "updated_at": "2026-01-06T20:28:17.735824957Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "af7d0719-ea7f-498f-9db4-b883f4b63843",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:28:07.626390694Z"
+      "updated_at": "2026-01-06T20:28:07.626390694Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "a1ab671d-20c0-411e-8afb-fbba199b1d81",
+      "status": "passed",
+      "updated_at": "2026-01-06T20:25:56.433094025Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "634735f4-c087-48df-ae34-803460071d5f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:25:56.437061154Z"
+      "updated_at": "2026-01-06T20:25:56.437061154Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "b69fa9a9-5645-4f17-9941-f053a4b68b14",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:36:59.225616719Z",
-  "updated_at": "2026-07-05T19:51:13.067845544Z",
-  "done_at": "2026-01-06T20:28:17.739300026Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement WorktreePaths detection",
+  "updated_at": "2026-07-05T19:51:13.067845544Z"
 }

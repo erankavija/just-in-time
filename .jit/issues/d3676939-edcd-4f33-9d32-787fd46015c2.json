@@ -1,34 +1,35 @@
 {
-  "id": "d3676939-edcd-4f33-9d32-787fd46015c2",
-  "title": "Write jit claim command reference",
-  "description": "Write complete CLI reference for `jit claim` subcommands (acquire, renew, release, force-evict, status, list) with all options, examples, and exit codes. Place in docs/reference/.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T17:51:45.711601839Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:20.948387184Z",
   "dependencies": [
     "730d25b5-f16c-4327-99fd-fb337e65edb9"
   ],
+  "description": "Write complete CLI reference for `jit claim` subcommands (acquire, renew, release, force-evict, status, list) with all options, examples, and exit codes. Place in docs/reference/.",
+  "documents": [],
+  "done_at": "2026-02-02T17:53:24.672468382Z",
+  "first_ready_at": "2026-02-01T23:40:15.429685537Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "e346a20b-bcfc-4e02-aafc-8686da50d02c",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:52:58.661765601Z"
+      "updated_at": "2026-02-02T17:52:58.661765601Z",
+      "updated_by": null
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d3676939-edcd-4f33-9d32-787fd46015c2",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:docs",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:20.948387184Z",
-  "updated_at": "2026-07-05T19:51:13.094309844Z",
-  "first_ready_at": "2026-02-01T23:40:15.429685537Z",
-  "claimed_at": "2026-02-02T17:51:45.711601839Z",
-  "done_at": "2026-02-02T17:53:24.672468382Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Write jit claim command reference",
+  "updated_at": "2026-07-05T19:51:13.094309844Z"
 }

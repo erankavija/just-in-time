@@ -18,16 +18,19 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "7b787ba5-6f69-4c64-8e9c-4822c43495ae",
       "status": "passed",
       "updated_at": "2026-08-02T18:17:40.402550140Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "f282e7c8-11e3-4603-a1c9-40bce285028f",
       "status": "passed",
       "updated_at": "2026-08-02T17:48:39.423440293Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "780760ac-7d2d-47f8-8745-7a1cfcf74ef4",
       "status": "passed",
       "updated_at": "2026-08-02T17:46:49.541583197Z",
       "updated_by": "auto:executor"

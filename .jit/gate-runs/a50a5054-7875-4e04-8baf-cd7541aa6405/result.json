@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "human:user",
+  "command": "",
+  "commit": null,
+  "completed_at": "2025-12-20T21:46:20.883862418Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "c4738097-cdfd-4fe8-a279-a6ee7f2e1ce9",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "a50a5054-7875-4e04-8baf-cd7541aa6405",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2025-12-20T21:46:20.883862418Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

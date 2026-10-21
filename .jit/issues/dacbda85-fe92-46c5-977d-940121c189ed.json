@@ -1,13 +1,15 @@
 {
-  "id": "dacbda85-fe92-46c5-977d-940121c189ed",
-  "title": "Implement lock metadata for diagnostics",
-  "description": "Implement lock metadata files (`*.lock.meta`) with PID, agent_id, created_at, and last_updated. Enable diagnosis of stuck processes. Clean up metadata on lock release. See design doc section \"Lock Hygiene and Metadata\".",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2026-02-02T10:01:35.031205191Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.071412312Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement lock metadata files (`*.lock.meta`) with PID, agent_id, created_at, and last_updated. Enable diagnosis of stuck processes. Clean up metadata on lock release. See design doc section \"Lock Hygiene and Metadata\".",
+  "documents": [],
+  "done_at": "2026-02-02T10:14:32.418798554Z",
+  "first_ready_at": "2026-01-07T23:32:21.580893728Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:11:00.344319769Z"
-    },
     "clippy": {
+      "run_id": "75063966-9ee3-4d3e-aac8-d743cf62317e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:11:20.259282906Z"
+      "updated_at": "2026-02-02T10:11:20.259282906Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "c4f1b3a4-988c-4109-bdc1-44b082267f30",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:11:27.382416014Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:01:35.028074600Z"
+      "updated_at": "2026-02-02T10:11:27.382416014Z",
+      "updated_by": "agent:copilot-session"
     },
     "fmt": {
+      "run_id": "0cf3233b-ef0d-4968-91f5-f44d277263e5",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:14:27.675670697Z"
+      "updated_at": "2026-02-02T10:14:27.675670697Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "76526e84-0b43-4e3c-94a4-16bee924de8b",
+      "status": "passed",
+      "updated_at": "2026-02-02T10:01:35.028074600Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "tests": {
+      "run_id": "95508ee7-8fcb-477e-b419-e23df6f51846",
+      "status": "passed",
+      "updated_at": "2026-02-02T10:11:00.344319769Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "dacbda85-fe92-46c5-977d-940121c189ed",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.071412312Z",
-  "updated_at": "2026-07-05T19:51:13.099972528Z",
-  "first_ready_at": "2026-01-07T23:32:21.580893728Z",
-  "claimed_at": "2026-02-02T10:01:35.031205191Z",
-  "done_at": "2026-02-02T10:14:32.418798554Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement lock metadata for diagnostics",
+  "updated_at": "2026-07-05T19:51:13.099972528Z"
 }

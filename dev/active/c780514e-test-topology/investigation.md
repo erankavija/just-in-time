@@ -34,15 +34,15 @@ The Background misses six facts:
 | # | Claim | Verdict | Evidence |
 | --- | --- | --- | --- |
 | 1 | The projection suite has 32 tests, binds both forms, and checks completeness at `:1128`. | valid-and-open | 32 `#[test]`. `assert_projected_exit_status_in_both_forms` at `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:156-187`. `test_command_exit_codes_every_row_is_verified` at `:1128`. Caveat in §4. |
-| 2 | `exit_code_tests.rs` has 39 tests and 1,637 lines and re-proves codes (`:36`/`:774`, `:69`/`:818`, `:1566`/`:966`). | valid-and-open | 39 tests, 1,637 lines. All cited line pairs match. The file also owns non-exit-code behaviour that must move: claim assign semantics (`:954`, `:999`), human remediation text (`:559`, `:897`), claim-next skipping (`:820`), ambiguous and short prefixes (`:1147-1488`), and startup envelopes (`:1488-1560`). |
+| 2 | `exit_code_tests.rs` has 39 tests and 1,637 lines and re-proves codes (`:36`/`:774`, `:69`/`:818`, `:1566`/`:966`). | valid-and-open | 39 tests, 1,637 lines. All cited line pairs match. 14 tests are re-proofs, and 25 own behaviour that must move: blocked-transition envelopes, claim behaviour, confirmed-delete output, id-prefix errors, argument guards, and startup envelopes. §D.1 classifies every test. Other subprocess suites also assert projected exit codes (§D.2). |
 | 3 | `invocation_exit_status_parity_tests.rs` re-proves parity. | valid-and-open | 5 tests in `crates/jit/tests/cli_issue/invocation_exit_status_parity_tests.rs`. Two cases have no projection row: unresolved ids across namespaces (`:65`) and a malformed stored record (`:133`). Move them, do not drop them. |
-| 4 | `domain_queries_tests.rs` owns pure filters; `query_tests.rs` has 25 subprocess tests and 1,422 lines. | valid-and-open | `crates/jit/tests/fast_issue/domain_queries_tests.rs` has 10 tests. `crates/jit/src/domain/queries.rs` has 21 more unit tests. `crates/jit/tests/cli_query_graph/query_tests.rs` has 25 tests and 1,422 lines. Gap: `query available` composes its filters and priority sort in `crates/jit/src/commands/query.rs:122-148`, and `crates/jit/src/commands/issue.rs:800` repeats the sort. That property has no domain owner yet. |
+| 4 | `domain_queries_tests.rs` owns pure filters; `query_tests.rs` has 25 subprocess tests and 1,422 lines. | valid-and-open | `crates/jit/tests/fast_issue/domain_queries_tests.rs` has 10 tests. `crates/jit/src/domain/queries.rs` has 21 more unit tests. `crates/jit/tests/cli_query_graph/query_tests.rs` has 25 tests and 1,422 lines. Label and strategic query re-proofs outside it are in §D.3. Gap: `query available` composes its filters and priority sort in `crates/jit/src/commands/query.rs:122-148`, and `crates/jit/src/commands/issue.rs:800` repeats the sort. That property has no domain owner yet. |
 | 5 | `harness_demo.rs` has 526 lines and 14 tests and re-proves queries, blocking, cycles, and gates. | valid-and-open | 527 lines, 14 tests. Six cases have no other owner and must move: `:291` item list/resolve, `:314` kind/label coverage, `:377` container progress, `:442` status projection, `:462` empty rollup, and `:475` archive candidates. |
 | 6 | `workflow_tests.rs:529-743` re-proves auto-transitions owned by `types.rs:2427`. | invalid-as-stated (location) | The tests are at `crates/jit/tests/cli_repo_workflow/workflow_tests.rs:529,577,646,698`. The domain predicates are tested at `crates/jit/src/domain/types.rs:2546-2703`, not `:2427`. The cascade to dependents (`commands/issue.rs:816-859`, `commands/mod.rs:2791`) is command-layer behaviour. Its harness-level owners include `commands/bulk_update.rs:2001` and `tests/fast_issue/lifecycle_timestamps_tests.rs:89`. "Proven only at the domain" needs a domain extraction or a single harness owner. |
 | 7 | `batch_create.rs:686-711` repeats `graph/keyed.rs` tests over an adapter. | valid-and-open | `detect_cycle` is at `crates/jit/src/commands/batch_create.rs:640`, with four tests at `:686-707`. The owner `crates/jit/src/graph/keyed.rs:145-195` includes a proptest at `:344`. |
-| 8 | `harness_demo.rs:133`, `integration_test.rs:616`, and `exit_code_tests.rs:69` re-prove cycle rejection. | valid-and-open | All three cited lines match. |
+| 8 | `harness_demo.rs:133`, `integration_test.rs:616`, and `exit_code_tests.rs:69` re-prove cycle rejection. | valid-and-open | All three cited lines match. §D.3 classifies three more cycle tests; each owns a different property. |
 | 9 | About 800 lines at `repository_state_store_tests.rs:1735-2555` re-prove finalization. | invalid-as-stated (location) | The section is now `crates/jit/src/storage/repository_state_store_tests.rs:1754-2585` ("REQ-01: typed mutation determinism"). Its own comment (`:1756-1760`) says the finalizer is a pure function of the image, which confirms the re-proof. The file has 3,810 lines. |
-| 10 | 19 tests in `list_envelope_tests.rs` assert `count == len`, again at `search_tests.rs:236`, `artifact_conformance_cli_tests.rs:647`, and `profile_cli_tests.rs:1940`. | invalid-as-stated (locations, scope) | 19 tests confirmed. Re-assertions now sit at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs:~640`, `profile_cli_tests.rs:1695` (`assert_count_envelope`, not `:1940`), `worktree_cli_tests.rs:546,1036`, and `container_rollup_tests.rs:211,348`. New since `79c177fbd`: `crates/jit/src/domain/list_envelope.rs` derives `count` and owns it in unit tests (`:261`, `:305`). Only `ProfileCollection` uses it (`crates/jit/src/profile/application.rs:29`). 39 hand-written `count: usize` fields remain (25 in `output.rs`), plus `json!` bodies in `main.rs:4615,5053,5074,5998,7584,7669`. |
+| 10 | 19 tests in `list_envelope_tests.rs` assert `count == len`, again at `search_tests.rs:236`, `artifact_conformance_cli_tests.rs:647`, and `profile_cli_tests.rs:1940`. | invalid-as-stated (locations, scope) | 19 tests confirmed. Re-assertions now sit at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs:~640`, `profile_cli_tests.rs:1695` (`assert_count_envelope`, not `:1940`), `worktree_cli_tests.rs:546,1036`, `container_rollup_tests.rs:211,348`, and `cli_issue/issue_search_json_tests.rs:234`. New since `79c177fbd`: `crates/jit/src/domain/list_envelope.rs` derives `count` and owns it in unit tests (`:261`, `:305`). Only `ProfileCollection` uses it (`crates/jit/src/profile/application.rs:29`). Since 650e6a56, the output module's count structs are `ListEnvelope` instantiations. Sixteen list-emitting commands still have no typed output schema (§D.4, derived from emission sites), so a schema-driven enumeration misses them. |
 
 ### Fixtures and contracts
 
@@ -51,7 +51,7 @@ The Background misses six facts:
 | 11 | No shared subprocess fixture exists. | valid-and-open | None in `crates/jit/src/test_utils.rs`, `test_harness.rs`, or suite roots. `cli_issue/failure_probe_fixture.rs` is suite-local. |
 | 12 | `fn jit_binary` is defined in 56 files. | valid-and-open | 56 files, all under `crates/jit/tests/`. |
 | 13 | 42 files use `cargo_bin!`; 68 use `env!("CARGO_BIN_EXE_jit")`. | invalid-as-stated (count) | Now 43 and 69 in tests, plus one doc mention at `test_utils.rs:225`. |
-| 14 | 57 files define `setup_test_repo`/`setup_repo`. | invalid-as-stated (scope) | 56 test files plus `test_utils.rs:918`. These are not the only private setups: other names add 33 more definitions, including `setup` ×6, `setup_test_env` ×3, `setup_repository` ×3, `setup_repo_with_issue` ×3, `setup_git_repo`, and `setup_initialized_repo`. Some are in-process setups, for example `fast_rules/cli_warnings_integration_tests.rs:24`. |
+| 14 | 57 files define `setup_test_repo`/`setup_repo`. | invalid-as-stated (scope) | 56 test files plus `test_utils.rs:918`. These are not the only private setups: other names add 33 more definitions, including `setup` ×6, `setup_test_env` ×3, `setup_repository` ×3, `setup_repo_with_issue` ×3, `setup_git_repo`, and `setup_initialized_repo`. The in-process ones outside the CLI targets are listed in §D.6. |
 | 15 | 112 `split_whitespace` sites scrape ids. | invalid-as-stated (count) | 114 sites in 39 test files. Not every site scrapes ids; `scratch_build/build_profile_policy_tests.rs:132` parses a script. |
 | 16 | 17 files hand-roll `git init`. | invalid-as-stated (count) | 20 test files spawn `git init`, plus 8 `src` test modules. Private helpers include `run_git`, `git`, `init_git`, `setup_git_repo`, and `git_repository_with_jit` (for example `cli_repo_workflow/lock_contention_tests.rs:31`). |
 | 17 | No file removes inherited `JIT_*` variables. | invalid-as-stated | Several files remove chosen variables: `steering_scenarios.rs:143-146` (and pins `JIT_AGENT_ID`), `repo_discovery_tests.rs:23-25`, `profile_acceptance_tests.rs:64-65`, `project_config_tests.rs:144`, and `failure_probe_fixture.rs:566`. The substance holds: no shared fixture scrubs all `JIT_*`. The product reads `JIT_AGENT_ID` (10 sites), `JIT_DATA_DIR`, `JIT_WORKTREE_*`, `JIT_ALLOW_DELETION`, `JIT_LOCK_TIMEOUT`, and others, so most spawns inherit them. |
@@ -63,7 +63,7 @@ The Background misses six facts:
 | 23 | No shared `IssueStore` conformance suite; a cross-backend matrix exists only for `RepositoryStateStore` (`:660`). | invalid-as-stated | No shared suite exists. Three ad-hoc cross-backend reader tests now do: `repository_state_store_tests.rs:220` (`load_issue`/`list_issues`/`resolve_issue_id`), `:278` (id resolution, `16d63038`), and `:691` (event log, `842b0ac6`/`47a082ef`). The matrix header is at `:644`. `read_issues` is gone (`f9add0dd8`). The trait has 21 methods (`crates/jit/src/storage/mod.rs`). |
 | 24 | `InMemoryStorage::read_path_bytes` reads real disk and ignores `at_commit` (`memory.rs:987-1022`). | valid-and-open | Now `crates/jit/src/storage/memory.rs:943-990`: `_at_commit` is unused and the read is `std::fs::read(root_path.join(path))`. |
 | 25 | Env changes in `config.rs`, `serve.rs`, and `server/src/lib.rs` run without a shared guard; `EnvironmentRestore` is private. | already-done | `EnvGuard` (`crates/jit/src/test_utils.rs:85-131`) and `CurrentDirGuard` (`:50-77`) are the only mutators. Users: `config.rs`, `serve.rs`, `crates/server/src/lib.rs`, `storage/json.rs`, `commands/hooks.rs`, `commands/claim.rs`. `EnvironmentRestore` is gone. The policy test is `crates/jit/tests/scratch_build/process_state_policy_tests.rs`, and no `set_var`/`remove_var`/`set_current_dir` call remains outside `test_utils.rs`. |
-| 26 | `merged_tree_gate_verification_tests.rs:47-53` prints `SKIP:` and passes when the self-test exits 2. | valid-and-open | `:48-53`. Also unlisted: `scratch_build/rust_build_budget_checker_tests.rs` has 14 `SKIP: jq not on PATH` passes (`:175`…`:521`), and `scratch_build/dependency_feature_policy_tests.rs:168,185` skips without cargo. |
+| 26 | `merged_tree_gate_verification_tests.rs:47-53` prints `SKIP:` and passes when the self-test exits 2. | valid-and-open | `:48-53`. Also unlisted: `scratch_build/rust_build_budget_checker_tests.rs` has 14 `SKIP: jq not on PATH` passes (`:175`…`:521`), `scratch_build/dependency_feature_policy_tests.rs:168,185` skips without cargo, and `cli_item_validate/validate_cli_rule_tests.rs:930-935` skips without node. §D.5 covers the full sweep. |
 | 27 | `cargo-ci-selftest.sh` (622 lines) runs nested cargo builds of six fixture crates inside the default suite. | valid-and-open | 622 lines. `cargo build` at `scripts/cargo-ci-selftest.sh:501`, gate runs at `:486`, scenarios at `:606-612`. It takes 3.99 s quiet (§A). |
 | 28 | `build_profile_policy_tests.rs:332` runs `profile-test-suite.sh --self-test`. | valid-and-open | `crates/jit/tests/scratch_build/build_profile_policy_tests.rs:332-345`. Unlisted: `cli_issue/failure_probe_fixture.rs:1060` runs `scripts/setup-recorded-failure-corpus.sh --self-test`, and `rust_build_budget_checker_tests.rs:145` drives `rust-build-budget.sh`. No gate in `.jit/gates.toml` runs a script self-test. |
 | 29 | `test_utils.rs:78-860` keys the cache on SHA-256 of the test and `jit` executables. | valid-and-open (lines drift) | Fixture code is `crates/jit/src/test_utils.rs:133-916`; key at `:588-634`. It hashes the setup executable (`current_exe`) and an optional scenario executable. Each test binary therefore gets its own key, and every rebuild invalidates every key. Unlisted: entries are never collected. `target/jit-profiled-repository-fixtures` holds 1,341 entries (714 run receipts) and 747 MB. |
@@ -136,7 +136,7 @@ Each invariant was resolved with `jit item show`.
 
 - `@/inv/orthogonal-tests`: violated by claims 2–10. REQ-09's half ("passes alone, in any order, in parallel") is enforced for env and cwd by `process_state_policy_tests.rs`. The receipt env lock and fixture-cache lock contention (§A) remain order- and load-sensitive.
 - `@/inv/shared-test-contracts`: violated by #11–#24. No `IssueStore` suite exists, and `memory_executor`, `fixture_issue`, and `TaxonomyRepo` each have parallel copies.
-- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 17 tool-missing `SKIP` paths pass silently (#26). These are held-out tests in substance.
+- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 18 tool-missing skip paths pass silently (#26, §D.5). These are held-out tests in substance.
 - `@/inv/bounded-rust-build-footprint`: passes at 10/12 targets and 1.61/2 GiB. The fixture cache's 747 MB in `target/` is unbudgeted. A new integration target for a shared fixture is not needed; the test-support surface already compiles once.
 - `@/inv/domain-agnostic`: the `CANONICAL_ITEM_KINDS` copies and `D-[0-9]+` literals are test-side copies of package vocabulary. REQ-07's derivation from `profiles/jit-default` must stay in test support and out of engine code.
 
@@ -222,3 +222,128 @@ Recommendation for the dispatcher: give REQ-04 an edge onto `650e6a56` and the h
   - Suite roots `crates/jit/tests/*/main.rs` hold local fixtures (`fixture_issue`, `TaxonomyRepo`, `memory_executor`).
 - **Build budget** (`scripts/rust-build-budget.sh:41-43`, `dev/benchmarks/rust-build-budgets/README.md`): targets 10/12; active test executables 14, 1,723,670,208/2,147,483,648 B; suite-duration limit 30 s. The latest `suite-build` line warmed 17 executables totalling 2,051,867,776 B in 73 ms.
 - **Script self-test gates.** None. `.jit/gates.toml` declares `cargo-ci` (`./scripts/cargo-ci.sh`), `cargo-ci-features`, `clippy`, `docs-mechanical`, `fmt`, `jit-validate`, `mcp-ci`, `npm-ci`, `repo-validate`, `secret-detection`, `tests`, `dependency-audit`, and the AI-review gates. All four script self-tests run inside the default Rust suite.
+
+## D. Re-proof and fixture sweeps
+
+### D.1 `exit_code_tests.rs` case inventory
+
+| Lines | Tests | Assertions beyond the exit code | Class and destination |
+| --- | --- | --- | --- |
+| `:36`, `:51`, `:69`, `:147`, `:169`, `:296` | success, not found, cycle, invalid argument, I/O error, help and version | none, or a generic stderr fragment | re-proof (projection rows; graph owns cycles) |
+| `:112` | gate not in registry | "not found in registry" and JSON code | re-proof (`fast_issue/bulk_operations_tests.rs:70`, `storage/errors.rs`) |
+| `:187` | already exists | "already exists" | re-proof (claim, profile and snapshot suites assert it) |
+| `:227` | JSON error format | `ISSUE_NOT_FOUND` envelope | re-proof (failure-envelope contract suite) |
+| `:247` | validation command | none | re-proof |
+| `:1040` | invalid label pattern | "Invalid label pattern" | re-proof (`label_query_json_tests.rs`, `fast_rules/label_query_tests.rs`) |
+| `:1060` | invalid document scope | "Invalid scope" | re-proof (`cli_query_graph/check_links_tests.rs:384`) |
+| `:1255` | batch description guard | guard message | re-proof (`issue_update_description_ops_tests.rs`) |
+| `:1566` | unconfirmed delete | `JIT_ALLOW_DELETION=1` remediation, empty stdout | re-proof (`error_json_tests.rs`, projection suite) |
+| `:312`, `:405`, `:493`, `:559`, `:605` | transition blocked by gates or dependencies, human and JSON; missing dependency | `BLOCKED` details (`requested_state`, `actual_state`, blockers), remediation commands, human remediation text | unique → `cli_issue/error_json_tests.rs` |
+| `:1488`, `:1512`, `:1528` | startup repository-not-found (JSON and plain), format too new | `REPOSITORY_NOT_FOUND` and `REPOSITORY_FORMAT_TOO_NEW` envelopes, empty plain stdout | unique → `cli_issue/top_level_failure_envelope_tests.rs` |
+| `:652`, `:702`, `:765`, `:820`, `:897`, `:920`, `:954`, `:999` | claim blocked by dependencies or precheck gate, claim-next blocked and skipping non-ready issues, `--assign` hints (human and JSON), assign-only claim, ready-issue claim | blocked details, skip behaviour, assign hint text, resulting state and assignee | unique → `cli_repo_workflow/claim_integration_tests.rs` |
+| `:1590`, `:1616` | confirmed delete, text and JSON | "Deleted issue:" text and JSON body (strings appear only in `main.rs`) | unique → `cli_repo_workflow/integration_test.rs` |
+| `:1189`, `:1220` | ambiguous and too-short prefix on `issue show` | "Ambiguous ID", `AMBIGUOUS_ID`, "at least 4 characters" (no other test owns these) | unique → `cli_issue/issue_status_projection_tests.rs` (already owns `INVALID_ID_PREFIX`) |
+| `:1372`, `:1447` | too-short and ambiguous prefix in both `dep add` positions | position-specific error codes | unique → `cli_query_graph/dep_add_redundancy_cli_tests.rs` |
+| `:1315` | `dep rm` symmetric argument validation | symmetric error for both positions | unique → `cli_query_graph/dep_add_redundancy_cli_tests.rs` |
+| `:1280` | parent filter before subcommand | "were given before" guard and `INVALID_ARGUMENT` envelope (string only in `main.rs`) | unique → `cli_query_graph/query_json_tests.rs` |
+| `:1079` | gate preset create naming a removed registry gate | "Gate not found in registry: mygate" | unique → `cli_repo_workflow/gate_preset_tests.rs` |
+
+### D.2 Projected exit codes asserted outside the projection suite
+
+Sweep over `crates/jit/tests/cli_*`, excluding `exit_code_tests.rs`, the parity suite and the projection suite. It covers four forms:
+
+- numeric `.code(N)`;
+- `status.code()` compared with `Some(…)`, single-line or multi-line, where the expected value is a literal, `ExitCode::X`, or a derived `code.exit_code().code()`;
+- symbolic `ExitCode::X.code()` and `ExitCode::X as i32`;
+- helpers that take an expected exit code (`profile_acceptance_tests.rs:105` `failed_json_with_path`).
+
+The projection's wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command, so each such assertion re-proves a row unless its command and code pair has no row. Several tests use the code as their only evidence of the error class on a path, for example `repo_discovery_tests.rs:355` ("NotFound (3), not GenericError (1)") and the lock timeouts in `lock_contention_tests.rs:66` and `profile_concurrency_tests.rs:119`. These need another class witness, such as the `--json` envelope's `error.code`.
+
+| Target | Files (assertion sites) |
+| --- | --- |
+| `cli_gate` | `gate_evaluate_exit_code_test.rs` (13 sites in 13 tests, whose added property is the JSON verdict), `gate_evaluate_all_test.rs` (9), `gate_cli_integration_test.rs` (7), `gate_status_all_strict_test.rs` (5), `gate_evaluate_rerun_test.rs` (5), `gate_preset_apply_json_failure_test.rs` (2), and one each in `gate_findings_test.rs`, `bracket_coverage_gate_run_test.rs` and `gate_status_all_lean_response_test.rs` |
+| `cli_issue` | `batch_create_tests.rs` (10), `top_level_failure_envelope_tests.rs` (6), `issue_status_projection_tests.rs` (4), `issue_show_projection_test.rs` (4), `issue_create_description_file_tests.rs` (3), and one each in `error_json_tests.rs`, `issue_search_label_filter_tests.rs` (`ExitCode::InvalidArgument`), `stored_record_classification_tests.rs`, `search_exit_status_tests.rs`, `snapshot_export_tests.rs`, `verb_hint_tests.rs`, `serve_failure_envelope_tests.rs` and `container_rollup_tests.rs` |
+| `cli_query_graph` | `check_links_tests.rs` (7), `dep_add_redundancy_cli_tests.rs` (7), `scope_validation_tests.rs` (4), `graph_json_tests.rs` (2), `label_query_json_tests.rs` (2, derived from the error classification) |
+| `cli_item_validate` | `validate_cli_rule_tests.rs` (6), `invariant_check_cli_tests.rs` (4), `derived_state_repair_tests.rs` (3), `project_render_cli_tests.rs` (1), `validation_lease_tests.rs` (1) |
+| `cli_repo_workflow` | `profile_cli_tests.rs` (9), `claim_integration_tests.rs` (5), `config_get_tests.rs` (4), `project_config_tests.rs` (4), `serve_cli_tests.rs` (2), and one each in `first_guess_residuals_test.rs`, `format_compat_cli_tests.rs`, `integration_test.rs`, `lock_contention_tests.rs` (`ExitCode::LockTimeout`), `profile_concurrency_tests.rs`, `repo_discovery_tests.rs` and `worktree_cli_tests.rs`; `profile_acceptance_tests.rs` asserts through its `failed_json_with_path` helper |
+
+Out of scope: three recorded-corpus contracts compare statuses against the registered error classification. They are `failure_probe_fixture.rs` (`:1101`, `:1251`), `failure_envelope_contract_tests.rs:95` and `failure_probe_coverage_tests.rs`. Matches under `scratch_build` and `fast_docs_templates/ai_review_verdict_tests.rs` assert shell-script exit codes, not `jit`'s.
+
+### D.3 Query and cycle re-proofs outside `query_tests.rs`
+
+The domain owns `query_by_label`, `query_by_labels` and `query_strategic` (`domain/queries.rs:278,318,336`).
+
+| File | Tests | Class |
+| --- | ---: | --- |
+| `cli_query_graph/label_filter_repeatable_query_tests.rs` | 17 | re-proof: AND semantics and single-label regression for each of eight list subcommands; the wiring is one repeatable `--label` case per subcommand |
+| `cli_query_graph/label_query_json_tests.rs` | 7 | re-proof of pattern semantics (exact, wildcard, no match, case); the invalid-pattern error is the wiring case |
+| `cli_query_graph/query_json_tests.rs` | 5 | wiring of `--state`, `--priority`, `--assignee`, `ready` and `blocked` JSON output; it re-proves filter semantics only where it asserts membership beyond one matching issue |
+| `cli_query_graph/label_hierarchy_e2e_test.rs` | 4 | mixed: label validation and hierarchy warnings are owned here; query semantics inside the workflows are re-proofs |
+| `fast_rules/label_query_tests.rs` | 12 | re-proof of `query_by_label` through the executor; the `search_issues_with_filters` cases (3) own the search filter composition |
+| `fast_rules/label_strategic_tests.rs` | 7 | re-proof of `query_strategic` through the executor |
+| `fast_rules/validation_tests.rs:61` | 1 | owner: repository validation reporting a stored cycle (not dependency-operation rejection) |
+| `cli_issue/batch_create_tests.rs:196` | 1 | owner: batch atomicity (zero created) and cycle keys named in the message; only its exit code re-proves a row |
+| `fast_issue/bulk_operations_tests.rs:221` | 1 | owner: atomic rejection of a multi-edge dependency batch (`DependencyBatchRejectedError`) |
+
+### D.4 List-emitting command outputs
+
+Derived from emission sites, not from the schema. The sweep covered every struct under `crates/jit/src` with a numeric `count` field and every inline `json!` body with a `"count"` key. `schema.rs:730` falls back to `(None, "CommandResponse")` for unregistered commands. The generated schema has 29 commands whose output carries `count`.
+
+| Emission | Command | Schema today |
+| --- | --- | --- |
+| inline `json!` in `main.rs` (`:4547`, `:4984`, `:5005`, `:5900`, `:7391`, `:7476`) | `gate preset list`, `events tail`, `events query`, `label values`, `claim status`, `claim list` | fallback |
+| `DocumentListResult`, `AssetListResult` (`commands/mod.rs:1863`, `:1878`) | `doc list`, `doc assets list` | fallback |
+| `ItemListResult` (`commands/item.rs:20`) | `item list`, `item search` | fallback |
+| `InvariantCheckResult` (`commands/invariant.rs:24`) | `invariant check` | fallback |
+| `ProjectRenderResult` (`commands/project.rs:47`) | `project render` | fallback |
+| `ArchiveCandidates`, `ArtifactPlan` (`domain/artifact_plan.rs:30`, `:962`; `count` is the artifact or candidate length) | `archive candidates`, `archive document`, `archive container` | fallback |
+| `GraphDownstreamResponse`, registered under the key `graph_downstream` (`schema.rs:668`) | `graph rdeps` | fallback, because of the key mismatch |
+| `ListEnvelope` instantiations in `output.rs` | the 29 schema commands | typed |
+
+The following carry a `count` that is not a list envelope:
+
+- `ProjectionRenderReport.count` (`commands/project.rs:27`) counts rendered items, not `kinds`.
+- `StateCount` (`output.rs:1909`) is a tally.
+- `IssuesInfo` and `DocumentsInfo` (`snapshot.rs:53`, `:64`) are snapshot manifest data written to the export, not command stdout.
+- `GraphData` (`crates/server/src/routes.rs:117`) is the HTTP API, not a CLI command.
+
+`list_envelope_tests.rs` covers every fallback command except `claim status`, `project render` and the three archive commands.
+
+### D.5 Tool-missing skips
+
+| Site | Tool | Count |
+| --- | --- | ---: |
+| `scratch_build/merged_tree_gate_verification_tests.rs:48-53` | git, cargo or jq (script exit 2) | 1 |
+| `scratch_build/rust_build_budget_checker_tests.rs:175`…`:521` | jq | 14 |
+| `scratch_build/dependency_feature_policy_tests.rs:168,185` | cargo | 2 |
+| `cli_item_validate/validate_cli_rule_tests.rs:930-935` | node | 1 |
+
+`storage/lock.rs:652` (`skip_unless_write_is_denied`) skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool.
+
+### D.6 In-process private setups outside the CLI targets
+
+File-backed setups. These are functions that create a temporary repository, write configuration, run `jit init` or open a `JsonFileStorage` executor:
+
+- `fast_rules/default_rules_registry_derivation_tests.rs`: `executor` (`:18`) and `setup_initialized_repo` (`:28`).
+- `fast_rules/type_hierarchy_schema_regen_tests.rs`: `executor` (`:10`) and `setup_initialized_repo` (`:16`), the same as the previous file.
+- `fast_rules/effective_rules_tests.rs`: `repo` (`:16`) and `executor` (`:36`).
+- `fast_rules/undeclared_taxonomy_tests.rs:20`: `scaffold_declaring`, a third init-from-config copy.
+- `fast_docs_templates/planning_preset_tests.rs:21`: `file_backed_executor`.
+- `fast_docs_templates/templates_loader_tests.rs:16`: `setup`, which writes declaration files into a temporary directory.
+- `fast_docs_templates/git_revision_tests.rs:15-20`: hand-rolls `git init` with a fixed author identity.
+- `fast_rules/cli_warnings_integration_tests.rs:24`: a profiled setup, which the rule-warning move removes.
+
+Memory-backed setups. These are functions that build an `InMemoryStorage` or a memory executor and seed declarations, instead of taking them from the shared executor:
+
+- `store_with_rules` in `fast_issue/graph_rule_validation_tests.rs:15` and `fast_rules/validate_rule_runner_tests.rs:21`.
+- `executor_with_rules` in `fast_issue/transition_graph_enforcement_tests.rs:24` and `fast_rules/local_rule_enforcement_tests.rs:20`.
+- `executor` in `fast_issue/strictness_enforcement_tests.rs:42` and `fast_issue/strictness_transition_tests.rs:41`.
+- `executor_for` in `fast_issue/graph_rule_validation_tests.rs:34`.
+- `make_storage` in `fast_issue/short_hash_tests.rs:389`.
+- `executor_with_templates` in `fast_docs_templates/template_binding_tests.rs:106`.
+- `memory_storage` in `fast_docs_templates/template_apply_atomicity_tests.rs:380`.
+- `storage_with` and `render_executor` in `fast_rules/project_render_harness_tests.rs:77,90`.
+- `strategic_executor` in `fast_rules/label_strategic_tests.rs:13`.
+- `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.
+
+Helpers that act on a `TestHarness` or executor they are given (for example `configure`, `create_epic`, `seed_epic`) are scenario steps, not setups.

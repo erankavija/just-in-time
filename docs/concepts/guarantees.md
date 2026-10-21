@@ -524,7 +524,7 @@ find .jit -type f -name '*.tmp' -mmin +60 -delete
 ```
 
 The one-hour age is the default temp-file cleanup threshold — see
-[Runtime Coordination Defaults](../reference/runtime-defaults.md), the
+[Runtime Defaults](../reference/runtime-defaults.md), the
 generated source of that value.
 
 ### Stale Claim Leases

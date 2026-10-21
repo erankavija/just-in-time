@@ -1,36 +1,38 @@
 {
-  "id": "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c",
-  "title": "Uniform JSON list envelope across query and list commands",
-  "description": "List-emitting commands return differing top-level JSON shapes; agents guessed bare arrays, got silently empty jq projections, and settled on a defensive dual-path parser repeated verbatim across sessions (~29 occurrences mined, plus fallback command chains).\n\n## Background\n\nDecided convention: every list-emitting command wraps its collection in an envelope with a `count` field and a collection-typed key — `{\"count\": N, \"issues\": [...]}` for issue lists, `{\"count\": N, \"gates\": [...]}` for gate lists, and likewise for events, documents, and claims. The scope is every command that emits a collection, not only the issue family.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Every list- and query-family command's JSON output uses the envelope `{\"count\": N, \"<collection>\": [...]}` with a collection-typed key (issues, gates, events, documents, claims).\n- [ ] [hard] REQ-02: The envelope is stated in each command's help and in the CLI reference.\n- [ ] [hard] REQ-03: Any shape change is called out in a migration note in the changelog or release notes.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T10:24:27.898256917Z",
+  "context": {},
+  "created_at": "2026-07-05T10:03:08.382534643Z",
   "dependencies": [],
+  "description": "List-emitting commands return differing top-level JSON shapes; agents guessed bare arrays, got silently empty jq projections, and settled on a defensive dual-path parser repeated verbatim across sessions (~29 occurrences mined, plus fallback command chains).\n\n## Background\n\nDecided convention: every list-emitting command wraps its collection in an envelope with a `count` field and a collection-typed key — `{\"count\": N, \"issues\": [...]}` for issue lists, `{\"count\": N, \"gates\": [...]}` for gate lists, and likewise for events, documents, and claims. The scope is every command that emits a collection, not only the issue family.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Every list- and query-family command's JSON output uses the envelope `{\"count\": N, \"<collection>\": [...]}` with a collection-typed key (issues, gates, events, documents, claims).\n- [ ] [hard] REQ-02: The envelope is stated in each command's help and in the CLI reference.\n- [ ] [hard] REQ-03: Any shape change is called out in a migration note in the changelog or release notes.",
+  "documents": [],
+  "done_at": "2026-07-05T11:36:03.009033269Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "32959f2e-1c48-4383-8bef-f583ca45f05b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T11:30:31.221321560Z"
+      "updated_at": "2026-07-05T11:30:31.221321560Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "5849389e-f788-4d05-9f23-693ad363f3cd",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T11:33:48.574681391Z"
+      "updated_at": "2026-07-05T11:33:48.574681391Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "74fbdb69-399c-4f9d-b2d8-8a2de2dcec3c",
   "labels": [
     "type:enhancement",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T10:03:08.382534643Z",
-  "updated_at": "2026-07-05T19:51:13.006844650Z",
-  "claimed_at": "2026-07-05T10:24:27.898256917Z",
-  "done_at": "2026-07-05T11:36:03.009033269Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Uniform JSON list envelope across query and list commands",
+  "updated_at": "2026-07-05T19:51:13.006844650Z"
 }

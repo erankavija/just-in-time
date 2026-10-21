@@ -1,13 +1,15 @@
 {
-  "id": "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
-  "title": "Implement jit claim force-evict command",
-  "description": "Implement `jit claim force-evict <lease-id>` with `--reason <text>` for admin eviction of stale leases. Log eviction with reason. Require explicit confirmation or `--force` flag.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli-commands",
+  "claimed_at": "2026-01-08T22:24:58.308633630Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.601093935Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `jit claim force-evict <lease-id>` with `--reason <text>` for admin eviction of stale leases. Log eviction with reason. Require explicit confirmation or `--force` flag.",
+  "documents": [],
+  "done_at": "2026-01-08T22:27:22.726144407Z",
+  "first_ready_at": "2026-01-07T23:32:21.514770378Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
+      "run_id": "2af47e19-9b8d-49a7-99b8-1102009d9406",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:26:57.335323473Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-08T22:24:58.305504847Z"
+      "updated_at": "2026-01-08T22:27:15.352071164Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "de8919df-31f5-4ae6-8d0c-5b4f15e324a0",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-08T22:27:18.165674230Z"
+      "updated_at": "2026-01-08T22:27:18.165674230Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "ed899b40-eafe-471d-8fde-3eef7e48930d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:27:17.759698745Z"
+      "updated_at": "2026-01-08T22:27:17.759698745Z",
+      "updated_by": "auto:executor"
     },
-    "clippy": {
+    "tdd-reminder": {
+      "run_id": "4ee0eb9e-4069-4891-a879-b2b3670cff75",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:27:15.352071164Z"
+      "updated_at": "2026-01-08T22:24:58.305504847Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "ea1edcde-ced8-4a5c-b92c-8ae1a985d36b",
+      "status": "passed",
+      "updated_at": "2026-01-08T22:26:57.335323473Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "2ba4d4c7-5ad9-4d01-90c2-92cbf5819580",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.601093935Z",
-  "updated_at": "2026-07-05T19:51:12.932699996Z",
-  "first_ready_at": "2026-01-07T23:32:21.514770378Z",
-  "claimed_at": "2026-01-08T22:24:58.308633630Z",
-  "done_at": "2026-01-08T22:27:22.726144407Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit claim force-evict command",
+  "updated_at": "2026-07-05T19:51:12.932699996Z"
 }

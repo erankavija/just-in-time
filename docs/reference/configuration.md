@@ -244,9 +244,12 @@ content_format = "markdown"
 
 | Field | Description |
 |-------|-------------|
-| `strictness` | Repo-wide enforcement modulator: `"strict"`, `"loose"` (default), `"permissive"` |
+| `strictness` | Repo-wide enforcement modulator: `"strict"`, `"loose"`, `"permissive"` |
 | `default_type` | Auto-assign when no type:* label |
-| `content_format` | Default body parser: `"markdown"` (default), `"html"`, `"xml"` |
+| `content_format` | Default body parser: `"markdown"`, `"html"`, `"xml"` |
+
+The defaults applied when `strictness` or `content_format` is absent are listed
+in [Runtime Defaults](runtime-defaults.md).
 
 **Strictness** globally modulates which rule violations block a write or state
 transition, layered on top of each rule's per-rule `enforce` flag and `severity`
@@ -254,7 +257,7 @@ transition, layered on top of each rule's per-rule `enforce` flag and `severity`
 only the block/allow decision:
 
 - `strict` — any violation blocks, whether a warning or an error, enforced or not.
-- `loose` (default) — only an enforced error blocks; every other finding is an
+- `loose` — only an enforced error blocks; every other finding is an
   advisory warning.
 - `permissive` — nothing blocks; every violation is reported as an advisory
   warning.
@@ -329,10 +332,10 @@ project-scoped kind projects this way. Fields:
 | Field | Values | Meaning |
 |-------|--------|---------|
 | `kind` | a kind name, or an array of names | **Required.** The addressable item kind(s) to render (e.g. `"invariant"`, or `["rule", "gate"]`); an array must name at least one kind — an empty list is rejected at parse. Every kind must be project-scoped; issue-scoped kinds are not renderable. |
-| `mode` | `region` \| `separate-file` | `region` rewrites only the delimited block inside an existing `target`, byte-preserving everything outside it; `separate-file` writes the whole `target` file. Defaults to `separate-file`. |
+| `mode` | `region` \| `separate-file` | `region` rewrites only the delimited block inside an existing `target`, byte-preserving everything outside it; `separate-file` writes the whole `target` file. The default is listed in [Runtime Defaults](runtime-defaults.md). |
 | `target` | repo-relative path | **Required.** The documentation file written. There is no default — a projection with no `target` is an error. |
-| `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets and works for any project-scoped kind; `full` renders the built-in rich views (severity/enforcement metadata) and is limited to the registry kinds whose declared `source` is exactly the invariant store (`.jit/invariants.toml`) or exactly the rule + gate stores together (`.jit/rules.toml` + `.jit/gates.toml`) — the only sources with a whole-file renderer. A markdown-first kind, or a registry kind whose source points elsewhere, must use `id-anchor`. Defaults to `full`. |
-| `region-begin` / `region-end` | marker strings | `region`-mode delimiters. Default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived from the projection name. |
+| `style` | `id-anchor` \| `full` | `id-anchor` renders generic `- **{self-id}** — {text}` bullets and works for any project-scoped kind; `full` renders the built-in rich views (severity/enforcement metadata) and is limited to the registry kinds whose declared `source` is exactly the invariant store (`.jit/invariants.toml`) or exactly the rule + gate stores together (`.jit/rules.toml` + `.jit/gates.toml`) — the only sources with a whole-file renderer. A markdown-first kind, or a registry kind whose source points elsewhere, must use `id-anchor`. The default is listed in [Runtime Defaults](runtime-defaults.md). |
+| `region-begin` / `region-end` | marker strings | `region`-mode delimiters. The defaults, derived from the projection name, are listed in [Runtime Defaults](runtime-defaults.md). |
 
 Run `jit project render` (optionally `--name <name>` for one) after editing a
 projected kind's source of truth — its registry, or its markdown document for a
@@ -488,8 +491,8 @@ write_policy = "refuse"    # Linked-checkout write-policy stance
 | `"off"` | No lease enforcement |
 
 The mode is read from the repository's own `.jit/config.toml` only: `off`
-with no `[worktree]` section, `strict` when the section omits the key, and the
-declared value otherwise. `jit config show`, `jit config get`, and write
+with no `[worktree]` section, the [default mode](runtime-defaults.md) when the
+section omits the key, and the declared value otherwise. `jit config show`, `jit config get`, and write
 commands all resolve it by this rule; user and system config and environment
 variables do not change it.
 
@@ -501,8 +504,8 @@ variables do not change it.
 | `"allow"` | Permits state-mutating commands run inside a linked non-primary checkout |
 
 With no `[worktree]` section, and with the section present but `write_policy`
-omitted, the declared stance is `"refuse"` — unlike `enforce_leases`, both
-cases resolve identically rather than diverging by section presence.
+omitted, the declared stance is the [default stance](runtime-defaults.md).
+Unlike `enforce_leases`, both cases resolve identically.
 
 Under the refusing stance, a command that would open a repository mutation
 session inside a linked non-primary checkout fails with
@@ -562,17 +565,19 @@ indefinite (`--ttl 0`) lease.
 
 ```toml
 [coordination]
-max_indefinite_leases_per_agent = 2
-max_indefinite_leases_per_repo = 10
+max_indefinite_leases_per_agent = 3
+max_indefinite_leases_per_repo = 12
 ```
 
 #### `max_indefinite_leases_per_agent`
 
-Maximum indefinite (TTL=0) leases per agent. Default: `2`.
+Maximum indefinite (TTL=0) leases per agent. The default is listed in
+[Runtime Defaults](runtime-defaults.md).
 
 #### `max_indefinite_leases_per_repo`
 
-Maximum indefinite leases across entire repository. Default: `10`.
+Maximum indefinite leases across the entire repository. The default is listed in
+[Runtime Defaults](runtime-defaults.md).
 
 These two limits are the only `[coordination]` keys; a config setting any
 other key in the section fails to load. Claim timing is not configurable: a
@@ -586,7 +591,7 @@ Both values are listed under
 
 The built-in lock, recovery-cleanup, and claim lease defaults, each with its
 unit and operational scope, are listed in
-[Runtime Coordination Defaults](runtime-defaults.md). That reference is
+[Runtime Defaults](runtime-defaults.md). That reference is
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.
 
@@ -638,7 +643,8 @@ or section fails to load with an error naming it.
 jit config show
 ```
 
-Displays the merged configuration from all sources.
+Renders the snapshot `jit config get` walks: every section, in the form its key
+path resolves to below.
 
 ### Get Single Value
 
@@ -665,8 +671,7 @@ jit config get documentation.development_root
 jit config get namespaces.type.unique
 ```
 
-`worktree` and `coordination` resolve the merged, default-filled view that
-`jit config show` displays. Every other section reads the repository's
+`worktree` and `coordination` resolve the merged, default-filled view. Every other section reads the repository's
 `config.toml` only, with no system/user merge or built-in defaults; an absent
 section resolves to `{}`.
 `templates` and `invariants` are not part of this surface (they load from

@@ -7,9 +7,9 @@ set -euo pipefail
 # Target:
 #   docs/reference/runtime-defaults.md
 #
-# WHERE THE VALUES COME FROM. The lock, recovery-cleanup, and claim lease
-# defaults are declared once as the
-# constants in crates/jit/src/runtime_defaults.rs, which every call site reads,
+# WHERE THE VALUES COME FROM. The lock, recovery-cleanup, claim lease,
+# worktree policy, and validation defaults are declared once as named constants, in
+# crates/jit/src/runtime_defaults.rs or as their config type's DEFAULT, which every call site reads,
 # so the page cannot state a default the code does not use
 # (`@/inv/single-source-prose`). The conformance test beside the constants
 # asserts the committed page equals the render and names this script.

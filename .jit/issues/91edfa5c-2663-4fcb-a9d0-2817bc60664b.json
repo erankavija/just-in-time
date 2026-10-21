@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "5d774061-61dd-4eb4-a4c9-faaa347c9cae",
+    "ce221384-7b46-41b6-968a-cbeee7b600d3",
+    "f22147ec-0158-4afb-b10d-64119e5a395c"
+  ],
+  "description": "Aggregate the work that removes repeated work from validation capture, issue creation, `validate --fix` and link checking, and measures the result.\n\n## Success Criteria\n\n- [hard] REQ-01: Capture specs validate only added entries, and a capture round requests its document references as one batch.\n- [hard] REQ-02: Issue creation reports findings from its own mutation image, identically in human and JSON output.\n- [hard] REQ-03: `validate --fix` publishes one mutation and always reports one post-fix report.\n- [hard] REQ-04: Link checking probes each distinct URL once through one timed agent with bounded concurrency.\n- [hard] REQ-05: A recorded release-build run on this repository shows per-issue validation no slower than whole validation.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "91edfa5c-2663-4fcb-a9d0-2817bc60664b",
+  "labels": [
+    "type:story",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-side-paths",
+    "component:validation",
+    "component:cli",
+    "component:core",
+    "per:@/charter/D-20"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Capture, creation, fix and link checking stop repeating work",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

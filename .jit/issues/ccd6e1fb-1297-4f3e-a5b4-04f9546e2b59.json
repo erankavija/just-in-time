@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "977d01d8-2757-48c2-ad73-25f42c4b2105"
+  ],
+  "description": "Compile the local rules' JSON Schemas once and reuse them across issues, so whole-repository validation stops recompiling every schema for every issue.\n\n## Background\n\n- `evaluate_local` (`crates/jit/src/validation/local.rs`) desugars each matching rule's schema (`:302-305`) and builds a new `SchemaEngine` per call (`:316-317`). The engine caches compiled validators by schema key (`crates/jit/src/validation/engine.rs:177-183,408-440`), but the cache lives only for that one call.\n- Repository validation calls `evaluate_local` once per issue (`crates/jit/src/validation/repository.rs:568-576`), so each schema compiles once per issue.\n- Single-issue write paths also call `evaluate_local` (`commands/mod.rs`, `commands/template.rs`, `commands/bulk_update.rs`, `commands/gate_check.rs`, `commands/validate.rs`) and its tests (`validation/local.rs`, `repository_state/default_rules.rs`, `tests/fast_docs_templates/content_format_dispatch.rs`, `tests/fast_rules/example_rulesets_tests.rs`, `tests/fast_rules/default_rules_registry_derivation_tests.rs`). `SchemaEngine` is `!Sync`, which suits a single-threaded report.\n\n## Success Criteria\n\n- [hard] REQ-01: A compiled local-rule set holds the desugared schemas and one `SchemaEngine`, and evaluates any number of issues; each distinct schema compiles at most once per set.\n- [hard] REQ-02: `evaluate_local` keeps its signature and builds a compiled set for its one issue, so its callers are unchanged.\n- [hard] REQ-03: Repository validation evaluates every issue through one compiled set per validation.\n- [hard] REQ-04: A unit test evaluates two issues against one compiled set and shows that both use the same compiled validator for a shared schema.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "ccd6e1fb-1297-4f3e-a5b4-04f9546e2b59",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-core",
+    "component:validation",
+    "per:@/charter/D-20",
+    "satisfies:9876a23a/REQ-11"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Local rules compile each schema once per evaluation set",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

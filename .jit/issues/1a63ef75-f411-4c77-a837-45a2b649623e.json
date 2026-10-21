@@ -1,36 +1,38 @@
 {
-  "id": "1a63ef75-f411-4c77-a837-45a2b649623e",
-  "title": "Sweep stale help text and machine-output parity gaps",
-  "description": "The epic fix audit found help and reference text that lags delivered behavior, plus two commands outside the machine-output contract.\n\n## Background\n\nIssue claim help still reads \"Claim an unassigned issue (atomic)\" although same-assignee re-claim now succeeds and promotes to in_progress; the CLI reference exit-code section lists only 0/1/2 although the binary uses 0 through 6 and 10; init and graph export reject the machine-output flag entirely.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Issue claim help documents idempotent same-assignee re-claim and the in_progress promotion.\n- [ ] [hard] REQ-02: The CLI reference documents the full exit-code taxonomy matching the implemented set.\n- [ ] [hard] REQ-03: Init supports machine output (reporting created paths and repository id); graph export accepts the machine-output flag as equivalent to JSON format on stdout.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T22:01:52.142560472Z",
+  "context": {},
+  "created_at": "2026-07-05T10:03:40.071400677Z",
   "dependencies": [],
+  "description": "The epic fix audit found help and reference text that lags delivered behavior, plus two commands outside the machine-output contract.\n\n## Background\n\nIssue claim help still reads \"Claim an unassigned issue (atomic)\" although same-assignee re-claim now succeeds and promotes to in_progress; the CLI reference exit-code section lists only 0/1/2 although the binary uses 0 through 6 and 10; init and graph export reject the machine-output flag entirely.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Issue claim help documents idempotent same-assignee re-claim and the in_progress promotion.\n- [ ] [hard] REQ-02: The CLI reference documents the full exit-code taxonomy matching the implemented set.\n- [ ] [hard] REQ-03: Init supports machine output (reporting created paths and repository id); graph export accepts the machine-output flag as equivalent to JSON format on stdout.",
+  "documents": [],
+  "done_at": "2026-07-05T23:01:20.471211146Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "368becf9-57dd-445e-9e1f-dd131e384e51",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T22:55:25.810999715Z"
+      "updated_at": "2026-07-05T22:55:25.810999715Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "98184a8d-e0f6-42a0-861a-744957f59dbd",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T22:59:31.428220042Z"
+      "updated_at": "2026-07-05T22:59:31.428220042Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "1a63ef75-f411-4c77-a837-45a2b649623e",
   "labels": [
     "type:task",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T10:03:40.071400677Z",
-  "updated_at": "2026-07-05T23:01:20.471211686Z",
-  "claimed_at": "2026-07-05T22:01:52.142560472Z",
-  "done_at": "2026-07-05T23:01:20.471211146Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Sweep stale help text and machine-output parity gaps",
+  "updated_at": "2026-07-05T23:01:20.471211686Z"
 }

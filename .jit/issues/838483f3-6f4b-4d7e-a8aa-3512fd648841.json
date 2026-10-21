@@ -1,37 +1,39 @@
 {
-  "id": "838483f3-6f4b-4d7e-a8aa-3512fd648841",
-  "title": "Breakdown: agent-ergonomics fan-out",
-  "description": "Breakdown node for the agent-ergonomics bracket: gates the fan-out of REQ-01..REQ-11 behind coverage and decomposition review.\n\n## Success Criteria\n\n- [ ] coverage-preview passes: every `[hard]` REQ criterion of epic 53e3fa36 is credited by a child via `satisfies:REQ-NN`.\n- [ ] breakdown-review passes: the decomposition is coherent, right-sized, and correctly wired.\n\n## Notes\n\nBreakdown node `B` for container 53e3fa36; consumes the approved plan node 2937919f.",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-22T21:20:41.047298043Z",
   "dependencies": [
     "2937919f-87ba-4170-812f-23a8d168f08c"
   ],
+  "description": "Breakdown node for the agent-ergonomics bracket: gates the fan-out of REQ-01..REQ-11 behind coverage and decomposition review.\n\n## Success Criteria\n\n- [ ] coverage-preview passes: every `[hard]` REQ criterion of epic 53e3fa36 is credited by a child via `satisfies:REQ-NN`.\n- [ ] breakdown-review passes: the decomposition is coherent, right-sized, and correctly wired.\n\n## Notes\n\nBreakdown node `B` for container 53e3fa36; consumes the approved plan node 2937919f.",
+  "documents": [],
+  "done_at": "2026-06-22T21:32:38.176963785Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
     "breakdown-review": {
+      "run_id": "5f611deb-86e0-4d14-86e5-8ef05907cbdb",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-22T21:30:48.117392737Z"
+      "updated_at": "2026-06-22T21:30:48.117392737Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
+      "run_id": "7dedeb9c-4181-4b35-8d36-c8b2e2880418",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-22T21:51:21.759655845Z"
+      "updated_at": "2026-06-22T21:51:21.759655845Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "838483f3-6f4b-4d7e-a8aa-3512fd648841",
   "labels": [
     "type:breakdown",
     "epic:agent-ergonomics",
     "brackets:53e3fa36"
   ],
-  "created_at": "2026-06-22T21:20:41.047298043Z",
-  "updated_at": "2026-07-05T19:51:13.020204950Z",
-  "done_at": "2026-06-22T21:32:38.176963785Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Breakdown: agent-ergonomics fan-out",
+  "updated_at": "2026-07-05T19:51:13.020204950Z"
 }

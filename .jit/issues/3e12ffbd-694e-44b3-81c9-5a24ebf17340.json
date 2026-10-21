@@ -31,21 +31,25 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "311fecd3-c917-4cc6-a7d3-43651c41ec4f",
       "status": "passed",
       "updated_at": "2026-07-16T20:29:53.741621722Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "5a70c04d-fb8c-4f54-9ff8-27cdbc336043",
       "status": "passed",
       "updated_at": "2026-07-17T03:17:54.494510311Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "9241c7fd-016a-471a-ac77-ac9da439ac0f",
       "status": "passed",
       "updated_at": "2026-07-17T03:42:41.236438124Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "a264b300-c1fc-4f7a-9aa5-4bf0a1dbc52f",
       "status": "passed",
       "updated_at": "2026-07-17T00:31:35.904630429Z",
       "updated_by": "auto:executor"

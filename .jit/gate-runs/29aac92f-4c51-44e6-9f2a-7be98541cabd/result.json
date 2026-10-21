@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:docs-worker",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-02-02T21:31:55.666696527Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "ab451fdb-2bd3-42e2-a866-9d644779eb53",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "29aac92f-4c51-44e6-9f2a-7be98541cabd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-02-02T21:31:55.666696527Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

@@ -1,35 +1,37 @@
 {
-  "id": "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
-  "title": "Replace storage eprintln! diagnostics with typed warnings",
-  "description": "Replace storage-layer `eprintln!` diagnostics with typed warnings propagated to the output layer (report boundary leak). Storage must not write to stderr directly.\n\n## Sites\n- `storage/claim_coordinator.rs:963,1052,1066`, plus `storage/lock_cleanup.rs` and `storage/worktree_identity.rs` — currently emit `eprintln!` diagnostics inline.\n\n## Approach\nPropagate a typed `Vec<StorageWarning>` (e.g. `SequenceGap`, `IndexRebuilt`, `TempCleanupFailed`) up to the output layer, or route via `tracing::warn!`. Choose one mechanism consistently with how the rest of the crate surfaces non-fatal diagnostics.\n\n## Success Criteria\n- [ ] No `eprintln!`/`println!` for diagnostics remains in `storage/`; non-fatal storage conditions are represented as typed warnings (`StorageWarning` enum) or routed through the project's logging facility.\n- [ ] The output layer (not storage) decides how/whether warnings are rendered to the user; `--json` callers are unaffected by stray stderr writes from storage.\n- [ ] Each previously-printed condition still surfaces (covered by a test asserting the warning is produced).\n- [ ] `cargo-ci` and `code-review` pass.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-25T21:59:16.222229763Z",
+  "context": {},
+  "created_at": "2026-06-25T21:41:24.527618449Z",
   "dependencies": [],
+  "description": "Replace storage-layer `eprintln!` diagnostics with typed warnings propagated to the output layer (report boundary leak). Storage must not write to stderr directly.\n\n## Sites\n- `storage/claim_coordinator.rs:963,1052,1066`, plus `storage/lock_cleanup.rs` and `storage/worktree_identity.rs` — currently emit `eprintln!` diagnostics inline.\n\n## Approach\nPropagate a typed `Vec<StorageWarning>` (e.g. `SequenceGap`, `IndexRebuilt`, `TempCleanupFailed`) up to the output layer, or route via `tracing::warn!`. Choose one mechanism consistently with how the rest of the crate surfaces non-fatal diagnostics.\n\n## Success Criteria\n- [ ] No `eprintln!`/`println!` for diagnostics remains in `storage/`; non-fatal storage conditions are represented as typed warnings (`StorageWarning` enum) or routed through the project's logging facility.\n- [ ] The output layer (not storage) decides how/whether warnings are rendered to the user; `--json` callers are unaffected by stray stderr writes from storage.\n- [ ] Each previously-printed condition still surfaces (covered by a test asserting the warning is produced).\n- [ ] `cargo-ci` and `code-review` pass.",
+  "documents": [],
+  "done_at": "2026-06-26T00:34:31.656088869Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "c489ebdd-4fdd-4521-b2f2-7b5cab909f3a",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T00:30:10.429672422Z"
+      "updated_at": "2026-06-26T00:30:10.429672422Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "65382944-f171-4e82-809b-70e21926a7e0",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T00:32:12.415027252Z"
+      "updated_at": "2026-06-26T00:32:12.415027252Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d0edc072-4fbe-4f52-b05a-8b389239e6b7",
   "labels": [
     "type:task",
     "epic:code-smell-cleanup"
   ],
-  "created_at": "2026-06-25T21:41:24.527618449Z",
-  "updated_at": "2026-07-05T19:51:13.091030101Z",
-  "claimed_at": "2026-06-25T21:59:16.222229763Z",
-  "done_at": "2026-06-26T00:34:31.656088869Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Replace storage eprintln! diagnostics with typed warnings",
+  "updated_at": "2026-07-05T19:51:13.091030101Z"
 }

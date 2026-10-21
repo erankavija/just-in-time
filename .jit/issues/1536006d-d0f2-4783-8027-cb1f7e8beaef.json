@@ -1,39 +1,41 @@
 {
-  "id": "1536006d-d0f2-4783-8027-cb1f7e8beaef",
-  "title": "Plan-document location resolver",
-  "description": "A boundary resolver that loads a plan document from either the issue body or a configured external path and feeds its content to the pure validation engine.\n\n## Success Criteria\n\n- [ ] An inline plan body and an external-file plan both resolve to the same projected content for validation.\n- [ ] File reading happens at the boundary; the validation engine performs no filesystem I/O.\n- [ ] A missing or unreadable external plan path produces a clear error.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-16T22:26:11.148122305Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.094250428Z",
   "dependencies": [
     "c78168d8-152a-4809-bb54-8de877197331"
   ],
+  "description": "A boundary resolver that loads a plan document from either the issue body or a configured external path and feeds its content to the pure validation engine.\n\n## Success Criteria\n\n- [ ] An inline plan body and an external-file plan both resolve to the same projected content for validation.\n- [ ] File reading happens at the boundary; the validation engine performs no filesystem I/O.\n- [ ] A missing or unreadable external plan path produces a clear error.",
+  "documents": [],
+  "done_at": "2026-06-17T00:02:07.378303145Z",
+  "first_ready_at": "2026-06-16T18:29:34.583866817Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T00:00:21.669671352Z"
-    },
     "cargo-ci": {
+      "run_id": "85a42a22-a052-4e82-a94f-8d0102977fc6",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T23:50:23.486927240Z"
+      "updated_at": "2026-06-16T23:50:23.486927240Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "24bee5cc-b72f-4233-b77a-387a199b3a60",
+      "status": "passed",
+      "updated_at": "2026-06-17T00:00:21.669671352Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "1536006d-d0f2-4783-8027-cb1f7e8beaef",
   "labels": [
     "type:task",
     "story:scaffolding-and-gates",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.094250428Z",
-  "updated_at": "2026-07-05T19:51:12.915600014Z",
-  "first_ready_at": "2026-06-16T18:29:34.583866817Z",
-  "claimed_at": "2026-06-16T22:26:11.148122305Z",
-  "done_at": "2026-06-17T00:02:07.378303145Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Plan-document location resolver",
+  "updated_at": "2026-07-05T19:51:12.915600014Z"
 }

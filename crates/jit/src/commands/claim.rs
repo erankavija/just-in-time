@@ -141,8 +141,8 @@ pub fn execute_claim_acquire<S: IssueStore + crate::storage::RepositoryStateStor
         ttl_secs,
         reason,
         ClaimAcquireLimits::new(
-            coord_config.max_indefinite_leases_per_agent(),
-            coord_config.max_indefinite_leases_per_repo(),
+            coord_config.max_indefinite_leases_per_agent,
+            coord_config.max_indefinite_leases_per_repo,
         ),
         |persisted_id| storage.resolve_issue_id(&IssueIdPrefix::parse(persisted_id)?),
         |_lease| {

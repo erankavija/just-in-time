@@ -34,16 +34,19 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "56453a86-7494-4095-b1f1-432ba9759134",
       "status": "passed",
       "updated_at": "2026-07-30T21:25:00.583737245Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
+      "run_id": "1df4955e-3f9a-48ca-a6f5-2df01dbcdd62",
       "status": "passed",
       "updated_at": "2026-07-30T21:21:32.906829806Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "4bb80ed8-544a-414a-bc1b-952e5a97c76a",
       "status": "passed",
       "updated_at": "2026-07-30T21:21:27.495829148Z",
       "updated_by": "auto:executor"

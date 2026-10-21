@@ -1,55 +1,57 @@
 {
-  "id": "0b7e864d-0985-424a-a43d-8cf4fd351ad3",
-  "title": "Mechanical violation auto-fixer for content-standards sweep",
-  "description": "Applies safe, rule-based corrections to every content-standards violation classified as mechanical, and confirms each fix actually resolves the flagged violation.\n\n## Background\n\nA prior scan enumerates every content-standards violation across the project's issues and documents and classifies each as mechanical or judgment, per the rules in `docs/reference/jit-content-standards.md`. Mechanical violations follow a single unambiguous correction: inserting a missing `[hard]`/`[aspirational]` marker with a fresh `REQ-N` id, stripping an embedded id or ordinal from a title, or inserting a missing `## Success Criteria` heading. These are safe to apply without a human decision. Judgment violations are never touched here.\n\n## Success Criteria\n\n- [hard] REQ-01: For every finding classified as `mechanical`, the fixer applies the correction to the source issue or document.\n- [hard] REQ-02: Re-scanning the project after the fixer runs no longer reports any of the fixed findings as violations.\n- [hard] REQ-03: The fixer makes no change to any finding classified as `judgment`, and makes no change to any issue or document with zero mechanical findings.\n- [hard] REQ-04: For each fix applied, the fixer records the issue or document changed and the rule it corrected.\n\n## Notes\n\nA correction changes only the content the rule targets; it leaves every other part of the issue or document (other sections, unrelated criteria) unchanged.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-02T20:49:27.954323738Z",
+  "context": {},
+  "created_at": "2026-07-01T22:19:45.853900227Z",
   "dependencies": [
     "66aeee5f-416d-4397-9d15-19971900fb6f"
   ],
+  "description": "Applies safe, rule-based corrections to every content-standards violation classified as mechanical, and confirms each fix actually resolves the flagged violation.\n\n## Background\n\nA prior scan enumerates every content-standards violation across the project's issues and documents and classifies each as mechanical or judgment, per the rules in `docs/reference/jit-content-standards.md`. Mechanical violations follow a single unambiguous correction: inserting a missing `[hard]`/`[aspirational]` marker with a fresh `REQ-N` id, stripping an embedded id or ordinal from a title, or inserting a missing `## Success Criteria` heading. These are safe to apply without a human decision. Judgment violations are never touched here.\n\n## Success Criteria\n\n- [hard] REQ-01: For every finding classified as `mechanical`, the fixer applies the correction to the source issue or document.\n- [hard] REQ-02: Re-scanning the project after the fixer runs no longer reports any of the fixed findings as violations.\n- [hard] REQ-03: The fixer makes no change to any finding classified as `judgment`, and makes no change to any issue or document with zero mechanical findings.\n- [hard] REQ-04: For each fix applied, the fixer records the issue or document changed and the rule it corrected.\n\n## Notes\n\nA correction changes only the content the rule targets; it leaves every other part of the issue or document (other sections, unrelated criteria) unchanged.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "implementation",
+      "format": "markdown",
+      "label": "Mechanical content-standards auto-fixer",
+      "path": ".agents/skills/jit-project-lead/scripts/standards-fix.sh"
+    },
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Auto-fixer contract and rule->correction mapping",
+      "path": ".agents/skills/jit-project-lead/references/standards-fix.md"
+    }
+  ],
+  "done_at": "2026-07-02T22:43:56.279040099Z",
+  "first_ready_at": "2026-07-02T20:32:46.536192180Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T22:42:28.752269462Z"
-    },
     "cargo-ci": {
+      "run_id": "7760e311-112d-4199-9bd1-99175640fc50",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T22:40:52.329153185Z"
+      "updated_at": "2026-07-02T22:40:52.329153185Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "b0393608-a761-4104-900e-111ed475a563",
+      "status": "passed",
+      "updated_at": "2026-07-02T22:42:28.752269462Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": ".agents/skills/jit-project-lead/scripts/standards-fix.sh",
-      "commit": null,
-      "label": "Mechanical content-standards auto-fixer",
-      "doc_type": "implementation",
-      "format": "markdown"
-    },
-    {
-      "path": ".agents/skills/jit-project-lead/references/standards-fix.md",
-      "commit": null,
-      "label": "Auto-fixer contract and rule->correction mapping",
-      "doc_type": "reference",
-      "format": "markdown"
-    }
-  ],
+  "id": "0b7e864d-0985-424a-a43d-8cf4fd351ad3",
   "labels": [
     "type:task",
     "epic:jit-project-lead",
     "story:standards-sweep-mode",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-01T22:19:45.853900227Z",
-  "updated_at": "2026-07-20T06:50:44.975489355Z",
-  "first_ready_at": "2026-07-02T20:32:46.536192180Z",
-  "claimed_at": "2026-07-02T20:49:27.954323738Z",
-  "done_at": "2026-07-02T22:43:56.279040099Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Mechanical violation auto-fixer for content-standards sweep",
+  "updated_at": "2026-07-20T06:50:44.975489355Z"
 }

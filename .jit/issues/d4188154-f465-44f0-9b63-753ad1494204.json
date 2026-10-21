@@ -1,38 +1,40 @@
 {
-  "id": "d4188154-f465-44f0-9b63-753ad1494204",
-  "title": "Hard-remove legacy config + migration backward-compat (rules.toml sole source)",
-  "description": "Hard-remove the legacy config + migration backward-compat machinery so `rules.toml` is the sole validation source. Only jit + gf2 exist pre-1.0 and both are migrated (Task C), so no legacy support is needed.\n\n## Background\n\nPart of Scope Expansion 2. See `dev/active/f6a704d0-expansion2-plan.md` §3 and §6a (MF1/MF2/MF3/MF4). Depends on Task C (migrate gf2 before deleting the migration code).\n\n## Success Criteria\n\n- [ ] [hard] `crates/jit/src/validation/migration.rs` (config→rules migration, coexistence, materialize-existing, deprecated-key scan) is removed; only a fixed-default scaffold path remains for `jit init`.\n- [ ] [hard] Legacy `[validation]` enforcement keys and `NamespaceConfig.{values,pattern,required}` parsing are removed (incl. `config_manager.rs` and all struct literals); `default_type`/`strictness` and the namespace registry + type_hierarchy are retained.\n- [ ] [hard] `default_ruleset(namespaces)` is the fixed default emitting exactly: label-format (e=true), namespace-registry (e=false, when registry non-empty), type-hierarchy-known (e=false), namespace-unique:<ns> (e=true), and UNCONDITIONAL orphan-leaf + strategic-consistency (warn).\n- [ ] [hard] An absent `rules.toml` builds defaults IN MEMORY on the read path (no write-on-read); only `jit init` materializes it to disk under the write lock.\n- [ ] [hard] Fresh-init uses the lean default (no namespace value/pattern/required starter rules); `intended_default_config` + tests updated; DR §8.2/§8.4 and docs/reference config docs updated.\n- [ ] [hard] Acceptance: `jit init` in this repo yields an empty `git diff` on `.jit/rules.toml`; `cargo fmt`, `clippy --workspace --all-targets`, `cargo test --workspace` clean.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-07T20:24:42.314043803Z",
+  "context": {},
+  "created_at": "2026-06-07T17:58:58.162735062Z",
   "dependencies": [
     "2fb9f910-ae16-431d-8bb3-bf83634d1f90"
   ],
+  "description": "Hard-remove the legacy config + migration backward-compat machinery so `rules.toml` is the sole validation source. Only jit + gf2 exist pre-1.0 and both are migrated (Task C), so no legacy support is needed.\n\n## Background\n\nPart of Scope Expansion 2. See `dev/active/f6a704d0-expansion2-plan.md` §3 and §6a (MF1/MF2/MF3/MF4). Depends on Task C (migrate gf2 before deleting the migration code).\n\n## Success Criteria\n\n- [ ] [hard] `crates/jit/src/validation/migration.rs` (config→rules migration, coexistence, materialize-existing, deprecated-key scan) is removed; only a fixed-default scaffold path remains for `jit init`.\n- [ ] [hard] Legacy `[validation]` enforcement keys and `NamespaceConfig.{values,pattern,required}` parsing are removed (incl. `config_manager.rs` and all struct literals); `default_type`/`strictness` and the namespace registry + type_hierarchy are retained.\n- [ ] [hard] `default_ruleset(namespaces)` is the fixed default emitting exactly: label-format (e=true), namespace-registry (e=false, when registry non-empty), type-hierarchy-known (e=false), namespace-unique:<ns> (e=true), and UNCONDITIONAL orphan-leaf + strategic-consistency (warn).\n- [ ] [hard] An absent `rules.toml` builds defaults IN MEMORY on the read path (no write-on-read); only `jit init` materializes it to disk under the write lock.\n- [ ] [hard] Fresh-init uses the lean default (no namespace value/pattern/required starter rules); `intended_default_config` + tests updated; DR §8.2/§8.4 and docs/reference config docs updated.\n- [ ] [hard] Acceptance: `jit init` in this repo yields an empty `git diff` on `.jit/rules.toml`; `cargo fmt`, `clippy --workspace --all-targets`, `cargo test --workspace` clean.",
+  "documents": [],
+  "done_at": "2026-06-08T05:50:08.199115824Z",
+  "first_ready_at": "2026-06-07T19:53:59.053503192Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "6f48e3f5-275a-41dd-a953-789953e84ffa",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-08T05:44:43.892715429Z"
+      "updated_at": "2026-06-08T05:44:43.892715429Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "782db61e-01c6-4e98-b620-f9339f11dd5c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-08T05:47:37.768450305Z"
+      "updated_at": "2026-06-08T05:47:37.768450305Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d4188154-f465-44f0-9b63-753ad1494204",
   "labels": [
     "type:task",
     "epic:validation-engine"
   ],
-  "created_at": "2026-06-07T17:58:58.162735062Z",
-  "updated_at": "2026-07-05T19:51:13.094717634Z",
-  "first_ready_at": "2026-06-07T19:53:59.053503192Z",
-  "claimed_at": "2026-06-07T20:24:42.314043803Z",
-  "done_at": "2026-06-08T05:50:08.199115824Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Hard-remove legacy config + migration backward-compat (rules.toml sole source)",
+  "updated_at": "2026-07-05T19:51:13.094717634Z"
 }

@@ -1,35 +1,37 @@
 {
-  "id": "765688e1-2b0d-4d64-8836-eb1f57e3aa6e",
-  "title": "Gate-result recency predicate with fresh-evidence example",
-  "description": "Add a predicate on gate-result freshness so rulesets can require recent evidence before completion, and ship a fresh-evidence example ruleset.\n\n## Success Criteria\n\n- [ ] Rules can assert that an issue's gate results are no older than a configured age (evaluated against the recorded gate timestamps)\n- [ ] A stale or missing gate result yields a finding naming the gate and its age\n- [ ] An example ruleset under docs/examples/ demonstrates fresh-evidence-before-done, blocking via transition enforcement\n- [ ] Behavior is deterministic and testable (clock injection or equivalent; no hidden wall-clock reads in the pure engine)",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-09T23:31:05.017073501Z",
+  "context": {},
+  "created_at": "2026-06-09T21:52:58.511871939Z",
   "dependencies": [],
+  "description": "Add a predicate on gate-result freshness so rulesets can require recent evidence before completion, and ship a fresh-evidence example ruleset.\n\n## Success Criteria\n\n- [ ] Rules can assert that an issue's gate results are no older than a configured age (evaluated against the recorded gate timestamps)\n- [ ] A stale or missing gate result yields a finding naming the gate and its age\n- [ ] An example ruleset under docs/examples/ demonstrates fresh-evidence-before-done, blocking via transition enforcement\n- [ ] Behavior is deterministic and testable (clock injection or equivalent; no hidden wall-clock reads in the pure engine)",
+  "documents": [],
+  "done_at": "2026-06-10T14:37:06.807696910Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T00:43:37.864440850Z"
-    },
     "cargo-ci": {
+      "run_id": "ae5c2345-556d-4d5d-a6cd-9ddc538dece7",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T00:40:43.735691962Z"
+      "updated_at": "2026-06-10T00:40:43.735691962Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cd7d57cb-33a6-450b-b957-d2186f40457d",
+      "status": "passed",
+      "updated_at": "2026-06-10T00:43:37.864440850Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "765688e1-2b0d-4d64-8836-eb1f57e3aa6e",
   "labels": [
     "type:task",
     "epic:validation-lifecycle"
   ],
-  "created_at": "2026-06-09T21:52:58.511871939Z",
-  "updated_at": "2026-07-05T19:51:13.007989861Z",
-  "claimed_at": "2026-06-09T23:31:05.017073501Z",
-  "done_at": "2026-06-10T14:37:06.807696910Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Gate-result recency predicate with fresh-evidence example",
+  "updated_at": "2026-07-05T19:51:13.007989861Z"
 }

@@ -1,13 +1,15 @@
 {
-  "id": "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff",
-  "title": "Implement gate bypass for Rejected state",
-  "description": "Update update_issue_state() in commands/issue.rs to bypass gate validation when transitioning to Rejected state. Add should_check_gates() helper that returns true for Done, false for Rejected. Allow direct transition from any state to Rejected without gate enforcement. Add tests verifying Rejected bypasses both prechecks and postchecks.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session-1",
+  "claimed_at": "2025-12-20T20:17:48.827988691Z",
+  "context": {},
+  "created_at": "2025-12-20T20:17:48.824843677Z",
   "dependencies": [
     "0b7723c5-13d3-4c60-b940-5cade111b02d"
   ],
+  "description": "Update update_issue_state() in commands/issue.rs to bypass gate validation when transitioning to Rejected state. Add should_check_gates() helper that returns true for Done, false for Rejected. Allow direct transition from any state to Rejected without gate enforcement. Add tests verifying Rejected bypasses both prechecks and postchecks.",
+  "documents": [],
+  "done_at": "2025-12-20T20:19:50.370594813Z",
+  "first_ready_at": "2025-12-20T20:12:00.365489800Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "clippy": {
+      "run_id": "abacb7ff-df98-4a9e-b390-1a13ef0ecad5",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T20:19:41.811348534Z"
+      "updated_at": "2025-12-20T20:19:40.098943183Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9c7d19cc-c0bb-44d3-b325-a4bef68413ac",
+      "status": "passed",
+      "updated_at": "2025-12-20T20:19:41.811348534Z",
+      "updated_by": "human:user"
     },
     "fmt": {
+      "run_id": "eb127166-30ce-4238-9e07-e7a261c1ec86",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:19:41.506061487Z"
+      "updated_at": "2025-12-20T20:19:41.506061487Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "d3d32740-246a-4b06-99a4-27e7d8ffa735",
       "status": "passed",
-      "updated_by": "agent:copilot-session-1",
-      "updated_at": "2025-12-20T20:17:48.824693687Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:19:40.098943183Z"
+      "updated_at": "2025-12-20T20:17:48.824693687Z",
+      "updated_by": "agent:copilot-session-1"
     },
     "tests": {
+      "run_id": "87ff718c-f516-4e10-b2ab-f01c4c99635f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:19:38.891544863Z"
+      "updated_at": "2025-12-20T20:19:38.891544863Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "db7fdd9a-6bf7-4eff-88ee-5874d3c61cff",
   "labels": [
     "type:task",
     "epic:rejection-state",
     "milestone:v1.0",
     "component:core"
   ],
-  "created_at": "2025-12-20T20:17:48.824843677Z",
-  "updated_at": "2026-07-05T19:51:13.100410978Z",
-  "first_ready_at": "2025-12-20T20:12:00.365489800Z",
-  "claimed_at": "2025-12-20T20:17:48.827988691Z",
-  "done_at": "2025-12-20T20:19:50.370594813Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement gate bypass for Rejected state",
+  "updated_at": "2026-07-05T19:51:13.100410978Z"
 }

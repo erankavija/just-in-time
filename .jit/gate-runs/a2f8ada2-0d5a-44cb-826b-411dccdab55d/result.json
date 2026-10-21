@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:copilot-cli",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-02-03T20:13:43.731292205Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "2a48ca4d-8ad3-46b7-9cf4-5207fa95b143",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "a2f8ada2-0d5a-44cb-826b-411dccdab55d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-02-03T20:13:43.731292205Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

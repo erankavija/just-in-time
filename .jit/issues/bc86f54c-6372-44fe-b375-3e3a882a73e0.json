@@ -1,38 +1,40 @@
 {
-  "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
-  "title": "Blocking graph-rule evaluation at state transitions",
-  "description": "Evaluate graph rules at issue state transitions and block the transition when an enforcing rule fails, closing the bypass where an issue reaches `done` despite failing coverage rules.\n\n## Background\n\nGraph rules currently run only in `jit validate` and gate checkers; the write path runs local rules only. The done transition is therefore unguarded by coverage and reference-integrity rules.\n\n## Success Criteria\n\n- [ ] Transitioning an issue evaluates the graph rules applicable to it in its target state; a failing rule with `enforce = true` blocks the transition with exit 4 and prints the findings\n- [ ] Non-enforcing failures are reported on the transition without blocking it\n- [ ] Transition-time rule evaluation runs over only the affected issue's graph neighborhood slice (the issue plus its transitive dependency closure); building that slice may read the store, since reverse edges are not indexed (amended 2026-06-10 with user approval; a persisted reverse-edge index is future work)\n- [ ] Blocked transitions are recorded in the event log\n- [ ] Documentation describing where rules run (concepts doc and rules.toml comments) matches the new behavior",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-09T23:31:05.033259096Z",
+  "context": {},
+  "created_at": "2026-06-09T21:52:58.401969838Z",
   "dependencies": [
     "cca3e80b-4a9a-498d-995b-15ff80acab4a"
   ],
+  "description": "Evaluate graph rules at issue state transitions and block the transition when an enforcing rule fails, closing the bypass where an issue reaches `done` despite failing coverage rules.\n\n## Background\n\nGraph rules currently run only in `jit validate` and gate checkers; the write path runs local rules only. The done transition is therefore unguarded by coverage and reference-integrity rules.\n\n## Success Criteria\n\n- [ ] Transitioning an issue evaluates the graph rules applicable to it in its target state; a failing rule with `enforce = true` blocks the transition with exit 4 and prints the findings\n- [ ] Non-enforcing failures are reported on the transition without blocking it\n- [ ] Transition-time rule evaluation runs over only the affected issue's graph neighborhood slice (the issue plus its transitive dependency closure); building that slice may read the store, since reverse edges are not indexed (amended 2026-06-10 with user approval; a persisted reverse-edge index is future work)\n- [ ] Blocked transitions are recorded in the event log\n- [ ] Documentation describing where rules run (concepts doc and rules.toml comments) matches the new behavior",
+  "documents": [],
+  "done_at": "2026-06-10T14:37:06.987643151Z",
+  "first_ready_at": "2026-06-09T23:30:17.028986022Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T14:34:47.087530506Z"
-    },
     "cargo-ci": {
+      "run_id": "287b45e5-3257-407b-8608-dc003bedf5c0",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-10T14:31:41.542249511Z"
+      "updated_at": "2026-06-10T14:31:41.542249511Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0e8cf3f6-9c10-43db-81fe-5982e96181d0",
+      "status": "passed",
+      "updated_at": "2026-06-10T14:34:47.087530506Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "bc86f54c-6372-44fe-b375-3e3a882a73e0",
   "labels": [
     "type:task",
     "epic:validation-lifecycle"
   ],
-  "created_at": "2026-06-09T21:52:58.401969838Z",
-  "updated_at": "2026-07-05T19:51:13.075130040Z",
-  "first_ready_at": "2026-06-09T23:30:17.028986022Z",
-  "claimed_at": "2026-06-09T23:31:05.033259096Z",
-  "done_at": "2026-06-10T14:37:06.987643151Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Blocking graph-rule evaluation at state transitions",
+  "updated_at": "2026-07-05T19:51:13.075130040Z"
 }

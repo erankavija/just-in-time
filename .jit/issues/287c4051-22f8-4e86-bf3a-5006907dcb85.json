@@ -32,11 +32,13 @@
   ],
   "gates_status": {
     "doc-review": {
+      "run_id": "cdd7a11b-a505-441a-98bd-2eafc15298b8",
       "status": "passed",
       "updated_at": "2026-07-10T15:55:38.691443305Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "ffe60cf1-08ff-4368-85df-a5bb92517f23",
       "status": "passed",
       "updated_at": "2026-07-10T15:57:04.231491727Z",
       "updated_by": "auto:executor"

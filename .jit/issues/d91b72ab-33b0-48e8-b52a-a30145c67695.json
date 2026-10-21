@@ -1,13 +1,15 @@
 {
-  "id": "d91b72ab-33b0-48e8-b52a-a30145c67695",
-  "title": "Implement jit claim release command",
-  "description": "Implement `jit claim release <lease-id>` to explicitly release lease before expiry. Verify ownership. Support `--json` output.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli-commands",
+  "claimed_at": "2026-01-08T21:25:05.700391011Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.599040615Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `jit claim release <lease-id>` to explicitly release lease before expiry. Verify ownership. Support `--json` output.",
+  "documents": [],
+  "done_at": "2026-01-08T21:34:52.663527996Z",
+  "first_ready_at": "2026-01-07T23:32:21.508179749Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-cli-commands",
-      "updated_at": "2026-01-08T21:30:34.895928214Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:29:48.870969806Z"
-    },
     "clippy": {
+      "run_id": "6c4d77a0-f80f-4e50-8e07-5e895c84eae3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:30:06.790122496Z"
+      "updated_at": "2026-01-08T21:30:06.790122496Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "e09714a3-61b7-4fec-a085-0c652caf801c",
       "status": "passed",
-      "updated_by": "human:reviewer",
-      "updated_at": "2026-01-08T21:34:50.978007401Z"
+      "updated_at": "2026-01-08T21:34:50.978007401Z",
+      "updated_by": "human:reviewer"
     },
     "fmt": {
+      "run_id": "16cd3263-4a7e-4c10-b607-87fd96455c85",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:30:10.895559681Z"
+      "updated_at": "2026-01-08T21:30:10.895559681Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "de717b4b-250a-4078-9ff5-4e86b1acf1fe",
+      "status": "passed",
+      "updated_at": "2026-01-08T21:30:34.895928214Z",
+      "updated_by": "agent:copilot-cli-commands"
+    },
+    "tests": {
+      "run_id": "19f481ff-4713-4d34-9efd-114b278c074b",
+      "status": "passed",
+      "updated_at": "2026-01-08T21:29:48.870969806Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d91b72ab-33b0-48e8-b52a-a30145c67695",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.599040615Z",
-  "updated_at": "2026-07-05T19:51:13.099542217Z",
-  "first_ready_at": "2026-01-07T23:32:21.508179749Z",
-  "claimed_at": "2026-01-08T21:25:05.700391011Z",
-  "done_at": "2026-01-08T21:34:52.663527996Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit claim release command",
+  "updated_at": "2026-07-05T19:51:13.099542217Z"
 }

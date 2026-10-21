@@ -1,0 +1,56 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "629f3194a0d4db747b1f9719eb9626a5ddea8f90",
+  "completed_at": "2026-10-21T17:03:14.890453861Z",
+  "duration_ms": 385408,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/claim.md",
+        "id": "F1",
+        "line": 117,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/459bb995/requirement/REQ-01",
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The claim reference still hard-codes the 2 and 10 lease defaults instead of citing the runtime-defaults projection."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/how-to/multi-agent-coordination.md",
+        "id": "F2",
+        "line": 239,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/459bb995/requirement/REQ-01",
+          "@/invariant/single-source-prose",
+          "@/charter/D-18"
+        ],
+        "severity": "medium",
+        "summary": "Documentation still restates the write-policy default rather than deriving it from its named constant."
+      }
+    ],
+    "summary": "Two blocking documentation duplicates leave configuration defaults outside their canonical statements.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f62e6287-876c-439c-9b3a-d6c7ac176f29",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:56:49.482153219Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 12039 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15f64-e500-7183-a8f4-7e1217778112\n--------\nuser\n--- 12026 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4590bd483 `refactor(jit:459bb995): state each configuration default once`; 629f3194 merge (empty individual patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/459bb995/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml); @/issue/842b0ac6/requirement/REQ-03 (parent issue description, markdown-first)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:54:58Z); doc-review pending; docs-mechanical pending\nTruncation recovery: recovered initial truncated output through per-commit, per-file patch and bounded current-file reads; discarded generated target fixture AGENTS listing as outside the attributable footprint\n\n1. [blocking][issue-impact] `docs/reference/claim.md:117` and `:124`–`:125` still state the lease-limit defaults as `2` and `10`, rather than citing the new runtime-defaults projection. This leaves the same defaults in prose outside their named constants and fails hard REQ-01. References: @/issue/459bb995/requirement/REQ-01, @/invariant/single-source-prose.\n\n2. [blocking][issue-impact] The `write_policy` default remains duplicated in prose: `docs/how-to/multi-agent-coordination.md:239` labels `\"refuse\"` as the default, while `docs/reference/configuration.md:503`–`:505` repeats it. It must derive from or cite the canonical `LinkedCheckoutWriteStance::DEFAULT` statement to satisfy hard REQ-01. References: @/issue/459bb995/requirement/REQ-01, @/invariant/single-source-prose, @/charter/D-18.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Two blocking documentation duplicates leave configuration defaults outside their canonical statements.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The claim reference still hard-codes the 2 and 10 lease defaults instead of citing the runtime-defaults projection.\",\"file\":\"docs/reference/claim.md\",\"line\":117,\"references\":[\"@/issue/459bb995/requirement/REQ-01\",\"@/invariant/single-source-prose\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Documentation still restates the write-policy default rather than deriving it from its named constant.\",\"file\":\"docs/how-to/multi-agent-coordination.md\",\"line\":239,\"references\":[\"@/issue/459bb995/requirement/REQ-01\",\"@/invariant/single-source-prose\",\"@/charter/D-18\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

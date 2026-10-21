@@ -1,39 +1,41 @@
 {
-  "id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
-  "title": "Scoped validation: jit validate --scope",
-  "description": "Add `jit validate --scope <id>` that evaluates rules over a container bracket subtree with a deterministic exit code, for use as a gate checker.\n\n## Success Criteria\n\n- [ ] The scope slice is the container transitive dependency closure including the breakdown node, and excludes whole-repo rules.\n- [ ] Each in-slice issue is evaluated against the rules whose selector matches it; a rule selecting the breakdown node fires.\n- [ ] Exits 4 (ValidationFailed) with findings shown when an enforcing rule fails; zero when clean.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-16T20:43:14.262685225Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.082657884Z",
   "dependencies": [
     "4b090868-1018-4cb2-acd7-de449a034e51"
   ],
+  "description": "Add `jit validate --scope <id>` that evaluates rules over a container bracket subtree with a deterministic exit code, for use as a gate checker.\n\n## Success Criteria\n\n- [ ] The scope slice is the container transitive dependency closure including the breakdown node, and excludes whole-repo rules.\n- [ ] Each in-slice issue is evaluated against the rules whose selector matches it; a rule selecting the breakdown node fires.\n- [ ] Exits 4 (ValidationFailed) with findings shown when an enforcing rule fails; zero when clean.",
+  "documents": [],
+  "done_at": "2026-06-16T22:24:38.664189625Z",
+  "first_ready_at": "2026-06-16T20:31:13.777795902Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "0b4d3357-8373-4fb6-a70a-443084a5884b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T22:13:19.977858412Z"
+      "updated_at": "2026-06-16T22:13:19.977858412Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "43273b83-f219-438b-8faa-dc736016e578",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T22:22:30.728276743Z"
+      "updated_at": "2026-06-16T22:22:30.728276743Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
   "labels": [
     "type:task",
     "story:engine-primitives",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.082657884Z",
-  "updated_at": "2026-07-05T19:51:12.960881517Z",
-  "first_ready_at": "2026-06-16T20:31:13.777795902Z",
-  "claimed_at": "2026-06-16T20:43:14.262685225Z",
-  "done_at": "2026-06-16T22:24:38.664189625Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Scoped validation: jit validate --scope",
+  "updated_at": "2026-07-05T19:51:12.960881517Z"
 }

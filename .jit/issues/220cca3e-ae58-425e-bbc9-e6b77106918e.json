@@ -1,31 +1,33 @@
 {
-  "id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
-  "title": "breakdown: Dependency-aware container artifact archival",
-  "description": "Breakdown node bracketing Dependency-aware container artifact archival (7d3a3a47). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-12T21:36:24.522654403Z",
   "dependencies": [
     "1dbc72f6-c6e0-4159-9843-de9bfb68c2e2"
   ],
+  "description": "Breakdown node bracketing Dependency-aware container artifact archival (7d3a3a47). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "done_at": "2026-07-13T01:36:38.891908618Z",
+  "first_ready_at": "2026-07-12T21:36:24.522654823Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T13:56:17.488212424Z"
-    },
     "breakdown-review": {
+      "run_id": "77e844f4-6633-4206-b53f-80271ceb5c68",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T11:44:02.053174465Z"
+      "updated_at": "2026-07-13T11:44:02.053174465Z",
+      "updated_by": "auto:executor"
+    },
+    "coverage-preview": {
+      "run_id": "37dafb83-d6c5-40d7-a9f9-6cfdddd66058",
+      "status": "passed",
+      "updated_at": "2026-07-13T13:56:17.488212424Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "220cca3e-ae58-425e-bbc9-e6b77106918e",
   "labels": [
     "epic:artifact-archival",
     "component:docs",
@@ -33,8 +35,8 @@
     "type:breakdown",
     "brackets:7d3a3a47"
   ],
-  "created_at": "2026-07-12T21:36:24.522654403Z",
-  "updated_at": "2026-07-13T13:56:17.591168719Z",
-  "first_ready_at": "2026-07-12T21:36:24.522654823Z",
-  "done_at": "2026-07-13T01:36:38.891908618Z"
+  "priority": "high",
+  "state": "done",
+  "title": "breakdown: Dependency-aware container artifact archival",
+  "updated_at": "2026-07-13T13:56:17.591168719Z"
 }

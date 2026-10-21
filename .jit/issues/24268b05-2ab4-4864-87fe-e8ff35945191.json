@@ -18,16 +18,19 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "8e22dd96-7ff9-4081-b321-7553efea2535",
       "status": "passed",
       "updated_at": "2026-10-21T15:38:30.469243065Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "d1d65681-3605-4759-871a-1bbe629c6d0f",
       "status": "passed",
       "updated_at": "2026-10-21T15:36:17.123763663Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "2a518c2f-702e-48f3-94ab-cc837b03b7f9",
       "status": "passed",
       "updated_at": "2026-10-21T11:37:48.034070329Z",
       "updated_by": "auto:executor"

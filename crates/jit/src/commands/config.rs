@@ -336,6 +336,16 @@ impl<S: IssueStore> CommandExecutor<S> {
         })
     }
 
+    /// The effective-configuration snapshot behind both `jit config get` and
+    /// `jit config show`.
+    ///
+    /// All filesystem interaction (system/user/repo existence probing,
+    /// home-directory resolution, each source's `JitConfig::load`) lives behind
+    /// `EffectiveConfig::load` in the config layer.
+    pub fn effective_config_snapshot(&self) -> Result<serde_json::Value> {
+        EffectiveConfig::load(self.storage.root())?.full_snapshot()
+    }
+
     /// Resolve a dotted `section[.field[.subfield...]]` key against the WHOLE
     /// configuration surface (REQ-01 of jit:043ae624), returning the value the
     /// CLI needs to print.
@@ -353,12 +363,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// unconverted, so it is classified the same way every other config-load
     /// failure in this codebase is, not misreported as a bad argument.
     pub fn get_config(&self, key: &str) -> Result<ConfigGetOutcome> {
-        // All filesystem interaction (system/user/repo existence probing,
-        // home-directory resolution, each source's `JitConfig::load`) lives
-        // behind `EffectiveConfig::load` in the config layer — this command
-        // only orchestrates the already-assembled snapshot and the key walk.
-        let effective = EffectiveConfig::load(self.storage.root())?;
-        let snapshot = effective.full_snapshot()?;
+        let snapshot = self.effective_config_snapshot()?;
         let value = resolve_dotted_key(&snapshot, key)
             .map_err(|e| anyhow::Error::from(InvalidArgumentError::new(e.to_string())))?;
 
@@ -493,9 +498,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             cap.value,
-            serde_json::json!(
-                crate::config::CoordinationConfig::default().max_indefinite_leases_per_agent()
-            )
+            serde_json::json!(crate::runtime_defaults::MAX_INDEFINITE_LEASES_PER_AGENT)
         );
     }
 

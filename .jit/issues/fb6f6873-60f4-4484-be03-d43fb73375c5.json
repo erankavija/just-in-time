@@ -1,13 +1,14 @@
 {
-  "id": "fb6f6873-60f4-4484-be03-d43fb73375c5",
-  "title": "Implement branch divergence detection",
-  "description": "Implement `check_branch_divergence()` to detect when branch has diverged from origin/main. Block global operations (config, gates registry, type-hierarchy) when diverged. See design doc section \"Branch Divergence Detection\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.590317962Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `check_branch_divergence()` to detect when branch has diverged from origin/main. Block global operations (config, gates registry, type-hierarchy) when diverged. See design doc section \"Branch Divergence Detection\".",
+  "documents": [],
+  "done_at": "2026-02-01T22:56:39.293514285Z",
+  "first_ready_at": "2026-01-07T23:32:21.481692363Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "clippy": {
+      "run_id": "9ce7de46-8cbe-4bd8-b176-b6d880010dd7",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T22:56:39.292833215Z"
+      "updated_at": "2026-02-01T22:56:33.892114170Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a367cad9-e171-48a5-9b59-331f17b678c0",
+      "status": "passed",
+      "updated_at": "2026-02-01T22:56:39.292833215Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "9c0c30c2-c091-44fd-8376-94105da13d6c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T22:56:38.649344171Z"
+      "updated_at": "2026-02-01T22:56:38.649344171Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "83bb54f6-ba01-49f9-b9dd-07408bce9198",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-01T22:56:39.172901300Z"
+      "updated_at": "2026-02-01T22:56:39.172901300Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "9d335139-7bc1-4346-97b0-5cb5c66b1ec3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T22:56:09.094543865Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T22:56:33.892114170Z"
+      "updated_at": "2026-02-01T22:56:09.094543865Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "fb6f6873-60f4-4484-be03-d43fb73375c5",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.590317962Z",
-  "updated_at": "2026-07-05T19:51:13.124771566Z",
-  "first_ready_at": "2026-01-07T23:32:21.481692363Z",
-  "done_at": "2026-02-01T22:56:39.293514285Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement branch divergence detection",
+  "updated_at": "2026-07-05T19:51:13.124771566Z"
 }

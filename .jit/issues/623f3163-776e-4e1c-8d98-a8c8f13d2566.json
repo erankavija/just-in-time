@@ -1,13 +1,15 @@
 {
-  "id": "623f3163-776e-4e1c-8d98-a8c8f13d2566",
-  "title": "Complete the generated CLI schema contract",
-  "description": "`jit --schema` omits the real `rejected` lifecycle state and does not expose all accepted CLI spellings: visible aliases and global help/schema/version flags are absent. That makes the schema unsafe as a sole machine-readable CLI contract.\n\nSource: `crates/jit/src/schema.rs:103-141,235-249,286-315,459-469`; `crates/jit/src/domain/types.rs:19-42,75-101`; `crates/jit/src/cli.rs:20-36,978-987,1822-1828`.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema represents every real `State` value, including `rejected`, from one authoritative enumeration.\n- [hard] REQ-02: The schema exposes accepted visible aliases and all global help/schema/version flags in documented machine-readable form.\n- [hard] REQ-03: Focused tests fail when a state, primary flag, alias, or global flag is omitted.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-11T21:18:09.099252708Z",
+  "context": {},
+  "created_at": "2026-07-11T13:35:35.548692888Z",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
+  "description": "`jit --schema` omits the real `rejected` lifecycle state and does not expose all accepted CLI spellings: visible aliases and global help/schema/version flags are absent. That makes the schema unsafe as a sole machine-readable CLI contract.\n\nSource: `crates/jit/src/schema.rs:103-141,235-249,286-315,459-469`; `crates/jit/src/domain/types.rs:19-42,75-101`; `crates/jit/src/cli.rs:20-36,978-987,1822-1828`.\n\n## Success Criteria\n\n- [hard] REQ-01: The schema represents every real `State` value, including `rejected`, from one authoritative enumeration.\n- [hard] REQ-02: The schema exposes accepted visible aliases and all global help/schema/version flags in documented machine-readable form.\n- [hard] REQ-03: Focused tests fail when a state, primary flag, alias, or global flag is omitted.",
+  "documents": [],
+  "done_at": "2026-07-11T22:40:25.787392039Z",
+  "first_ready_at": "2026-07-11T13:35:35.548693328Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,32 +17,33 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "6bd71305-7c3a-48ea-8d37-a5430ab40f0d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T22:29:18.993738473Z"
+      "updated_at": "2026-07-11T22:29:18.993738473Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "217624b1-a15c-4182-97be-104ac46c0916",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T22:38:22.201818381Z"
+      "updated_at": "2026-07-11T22:38:22.201818381Z",
+      "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "cef6b7aa-bb4d-487d-80f4-34e48a6ff646",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-11T22:38:21.063334123Z"
+      "updated_at": "2026-07-11T22:38:21.063334123Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "623f3163-776e-4e1c-8d98-a8c8f13d2566",
   "labels": [
     "type:bug",
     "milestone:v1.0",
     "component:cli",
     "epic:documentation-contract-followups"
   ],
-  "created_at": "2026-07-11T13:35:35.548692888Z",
-  "updated_at": "2026-07-11T22:40:25.787392889Z",
-  "first_ready_at": "2026-07-11T13:35:35.548693328Z",
-  "claimed_at": "2026-07-11T21:18:09.099252708Z",
-  "done_at": "2026-07-11T22:40:25.787392039Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Complete the generated CLI schema contract",
+  "updated_at": "2026-07-11T22:40:25.787392889Z"
 }

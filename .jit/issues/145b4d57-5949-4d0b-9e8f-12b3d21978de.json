@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "977d01d8-2757-48c2-ad73-25f42c4b2105"
+  ],
+  "description": "Move every command-layer reader of the default content format and strictness onto `JitConfig::content_format()` and `JitConfig::strictness()`, and delete the executor's own resolver.\n\n## Background\n\n`JitConfig::content_format()` and `JitConfig::strictness()` state both defaults. The command layer restates them:\n\n- content-format chains in `crates/jit/src/commands/mod.rs:1054-1059` (`derive_write_validation`), `:1186-1191` (`derive_state_transition`), `:1441-1445`, `:1476-1480`, `:2460-2465` (`publish_issue_creation`), `commands/validate.rs:1080-1085` (`rule_validation_report`), `commands/gate_check.rs:463-468,543-548` and `commands/template.rs:1122-1126`;\n- strictness chains in `commands/mod.rs:1060-1065,1192-1197`, `commands/template.rs:1127-1130` and `commands/bulk_update.rs:625-630`;\n- `CommandExecutor::repo_content_format` (`commands/mod.rs:2633-2640`), called from `commands/validate.rs:1512,1613,1780,1939`, `commands/bulk_update.rs:624` and `commands/item.rs:135,287,365`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed site reads the content format or strictness through the `JitConfig` accessor, and no code under `crates/jit/src/commands/` maps an absent `[validation]` value to a default.\n- [hard] REQ-02: `CommandExecutor::repo_content_format` no longer exists.\n- [hard] REQ-03: The existing suites pass unchanged.\n\n## Notes\n\n- Behaviour is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "145b4d57-5949-4d0b-9e8f-12b3d21978de",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-core",
+    "component:validation",
+    "component:core",
+    "per:@/charter/D-20",
+    "per:@/charter/D-18",
+    "satisfies:9876a23a/REQ-12"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Commands read content format and strictness through the configuration accessors",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

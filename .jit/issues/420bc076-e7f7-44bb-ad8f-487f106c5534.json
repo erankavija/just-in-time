@@ -1,0 +1,31 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "145b4d57-5949-4d0b-9e8f-12b3d21978de",
+    "2b5f452c-ac5a-46ed-8a56-d862f0d93d04",
+    "ea843d26-492a-44cc-8c10-15f19b8c8ce3"
+  ],
+  "description": "Aggregate the work that makes repository validation one pure function in the validation layer, over records parsed once, with its resolvers, defaults and compiled rules stated once.\n\n## Success Criteria\n\n- [hard] REQ-01: One pure validation-layer function computes the repository report from a captured validation and injected inputs.\n- [hard] REQ-02: The validation layer's production code imports nothing from `commands`.\n- [hard] REQ-03: Item links resolve against one address index with item kinds resolved once; container pointers resolve through one index per evaluation.\n- [hard] REQ-04: Whole-repository validation parses the index and each issue once, and each schema compiles once per report.\n- [hard] REQ-05: Plan-document references, the content-format default and the strictness default each come from one function.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "holistic-review"
+  ],
+  "gates_status": {},
+  "id": "420bc076-e7f7-44bb-ad8f-487f106c5534",
+  "labels": [
+    "type:story",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-core",
+    "component:validation",
+    "component:core",
+    "per:@/charter/D-20"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "One pure validation report over parsed records",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

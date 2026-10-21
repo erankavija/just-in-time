@@ -30,6 +30,7 @@
   ],
   "gates_status": {
     "doc-review": {
+      "run_id": "c88d9b57-417f-4649-97d2-141fc13c66b8",
       "status": "passed",
       "updated_at": "2026-09-20T11:28:19.776222987Z",
       "updated_by": "auto:executor"

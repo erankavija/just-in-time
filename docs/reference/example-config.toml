@@ -69,9 +69,10 @@ story = "story"
 # Repo-wide enforcement strictness, layered on top of each rule's enforce/severity
 # (it never changes them — only the block/allow decision):
 #   strict      — any violation blocks (warning or error, enforced or not)
-#   loose       — only an enforced error blocks; warnings are advisory (default)
+#   loose       — only an enforced error blocks; warnings are advisory
 #   permissive  — nothing blocks; every violation is report-only
-# An unrecognized value is rejected. Absent means "loose".
+# An unrecognized value is rejected. The default applied when absent is listed
+# in docs/reference/runtime-defaults.md.
 strictness = "loose"
 
 # Auto-assign this type when creating issues without a type:* label
@@ -79,7 +80,8 @@ default_type = "task"
 
 # Repo-level default content format for issue description bodies. Selects the
 # parser used to extract `sections` during validation for issues that carry no
-# per-issue `content_format`. One of: "markdown" (default), "html", "xml".
+# per-issue `content_format`. One of: "markdown", "html", "xml"; the default
+# applied when absent is listed in docs/reference/runtime-defaults.md.
 # Note: "html"/"xml" require the binary to be built with the matching cargo
 # feature; selecting an uncompiled format produces a clear error, never a silent
 # Markdown fallback.
@@ -152,14 +154,14 @@ examples = ["resolution:wont-fix", "resolution:duplicate", "resolution:obsolete"
 # (a TOML registry, or a markdown document for a markdown-first kind). Fields:
 #   kind   — a kind name, or an array (must be project-scoped)
 #   mode   — "region" (rewrite only the delimited block, preserving the rest) or
-#            "separate-file" (write the whole file); defaults to "separate-file"
+#            "separate-file" (write the whole file)
 #   target — REQUIRED repo-relative path (no default)
 #   style  — "id-anchor" (generic `- **{id}** — {text}` bullets, any
 #            project-scoped kind) or "full" (built-in rich views, ONLY for the
-#            invariant store or the rule + gate stores together); defaults to
-#            "full"
-#   region-begin / region-end — region markers; default to
-#            "<!-- jit:<name>:begin -->" / "<!-- jit:<name>:end -->"
+#            invariant store or the rule + gate stores together)
+#   region-begin / region-end — region markers
+# The defaults of mode, style, and the region markers are listed in
+# docs/reference/runtime-defaults.md.
 # [projection.invariants]
 # kind = "invariant"
 # mode = "region"

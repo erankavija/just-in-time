@@ -19,6 +19,7 @@
   ],
   "gates_status": {
     "plan-review": {
+      "run_id": "daed0f4a-b0e5-41a9-9714-6bfb28db7628",
       "status": "passed",
       "updated_at": "2026-06-26T20:29:14.825956023Z",
       "updated_by": "auto:executor"

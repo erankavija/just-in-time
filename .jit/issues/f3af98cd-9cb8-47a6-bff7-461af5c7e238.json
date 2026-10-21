@@ -1,11 +1,12 @@
 {
-  "id": "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
-  "title": "Enhance gate error messages",
-  "description": "When an automated gate check fails, show the path to the full output file.\n\n## Current Behavior\n\nWhen `jit gate check <issue> <gate>` fails, the output shows:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n```\n\nOnly the first line of stderr is displayed. Users don't know where to find the full output.\n\n## Proposed Behavior\n\nWhen a gate fails, include the path to the result file:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n  Full output: .jit/gate-runs/2aa8649a-d747-4326-8b9a-f76dac94a6d7/result.json\n```\n\n## Implementation\n\nThe `GateRunResult` already contains `run_id`. The file path is:\n`.jit/gate-runs/<run_id>/result.json`\n\nUpdate the gate check output in `main.rs` (around line 1157-1164) to print the file path after showing the error preview.\n\n## Scope\n\n- Only for automated gates (manual gates don't produce result files)\n- Human-readable output only (JSON output already contains full result)\n- Both `gate check` and `gate check-all` commands",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2026-02-15T01:10:54.806379994Z",
+  "context": {},
+  "created_at": "2025-12-18T20:37:08.854872534Z",
   "dependencies": [],
+  "description": "When an automated gate check fails, show the path to the full output file.\n\n## Current Behavior\n\nWhen `jit gate check <issue> <gate>` fails, the output shows:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n```\n\nOnly the first line of stderr is displayed. Users don't know where to find the full output.\n\n## Proposed Behavior\n\nWhen a gate fails, include the path to the result file:\n```\n✗ Gate 'fmt' failed for issue 5863c67c\n  Error: Diff in /home/user/project/src/file.rs:123:\n  Full output: .jit/gate-runs/2aa8649a-d747-4326-8b9a-f76dac94a6d7/result.json\n```\n\n## Implementation\n\nThe `GateRunResult` already contains `run_id`. The file path is:\n`.jit/gate-runs/<run_id>/result.json`\n\nUpdate the gate check output in `main.rs` (around line 1157-1164) to print the file path after showing the error preview.\n\n## Scope\n\n- Only for automated gates (manual gates don't produce result files)\n- Human-readable output only (JSON output already contains full result)\n- Both `gate check` and `gate check-all` commands",
+  "documents": [],
+  "done_at": "2026-02-19T18:59:58.404704632Z",
   "gates_required": [
     "tests",
     "clippy",
@@ -14,42 +15,46 @@
     "tdd-reminder"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
+      "run_id": "302b3310-e658-49c1-a994-4f4054f4494e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-15T01:32:35.575059547Z"
+      "updated_at": "2026-02-15T01:14:15.068448580Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "cac9939f-5b2d-4940-98d5-501b59147d5e",
       "status": "passed",
-      "updated_by": "agent:claude",
-      "updated_at": "2026-02-19T18:59:58.401535852Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-15T01:10:54.797573142Z"
+      "updated_at": "2026-02-19T18:59:58.401535852Z",
+      "updated_by": "agent:claude"
     },
     "fmt": {
+      "run_id": "736860cd-68d3-45c7-bc07-ccab25e85ea7",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-15T01:14:19.274188583Z"
+      "updated_at": "2026-02-15T01:14:19.274188583Z",
+      "updated_by": "auto:executor"
     },
-    "clippy": {
+    "tdd-reminder": {
+      "run_id": "6a2fc461-a22c-4a52-a4ef-29b2426afa40",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-15T01:14:15.068448580Z"
+      "updated_at": "2026-02-15T01:10:54.797573142Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "1d5cff9a-dee0-4f53-b0d2-1213f5e4b1c2",
+      "status": "passed",
+      "updated_at": "2026-02-15T01:32:35.575059547Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "f3af98cd-9cb8-47a6-bff7-461af5c7e238",
   "labels": [
     "type:task",
     "epic:phase5.2",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-18T20:37:08.854872534Z",
-  "updated_at": "2026-07-05T19:51:13.115983989Z",
-  "claimed_at": "2026-02-15T01:10:54.806379994Z",
-  "done_at": "2026-02-19T18:59:58.404704632Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Enhance gate error messages",
+  "updated_at": "2026-07-05T19:51:13.115983989Z"
 }

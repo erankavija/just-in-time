@@ -1,36 +1,38 @@
 {
-  "id": "043ae624-778b-4711-8c99-9ad2db39ba9a",
-  "title": "Config value accessor command",
-  "description": "Agents grep and sed the raw config file for type hierarchy, development root, archive root, and managed paths (~10 mined occurrences, including hand-rolled awk in skill scripts) because config introspection covers only part of the surface.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A config accessor takes a dotted key path and prints the value raw and as JSON, covering the whole configuration surface (type hierarchy, label associations, documentation paths, validation settings).\n- [ ] [hard] REQ-02: An unknown key fails nonzero with a typed error listing the valid top-level sections.\n- [ ] [hard] REQ-03: Documented in the CLI reference.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T15:39:47.221527157Z",
+  "context": {},
+  "created_at": "2026-07-05T10:03:39.993054440Z",
   "dependencies": [],
+  "description": "Agents grep and sed the raw config file for type hierarchy, development root, archive root, and managed paths (~10 mined occurrences, including hand-rolled awk in skill scripts) because config introspection covers only part of the surface.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A config accessor takes a dotted key path and prints the value raw and as JSON, covering the whole configuration surface (type hierarchy, label associations, documentation paths, validation settings).\n- [ ] [hard] REQ-02: An unknown key fails nonzero with a typed error listing the valid top-level sections.\n- [ ] [hard] REQ-03: Documented in the CLI reference.",
+  "documents": [],
+  "done_at": "2026-07-05T16:30:36.651787120Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T16:28:40.282750059Z"
-    },
     "cargo-ci": {
+      "run_id": "d3a63633-fe7a-4607-a85c-09246c8b1612",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T16:25:53.464531763Z"
+      "updated_at": "2026-07-05T16:25:53.464531763Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "9f7d742a-4364-42d4-9b1d-a100af3fdc78",
+      "status": "passed",
+      "updated_at": "2026-07-05T16:28:40.282750059Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "043ae624-778b-4711-8c99-9ad2db39ba9a",
   "labels": [
     "type:enhancement",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T10:03:39.993054440Z",
-  "updated_at": "2026-07-05T19:51:12.894469758Z",
-  "claimed_at": "2026-07-05T15:39:47.221527157Z",
-  "done_at": "2026-07-05T16:30:36.651787120Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Config value accessor command",
+  "updated_at": "2026-07-05T19:51:12.894469758Z"
 }

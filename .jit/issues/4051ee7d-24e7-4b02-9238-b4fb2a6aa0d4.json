@@ -1,13 +1,15 @@
 {
-  "id": "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
-  "title": "Add query support for closed issues",
-  "description": "Add 'jit query closed' command that returns both Done and Rejected issues. Implement is_closed() helper for State enum. Update query commands to support the closed meta-state. Ensure --json output works correctly. Add tests for querying closed issues.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot-current-session",
+  "claimed_at": "2025-12-20T22:01:52.771560696Z",
+  "context": {},
+  "created_at": "2025-12-20T22:02:06.265978301Z",
   "dependencies": [
     "0b7723c5-13d3-4c60-b940-5cade111b02d"
   ],
+  "description": "Add 'jit query closed' command that returns both Done and Rejected issues. Implement is_closed() helper for State enum. Update query commands to support the closed meta-state. Ensure --json output works correctly. Add tests for querying closed issues.",
+  "documents": [],
+  "done_at": "2025-12-20T22:02:42.469660576Z",
+  "first_ready_at": "2025-12-20T20:12:00.366519261Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
+      "run_id": "68a605c8-b52c-4a90-8a15-2e940b323615",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T22:02:07.974646097Z"
+      "updated_at": "2025-12-20T22:02:06.268645124Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "56f629d9-0ca8-4856-9cb8-e3cdd4d4fb03",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-20T22:02:12.369217701Z"
+      "updated_at": "2025-12-20T22:02:12.369217701Z",
+      "updated_by": null
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "dd610e2a-2753-4b25-828f-b6de7930c7cb",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T22:02:06.268645124Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T22:02:05.057307999Z"
+      "updated_at": "2025-12-20T22:02:07.974646097Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "8bcfbeda-917c-4a33-b4eb-1e38cc7ccc75",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-20T22:01:52.768274372Z"
+      "updated_at": "2025-12-20T22:01:52.768274372Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "10b14347-c0e6-4d24-b40b-89bdb67d2e2f",
+      "status": "passed",
+      "updated_at": "2025-12-20T22:02:05.057307999Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "4051ee7d-24e7-4b02-9238-b4fb2a6aa0d4",
   "labels": [
     "type:task",
     "epic:rejection-state",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-20T22:02:06.265978301Z",
-  "updated_at": "2026-07-05T19:51:12.950255279Z",
-  "first_ready_at": "2025-12-20T20:12:00.366519261Z",
-  "claimed_at": "2025-12-20T22:01:52.771560696Z",
-  "done_at": "2025-12-20T22:02:42.469660576Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add query support for closed issues",
+  "updated_at": "2026-07-05T19:51:12.950255279Z"
 }

@@ -1,13 +1,15 @@
 {
-  "id": "7ff7b349-15fe-45dc-a7d1-8f2fd208884c",
-  "title": "Update status reporting for Rejected state",
-  "description": "Update 'jit status' command to display Rejected count separately from Done. Show both in summary output. Update status calculation logic to distinguish terminal states. Format: 'Done: 6, Rejected: 1' to clearly show outcomes. Update JSON output schema to include rejected count.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot-session-1",
+  "claimed_at": "2025-12-20T20:25:57.640384236Z",
+  "context": {},
+  "created_at": "2025-12-20T20:25:57.637239182Z",
   "dependencies": [
     "0b7723c5-13d3-4c60-b940-5cade111b02d"
   ],
+  "description": "Update 'jit status' command to display Rejected count separately from Done. Show both in summary output. Update status calculation logic to distinguish terminal states. Format: 'Done: 6, Rejected: 1' to clearly show outcomes. Update JSON output schema to include rejected count.",
+  "documents": [],
+  "done_at": "2025-12-20T20:28:46.968607363Z",
+  "first_ready_at": "2025-12-20T20:12:00.366004770Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T20:28:46.965336050Z"
-    },
     "clippy": {
+      "run_id": "5e3389df-5dba-4c3c-8896-578e82abcec2",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:28:45.253940690Z"
+      "updated_at": "2025-12-20T20:28:45.253940690Z",
+      "updated_by": "auto:executor"
     },
-    "tests": {
+    "code-review": {
+      "run_id": "732564b5-5116-44b7-9e4b-c3838c1ebcf1",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:28:43.146723229Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session-1",
-      "updated_at": "2025-12-20T20:25:57.637093382Z"
+      "updated_at": "2025-12-20T20:28:46.965336050Z",
+      "updated_by": "human:user"
     },
     "fmt": {
+      "run_id": "72a70e89-9a54-4a01-9336-d08416bc4dd0",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:28:46.660088913Z"
+      "updated_at": "2025-12-20T20:28:46.660088913Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "479f6847-2d8a-465d-870d-32446c6d6ba3",
+      "status": "passed",
+      "updated_at": "2025-12-20T20:25:57.637093382Z",
+      "updated_by": "agent:copilot-session-1"
+    },
+    "tests": {
+      "run_id": "4930d04a-5eee-4c66-b62b-c92e68ce00f8",
+      "status": "passed",
+      "updated_at": "2025-12-20T20:28:43.146723229Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "7ff7b349-15fe-45dc-a7d1-8f2fd208884c",
   "labels": [
     "type:task",
     "epic:rejection-state",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-20T20:25:57.637239182Z",
-  "updated_at": "2026-07-05T19:51:13.017284228Z",
-  "first_ready_at": "2025-12-20T20:12:00.366004770Z",
-  "claimed_at": "2025-12-20T20:25:57.640384236Z",
-  "done_at": "2025-12-20T20:28:46.968607363Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Update status reporting for Rejected state",
+  "updated_at": "2026-07-05T19:51:13.017284228Z"
 }

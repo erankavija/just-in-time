@@ -1,11 +1,12 @@
 {
-  "id": "c02e7ca8-6989-4368-aae4-f0bac23705da",
-  "title": "Prevent document viewer SSE rerenders and restore viewer font sizing",
-  "description": "Fix follow-up regressions in the Web UI document viewer.\n\n## Background\n\nAfter the modular renderer rollout, two more issues remain:\n- The source-code viewer scrolls jerkily because the file viewer re-renders during unrelated live issue refreshes.\n- CSV, TXT, and rich source viewers no longer match the original markdown viewer's code-view font sizing.\n\n## Success Criteria\n\n- [ ] The document viewer does not re-render its loaded document content during unrelated parent live-refresh updates when its own effective props have not changed.\n- [ ] CSV, TXT, and rich source renderers use the same default content font size as the original markdown code-view baseline.\n- [ ] Existing renderer/viewer tests cover the stabilized behavior and the configured web CI gate passes cleanly.\n\n## Notes\n\nThis is a focused follow-up to the modular document rendering slice and the immediate viewer polish fix.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-05-06T16:10:19.515500148Z",
+  "context": {},
+  "created_at": "2026-05-06T16:10:12.055810214Z",
   "dependencies": [],
+  "description": "Fix follow-up regressions in the Web UI document viewer.\n\n## Background\n\nAfter the modular renderer rollout, two more issues remain:\n- The source-code viewer scrolls jerkily because the file viewer re-renders during unrelated live issue refreshes.\n- CSV, TXT, and rich source viewers no longer match the original markdown viewer's code-view font sizing.\n\n## Success Criteria\n\n- [ ] The document viewer does not re-render its loaded document content during unrelated parent live-refresh updates when its own effective props have not changed.\n- [ ] CSV, TXT, and rich source renderers use the same default content font size as the original markdown code-view baseline.\n- [ ] Existing renderer/viewer tests cover the stabilized behavior and the configured web CI gate passes cleanly.\n\n## Notes\n\nThis is a focused follow-up to the modular document rendering slice and the immediate viewer polish fix.",
+  "documents": [],
+  "done_at": "2026-05-06T16:27:19.809373507Z",
   "gates_required": [
     "tdd-reminder",
     "npm-ci",
@@ -13,23 +14,25 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "2ac08682-6a3e-4b5d-8863-b4f66deeae56",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-06T16:23:14.475295116Z"
+      "updated_at": "2026-05-06T16:23:14.475295116Z",
+      "updated_by": "auto:executor"
     },
     "npm-ci": {
+      "run_id": "03bcc87b-46f2-4e2c-bed8-af6281979c64",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-06T16:22:53.562126403Z"
+      "updated_at": "2026-05-06T16:22:53.562126403Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "115fb97b-bed4-4836-8041-9c37dfe2ecbd",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-05-06T16:10:19.471182916Z"
+      "updated_at": "2026-05-06T16:10:19.471182916Z",
+      "updated_by": null
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c02e7ca8-6989-4368-aae4-f0bac23705da",
   "labels": [
     "type:task",
     "epic:usability",
@@ -37,8 +40,8 @@
     "component:web",
     "story:modular-document-rendering"
   ],
-  "created_at": "2026-05-06T16:10:12.055810214Z",
-  "updated_at": "2026-07-05T19:51:13.077708772Z",
-  "claimed_at": "2026-05-06T16:10:19.515500148Z",
-  "done_at": "2026-05-06T16:27:19.809373507Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Prevent document viewer SSE rerenders and restore viewer font sizing",
+  "updated_at": "2026-07-05T19:51:13.077708772Z"
 }

@@ -45,7 +45,7 @@ fn gate_address(key: &str) -> String {
 /// by its canonical kind-segmented form (`@/rule/<name>`, `@/gate/<key>`). The two
 /// styles ([`ProjectionStyle`]) differ only in framing:
 ///
-/// - [`ProjectionStyle::Full`] (the default) renders a `## Rules` section of
+/// - [`ProjectionStyle::Full`] renders a `## Rules` section of
 ///   `- **@/rule/{name}** — {description} ({severity}, {enforced|advisory})`
 ///   bullets (the description falls back to the rule name, and the prose suffix
 ///   mirrors the gate line's framing) followed by a `## Gates` section of

@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:copilot-worktree-foundation",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-01-06T20:24:17.462388833Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "5186a98d-ff33-467f-9bad-f048b6a547d3",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "75a0a4c9-c258-473e-a3a2-b3005773a15a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-01-06T20:24:17.462388833Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

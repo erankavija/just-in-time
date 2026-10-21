@@ -3,6 +3,7 @@
 //! JIT supports repository-level configuration through `.jit/config.toml`.
 //! If no config file exists, the system falls back to sensible defaults.
 
+use crate::runtime_defaults::{MAX_INDEFINITE_LEASES_PER_AGENT, MAX_INDEFINITE_LEASES_PER_REPO};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -77,8 +78,13 @@ pub struct JitConfig {
 /// Schema version configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VersionConfig {
-    /// Schema version number (default: 1).
+    /// Schema version number.
     pub schema: u32,
+}
+
+impl VersionConfig {
+    /// Schema version applied when the repository declares no `[version]`.
+    pub const DEFAULT_SCHEMA: u32 = 2;
 }
 
 /// Project identity configuration from the `[project]` TOML table.
@@ -249,9 +255,7 @@ pub struct ValidationConfig {
     /// Repo-wide enforcement strictness: `"strict"`, `"loose"`, or
     /// `"permissive"`. It modulates which rule violations block a write or
     /// transition, layered on top of each rule's `enforce`/severity, without
-    /// changing either. Absent means `"loose"` (only an enforced error blocks —
-    /// the pre-strictness behavior). Resolved via
-    /// [`ValidationConfig::strictness`].
+    /// changing either. Resolved via [`ValidationConfig::strictness`].
     ///
     /// Validated at deserialize time (like [`ProjectName`]): loading a
     /// `config.toml` whose `strictness` is not one of the three levels fails
@@ -264,20 +268,19 @@ pub struct ValidationConfig {
     /// Repo-level default content format for issue bodies ("markdown", "html",
     /// "xml"). Selects the [`ContentParser`](crate::document::ContentParser) used
     /// to extract `sections` for issues that carry no per-issue `content_format`.
-    /// Absent means "markdown".
     pub content_format: Option<String>,
 }
 
 impl ValidationConfig {
     /// Resolve the repo-level default content format, defaulting to
-    /// [`ContentFormat::Markdown`](crate::domain::ContentFormat::Markdown) when
+    /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) when
     /// unset. An invalid value is surfaced as an error rather than silently
     /// defaulting, so a misconfigured `config.toml` cannot quietly pick the wrong
     /// parser.
     pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
         use std::str::FromStr;
         match self.content_format.as_deref() {
-            None => Ok(crate::domain::ContentFormat::Markdown),
+            None => Ok(crate::domain::ContentFormat::DEFAULT),
             Some(value) => crate::domain::ContentFormat::from_str(value).with_context(|| {
                 format!("invalid [validation].content_format in .jit/config.toml: '{value}'")
             }),
@@ -286,7 +289,7 @@ impl ValidationConfig {
 
     /// Resolve the repo-wide validation
     /// [`Strictness`](crate::validation::Strictness) from `strictness`, defaulting
-    /// to [`Strictness::Loose`](crate::validation::Strictness::Loose) when unset.
+    /// to [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) when unset.
     ///
     /// The value is already validated at deserialize time (see
     /// [`deserialize_strictness`]), so a loaded config resolves infallibly; the
@@ -633,10 +636,7 @@ impl ItemKindConfig {
             .collect()
     }
     /// Resolve the kind's [`SourceOfTruth`], defaulting to
-    /// [`SourceOfTruth::MarkdownFirst`] when the `source-of-truth` field is unset.
-    ///
-    /// The default matches the requirement kind, which is authored in issue
-    /// descriptions (markdown) and indexed from them.
+    /// [`SourceOfTruth::DEFAULT`] when the `source-of-truth` field is unset.
     pub fn source_of_truth(&self) -> SourceOfTruth {
         self.source_of_truth.unwrap_or_default()
     }
@@ -852,23 +852,33 @@ impl Serialize for KindScopeConfig {
 /// This is the sixth field of the item-kind six-tuple `(section, id-pattern,
 /// marker(s), link-namespace(s), scope, source-of-truth)`. It is DISTINCT from
 /// the [`ItemKindConfig::source`] file PATH: `source-of-truth` is a direction,
-/// `source` is a location. A `markdown-first` kind (the requirement default) is
-/// authored in prose and indexed from it; a `registry-first` kind is authored in
+/// `source` is a location. A `markdown-first` kind is authored in prose and indexed from it; a `registry-first` kind is authored in
 /// a structured registry file and projected from it.
 ///
 /// Deserialized from the kebab-case tokens `"markdown-first"` / `"registry-first"`
 /// via serde rename; an unrecognized value is a descriptive parse error rather
 /// than a silent default.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 pub enum SourceOfTruth {
     /// Items are authored in markdown prose (issue descriptions or a markdown
-    /// source file) and indexed from it. The requirement-kind default.
-    #[default]
+    /// source file) and indexed from it.
     #[serde(rename = "markdown-first")]
     MarkdownFirst,
     /// Items are authored in a structured registry file and projected from it.
     #[serde(rename = "registry-first")]
     RegistryFirst,
+}
+
+impl SourceOfTruth {
+    /// Direction applied when a kind omits `source-of-truth`: the requirement
+    /// kind's, which is authored in issue descriptions and indexed from them.
+    pub const DEFAULT: Self = Self::MarkdownFirst;
+}
+
+impl Default for SourceOfTruth {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
 }
 
 /// The default begin marker delimiting projection `<name>`'s region in `region`
@@ -997,8 +1007,8 @@ impl schemars::JsonSchema for ProjectionKinds {
 /// - `style` — [`ProjectionStyle`] (`id-anchor` renders generic `- **{id}** —
 ///   {text}` rows; `full` renders the built-in rich registry views).
 /// - `region-begin` / `region-end` — optional region delimiters; when unset they
-///   default to `<!-- jit:<name>:begin -->` / `<!-- jit:<name>:end -->`, derived
-///   from the projection name (so the accessors take that name).
+///   default to [`default_region_begin`] / [`default_region_end`], derived from
+///   the projection name (so the accessors take that name).
 ///
 /// # Examples
 ///
@@ -1030,7 +1040,7 @@ pub struct ProjectionConfig {
     /// The item kind(s) whose addressable rows this projection renders.
     pub kind: ProjectionKinds,
     /// Projection mode: a whole separate file, or a delimited region within an
-    /// existing file. Defaults to [`ProjectionMode::SeparateFile`] when unset.
+    /// existing file. Defaults to [`ProjectionMode::DEFAULT`] when unset.
     #[serde(default)]
     pub mode: Option<ProjectionMode>,
     /// Repo-relative path of the documentation target. REQUIRED: a projection
@@ -1041,15 +1051,15 @@ pub struct ProjectionConfig {
     #[serde(default)]
     pub target: Option<String>,
     /// Begin marker delimiting the rewritten region in `region` mode. Defaults to
-    /// `<!-- jit:<name>:begin -->` when unset.
+    /// [`default_region_begin`] when unset.
     #[serde(default, rename = "region-begin")]
     pub region_begin: Option<String>,
     /// End marker delimiting the rewritten region in `region` mode. Defaults to
-    /// `<!-- jit:<name>:end -->` when unset.
+    /// [`default_region_end`] when unset.
     #[serde(default, rename = "region-end")]
     pub region_end: Option<String>,
     /// Render style for the projected markdown block. Defaults to
-    /// [`ProjectionStyle::Full`] when unset.
+    /// [`ProjectionStyle::DEFAULT`] when unset.
     #[serde(default)]
     pub style: Option<ProjectionStyle>,
 }
@@ -1060,7 +1070,7 @@ impl ProjectionConfig {
         self.kind.names()
     }
 
-    /// The resolved projection mode (defaulting to [`ProjectionMode::SeparateFile`]).
+    /// The resolved projection mode (defaulting to [`ProjectionMode::DEFAULT`]).
     pub fn mode(&self) -> ProjectionMode {
         self.mode.unwrap_or_default()
     }
@@ -1081,7 +1091,7 @@ impl ProjectionConfig {
             .unwrap_or_else(|| default_region_end(name))
     }
 
-    /// The resolved render style (defaulting to [`ProjectionStyle::Full`]).
+    /// The resolved render style (defaulting to [`ProjectionStyle::DEFAULT`]).
     pub fn style(&self) -> ProjectionStyle {
         self.style.unwrap_or_default()
     }
@@ -1091,13 +1101,10 @@ impl ProjectionConfig {
 ///
 /// Deserialized from the kebab-case tokens `"separate-file"` / `"region"` via
 /// serde rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `mode` field) is [`ProjectionMode::SeparateFile`].
-#[derive(
-    Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
-)]
+/// silent default. The default (no `mode` field) is [`ProjectionMode::DEFAULT`].
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 pub enum ProjectionMode {
-    /// Write the rendered block to a separate whole file (the default).
-    #[default]
+    /// Write the rendered block to a separate whole file.
     #[serde(rename = "separate-file")]
     SeparateFile,
     /// Replace only a delimited region within an existing file, byte-preserving
@@ -1106,11 +1113,36 @@ pub enum ProjectionMode {
     Region,
 }
 
+impl ProjectionMode {
+    /// Mode applied when a projection omits `mode`.
+    pub const DEFAULT: Self = Self::SeparateFile;
+
+    /// The config token naming this mode, matching its serialized form.
+    pub const fn as_token(self) -> &'static str {
+        match self {
+            ProjectionMode::SeparateFile => "separate-file",
+            ProjectionMode::Region => "region",
+        }
+    }
+}
+
+impl Default for ProjectionMode {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl std::fmt::Display for ProjectionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_token())
+    }
+}
+
 /// How a projected registry is rendered into the markdown block.
 ///
 /// Deserialized from the kebab-case tokens `"full"` / `"id-anchor"` via serde
 /// rename; an unrecognized value is a descriptive parse error rather than a
-/// silent default. The default (no `style` field) is [`ProjectionStyle::Full`].
+/// silent default. The default (no `style` field) is [`ProjectionStyle::DEFAULT`].
 ///
 /// - [`ProjectionStyle::IdAnchor`] renders a heading-less generic bullet list of
 ///   `- **{self-id}** — {text}` rows from a kind's addressable items — the
@@ -1119,14 +1151,11 @@ pub enum ProjectionMode {
 ///   invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
 ///   registries' `## Rules` / `## Gates` sections with severity/enforce metadata),
 ///   which carry typed fields absent from a generic addressable row.
-#[derive(
-    Debug, Clone, Copy, Deserialize, Serialize, Default, PartialEq, Eq, schemars::JsonSchema,
-)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, schemars::JsonSchema)]
 pub enum ProjectionStyle {
-    /// Render the built-in rich registry view for the projection's kind(s) (the
-    /// default): the invariant registry's `[kind]`/enforced-by bullets, or the
-    /// rule + gate registries' `## Rules` / `## Gates` sections with metadata.
-    #[default]
+    /// Render the built-in rich registry view for the projection's kind(s): the
+    /// invariant registry's `[kind]`/enforced-by bullets, or the rule + gate
+    /// registries' `## Rules` / `## Gates` sections with metadata.
     #[serde(rename = "full")]
     Full,
     /// Render a heading-less generic bullet list of `- **{self-id}** — {text}`
@@ -1134,6 +1163,31 @@ pub enum ProjectionStyle {
     /// hand-authored heading. Kind-agnostic: any item kind renders this way.
     #[serde(rename = "id-anchor")]
     IdAnchor,
+}
+
+impl ProjectionStyle {
+    /// Style applied when a projection omits `style`.
+    pub const DEFAULT: Self = Self::Full;
+
+    /// The config token naming this style, matching its serialized form.
+    pub const fn as_token(self) -> &'static str {
+        match self {
+            ProjectionStyle::Full => "full",
+            ProjectionStyle::IdAnchor => "id-anchor",
+        }
+    }
+}
+
+impl Default for ProjectionStyle {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl std::fmt::Display for ProjectionStyle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_token())
+    }
 }
 
 /// An error validating an explicitly-declared `[item_kinds.X]` table.
@@ -1206,12 +1260,32 @@ pub struct WorktreeConfig {
 /// in TOML configuration (`[worktree] enforce_leases = ...`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EnforcementMode {
-    /// Block operations without active lease (production-safe default).
+    /// Block operations without active lease (production-safe).
     Strict,
     /// Warn but allow operations without lease (development-friendly).
     Warn,
     /// No enforcement - bypass lease checks (backward compatible).
     Off,
+}
+
+impl EnforcementMode {
+    /// Mode a `[worktree]` section applies when it omits `enforce_leases`.
+    pub const DEFAULT: Self = Self::Strict;
+
+    /// The configuration token for this mode.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Strict => "strict",
+            Self::Warn => "warn",
+            Self::Off => "off",
+        }
+    }
+}
+
+impl std::fmt::Display for EnforcementMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
 impl std::str::FromStr for EnforcementMode {
@@ -1256,27 +1330,27 @@ impl WorktreeConfig {
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CoordinationConfig {
-    /// Maximum concurrent TTL=0 leases per agent (default: 2).
+    /// Maximum concurrent TTL=0 leases per agent (default:
+    /// [`MAX_INDEFINITE_LEASES_PER_AGENT`]).
     pub max_indefinite_leases_per_agent: Option<u32>,
-    /// Maximum concurrent TTL=0 leases per repository (default: 10).
+    /// Maximum concurrent TTL=0 leases per repository (default:
+    /// [`MAX_INDEFINITE_LEASES_PER_REPO`]).
     pub max_indefinite_leases_per_repo: Option<u32>,
 }
 
-impl CoordinationConfig {
-    pub fn max_indefinite_leases_per_agent(&self) -> u32 {
-        self.max_indefinite_leases_per_agent.unwrap_or(2)
-    }
-
-    pub fn max_indefinite_leases_per_repo(&self) -> u32 {
-        self.max_indefinite_leases_per_repo.unwrap_or(10)
-    }
+/// The coordination limits in force after layering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct EffectiveCoordination {
+    pub max_indefinite_leases_per_agent: u32,
+    pub max_indefinite_leases_per_repo: u32,
 }
 
 /// Resolve the lease enforcement mode from a repository's `[worktree]` section:
-/// `off` without the section, `strict` when the section omits the key.
+/// `off` without the section, [`EnforcementMode::DEFAULT`] when the section
+/// omits the key.
 fn resolve_enforcement_mode(worktree: Option<&WorktreeConfig>) -> EnforcementMode {
     worktree.map_or(EnforcementMode::Off, |wt| {
-        wt.enforce_leases.unwrap_or(EnforcementMode::Strict)
+        wt.enforce_leases.unwrap_or(EnforcementMode::DEFAULT)
     })
 }
 
@@ -1287,6 +1361,28 @@ impl JitConfig {
     /// decides it; user/system layers and the environment do not.
     pub fn enforcement_mode(&self) -> EnforcementMode {
         resolve_enforcement_mode(self.worktree.as_ref())
+    }
+
+    /// The repo-level content format for issue bodies: `[validation]`'s
+    /// [`ValidationConfig::content_format`], or
+    /// [`ContentFormat::DEFAULT`](crate::domain::ContentFormat::DEFAULT) without
+    /// the section.
+    pub fn content_format(&self) -> Result<crate::domain::ContentFormat> {
+        self.validation.as_ref().map_or(
+            Ok(crate::domain::ContentFormat::DEFAULT),
+            ValidationConfig::content_format,
+        )
+    }
+
+    /// The repo-wide validation strictness: `[validation]`'s
+    /// [`ValidationConfig::strictness`], or
+    /// [`Strictness::DEFAULT`](crate::validation::Strictness::DEFAULT) without the
+    /// section.
+    pub fn strictness(&self) -> Result<crate::validation::Strictness> {
+        self.validation.as_ref().map_or(
+            Ok(crate::validation::Strictness::DEFAULT),
+            ValidationConfig::strictness,
+        )
     }
 
     /// Load configuration from `.jit/config.toml` if it exists.
@@ -1556,21 +1652,30 @@ impl EffectiveConfig {
         std::env::var("JIT_AGENT_ID").ok()
     }
 
-    /// Get effective coordination config with merged values.
-    pub fn coordination(&self) -> MergedCoordinationConfig {
-        MergedCoordinationConfig {
-            repo: self
-                .repo_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
-            user: self
-                .user_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
-            system: self
-                .system_config
-                .as_ref()
-                .and_then(|c| c.coordination.clone()),
+    /// The first value `read` finds in the repository, user, then system layer.
+    fn layered<T>(&self, read: impl Fn(&JitConfig) -> Option<T>) -> Option<T> {
+        [&self.repo_config, &self.user_config, &self.system_config]
+            .into_iter()
+            .flatten()
+            .find_map(read)
+    }
+
+    /// The coordination limits: each key's first layered value, else its
+    /// built-in default.
+    pub fn coordination(&self) -> EffectiveCoordination {
+        let limit = |read: fn(&CoordinationConfig) -> Option<u32>, default| {
+            self.layered(|c| c.coordination.as_ref().and_then(read))
+                .unwrap_or(default)
+        };
+        EffectiveCoordination {
+            max_indefinite_leases_per_agent: limit(
+                |c| c.max_indefinite_leases_per_agent,
+                MAX_INDEFINITE_LEASES_PER_AGENT,
+            ),
+            max_indefinite_leases_per_repo: limit(
+                |c| c.max_indefinite_leases_per_repo,
+                MAX_INDEFINITE_LEASES_PER_REPO,
+            ),
         }
     }
 
@@ -1578,12 +1683,12 @@ impl EffectiveConfig {
     /// its WHOLE surface, for `jit config get`'s generic dotted-path walk
     /// (see [`resolve_dotted_key`](crate::commands::resolve_dotted_key)).
     ///
-    /// Two resolution strategies, matching how the rest of the codebase
-    /// already reads these sections — this method does not invent a THIRD
-    /// merge policy:
-    /// - `worktree`, `coordination`: the accessors above that `jit config
-    ///   show` uses (the merged repo, user, system, default chain, except the
-    ///   repo-only [`Self::enforcement_mode`]).
+    /// `jit config show` renders this same snapshot. Two resolution
+    /// strategies, matching how the rest of the codebase already reads these
+    /// sections — this method does not invent a THIRD merge policy:
+    /// - `worktree`, `coordination`: [`Self::enforcement_mode`] (repo-only) and
+    ///   [`Self::coordination`] (the layered repo, user, system, default
+    ///   chain).
     /// - every other section (`version`, `project`, `type_hierarchy`,
     ///   `validation`, `documentation`, `namespaces`, `item_kinds`,
     ///   `projection`): read from the
@@ -1649,62 +1754,15 @@ impl EffectiveConfig {
         map.insert(
             "worktree".to_string(),
             serde_json::json!({
-                "enforce_leases": format!("{:?}", self.enforcement_mode()).to_lowercase(),
+                "enforce_leases": self.enforcement_mode().as_str(),
             }),
         );
         map.insert(
             "coordination".to_string(),
-            serde_json::json!({
-                "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
-                "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
-            }),
+            serde_json::to_value(self.coordination())?,
         );
 
         Ok(serde_json::Value::Object(map))
-    }
-}
-
-/// Merged coordination config with priority resolution per field.
-#[derive(Debug)]
-pub struct MergedCoordinationConfig {
-    repo: Option<CoordinationConfig>,
-    user: Option<CoordinationConfig>,
-    system: Option<CoordinationConfig>,
-}
-
-impl MergedCoordinationConfig {
-    pub fn max_indefinite_leases_per_agent(&self) -> u32 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.max_indefinite_leases_per_agent)
-            .or_else(|| {
-                self.user
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_agent)
-            })
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_agent)
-            })
-            .unwrap_or(2)
-    }
-
-    pub fn max_indefinite_leases_per_repo(&self) -> u32 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.max_indefinite_leases_per_repo)
-            .or_else(|| {
-                self.user
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_repo)
-            })
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.max_indefinite_leases_per_repo)
-            })
-            .unwrap_or(10)
     }
 }
 
@@ -2912,13 +2970,6 @@ max_indefinite_leases_per_repo = 10
         assert_eq!(coord.max_indefinite_leases_per_repo, Some(10));
     }
 
-    #[test]
-    fn test_coordination_config_defaults() {
-        let coord = CoordinationConfig::default();
-        assert_eq!(coord.max_indefinite_leases_per_agent(), 2);
-        assert_eq!(coord.max_indefinite_leases_per_repo(), 10);
-    }
-
     /// The removed coordination timing keys are rejected as unknown keys.
     #[test]
     fn test_coordination_config_rejects_removed_timing_keys() {
@@ -2956,7 +3007,7 @@ max_indefinite_leases_per_agent = 3
 
         // Verify coordination
         let coord = config.coordination.unwrap();
-        assert_eq!(coord.max_indefinite_leases_per_agent(), 3); // declared above, not the default
+        assert_eq!(coord.max_indefinite_leases_per_agent, Some(3));
     }
 
     // ============================================================
@@ -2968,8 +3019,13 @@ max_indefinite_leases_per_agent = 3
         let loader = ConfigLoader::new();
         let config = loader.build();
 
-        // Should have all defaults
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
+        assert_eq!(
+            config.coordination(),
+            EffectiveCoordination {
+                max_indefinite_leases_per_agent: MAX_INDEFINITE_LEASES_PER_AGENT,
+                max_indefinite_leases_per_repo: MAX_INDEFINITE_LEASES_PER_REPO,
+            }
+        );
     }
 
     #[test]
@@ -2987,9 +3043,12 @@ max_indefinite_leases_per_agent = 5
         let config = loader.build();
 
         // Repo value overrides default
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 5);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 5);
         // Other defaults preserved
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 10);
+        assert_eq!(
+            config.coordination().max_indefinite_leases_per_repo,
+            MAX_INDEFINITE_LEASES_PER_REPO
+        );
     }
 
     #[test]
@@ -3020,9 +3079,9 @@ max_indefinite_leases_per_agent = 6
         let config = loader.build();
 
         // Repo overrides user for the per-agent cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 6);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 6);
         // User value used for the per-repo cap (not in repo config)
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 20);
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 20);
     }
 
     #[test]
@@ -3063,9 +3122,9 @@ max_indefinite_leases_per_repo = 40
         let config = loader.build();
 
         // User wins over system for the per-agent cap (not in repo)
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 7);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent, 7);
         // Repo wins over system for the per-repo cap
-        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 40);
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo, 40);
     }
 
     #[test]
@@ -3082,8 +3141,10 @@ max_indefinite_leases_per_repo = 40
             .unwrap();
         let config = loader.build();
 
-        // All defaults
-        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
+        assert_eq!(
+            config.coordination().max_indefinite_leases_per_agent,
+            MAX_INDEFINITE_LEASES_PER_AGENT
+        );
     }
 
     #[test]

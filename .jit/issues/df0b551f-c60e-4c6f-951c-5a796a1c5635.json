@@ -1,11 +1,12 @@
 {
-  "id": "df0b551f-c60e-4c6f-951c-5a796a1c5635",
-  "title": "Auto-transition issues to Ready when dependencies complete",
-  "description": "Issues remain in Backlog state even when all dependencies are in terminal states (Done/Rejected). Expected: When an issue's last dependency completes, it should automatically transition from Backlog to Ready. Actual: Issues stay in Backlog and require manual 'jit issue update --state ready'. Example: Issue c4738097 had two dependencies (277afb61 and db7fdd9a), both Done, but remained in Backlog. This affects workflow automation and agent coordination - agents can't discover newly-ready work without manual intervention.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2025-12-20T21:31:56.681141904Z",
+  "context": {},
+  "created_at": "2025-12-20T21:38:17.830841822Z",
   "dependencies": [],
+  "description": "Issues remain in Backlog state even when all dependencies are in terminal states (Done/Rejected). Expected: When an issue's last dependency completes, it should automatically transition from Backlog to Ready. Actual: Issues stay in Backlog and require manual 'jit issue update --state ready'. Example: Issue c4738097 had two dependencies (277afb61 and db7fdd9a), both Done, but remained in Backlog. This affects workflow automation and agent coordination - agents can't discover newly-ready work without manual intervention.",
+  "documents": [],
+  "done_at": "2025-12-20T21:39:06.725701563Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,40 +15,44 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
+      "run_id": "5c3cc880-25ea-4812-9190-eba1c1703b58",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2025-12-20T21:31:59.194504710Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:38:54.665929334Z"
+      "updated_at": "2025-12-20T21:38:17.322736298Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "540fea7a-c95f-42ee-a562-fcd57d632847",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T21:38:17.833336125Z"
+      "updated_at": "2025-12-20T21:38:17.833336125Z",
+      "updated_by": "human:user"
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "7d2a2e96-d8ce-42ef-a410-8ab9b210cc9e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:38:17.322736298Z"
+      "updated_at": "2025-12-20T21:38:54.665929334Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "76f8b8d4-107b-44fa-aa22-b204ce00cade",
+      "status": "passed",
+      "updated_at": "2025-12-20T21:31:59.194504710Z",
+      "updated_by": "agent:copilot-session"
     },
     "tests": {
+      "run_id": "413212ef-8be2-4da3-816c-19d2745c46b4",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:38:07.343935751Z"
+      "updated_at": "2025-12-20T21:38:07.343935751Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "df0b551f-c60e-4c6f-951c-5a796a1c5635",
   "labels": [
     "type:bug",
     "epic:core-maintenance"
   ],
-  "created_at": "2025-12-20T21:38:17.830841822Z",
-  "updated_at": "2026-07-05T19:51:13.101920949Z",
-  "claimed_at": "2025-12-20T21:31:56.681141904Z",
-  "done_at": "2025-12-20T21:39:06.725701563Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Auto-transition issues to Ready when dependencies complete",
+  "updated_at": "2026-07-05T19:51:13.101920949Z"
 }

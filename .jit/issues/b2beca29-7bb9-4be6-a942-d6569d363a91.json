@@ -1,37 +1,41 @@
 {
-  "id": "b2beca29-7bb9-4be6-a942-d6569d363a91",
-  "title": "Add viewer-shell support for rich/raw toggles, search highlighting, and preview caps",
-  "description": "Add the shared `DocumentViewer` shell behavior needed by the new modular renderers without turning the viewer into a format-specific implementation layer.\n\n## Background\n\nThe new CSV and text/code renderers need some shared viewer behavior: inline rich/raw switching, consistent search-query propagation, and capped-preview UX for large files. That behavior should be driven by renderer capabilities so the viewer shell stays generic and existing Markdown and HTML renderers remain stable.\n\n## Success Criteria\n\n- [ ] `DocumentViewer` supports inline rich/raw toggling for renderers that advertise that capability.\n- [ ] Search queries propagate correctly to the new renderers without regressing existing Markdown behavior.\n- [ ] Preview-cap behavior is wired through the viewer shell in a renderer-agnostic way.\n- [ ] Existing HTML behavior remains intact, including the current history suppression and iframe-based rendering path.\n- [ ] Integration tests cover viewer-shell behavior across Markdown, HTML, CSV, and text/code renderers.\n\n## Notes\n\nThis task should focus on shared shell behavior rather than implementing CSV parsing or source rendering details directly in `DocumentViewer`.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-05-06T13:46:04.807127707Z",
+  "context": {},
+  "created_at": "2026-05-06T13:10:52.366213513Z",
   "dependencies": [
     "d2fe467c-fa62-4797-9032-874f2ab3c52c"
   ],
+  "description": "Add the shared `DocumentViewer` shell behavior needed by the new modular renderers without turning the viewer into a format-specific implementation layer.\n\n## Background\n\nThe new CSV and text/code renderers need some shared viewer behavior: inline rich/raw switching, consistent search-query propagation, and capped-preview UX for large files. That behavior should be driven by renderer capabilities so the viewer shell stays generic and existing Markdown and HTML renderers remain stable.\n\n## Success Criteria\n\n- [ ] `DocumentViewer` supports inline rich/raw toggling for renderers that advertise that capability.\n- [ ] Search queries propagate correctly to the new renderers without regressing existing Markdown behavior.\n- [ ] Preview-cap behavior is wired through the viewer shell in a renderer-agnostic way.\n- [ ] Existing HTML behavior remains intact, including the current history suppression and iframe-based rendering path.\n- [ ] Integration tests cover viewer-shell behavior across Markdown, HTML, CSV, and text/code renderers.\n\n## Notes\n\nThis task should focus on shared shell behavior rather than implementing CSV parsing or source rendering details directly in `DocumentViewer`.",
+  "documents": [],
+  "done_at": "2026-05-06T13:53:43.752677712Z",
+  "first_ready_at": "2026-05-06T13:45:16.782371637Z",
   "gates_required": [
     "tdd-reminder",
     "npm-ci",
     "code-review"
   ],
   "gates_status": {
-    "npm-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-06T13:49:38.233795489Z"
-    },
     "code-review": {
+      "run_id": "2893793a-4e2e-467e-b528-9c611de4fe8e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-06T13:49:50.392910598Z"
+      "updated_at": "2026-05-06T13:49:50.392910598Z",
+      "updated_by": "auto:executor"
+    },
+    "npm-ci": {
+      "run_id": "342fb034-3a94-4c4a-b7fc-8cfe20cf41c2",
+      "status": "passed",
+      "updated_at": "2026-05-06T13:49:38.233795489Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "f4a46af7-6e36-4968-bee0-83eb100e72ff",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-05-06T13:46:04.791785143Z"
+      "updated_at": "2026-05-06T13:46:04.791785143Z",
+      "updated_by": null
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "b2beca29-7bb9-4be6-a942-d6569d363a91",
   "labels": [
     "type:task",
     "epic:usability",
@@ -39,9 +43,8 @@
     "component:web",
     "story:modular-document-rendering"
   ],
-  "created_at": "2026-05-06T13:10:52.366213513Z",
-  "updated_at": "2026-07-05T19:51:13.060264869Z",
-  "first_ready_at": "2026-05-06T13:45:16.782371637Z",
-  "claimed_at": "2026-05-06T13:46:04.807127707Z",
-  "done_at": "2026-05-06T13:53:43.752677712Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add viewer-shell support for rich/raw toggles, search highlighting, and preview caps",
+  "updated_at": "2026-07-05T19:51:13.060264869Z"
 }

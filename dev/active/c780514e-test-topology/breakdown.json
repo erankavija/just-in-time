@@ -354,7 +354,8 @@
     ],
     "depends_on": [
       "harness-shipped-item-kinds",
-      "cli-item-validate-migration"
+      "cli-item-validate-migration",
+      "in-process-memory-setup-consolidation"
     ],
     "planning": {
       "outcome": "Decision-kind and projection-render suites read shipped item kinds from the shared derivation.",
@@ -857,57 +858,6 @@
     }
   },
   {
-    "key": "library-git-fixture-adoption",
-    "title": "Library unit tests initialise git through the shared helper",
-    "description": "Make source-tree test modules initialise git repositories through the shared test-support helper instead of private copies.\n\n## Background\n\nEight source test modules and one server module hand-roll `git init` for their tests: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs`, `commands/archive.rs` and `crates/server/src/routes.rs`. Shared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: No source-tree test module defines a git initialisation helper or spawns `git init` itself; each uses the shared test-support function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:shared-test-fixtures",
-      "component:testing",
-      "satisfies:c780514e/REQ-05",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/shared-test-contracts"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "cli-process-fixture"
-    ],
-    "planning": {
-      "outcome": "Source-tree test modules initialise git repositories through one shared test-support helper.",
-      "contract_refs": [
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-05"
-      ],
-      "terminal": {
-        "consumer_family": "source-tree test modules",
-        "test_boundary": "library unit tests",
-        "worker_sized_reason": "Nine modules replace a few lines of git setup with one existing call.",
-        "footprint": {
-          "touches": [
-            "crates/jit/src/gate_execution.rs",
-            "crates/jit/src/storage/json.rs",
-            "crates/jit/src/storage/repository_state_store_tests.rs",
-            "crates/jit/src/commands/mod.rs",
-            "crates/jit/src/commands/hooks.rs",
-            "crates/jit/src/commands/worktree.rs",
-            "crates/jit/src/profile/repository_package.rs",
-            "crates/jit/src/commands/archive.rs",
-            "crates/server/src/routes.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "env-reading-tests-guarded",
     "title": "Tests read shared process environment only under the environment guard",
     "description": "Close the remaining gap in process-state isolation: tests that read environment variables other tests set must hold the shared guard.\n\n## Background\n\n`EnvGuard` and `CurrentDirGuard` in `crates/jit/src/test_utils.rs` are the only mutators of the environment and working directory, enforced by `crates/jit/tests/scratch_build/process_state_policy_tests.rs`. Each serialises on a static mutex, recovers after poisoning and restores on drop; guards do not nest. Code that reads the environment without holding the guard is not serialised, so a test whose code under test reads `JIT_AGENT_ID`, `JIT_DATA_DIR` or another variable that a concurrent test sets under the guard can observe the other test's value. Known `EnvGuard` users are tests in `config.rs`, `serve.rs`, `crates/server/src/lib.rs`, `storage/json.rs`, `commands/hooks.rs` and `commands/claim.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: Every test whose code under test reads a process environment variable that some test sets under `EnvGuard` holds `EnvGuard` for that read, or passes the value explicitly instead.\n- [hard] REQ-02: No lock other than the two shared guards serialises environment or working-directory access in test code.\n- [hard] REQ-03: Each affected test passes alone, in any order and in parallel with the rest.\n",
@@ -997,57 +947,6 @@
     }
   },
   {
-    "key": "exit-code-unique-case-moves",
-    "title": "Unique exit-code suite behaviour moves beside its owners",
-    "description": "Move the behaviour that only the exit-code suite tests into the tests of the commands and envelopes it belongs to, so the suite can be deleted without losing coverage.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests, 1,637 lines) re-proves projected exit codes, for example success (`:36`), a dependency cycle (`:69`) and unconfirmed deletion (`:1566`). It also owns behaviour no other test owns: claim assign semantics (`:954`, `:999`), human remediation text (`:559`, `:897`), claim-next skipping (`:820`), ambiguous and short id prefixes (`:1147-1488`) and startup envelopes (`:1488-1560`). The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity.\n\n## Success Criteria\n\n- [hard] REQ-01: Each behaviour listed in the Background has an owning test outside `exit_code_tests.rs`, beside the tests of the same command or envelope.\n- [hard] REQ-02: A moved case asserts what it adds, such as remediation text, claim state or empty stdout on error, and asserts an exit code only where the projection suite has no row for it.\n- [hard] REQ-03: A behaviour an existing test already owns is not duplicated.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:exit-code-envelope-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-01",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "cli-issue-envelope-migration",
-      "cli-repo-checkout-migration"
-    ],
-    "planning": {
-      "outcome": "Claim, remediation, prefix and startup-envelope cases live beside their owners and assert only what they add.",
-      "contract_refs": [
-        "exit-code-projection-ownership",
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-01",
-        "D-04"
-      ],
-      "terminal": {
-        "consumer_family": "exit-code suite unique cases",
-        "test_boundary": "cli_issue integration target",
-        "worker_sized_reason": "About fifteen cases move with their assertions into existing owner files.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_issue/exit_code_tests.rs",
-            "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
-            "crates/jit/tests/cli_issue/error_json_tests.rs",
-            "crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs"
-          ],
-          "uncertainty": "Prefix-resolution cases land beside whichever command tests own id resolution at the CLI."
-        }
-      }
-    }
-  },
-  {
     "key": "exit-code-reproof-deletion",
     "title": "Exit-code re-proof suites are deleted",
     "description": "Delete the subprocess suites that re-prove command exit codes and parity now owned by the projection suite.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` re-prove bindings the exit-code projection suite owns, including the dependency-cycle exit code (`:69`). Their unique cases already have owners elsewhere. `crates/jit/tests/cli_issue/main.rs` declares both modules.\n\n## Success Criteria\n\n- [hard] REQ-01: `exit_code_tests.rs` and `invocation_exit_status_parity_tests.rs` no longer exist, and `cli_issue/main.rs` declares neither.\n- [hard] REQ-02: Every command-to-exit-code binding and human/machine parity case is proven by the projection suite.\n- [hard] REQ-03: No live document or source comment cites either file.\n",
@@ -1068,8 +967,9 @@
       "code-review"
     ],
     "depends_on": [
-      "exit-code-binding-completeness",
-      "exit-code-unique-case-moves"
+      "exit-code-envelope-case-moves",
+      "exit-code-claim-delete-case-moves",
+      "exit-code-argument-case-moves"
     ],
     "planning": {
       "outcome": "exit_code_tests.rs and the parity suite are gone; the projection suite alone binds exit codes.",
@@ -1096,57 +996,9 @@
     }
   },
   {
-    "key": "list-envelope-coverage-test",
-    "title": "One test proves the list-envelope count for each list-emitting command",
-    "description": "Replace the per-command list-envelope tests with one schema-driven test that covers each list-emitting command.\n\n## Background\n\n`crates/jit/src/domain/list_envelope.rs` derives `count` from the collection on serialize and rejects a mismatch on deserialize. The output module's count structs are `ListEnvelope` instantiations, while command-layer list results and inline `json!` bodies in `crates/jit/src/main.rs` still state `count` by hand. `crates/jit/tests/cli_issue/list_envelope_tests.rs` asserts `count == len` in 19 per-command subprocess tests. The generated CLI schema (`CommandSchema::generate()`) states each command's output schema.\n\n## Success Criteria\n\n- [hard] REQ-01: One test enumerates the list-emitting commands from the generated schema, meaning commands whose output carries `count` beside a collection. It runs each on a seeded repository through the shared CLI process fixture and asserts that `count` equals the collection's length.\n- [hard] REQ-02: The test fails and names the command when a list-emitting command in the schema has no invocation in it.\n- [hard] REQ-03: The 19 per-command cases of `list_envelope_tests.rs` no longer exist.\n",
-    "type": "task",
-    "priority": "normal",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:exit-code-envelope-ownership",
-      "component:testing",
-      "component:cli",
-      "satisfies:c780514e/REQ-04",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests",
-      "enforces:@/invariant/semantic-test-assertions"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [
-      "cli-process-fixture"
-    ],
-    "planning": {
-      "outcome": "A single schema-driven test checks count against collection length for each list-emitting command.",
-      "contract_refs": [
-        "list-envelope-coverage",
-        "cli-process-fixture"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-04",
-        "D-04"
-      ],
-      "terminal": {
-        "consumer_family": "list-envelope tests",
-        "test_boundary": "cli_issue integration target",
-        "worker_sized_reason": "One schema-driven test replaces one file of per-command cases.",
-        "footprint": {
-          "touches": [
-            "crates/jit/tests/cli_issue/list_envelope_tests.rs",
-            "crates/jit/tests/cli_issue/main.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "list-envelope-reassertion-removal",
     "title": "Per-command count re-assertions leave the list-emitting suites",
-    "description": "Remove the per-command checks of `count` against collection length that re-prove the list-envelope property.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test. Per-command re-assertions remain at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs` (about `:640`), `cli_repo_workflow/profile_cli_tests.rs:1695` (`assert_count_envelope`), `cli_repo_workflow/worktree_cli_tests.rs:546,1036` and `cli_issue/container_rollup_tests.rs:211,348`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test outside the single list-envelope coverage test asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
+    "description": "Remove the per-command checks of `count` against collection length that re-prove the list-envelope property.\n\n## Background\n\nThe list-envelope `count` property is owned by one schema-driven test. Per-command re-assertions remain at `cli_query_graph/search_tests.rs:236`, `cli_repo_workflow/artifact_conformance_cli_tests.rs` (about `:640`), `cli_repo_workflow/profile_cli_tests.rs:1695` (`assert_count_envelope`), `cli_repo_workflow/worktree_cli_tests.rs:546,1036`, `cli_issue/container_rollup_tests.rs:211,348` and `cli_issue/issue_search_json_tests.rs:234`.\n\n## Success Criteria\n\n- [hard] REQ-01: No test outside the single list-envelope coverage test asserts that a `count` field equals a collection's length.\n- [hard] REQ-02: Each edited test keeps the other properties it asserted.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1183,14 +1035,15 @@
       "terminal": {
         "consumer_family": "list-emitting command tests",
         "test_boundary": "CLI integration targets",
-        "worker_sized_reason": "Five files each drop one or two assertions or a helper.",
+        "worker_sized_reason": "Six files each drop one or two assertions or a helper.",
         "footprint": {
           "touches": [
             "crates/jit/tests/cli_query_graph/search_tests.rs",
             "crates/jit/tests/cli_repo_workflow/artifact_conformance_cli_tests.rs",
             "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
             "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
-            "crates/jit/tests/cli_issue/container_rollup_tests.rs"
+            "crates/jit/tests/cli_issue/container_rollup_tests.rs",
+            "crates/jit/tests/cli_issue/issue_search_json_tests.rs"
           ]
         }
       }
@@ -1433,7 +1286,7 @@
   {
     "key": "cycle-reproof-removal",
     "title": "Cycle detection is proven only in the graph module",
-    "description": "Remove the tests that re-prove dependency cycle detection above the graph module.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). `crates/jit/src/commands/batch_create.rs:640` adapts keyed detection, and four tests at `:686-707` repeat the keyed tests over that adapter. `crates/jit/tests/cli_repo_workflow/integration_test.rs:616` re-proves cycle rejection through the CLI; the cycle exit code is bound by the exit-code projection suite.\n\n## Success Criteria\n\n- [hard] REQ-01: The four adapter tests in `commands/batch_create.rs` no longer exist. At most one test there shows that batch creation rejects a cyclic manifest through the adapter.\n- [hard] REQ-02: `integration_test.rs` holds no dependency cycle re-proof.\n- [hard] REQ-03: Each cycle property the removed tests covered has an owning test in `crates/jit/src/graph/`.\n",
+    "description": "Remove the tests that re-prove dependency cycle detection above the graph module.\n\n## Background\n\n`crates/jit/src/graph/mod.rs` owns dependency cycle rejection, and `crates/jit/src/graph/keyed.rs:145-195` owns keyed cycle detection, including a property-based test (`:344`). `crates/jit/src/commands/batch_create.rs:640` adapts keyed detection, and four tests at `:686-707` repeat the keyed tests over that adapter. `crates/jit/tests/cli_repo_workflow/integration_test.rs:616` re-proves cycle rejection through the CLI; the cycle exit code is bound by the exit-code projection suite. Three other tests that mention cycles own different properties and stay: repository validation reporting a stored cycle (`fast_rules/validation_tests.rs:61`), batch-create atomicity (`cli_issue/batch_create_tests.rs:196`) and atomic rejection of a dependency batch (`fast_issue/bulk_operations_tests.rs:221`).\n\n## Success Criteria\n\n- [hard] REQ-01: The four adapter tests in `commands/batch_create.rs` no longer exist. At most one test there shows that batch creation rejects a cyclic manifest through the adapter.\n- [hard] REQ-02: `integration_test.rs` holds no dependency cycle re-proof.\n- [hard] REQ-03: Each cycle property the removed tests covered has an owning test in `crates/jit/src/graph/`.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -1994,50 +1847,6 @@
     }
   },
   {
-    "key": "server-shutdown-test-bound",
-    "title": "Server shutdown force-close test stays under the per-test bound",
-    "description": "Prove the server's drain entitlement without waiting out the real five-second drain, so no server test exceeds the per-test bound.\n\n## Background\n\n`crates/server/tests/server_integration/graceful_shutdown_tests.rs:538` (`test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero`) spawns `jit-server`, stalls a connection and waits the full `GRACEFUL_DRAIN_TIMEOUT` (5 s, `crates/server/src/shutdown.rs:33`) before asserting the force-close. It took 5.32 s and is the last test to finish in the suite run. A `test-support` build reads its drain deadline from `JIT_SERVER_DRAIN_DEADLINE_MS` (`configured_drain_deadline`), and `test_the_drain_assertion_rejects_a_server_that_force_closes_early` (`:626`) uses that seam to show the drain assertion fails against a server that force-closes early.\n\n## Success Criteria\n\n- [hard] REQ-01: The property that a stalled connection keeps its full drain entitlement before force-close is owned by one test that does not wait real time for the entitlement, for example a unit test of the drain under a paused clock.\n- [hard] REQ-02: The process-level test proves the wiring with a short configured deadline: a stalled connection is force-closed, the process exits zero, and the log records completion.\n- [hard] REQ-03: The drain assertion is still shown to fail against a server that force-closes early.\n- [hard] REQ-04: No test in the server crate exceeds 5 s on a warm target at load ≤ 10.\n",
-    "type": "task",
-    "priority": "high",
-    "labels": [
-      "epic:test-topology",
-      "milestone:v1.0",
-      "story:suite-cost",
-      "component:testing",
-      "component:server",
-      "satisfies:c780514e/REQ-13",
-      "per:@/charter/D-18",
-      "enforces:@/invariant/orthogonal-tests"
-    ],
-    "gates": [
-      "cargo-ci",
-      "code-review"
-    ],
-    "depends_on": [],
-    "planning": {
-      "outcome": "Drain-entitlement timing is proven without the real five-second wait, and no server test exceeds 5 s.",
-      "contract_refs": [
-        "suite-measurement-protocol"
-      ],
-      "produces_contracts": [],
-      "source_refs": [
-        "REQ-13",
-        "D-01"
-      ],
-      "terminal": {
-        "consumer_family": "server shutdown tests",
-        "test_boundary": "server_integration integration target",
-        "worker_sized_reason": "One timing property moves to a paused-clock unit test; one process test shortens.",
-        "footprint": {
-          "touches": [
-            "crates/server/tests/server_integration/graceful_shutdown_tests.rs",
-            "crates/server/src/shutdown.rs"
-          ]
-        }
-      }
-    }
-  },
-  {
     "key": "doctest-substep-bound",
     "title": "Doctest substep fits within the per-test bound",
     "description": "Bring the doctest substep under the per-test bound by keeping only rustdoc examples that clarify non-obvious behaviour.\n\n## Background\n\nThe `cargo-ci` doctest substep runs 61 doctests in 4.4 s, 21% of the warm suite clock. The workspace is on edition 2021, so rustdoc compiles and links each doctest against the `jit` library separately. Most examples sit in `validation/engine.rs`, `output.rs`, `domain/item.rs`, `config.rs`, `graph/hierarchy.rs`, `domain/queries.rs`, `visualization.rs` and `repository_state/default_rules.rs` under `crates/jit/src`. `@/inv/essential-code-prose` admits an example only where it clarifies non-obvious behaviour, and `cargo-ci` fails when a doctest is ignored.\n\n## Success Criteria\n\n- [hard] REQ-01: The doctest substep of `cargo-ci` takes under 5 s on a warm target at load ≤ 10, measured under the build turnstile.\n- [hard] REQ-02: Each rustdoc example that is removed either restated a property a unit test owns, or its property gains a unit test.\n- [hard] REQ-03: Each remaining example clarifies non-obvious behaviour, and none is ignored.\n\n## Notes\n\nExamples in feature-gated parser modules stay as they are.\n",
@@ -2295,13 +2104,13 @@
       "storage-contracts",
       "shared-test-fixtures",
       "failure-corpus-in-suite",
-      "rule-warning-tests-down-a-layer",
       "server-shutdown-test-bound",
       "doctest-substep-bound",
       "cargo-ci-selftest-gate",
       "profile-suite-selftest-gate",
       "build-budget-selftest-gate",
-      "dependency-policy-tool-failure"
+      "dependency-policy-tool-failure",
+      "mcp-parity-tool-failure"
     ],
     "planning": {
       "outcome": "A benchmark note records integration targets and active test-executable bytes before and after.",
@@ -2370,6 +2179,913 @@
     }
   },
   {
+    "key": "library-git-fixture-adoption",
+    "title": "In-process tests initialise git through the shared helper",
+    "description": "Make source-tree test modules and in-process suites initialise git repositories through the shared test-support helper instead of private copies.\n\n## Background\n\nEight source test modules and one server module hand-roll `git init` for their tests: `crates/jit/src/gate_execution.rs`, `storage/json.rs`, `storage/repository_state_store_tests.rs`, `commands/mod.rs`, `commands/hooks.rs`, `commands/worktree.rs`, `profile/repository_package.rs`, `commands/archive.rs` and `crates/server/src/routes.rs`. The in-process suite file `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` (`:15-20`) does the same with a fixed author identity. Shared test support provides a git initialisation function with a fixed author identity and no dependency on global git configuration.\n\n## Success Criteria\n\n- [hard] REQ-01: No source-tree test module and no in-process suite file defines a git initialisation helper or spawns `git init` itself; each uses the shared test-support function.\n- [hard] REQ-02: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-process-fixture"
+    ],
+    "planning": {
+      "outcome": "In-process test modules initialise git repositories through one shared test-support helper.",
+      "contract_refs": [
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "in-process test modules",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Ten modules replace a few lines of git setup with one existing call.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/gate_execution.rs",
+            "crates/jit/src/storage/json.rs",
+            "crates/jit/src/storage/repository_state_store_tests.rs",
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/hooks.rs",
+            "crates/jit/src/commands/worktree.rs",
+            "crates/jit/src/profile/repository_package.rs",
+            "crates/jit/src/commands/archive.rs",
+            "crates/server/src/routes.rs",
+            "crates/jit/tests/fast_docs_templates/git_revision_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-envelope-case-moves",
+    "title": "Blocked-transition and startup envelope cases move beside their owners",
+    "description": "Move the blocked-transition and startup-envelope cases that only the exit-code suite tests into the error-envelope suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:312` and `:405`: a transition blocked by gates, human and JSON. They assert the `BLOCKED` details (`requested_state`, `actual_state`, gate blockers) and remediation commands (`gate evaluate`, `gate status-all`, `gate status --all`).\n- `:493` and `:559`: a transition blocked by dependencies, JSON and human remediation text.\n- `:605`: a missing dependency, whose blocker state is `missing`.\n- `:1488`, `:1512` and `:1528`: startup envelopes. Repository-not-found emits `REPOSITORY_NOT_FOUND` under `--json` and empty stdout without it; a format that is too new emits `REPOSITORY_FORMAT_TOO_NEW`.\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test with the same non-exit assertions. The blocked transitions live in `cli_issue/error_json_tests.rs` and the startup envelopes in `cli_issue/top_level_failure_envelope_tests.rs`.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness"
+    ],
+    "planning": {
+      "outcome": "Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "error-envelope suites",
+        "test_boundary": "cli_issue integration target",
+        "worker_sized_reason": "Eight cases move with their assertions into two existing files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/exit_code_tests.rs",
+            "crates/jit/tests/cli_issue/error_json_tests.rs",
+            "crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-claim-delete-case-moves",
+    "title": "Claim and confirmed-delete cases move beside their owners",
+    "description": "Move the claim and confirmed-delete cases that only the exit-code suite tests into the claim and issue-lifecycle suites.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:652`, `:702` and `:765`: claim and claim-next blocked by dependencies or a precheck gate, with `BLOCKED` details and remediation.\n- `:820`: claim-next skipping non-ready issues.\n- `:897` and `:920`: blocked-claim messages naming `--assign`, human and JSON.\n- `:954` and `:999`: an assign-only claim sets the assignee without a transition, and claiming a ready issue moves it to in-progress.\n- `:1590` and `:1616`: confirmed delete in text mode (\"Deleted issue:\") and JSON mode. These strings appear in no other test.\n\n## Success Criteria\n\n- [hard] REQ-01: Each claim case listed in the Background has an owning test in `cli_repo_workflow/claim_integration_tests.rs`, and each confirmed-delete case has one in `cli_repo_workflow/integration_test.rs`, with the same non-exit assertions.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-repo-checkout-migration",
+      "cli-repo-workflow-migration"
+    ],
+    "planning": {
+      "outcome": "Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "claim-lifecycle CLI suites",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "Ten cases move with their assertions into two existing files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/exit_code_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/integration_test.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-argument-case-moves",
+    "title": "Id-prefix and argument-guard cases move beside their owners",
+    "description": "Move the id-prefix and argument-guard cases that only the exit-code suite tests beside the tests of the commands they guard.\n\n## Background\n\n`crates/jit/tests/cli_issue/exit_code_tests.rs` (39 subprocess tests) re-proves projected exit codes and also owns behaviour no other test owns. The exit-code projection suite owns command-to-exit-code bindings and their human/machine parity: outside it, a subprocess test asserts success or failure and the property it adds, and names a numeric exit code only for a command and code pair the projection has no row for. This entry covers these cases:\n\n- `:1189` and `:1220`: an ambiguous and a too-short prefix on `issue show` (\"Ambiguous ID\", `AMBIGUOUS_ID`, \"at least 4 characters\").\n- `:1372` and `:1447`: a too-short and an ambiguous prefix in both `dep add` positions.\n- `:1315`: symmetric argument validation for `dep rm`.\n- `:1280`: the guard against a parent filter given before the `query` subcommand (\"were given before\", `INVALID_ARGUMENT`); the string appears only in `main.rs`.\n- `:1079`: `gate preset create` naming a gate that was removed from the registry (\"Gate not found in registry: mygate\").\n\n## Success Criteria\n\n- [hard] REQ-01: Each case listed in the Background has an owning test with the same non-exit assertions. The `issue show` prefix cases live in `cli_issue/issue_status_projection_tests.rs`; the `dep add` and `dep rm` cases in `cli_query_graph/dep_add_redundancy_cli_tests.rs`; the parent-filter guard in `cli_query_graph/query_json_tests.rs`; and the preset case in `cli_repo_workflow/gate_preset_tests.rs`.\n- [hard] REQ-02: A moved case names a numeric exit code only where the projection has no row for its command and code.\n- [hard] REQ-03: A behaviour an existing test in those files already owns is not duplicated.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-issue-command-migration",
+      "cli-query-graph-migration",
+      "cli-repo-profile-migration"
+    ],
+    "planning": {
+      "outcome": "Id-prefix and argument-guard cases live beside the tests of the commands they guard.",
+      "contract_refs": [
+        "exit-code-projection-ownership",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "command argument tests",
+        "test_boundary": "CLI integration targets",
+        "worker_sized_reason": "Seven cases move with their assertions into four existing files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/exit_code_tests.rs",
+            "crates/jit/tests/cli_issue/issue_status_projection_tests.rs",
+            "crates/jit/tests/cli_query_graph/dep_add_redundancy_cli_tests.rs",
+            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/gate_preset_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-reassertion-cli-gate",
+    "title": "cli_gate tests stop re-asserting projected exit codes",
+    "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_gate` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_gate`: `gate_evaluate_exit_code_test.rs` (13), `gate_evaluate_all_test.rs` (9), `gate_cli_integration_test.rs` (7), `gate_status_all_strict_test.rs` (5), `gate_evaluate_rerun_test.rs` (5), `gate_preset_apply_json_failure_test.rs` (2), `gate_findings_test.rs` (1), `bracket_coverage_gate_run_test.rs` (1), `gate_status_all_lean_response_test.rs` (1). `gate_evaluate_exit_code_test.rs` has 13 tests of gate evaluate exits 0, 4, 10, 3 and 2; its added property is the JSON verdict each run reports.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n- [hard] REQ-04: `gate_evaluate_exit_code_test.rs` holds only cases that assert the reported verdict.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-gate-migration"
+    ],
+    "planning": {
+      "outcome": "The cli_gate suite asserts only properties it adds, with no projected exit-code re-assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "cli_gate exit-code assertions",
+        "test_boundary": "cli_gate integration target",
+        "worker_sized_reason": "Edits a bounded list of assertion sites in one target.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_gate/gate_evaluate_exit_code_test.rs",
+            "crates/jit/tests/cli_gate/gate_evaluate_all_test.rs",
+            "crates/jit/tests/cli_gate/gate_cli_integration_test.rs",
+            "crates/jit/tests/cli_gate/gate_status_all_strict_test.rs",
+            "crates/jit/tests/cli_gate/gate_evaluate_rerun_test.rs",
+            "crates/jit/tests/cli_gate/gate_preset_apply_json_failure_test.rs",
+            "crates/jit/tests/cli_gate/gate_findings_test.rs",
+            "crates/jit/tests/cli_gate/bracket_coverage_gate_run_test.rs",
+            "crates/jit/tests/cli_gate/gate_status_all_lean_response_test.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-reassertion-cli-issue",
+    "title": "cli_issue tests stop re-asserting projected exit codes",
+    "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_issue` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_issue`: `batch_create_tests.rs` (10), `top_level_failure_envelope_tests.rs` (6), `issue_status_projection_tests.rs` (4), `issue_show_projection_test.rs` (4), `issue_create_description_file_tests.rs` (3), `error_json_tests.rs` (1), `issue_search_label_filter_tests.rs` (1), `stored_record_classification_tests.rs` (1), `search_exit_status_tests.rs` (1), `snapshot_export_tests.rs` (1), `verb_hint_tests.rs` (1), `serve_failure_envelope_tests.rs` (1), `container_rollup_tests.rs` (1). Out of scope: the recorded-corpus contracts `failure_probe_fixture.rs`, `failure_envelope_contract_tests.rs` and `failure_probe_coverage_tests.rs`, which compare statuses against the registered error classification.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-envelope-case-moves",
+      "exit-code-argument-case-moves"
+    ],
+    "planning": {
+      "outcome": "The cli_issue suite asserts only properties it adds, with no projected exit-code re-assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "cli_issue exit-code assertions",
+        "test_boundary": "cli_issue integration target",
+        "worker_sized_reason": "Edits a bounded list of assertion sites in one target.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/batch_create_tests.rs",
+            "crates/jit/tests/cli_issue/top_level_failure_envelope_tests.rs",
+            "crates/jit/tests/cli_issue/issue_status_projection_tests.rs",
+            "crates/jit/tests/cli_issue/issue_show_projection_test.rs",
+            "crates/jit/tests/cli_issue/issue_create_description_file_tests.rs",
+            "crates/jit/tests/cli_issue/error_json_tests.rs",
+            "crates/jit/tests/cli_issue/issue_search_label_filter_tests.rs",
+            "crates/jit/tests/cli_issue/stored_record_classification_tests.rs",
+            "crates/jit/tests/cli_issue/search_exit_status_tests.rs",
+            "crates/jit/tests/cli_issue/snapshot_export_tests.rs",
+            "crates/jit/tests/cli_issue/verb_hint_tests.rs",
+            "crates/jit/tests/cli_issue/serve_failure_envelope_tests.rs",
+            "crates/jit/tests/cli_issue/container_rollup_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-reassertion-cli-query-graph",
+    "title": "cli_query_graph tests stop re-asserting projected exit codes",
+    "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_query_graph` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_query_graph`: `check_links_tests.rs` (7), `dep_add_redundancy_cli_tests.rs` (7), `scope_validation_tests.rs` (4), `graph_json_tests.rs` (2), `label_query_json_tests.rs` (2).\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "label-query-cli-wiring-reduction"
+    ],
+    "planning": {
+      "outcome": "The cli_query_graph suite asserts only properties it adds, with no projected exit-code re-assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "cli_query_graph exit-code assertions",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Edits a bounded list of assertion sites in one target.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/check_links_tests.rs",
+            "crates/jit/tests/cli_query_graph/dep_add_redundancy_cli_tests.rs",
+            "crates/jit/tests/cli_query_graph/scope_validation_tests.rs",
+            "crates/jit/tests/cli_query_graph/graph_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_query_json_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-reassertion-cli-item-validate",
+    "title": "cli_item_validate tests stop re-asserting projected exit codes",
+    "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_item_validate` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_item_validate`: `validate_cli_rule_tests.rs` (6), `invariant_check_cli_tests.rs` (4), `derived_state_repair_tests.rs` (3), `project_render_cli_tests.rs` (1), `validation_lease_tests.rs` (1).\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-binding-completeness",
+      "cli-item-validate-migration"
+    ],
+    "planning": {
+      "outcome": "The cli_item_validate suite asserts only properties it adds, with no projected exit-code re-assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "cli_item_validate exit-code assertions",
+        "test_boundary": "cli_item_validate integration target",
+        "worker_sized_reason": "Edits a bounded list of assertion sites in one target.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs",
+            "crates/jit/tests/cli_item_validate/invariant_check_cli_tests.rs",
+            "crates/jit/tests/cli_item_validate/derived_state_repair_tests.rs",
+            "crates/jit/tests/cli_item_validate/project_render_cli_tests.rs",
+            "crates/jit/tests/cli_item_validate/validation_lease_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "exit-code-reassertion-cli-repo-workflow",
+    "title": "cli_repo_workflow tests stop re-asserting projected exit codes",
+    "description": "Remove numeric exit-code assertions that re-prove projected rows from the `cli_repo_workflow` suite, keeping each test's own property and its error-class evidence.\n\n## Background\n\nThe exit-code projection suite (`cli_issue/command_exit_code_projection_tests.rs`) binds each command-to-exit-code row in both invocation forms, and its wildcard rows (`*` with 0, 1, 2, 3, 5, 10 and 11) bind every command. Outside it, a subprocess test asserts success or failure and the property it adds, such as a JSON verdict, an error envelope code, remediation text or empty stdout. It names a numeric exit code only for a command and code pair the projection has no row for. The sweep counts numeric `.code(N)`, single- and multi-line `status.code()` comparisons with `Some(...)` (literal, `ExitCode::X` or derived), symbolic `ExitCode::X.code()`, and helpers that take an expected code.\n\nExit-code assertion sites in `crates/jit/tests/cli_repo_workflow`: `profile_cli_tests.rs` (9), `claim_integration_tests.rs` (5), `config_get_tests.rs` (4), `project_config_tests.rs` (4), `serve_cli_tests.rs` (2), `first_guess_residuals_test.rs` (1), `format_compat_cli_tests.rs` (1), `integration_test.rs` (1), `lock_contention_tests.rs` (1), `profile_concurrency_tests.rs` (1), `repo_discovery_tests.rs` (1), `worktree_cli_tests.rs` (1), `profile_acceptance_tests.rs` (1). `profile_acceptance_tests.rs` asserts through its `failed_json_with_path` helper (`:105`), which takes an expected code. `repo_discovery_tests.rs:355` (not-found rather than generic error), `lock_contention_tests.rs:66` and `profile_concurrency_tests.rs:119` (lock timeout) use the code as their error-class evidence.\n\n## Success Criteria\n\n- [hard] REQ-01: No test in these files asserts a numeric exit code for a command and code pair the projection binds; each asserts success or failure instead.\n- [hard] REQ-02: Where a numeric exit code was a test's only evidence of which error class its path takes, the test asserts that class another way, such as the `error.code` of the `--json` envelope, instead of bare failure.\n- [hard] REQ-03: Each edited test keeps the other properties it asserted, and a test whose only assertion was a projected exit code with no class to preserve no longer exists.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-01",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-claim-delete-case-moves",
+      "exit-code-argument-case-moves"
+    ],
+    "planning": {
+      "outcome": "The cli_repo_workflow suite asserts only properties it adds, with no projected exit-code re-assertion.",
+      "contract_refs": [
+        "exit-code-projection-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-01"
+      ],
+      "terminal": {
+        "consumer_family": "cli_repo_workflow exit-code assertions",
+        "test_boundary": "cli_repo_workflow integration target",
+        "worker_sized_reason": "Edits a bounded list of assertion sites in one target.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_repo_workflow/profile_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/config_get_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/project_config_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/serve_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/first_guess_residuals_test.rs",
+            "crates/jit/tests/cli_repo_workflow/format_compat_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/integration_test.rs",
+            "crates/jit/tests/cli_repo_workflow/lock_contention_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_concurrency_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/repo_discovery_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs",
+            "crates/jit/tests/cli_repo_workflow/profile_acceptance_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "inline-list-output-types",
+    "title": "Inline list bodies in main.rs become typed list envelopes",
+    "description": "Replace the inline `json!` list bodies of six commands with typed list envelopes declared as their output schemas, and fix the schema key that hides `graph rdeps`.\n\n## Background\n\n`crates/jit/src/schema.rs` maps commands to output schemas and falls back to `(None, \"CommandResponse\")` (`:730`) for unregistered ones. `ListEnvelope<K, T, E>` (`crates/jit/src/output.rs`, `crates/jit/src/domain/list_envelope.rs`) derives `count` from its collection and has a manual `JsonSchema`. A command whose JSON carries `count` beside a collection under the fallback is invisible to a schema-driven list check.\n\nSix commands build `count` beside a collection as inline `json!` in `crates/jit/src/main.rs`: `gate preset list` (`:4547`), `events tail` (`:4984`), `events query` (`:5005`), `label values` (`:5900`), `claim status` (`:7391`) and `claim list` (`:7476`). `graph rdeps` emits `GraphDownstreamResponse`, but `schema.rs:668` registers it under the key `graph_downstream`, so its schema falls back.\n\n## Success Criteria\n\n- [hard] REQ-01: Each of the six commands emits a `ListEnvelope` instantiation declared as its output schema, and no inline `json!` body in `main.rs` carries a `count` key.\n- [hard] REQ-02: `graph rdeps` declares `GraphDownstreamResponse` as its output schema.\n- [hard] REQ-03: Each command's JSON output is unchanged apart from field order.\n- [hard] REQ-04: MCP tool generation and its unit tests pass against the regenerated schema.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:cli",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/semantic-types"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Six inline list bodies emit typed list envelopes, and graph rdeps declares its schema.",
+      "contract_refs": [
+        "list-envelope-coverage"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "inline list outputs",
+        "test_boundary": "generated CLI schema",
+        "worker_sized_reason": "Six outputs adopt one existing generic type, plus one registration key fix.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/main.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/src/output.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "command-list-output-types",
+    "title": "Command-layer list results become typed list envelopes",
+    "description": "Make the command-layer list results that carry a hand-set `count` typed list envelopes declared as their commands' output schemas.\n\n## Background\n\n`crates/jit/src/schema.rs` maps commands to output schemas and falls back to `(None, \"CommandResponse\")` (`:730`) for unregistered ones. `ListEnvelope<K, T, E>` (`crates/jit/src/output.rs`, `crates/jit/src/domain/list_envelope.rs`) derives `count` from its collection and has a manual `JsonSchema`. A command whose JSON carries `count` beside a collection under the fallback is invisible to a schema-driven list check.\n\nThese serialized results carry a hand-set `count` beside a collection and have no schema registration:\n\n- `DocumentListResult` and `AssetListResult` (`crates/jit/src/commands/mod.rs:1863`, `:1878`) for `doc list` and `doc assets list`.\n- `ItemListResult` (`commands/item.rs:20`) for `item list` and `item search`.\n- `InvariantCheckResult` (`commands/invariant.rs:24`) for `invariant check`.\n- `ProjectRenderResult` (`commands/project.rs:47`) for `project render`.\n- `ArchiveCandidates` (`domain/artifact_plan.rs:30`) for `archive candidates`, and `ArtifactPlan` (`:962`, with `count` equal to the artifact list's length) for `archive document` and `archive container`.\n\nThese counts are not list envelopes and stay as they are: `ProjectionRenderReport.count` (`commands/project.rs:27`) counts rendered items; `StateCount` (`output.rs:1909`) is a tally; `IssuesInfo` and `DocumentsInfo` (`snapshot.rs:53`, `:64`) are snapshot manifest data written to the export, not command stdout.\n\n## Success Criteria\n\n- [hard] REQ-01: Each listed result is a `ListEnvelope` instantiation, or embeds one for its collection, and is declared as its command's output schema; none sets `count` by hand.\n- [hard] REQ-02: Each command's JSON output is unchanged apart from field order, and `ArtifactPlan` still rejects a non-canonical plan on decode.\n- [hard] REQ-03: No struct under `crates/jit/src` carries a numeric `count` beside a collection outside `ListEnvelope`, except the non-envelope counts the Background names.\n- [hard] REQ-04: MCP tool generation and its unit tests pass against the regenerated schema.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:cli",
+      "component:core",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/single-source-prose",
+      "enforces:@/invariant/semantic-types"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review",
+      "mcp-ci"
+    ],
+    "depends_on": [
+      "inline-list-output-types"
+    ],
+    "planning": {
+      "outcome": "Command-layer list results for nine commands are list envelopes declared as their output schemas.",
+      "contract_refs": [
+        "list-envelope-coverage"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "command-layer list results",
+        "test_boundary": "generated CLI schema",
+        "worker_sized_reason": "Seven result types adopt one existing generic type, each with one schema registration.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/mod.rs",
+            "crates/jit/src/commands/item.rs",
+            "crates/jit/src/commands/invariant.rs",
+            "crates/jit/src/commands/project.rs",
+            "crates/jit/src/domain/artifact_plan.rs",
+            "crates/jit/src/schema.rs",
+            "crates/jit/src/output.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "in-process-file-setup-consolidation",
+    "title": "Shared file-backed repository setup for in-process suites",
+    "description": "Replace the private file-backed repository and executor setups of the in-process suites with shared test-support constructors.\n\n## Background\n\nFile-backed setups create a temporary repository, write configuration, run `jit init` or open a `JsonFileStorage` executor. These are defined privately:\n\n- `executor` and `setup_initialized_repo` in `crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs` (`:18`, `:28`) and again in `fast_rules/type_hierarchy_schema_regen_tests.rs` (`:10`, `:16`).\n- `repo` and `executor` in `fast_rules/effective_rules_tests.rs` (`:16`, `:36`).\n- `scaffold_declaring` in `fast_rules/undeclared_taxonomy_tests.rs:20`, a third init-from-config copy.\n- `file_backed_executor` in `fast_docs_templates/planning_preset_tests.rs:21`.\n- `setup` in `fast_docs_templates/templates_loader_tests.rs:16`, which writes declaration files into a temporary directory.\n\nShared test support provides `setup_test_repo` and `setup_test_repo_with_taxonomy` (`crates/jit/src/test_utils.rs`). The profiled setup in `fast_rules/cli_warnings_integration_tests.rs` is already gone.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support provides an initialised file-backed repository built from caller-supplied configuration, an executor over a file-backed repository, and a temporary declaration directory built from caller-supplied files.\n- [hard] REQ-02: No file in `fast_rules` or `fast_docs_templates` defines a function that creates a file-backed repository, opens a file-backed executor or writes a declaration directory of its own.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "rule-warning-tests-down-a-layer"
+    ],
+    "planning": {
+      "outcome": "In-process suites build file-backed repositories and executors through shared test support.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "file-backed suite setups",
+        "test_boundary": "fast_rules and fast_docs_templates integration targets",
+        "worker_sized_reason": "Three shared constructors replace about nine private helpers in six files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/test_utils.rs",
+            "crates/jit/tests/fast_rules/default_rules_registry_derivation_tests.rs",
+            "crates/jit/tests/fast_rules/type_hierarchy_schema_regen_tests.rs",
+            "crates/jit/tests/fast_rules/effective_rules_tests.rs",
+            "crates/jit/tests/fast_rules/undeclared_taxonomy_tests.rs",
+            "crates/jit/tests/fast_docs_templates/planning_preset_tests.rs",
+            "crates/jit/tests/fast_docs_templates/templates_loader_tests.rs"
+          ]
+        },
+        "warning_overrides": {
+          "multiple-test-boundaries": "One consumer family, private file-backed setups, spread over the two in-process integration targets that hold them; each target's suite observes its own files."
+        }
+      }
+    }
+  },
+  {
+    "key": "in-process-memory-setup-consolidation",
+    "title": "Memory-backed suite setups go through the shared memory executor",
+    "description": "Make the in-process suites build their memory stores and executors through the shared memory executor, passing scenario declarations as data.\n\n## Background\n\nThe shared memory executor in shared test support is initialised by product initialisation. Suite files build their own `InMemoryStorage` or memory executor and seed declarations around it:\n\n- `store_with_rules` in `crates/jit/tests/fast_issue/graph_rule_validation_tests.rs:15` and `fast_rules/validate_rule_runner_tests.rs:21`.\n- `executor_with_rules` in `fast_issue/transition_graph_enforcement_tests.rs:24` and `fast_rules/local_rule_enforcement_tests.rs:20`.\n- `executor` in `fast_issue/strictness_enforcement_tests.rs:42` and `fast_issue/strictness_transition_tests.rs:41`.\n- `executor_for` in `fast_issue/graph_rule_validation_tests.rs:34`, and `make_storage` in `fast_issue/short_hash_tests.rs:389`.\n- `executor_with_templates` in `fast_docs_templates/template_binding_tests.rs:106`, and `memory_storage` in `fast_docs_templates/template_apply_atomicity_tests.rs:380`.\n- `storage_with` and `render_executor` in `fast_rules/project_render_harness_tests.rs:77,90`, and `strategic_executor` in `fast_rules/label_strategic_tests.rs:13`.\n- `executor_with_sdd_example` and `research_coverage_executor` in `fast_rules/example_rulesets_tests.rs:612,1524`.\n\nHelpers that act on a `TestHarness` or executor they are given are scenario steps, not setups.\n\n## Success Criteria\n\n- [hard] REQ-01: Shared test support builds a memory store and executor from caller-supplied declarations (configuration, rules and templates) on top of the shared memory executor.\n- [hard] REQ-02: No file in `fast_issue`, `fast_rules` or `fast_docs_templates` defines a function that constructs an `InMemoryStorage` or a memory executor; scenario declarations stay in the tests as data.\n- [hard] REQ-03: Each affected test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:shared-test-fixtures",
+      "component:testing",
+      "satisfies:c780514e/REQ-05",
+      "satisfies:c780514e/REQ-06",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/shared-test-contracts"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "shared-memory-executor"
+    ],
+    "planning": {
+      "outcome": "In-process suites build memory stores and executors through the shared memory executor.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-05",
+        "REQ-06",
+        "D-02"
+      ],
+      "terminal": {
+        "consumer_family": "memory-backed suite setups",
+        "test_boundary": "fast_issue, fast_rules and fast_docs_templates integration targets",
+        "worker_sized_reason": "One declaration-seeding entry point replaces about fourteen private helpers in twelve files.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/commands/test_helpers.rs",
+            "crates/jit/tests/fast_issue/graph_rule_validation_tests.rs",
+            "crates/jit/tests/fast_rules/validate_rule_runner_tests.rs",
+            "crates/jit/tests/fast_issue/transition_graph_enforcement_tests.rs",
+            "crates/jit/tests/fast_rules/local_rule_enforcement_tests.rs",
+            "crates/jit/tests/fast_issue/strictness_enforcement_tests.rs",
+            "crates/jit/tests/fast_issue/strictness_transition_tests.rs",
+            "crates/jit/tests/fast_issue/short_hash_tests.rs",
+            "crates/jit/tests/fast_docs_templates/template_binding_tests.rs",
+            "crates/jit/tests/fast_docs_templates/template_apply_atomicity_tests.rs",
+            "crates/jit/tests/fast_rules/project_render_harness_tests.rs",
+            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
+            "crates/jit/tests/fast_rules/example_rulesets_tests.rs"
+          ]
+        },
+        "warning_overrides": {
+          "multiple-test-boundaries": "One consumer family, private suite setups, spread over the three in-process integration targets that hold them; each target's suite observes its own files."
+        }
+      }
+    }
+  },
+  {
+    "key": "label-query-cli-wiring-reduction",
+    "title": "Label and filter CLI tests assert one wiring case per subcommand and flag",
+    "description": "Cut the label and filter subprocess tests outside the main query suite to wiring cases, now that the domain owns label and strategic query semantics.\n\n## Background\n\n`crates/jit/src/domain/queries.rs` owns `query_by_label`, `query_by_labels` and `query_strategic` (`:278`, `:318`, `:336`). Subprocess tests in `crates/jit/tests/cli_query_graph` re-prove them. `label_filter_repeatable_query_tests.rs` (17 tests) proves AND semantics and a single-label regression for each of eight list subcommands. `label_query_json_tests.rs` (7) proves pattern semantics: exact, wildcard, no match and case. `query_json_tests.rs` (5) and the workflows of `label_hierarchy_e2e_test.rs` (4) assert filter membership. `query_json_tests.rs` also holds the guard against a parent filter given before the `query` subcommand, an argument-validation case with no other owner. The label-validation and hierarchy-warning properties of `label_hierarchy_e2e_test.rs` have no other owner.\n\n## Success Criteria\n\n- [hard] REQ-01: These files hold at most one case per list subcommand and per filter flag, each asserting that the filter reaches the domain query. They also keep the invalid-pattern error and the parent-filter guard as argument-validation cases.\n- [hard] REQ-02: A semantic property of a removed case that the domain tests lack gains a domain test.\n- [hard] REQ-03: The label-validation and hierarchy-warning assertions of `label_hierarchy_e2e_test.rs` remain.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "exit-code-argument-case-moves"
+    ],
+    "planning": {
+      "outcome": "Label and filter CLI tests keep one wiring case per subcommand or flag, and the domain owns label semantics.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "label query CLI tests",
+        "test_boundary": "cli_query_graph integration target",
+        "worker_sized_reason": "Four files shrink to wiring cases on an existing fixture.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_query_graph/label_filter_repeatable_query_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_query_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/query_json_tests.rs",
+            "crates/jit/tests/cli_query_graph/label_hierarchy_e2e_test.rs",
+            "crates/jit/src/domain/queries.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "list-envelope-coverage-test",
+    "title": "One test proves the list-envelope count for each list-emitting command",
+    "description": "Replace the per-command list-envelope tests with one schema-driven test that covers each list-emitting command.\n\n## Background\n\n`ListEnvelope` (`crates/jit/src/output.rs`) derives `count` from its collection on serialize and rejects a mismatch on deserialize. Each list-emitting command, found from its emission site, declares a typed output schema in the generated CLI schema (`CommandSchema::generate()`). `crates/jit/tests/cli_issue/list_envelope_tests.rs` asserts `count == len` in 19 per-command subprocess tests, covering `issue list`, the `query` family, `issue search`, `search`, `gate list`, `gate preset list`, `events tail` and `events query`, `doc list`, `doc assets list`, `claim list`, `label namespaces` and `label values`, `item list` and `item search`, `worktree list`, `worktree store-divergence`, `graph roots` and `graph rdeps`, `invariant check`, multi-id `issue show`, `graph deps` and `gate status-all`.\n\n## Success Criteria\n\n- [hard] REQ-01: One test enumerates the list-emitting commands from the generated schema, meaning commands whose output schema carries `count` beside a collection. It runs each on a seeded repository through the shared CLI process fixture and asserts that `count` equals the collection's length.\n- [hard] REQ-02: The test fails and names the command when a list-emitting command in the schema has no invocation in it.\n- [hard] REQ-03: Its invocations cover each command the 19 per-command cases covered, plus `claim status`, `project render` and the three `archive` commands.\n- [hard] REQ-04: Independently of the schema, the test fails and names the command when an invocation's JSON body carries `count` beside an array while that command's schema output is the untyped fallback.\n- [hard] REQ-05: The 19 per-command cases of `list_envelope_tests.rs` no longer exist.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:exit-code-envelope-ownership",
+      "component:testing",
+      "component:cli",
+      "satisfies:c780514e/REQ-04",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests",
+      "enforces:@/invariant/semantic-test-assertions"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-process-fixture",
+      "command-list-output-types"
+    ],
+    "planning": {
+      "outcome": "A single schema-driven test checks count against collection length for each list-emitting command.",
+      "contract_refs": [
+        "list-envelope-coverage",
+        "cli-process-fixture"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-04",
+        "D-04"
+      ],
+      "terminal": {
+        "consumer_family": "list-envelope tests",
+        "test_boundary": "cli_issue integration target",
+        "worker_sized_reason": "One schema-driven test replaces one file of per-command cases.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_issue/list_envelope_tests.rs",
+            "crates/jit/tests/cli_issue/main.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "label-query-harness-reduction",
+    "title": "Label and strategic executor tests keep one wiring case each",
+    "description": "Cut the executor-level label and strategic query tests to wiring cases, with label semantics owned by the domain.\n\n## Background\n\n`crates/jit/tests/fast_rules/label_query_tests.rs` has 12 tests. Nine re-prove `query_by_label` (`crates/jit/src/domain/queries.rs:278`) through the executor, and three own the composition of `search_issues_with_filters`. `crates/jit/tests/fast_rules/label_strategic_tests.rs` has 7 tests that re-prove `query_strategic` (`:336`) through the executor.\n\n## Success Criteria\n\n- [hard] REQ-01: Each file holds one executor case per query entry point, asserting that the executor reaches the domain query, and the `search_issues_with_filters` composition cases remain.\n- [hard] REQ-02: A property of a removed case that the domain tests lack gains a test in `domain/queries.rs`.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:query-graph-ownership",
+      "component:testing",
+      "satisfies:c780514e/REQ-02",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "in-process-memory-setup-consolidation"
+    ],
+    "planning": {
+      "outcome": "Executor label and strategic tests keep one wiring case per entry point, and the domain owns the semantics.",
+      "contract_refs": [
+        "domain-query-ownership"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-02"
+      ],
+      "terminal": {
+        "consumer_family": "label query executor tests",
+        "test_boundary": "fast_rules integration target",
+        "worker_sized_reason": "Two files shrink to a few wiring cases each.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/fast_rules/label_query_tests.rs",
+            "crates/jit/tests/fast_rules/label_strategic_tests.rs",
+            "crates/jit/src/domain/queries.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "mcp-parity-tool-failure",
+    "title": "MCP parity test fails when node is missing",
+    "description": "Make the MCP tool-generation parity test fail rather than pass when it cannot run node.\n\n## Background\n\n`crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs:930-935` returns early, printing \"node not available; skipping MCP parity assertion\", when `node --version` fails. The test runs the MCP server's tool generator (`mcp-server/lib/tool-generator.js`) over the real schema.\n\n## Success Criteria\n\n- [hard] REQ-01: The parity test fails, naming the missing tool, when node cannot run.\n- [hard] REQ-02: The test has no skip path, and it still asserts the generated `jit_validate` tool's properties.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:testing",
+      "component:tooling",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [
+      "cli-item-validate-migration"
+    ],
+    "planning": {
+      "outcome": "The MCP parity test fails rather than skips when node is missing.",
+      "contract_refs": [
+        "script-self-test-gates"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "MCP parity test",
+        "test_boundary": "cli_item_validate integration target",
+        "worker_sized_reason": "One test drops one early-return branch.",
+        "footprint": {
+          "touches": [
+            "crates/jit/tests/cli_item_validate/validate_cli_rule_tests.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "key": "server-shutdown-test-bound",
+    "title": "Server shutdown force-close test stays under the per-test bound",
+    "description": "Prove the drain entitlement at the shutdown-sequence layer with a short deadline, so no server test waits out the real five-second drain.\n\n## Background\n\n`crates/server/tests/server_integration/graceful_shutdown_tests.rs:538` (`test_jit_server_shutdown_force_closes_a_stalled_connection_and_exits_zero`) spawns `jit-server`, stalls a connection and waits the full `GRACEFUL_DRAIN_TIMEOUT` (5 s, `crates/server/src/shutdown.rs:33`) before asserting the force-close. It took 5.32 s and is the last test to finish in the suite run.\n\n`run_shutdown_sequence` (`shutdown.rs:152`) takes its drain deadline as a parameter and logs `drained_for_ms`. Its unit tests already pass a 300 ms deadline (`test_run_shutdown_sequence_force_closes_connections_that_outlive_the_deadline`, `:402`). A `test-support` build reads the serving process's deadline from `JIT_SERVER_DRAIN_DEADLINE_MS` (`configured_drain_deadline`). `test_the_drain_assertion_rejects_a_server_that_force_closes_early` (`:626`) uses that seam to show the drain assertion fails against a server that force-closes early.\n\n## Success Criteria\n\n- [hard] REQ-01: A unit test of `run_shutdown_sequence` with a short deadline owns the entitlement: a stalled connection keeps running for at least the deadline before it is force-closed.\n- [hard] REQ-02: The serving process enforces `GRACEFUL_DRAIN_TIMEOUT` when no test deadline is configured, proven without waiting for it.\n- [hard] REQ-03: The process-level test proves the wiring with a short configured deadline: a stalled connection is force-closed, the process exits zero, and the log records completion. The drain assertion is still shown to fail against a server that force-closes early.\n- [hard] REQ-04: No test in the server crate exceeds 5 s on a warm target at load ≤ 10.\n",
+    "type": "task",
+    "priority": "high",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:testing",
+      "component:server",
+      "satisfies:c780514e/REQ-13",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/orthogonal-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "Drain entitlement is proven with a short deadline, and no server test waits the real five-second drain.",
+      "contract_refs": [
+        "suite-measurement-protocol"
+      ],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-13",
+        "D-01"
+      ],
+      "terminal": {
+        "consumer_family": "server shutdown tests",
+        "test_boundary": "server_integration integration target",
+        "worker_sized_reason": "Uses an existing deadline parameter; one process test shortens and one unit test is added.",
+        "footprint": {
+          "touches": [
+            "crates/server/tests/server_integration/graceful_shutdown_tests.rs",
+            "crates/server/src/shutdown.rs"
+          ]
+        }
+      }
+    }
+  },
+  {
     "key": "exit-code-envelope-ownership",
     "title": "Exit codes and list envelopes each have one owning test",
     "description": "Aggregate the work that delivers this outcome: command exit codes and the list-envelope count each have one owning test.\n\n## Background\n\nThis story groups the test-topology tasks that share one design surface, so they can be reviewed together once each has landed.\n\n## Success Criteria\n\n- [hard] REQ-01: Command-to-exit-code bindings and their human/machine parity are proven only by the exit-code projection suite, which fails for a projected row without a binding case. Other subprocess tests assert only what they add.\n- [hard] REQ-02: The list-envelope `count` property is proven by one test that covers each list-emitting command, and no per-command test re-asserts it.\n",
@@ -2392,7 +3108,12 @@
     ],
     "depends_on": [
       "exit-code-reproof-deletion",
-      "list-envelope-reassertion-removal"
+      "list-envelope-reassertion-removal",
+      "exit-code-reassertion-cli-gate",
+      "exit-code-reassertion-cli-issue",
+      "exit-code-reassertion-cli-query-graph",
+      "exit-code-reassertion-cli-item-validate",
+      "exit-code-reassertion-cli-repo-workflow"
     ],
     "planning": {
       "outcome": "command exit codes and the list-envelope count each have one owning test",
@@ -2430,7 +3151,9 @@
       "auto-transition-wiring-reduction",
       "auto-transition-harness-owner",
       "cycle-reproof-removal",
-      "harness-demo-deletion"
+      "harness-demo-deletion",
+      "label-query-cli-wiring-reduction",
+      "label-query-harness-reduction"
     ],
     "planning": {
       "outcome": "query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring",
@@ -2509,10 +3232,10 @@
       "cli-repo-workflow-migration",
       "library-git-fixture-adoption",
       "shared-fixture-issue",
-      "shared-memory-executor",
       "unit-test-shipped-item-kinds",
       "suite-shipped-item-kinds",
-      "env-reading-tests-guarded"
+      "env-reading-tests-guarded",
+      "in-process-file-setup-consolidation"
     ],
     "planning": {
       "outcome": "CLI and in-process tests use one definition of each fixture and reach process state only through the shared guards",

@@ -27,11 +27,13 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "92811506-1038-42db-b715-67d833b76c6e",
       "status": "passed",
       "updated_at": "2026-02-08T18:23:39.016206576Z",
       "updated_by": "agent:copilot-session"
     },
     "tdd-reminder": {
+      "run_id": "807e0486-8820-46e6-acf8-b43705d4d9ee",
       "status": "passed",
       "updated_at": "2026-02-06T19:50:31.405020675Z",
       "updated_by": "agent:copilot-session"

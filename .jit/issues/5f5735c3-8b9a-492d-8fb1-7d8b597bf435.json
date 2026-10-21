@@ -1,39 +1,41 @@
 {
-  "id": "5f5735c3-8b9a-492d-8fb1-7d8b597bf435",
-  "title": "breakdown: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
-  "description": "Breakdown node bracketing Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-23T21:38:17.511021111Z",
   "dependencies": [
     "0d753ba5-356a-4342-a1fb-f880a1b0341d"
   ],
+  "description": "Breakdown node bracketing Structured project knowledge in jit: addressable items, qualified ids, and projected invariants (25064508). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "done_at": "2026-06-25T06:09:06.979014703Z",
+  "first_ready_at": "2026-06-24T21:47:26.009394229Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T05:12:53.130305537Z"
-    },
     "breakdown-review": {
+      "run_id": "a93a3ef9-1e26-414b-a5f3-401f8b5936f8",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-25T05:17:47.937174362Z"
+      "updated_at": "2026-06-25T05:17:47.937174362Z",
+      "updated_by": "auto:executor"
+    },
+    "coverage-preview": {
+      "run_id": "3a778bef-bfdb-4971-9d43-78190fd463c4",
+      "status": "passed",
+      "updated_at": "2026-06-25T05:12:53.130305537Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "5f5735c3-8b9a-492d-8fb1-7d8b597bf435",
   "labels": [
     "milestone:v1.0",
     "epic:structured-knowledge",
     "type:breakdown",
     "brackets:25064508"
   ],
-  "created_at": "2026-06-23T21:38:17.511021111Z",
-  "updated_at": "2026-07-05T19:51:12.983594893Z",
-  "first_ready_at": "2026-06-24T21:47:26.009394229Z",
-  "done_at": "2026-06-25T06:09:06.979014703Z"
+  "priority": "high",
+  "state": "done",
+  "title": "breakdown: Structured project knowledge in jit: addressable items, qualified ids, and projected invariants",
+  "updated_at": "2026-07-05T19:51:12.983594893Z"
 }

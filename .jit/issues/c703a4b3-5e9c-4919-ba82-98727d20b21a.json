@@ -1,40 +1,42 @@
 {
-  "id": "c703a4b3-5e9c-4919-ba82-98727d20b21a",
-  "title": "Migrate scoped validation and plan-content to templates",
-  "description": "Move the scoped-validation boundary and plan-content resolution onto the template registry.\n\n## Success Criteria\n- [ ] [hard] CFGA-01: scoped validation still halts at the breakdown node, with the boundary derived from the template.\n- [ ] [hard] CFGA-02: plan-content resolution derives breakable types and doc location from the template.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-23T18:36:50.436613885Z",
+  "context": {},
+  "created_at": "2026-06-22T22:28:29.426874165Z",
   "dependencies": [
     "3143ad87-1991-4873-a013-9456cea7234a"
   ],
+  "description": "Move the scoped-validation boundary and plan-content resolution onto the template registry.\n\n## Success Criteria\n- [ ] [hard] CFGA-01: scoped validation still halts at the breakdown node, with the boundary derived from the template.\n- [ ] [hard] CFGA-02: plan-content resolution derives breakable types and doc location from the template.",
+  "documents": [],
+  "done_at": "2026-06-23T19:09:46.268495505Z",
+  "first_ready_at": "2026-06-23T18:36:19.334468956Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "472d03f6-6f4a-40ad-959a-3ccd09ba0826",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T19:01:07.839395431Z"
+      "updated_at": "2026-06-23T19:01:07.839395431Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "1a7e4baf-4579-456c-8e39-a01e6e5b6509",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T19:08:11.963872804Z"
+      "updated_at": "2026-06-23T19:08:11.963872804Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c703a4b3-5e9c-4919-ba82-98727d20b21a",
   "labels": [
     "type:task",
     "story:planning-config-removal",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:28:29.426874165Z",
-  "updated_at": "2026-07-05T19:51:13.082472795Z",
-  "first_ready_at": "2026-06-23T18:36:19.334468956Z",
-  "claimed_at": "2026-06-23T18:36:50.436613885Z",
-  "done_at": "2026-06-23T19:09:46.268495505Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Migrate scoped validation and plan-content to templates",
+  "updated_at": "2026-07-05T19:51:13.082472795Z"
 }

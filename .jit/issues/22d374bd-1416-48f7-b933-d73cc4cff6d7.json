@@ -17,16 +17,19 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "ddff3d4e-d9a2-45a2-bb20-4471a9b7e8ee",
       "status": "passed",
       "updated_at": "2026-07-30T18:23:54.503479414Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
+      "run_id": "9e9aca83-9fd3-44e7-815c-ca3835f55c29",
       "status": "passed",
       "updated_at": "2026-07-30T18:07:33.537675044Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "209a61d2-117a-412f-b642-67bcac129412",
       "status": "passed",
       "updated_at": "2026-07-30T18:07:30.665858002Z",
       "updated_by": "auto:executor"

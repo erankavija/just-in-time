@@ -1,39 +1,41 @@
 {
-  "id": "923e42fb-42fb-4457-acff-b4891480c778",
-  "title": "breakdown: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
-  "description": "Breakdown node bracketing Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "done",
-  "priority": "normal",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-07-01T22:44:11.632362556Z",
   "dependencies": [
     "0b611ccf-7763-47a5-8401-2e033aa01523"
   ],
+  "description": "Breakdown node bracketing Addressing v2: uniform path-based addresses; rule/gate as addressable items (2821e177). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "done_at": "2026-07-01T23:23:14.521847879Z",
+  "first_ready_at": "2026-07-01T23:15:00.543289750Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T23:20:06.906715850Z"
-    },
     "breakdown-review": {
+      "run_id": "53d50c8f-d3f7-46c1-9ed7-9f66ef92d7d4",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T23:26:23.370556105Z"
+      "updated_at": "2026-07-01T23:26:23.370556105Z",
+      "updated_by": "auto:executor"
+    },
+    "coverage-preview": {
+      "run_id": "f4a366aa-2900-4a8e-9ade-09f83d054943",
+      "status": "passed",
+      "updated_at": "2026-07-01T23:20:06.906715850Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "923e42fb-42fb-4457-acff-b4891480c778",
   "labels": [
     "epic:addressing-v2",
     "milestone:v1.0",
     "type:breakdown",
     "brackets:2821e177"
   ],
-  "created_at": "2026-07-01T22:44:11.632362556Z",
-  "updated_at": "2026-07-05T19:51:13.035192411Z",
-  "first_ready_at": "2026-07-01T23:15:00.543289750Z",
-  "done_at": "2026-07-01T23:23:14.521847879Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "breakdown: Addressing v2: uniform path-based addresses; rule/gate as addressable items",
+  "updated_at": "2026-07-05T19:51:13.035192411Z"
 }

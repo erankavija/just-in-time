@@ -24,11 +24,13 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "35fe441c-661e-4c22-a497-4bf3aac2af67",
       "status": "passed",
       "updated_at": "2025-12-26T22:06:53.920911899Z",
       "updated_by": null
     },
     "tests": {
+      "run_id": "08c8189c-89f8-4f49-a4e5-b678847bd5cf",
       "status": "passed",
       "updated_at": "2025-12-26T22:06:47.789758881Z",
       "updated_by": "auto:executor"

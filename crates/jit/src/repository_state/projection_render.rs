@@ -240,12 +240,12 @@ fn render_full_body(
 }
 
 /// The repo-level content format (`[validation].content_format`, defaulting to
-/// Markdown), matching the selection issue descriptions and project sources use so
+/// [`ContentFormat::DEFAULT`]), matching the selection issue descriptions and project sources use so
 /// a projection scans its source identically.
 fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerError> {
     match config.validation.as_ref() {
         Some(validation) => match validation.content_format.as_deref() {
-            None => Ok(ContentFormat::Markdown),
+            None => Ok(ContentFormat::DEFAULT),
             Some(value)
                 if value.eq_ignore_ascii_case("markdown") || value.eq_ignore_ascii_case("md") =>
             {
@@ -255,6 +255,6 @@ fn repo_content_format(config: &JitConfig) -> Result<ContentFormat, ProducerErro
             Some(value) if value.eq_ignore_ascii_case("xml") => Ok(ContentFormat::Xml),
             Some(value) => Err(ProducerError::InvalidContentFormat(value.to_string())),
         },
-        None => Ok(ContentFormat::Markdown),
+        None => Ok(ContentFormat::DEFAULT),
     }
 }

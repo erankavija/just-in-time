@@ -1,0 +1,34 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:31:28.613451335Z",
+  "dependencies": [
+    "03c59566-093f-4a7c-a3a6-65098a4b28de",
+    "1f24e3e9-43bb-44da-aa8c-b4b90d157e94",
+    "7516ed50-df03-4309-b647-61436da9dbb0"
+  ],
+  "description": "Update the command reference for the changed `issue create`, `validate --fix` and `doc check-links` behaviour.\n\n## Background\n\n- `docs/reference/cli-commands.md` documents `jit issue create` (`:899` onwards), `jit doc check-links` (`:2841` onwards) and `jit validate --fix` (`:3249-3334`); `docs/reference/worktree-validate.md` documents `--fix` (`:367-368,449`).\n- `docs/how-to/multi-agent-coordination.md:421-425` tells readers to verify with plain `jit validate` because a `--fix` run that applies no fix reports `No fixes needed` without re-checking. Other pages only show the command.\n- Changed behaviour: `issue create` returns `findings` in JSON and prints the same findings in human output, and `--force` no longer hides them; `validate --fix` publishes every fix through one mutation and renders one report over the fixed repository, with its exit status, including when it applied no fix; `doc check-links` probes each distinct external URL once, with a request timeout and bounded concurrency.\n\n## Success Criteria\n\n- [hard] REQ-01: The `issue create`, `validate --fix` and `doc check-links` sections state the changed behaviour above.\n- [hard] REQ-02: No page under `docs/` describes `--fix` as publishing one mutation per fix or as skipping validation after a run that applied no fix.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "documents": [],
+  "gates_required": [
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "ce221384-7b46-41b6-968a-cbeee7b600d3",
+  "labels": [
+    "type:task",
+    "epic:one-validation-report",
+    "milestone:v1.0",
+    "story:report-side-paths",
+    "component:docs",
+    "per:@/charter/D-20",
+    "enforces:@/invariant/single-source-prose",
+    "satisfies:9876a23a/REQ-13",
+    "satisfies:9876a23a/REQ-14",
+    "satisfies:9876a23a/REQ-15"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Command references describe create findings, fix reporting and link probing",
+  "updated_at": "2026-10-21T20:31:28.613451335Z"
+}

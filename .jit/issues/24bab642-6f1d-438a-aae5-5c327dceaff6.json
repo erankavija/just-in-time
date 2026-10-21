@@ -15,6 +15,7 @@
   ],
   "gates_status": {
     "coverage-preview": {
+      "run_id": "fb1c7333-34be-4a87-84c3-f74b6109fdb9",
       "status": "passed",
       "updated_at": "2026-07-24T07:20:53.292893525Z",
       "updated_by": "auto:executor"

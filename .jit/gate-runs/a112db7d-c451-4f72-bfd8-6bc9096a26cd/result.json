@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "ci:fmt",
+  "command": "",
+  "commit": null,
+  "completed_at": "2025-12-20T13:04:21.247769414Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "fmt",
+  "issue_id": "4ae60108-d2b0-4fbc-829a-7df6203b1850",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "a112db7d-c451-4f72-bfd8-6bc9096a26cd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2025-12-20T13:04:21.247769414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

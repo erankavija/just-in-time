@@ -1,11 +1,11 @@
 {
-  "id": "61783d2f-afd5-4f69-bb41-54081d8a6158",
-  "title": "Implement agent identity configuration",
-  "description": "Implement agent identity resolution with priority: `--agent-id` flag > `JIT_AGENT_ID` env var > `~/.config/jit/agent.toml` > error. Support format `{type}:{identifier}` (e.g., `agent:copilot-1`). See design doc section \"Agent Identity\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.563881195Z",
   "dependencies": [],
+  "description": "Implement agent identity resolution with priority: `--agent-id` flag > `JIT_AGENT_ID` env var > `~/.config/jit/agent.toml` > error. Support format `{type}:{identifier}` (e.g., `agent:copilot-1`). See design doc section \"Agent Identity\".",
+  "documents": [],
+  "done_at": "2026-01-06T20:26:29.673375744Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -15,40 +15,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "638dde23-1406-4bb1-90f7-aeca3884f393",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:24:07.051541306Z"
+      "updated_at": "2026-01-06T20:24:07.051541306Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "767a6a76-4f2c-49c2-85e8-24fba3574b6b",
       "status": "passed",
-      "updated_by": "human:reviewer",
-      "updated_at": "2026-01-06T20:26:44.185852375Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-1",
-      "updated_at": "2026-01-06T20:24:07.051506056Z"
+      "updated_at": "2026-01-06T20:26:44.185852375Z",
+      "updated_by": "human:reviewer"
     },
     "fmt": {
+      "run_id": "0f1b75b9-3a59-439c-a633-e75a89407edf",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:24:07.051570126Z"
+      "updated_at": "2026-01-06T20:24:07.051570126Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "8c8e064c-1827-45e8-b46b-52b0fe446805",
+      "status": "passed",
+      "updated_at": "2026-01-06T20:24:07.051506056Z",
+      "updated_by": "agent:copilot-1"
     },
     "tests": {
+      "run_id": "6791aaf4-8725-4893-a01a-8c34e00dc947",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:24:07.051541496Z"
+      "updated_at": "2026-01-06T20:24:07.051541496Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "61783d2f-afd5-4f69-bb41-54081d8a6158",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.563881195Z",
-  "updated_at": "2026-07-05T19:51:12.986139575Z",
-  "done_at": "2026-01-06T20:26:29.673375744Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement agent identity configuration",
+  "updated_at": "2026-07-05T19:51:12.986139575Z"
 }

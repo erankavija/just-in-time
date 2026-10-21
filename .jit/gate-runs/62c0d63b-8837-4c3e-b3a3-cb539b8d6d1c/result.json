@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:jit-execution-lead",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-07-23T09:35:18.064132564Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "security-review",
+  "issue_id": "661d6be2-e28b-463d-be93-58ee3e20e663",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "62c0d63b-8837-4c3e-b3a3-cb539b8d6d1c",
+  "schema_version": 1,
+  "stage": "precheck",
+  "started_at": "2026-07-23T09:35:18.064132564Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

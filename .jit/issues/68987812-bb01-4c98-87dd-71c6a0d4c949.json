@@ -1,13 +1,15 @@
 {
-  "id": "68987812-bb01-4c98-87dd-71c6a0d4c949",
-  "title": "Implement jit config validate command",
-  "description": "Implement `jit config validate` to check configuration for errors, warnings, and deprecated options. Report issues with suggestions. Exit non-zero on errors.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T17:13:30.925435286Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.084175336Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement `jit config validate` to check configuration for errors, warnings, and deprecated options. Report issues with suggestions. Exit non-zero on errors.",
+  "documents": [],
+  "done_at": "2026-02-02T17:16:08.121465670Z",
+  "first_ready_at": "2026-01-06T21:01:34.504837433Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "clippy": {
+      "run_id": "5474016f-9767-4976-9d87-78f401f29afb",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:16:03.260867200Z"
+      "updated_at": "2026-02-02T17:15:53.817879418Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "dd62f622-6d0a-49cd-a20d-98d2108f3baa",
+      "status": "passed",
+      "updated_at": "2026-02-02T17:16:03.260867200Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "a65ee3a2-56e2-4901-bc95-4cb461c24c60",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:15:56.222640226Z"
+      "updated_at": "2026-02-02T17:15:56.222640226Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "42bbd910-0765-4427-b16a-9ea4513bf7d1",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:13:30.923757876Z"
+      "updated_at": "2026-02-02T17:13:30.923757876Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "e91c818a-390a-4b67-a2f0-a81906ebb06b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:15:31.901255858Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:15:53.817879418Z"
+      "updated_at": "2026-02-02T17:15:31.901255858Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "68987812-bb01-4c98-87dd-71c6a0d4c949",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.084175336Z",
-  "updated_at": "2026-07-05T19:51:12.994195121Z",
-  "first_ready_at": "2026-01-06T21:01:34.504837433Z",
-  "claimed_at": "2026-02-02T17:13:30.925435286Z",
-  "done_at": "2026-02-02T17:16:08.121465670Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Implement jit config validate command",
+  "updated_at": "2026-07-05T19:51:12.994195121Z"
 }

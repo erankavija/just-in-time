@@ -1,35 +1,37 @@
 {
-  "id": "cca3e80b-4a9a-498d-995b-15ff80acab4a",
-  "title": "State predicates in validation rule selectors",
-  "description": "Extend rule `when` selectors so rules can match on issue state, enabling lifecycle-phase scoping of validation rules.\n\n## Success Criteria\n\n- [ ] `when` accepts a state predicate (single state or list) combinable with the existing type and label selectors\n- [ ] Rules with a state predicate are evaluated only for issues in a matching state, on both the write path and `jit validate`\n- [ ] Unknown state names in `when` are rejected at config load with an error naming the rule and the valid states\n- [ ] `jit validate <id> --explain` shows whether the state predicate matched\n- [ ] The validation-rules how-to and configuration reference document state predicates",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-09T22:04:45.056922663Z",
+  "context": {},
+  "created_at": "2026-06-09T21:52:58.376575210Z",
   "dependencies": [],
+  "description": "Extend rule `when` selectors so rules can match on issue state, enabling lifecycle-phase scoping of validation rules.\n\n## Success Criteria\n\n- [ ] `when` accepts a state predicate (single state or list) combinable with the existing type and label selectors\n- [ ] Rules with a state predicate are evaluated only for issues in a matching state, on both the write path and `jit validate`\n- [ ] Unknown state names in `when` are rejected at config load with an error naming the rule and the valid states\n- [ ] `jit validate <id> --explain` shows whether the state predicate matched\n- [ ] The validation-rules how-to and configuration reference document state predicates",
+  "documents": [],
+  "done_at": "2026-06-09T23:30:16.961075482Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "aa3b0a5c-d0b5-4ef9-8f69-408cf16bba55",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-09T23:06:17.795817364Z"
+      "updated_at": "2026-06-09T23:06:17.795817364Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "51233443-8f88-43bf-8252-fa89b2f6707a",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-09T23:10:31.275153765Z"
+      "updated_at": "2026-06-09T23:10:31.275153765Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "cca3e80b-4a9a-498d-995b-15ff80acab4a",
   "labels": [
     "type:task",
     "epic:validation-lifecycle"
   ],
-  "created_at": "2026-06-09T21:52:58.376575210Z",
-  "updated_at": "2026-07-05T19:51:13.087386469Z",
-  "claimed_at": "2026-06-09T22:04:45.056922663Z",
-  "done_at": "2026-06-09T23:30:16.961075482Z"
+  "priority": "high",
+  "state": "done",
+  "title": "State predicates in validation rule selectors",
+  "updated_at": "2026-07-05T19:51:13.087386469Z"
 }

@@ -1,40 +1,42 @@
 {
-  "id": "73e5e853-c8b5-4b65-b559-13cbb683f4c5",
-  "title": "Edge wiring and move-upstream-to-role transform",
-  "description": "Wire internal and anchor edges and run the move-upstream-to-role transform on the pre-apply snapshot.\n\n## Success Criteria\n- [ ] [hard] APPB-01: internal and anchor edges are wired; the result is acyclic and transitively reduced.\n- [ ] [hard] APPB-02: the transform uses the pre-apply snapshot and never moves the freshly-created scaffold nodes.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-23T15:09:37.050251055Z",
+  "context": {},
+  "created_at": "2026-06-22T22:28:29.372554100Z",
   "dependencies": [
     "14137e1a-03e9-4da7-91e9-c28ed50efae8"
   ],
+  "description": "Wire internal and anchor edges and run the move-upstream-to-role transform on the pre-apply snapshot.\n\n## Success Criteria\n- [ ] [hard] APPB-01: internal and anchor edges are wired; the result is acyclic and transitively reduced.\n- [ ] [hard] APPB-02: the transform uses the pre-apply snapshot and never moves the freshly-created scaffold nodes.",
+  "documents": [],
+  "done_at": "2026-06-23T15:43:26.042791185Z",
+  "first_ready_at": "2026-06-23T15:09:06.039770823Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T15:41:31.186565764Z"
-    },
     "cargo-ci": {
+      "run_id": "886bb486-7728-42d5-8fca-cf859cad9bbc",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T15:33:27.855066122Z"
+      "updated_at": "2026-06-23T15:33:27.855066122Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "ca8ea05d-09de-4961-b5fe-c2d9ca434f08",
+      "status": "passed",
+      "updated_at": "2026-06-23T15:41:31.186565764Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "73e5e853-c8b5-4b65-b559-13cbb683f4c5",
   "labels": [
     "type:task",
     "story:apply-engine",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:28:29.372554100Z",
-  "updated_at": "2026-07-05T19:51:13.006422790Z",
-  "first_ready_at": "2026-06-23T15:09:06.039770823Z",
-  "claimed_at": "2026-06-23T15:09:37.050251055Z",
-  "done_at": "2026-06-23T15:43:26.042791185Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Edge wiring and move-upstream-to-role transform",
+  "updated_at": "2026-07-05T19:51:13.006422790Z"
 }

@@ -1,36 +1,38 @@
 {
-  "id": "7b7df884-8335-4c2a-8555-a7d5a541a0f0",
-  "title": "Fix strategic/tactical view to follow issue type labels",
-  "description": "The Web UI strategic/tactical view toggle is not filtering by type labels correctly. It should show only issues with strategic type labels (milestone, epic) in strategic view, and all others in tactical view. Currently it's not respecting the type hierarchy.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-current-session",
+  "claimed_at": "2025-12-20T22:14:20.904108202Z",
+  "context": {},
+  "created_at": "2025-12-20T22:16:52.873996470Z",
   "dependencies": [],
+  "description": "The Web UI strategic/tactical view toggle is not filtering by type labels correctly. It should show only issues with strategic type labels (milestone, epic) in strategic view, and all others in tactical view. Currently it's not respecting the type hierarchy.",
+  "documents": [],
+  "done_at": "2025-12-20T22:16:52.879415527Z",
   "gates_required": [
     "tests",
     "code-review"
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "52d5782e-fbd0-480f-a3df-a65a9cce6d4b",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2025-12-20T22:16:52.876042533Z"
+      "updated_at": "2025-12-20T22:16:52.876042533Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "395b3b11-e7b8-4ef5-9e2f-30a1c64f59b6",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T22:16:51.669599823Z"
+      "updated_at": "2025-12-20T22:16:51.669599823Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "7b7df884-8335-4c2a-8555-a7d5a541a0f0",
   "labels": [
     "type:bug",
     "component:web",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-20T22:16:52.873996470Z",
-  "updated_at": "2026-07-05T19:51:13.013215305Z",
-  "claimed_at": "2025-12-20T22:14:20.904108202Z",
-  "done_at": "2025-12-20T22:16:52.879415527Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Fix strategic/tactical view to follow issue type labels",
+  "updated_at": "2026-07-05T19:51:13.013215305Z"
 }

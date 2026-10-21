@@ -1,11 +1,12 @@
 {
-  "id": "e93af54b-af11-4512-ba34-8122251de039",
-  "title": "Format-agnostic validation: per-issue content_format + repo default + production parser dispatch",
-  "description": "Make production validation format-agnostic: select the content parser per issue, defaulting to a per-repo setting, so HTML/XML parsers are exercised in production rather than always parsing Markdown.\n\n## Background\n\nPart of Scope Expansion 2. Epic-review finding: production hardcodes `MarkdownContentParser`, defeating the format-agnostic design. See `dev/active/f6a704d0-expansion2-plan.md` §2 and §6a (MF5).\n\n## Success Criteria\n\n- [ ] [hard] An `Issue` carries an optional `content_format` field (`markdown|html|xml`), serde default+skip so existing issue files are not rewritten; settable via `jit issue create/update --content-format` and reflected in `--json` and `jit --schema` (MCP parity).\n- [ ] [hard] A per-repo default `content_format` (default markdown) exists in config.toml and survives later backward-compat removal (behavioral key).\n- [ ] [hard] A single selector chooses the parser as issue.content_format → repo default → markdown, and is used at BOTH production projection sites (`local.rs` build_projection AND `graph.rs` criterion_ids); no production site hardcodes Markdown.\n- [ ] [hard] A selected format whose parser feature is not compiled in produces a clear error (no silent Markdown fallback).\n- [ ] [hard] CI executes the cross-format path via a `cargo test -p jit --features html,xml` job (it is not run today); end-to-end tests prove HTML/XML bodies are parsed by the selected parser in production.\n- [ ] [hard] `cargo fmt`, `clippy --workspace --all-targets`, `cargo test --workspace`, and `cargo test -p jit --features html,xml` are clean.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-07T18:02:37.311289041Z",
+  "context": {},
+  "created_at": "2026-06-07T17:58:58.126685091Z",
   "dependencies": [],
+  "description": "Make production validation format-agnostic: select the content parser per issue, defaulting to a per-repo setting, so HTML/XML parsers are exercised in production rather than always parsing Markdown.\n\n## Background\n\nPart of Scope Expansion 2. Epic-review finding: production hardcodes `MarkdownContentParser`, defeating the format-agnostic design. See `dev/active/f6a704d0-expansion2-plan.md` §2 and §6a (MF5).\n\n## Success Criteria\n\n- [ ] [hard] An `Issue` carries an optional `content_format` field (`markdown|html|xml`), serde default+skip so existing issue files are not rewritten; settable via `jit issue create/update --content-format` and reflected in `--json` and `jit --schema` (MCP parity).\n- [ ] [hard] A per-repo default `content_format` (default markdown) exists in config.toml and survives later backward-compat removal (behavioral key).\n- [ ] [hard] A single selector chooses the parser as issue.content_format → repo default → markdown, and is used at BOTH production projection sites (`local.rs` build_projection AND `graph.rs` criterion_ids); no production site hardcodes Markdown.\n- [ ] [hard] A selected format whose parser feature is not compiled in produces a clear error (no silent Markdown fallback).\n- [ ] [hard] CI executes the cross-format path via a `cargo test -p jit --features html,xml` job (it is not run today); end-to-end tests prove HTML/XML bodies are parsed by the selected parser in production.\n- [ ] [hard] `cargo fmt`, `clippy --workspace --all-targets`, `cargo test --workspace`, and `cargo test -p jit --features html,xml` are clean.",
+  "documents": [],
+  "done_at": "2026-06-07T19:44:14.514437964Z",
   "gates_required": [
     "cargo-ci",
     "cargo-ci-features",
@@ -13,29 +14,31 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "f1cd6571-f312-4cf2-9e61-f5a1c51806dd",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-07T19:32:45.735672603Z"
+      "updated_at": "2026-06-07T19:32:45.735672603Z",
+      "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
+      "run_id": "e29016f3-c13b-423d-beb6-3f28e2638f55",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-07T19:35:25.671419741Z"
+      "updated_at": "2026-06-07T19:35:25.671419741Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "2639dab9-6c2a-4d28-b964-d736940b6c2f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-07T19:38:12.380614207Z"
+      "updated_at": "2026-06-07T19:38:12.380614207Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "e93af54b-af11-4512-ba34-8122251de039",
   "labels": [
     "type:task",
     "epic:validation-engine"
   ],
-  "created_at": "2026-06-07T17:58:58.126685091Z",
-  "updated_at": "2026-07-05T19:51:13.107631203Z",
-  "claimed_at": "2026-06-07T18:02:37.311289041Z",
-  "done_at": "2026-06-07T19:44:14.514437964Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Format-agnostic validation: per-issue content_format + repo default + production parser dispatch",
+  "updated_at": "2026-07-05T19:51:13.107631203Z"
 }

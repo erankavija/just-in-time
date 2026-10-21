@@ -1120,14 +1120,8 @@ fn validate_captured_issue_write(
     config: &crate::config::JitConfig,
     rules: &crate::declarations::rules::RuleSet,
 ) -> Result<()> {
-    let format = match config.validation.as_ref() {
-        Some(validation) => validation.content_format()?,
-        None => crate::domain::ContentFormat::Markdown,
-    };
-    let strictness = match config.validation.as_ref() {
-        Some(validation) => validation.strictness()?,
-        None => crate::validation::Strictness::Loose,
-    };
+    let format = config.content_format()?;
+    let strictness = config.strictness()?;
     let evaluation = crate::validation::evaluate_local(issue, rules, format)
         .map_err(|error| anyhow!("rule evaluation failed: {error}"))?
         .with_strictness(strictness);

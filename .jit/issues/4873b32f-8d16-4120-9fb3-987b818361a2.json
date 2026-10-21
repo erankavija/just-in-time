@@ -17,11 +17,13 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "9579e371-6c1c-4fc3-95ba-1258902c3dde",
       "status": "passed",
       "updated_at": "2026-08-02T17:51:05.059518378Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "1f84916f-87d7-4995-b859-a247d9ac39bf",
       "status": "passed",
       "updated_at": "2026-08-02T17:48:42.938358959Z",
       "updated_by": "auto:executor"

@@ -1,103 +1,105 @@
 {
-  "id": "b1586c0d-6f8e-451b-a46b-dedc2f16bb0f",
-  "title": "Unify gate field naming across JSON outputs",
-  "description": "Single-issue JSON emits gates with a `key` field while the per-issue gate status command emits `gate_statuses` entries with `gate_key`; agents wrote fallback lookups guessing both names, and one projection printed a null gate name when the guess missed.\n\n## Background\n\nDecided convention: `key` and `status` are canonical, matching the issue record's `gates[].key` — the larger existing surface. The per-issue gate status command migrates `gate_key` to `key` and its collection key `gate_statuses` to `gates`.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Everywhere gates appear in JSON output, the gate is identified by `key` and its state by `status`; gate collections use the key `gates`.\n- [ ] [hard] REQ-02: The unified shape is documented; the renamed fields are called out in a migration note.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T11:36:54.889599255Z",
+  "context": {},
+  "created_at": "2026-07-05T10:03:08.409951843Z",
   "dependencies": [],
+  "description": "Single-issue JSON emits gates with a `key` field while the per-issue gate status command emits `gate_statuses` entries with `gate_key`; agents wrote fallback lookups guessing both names, and one projection printed a null gate name when the guess missed.\n\n## Background\n\nDecided convention: `key` and `status` are canonical, matching the issue record's `gates[].key` — the larger existing surface. The per-issue gate status command migrates `gate_key` to `key` and its collection key `gate_statuses` to `gates`.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Everywhere gates appear in JSON output, the gate is identified by `key` and its state by `status`; gate collections use the key `gates`.\n- [ ] [hard] REQ-02: The unified shape is documented; the renamed fields are called out in a migration note.",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "external",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "https://keepachangelog.com/en/1.1.0/",
+          "resolved_path": null
+        }
+      ],
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "gate field naming migration note",
+      "path": "CHANGELOG.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "2668e2a8d6e8ceb61d86915a076fa804531d42baa541c1e4bed4f93088df760a",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../../mcp-server/README.md",
+          "resolved_path": "mcp-server/README.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "c0085e1647fc1454b9d830f682993b601abedc1da14fe6814dbd70d1c67ea2e7",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../how-to/custom-gates.md",
+          "resolved_path": "docs/how-to/custom-gates.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "d5cca4b888cdd11e52c98b106899bab88ab6483bbe8d7aa70ba904028b8184b0",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../tutorials/quickstart.md",
+          "resolved_path": "docs/tutorials/quickstart.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "087619fd5f3258d5a81a19d03f3abb3435f2a9df61a635bbef39f5c36dea4dbd",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/core-model.md",
+          "resolved_path": "docs/concepts/core-model.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "6d41681da21ef225de0f993461c1097a0804f5af790f26b155217a6d224a69dc",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "../concepts/planning-bracket.md",
+          "resolved_path": "docs/concepts/planning-bracket.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "unified gate key/status JSON shape",
+      "path": "docs/reference/cli-commands.md"
+    }
+  ],
+  "done_at": "2026-07-05T12:06:47.602301993Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T12:03:46.614639763Z"
-    },
     "cargo-ci": {
+      "run_id": "2cd1a34c-eb21-4413-9cf3-e4c2dfc691be",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T12:00:25.352737350Z"
+      "updated_at": "2026-07-05T12:00:25.352737350Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "23986f71-6226-4900-b118-14eeb07296df",
+      "status": "passed",
+      "updated_at": "2026-07-05T12:03:46.614639763Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "CHANGELOG.md",
-      "commit": null,
-      "label": "gate field naming migration note",
-      "doc_type": "reference",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "https://keepachangelog.com/en/1.1.0/",
-          "resolved_path": null,
-          "asset_type": "external",
-          "mime_type": null,
-          "content_hash": null,
-          "is_shared": false
-        }
-      ]
-    },
-    {
-      "path": "docs/reference/cli-commands.md",
-      "commit": null,
-      "label": "unified gate key/status JSON shape",
-      "doc_type": "reference",
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "../../mcp-server/README.md",
-          "resolved_path": "mcp-server/README.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "2668e2a8d6e8ceb61d86915a076fa804531d42baa541c1e4bed4f93088df760a",
-          "is_shared": false
-        },
-        {
-          "original_path": "../how-to/custom-gates.md",
-          "resolved_path": "docs/how-to/custom-gates.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "c0085e1647fc1454b9d830f682993b601abedc1da14fe6814dbd70d1c67ea2e7",
-          "is_shared": false
-        },
-        {
-          "original_path": "../tutorials/quickstart.md",
-          "resolved_path": "docs/tutorials/quickstart.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "d5cca4b888cdd11e52c98b106899bab88ab6483bbe8d7aa70ba904028b8184b0",
-          "is_shared": false
-        },
-        {
-          "original_path": "../concepts/core-model.md",
-          "resolved_path": "docs/concepts/core-model.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "087619fd5f3258d5a81a19d03f3abb3435f2a9df61a635bbef39f5c36dea4dbd",
-          "is_shared": false
-        },
-        {
-          "original_path": "../concepts/planning-bracket.md",
-          "resolved_path": "docs/concepts/planning-bracket.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "6d41681da21ef225de0f993461c1097a0804f5af790f26b155217a6d224a69dc",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "b1586c0d-6f8e-451b-a46b-dedc2f16bb0f",
   "labels": [
     "type:enhancement",
     "epic:core-maintenance",
     "component:gates"
   ],
-  "created_at": "2026-07-05T10:03:08.409951843Z",
-  "updated_at": "2026-07-05T19:51:13.058871658Z",
-  "claimed_at": "2026-07-05T11:36:54.889599255Z",
-  "done_at": "2026-07-05T12:06:47.602301993Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Unify gate field naming across JSON outputs",
+  "updated_at": "2026-07-05T19:51:13.058871658Z"
 }

@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:mcp-worker",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-02-02T21:35:06.069349691Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "8847805b-9320-4f1f-b9cf-cb7fe9944f7a",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "28bcfa5f-58ed-4528-8843-3b3aad5f6b3b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-02-02T21:35:06.069349691Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

@@ -1,11 +1,12 @@
 {
-  "id": "241b7002-f4e8-4f90-a0bf-1a25f75b62a6",
-  "title": "Add --stage option to 'jit registry add' command",
-  "description": "Currently there's no way to create precheck gates via CLI. The 'jit registry add' command should support a --stage option to specify 'precheck' or 'postcheck'. Default should remain 'postcheck' for backward compatibility.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot",
+  "claimed_at": "2025-12-20T17:45:32.886006190Z",
+  "context": {},
+  "created_at": "2025-12-20T17:48:49.314196517Z",
   "dependencies": [],
+  "description": "Currently there's no way to create precheck gates via CLI. The 'jit registry add' command should support a --stage option to specify 'precheck' or 'postcheck'. Default should remain 'postcheck' for backward compatibility.",
+  "documents": [],
+  "done_at": "2025-12-20T17:48:58.684119953Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,42 +15,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
+      "run_id": "e7ef7160-c2bf-4ed1-93f7-60295d97f0bc",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T17:48:48.110927901Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T17:48:50.722007752Z"
+      "updated_at": "2025-12-20T17:48:49.316272219Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "7fd10f77-ca1f-4e67-901b-1d7b58ca9028",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T17:48:55.538024298Z"
+      "updated_at": "2025-12-20T17:48:55.538024298Z",
+      "updated_by": "agent:copilot"
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "4ed584cd-70d4-4e94-82a9-26f76955909a",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T17:48:49.316272219Z"
+      "updated_at": "2025-12-20T17:48:50.722007752Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "1956f58d-eaa3-42b0-9ed3-ce7d89c61b8c",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T17:45:30.003468582Z"
+      "updated_at": "2025-12-20T17:45:30.003468582Z",
+      "updated_by": "agent:copilot"
+    },
+    "tests": {
+      "run_id": "ab900f4e-9365-4ddd-a2a7-2282fa47d4ab",
+      "status": "passed",
+      "updated_at": "2025-12-20T17:48:48.110927901Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "241b7002-f4e8-4f90-a0bf-1a25f75b62a6",
   "labels": [
     "type:task",
     "component:cli",
     "epic:phase5.2",
     "milestone:v1.0"
   ],
-  "created_at": "2025-12-20T17:48:49.314196517Z",
-  "updated_at": "2026-07-05T19:51:12.925299561Z",
-  "claimed_at": "2025-12-20T17:45:32.886006190Z",
-  "done_at": "2025-12-20T17:48:58.684119953Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add --stage option to 'jit registry add' command",
+  "updated_at": "2026-07-05T19:51:12.925299561Z"
 }

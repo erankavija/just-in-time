@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "ci:clippy",
+  "command": "",
+  "commit": null,
+  "completed_at": "2025-12-20T13:04:21.245785581Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "clippy",
+  "issue_id": "4ae60108-d2b0-4fbc-829a-7df6203b1850",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "7bee989b-38cd-4938-8c64-6087d1dcf34f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2025-12-20T13:04:21.245785581Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

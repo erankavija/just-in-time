@@ -1,11 +1,13 @@
 {
-  "id": "950256ae-069c-4537-9379-06b457604fbc",
-  "title": "Gate npm-ci does not cover the mcp-server test suite",
-  "description": "The `npm-ci` gate is the Node-side CI gate carried by mcp-server issues, but its checker runs only the web workspace. A change confined to `mcp-server/` can pass every gate on its issue while the mcp-server test suite is failing.\n\n## Background\n\n`.jit/gates.toml` defines the `npm-ci` checker as `cd web && npm test -- --run && npm run lint && npm run build`. Its description calls it the \"Web workspace checks\" and the \"web-side equivalent of cargo-ci\". Nothing in it enters `mcp-server/`.\n\nIssue a4e8d5ac (Align MCP system prompt with DAG-authoritative containment) carries `npm-ci` + `code-review` as its only gates and touches `mcp-server/index.js` exclusively. Its gates are therefore blind to `cd mcp-server && npm test`, whose integration suite fails at the time of filing (tool-count drift, tracked by c291e95c). The gate reported nothing.\n\n`cargo-ci` covers the whole Rust workspace. The Node side has no equivalent covering both Node workspaces, so mcp-server has no automated gate at all.\n\n## Success Criteria\n\n- [hard] REQ-1: Every workspace with a test suite is reachable by some gate, and the gate carried by an issue that changes `mcp-server/` runs the mcp-server suite.\n- [hard] REQ-2: Gate keys and descriptions state the workspaces each gate covers, so a gate cannot be selected for a workspace it does not exercise.\n- [hard] REQ-3: The `mcp-server` suite passing is a precondition for an mcp-server-touching issue to reach Done, enforced by gate configuration rather than by convention.\n\n## Notes\n\nConsider whether `npm-ci` grows to span both Node workspaces or whether a distinct `mcp-ci` gate is registered alongside it. Changing an existing gate retroactively re-evaluates issues outside the filing epic; a new gate key does not. Discovered while executing epic dbe1e821; the gate hole is orthogonal to that epic and lives here.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-14T12:35:13.376963757Z",
+  "context": {},
+  "created_at": "2026-07-09T20:35:02.513088727Z",
   "dependencies": [],
+  "description": "The `npm-ci` gate is the Node-side CI gate carried by mcp-server issues, but its checker runs only the web workspace. A change confined to `mcp-server/` can pass every gate on its issue while the mcp-server test suite is failing.\n\n## Background\n\n`.jit/gates.toml` defines the `npm-ci` checker as `cd web && npm test -- --run && npm run lint && npm run build`. Its description calls it the \"Web workspace checks\" and the \"web-side equivalent of cargo-ci\". Nothing in it enters `mcp-server/`.\n\nIssue a4e8d5ac (Align MCP system prompt with DAG-authoritative containment) carries `npm-ci` + `code-review` as its only gates and touches `mcp-server/index.js` exclusively. Its gates are therefore blind to `cd mcp-server && npm test`, whose integration suite fails at the time of filing (tool-count drift, tracked by c291e95c). The gate reported nothing.\n\n`cargo-ci` covers the whole Rust workspace. The Node side has no equivalent covering both Node workspaces, so mcp-server has no automated gate at all.\n\n## Success Criteria\n\n- [hard] REQ-1: Every workspace with a test suite is reachable by some gate, and the gate carried by an issue that changes `mcp-server/` runs the mcp-server suite.\n- [hard] REQ-2: Gate keys and descriptions state the workspaces each gate covers, so a gate cannot be selected for a workspace it does not exercise.\n- [hard] REQ-3: The `mcp-server` suite passing is a precondition for an mcp-server-touching issue to reach Done, enforced by gate configuration rather than by convention.\n\n## Notes\n\nConsider whether `npm-ci` grows to span both Node workspaces or whether a distinct `mcp-ci` gate is registered alongside it. Changing an existing gate retroactively re-evaluates issues outside the filing epic; a new gate key does not. Discovered while executing epic dbe1e821; the gate hole is orthogonal to that epic and lives here.",
+  "documents": [],
+  "done_at": "2026-07-14T13:00:16.543500794Z",
+  "first_ready_at": "2026-07-09T20:35:02.513094017Z",
   "gates_required": [
     "jit-validate",
     "doc-review",
@@ -15,41 +17,44 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "649bcdd5-96ed-4ded-a0e8-faef3e0b73f3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T12:55:33.102960503Z"
-    },
-    "jit-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T12:48:15.694631030Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T12:53:39.051391317Z"
-    },
-    "mcp-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T12:48:21.990102228Z"
+      "updated_at": "2026-07-14T12:55:33.102960503Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "33a45e50-6445-47cf-ad03-284520f3c5c2",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-14T12:53:48.368651792Z"
+      "updated_at": "2026-07-14T12:53:48.368651792Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "430c3262-70fe-4d11-8b13-a0a101acd4ca",
+      "status": "passed",
+      "updated_at": "2026-07-14T12:53:39.051391317Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "run_id": "f9ffcee2-3f0b-4a97-adf4-79a84477bde2",
+      "status": "passed",
+      "updated_at": "2026-07-14T12:48:15.694631030Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "43e33311-a0a4-41cc-8adf-28e616651386",
+      "status": "passed",
+      "updated_at": "2026-07-14T12:48:21.990102228Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "950256ae-069c-4537-9379-06b457604fbc",
   "labels": [
     "epic:core-maintenance",
     "component:mcp",
     "type:bug"
   ],
-  "created_at": "2026-07-09T20:35:02.513088727Z",
-  "updated_at": "2026-07-14T13:00:16.543501724Z",
-  "first_ready_at": "2026-07-09T20:35:02.513094017Z",
-  "claimed_at": "2026-07-14T12:35:13.376963757Z",
-  "done_at": "2026-07-14T13:00:16.543500794Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Gate npm-ci does not cover the mcp-server test suite",
+  "updated_at": "2026-07-14T13:00:16.543501724Z"
 }

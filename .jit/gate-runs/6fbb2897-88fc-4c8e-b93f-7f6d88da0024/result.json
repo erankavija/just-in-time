@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0dd057fe030ca9e8462a6958d4b19809fb4668b9",
+  "completed_at": "2026-10-21T17:20:01.589466198Z",
+  "duration_ms": 254208,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Attributed CLI-output changes replace status markers with words, preserve type icons, and add a regression guard.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6fbb2897-88fc-4c8e-b93f-7f6d88da0024",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T17:15:47.381194775Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: d6cd72c21; 32225f790 (merge integrating the same five-file patch)\nPolicy sources: AGENTS.md; .jit/config.toml\nResolved items: @/issue/3d9a0ce3/requirement/REQ-05 (issue Success Criteria); @/invariant/orthogonal-tests and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:48:43Z); prior code-review errored (exit 75, no structured findings)\nTruncation recovery: re-read the attributed patch by file and main.rs hunk; inspected current affected output and regression test paths\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"Attributed CLI-output changes replace status markers with words, preserve type icons, and add a regression guard.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

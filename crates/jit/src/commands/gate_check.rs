@@ -460,12 +460,7 @@ fn captured_issue_rule_report(
         .ok_or_else(|| crate::storage::IssueNotFoundError::new(issue_id))?;
     let declarations = crate::repository_state::declarations_from_image(image)?;
     let config = crate::repository_state::assemble_config(image)?;
-    let repo_format = config
-        .validation
-        .as_ref()
-        .map(crate::config::ValidationConfig::content_format)
-        .transpose()?
-        .unwrap_or(crate::domain::ContentFormat::Markdown);
+    let repo_format = config.content_format()?;
     let local = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)
         .map_err(|error| anyhow!("Local rule evaluation failed: {error}"))?;
     let mut findings = local
@@ -540,12 +535,7 @@ fn captured_scope_rule_report(
         .filter(|issue| scope_ids.contains(&issue.id))
         .cloned()
         .collect::<Vec<_>>();
-    let repo_format = config
-        .validation
-        .as_ref()
-        .map(crate::config::ValidationConfig::content_format)
-        .transpose()?
-        .unwrap_or(crate::domain::ContentFormat::Markdown);
+    let repo_format = config.content_format()?;
     let mut findings = Vec::new();
     for issue in &slice {
         let evaluation = crate::validation::evaluate_local(issue, &declarations.rules, repo_format)

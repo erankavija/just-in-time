@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:codex-profiles-mvp",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-07-16T11:25:32.111728634Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "security-review",
+  "issue_id": "0aec3b1e-ccd3-4f12-96c6-3750ed7e8563",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "cdadbcd9-7d9c-4e4c-9ca7-29854d7fd83c",
+  "schema_version": 1,
+  "stage": "precheck",
+  "started_at": "2026-07-16T11:25:32.111728634Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

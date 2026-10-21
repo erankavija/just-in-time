@@ -15,6 +15,7 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "c3291db2-8e52-461b-812c-e1476d28d8e0",
       "status": "passed",
       "updated_at": "2026-06-27T23:27:49.703752244Z",
       "updated_by": "auto:executor"

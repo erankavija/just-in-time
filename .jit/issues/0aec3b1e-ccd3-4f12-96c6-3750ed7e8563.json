@@ -22,31 +22,37 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "50b00d10-29ec-4270-b582-623ecd5f73ea",
       "status": "passed",
       "updated_at": "2026-07-16T11:49:15.873296359Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "91732b58-77e9-4f50-80b5-95925d6dbf92",
       "status": "passed",
       "updated_at": "2026-07-16T11:54:07.833493166Z",
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
+      "run_id": "89124519-3e68-43b4-ba51-371572c29183",
       "status": "passed",
       "updated_at": "2026-07-16T11:51:33.070728976Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "3201519a-efe3-49a2-a633-2eda33fa259c",
       "status": "passed",
       "updated_at": "2026-07-16T11:53:31.791681377Z",
       "updated_by": "auto:executor"
     },
     "secret-detection": {
+      "run_id": "709b207c-8ada-4404-b30b-4246f6e1b77a",
       "status": "passed",
       "updated_at": "2026-07-16T11:52:12.135074323Z",
       "updated_by": "auto:executor"
     },
     "security-review": {
+      "run_id": "cdadbcd9-7d9c-4e4c-9ca7-29854d7fd83c",
       "status": "passed",
       "updated_at": "2026-07-16T11:25:32.111728634Z",
       "updated_by": "agent:codex-profiles-mvp"

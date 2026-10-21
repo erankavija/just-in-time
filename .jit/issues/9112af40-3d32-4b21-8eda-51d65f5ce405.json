@@ -1,13 +1,15 @@
 {
-  "id": "9112af40-3d32-4b21-8eda-51d65f5ce405",
-  "title": "Add asset discovery and scanning",
-  "description": "Implement asset discovery logic that scans documents using format adapters, classifies assets as per-doc vs shared, and resolves paths.\n\n## Rationale\n\nDocuments reference assets (images, diagrams). Need to discover these references, resolve paths correctly, and classify whether they're per-doc (move with doc) or shared (stay in place).\n\n## Acceptance Criteria\n\n### 1. Implement Asset Discovery\n\nCreate :\n\n\n\n### 2. Implement Asset Classification\n\n_assets/\n\n### 3. Path Resolution\n\n- Relative paths () → resolve to repo root\n- Root-relative paths () → already absolute\n- External URLs () → mark as external\n- Handle  in paths correctly\n- Validate no path escape (security)\n\n### 4. MIME Type Detection\n\nUse file extension mapping:\n-  → \n- ,  → \n-  → \n-  → \n- etc.\n\n### 5. Hash Computation\n\n- Compute SHA256 for binary assets\n- Use git blob SHA if available\n- Handle missing files gracefully (warn, don't fail)\n\n### 6. Integration Tests\n\n- Scan doc with per-doc assets\n- Scan doc with shared assets\n- Scan doc with external URLs\n- Scan doc with missing assets (warns)\n- Classification: single vs multi-reference\n- Path resolution edge cases\n\n## Dependencies\n\n- Task 6: Format adapter registry\n\n## Success Metrics\n\n- Asset scanning functional for Markdown\n- Classification logic correct\n- Path resolution handles all cases\n- Tests cover edge cases\n- Performance acceptable (100s of docs/assets)",
-  "state": "done",
-  "priority": "high",
   "assignee": "copilot:session-1",
+  "claimed_at": "2025-12-22T23:16:51.185555502Z",
+  "context": {},
+  "created_at": "2025-12-22T23:21:36.139528683Z",
   "dependencies": [
     "e22fa014-b7c6-40fd-af48-128658f32928"
   ],
+  "description": "Implement asset discovery logic that scans documents using format adapters, classifies assets as per-doc vs shared, and resolves paths.\n\n## Rationale\n\nDocuments reference assets (images, diagrams). Need to discover these references, resolve paths correctly, and classify whether they're per-doc (move with doc) or shared (stay in place).\n\n## Acceptance Criteria\n\n### 1. Implement Asset Discovery\n\nCreate :\n\n\n\n### 2. Implement Asset Classification\n\n_assets/\n\n### 3. Path Resolution\n\n- Relative paths () → resolve to repo root\n- Root-relative paths () → already absolute\n- External URLs () → mark as external\n- Handle  in paths correctly\n- Validate no path escape (security)\n\n### 4. MIME Type Detection\n\nUse file extension mapping:\n-  → \n- ,  → \n-  → \n-  → \n- etc.\n\n### 5. Hash Computation\n\n- Compute SHA256 for binary assets\n- Use git blob SHA if available\n- Handle missing files gracefully (warn, don't fail)\n\n### 6. Integration Tests\n\n- Scan doc with per-doc assets\n- Scan doc with shared assets\n- Scan doc with external URLs\n- Scan doc with missing assets (warns)\n- Classification: single vs multi-reference\n- Path resolution edge cases\n\n## Dependencies\n\n- Task 6: Format adapter registry\n\n## Success Metrics\n\n- Asset scanning functional for Markdown\n- Classification logic correct\n- Path resolution handles all cases\n- Tests cover edge cases\n- Performance acceptable (100s of docs/assets)",
+  "documents": [],
+  "done_at": "2025-12-22T23:21:41.724999435Z",
+  "first_ready_at": "2025-12-22T23:15:28.418188865Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-22T23:21:34.936071128Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-22T23:21:34.938961600Z"
-    },
     "clippy": {
+      "run_id": "7f27493a-02c4-4a9b-9d9c-3a6a6940b972",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-22T23:21:34.936677699Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "copilot:session-1",
-      "updated_at": "2025-12-22T23:16:51.182201639Z"
+      "updated_at": "2025-12-22T23:21:34.936677699Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "42d27749-009e-4ba5-8903-7831278ddaa5",
       "status": "passed",
-      "updated_by": "copilot:session-1",
-      "updated_at": "2025-12-22T23:21:34.940268231Z"
+      "updated_at": "2025-12-22T23:21:34.940268231Z",
+      "updated_by": "copilot:session-1"
+    },
+    "fmt": {
+      "run_id": "0b592f0e-bf80-4e17-aa9b-cca2e0ad14d9",
+      "status": "passed",
+      "updated_at": "2025-12-22T23:21:34.938961600Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "2e773bfb-26a2-4643-bc3a-9e67fb5585c6",
+      "status": "passed",
+      "updated_at": "2025-12-22T23:16:51.182201639Z",
+      "updated_by": "copilot:session-1"
+    },
+    "tests": {
+      "run_id": "eb7c7266-2400-4089-826e-c411cf973e47",
+      "status": "passed",
+      "updated_at": "2025-12-22T23:21:34.936071128Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9112af40-3d32-4b21-8eda-51d65f5ce405",
   "labels": [
     "type:task",
     "epic:docs-lifecycle",
     "milestone:v1.0",
     "component:core"
   ],
-  "created_at": "2025-12-22T23:21:36.139528683Z",
-  "updated_at": "2026-07-05T19:51:13.034314140Z",
-  "first_ready_at": "2025-12-22T23:15:28.418188865Z",
-  "claimed_at": "2025-12-22T23:16:51.185555502Z",
-  "done_at": "2025-12-22T23:21:41.724999435Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add asset discovery and scanning",
+  "updated_at": "2026-07-05T19:51:13.034314140Z"
 }

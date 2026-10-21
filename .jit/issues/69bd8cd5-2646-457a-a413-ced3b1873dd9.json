@@ -16,11 +16,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "c2a48e53-23a5-4930-a399-88565ed5590e",
       "status": "passed",
       "updated_at": "2026-06-25T19:48:54.695683387Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "cc9b285e-6848-4ae1-83eb-632302ba5b45",
       "status": "passed",
       "updated_at": "2026-06-25T19:52:11.684054176Z",
       "updated_by": "auto:executor"

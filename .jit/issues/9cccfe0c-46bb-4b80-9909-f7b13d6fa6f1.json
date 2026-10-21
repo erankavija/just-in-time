@@ -1,40 +1,42 @@
 {
-  "id": "9cccfe0c-46bb-4b80-9909-f7b13d6fa6f1",
-  "title": "Add the apply command plumbing (additive)",
-  "description": "Add the `jit apply` command surface — argument parsing, dispatch, and result printing — as a purely additive command. The existing scaffold command keeps working and the scaffold is **not** flipped here, so this task leaves no broken intermediate.\n\n## Success Criteria\n- [ ] [hard] SCFA-01: `jit apply` is wired (parse, dispatch, print) and invokes the engine, with the existing scaffold command still fully working.\n- [ ] [hard] SCFA-02: this task is purely additive — no existing behavior or default scaffold path changes.\n- [ ] [hard] SCFA-03: the CLI accepts `<template> <container>` plus repeatable `--anchor role=id`, `--force`, and `--json`, per the approved contract.\n- [ ] [hard] SCFA-04: `--json` emits a machine-readable apply result containing the template name, the resolved anchor bindings, and the created or refreshed node ids by role.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-23T17:15:34.662621255Z",
+  "context": {},
+  "created_at": "2026-06-22T22:28:29.390914865Z",
   "dependencies": [
     "643874f2-fcca-48a4-96e5-b26b39a4f868"
   ],
+  "description": "Add the `jit apply` command surface — argument parsing, dispatch, and result printing — as a purely additive command. The existing scaffold command keeps working and the scaffold is **not** flipped here, so this task leaves no broken intermediate.\n\n## Success Criteria\n- [ ] [hard] SCFA-01: `jit apply` is wired (parse, dispatch, print) and invokes the engine, with the existing scaffold command still fully working.\n- [ ] [hard] SCFA-02: this task is purely additive — no existing behavior or default scaffold path changes.\n- [ ] [hard] SCFA-03: the CLI accepts `<template> <container>` plus repeatable `--anchor role=id`, `--force`, and `--json`, per the approved contract.\n- [ ] [hard] SCFA-04: `--json` emits a machine-readable apply result containing the template name, the resolved anchor bindings, and the created or refreshed node ids by role.",
+  "documents": [],
+  "done_at": "2026-06-23T17:37:55.947856710Z",
+  "first_ready_at": "2026-06-23T17:14:55.637830090Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T17:35:42.665163887Z"
-    },
     "cargo-ci": {
+      "run_id": "ed76db27-8901-4f41-a0ab-9b6b86ebf54a",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T17:28:41.888915442Z"
+      "updated_at": "2026-06-23T17:28:41.888915442Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7eff721e-1e4b-462c-9b51-ba3ab3ccd2e5",
+      "status": "passed",
+      "updated_at": "2026-06-23T17:35:42.665163887Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9cccfe0c-46bb-4b80-9909-f7b13d6fa6f1",
   "labels": [
     "type:task",
     "story:scaffold-switch",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:28:29.390914865Z",
-  "updated_at": "2026-07-05T19:51:13.046003929Z",
-  "first_ready_at": "2026-06-23T17:14:55.637830090Z",
-  "claimed_at": "2026-06-23T17:15:34.662621255Z",
-  "done_at": "2026-06-23T17:37:55.947856710Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add the apply command plumbing (additive)",
+  "updated_at": "2026-07-05T19:51:13.046003929Z"
 }

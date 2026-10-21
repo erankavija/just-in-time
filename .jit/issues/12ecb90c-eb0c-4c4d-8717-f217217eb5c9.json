@@ -1,0 +1,42 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T20:36:56.502609569Z",
+  "dependencies": [
+    "0dc73711-07fb-49c3-8eda-996516b19bd1"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Converge previews and coupled derivations on the mutation session (b697a3f7) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-21T20:36:56.502609569Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-21T20:36:56.502609569Z",
+      "updated_by": null
+    }
+  },
+  "id": "12ecb90c-eb0c-4c4d-8717-f217217eb5c9",
+  "labels": [
+    "epic:one-mutation-path",
+    "milestone:v1.0",
+    "component:core",
+    "component:storage",
+    "component:gates",
+    "per:@/charter/D-20",
+    "per:@/charter/D-18",
+    "type:breakdown",
+    "brackets:b697a3f7"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Converge previews and coupled derivations on the mutation session",
+  "updated_at": "2026-10-21T20:36:56.502609569Z"
+}
