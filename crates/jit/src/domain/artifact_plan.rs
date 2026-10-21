@@ -294,8 +294,7 @@ pub struct ArtifactOwner {
     /// Lifecycle state used for terminal-owner classification.
     pub state: State,
     /// Pre-archive origin, so an `Archived` owner classifies by its effective
-    /// terminal state (`jit:45a140ae`). `Some` only for an `Archived` owner
-    /// that recorded its origin; absent otherwise.
+    /// terminal state (`jit:45a140ae`). `Some` exactly for an `Archived` owner.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_from: Option<State>,
     /// Whether the owner belongs to the selected resolved subtree.
