@@ -1,17 +1,29 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T19:52:15.010024146Z",
   "context": {},
   "created_at": "2026-10-20T19:42:10.671290446Z",
   "dependencies": [],
   "description": "Every read of active leases appends a fresh auto-eviction record for each expired lease, because the eviction is never saved to the claims index. The claims log grows without bound with duplicate evictions, and every later claim operation pays to rescan it.\n\n## Background\n\n`ClaimCoordinator::get_active_leases` (`crates/jit/src/storage/claim_coordinator.rs:1195-1235`) takes the exclusive claims lock, loads the index and calls `evict_expired`. `evict_expired_at` (`claim_coordinator.rs:910-931`) appends an `auto-evict` operation to `claims.jsonl` for each expired lease and removes the lease only from the in-memory index. `get_active_leases` never writes the index back. The next read therefore finds the same expired lease and logs its eviction again. Other eviction callers (lease acquisition paths, recovery) persist the index after evicting.\n\nThe lease-status, lease-list and lease-check paths in `crates/jit/src/commands/claim.rs` all call `get_active_leases`.\n\nObserved in this repository's claims log: 459 `auto-evict` entries, one lease id appearing 292 times.\n\nReproduction (git repository with one commit):\n\n1. Acquire a lease on an issue with a TTL of 1 second.\n2. Wait 2 seconds.\n3. List active leases three times.\n4. `claims.jsonl` now holds three `auto-evict` entries for the same lease, and `claims.index.json` still lists it.\n\n## Success Criteria\n\n- [hard] REQ-01: After an active-lease read evicts an expired lease, the persisted claims index no longer contains that lease.\n- [hard] REQ-02: Repeated active-lease reads append exactly one auto-eviction record per expired lease in total.\n- [hard] REQ-03: Active-lease reads with no expired leases append nothing to the claims log.\n- [hard] REQ-04: A regression test covers repeated reads over an expired lease and asserts a single eviction record and an index without the lease.\n\n## Notes\n\nThe duplicate entries already in existing claims logs are harmless to replay but inflate the log. Compacting them is out of scope.",
   "documents": [],
+  "done_at": "2026-10-21T00:53:42.775539306Z",
   "first_ready_at": "2026-10-20T19:42:10.671290446Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-20T21:15:23.347680577Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:50:45.937166972Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d7d0d0db-05dd-4954-805a-3564cf7af4a6",
   "labels": [
     "epic:audit-correctness",
@@ -20,7 +32,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Reading active leases re-evicts the same expired lease on every call",
-  "updated_at": "2026-10-20T19:52:15.010024146Z"
+  "updated_at": "2026-10-21T00:53:42.775539306Z"
 }

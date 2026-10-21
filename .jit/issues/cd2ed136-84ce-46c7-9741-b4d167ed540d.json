@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "`graph export` drops in-scope issues and can return an empty graph for a valid `--scope`. Its node order also changes between runs over the same repository.\n\n## Background\n\nThe dot, mermaid and JSON exporters gather nodes with `collect_all_nodes` (`crates/jit/src/visualization.rs:341-357`). It walks dependents from `graph.get_roots()`, the nodes whose `dependencies` list is empty. A scoped export builds the graph from the scope members only, but each member keeps its full dependency list. A member whose dependencies all lie outside the scope is not a root, so it and everything reachable only through it are skipped. When no member has an empty dependency list, the export is empty.\n\n`get_roots` and `get_dependents` iterate the graph's `HashMap` (`crates/jit/src/graph/mod.rs:69, 260-275`), so the output order follows per-process hash seeding.\n\nReproduction:\n\n```sh\njit init\nX=<create \"Outside\">; T=<create \"Task\">; E=<create \"Epic\">\njit dep add $T $X; jit dep add $E $T\njit graph export --scope $E --json\n# {\"nodes\": [], \"edges\": []}\n# five unscoped exports of five independent issues: five different orders\n```\n\n## Success Criteria\n\n- [hard] REQ-01: Every format of a scoped export lists exactly the scope's member issues, including members whose dependencies all lie outside the scope.\n- [hard] REQ-02: An unscoped export lists every issue in the repository.\n- [hard] REQ-03: Repeated exports of an unchanged repository produce byte-identical output in every format.\n- [hard] REQ-04: A regression test exports a scope whose members all depend on out-of-scope issues and asserts that every member appears.\n- [hard] REQ-05: A property-based test over generated DAGs and scopes asserts that the exported node set equals the selected node set.\n\n## Notes\n\nThe exporters already receive the selected node set, so collection needs no traversal. Iterating the graph's nodes in a deterministic order (for example by ID) satisfies REQ-01 to REQ-03.",
   "documents": [],
+  "done_at": "2026-10-21T00:53:40.241603873Z",
   "first_ready_at": "2026-10-20T19:42:11.241412750Z",
   "gates_required": [
     "cargo-ci",
@@ -13,8 +14,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-20T20:21:36.823734959Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T00:33:28.154538800Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:39:50.129251525Z",
       "updated_by": "auto:executor"
     }
   },
@@ -27,7 +33,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Graph export lists every in-scope issue in a stable order",
-  "updated_at": "2026-10-20T20:21:36.823734959Z"
+  "updated_at": "2026-10-21T00:53:40.241603873Z"
 }

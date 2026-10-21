@@ -1,17 +1,29 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-20T19:52:15.795826713Z",
   "context": {},
   "created_at": "2026-10-20T19:42:12.106939459Z",
   "dependencies": [],
   "description": "The shipped pre-commit hook, which `jit hooks install` copies from `scripts/hooks/pre-commit`, matches paths from an obsolete storage layout. On a diverged branch, gate-registry edits commit unchecked. In strict mode, issue edits commit without a lease check.\n\n## Background\n\nThe global-operation guard at `scripts/hooks/pre-commit:36` matches `.jit/gates/registry.json` and `.jit/type-hierarchy`. Gate definitions now live in `.jit/gates.toml`, and the type hierarchy is a `[type_hierarchy]` table inside `.jit/config.toml` (`docs/reference/storage-format.md`). As a result, only `config.toml` edits are checked. The strict-mode lease check at `scripts/hooks/pre-commit:67` matches `.jit/issues/<id>/issue.json`, but issues are stored as `.jit/issues/<uuid>.json`, so that check never runs. The hook test script `scripts/test-hooks.sh:110-113` writes `.jit/gates/registry.json`, so it exercises the dead path and misses the gap.\n\nReproduction in a fresh repository with `jit hooks install` and `[worktree] enforce_leases = \"strict\"`, on a `feature` branch diverged from `main`:\n\n```bash\necho '# x' >> .jit/gates.toml;  git add .jit/gates.toml;  git commit -m g   # commits\necho '# x' >> .jit/config.toml; git add .jit/config.toml; git commit -m c   # blocked\njit issue create x; git add -A; JIT_AGENT_ID=agent:nobody git commit -m i   # commits, no lease check\n```\n\n## Success Criteria\n\n- [hard] REQ-01: On a branch diverged from main with enforcement enabled, committing a change to `.jit/gates.toml` is blocked with the global-operation message.\n- [hard] REQ-02: In strict mode, committing a change to `.jit/issues/<uuid>.json` without an active lease held by the committing agent is blocked.\n- [hard] REQ-03: Every path pattern the hook guards names a file in the current storage layout; it names no `gates/registry.json`, `type-hierarchy`, or `issues/<id>/issue.json` path.\n- [hard] REQ-04: The hook header comment and `scripts/hooks/README.md` describe the guarded files by their current paths.\n- [hard] REQ-05: A regression test proves a `gates.toml` commit on a diverged branch is blocked and a strict-mode issue-file commit without a lease is blocked.\n\n## Notes\n\n`scripts/test-hooks.sh` creates obsolete paths; fix or replace it rather than add a parallel test. Deriving the guarded paths from the storage layout, rather than hand-listing them, keeps the hook from drifting again.",
   "documents": [],
+  "done_at": "2026-10-21T00:53:42.503467440Z",
   "first_ready_at": "2026-10-20T19:42:12.106939459Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-20T21:15:13.755793939Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T00:49:49.583182551Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "514df7d3-caa6-40bb-9fba-d250e1bb756d",
   "labels": [
     "epic:audit-correctness",
@@ -21,7 +33,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Guard current storage paths in the shipped pre-commit hook",
-  "updated_at": "2026-10-20T19:52:15.795826713Z"
+  "updated_at": "2026-10-21T00:53:42.503467440Z"
 }
