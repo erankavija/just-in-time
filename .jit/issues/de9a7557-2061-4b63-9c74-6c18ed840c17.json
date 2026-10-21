@@ -8,6 +8,7 @@
   ],
   "description": "After the plan-review checkpoint passes, decompose the plan for Compute one validation report and derive every validation view from it (9876a23a) into well-ordered implementation issues.",
   "documents": [],
+  "done_at": "2026-10-21T20:36:23.984331179Z",
   "first_ready_at": "2026-10-21T20:31:28.149891897Z",
   "gates_required": [
     "coverage-preview",
@@ -15,9 +16,9 @@
   ],
   "gates_status": {
     "breakdown-review": {
-      "status": "pending",
-      "updated_at": "2026-10-21T15:51:58.029735438Z",
-      "updated_by": null
+      "status": "passed",
+      "updated_at": "2026-10-21T20:36:15.899297301Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
       "status": "passed",
@@ -38,7 +39,7 @@
     "brackets:9876a23a"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "breakdown: Compute one validation report and derive every validation view from it",
-  "updated_at": "2026-10-21T20:31:50.052613846Z"
+  "updated_at": "2026-10-21T20:36:23.984331179Z"
 }

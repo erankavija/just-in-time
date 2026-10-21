@@ -1,0 +1,28 @@
+{
+  "branch": null,
+  "by": "auto:executor",
+  "command": "builtin:rule_validation",
+  "commit": null,
+  "completed_at": "2026-10-21T20:31:49.640672639Z",
+  "duration_ms": 25,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "Built-in validation passed with 0 advisory finding(s)",
+    "verdict": "pass"
+  },
+  "gate_key": "coverage-preview",
+  "issue_id": "de9a7557-2061-4b63-9c74-6c18ed840c17",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "becb8af5-6389-46a3-9285-288f14d3cb6b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:31:49.615561227Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Built-in validation passed with 0 advisory finding(s)"
+}
