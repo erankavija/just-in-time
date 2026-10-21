@@ -1,0 +1,43 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e2f2693d8041247bd3a35c09acec38f9887a69e0",
+  "completed_at": "2026-10-21T20:49:50.090593154Z",
+  "duration_ms": 269744,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/cli.rs",
+        "id": "F1",
+        "line": 713,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/459bb995/requirement/REQ-01",
+          "@/invariant/single-source-prose",
+          "@/invariant/essential-code-prose"
+        ],
+        "severity": "medium",
+        "summary": "ContentFormat::DEFAULT is still restated as a Markdown fallback in CLI, rustdoc, and reference prose."
+      }
+    ],
+    "summary": "ContentFormat's default is still duplicated across attributable CLI, rustdoc, and reference prose.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "c0a7bd01-13c3-4bab-ad3d-45ba1a96e4ad",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:45:20.346391849Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 5349 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a16036-18e6-7072-ab7c-c895137eb8f1\n--------\nuser\n--- 5336 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 4590bd483, 629f3194, c9df5b860, 3bfbfc1af, 4568aea4 (`jit:459bb995`)\nPolicy sources: AGENTS.md\nResolved items: @/issue/459bb995/requirement/REQ-01–REQ-05 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/single-source-prose and @/invariant/essential-code-prose (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0); code-review previously failed (exit 1; its two findings were addressed); doc-review pending; docs-mechanical pending\nTruncation recovery: none\n\n1. **[blocking, issue-impact, medium]** REQ-01 remains incomplete: the newly centralized `ContentFormat::DEFAULT` is still restated as a Markdown fallback in attributable configuration prose, including [cli.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/cli.rs:713), [domain/types.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/types.rs:477), [validation/graph.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/graph.rs:1088), [validation/local.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/validation/local.rs:345), and [cli-commands.md](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:904). Cite the named default/projection or describe the fallback without restating its value. References: `@/issue/459bb995/requirement/REQ-01`, `@/invariant/single-source-prose`, `@/invariant/essential-code-prose`.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"ContentFormat's default is still duplicated across attributable CLI, rustdoc, and reference prose.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"ContentFormat::DEFAULT is still restated as a Markdown fallback in CLI, rustdoc, and reference prose.\",\"file\":\"crates/jit/src/cli.rs\",\"line\":713,\"references\":[\"@/issue/459bb995/requirement/REQ-01\",\"@/invariant/single-source-prose\",\"@/invariant/essential-code-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

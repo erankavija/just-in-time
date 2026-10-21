@@ -308,7 +308,7 @@
           "title": "State each configuration default once",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-awaiting-merge"
+          "status": "rework-2-dispatched"
         },
         {
           "id": "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
@@ -434,7 +434,7 @@
     "af9a5509": 1,
     "81e7cdc3": 1,
     "5e846743": 1,
-    "459bb995": 1,
+    "459bb995": 2,
     "d125490a": 1
   },
   "surfaced_pitfalls": [
@@ -451,7 +451,9 @@
     "81e7cdc3: DocumentReference::new gained a production caller (artifact_directory.rs:124, from 66986f88) after planning; lead chose struct literal in production plus one test fixture to meet REQ-01 as written.",
     "459bb995 scope note: rules.toml defaults (severity 'default: warn', enforce 'defaults to false' in docs/how-to/validation-rules.md:63/72, declarations/rules.rs:18), profile-manifest field defaults (docs/reference/profiles.md:163/171/183) and CLI flag defaults are still restated in prose; outside REQ-01 (configuration defaults). Candidate follow-up.",
     "459bb995 replaced project.rs mode_token/style_token (audit had assigned them to 2195c98f); 2195c98f lead informed.",
-    "d125490a: 31.6 s budget failure was host variance; worker measured +50 ms from the change (3 alternating runs, base 794bc6798 vs head)."
+    "d125490a: 31.6 s budget failure was host variance; worker measured +50 ms from the change (3 alternating runs, base 794bc6798 vs head).",
+    "Slow test: cli_repo_workflow profile_cli_tests::test_profile_pack_packs_every_shipped_package_from_the_checkout takes ~8.8 s alone and hit the 20 s nextest timeout in 459bb995's full run (load rising 1.7->6.8). Candidate for c780514e alongside the profiled-fixture timeouts.",
+    "459bb995 R2 code-review: restatements phrased as 'falls back to Markdown' escaped the R1 'default' sweep (same class). Rework 2 is the last before escalation."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
