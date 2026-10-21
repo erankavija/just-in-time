@@ -2976,7 +2976,9 @@ jit doc add abc123 docs/design/auth.md --commit 9c2d1a7 --json
 
 ### `jit doc list`
 
-List an issue's document references.
+List an issue's documents: its explicit references, then the files under the
+directories it owns in the declared issue-scoped areas ([derived
+documents](configuration.md#issue-artifact-directories)).
 
 ```bash
 jit doc list <ID> [--json]
@@ -3049,7 +3051,8 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
 reports `valid`, `errors`, `warnings`, and a `summary`.
 
-Each reference is checked at the version it names, the same version `jit
+The documents in scope include each issue's derived documents, which are also
+tracked link targets. Each reference is checked at the version it names, the same version `jit
 validate` resolves it against. A reference pinned to a commit is read at that
 commit — its file, its assets, and its internal links alike — so it stays valid
 after the working tree moves past it, and stays invalid when its file is absent

@@ -23,12 +23,16 @@
 //! Resolution is pure. It states where an artifact belongs and reads nothing,
 //! so an issue whose artifacts still sit flat in the area resolves the same
 //! canonical directory while those artifacts stay where they are.
+//!
+//! Location alone therefore names an owner: [`derive_issue_documents`] turns a
+//! listing of the declared areas into the documents an issue owns without an
+//! explicit link.
 
 use crate::config::DocumentationConfig;
-use crate::domain::artifact_classifier::archive_container_slug;
+use crate::domain::artifact_classifier::{archive_container_slug, contains_path};
 use crate::domain::artifact_plan::normalize_artifact_path;
 use crate::domain::type_taxonomy::HierarchyConfig;
-use crate::domain::Issue;
+use crate::domain::{DocumentReference, Issue};
 use crate::labels::type_value_of;
 
 /// Stable failures while resolving an issue's canonical artifact directory.
@@ -78,6 +82,47 @@ pub fn resolve_artifact_directory(
             area: area.to_string(),
             declared: documentation.issue_scoped_areas(),
         })
+}
+
+/// The documents `issue` owns by location: every path in `files` lying beneath
+/// the directory the issue owns in a declared issue-scoped area.
+///
+/// `files` is a repository-relative listing of files; the caller decides how
+/// much of the tree it covers, and a path outside every owned directory is
+/// ignored. A derived document is a bare path: it carries no commit pin, type,
+/// label, format, or assets. A path an explicit link of the issue already names
+/// is left to that link, which is how metadata attaches to a derived path. A
+/// repository declaring no area derives nothing. The result is normalized,
+/// sorted, and free of duplicates.
+pub fn derive_issue_documents(
+    issue: &Issue,
+    files: &[String],
+    documentation: &DocumentationConfig,
+    hierarchy: &HierarchyConfig,
+) -> Vec<DocumentReference> {
+    let directories = documentation
+        .issue_scoped_areas()
+        .iter()
+        .filter_map(|area| resolve_artifact_directory(issue, area, documentation, hierarchy).ok())
+        .collect::<Vec<_>>();
+    let linked = issue
+        .documents
+        .iter()
+        .map(|document| normalize_artifact_path(&document.path))
+        .collect::<std::collections::BTreeSet<_>>();
+    files
+        .iter()
+        .map(|file| normalize_artifact_path(file))
+        .filter(|file| {
+            directories
+                .iter()
+                .any(|directory| file != directory && contains_path(directory, file))
+        })
+        .filter(|file| !linked.contains(file))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .map(DocumentReference::new)
+        .collect()
 }
 
 /// The slug of the issue's single membership value, when the three-step
@@ -422,6 +467,104 @@ mod tests {
         // is unchanged once the tree is gone.
         std::fs::remove_dir_all(&area).unwrap();
         assert_eq!(resolve(&issue, AREA).unwrap(), resolved);
+    }
+
+    /// Derive `issue`'s documents over both registry vocabularies.
+    fn derive(issue: &Issue, files: &[String]) -> Vec<DocumentReference> {
+        derive_issue_documents(
+            issue,
+            files,
+            &documentation(Some(&[AREA, OTHER_AREA])),
+            &hierarchy(NAMESPACE),
+        )
+    }
+
+    fn derived_paths(issue: &Issue, files: &[String]) -> Vec<String> {
+        derive(issue, files)
+            .into_iter()
+            .map(|document| document.path)
+            .collect()
+    }
+
+    #[test]
+    fn test_derive_issue_documents_returns_the_files_under_the_issue_directory_in_each_declared_area(
+    ) {
+        let issue = fixture("Derived Documents", &single_membership());
+        let other = fixture("Another Owner", &single_membership());
+        let owned = resolve(&issue, AREA).unwrap();
+        let owned_elsewhere = resolve_artifact_directory(
+            &issue,
+            OTHER_AREA,
+            &documentation(Some(&[OTHER_AREA])),
+            &hierarchy(NAMESPACE),
+        )
+        .unwrap();
+        let inside = [
+            format!("{owned}/plan.md"),
+            format!("{owned}/notes/deep/sketch.svg"),
+            format!("{owned_elsewhere}/log.md"),
+        ];
+        let outside = [
+            format!("{AREA}/{}-plan.md", issue.short_id()),
+            format!("{owned}-sibling/plan.md"),
+            format!("{}/plan.md", resolve(&other, AREA).unwrap()),
+            format!("unscoped/{}/plan.md", issue.short_id()),
+        ];
+        let files = inside
+            .iter()
+            .chain(&outside)
+            .cloned()
+            .chain([format!("./{}", inside[0])])
+            .collect::<Vec<_>>();
+
+        let mut expected = inside.to_vec();
+        expected.sort();
+        assert_eq!(derived_paths(&issue, &files), expected);
+    }
+
+    #[test]
+    fn test_derive_issue_documents_carries_no_pin_type_or_label() {
+        let issue = fixture("Derived Documents", &single_membership());
+        let file = format!("{}/plan.md", resolve(&issue, AREA).unwrap());
+
+        let derived = derive(&issue, std::slice::from_ref(&file));
+
+        assert_eq!(derived, vec![DocumentReference::new(file)]);
+        assert!(derived.iter().all(|document| document.commit.is_none()
+            && document.doc_type.is_none()
+            && document.label.is_none()));
+    }
+
+    #[test]
+    fn test_derive_issue_documents_derives_nothing_without_declared_areas() {
+        let issue = fixture("Derived Documents", &single_membership());
+        let file = format!("{}/plan.md", resolve(&issue, AREA).unwrap());
+
+        [None, Some(&[][..])].iter().for_each(|areas| {
+            assert!(derive_issue_documents(
+                &issue,
+                std::slice::from_ref(&file),
+                &documentation(*areas),
+                &hierarchy(NAMESPACE),
+            )
+            .is_empty());
+        });
+    }
+
+    #[test]
+    fn test_derive_issue_documents_leaves_an_explicitly_linked_path_to_its_link() {
+        let mut issue = fixture("Derived Documents", &single_membership());
+        let directory = resolve(&issue, AREA).unwrap();
+        let linked = format!("{directory}/plan.md");
+        let unlinked = format!("{directory}/notes.md");
+        let mut link = DocumentReference::new(format!("./{linked}"));
+        link.label = Some("Plan".to_string());
+        issue.documents = vec![link];
+
+        assert_eq!(
+            derived_paths(&issue, &[linked, unlinked.clone()]),
+            vec![unlinked]
+        );
     }
 
     proptest! {

@@ -257,9 +257,11 @@ Every gate checker receives these environment variables:
 ### `JIT_ISSUE_DOCS`
 
 Every gate checker receives `JIT_ISSUE_DOCS`, a JSON array describing the
-issue's linked documents (the same set `jit doc list <issue>` shows) — so a
-checker script can inline a plan, design doc, or amendment into its review
-prompt instead of relying on the description alone.
+issue's explicitly linked documents, so a checker script can inline a plan,
+design doc, or amendment into its review prompt instead of relying on the
+description alone. It omits the [derived
+documents](../reference/configuration.md#issue-artifact-directories) that `jit
+doc list <issue>` also shows.
 
 Each element has three fields, all string or `null`:
 

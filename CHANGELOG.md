@@ -220,6 +220,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- **An issue's documents include the files under its artifact directories.** A
+  file under the directory an issue owns in a declared issue-scoped area is one
+  of its documents by location, with no `jit doc add`: `doc list`, `doc show`,
+  `history`, `diff`, `doc check-links`, and the server's document routes and
+  search treat it as tracked. Artifacts a worker commits in a linked worktree
+  are listed once the branch merges, with no tracker write. A derived document
+  carries no pin, type, or label; an explicit link still attaches a path
+  elsewhere or metadata. The server executor's `get_linked_document_paths` is
+  now `get_issue_document_paths`.
+
 - **Linked checkouts follow a declared write policy, and a linked store that
   diverged anyway is now discoverable and recoverable.** A state-mutating
   command inside a linked non-primary checkout previously wrote to that
