@@ -384,7 +384,9 @@ fn test_search_issues_with_filters_wildcard_still_applies_text_query() {
 #[test]
 fn test_search_issues_with_filters_malformed_pattern_is_invalid_label_pattern() {
     let executor = crate::memory_executor(InMemoryStorage::new());
-    for bad in ["type", ":*"] {
+    // Search goes through the shared validator, so it rejects malformed exact
+    // labels as well as malformed wildcards; `labels` owns the full matrix.
+    for bad in ["type", ":*", "type:", "type:a:b"] {
         let error = executor
             .search_issues_with_filters("", None, None, None, &[bad.to_string()])
             .unwrap_err();

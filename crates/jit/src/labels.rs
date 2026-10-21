@@ -26,14 +26,19 @@ use std::sync::OnceLock;
 ///   separator.
 static LABEL_REGEX: OnceLock<Regex> = OnceLock::new();
 
+/// Namespace grammar shared by [`label_regex`] and [`validate_label_pattern`].
+const NAMESPACE_PATTERN: &str = "[a-z][a-z0-9-]*";
+
+static NAMESPACE_REGEX: OnceLock<Regex> = OnceLock::new();
+
 /// `pub(crate)` so `repository_state::default_rules::CANONICAL_LABEL_REGEX` (the write-path
 /// duplicate) can be tested against this compiled pattern's source string and
 /// kept in lockstep, rather than drifting behind a manual-sync comment.
 pub(crate) fn label_regex() -> &'static Regex {
     LABEL_REGEX.get_or_init(|| {
-        Regex::new(
-            r"^[a-z][a-z0-9-]*:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|@(?:[a-z][a-z0-9-]*)?(?:/[a-zA-Z0-9._-]+){2,})$",
-        )
+        Regex::new(&format!(
+            r"^{NAMESPACE_PATTERN}:(?:[a-zA-Z0-9][a-zA-Z0-9._/-]*|@(?:[a-z][a-z0-9-]*)?(?:/[a-zA-Z0-9._-]+){{2,}})$"
+        ))
         .expect("Label regex should compile")
     })
 }
@@ -56,6 +61,33 @@ pub fn validate_label(label: &str) -> Result<()> {
         return Err(anyhow!(msg));
     }
     Ok(())
+}
+
+/// Validate a label filter pattern: a concrete label accepted by
+/// [`validate_label`], or `namespace:*` with a well-formed namespace.
+///
+/// # Errors
+///
+/// Returns [`InvalidLabelPatternError`](crate::errors::InvalidLabelPatternError)
+/// for any other pattern.
+pub fn validate_label_pattern(pattern: &str) -> Result<()> {
+    let result = match pattern.strip_suffix(":*") {
+        Some(namespace) => NAMESPACE_REGEX
+            .get_or_init(|| {
+                Regex::new(&format!("^{NAMESPACE_PATTERN}$"))
+                    .expect("Namespace regex should compile")
+            })
+            .is_match(namespace)
+            .then_some(())
+            .ok_or_else(|| format!("namespace '{namespace}' must match {NAMESPACE_PATTERN}")),
+        None => validate_label(pattern).map_err(|e| e.to_string()),
+    };
+    result.map_err(|reason| {
+        crate::errors::InvalidLabelPatternError::new(format!(
+            "Invalid label pattern '{pattern}': must be 'namespace:value' or 'namespace:*' ({reason})"
+        ))
+        .into()
+    })
 }
 
 /// Parse a label into namespace and value components
@@ -217,6 +249,50 @@ pub fn validate_assignee_format(assignee: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn is_invalid_label_pattern(pattern: &str) -> bool {
+        validate_label_pattern(pattern).is_err_and(|e| {
+            e.downcast_ref::<crate::errors::InvalidLabelPatternError>()
+                .is_some()
+        })
+    }
+
+    #[test]
+    fn test_validate_label_pattern_accepts_concrete_labels_and_namespace_wildcards() {
+        for pattern in [
+            "type:task",
+            "satisfies:56ab0224/REQ-01",
+            "enforces:@/rule/label-format",
+            "type:*",
+            "team-2:*",
+        ] {
+            assert!(
+                validate_label_pattern(pattern).is_ok(),
+                "{pattern:?} rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_label_pattern_rejects_malformed_concrete_labels_and_wildcards() {
+        for pattern in [
+            "type",
+            "type:",
+            "type:a:b",
+            "type:-x",
+            "type:a b",
+            "Type:task",
+            ":task",
+            ":*",
+            "*",
+            "Type:*",
+            "2ns:*",
+            "type:*x",
+            "type:a*",
+        ] {
+            assert!(is_invalid_label_pattern(pattern), "{pattern:?} accepted");
+        }
+    }
 
     #[test]
     fn test_validate_label_valid_formats() {

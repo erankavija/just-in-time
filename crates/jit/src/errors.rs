@@ -144,7 +144,7 @@ impl InvalidArgumentError {
 /// This dedicated type preserves the established `INVALID_LABEL_PATTERN`
 /// machine-readable code while allowing the top-level CLI classifier to select
 /// it structurally. Its display text remains the exact validation message
-/// produced at the query boundary.
+/// produced by [`crate::labels::validate_label_pattern`].
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{message}")]
 pub struct InvalidLabelPatternError {
