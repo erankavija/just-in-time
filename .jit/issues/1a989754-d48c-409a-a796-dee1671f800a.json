@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T16:51:33.226673586Z",
   "context": {},
   "created_at": "2026-10-21T01:06:58.361882571Z",
   "dependencies": [
@@ -25,7 +26,7 @@
     "satisfies:3d9a0ce3/REQ-04"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "Remove the profile selector tags",
-  "updated_at": "2026-10-21T16:26:02.699930441Z"
+  "updated_at": "2026-10-21T16:51:33.226673586Z"
 }

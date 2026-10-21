@@ -14,7 +14,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T16:50:25.251660096Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "3754095f-d396-40b7-b2f1-e7624aacd6a6",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Replace emoji status markers in CLI output with words",
-  "updated_at": "2026-10-21T16:33:15.368698689Z"
+  "updated_at": "2026-10-21T16:50:25.251660096Z"
 }
