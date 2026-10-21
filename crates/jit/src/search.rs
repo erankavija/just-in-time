@@ -144,10 +144,12 @@ pub fn search(data_dir: &Path, query: &str, options: SearchOptions) -> Result<Ve
         cmd.arg("--glob").arg(pattern);
     }
 
+    // ripgrep matches globs relative to its working directory, so run it in the search root.
     // The pattern is the value of `--regexp=`, so a leading `-` is never read as a flag.
     cmd.arg(format!("--regexp={query}"))
         .arg("--")
-        .arg(data_dir)
+        .arg(std::path::absolute(data_dir)?)
+        .current_dir(data_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
