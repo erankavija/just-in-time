@@ -1195,7 +1195,7 @@ fetch the body with `jit issue show`:
   "short_id": "5c581575",
   "state": "in_progress",
   "updated_at": "2026-04-28T18:25:16.699033997Z",
-  "message": "Updated issue 5c581575 to InProgress"
+  "message": "Updated issue 5c581575 to in_progress"
 }
 ```
 
@@ -1702,10 +1702,10 @@ jit query all --state rejected --json | jq -r '.issues[] | {id, title, labels}'
 **State transition examples:**
 
 ```bash
-# From Ready → Rejected (skip work entirely)
+# From ready → Rejected (skip work entirely)
 jit issue reject $READY_ISSUE --reason "out-of-scope"
 
-# From In Progress → Rejected (abandon in-progress work)
+# From in_progress → Rejected (abandon in-progress work)
 jit issue reject $WIP_ISSUE --reason "duplicate"
 
 # From Gated → Rejected (bypass failing gates)
@@ -3411,19 +3411,19 @@ jit status [--json]
 
 ```text
 Status:
-  Open: 3
-  Ready: 4
-  In Progress: 2
-  Done: 8
-  Rejected: 1
-  Blocked: 5
+  backlog: 3
+  ready: 4
+  in_progress: 2
+  done: 8
+  rejected: 1
+  blocked: 5
 ```
 
 JSON carries the same counts plus `gated` and `total`:
 
 ```json
 {
-  "open": 3,
+  "backlog": 3,
   "ready": 4,
   "in_progress": 2,
   "gated": 0,
@@ -3431,12 +3431,12 @@ JSON carries the same counts plus `gated` and `total`:
   "rejected": 1,
   "blocked": 5,
   "total": 18,
-  "message": "3 open, 4 ready, 2 in progress, 8 done"
+  "message": "3 backlog, 4 ready, 2 in_progress, 8 done"
 }
 ```
 
-`open` counts `backlog` issues; `blocked` counts issues held by an unmet
-dependency, so an issue can appear in both `open` and `blocked`. For a rollup
+`blocked` counts issues held by an unmet dependency, so an issue can appear
+in both `backlog` and `blocked`. For a rollup
 scoped to a container or a label bucket, use
 [`jit issue progress`](#container-progress-jit-issue-progress) or
 [`jit query count`](#state-aggregation-jit-query-count).
@@ -4252,7 +4252,7 @@ RECENT_DONE=$(jit events query --event-type issue_state_changed --limit 100 --js
   jq -r '[.events[] | select(.to == "done")] | length')
 
 echo "Ready: $READY"
-echo "In Progress: $IN_PROGRESS"
+echo "in_progress: $IN_PROGRESS"
 echo "Blocked: $BLOCKED"
 echo "Recently completed (last 100 events): $RECENT_DONE"
 ```

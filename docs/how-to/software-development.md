@@ -183,7 +183,7 @@ TASK=$(jit issue create \
 **Step 3: Follow TDD workflow**
 
 ```bash
-# 1. Satisfy the precheck before claiming (claim runs prechecks on Ready → InProgress)
+# 1. Satisfy the precheck before claiming (claim runs prechecks on ready → in_progress)
 jit gate evaluate $TASK tdd-reminder --by agent:developer-1
 
 # 2. Claim the issue after the precheck passes

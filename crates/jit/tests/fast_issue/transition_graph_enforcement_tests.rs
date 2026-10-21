@@ -691,8 +691,8 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
 
 #[test]
 fn test_update_issue_state_enforces_non_terminal_arm_transition() {
-    // M3: the `_` arm (e.g. Ready -> InProgress) previously skipped graph
-    // enforcement. An enforcing rule scoped to the in-progress state must now
+    // M3: the `_` arm (e.g. ready -> in_progress) previously skipped graph
+    // enforcement. An enforcing rule scoped to the in_progress state must now
     // block this state-only transition too.
     let rules = r#"
 [[rules]]
@@ -770,7 +770,7 @@ fn test_bulk_update_blocked_by_enforcing_done_graph_rule() {
         result.errors[0].1
     );
 
-    // The issue is unchanged: still InProgress, not Done.
+    // The issue is unchanged: still in_progress, not done.
     let after = executor.storage().load_issue(&epic).unwrap();
     assert_eq!(
         after.state,

@@ -195,7 +195,7 @@ impl std::fmt::Display for BlockingReason {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BlockingReason::Dependency { id, title, state } => {
-                write!(f, "dependency:{} ({}:{:?})", id, title, state)
+                write!(f, "dependency:{} ({}:{})", id, title, state.as_str())
             }
             BlockingReason::Gate { key, status } => {
                 write!(f, "gate:{} ({:?})", key, status)
@@ -813,13 +813,13 @@ mod tests {
         // Display renders the canonical reason string.
         assert_eq!(
             result[0].1[0].to_string(),
-            "dependency:dep1 (Upstream:InProgress)"
+            "dependency:dep1 (Upstream:in_progress)"
         );
     }
 
     #[test]
     fn test_query_blocked_omits_rejected_dependency_from_reasons() {
-        // A Rejected dependency is met: only the InProgress one is a reason.
+        // A Rejected dependency is met: only the in_progress one is a reason.
         let mut rejected =
             crate::domain::types::fixture_issue("Abandoned".to_string(), String::new());
         rejected.id = "dep1".to_string();

@@ -208,7 +208,7 @@ Issues progress through states as work advances:
 flowchart LR
     C[Creation] --> R[Ready]
     B[Backlog: unmet dependencies] --> R
-    R --> P[In Progress: prechecks pass]
+    R --> P[in_progress: prechecks pass]
     P --> G[Gated: completion blocked]
     P --> D[Done: gates already passed]
     G --> D[Done: retry after gates pass]
@@ -695,8 +695,8 @@ Gates influence state transitions:
 ```mermaid
 stateDiagram-v2
     Backlog --> Ready: dependencies effectively terminal
-    Ready --> InProgress: prechecks pass
-    InProgress --> Gated: done requested with unpassed gates
+    Ready --> in_progress: prechecks pass
+    in_progress --> Gated: done requested with unpassed gates
     Gated --> Done: done retried after gate statuses pass
     note right of Gated
         Waiting for gates
@@ -745,8 +745,8 @@ Issues progress through a lifecycle with the following states:
 stateDiagram-v2
     [*] --> Ready: dependency-free creation
     Backlog --> Ready: dependencies satisfied
-    Ready --> InProgress: claim / prechecks pass
-    InProgress --> Gated: completion attempted
+    Ready --> in_progress: claim / prechecks pass
+    in_progress --> Gated: completion attempted
     Gated --> Done: done retried after gates pass
     Done --> Archived: retire (records origin)
     Rejected --> Archived: retire (records origin)
@@ -771,7 +771,7 @@ stateDiagram-v2
 **Ready**: Issue is unblocked (all dependencies satisfied). It may be assigned;
 `jit query available` selects ready, unassigned work.
 
-**In Progress**: Issue is actively being worked on by an assignee.
+**in_progress**: Issue is actively being worked on by an assignee.
 
 **Gated**: Issue has attempted to transition to Done, but quality gates have not
 all passed. Evaluate or attest the gates, then retry `jit issue update --state done`.
@@ -809,7 +809,7 @@ do not rely on it to prohibit a later explicit state update.
 - `Ready → Backlog`: Automatic. The inverse: adding a dependency on a non-terminal issue — through `jit dep add` or through graph-template application — demotes the dependent in the same operation, so stored readiness never contradicts the graph
 
 **Guarded workflow operations:**
-- `Ready → In Progress`: `jit issue claim` attempts this transition and runs prechecks
+- `ready → in_progress`: `jit issue claim` attempts this transition and runs prechecks
 - `jit issue assign`: Changes only the assignee; it does not change state
 - `→ Done`: `jit issue update --state done` checks dependencies and gate statuses
 - `→ Gated`: A `done` request with unpassed gates is diverted here

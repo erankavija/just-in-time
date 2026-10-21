@@ -401,8 +401,8 @@ unpassed gate):
 ```
 Blocked issues:
   abc123 | Feature Integration | High
-    - dependency:def456 (Unit Tests:InProgress)
-    - dependency:ghi789 (API Documentation:Backlog)
+    - dependency:def456 (Unit Tests:in_progress)
+    - dependency:ghi789 (API Documentation:backlog)
 
 Total: 1
 ```

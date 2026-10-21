@@ -59,7 +59,7 @@ No domain-agnostic concern; deletion only. `@/inv/essential-code-prose`: fix `te
 Split point: (a) breakdown, (b) validate+drift. Independent.
 
 #### 7. Overlap
-- **6ff14f21** (InProgress, worktree `agent-6ff14f21`, uncommitted): edits `validate.rs:1906` (inside `validate_integrity_silent`), `bracket_breakdown_tests.rs:656`, `template_binding_tests.rs:108,293`, `template_apply_atomicity_tests.rs:392`. Conflict resolves by deletion; land 6ff14f21 first or tell its worker the hunks are going away.
+- **6ff14f21** (in_progress, worktree `agent-6ff14f21`, uncommitted): edits `validate.rs:1906` (inside `validate_integrity_silent`), `bracket_breakdown_tests.rs:656`, `template_binding_tests.rs:108,293`, `template_apply_atomicity_tests.rs:392`. Conflict resolves by deletion; land 6ff14f21 first or tell its worker the hunks are going away.
 - **f4d9502a** Background cites `validate.rs:2467`, `2549` (libgit2 doc-reference check) — REQ-01 deletes them; f4d9502a must sequence after or drop that bullet.
 
 ---
@@ -134,7 +134,7 @@ Recommended shape: one private non-`cfg` function `resolve_agent_id_from(cli, en
 `config.rs` ≈−50 src, −95 tests; `agent_config.rs` −35 twin, ~+10 seam, tests edited. ≈−170. Small.
 
 #### 7. Overlap
-`config.rs` is a hotspot: REQ-03/REQ-04 (other slices), **d92f54aa** (InProgress, no worktree found — cannot diff; file-level overlap `config.rs`), **bedf0962** (Ready; `config.rs`/`config_manager.rs`), **6ff14f21** (uncommitted `config.rs` edits). REQ-04's `deny_unknown_fields` on agent.toml applies to the surviving type — do REQ-05 first or in the same task as REQ-04's agent part.
+`config.rs` is a hotspot: REQ-03/REQ-04 (other slices), **d92f54aa** (in_progress, no worktree found — cannot diff; file-level overlap `config.rs`), **bedf0962** (Ready; `config.rs`/`config_manager.rs`), **6ff14f21** (uncommitted `config.rs` edits). REQ-04's `deny_unknown_fields` on agent.toml applies to the surviving type — do REQ-05 first or in the same task as REQ-04's agent part.
 
 ---
 
@@ -293,7 +293,7 @@ The unit tests `claim.rs:1067-1090` (`execute_claim_status_test`), `1244-1260` (
 `claim.rs` −65, `main.rs` 3 lines. Trivial; bundle with REQ-20 or REQ-23.
 
 #### 7. Overlap
-`main.rs` (df129d9e, 2d10f1dd uncommitted). **d7d0d0db** (InProgress) edits `storage/claim_coordinator.rs`, not `claim.rs`.
+`main.rs` (df129d9e, 2d10f1dd uncommitted). **d7d0d0db** (in_progress) edits `storage/claim_coordinator.rs`, not `claim.rs`.
 
 ---
 
@@ -398,7 +398,7 @@ No layer change. `memory.rs:479-492` strict event parsing (see REQ-08) is in thi
 - **REQ-19 ↔ c780514e**: claim unit tests use private `_test` re-implementations instead of the production commands (`claim.rs:1067,1244,1630`).
 - **REQ-20 ↔ df129d9e**: `GateNotRequiredError` classification lives in `main.rs:79,719,9063`; unchanged by REQ-20.
 - **REQ-07 ↔ 16d63038**: both edit the `IssueStore` trait (`storage/mod.rs`) and its JSON/memory impls.
-- **6ff14f21** (InProgress, not on the dispatcher's list): uncommitted edits inside `validate_integrity_silent` and in the breakdown/template test files REQ-01 deletes.
+- **6ff14f21** (in_progress, not on the dispatcher's list): uncommitted edits inside `validate_integrity_silent` and in the breakdown/template test files REQ-01 deletes.
 
 ### Open decisions
 1. **REQ-07 "Listing issues writes nothing" vs `.index.lock`.** `list_issues` opens `.index.lock` create-if-absent (`lock.rs:255`). Options: (a) read it as "no repository content" (lock files are gitignored runtime state, `storage-format.md:70-75`); (b) make shared reads open existing lock files only. Recommend (a), and state it in the owning test (the tree is unchanged apart from the retained lock set). Confirm with the reviewer, since criteria are read literally.
@@ -517,7 +517,7 @@ Natural splits:
   - Depends on (a), d92f54aa and bedf0962.
 
 #### 7. Overlap and sequencing
-- **d92f54aa** (InProgress, no worktree, no commits yet).
+- **d92f54aa** (in_progress, no worktree, no commits yet).
   - Its region: `CoordinationConfig` `config.rs:1334-1371`, `MergedCoordinationConfig` `:2009-2085`, `full_snapshot` `:1968-1976`, `main.rs:6810-6814,6855-6865`, `configuration.md:547-571`, `multi-agent-coordination.md:257`, `manifest.toml:444-454`, `commands/config.rs:497-504` (the `coordination.default_ttl_secs` assertion), `cli-commands.md:3972`.
   - It shares every file with (a) and (b). Land it first.
 - **bedf0962** (Ready, unassigned).
@@ -860,7 +860,7 @@ None.
 About 30 lines plus one owning test: the declared class set equals `State::all()`, and every node class is declared. Not a graph operation, so no proptest.
 
 #### 7. Overlap
-cd2ed136 is merged into main (`f641f2f29`); its issue is still InProgress, awaiting gates. There is no remaining code conflict.
+cd2ed136 is merged into main (`f641f2f29`); its issue is still in_progress, awaiting gates. There is no remaining code conflict.
 
 ### Cross-slice couplings
 - **REQ-04 ↔ REQ-05.** Agent-config strictness must apply to the single surviving type, so do it inside REQ-05. The two types disagree on optionality: `created_at` and `description` are required in `agent_config.rs:33-36` and optional in `config.rs:1447-1450`. REQ-05 must pick one, and docs (`configuration.md:592-639`) show all three fields. `agent.toml`'s `default_ttl_secs` is documented as "parsed metadata only" (`configuration.md:635-637`). That is an inert key of the same kind REQ-03 removes; flag it to the REQ-05 owner.

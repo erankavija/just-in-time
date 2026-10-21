@@ -624,7 +624,7 @@ Notes on the steps:
 
 Seams with other issues:
 - **aa423d02** (claim-next filter, Ready): it rewrites `commands/issue.rs:737-762`, the same lines as V4. Land aa423d02 first, or have V4 touch only the sort key.
-- **7d1bfe89** (lexer, InProgress in `.agents/worktrees/agent-7d1bfe89`): it changes only `query_engine/lexer.rs` and one CLI test, so it does not overlap V3, V4 or V9. `FilterField` (`lexer.rs:18-41`) and the hand-written field list in `error.rs:39` are a further closed vocabulary.
+- **7d1bfe89** (lexer, in_progress in `.agents/worktrees/agent-7d1bfe89`): it changes only `query_engine/lexer.rs` and one CLI test, so it does not overlap V3, V4 or V9. `FilterField` (`lexer.rs:18-41`) and the hand-written field list in `error.rs:39` are a further closed vocabulary.
 - **d23c58c0**: its fix is already merged to `main` (7691e0e09, `type_taxonomy.rs` `validate_orphans`), with gates still pending. No conflict with V11.
 - **f368ce3d**: owns `commands/query.rs:68` (confirmed). Its REQ-03 benefits from the typed `TypeHierarchyKind` after V10a.
 - **df129d9e** REQ-16: its CLI filter argument group consumes the generated `FromStr` from V3 and V4 at the `main.rs` parse sites.

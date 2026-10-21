@@ -57,7 +57,7 @@
 **Before** (human-readable):
 ```bash
 $ jit query all
-Backlog: 5  Ready: 3  In Progress: 2  Done: 10
+backlog: 5  ready: 3  in_progress: 2  done: 10
 
 abc123 | Feature: Add authentication | high | backlog
 def456 | Bug: Fix login redirect     | critical | ready

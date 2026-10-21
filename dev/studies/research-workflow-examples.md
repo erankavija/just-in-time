@@ -170,7 +170,7 @@ jit dep add $IDEA $RESEARCH
 
 # 4. Assign and work on research task
 jit issue claim $RESEARCH agent:researcher-1
-jit issue update $RESEARCH --state in-progress
+jit issue update $RESEARCH --state in_progress
 
 # 5a. If research task proves feasible → promote to epic (see Pattern 2)
 # 5b. If research task proves infeasible → close idea with findings
@@ -303,9 +303,9 @@ jit graph show $MILESTONE
 **Visualization:**
 ```
 [Milestone: v1.1] (backlog, type:milestone, milestone:v1.1)
-  ├─ depends on → [Epic: Semantic Search] (in-progress, epic:semantic-search)
+  ├─ depends on → [Epic: Semantic Search] (in_progress, epic:semantic-search)
   │                 ├─ depends on → [Task: Embedding] (done)
-  │                 ├─ depends on → [Task: Qdrant] (in-progress)
+  │                 ├─ depends on → [Task: Qdrant] (in_progress)
   │                 └─ depends on → [Task: API] (blocked)
   └─ depends on → [Epic: Search UI] (backlog, epic:search-ui)
                     └─ depends on → [Task: Redesign mockups] (ready)
@@ -393,7 +393,7 @@ jit dep add $EPIC $TASK1
 
 # 2. While working, discover new required tasks
 jit issue claim $TASK1 agent:dev-1
-jit issue update $TASK1 --state in-progress
+jit issue update $TASK1 --state in_progress
 
 # 3. Agent discovers need for additional work
 TASK2=$(jit issue create \
@@ -469,7 +469,7 @@ jit dep add $IDEA $RESEARCH  # Idea depends on research results
 
 # Assign to researcher
 jit issue claim $RESEARCH agent:researcher-alice
-jit issue update $RESEARCH --state in-progress
+jit issue update $RESEARCH --state in_progress
 
 # Week 2 (Day 3): Research task completes with findings
 jit issue update $RESEARCH --state done \
@@ -587,8 +587,8 @@ jit dep add $TASK_UI $TASK_API     # UI needs API
 jit issue claim $TASK_EMBED agent:dev-bob
 jit issue claim $TASK_DB agent:dev-carol
 
-jit issue update $TASK_EMBED --state in-progress
-jit issue update $TASK_DB --state in-progress
+jit issue update $TASK_EMBED --state in_progress
+jit issue update $TASK_DB --state in_progress
 
 # Week 5: Bob finishes embeddings
 jit issue update $TASK_EMBED --state done
@@ -604,14 +604,14 @@ jit query available
 # Output: TASK_API
 
 jit issue claim $TASK_API agent:dev-bob
-jit issue update $TASK_API --state in-progress
+jit issue update $TASK_API --state in_progress
 
 # Week 7: Bob finishes API
 jit issue update $TASK_API --state done
 
 # TASK_UI now unblocked
 jit issue claim $TASK_UI agent:dev-diana
-jit issue update $TASK_UI --state in-progress
+jit issue update $TASK_UI --state in_progress
 
 # Week 8: Diana finishes UI
 jit issue update $TASK_UI --state done
@@ -919,7 +919,7 @@ jit dep add $EPIC $TASK  # Edge = required
 ```bash
 # WRONG: Task completes but agent forgets to update
 jit issue update $TASK --context "done_at:2026-01-15"
-# Issue still shows state:in-progress ❌
+# Issue still shows state:in_progress ❌
 # Epic remains blocked
 ```
 

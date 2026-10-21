@@ -645,12 +645,12 @@ impl<S: IssueStore> CommandExecutor<S> {
 
     /// Update issue state with precheck/postcheck hooks
     ///
-    /// This method runs prechecks before transitioning to InProgress
+    /// This method runs prechecks before transitioning to in_progress
     /// and postchecks when transitioning to Gated.
     ///
     /// Returns warnings (e.g., lease warnings) if any.
     ///
-    /// Note: this state-only transition path (used by `jit claim` → InProgress and
+    /// Note: this state-only transition path (used by `jit claim` → in_progress and
     /// `jit issue reject` → Rejected) intentionally does NOT run `.jit/rules.toml`
     /// local-rule enforcement: `claim` carries no content edits and `reject`
     /// deliberately bypasses validation. Local rules are enforced on the
@@ -1132,7 +1132,7 @@ mod tests {
         );
         assert!(result.unwrap_err().to_string().contains("tdd-reminder"));
 
-        // Verify issue is still Ready, not InProgress
+        // Verify issue is still ready, not in_progress
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(
             issue.state,
@@ -1197,7 +1197,7 @@ mod tests {
             "Claiming should succeed when precheck passes"
         );
 
-        // Verify issue transitioned to InProgress and is assigned
+        // Verify issue transitioned to in_progress and is assigned
         let issue = executor.storage.load_issue(&issue_id).unwrap();
         assert_eq!(issue.state, State::InProgress);
         assert_eq!(issue.assignee, Some("agent:test".parse().unwrap()));
@@ -1308,7 +1308,7 @@ mod tests {
         assert_eq!(
             issue.state,
             State::InProgress,
-            "rejected claim must not disturb the existing in-progress state"
+            "rejected claim must not disturb the existing in_progress state"
         );
         assert_eq!(
             issue.assignee,
@@ -1548,7 +1548,7 @@ assert = { dependency-shape = { target = { type = "design" }, mode = "must" } }
         crate::commands::test_helpers::seed_issue(&executor.storage, issue);
         executor.add_gate(&issue_id, "tests".to_string()).unwrap();
 
-        // First `--state done`: a genuine InProgress -> Gated transition, which
+        // First `--state done`: a genuine in_progress -> gated transition, which
         // should persist and emit exactly one state-change event.
         let first = executor.update_issue_state(&issue_id, State::Done);
         assert!(first.is_err(), "unpassed gates should block done");

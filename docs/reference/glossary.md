@@ -17,7 +17,7 @@
 
 **Ready**: Unblocked and available to claim
 
-**InProgress**: Actively being worked on
+**in_progress**: Actively being worked on
 
 **Gated**: Waiting for quality gate checks
 

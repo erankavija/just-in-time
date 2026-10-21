@@ -39,10 +39,10 @@
 │  └────────────────────┘  │  • diagrams/auth-sequence.png             │
 │                          │    [View Image] [@ HEAD]                   │
 │      Graph Controls      │                                              │
-│  • 🔵 Open               │  🔗 Dependencies (2):                       │
-│  • 🟢 Ready              │  • Issue #00XYZ: Setup database            │
-│  • 🟡 In Progress        │  • Issue #00ABC: Create user model         │
-│  • ✅ Done               │                                              │
+│  • 🔵 backlog            │  🔗 Dependencies (2):                       │
+│  • 🟢 ready              │  • Issue #00XYZ: Setup database            │
+│  • 🟡 in_progress        │  • Issue #00ABC: Create user model         │
+│  • ✅ done               │                                              │
 │  • 🔴 Blocked            │  ⚡ Gates (2/3 passed):                     │
 │                          │  • ✅ code_review                           │
 │                          │  • ✅ unit_tests                            │
@@ -51,7 +51,7 @@
 │                          │  [Edit] [Close] [Claim] [Transition]       │
 └──────────────────────────┴──────────────────────────────────────────────┘
 
-                    STATUS BAR: 45 issues • 12 ready • 5 in progress
+                    STATUS BAR: 45 issues • 12 ready • 5 in_progress
 ```
 
 ---

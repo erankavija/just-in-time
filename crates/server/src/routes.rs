@@ -218,7 +218,7 @@ async fn get_graph<S: IssueStore>(
 /// Status summary
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StatusResponse {
-    pub open: usize,
+    pub backlog: usize,
     pub ready: usize,
     pub in_progress: usize,
     pub done: usize,
@@ -236,7 +236,7 @@ async fn get_status<S: IssueStore>(
     })?;
 
     Ok(Json(StatusResponse {
-        open: summary.open,
+        backlog: summary.backlog,
         ready: summary.ready,
         in_progress: summary.in_progress,
         done: summary.done,
