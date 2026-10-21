@@ -534,11 +534,9 @@ impl<S: IssueStore> CommandExecutor<S> {
             enforce_lease: true,
         })?;
 
-        // Check whether the completed publication unblocks dependents.
-        if let Some(s) = state {
-            if s.is_terminal() {
-                self.check_auto_transitions()?;
-            }
+        // A publication that entered a terminal state may unblock dependents.
+        if outcome.entered_terminal {
+            self.check_auto_transitions()?;
         }
 
         Ok((outcome.target_id, outcome.warnings))
