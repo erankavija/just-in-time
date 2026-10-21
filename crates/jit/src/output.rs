@@ -1278,27 +1278,16 @@ macro_rules! collection_keys {
 }
 
 collection_keys! {
-    /// `issues`
     IssuesKey = "issues";
-    /// `dependents`
     DependentsKey = "dependents";
-    /// `roots`
     RootsKey = "roots";
-    /// `nodes`
     NodesKey = "nodes";
-    /// `divergences`
     DivergencesKey = "divergences";
-    /// `by_state`
     ByStateKey = "by_state";
-    /// `gates`
     GatesKey = "gates";
-    /// `results`
     ResultsKey = "results";
-    /// `artifacts`
     ArtifactsKey = "artifacts";
-    /// `namespaces`
     NamespacesKey = "namespaces";
-    /// `worktrees`
     WorktreesKey = "worktrees";
 }
 
