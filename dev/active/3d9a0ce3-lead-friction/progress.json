@@ -12,7 +12,7 @@
           "title": "Accept the worktree root as a gate input root",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged a51913ccd; cargo-ci passed; code-review/doc-review pending"
+          "status": "rework 1 (docfix1): doc-review F1 custom-gates internal detail; code-review passed"
         },
         {
           "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
@@ -20,7 +20,7 @@
           "title": "Record a checker infrastructure fault as an error",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged 131e5080c; cargo-ci passed; code-review/doc-review pending"
+          "status": "rework 1 (docfix1): doc-review F1 storage-records exit 75; code-review passed"
         },
         {
           "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
@@ -28,7 +28,7 @@
           "title": "Derive an issue's documents from its artifact directory",
           "classification": "implementation",
           "model": "opus",
-          "status": "merged 428147948; cargo-ci passed (forced rerun after budget-only load failure); code-review/doc-review pending"
+          "status": "rework 1 (docfix1): doc-review F1 doc show reference; code-review passed"
         },
         {
           "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
@@ -36,7 +36,7 @@
           "title": "Remove profile checks from repository validation",
           "classification": "implementation",
           "model": "haiku",
-          "status": "merged 78684701c + lead fix af530c678 (stale tests); cargo-ci passed; code-review pending"
+          "status": "rework 1 (opus, combined docfix1 worktree): code-review F1 stale validation-provenance prose"
         },
         {
           "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
@@ -44,7 +44,7 @@
           "title": "Produce the shipped workflow package by packing its directory",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "merged 48999bd25; docs-mechanical passed; code-review pending"
+          "status": "done"
         }
       ],
       "note": "1a: disk-bounded (51G free) sub-wave"
@@ -58,7 +58,7 @@
           "title": "Reuse gate verdicts only by declared-input digest",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "done (merge 203c67fd2; cargo-ci forced rerun after load-only timeouts)"
         },
         {
           "id": "f37d228e-f3dd-412f-87c7-364f64da2f07",
@@ -495,6 +495,10 @@
     {
       "topic": "load-induced cargo-ci failures reused by digest",
       "resolution": "steward approved new task 494f1d4b (option A)"
+    },
+    {
+      "topic": "df129d9e run-status renderer task requires removed '(already passed at HEAD)' output",
+      "resolution": "reported to steward; pending"
     }
   ],
   "surfaced_pitfalls": [
@@ -503,7 +507,12 @@
     "d6bbe05f: docs/reference/profiles.md 'Derived state and managed regions' still describes validation over profile-owned targets; ae85c6ce rewrites it.",
     "ae2e3739 renamed gate_check real_repo_root -> real_repo_layout; a df129d9e task inventory names real_repo_root."
   ],
-  "rework_counts": {},
+  "rework_counts": {
+    "d6bbe05f": 1,
+    "fd9bfab8": 1,
+    "ae2e3739": 1,
+    "66986f88": 1
+  },
   "started_at": "2026-10-21T04:21:37+03:00",
   "resource_policy": "steward: <=1 live worktree, dispatch only with >=60GB free, CARGO_INCREMENTAL=0, full gates under turnstile+exclusive flock, other cargo under turnstile+shared flock"
 }
