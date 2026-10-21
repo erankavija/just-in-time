@@ -380,7 +380,7 @@ jit query count --by state
 jit graph tree
 jit gate list
 
-# Inspect an issue and the durable artifacts linked to it.
+# Inspect an issue and the durable artifacts it owns.
 jit issue status <issue-id>
 jit doc list <issue-id>
 ```

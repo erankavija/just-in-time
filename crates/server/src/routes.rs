@@ -281,9 +281,9 @@ async fn search_issues<S: IssueStore>(
 ) -> Result<Json<SearchResponse>, StatusCode> {
     let start = std::time::Instant::now();
 
-    // Get all linked document paths to restrict search
-    let linked_docs = state.executor.get_linked_document_paths().map_err(|e| {
-        tracing::error!("Failed to get linked documents: {:?}", e);
+    // Restrict search to issue documents, explicit or derived
+    let document_paths = state.executor.get_issue_document_paths().map_err(|e| {
+        tracing::error!("Failed to get issue documents: {:?}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -292,7 +292,7 @@ async fn search_issues<S: IssueStore>(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
     let nested_data = layout.data_root().strip_prefix(layout.worktree_root()).ok();
-    let mut file_patterns = linked_docs;
+    let mut file_patterns = document_paths;
     if let Some(relative) = nested_data {
         file_patterns.push(format!("{}/issues/*.json", relative.display()));
     }
@@ -618,9 +618,9 @@ async fn get_document_content<S: IssueStore>(
 
 /// Get raw document bytes (issue-scoped variant)
 ///
-/// Verifies that `path` is linked to the requested issue, then reads the file
-/// as raw bytes via `read_document_bytes` (which delegates to
-/// `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
+/// Verifies that `path` is a document of the requested issue, explicit or
+/// derived, then reads the file as raw bytes via `read_document_bytes` (which
+/// delegates to `IssueStore::read_path_bytes`).  Binary artifacts are served faithfully
 /// without any UTF-8 conversion.  HTML responses for working-tree reads get a
 /// `<base href>` injected so sibling assets resolve via `/api/raw/*path`.
 async fn get_document_raw<S: IssueStore>(
@@ -1474,13 +1474,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_search_only_searches_linked_documents() {
-        // This test verifies that search is restricted to linked documents
-        // by checking that get_linked_document_paths is called
+    async fn test_search_only_searches_issue_documents() {
+        // This test verifies that search is restricted to issue documents
+        // by checking that get_issue_document_paths is called
         // (implementation detail test - would need integration test for full verification)
         let server = create_test_app();
         let _response = server.get("/search?q=test").await;
-        // If it doesn't panic or error, the linked document logic is being used
+        // If it doesn't panic or error, the issue-document logic is being used
     }
 
     #[tokio::test]
@@ -2191,6 +2191,92 @@ pattern = '^v\d+\.\d+$'
         let response = server.get(&url).await;
         assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
         assert_eq!(response.text(), "");
+    }
+
+    /// Every issue-scoped document read, and the search universe, accept a
+    /// file under the issue's artifact directory that no link names.
+    #[tokio::test]
+    async fn test_document_reads_serve_a_derived_document_without_a_link() {
+        use jit::domain::Priority;
+        use jit::storage::JsonFileStorage;
+        use std::fs;
+        use std::process::Command;
+
+        let temp = tempfile::tempdir().unwrap();
+        let git = |args: &[&str]| {
+            let status = Command::new("git")
+                .current_dir(temp.path())
+                .args(args)
+                .status()
+                .unwrap();
+            assert!(status.success(), "git {args:?}");
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.email", "test@example.com"]);
+        git(&["config", "user.name", "Test"]);
+        let jit_dir = temp.path().join(".jit");
+        initialize_file_backed_test_repository(temp.path());
+        fs::write(
+            jit_dir.join("config.toml"),
+            "[worktree]\nenforce_leases = \"off\"\n\n[documentation]\nissue_scoped_areas = [\"notes\"]\n",
+        )
+        .unwrap();
+        let executor = test_executor(JsonFileStorage::new(&jit_dir));
+        let (id, _) = executor
+            .create_issue(
+                "Derived document reads".to_string(),
+                "desc".to_string(),
+                Priority::Normal,
+                vec![],
+                vec![],
+                None,
+                None,
+                false,
+            )
+            .unwrap();
+        let directory = executor
+            .resolve_issue_artifact_directory(&id, "notes")
+            .unwrap()
+            .directory;
+        let doc_rel = format!("{directory}/plan.md");
+        let doc_path = temp.path().join(&doc_rel);
+        fs::create_dir_all(doc_path.parent().unwrap()).unwrap();
+        ["first\n", "second\n"].iter().for_each(|content| {
+            fs::write(&doc_path, content).unwrap();
+            git(&["add", doc_rel.as_str()]);
+            git(&["commit", "-qm", content.trim()]);
+        });
+
+        assert!(executor
+            .get_issue_document_paths()
+            .unwrap()
+            .contains(&doc_rel));
+        let tracker = Arc::new(ChangeTracker::new(16));
+        let state = AppState {
+            executor,
+            tracker,
+            project_name: "test-project".to_string(),
+            shutdown: CancellationToken::new(),
+        };
+        let server = TestServer::new(create_routes(state)).unwrap();
+        let base = format!(
+            "/issues/{id}/documents/{}",
+            percent_encode_segment(&doc_rel)
+        );
+
+        for route in ["content", "raw", "history"] {
+            server
+                .get(&format!("{base}/{route}"))
+                .await
+                .assert_status_ok();
+        }
+        server
+            .get(&format!("{base}/diff"))
+            .add_query_param("from", "HEAD~1")
+            .await
+            .assert_status_ok();
+        let history: serde_json::Value = server.get(&format!("{base}/history")).await.json();
+        assert_eq!(history["commits"].as_array().unwrap().len(), 2);
     }
 
     #[tokio::test]

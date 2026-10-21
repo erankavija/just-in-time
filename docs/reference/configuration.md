@@ -169,6 +169,14 @@ rather than a reading of the tree, so it resolves the same before anything is
 written there, and an area the repository does not declare is rejected rather
 than resolved.
 
+Every file under that directory is one of the issue's documents by location,
+with no `jit doc add`: `jit doc list`, `jit doc show`, `history`, `diff`,
+`jit doc check-links`, and the server's document routes and search treat it as
+tracked. A derived document carries no commit pin, type, or label. An explicit
+link attaches a path outside the directory, or metadata such as a label to any
+path; a path both linked and derived is listed once, as its link. A repository
+declaring no issue-scoped area derives nothing.
+
 The convention governs artifacts as they are created. Artifacts already sitting
 flat in a declared area stay resolvable and are never restructured in place;
 `jit doc conformance` lists them as advice, mutating nothing and blocking no

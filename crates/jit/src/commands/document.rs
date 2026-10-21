@@ -109,17 +109,145 @@ impl<S: IssueStore> CommandExecutor<S> {
         self.publish_document_add(&full_id, path, commit, label, doc_type, skip_scan)
     }
 
+    /// Each declared issue-scoped area paired with its no-follow recursive
+    /// listing at `scope`.
+    ///
+    /// The registry is read through the accessor that decides area membership
+    /// everywhere else: a declared entry that normalizes to nothing names no
+    /// area, so it is neither walked nor named. Each surviving area is named in
+    /// its normalized spelling. An area that is absent, a file, or a symlink
+    /// lists nothing.
+    fn list_issue_scoped_areas(
+        &self,
+        documentation: &crate::config::DocumentationConfig,
+        scope: crate::domain::artifact_discovery::ArtifactListingScope,
+    ) -> Result<Vec<(String, Vec<String>)>> {
+        use crate::domain::artifact_discovery::ArtifactEvidence;
+
+        documentation
+            .issue_scoped_areas()
+            .into_iter()
+            .filter(|area| documentation.is_issue_scoped_area(area))
+            .map(|area| {
+                let area = crate::domain::artifact_plan::normalize_artifact_path(&area);
+                let entries = match crate::storage::artifact_planning::inspect_artifact_evidence(
+                    &self.storage,
+                    &area,
+                    scope,
+                )? {
+                    ArtifactEvidence::Directory { entries, .. } => entries,
+                    _ => Vec::new(),
+                };
+                Ok((area, entries))
+            })
+            .collect()
+    }
+
+    /// Each of `issues` paired with its documents: its explicit links followed
+    /// by the documents it owns by location
+    /// ([`derive_issue_documents`](crate::domain::artifact_directory::derive_issue_documents)).
+    ///
+    /// The declared issue-scoped areas are listed once for the whole set, so a
+    /// repository declaring none reads no tree.
+    fn with_issue_documents(
+        &self,
+        issues: Vec<crate::domain::Issue>,
+    ) -> Result<Vec<(crate::domain::Issue, Vec<crate::domain::DocumentReference>)>> {
+        use crate::domain::artifact_discovery::ArtifactListingScope;
+
+        let documentation = self
+            .config_manager
+            .load()?
+            .documentation
+            .unwrap_or_default();
+        let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
+        let files = self
+            .list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveFiles)?
+            .into_iter()
+            .flat_map(|(_, files)| files)
+            .collect::<Vec<_>>();
+        Ok(issues
+            .into_iter()
+            .map(|issue| {
+                let documents = issue
+                    .documents
+                    .iter()
+                    .cloned()
+                    .chain(crate::domain::artifact_directory::derive_issue_documents(
+                        &issue,
+                        &files,
+                        &documentation,
+                        &hierarchy,
+                    ))
+                    .collect();
+                (issue, documents)
+            })
+            .collect())
+    }
+
+    /// The document of `issue` at `path`, explicit or derived.
+    ///
+    /// # Errors
+    ///
+    /// [`PathReadError::NotFound`](crate::storage::PathReadError::NotFound)
+    /// when the issue has no document at `path`, and
+    /// [`PathReadError::Other`](crate::storage::PathReadError::Other) when the
+    /// declared areas cannot be listed.
+    fn find_issue_document(
+        &self,
+        issue: crate::domain::Issue,
+        path: &str,
+    ) -> Result<crate::domain::DocumentReference, crate::storage::PathReadError> {
+        use crate::storage::PathReadError;
+
+        let issue_id = issue.id.clone();
+        self.with_issue_documents(vec![issue])
+            .map_err(PathReadError::Other)?
+            .into_iter()
+            .flat_map(|(_, documents)| documents)
+            .find(|document| document.path == path)
+            .ok_or_else(|| {
+                PathReadError::NotFound(format!(
+                    "Document reference {path} not found in issue {issue_id}"
+                ))
+            })
+    }
+
+    /// [`find_issue_document`](Self::find_issue_document) for the CLI, which
+    /// reports an absent document as a
+    /// [`NotFoundError`](crate::errors::NotFoundError).
+    fn require_issue_document(
+        &self,
+        issue: crate::domain::Issue,
+        path: &str,
+    ) -> Result<crate::domain::DocumentReference> {
+        self.find_issue_document(issue, path)
+            .map_err(|error| match error {
+                crate::storage::PathReadError::NotFound(message) => {
+                    crate::errors::NotFoundError::new(message).into()
+                }
+                other => other.into(),
+            })
+    }
+
+    /// List `issue_id`'s documents: its explicit links, then the files it owns
+    /// by location under its artifact directories.
     pub fn list_document_references(
         &self,
         issue_id: &str,
     ) -> Result<crate::commands::DocumentListResult> {
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
+        let documents = self
+            .with_issue_documents(vec![issue])?
+            .into_iter()
+            .flat_map(|(_, documents)| documents)
+            .collect::<Vec<_>>();
 
         Ok(crate::commands::DocumentListResult {
             issue_id: full_id,
-            documents: issue.documents.clone(),
-            count: issue.documents.len(),
+            count: documents.len(),
+            documents,
         })
     }
 
@@ -203,8 +331,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     pub fn report_artifact_conformance(
         &self,
     ) -> Result<crate::output::ArtifactConformanceResponse> {
-        use crate::domain::artifact_discovery::{ArtifactEvidence, ArtifactListingScope};
-        use crate::domain::artifact_plan::normalize_artifact_path;
+        use crate::domain::artifact_discovery::ArtifactListingScope;
 
         let documentation = self
             .config_manager
@@ -213,34 +340,15 @@ impl<S: IssueStore> CommandExecutor<S> {
             .unwrap_or_default();
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
         let issues = self.storage.read_issues()?;
-        // The declared registry, through the accessor that decides area
-        // membership everywhere else: a declared entry that normalizes to
-        // nothing names no area, so it is neither walked nor reported as
-        // walked. The surviving entries are reported in their normalized
-        // spelling, which is the spelling every finding carries.
-        let areas = documentation
-            .issue_scoped_areas()
-            .into_iter()
-            .filter(|area| documentation.is_issue_scoped_area(area))
-            .map(|area| normalize_artifact_path(&area))
-            .collect::<Vec<_>>();
+        let listings =
+            self.list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveEntries)?;
 
-        let artifacts = areas
+        let artifacts = listings
             .iter()
-            .map(|area| {
-                let paths = match crate::storage::artifact_planning::inspect_artifact_evidence(
-                    &self.storage,
-                    area,
-                    ArtifactListingScope::RecursiveEntries,
-                )? {
-                    ArtifactEvidence::Directory { entries, .. } => entries,
-                    // An area that is absent, a file, or a symlink holds no
-                    // per-issue artifact tree to walk.
-                    _ => Vec::new(),
-                };
+            .map(|(area, paths)| {
                 crate::domain::artifact_conformance::report_area_artifacts(
                     area,
-                    &paths,
+                    paths,
                     &issues,
                     &documentation,
                     &hierarchy,
@@ -254,7 +362,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .collect::<Vec<_>>();
 
         Ok(crate::output::ArtifactConformanceResponse {
-            areas,
+            areas: listings.into_iter().map(|(area, _)| area).collect(),
             count: artifacts.len(),
             artifacts,
         })
@@ -390,17 +498,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
-
-        let doc = issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                crate::errors::NotFoundError::new(format!(
-                    "Document reference {} not found in issue {}",
-                    path, full_id
-                ))
-            })?;
+        let doc = self.require_issue_document(issue, path)?;
 
         // Determine which commit to view
         let reference = if let Some(at) = at_commit {
@@ -456,18 +554,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
-
-        // Verify document reference exists
-        issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                crate::errors::NotFoundError::new(format!(
-                    "Document reference {} not found in issue {}",
-                    path, full_id
-                ))
-            })?;
+        self.require_issue_document(issue, path)?;
 
         let layout = self.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
@@ -492,18 +579,7 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         let full_id = self.storage.resolve_issue_id(issue_id)?;
         let issue = self.storage.load_issue(&full_id)?;
-
-        // Verify document reference exists
-        issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                crate::errors::NotFoundError::new(format!(
-                    "Document reference {} not found in issue {}",
-                    path, full_id
-                ))
-            })?;
+        self.require_issue_document(issue, path)?;
 
         let layout = self.require_layout()?;
         let repo = Repository::open(layout.worktree_root())
@@ -561,7 +637,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// It's not called from the CLI binary, hence the dead_code warning.
     ///
     /// Returns typed [`PathReadError`] so route handlers can distinguish 404
-    /// (file or document reference not found) from 500 (storage failure)
+    /// (file or document not found) from 500 (storage failure)
     /// without string-matching on error messages.
     #[allow(dead_code)]
     pub fn read_document_content(
@@ -570,20 +646,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(String, String), crate::storage::PathReadError> {
-        use crate::storage::PathReadError;
-
         let issue = self.load_issue_typed(issue_id)?;
-
-        let doc = issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                PathReadError::NotFound(format!(
-                    "Document reference {} not found in issue {}",
-                    path, issue_id
-                ))
-            })?;
+        let doc = self.find_issue_document(issue, path)?;
 
         // Prefer explicit at_commit; fall back to the doc's pinned commit; then
         // None (working-tree read).
@@ -602,7 +666,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// content to `String`, so binary artifacts are round-tripped without loss.
     ///
     /// Steps:
-    /// 1. Load the issue and verify that `path` is linked as a `DocumentReference`.
+    /// 1. Load the issue and find its document at `path`, explicit or derived.
     /// 2. Resolve the effective commit: explicit `at_commit` → doc's pinned commit → `None`.
     /// 3. For working-tree reads, resolve the document path relative to the repo
     ///    root so callers do not need to know the process CWD.
@@ -616,20 +680,8 @@ impl<S: IssueStore> CommandExecutor<S> {
         path: &str,
         at_commit: Option<&str>,
     ) -> Result<(Vec<u8>, String), crate::storage::PathReadError> {
-        use crate::storage::PathReadError;
-
         let issue = self.load_issue_typed(issue_id)?;
-
-        let doc = issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                PathReadError::NotFound(format!(
-                    "Document reference {} not found in issue {}",
-                    path, issue_id
-                ))
-            })?;
+        let doc = self.find_issue_document(issue, path)?;
 
         // Prefer explicit at_commit; fall back to the doc's pinned commit; then
         // None (working-tree read).
@@ -649,8 +701,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: Part of public API used by jit-server.
     ///
-    /// Returns [`PathReadError::NotFound`] when the document reference does not
-    /// exist on the issue so that route handlers can return HTTP 404 without
+    /// Returns [`PathReadError::NotFound`] when the issue has no document at
+    /// `path` so that route handlers can return HTTP 404 without
     /// string-matching on the error message.
     #[allow(dead_code)]
     pub fn get_document_history(
@@ -662,18 +714,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use git2::Repository;
 
         let issue = self.load_issue_typed(issue_id)?;
-
-        // Verify document reference exists
-        issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                PathReadError::NotFound(format!(
-                    "Document reference {} not found in issue {}",
-                    path, issue_id
-                ))
-            })?;
+        self.find_issue_document(issue, path)?;
 
         let layout = self.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
@@ -693,8 +734,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     ///
     /// Note: Part of public API used by jit-server.
     ///
-    /// Returns [`PathReadError::NotFound`] when the document reference does not
-    /// exist on the issue so that route handlers can return HTTP 404 without
+    /// Returns [`PathReadError::NotFound`] when the issue has no document at
+    /// `path` so that route handlers can return HTTP 404 without
     /// string-matching on the error message.
     #[allow(dead_code)]
     pub fn get_document_diff(
@@ -709,18 +750,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use similar::{ChangeTag, TextDiff};
 
         let issue = self.load_issue_typed(issue_id)?;
-
-        // Verify document reference exists
-        issue
-            .documents
-            .iter()
-            .find(|d| d.path == path)
-            .ok_or_else(|| {
-                PathReadError::NotFound(format!(
-                    "Document reference {} not found in issue {}",
-                    path, issue_id
-                ))
-            })?;
+        self.find_issue_document(issue, path)?;
 
         let layout = self.require_layout().map_err(PathReadError::Other)?;
         let repo_root = layout.worktree_root();
@@ -760,24 +790,20 @@ impl<S: IssueStore> CommandExecutor<S> {
         )))
     }
 
-    /// Get all document paths referenced by issues.
+    /// Every issue's document paths, explicit or derived, sorted and
+    /// deduplicated.
     ///
     /// Note: Part of public API used by jit-server search functionality.
     #[allow(dead_code)]
-    pub fn get_linked_document_paths(&self) -> Result<Vec<String>> {
-        let issues = self.storage.list_issues()?;
-
-        let mut paths = std::collections::HashSet::new();
-        for issue in issues {
-            for doc in &issue.documents {
-                paths.insert(doc.path.clone());
-            }
-        }
-
-        let mut result: Vec<String> = paths.into_iter().collect();
-        result.sort();
-
-        Ok(result)
+    pub fn get_issue_document_paths(&self) -> Result<Vec<String>> {
+        Ok(self
+            .with_issue_documents(self.storage.list_issues()?)?
+            .into_iter()
+            .flat_map(|(_, documents)| documents)
+            .map(|document| document.path)
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect())
     }
 
     /// Read a file as raw bytes from the repository, optionally at a git commit.
@@ -1066,15 +1092,20 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
         };
 
-        // Collect all documents to check
-        let mut all_documents = Vec::new();
-        let mut all_document_paths = Vec::new();
-        for issue in &issues {
-            for doc in &issue.documents {
-                all_documents.push((issue.id.clone(), doc));
-                all_document_paths.push(PathBuf::from(&doc.path));
-            }
-        }
+        // Every document in scope, explicit or derived, is checked and tracked.
+        let documented = self.with_issue_documents(issues)?;
+        let all_documents = documented
+            .iter()
+            .flat_map(|(issue, documents)| {
+                documents
+                    .iter()
+                    .map(move |document| (issue.id.clone(), document))
+            })
+            .collect::<Vec<_>>();
+        let all_document_paths = all_documents
+            .iter()
+            .map(|(_, document)| PathBuf::from(&document.path))
+            .collect::<Vec<_>>();
 
         if all_documents.is_empty() {
             return Ok(crate::commands::LinkCheckResult {
