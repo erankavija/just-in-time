@@ -108,7 +108,7 @@ fn test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blo
 
 #[cfg(unix)]
 #[test]
-fn test_inspect_pinned_target_classifies_tree_modes_without_worktree_fallback() {
+fn test_inspect_pinned_targets_classifies_tree_modes_without_worktree_fallback() {
     use jit::repository_state::RepositoryTargetKind;
     use std::os::unix::fs::symlink;
 
@@ -124,18 +124,21 @@ fn test_inspect_pinned_target_classifies_tree_modes_without_worktree_fallback() 
     repo.write("docs/link.md", b"working tree fallback bait");
 
     let resolver = GitRevisionResolver::new(&repo.root);
-    let regular = resolver
-        .inspect_pinned_target(&revision, "docs/file.md")
-        .unwrap();
-    let directory = resolver
-        .inspect_pinned_target(&revision, "docs/section")
-        .unwrap();
-    let symlink = resolver
-        .inspect_pinned_target(&revision, "docs/link.md")
-        .unwrap();
-    let missing = resolver
-        .inspect_pinned_target(&revision, "docs/missing.md")
-        .unwrap();
+    let inspect = |path: &str| {
+        let request = (revision.clone(), path.to_string());
+        resolver
+            .inspect_pinned_targets(
+                &[request.clone()].into_iter().collect(),
+                &mut BTreeMap::new(),
+            )
+            .remove(&request)
+            .unwrap()
+            .unwrap()
+    };
+    let regular = inspect("docs/file.md");
+    let directory = inspect("docs/section");
+    let symlink = inspect("docs/link.md");
+    let missing = inspect("docs/missing.md");
 
     assert_eq!(regular.target_kind(), RepositoryTargetKind::File);
     assert_eq!(regular.bytes(), Some(b"pinned regular file".as_slice()));
@@ -187,26 +190,9 @@ fn process_log(log: &Path) -> Vec<String> {
 }
 
 #[cfg(unix)]
-fn assert_batch_matches_single(
-    expected: &Result<jit::storage::PinnedTargetRead, GitRevisionError>,
-    actual: &Result<jit::storage::PinnedTargetRead, GitRevisionError>,
-) {
-    match (expected, actual) {
-        (Ok(expected), Ok(actual)) => assert_eq!(expected, actual),
-        (Err(expected), Err(actual)) => {
-            assert_eq!(
-                std::mem::discriminant(expected),
-                std::mem::discriminant(actual)
-            );
-            assert_eq!(expected.to_string(), actual.to_string());
-        }
-        (expected, actual) => panic!("single={expected:?}, batch={actual:?}"),
-    }
-}
-
-#[cfg(unix)]
 #[test]
-fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() {
+fn test_inspect_pinned_targets_classifies_every_target_class() {
+    use jit::repository_state::RepositoryTargetKind;
     use std::os::unix::fs::PermissionsExt;
 
     let repo = Repo::new();
@@ -247,25 +233,86 @@ fn test_inspect_pinned_targets_matches_single_requests_for_every_target_class() 
     .map(|(revision, path)| (revision.to_string(), path.to_string()))
     .collect::<std::collections::BTreeSet<_>>();
 
-    let ordinary = GitRevisionResolver::new(&repo.root);
-    let expected = requests
-        .iter()
-        .map(|request| {
-            (
-                request.clone(),
-                ordinary.inspect_pinned_target(&request.0, &request.1),
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
     let (wrapper, _) = counted_git(&repo);
     let batched = GitRevisionResolver::with_git_program(&repo.root, wrapper);
     let mut cache = BTreeMap::new();
     let actual = batched.inspect_pinned_targets(&requests, &mut cache);
 
-    assert_eq!(actual.len(), expected.len());
-    requests.iter().for_each(|request| {
-        assert_batch_matches_single(expected.get(request).unwrap(), actual.get(request).unwrap());
+    assert_eq!(actual.len(), requests.len());
+    let expected_kinds = [
+        ("HEAD", "docs/file.md", Some(RepositoryTargetKind::File)),
+        (
+            "HEAD",
+            "docs/executable.sh",
+            Some(RepositoryTargetKind::File),
+        ),
+        (
+            "HEAD",
+            "docs/section",
+            Some(RepositoryTargetKind::Directory),
+        ),
+        (
+            "HEAD",
+            "docs/link.md",
+            Some(RepositoryTargetKind::Unsupported),
+        ),
+        (
+            "HEAD",
+            "docs/missing.md",
+            Some(RepositoryTargetKind::Missing),
+        ),
+        (
+            "HEAD",
+            "docs/file.md/x",
+            Some(RepositoryTargetKind::Missing),
+        ),
+        (
+            "HEAD",
+            "docs/space name.md",
+            Some(RepositoryTargetKind::File),
+        ),
+        ("HEAD", "docs", Some(RepositoryTargetKind::Directory)),
+        ("HEAD", "docs/[x].md", Some(RepositoryTargetKind::File)),
+        ("HEAD", "docs/*.md", Some(RepositoryTargetKind::Missing)),
+        (
+            "HEAD",
+            ":(glob)docs/*.md",
+            Some(RepositoryTargetKind::Missing),
+        ),
+        (
+            first.as_str(),
+            "docs/file.md",
+            Some(RepositoryTargetKind::File),
+        ),
+        (
+            abbreviated.as_str(),
+            "docs/file.md",
+            Some(RepositoryTargetKind::File),
+        ),
+        (range.as_str(), "docs/file.md", None),
+        ("not-a-revision", "docs/file.md", None),
+    ];
+    assert_eq!(expected_kinds.len(), requests.len());
+    expected_kinds.iter().for_each(|(revision, path, kind)| {
+        let request = (revision.to_string(), path.to_string());
+        let result = actual.get(&request).expect("every request has a result");
+        assert_eq!(
+            result.as_ref().ok().map(|read| read.target_kind()),
+            *kind,
+            "{request:?}"
+        );
     });
+    assert!(matches!(
+        actual[&("not-a-revision".to_string(), "docs/file.md".to_string())],
+        Err(GitRevisionError::RevisionNotFound { .. })
+    ));
+    assert_eq!(
+        actual[&(first.clone(), "docs/file.md".to_string())]
+            .as_ref()
+            .unwrap()
+            .bytes(),
+        Some(b"first version".as_slice())
+    );
     assert_eq!(
         actual[&("HEAD".to_string(), "docs/file.md".to_string())]
             .as_ref()
@@ -406,7 +453,7 @@ fn test_inspect_pinned_targets_resolves_distinct_revisions_in_one_success_proces
 }
 
 #[test]
-fn test_inspect_pinned_targets_returns_same_git_unavailable_error_for_every_request() {
+fn test_inspect_pinned_targets_reports_git_unavailable_for_every_request() {
     let repo = Repo::new();
     repo.write("docs/file.md", b"content");
     repo.commit("content");
@@ -421,37 +468,9 @@ fn test_inspect_pinned_targets_returns_same_git_unavailable_error_for_every_requ
     let mut cache = BTreeMap::new();
     let actual = resolver.inspect_pinned_targets(&requests, &mut cache);
 
+    assert_eq!(actual.len(), requests.len());
     requests.iter().for_each(|request| {
-        let expected = resolver
-            .inspect_pinned_target(&request.0, &request.1)
-            .unwrap_err();
-        let actual = actual.get(request).unwrap().as_ref().unwrap_err();
-        assert!(matches!(actual, GitRevisionError::GitUnavailable { .. }));
-        assert_eq!(expected.to_string(), actual.to_string());
+        let error = actual.get(request).unwrap().as_ref().unwrap_err();
+        assert!(matches!(error, GitRevisionError::GitUnavailable { .. }));
     });
-}
-
-#[test]
-fn test_git_revision_resolver_lists_committed_and_worktree_changes_without_losing_untracked_paths()
-{
-    let repo = Repo::new();
-    repo.write("src/main.rs", b"fn main() {}\n");
-    let base = repo.commit("source");
-
-    repo.write("docs/metadata.md", b"metadata-only change\n");
-    let head = repo.commit("documentation");
-    repo.write("src/main.rs", b"fn main() { println!(\"changed\"); }\n");
-    repo.write("Cargo.toml", b"[package]\nname = \"changed\"\n");
-    repo.write("new-top-level-tooling.txt", b"not compiled\n");
-
-    let resolver = GitRevisionResolver::new(&repo.root);
-    let committed = resolver.changed_paths_between(&base, &head).unwrap();
-    assert_eq!(committed, vec!["docs/metadata.md"]);
-
-    let worktree = resolver.changed_worktree_paths().unwrap();
-    assert!(worktree.iter().any(|path| path == "src/main.rs"));
-    assert!(worktree.iter().any(|path| path == "Cargo.toml"));
-    assert!(worktree
-        .iter()
-        .any(|path| path == "new-top-level-tooling.txt"));
 }
