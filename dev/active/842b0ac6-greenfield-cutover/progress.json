@@ -101,7 +101,7 @@
           "title": "Drop the unused storage type parameter from claim commands",
           "classification": "implementation",
           "model": "haiku",
-          "status": "merged-gate-pending"
+          "status": "done"
         },
         {
           "id": "4251137e-6a16-402c-ad97-91889cea4978",
@@ -423,7 +423,8 @@
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
     "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns).",
-    "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass."
+    "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass.",
+    "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
