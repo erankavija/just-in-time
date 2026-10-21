@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "The mermaid exporter declares a class for the retired `open` state, and none for three states its nodes use.\n\n## Background\n\n`crates/jit/src/visualization.rs:217-221` declares `classDef` lines including `open`. Nodes use the classes `backlog|ready|inprogress|gated|done|rejected|archived` (`:189-197`), so `backlog`, `gated` and `rejected` are undeclared and `open` is unused. `test_export_mermaid_format` (`visualization.rs:369-388`) asserts `classDef open`. `tests/cli_repo_workflow/integration_test.rs:255` asserts that a `classDef` exists. The dot exporter keeps its own per-state colour table (`visualization.rs:128-136`).\n\n`State::all()` and `State::as_str()` exist (`domain/types.rs:71-101`). Mermaid accepts underscores, so `inprogress` becomes `in_progress`.\n\n## Success Criteria\n\n- [hard] REQ-01: The mermaid exporter declares exactly one `classDef` per lifecycle state, generated from the state enumeration, and no other class.\n- [hard] REQ-02: Each node's class is its state's canonical token.\n- [hard] REQ-03: One owning test proves that the declared class set equals the state enumeration and that every node class is declared.\n\n## Notes\n\nA state-to-style table may be shared with the dot exporter.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "bc0bd663-859c-4d88-b46d-17a334f60784",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "satisfies:842b0ac6/REQ-12"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Derive mermaid state classes from the state enumeration",
+  "updated_at": "2026-10-21T00:54:34.574529728Z"
+}

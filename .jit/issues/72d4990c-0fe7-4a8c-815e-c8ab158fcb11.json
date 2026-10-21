@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "A presentation helper, `MinimalIssue::state_symbol`, lives in the domain, and the output layer holds an identical twin.\n\n## Background\n\n`MinimalIssue::state_symbol` (`crates/jit/src/domain/types.rs:746`) has one production caller, `print_issue_show_human` (`main.rs:2088`), which renders `IssueShowResponse.dependencies: Vec<MinimalIssue>` (`output.rs:1866`). `DependencyTreeNode::state_symbol` (`output.rs:1607`) maps states to the same symbols. Presentation belongs to the output layer, and two copies of one mapping diverge.\n\n## Success Criteria\n\n- [hard] REQ-01: `MinimalIssue::state_symbol` no longer exists.\n- [hard] REQ-02: One output-layer function maps a lifecycle state to its symbol, and both issue-show dependency rendering and dependency-tree rendering call it.\n- [hard] REQ-03: Human output for issue show and dependency trees is unchanged.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "72d4990c-0fe7-4a8c-815e-c8ab158fcb11",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:cli",
+    "component:core",
+    "satisfies:842b0ac6/REQ-16"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Render state symbols in the output layer",
+  "updated_at": "2026-10-21T00:54:40.257185352Z"
+}

@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "The bracket breakdown command module has no production caller. Removing it, with the code and prose that exist only for it, shrinks the command layer by about 550 lines.\n\n## Background\n\n`crates/jit/src/commands/breakdown.rs` (547 lines) is a private module (`commands/mod.rs:31`) re-exported as `BracketBreakdownResult` and `BracketChild` (`commands/mod.rs:74`). No production code calls `bracket_breakdown` or `bracket_breakdown_with_template`. The module opens one mutation session per child (`breakdown.rs:406`) and one per edge (`breakdown.rs:424,433,450`).\n\nIts consumers are tests and prose:\n\n- `crates/jit/tests/fast_docs_templates/bracket_breakdown_tests.rs` (the whole file, declared at `fast_docs_templates/main.rs:15`).\n- The breakdown halves of two tests in `fast_docs_templates/template_binding_tests.rs:162-175,207-220,272-278`, with its module doc at `:13-21`.\n- A doctest at `breakdown.rs:32-56`.\n- Module docs in `tests/cli_repo_workflow/template_binding_cli_tests.rs:18-20` and `tests/cli_gate/bracket_coverage_gate_run_test.rs:16-18,151`.\n\n`CommandExecutor::template_roles` (`commands/template.rs:103`) has one caller, `breakdown.rs:327`. Its doc comment (`template.rs:97-101`) lists breakdown as a consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: `commands/breakdown.rs`, its module declaration and its re-exports no longer exist.\n- [hard] REQ-02: `CommandExecutor::template_roles` no longer exists, and no doc comment lists breakdown as a template-role consumer.\n- [hard] REQ-03: No test, doctest or test-module doc comment names `bracket_breakdown`, `BracketChild` or `BracketBreakdownResult`.\n- [hard] REQ-04: The template-binding tests keep their template-apply and forced-refresh assertions.\n\n## Notes\n\nNothing in production consumes breakdown, so its tests are deleted, not rewritten. No test asserting the module's absence is added.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "866bdde0-94f6-4af7-b2b0-d3d454a59afe",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "satisfies:842b0ac6/REQ-01"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove the bracket breakdown module",
+  "updated_at": "2026-10-21T00:54:27.076100119Z"
+}

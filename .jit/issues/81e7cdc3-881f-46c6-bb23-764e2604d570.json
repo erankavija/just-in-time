@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "`DocumentReference` carries six builder methods under `allow(dead_code)`. Production calls none of them, and tests construct references through them from 38 places.\n\n## Background\n\nThe builders sit at `crates/jit/src/domain/types.rs:848-899`, each under `allow(dead_code)`. `with_format` and `with_assets` have no caller; the `with_format` hits at `output.rs:253` and `artifact_discovery.rs:460` belong to `artifact_plan.rs:683`. `new`, `at_commit`, `with_label` and `with_type` are called only from tests, at 38 sites:\n\n- `commands/archive.rs` (14), `domain/types.rs` (10), `domain/projection.rs` (3), `repository_state/archive.rs` (2).\n- One each in `commands/gate_check.rs`, `declarations/rules.rs`, `domain/artifact_conformance.rs`, `gate_execution.rs` and `validation/local.rs`.\n- Integration tests `tests/fast_docs_templates/artifact_discovery_tests.rs`, `tests/fast_docs_templates/artifact_inventory_tests.rs` and `tests/fast_rules/example_rulesets_tests.rs` (2).\n\nThe web `DocumentReference` TypeScript type mirrors the struct shape and is unaffected.\n\n## Success Criteria\n\n- [hard] REQ-01: `DocumentReference` has none of the six builder methods and no `allow(dead_code)`.\n- [hard] REQ-02: Tests construct references through one shared fixture, and no test file defines its own reference-building helper.\n- [hard] REQ-03: Each rewritten test asserts the property it asserted before.\n\n## Notes\n\nThe shared fixture lives in `crates/jit/src/test_utils.rs`, a public module that both unit and integration tests reach.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:testing",
+    "satisfies:842b0ac6/REQ-16"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove the DocumentReference builder methods",
+  "updated_at": "2026-10-21T00:54:40.807292747Z"
+}

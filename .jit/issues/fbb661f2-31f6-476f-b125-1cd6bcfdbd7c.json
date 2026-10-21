@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "459bb995-46f9-42d3-a83c-d50d406c0f80"
+  ],
+  "description": "`config.toml` loads silently when it holds a removed key or a typo, and the load error that does surface drops its cause. Loading becomes strict, and the error names the offending key.\n\n## Background\n\nNo `config.toml` type carries `deny_unknown_fields` except `IconConfigToml` (`crates/jit/src/config.rs:219`). The tolerant types include `JitConfig` (`:12`), `VersionConfig` (`:84`), `ProjectConfig` (`:97`), `HierarchyConfigToml` (`:205`), `ValidationConfig` (`:253`), `DocumentationConfig` (`:315`), `NamespaceConfig` (`:420`), `ItemKindConfig` (`:516`), `TomlSourceDescriptor` (`:760`, reached through the visitor at `:690-726`), `ProjectionConfig` (`:1034`), `WorktreeConfig` (`:1214`) and `CoordinationConfig` (`:1334`). No configuration type uses `flatten` or a tagged enum. All three layers deserialize `JitConfig` (`config.rs:1677-1692`), through two paths: `JitConfig::load` (`:1531`) and `declarations::parse_configuration` (`declarations/mod.rs:65-69`, also `storage/ruleset_store.rs:146`).\n\n`test_load_config_with_removed_keys_still_parses` (`config.rs:2701-2742`) asserts that stale configuration loads. Prose claims tolerance at `config.rs:248-252,415-419,1525-1529,2694-2698`.\n\nThe load error drops its cause. `JitConfig::load` wraps the error with `.context(...)` (`config.rs:1531`), and `main.rs:6989,6999` format it with `{}`, so `config validate` prints only `repo config: Failed to parse config.toml`. The declarations path already prints the TOML cause. With `deny_unknown_fields`, toml 0.8 reports ``unknown field `x`, expected one of ...``.\n\n`config set --global` writes the user file without parsing it again (`commands/config.rs:243-251`). The repository scope re-parses through `declarations_from_image` (`commands/config.rs:327`).\n\n## Success Criteria\n\n- [hard] REQ-01: Every type deserialized from `config.toml` rejects unknown fields, at each configuration layer and through both parse paths.\n- [hard] REQ-02: Loading a `config.toml` that holds an unknown key fails with an error naming the key, wherever the configuration is loaded, including `config show` and `config validate`.\n- [hard] REQ-03: `config set` parses the edited document as configuration before writing it, at both repository and global scope, and refuses an edit that would not load.\n- [hard] REQ-04: No test asserts that stale configuration loads, and no prose claims tolerance of unknown keys. One owning test proves that an unknown key is rejected by name.\n- [hard] REQ-05: No serde field alias remains on configuration types.\n\n## Notes\n\n`#[serde(skip)]` fields (`templates`, `invariants`) become unknown keys, as intended. Inline test configuration strings that carry undeclared keys are corrected (`test_utils.rs`, `test_taxonomy.rs`, `repository_state/materialize.rs` tests compose configurations from strings). `CoordinationConfig` gets the attribute like every other configuration struct, whatever fields it holds when this change lands. This repository's `.jit/config.toml` uses only declared keys.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:cli",
+    "satisfies:842b0ac6/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Reject unknown keys in config.toml",
+  "updated_at": "2026-10-21T00:54:09.217003678Z"
+}

@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "`State::from_str` accepts the retired aliases `open` and `inprogress` and folds case. A second state parser in rule declarations keeps its own token table.\n\n## Background\n\n`State::from_str` (`crates/jit/src/domain/types.rs:160-164`) lowercases its input and accepts `open` and `inprogress`. Tests assert both behaviours (`types.rs:2915-2923,2929,2931`). Serde (`#[serde(rename_all = \"snake_case\")]`, `types.rs:16-19`) is already strict. `State::all()` (`:91`) and `State::as_str()` (`:71-89`) exist.\n\nParse sites through `State::from_str`: `main.rs:2013` (search `--state`), `:3174` (list and query `--state`), `:3585` (issue update), `:3707` (bulk update), and the query `state:` filter (`query_engine/parser.rs:187-191`).\n\n`declarations/rules.rs:372-383` `token_to_state` parses rule `when.state` and label-coverage `child-state`. It rejects the aliases but also lowercases. `query_engine/error.rs:12-13` `STATE_VALUES` is a hand-maintained list.\n\nCLI tests that use the alias: `tests/cli_issue/quiet_mode_tests.rs:75` runs `issue update --state open` and asserts success. `tests/cli_query_graph/query_tests.rs:1392` runs `query -s open available` and asserts failure; it exists to prove that a parent filter is rejected, and with `open` invalid it would pass without reaching that rejection.\n\nProse naming the aliases: `query_engine/error.rs:8-11`, `declarations/rules.rs:368-370`, `dev/architecture/core-system-design.md:123`.\n\n## Success Criteria\n\n- [hard] REQ-01: `State::from_str` accepts exactly the snake_case tokens serde emits. It rejects `open`, `inprogress` and every case variant of a canonical token.\n- [hard] REQ-02: Rule declarations parse states through `State::from_str`, and no second state-token table remains.\n- [hard] REQ-03: The query language's list of state values derives from the state enumeration.\n- [hard] REQ-04: One owning unit test proves that every non-canonical token is rejected and every canonical token round-trips. The query parser's rejection error lists the canonical values.\n- [hard] REQ-05: No prose describes state aliases or case-insensitive state parsing.\n- [hard] REQ-06: CLI tests pass states as canonical tokens, and the query test for a rejected parent filter still fails on the parent filter itself.\n\n## Notes\n\nPriority parsing is out of scope.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "satisfies:842b0ac6/REQ-09"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Parse lifecycle states from canonical tokens only",
+  "updated_at": "2026-10-21T00:54:33.577873618Z"
+}

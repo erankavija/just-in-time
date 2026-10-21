@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "`agent.toml` has two Rust types that disagree on optionality, and the resolver its tests exercise is a test-only copy of the production function. One strict type remains, behind one resolver.\n\n## Background\n\n- Production type: `agent_config::AgentConfig`/`AgentSection` (`crates/jit/src/agent_config.rs:23-41`, `load()` at `:43-74`). `created_at` and `description` are required, and it tolerates a legacy `[behavior]` block (`:20-22`, test `:271-290`).\n- Test-only type: `config::AgentConfig`/`AgentIdentity` (`config.rs:1434-1481`), with every field optional, used only by six tests (`config.rs:3637-3726`), including a `[behavior]` twin test at `:3659-3676`.\n- `#[cfg(test)] fn resolve_agent_id_with_env` (`agent_config.rs:121-155`) duplicates `resolve_agent_id` (`:82-112`). Its tests (`:288-353`) call the real `AgentConfig::load()` (`:140`), which reads `dirs::config_dir()/jit/agent.toml`. `test_resolve_agent_id_no_config_error` (`:342`) therefore passes only on hosts without that file.\n- `AgentSection.default_ttl_secs` (`agent_config.rs:39-40`) is never read. `docs/reference/configuration.md:621-623` calls it \"parsed metadata only\".\n\nProduction callers of `resolve_agent_id`: `commands/claim.rs:105,241,300,435,483`, `commands/template.rs:301`, `commands/mod.rs:728,753,3269`.\n\n## Success Criteria\n\n- [hard] REQ-01: `config::AgentConfig` and `config::AgentIdentity` no longer exist, and `agent_config::AgentConfig` is the only agent configuration type.\n- [hard] REQ-02: The resolver function the tests call is the one production calls, with the environment lookup and the configuration loader as parameters. No `cfg(test)` copy remains.\n- [hard] REQ-03: Resolver tests read no host configuration file or process environment variable.\n- [hard] REQ-04: An `agent.toml` with an unknown key, including a `[behavior]` block, fails to load with an error naming the key.\n- [hard] REQ-05: `default_ttl_secs` is not an agent configuration field, and the configuration reference does not document it.\n\n## Notes\n\n`created_at` and `description` stay required, as production has them. Tests for the removed type are deleted.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "5e846743-174b-4385-9c95-a700a8df6587",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:docs",
+    "satisfies:842b0ac6/REQ-05",
+    "satisfies:842b0ac6/REQ-04"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Keep one agent configuration type",
+  "updated_at": "2026-10-21T00:54:29.776876418Z"
+}

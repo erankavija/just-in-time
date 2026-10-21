@@ -1,0 +1,52 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "0e3b69fc-1af7-4cc8-9089-96f2debd6324",
+    "2492ab29-2047-4bae-9cdc-d17749f1e515",
+    "287eef78-ee7b-4d2b-a1ec-1f38f75ce678",
+    "4251137e-6a16-402c-ad97-91889cea4978",
+    "45b442f3-fe6d-4626-af72-905c6f25d388",
+    "4c216a28-9362-4e0d-9ccd-e5cd43f9093b",
+    "52732879-2ab3-4475-8d07-a8718ef0cc15",
+    "58282882-59d6-4e0c-b47b-f49a8ca11cc3",
+    "5e846743-174b-4385-9c95-a700a8df6587",
+    "69af08af-ead8-4939-8d82-8f9017b82914",
+    "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
+    "72d4990c-0fe7-4a8c-815e-c8ab158fcb11",
+    "81e7cdc3-881f-46c6-bb23-764e2604d570",
+    "8397eb74-827c-46e5-9f59-7e67c534ed0e",
+    "84745746-91d9-41d0-b120-f1e5e806a9d2",
+    "866bdde0-94f6-4af7-b2b0-d3d454a59afe",
+    "9aa54649-ae13-46da-bc35-6ec20f085b78",
+    "afc2b698-34bb-43d1-b7e2-c859de8d8104",
+    "bc0bd663-859c-4d88-b46d-17a334f60784",
+    "cd7b6c4a-5555-48a5-b9a9-b3ba19441015",
+    "d759d606-cf7b-4548-9fbe-bcf48793856e",
+    "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
+    "e1af39db-860f-4715-9e68-b9d126a81c12",
+    "ec190bd5-af89-4776-969f-81f48412592a",
+    "fbb661f2-31f6-476f-b125-1cd6bcfdbd7c"
+  ],
+  "description": "Items defined in `domain/types.rs` are imported both through the `domain` facade and through `domain::types::`, and the facade's glob re-export is justified as backward compatibility.\n\n## Background\n\n`crates/jit/src/domain/mod.rs:44-45` re-exports `types::*` \"for backward compatibility\". About 546 references in 128 files use the facade (`domain::X`). There are 339 `domain::types::` lines in 36 files. Of those, 333 are `crate::domain::types::fixture_issue`, a `#[cfg(test)] pub(crate)` fixture (`domain/types.rs:491-492`). The other six are `domain/projection.rs:47,216`, `commands/worktree.rs:751`, `domain/store_divergence.rs:167` and two rustdoc lines in `validation/graph.rs:87-88`. Inside `domain/`, two `super::types` references remain.\n\nA glob `pub use` re-exports `pub(crate)` items at `pub(crate)` visibility, so `crate::domain::fixture_issue` resolves in test builds. Once `mod types` is private, the compiler rejects any second path.\n\n## Success Criteria\n\n- [hard] REQ-01: `domain::types` is a private module, and every item defined in `domain/types.rs` is reached as `domain::<Item>`.\n- [hard] REQ-02: No source, test or rustdoc path names `domain::types::`.\n- [hard] REQ-03: `domain/mod.rs` carries no backward-compatibility justification for a re-export.\n\n## Notes\n\nThe change is mechanical, with zero semantic change, and can be re-run after a rebase. The footprint lists the 39 files that name the path, measured by search at planning time; a file that gains such a path later is rewritten the same way.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b4929342-6c7c-4f35-8e18-c8cbb0ec526c",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "satisfies:842b0ac6/REQ-14"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Import domain type items through the domain facade",
+  "updated_at": "2026-10-21T00:54:09.217003678Z"
+}

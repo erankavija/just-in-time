@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "`web/src/types/hierarchy.ts` is imported by nothing, and it hardcodes a strategic-level threshold.\n\n## Background\n\nA scan of `web/src` (67 files, resolving `import`, `export from`, dynamic `import()` and `vi.mock`) finds every non-entry module imported except `src/types/hierarchy.ts`. The roots that are not imported by design are `src/main.tsx` (`web/index.html:11`), `src/test/setup.ts` (`vitest.config.ts:9`), `src/vite-env.d.ts` (ambient) and the test files. `hierarchy.ts` imports nothing, and no documentation references it. Its lines 43-45 hardcode strategic as `level <= 2`.\n\n## Success Criteria\n\n- [hard] REQ-01: `web/src/types/hierarchy.ts` no longer exists.\n- [hard] REQ-02: Every module under `web/src` other than the entry points and test files is imported by the application or its tests.\n\n## Notes\n\nNo import-graph guard is added.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "npm-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:web",
+    "satisfies:842b0ac6/REQ-25"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove the orphaned web hierarchy module",
+  "updated_at": "2026-10-21T00:54:45.508470686Z"
+}

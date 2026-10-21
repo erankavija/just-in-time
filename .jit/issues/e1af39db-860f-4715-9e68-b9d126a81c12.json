@@ -1,0 +1,29 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "Enforcement drift has a strict function that only its own tests call, beside the tolerant function production uses. One function remains, under the plain name.\n\n## Background\n\n`drift::enforcement_drift` (`crates/jit/src/validation/drift.rs:107`) has 11 callers, all of them tests in `drift.rs:252-376`. Production calls `enforcement_drift_tolerant` at `commands/validate.rs:1743,1777` and `validation/repository.rs:613,618`. The `_tolerant` suffix exists only to tell it apart from the strict twin. Its rustdoc says its semantics \"extend [`enforcement_drift`]\" (`drift.rs:149`).\n\n## Success Criteria\n\n- [hard] REQ-01: The test-only strict function no longer exists, and the surviving function is named `enforcement_drift`.\n- [hard] REQ-02: No identifier, call site or doctest names `enforcement_drift_tolerant`.\n- [hard] REQ-03: The drift tests exercise the surviving function with loaded rule and gate sources (`SourceState::Loaded`), covering the cases the strict-function tests covered.\n- [hard] REQ-04: The surviving function's rustdoc states its own semantics and refers to no removed function.\n\n## Notes\n\nThe tests stay in the pure validation layer.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "e1af39db-860f-4715-9e68-b9d126a81c12",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:validation",
+    "satisfies:842b0ac6/REQ-01"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Keep one enforcement drift function",
+  "updated_at": "2026-10-21T00:54:28.179894720Z"
+}

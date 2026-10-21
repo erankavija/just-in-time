@@ -1,0 +1,33 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "Both shipped profiles still declare manifest version 1. The decoder accepts versions 1 and 2, and they hash package identity differently. Version 2 becomes the only wire version.\n\n## Background\n\n- `profiles/jit-default/manifest.toml:10` and `profiles/jit-dogfood/manifest.toml:4` declare `manifest-version = 1`. The dogfood manifest's `dependencies = [\"jit-default\"]` becomes a `[[dependency]]` table, which version 1 decoded as requirement `\"*\"` (`crates/jit/src/profile/wire.rs:84-90`).\n- `docs/reference/profiles.md:93-99` says the decoder \"continues to accept version-1 manifests\".\n- Version-1 decoding parses the TOML four times (`wire.rs:52`, `:72`, and twice at `:96` through `v1_declares_template_field`). It hashes canonical JSON of the wire (`:79`, through `canonicalize` at `:240-253`), while version 2 hashes the source bytes (`:156`). The error text is at `wire.rs:17,42-43`.\n- Twelve files spell version 1: the two profiles; fixtures `crates/jit/tests/fixtures/profile-packages/{synthetic-valid,planner-asset-only,planner-invalid-interpolation}/manifest.toml`; inline strings in `profile/manifest.rs:422`, `profile/package.rs` (the version-1 literal and the `legacy_v1_identity_hash` oracle, `:1040-1114,1225-1243`), `profile/package_capture.rs:871`, `wire.rs` tests (`:261-300,370-420`), `commands/profile.rs`, `test_utils.rs`, `tests/cli_repo_workflow/{profile_cli_tests.rs,profile_edit_refresh_cli_tests.rs}`; and `scripts/release_version_contract_test.py:172`.\n- `scripts/release-version-contract.py:466-468` reads the version-1 key `jit` from the dogfood manifest.\n- `profile/package.rs:1465` pins the synthetic-valid package hash.\n- The decoder-ownership authority test (`crates/jit/tests/scratch_build/repository_state_cutover_tests.rs:1382`) checks `profile/wire.rs`.\n\nTarget hashes derive from canonical contributions and do not change. This repository records no applied-profile hash.\n\n## Success Criteria\n\n- [hard] REQ-01: Both shipped profiles, every fixture and every inline test manifest declare `manifest-version = 2`.\n- [hard] REQ-02: The decoder rejects every other version with an error naming the version, and it parses a manifest once.\n- [hard] REQ-03: Package identity hashes the manifest source bytes. The version-1 types, the version-1 decoder, the template-field probe and the canonical-JSON identity function no longer exist.\n- [hard] REQ-04: `scripts/release-version-contract.py` reads `compatible-jit`, and its test fixture uses the version-2 form.\n- [hard] REQ-05: `docs/reference/profiles.md` documents version 2 alone.\n- [hard] REQ-06: The decoder-ownership authority test asserts the decoder's current ownership. Regenerating the template region and the project projections produces no diff, and repository validation passes here.\n\n## Notes\n\nThe pinned synthetic-valid hash is re-derived or replaced by a relational assertion. The legacy-identity oracle test is deleted. If the identity change invalidates an applied-profile record in this repository, the dogfood profile is re-applied in the same change.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "756ec5ec-4cae-4e18-b67d-96c3a6d7ecd9",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:docs",
+    "component:release",
+    "satisfies:842b0ac6/REQ-06"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Keep one profile manifest version",
+  "updated_at": "2026-10-21T00:54:30.461231616Z"
+}

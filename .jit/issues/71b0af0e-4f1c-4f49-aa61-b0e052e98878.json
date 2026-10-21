@@ -1,0 +1,30 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "6792cc41-d648-45f1-a1f9-f19ddf2a0cae"
+  ],
+  "description": "The type taxonomy carries an error enum whose only constructed variant every caller discards, an error variant nothing constructs, and a test-only membership checker with its validation-issue variant.\n\n## Background\n\nIn `crates/jit/src/domain/type_taxonomy.rs`:\n\n- `HierarchyError` (`:66-74`). Its `InvalidLabel` variant is constructed by `extract_type` (`:231`), whose callers (`:330,377,426`) all discard the error with `Err(_)`. `UnknownType` is never constructed (`allow(dead_code)` at `:69`). Tests are at `:657-676`.\n- `ConfigError::DuplicateType` (`:128`, `allow(dead_code)`) is never constructed.\n- `detect_membership_issues` (`:478`, `allow(dead_code)`) has only test callers: the whole of `crates/jit/tests/fast_rules/label_membership_validation_tests.rs` (10 tests, declared at `fast_rules/main.rs:14`). It is the only constructor of `ValidationIssue::InvalidMembershipReference` (`:86`, built at `:527,550`). That variant is matched in `generate_fixes` (`:599`) and in `commands/validate.rs:1509`.\n\nProduction checks membership references through rule label-reference assertions in `validation/graph.rs`.\n\n## Success Criteria\n\n- [hard] REQ-01: `HierarchyError` no longer exists, and `extract_type` returns an `Option`.\n- [hard] REQ-02: `ConfigError::DuplicateType` no longer exists.\n- [hard] REQ-03: `detect_membership_issues`, `ValidationIssue::InvalidMembershipReference` and their match arms no longer exist, and the membership validation test file is deleted.\n- [hard] REQ-04: The taxonomy module holds no `allow(dead_code)` on an error type or validation function.\n\n## Notes\n\nThe orphan-validation code in the same module is unaffected.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T00:54:09.217003678Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "71b0af0e-4f1c-4f49-aa61-b0e052e98878",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:validation",
+    "satisfies:842b0ac6/REQ-16"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "Remove dead taxonomy error and membership types",
+  "updated_at": "2026-10-21T00:54:38.592583715Z"
+}

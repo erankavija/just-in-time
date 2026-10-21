@@ -1,0 +1,32 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T00:54:09.217003678Z",
+  "dependencies": [
+    "af9a5509-51c2-4a3b-9881-b870603ab71c"
+  ],
+  "description": "Configuration defaults are written in several places: a per-layer accessor, a merged accessor, two printers and the prose. Each default gets one named statement that every reader derives from.\n\n## Background\n\nThe defaults and where each is stated:\n\n- `enforce_leases` (`Strict`): `crates/jit/src/config.rs:1317,1820,1966` and `main.rs:6807,6849`; prose at `docs/reference/configuration.md:482`. Which mode commands enforce, and how the value resolves across layers and the environment (including the no-section path at `config_manager.rs:111`), is owned elsewhere. This change moves where the default value is stated, not how it resolves.\n- `[coordination]` timing keys: their declarations are being reduced elsewhere. Whichever of them still exist when this change lands are in scope like any other default.\n- `max_indefinite_leases_per_agent = 2`: `config.rs:1364,2065`; prose at `configuration.md:560` and `profiles/jit-default/manifest.toml:453`.\n- `max_indefinite_leases_per_repo = 10`: `config.rs:1368,2084`; prose at `configuration.md:564` and `manifest.toml:454`.\n- `write_policy` is already one constant, `LinkedCheckoutWriteStance::DEFAULT`.\n\nOnly tests call the per-layer accessors (`config.rs:1335-1428`; tests at `:3508-3587`). Production uses the `Merged*` accessors (`config.rs:2009-2172`): `commands/claim.rs:112,143-144`, the printers, and `full_snapshot`. `config show` (`main.rs`) and `EffectiveConfig::full_snapshot` (`config.rs`) print the same merged view, each with its own `unwrap_or` defaults.\n\n`crates/jit/src/runtime_defaults.rs` already projects named defaults into `docs/reference/runtime-defaults.md` (`scripts/generate-runtime-defaults-reference.sh`).\n\n## Success Criteria\n\n- [hard] REQ-01: Each configuration default present when the change lands, including the `enforce_leases` default and any remaining `[coordination]` timing key, is stated once as one named constant, and no accessor, printer or prose restates its value.\n- [hard] REQ-02: No per-layer default accessor remains, and the effective configuration reads each key's layers through one layered lookup over the repository, user and system layers.\n- [hard] REQ-03: The resolution behaviour of `enforce_leases` across layers and the environment, and the mode commands enforce, are unchanged by this change.\n- [hard] REQ-04: `config show` renders the same merged snapshot that `config get` returns.\n- [hard] REQ-05: The runtime-defaults reference projects the lease-limit defaults, and the configuration reference and the `jit-default` profile comment cite it in place of the numbers.\n\n## Notes\n\nConfiguration file I/O stays in `config.rs`; `main.rs` only renders. Each criterion holds in any order relative to the in-flight work on the `[coordination]` timing keys and on `enforce_leases` resolution. The criteria cover the keys that exist when this change lands, and the change neither adds nor removes keys.\n",
+  "documents": [],
+  "gates_required": [
+    "cargo-ci",
+    "code-review",
+    "doc-review",
+    "docs-mechanical"
+  ],
+  "gates_status": {},
+  "id": "459bb995-46f9-42d3-a83c-d50d406c0f80",
+  "labels": [
+    "type:task",
+    "epic:greenfield-cutover",
+    "milestone:v1.0",
+    "per:@/charter/D-18",
+    "component:core",
+    "component:cli",
+    "component:docs",
+    "satisfies:842b0ac6/REQ-03"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "State each configuration default once",
+  "updated_at": "2026-10-21T00:54:09.217003678Z"
+}

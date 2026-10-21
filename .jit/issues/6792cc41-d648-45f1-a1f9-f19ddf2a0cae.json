@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-842b0ac6",
+  "claimed_at": "2026-10-21T00:54:07.470770863Z",
   "context": {},
   "created_at": "2026-10-20T20:17:42.709764601Z",
   "dependencies": [
@@ -40,7 +41,7 @@
     "brackets:842b0ac6"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "in_progress",
   "title": "breakdown: Remove dead code and compatibility shims across the workspace",
-  "updated_at": "2026-10-21T00:53:53.587416371Z"
+  "updated_at": "2026-10-21T00:54:08.581311202Z"
 }
