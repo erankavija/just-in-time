@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ffb25059bbbd1c7d8a757d6ddd0e32e491d502f7",
+  "completed_at": "2026-10-21T05:50:37.331236078Z",
+  "duration_ms": 273313,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All issue-scoped hard requirements are satisfied with passing recorded MCP validation.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bc7eb715-9c7f-47ff-bbd6-5d63fee3f123",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "0669a5d1-e5c4-4b63-82e2-a925ecb172b5",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T05:46:04.017316245Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: `3f26f2950` (`jit:bc7eb715`); `mcp-server/index.js`, `mcp-server/lib/cli-executor.js`, `mcp-server/test-unit.js`\nPolicy sources: `AGENTS.md` (repository root; no nested policy applies)\nResolved items: `@/issue/bc7eb715/requirement/REQ-01`, `REQ-02`, `REQ-03`; `@/issue/df129d9e/requirement/REQ-15`; `@/invariant/essential-code-prose`, `orthogonal-tests`, `semantic-test-assertions`, `shared-test-contracts` (configured registries)\nGate evidence: `mcp-ci` passed, exit 0, 2026-10-21T05:45:57Z; `code-review` was pending for this judgment\nTruncation recovery: narrowed reads of relevant plan, investigation, test-conformance, and gate-history ranges\n\n1. No findings. The request path forwards `global_options` at `mcp-server/index.js:286`; `buildCliArgs` handles leaf/global JSON declarations and deduplication at `mcp-server/lib/cli-executor.js:121-145`; focused unit coverage verifies all required schema shapes at `mcp-server/test-unit.js:219-242` and `839-873`.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All issue-scoped hard requirements are satisfied with passing recorded MCP validation.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
