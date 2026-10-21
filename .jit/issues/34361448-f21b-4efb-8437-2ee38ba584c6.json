@@ -28,7 +28,7 @@
     "satisfies:842b0ac6/REQ-26"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Resolve the coordination lease limits through one resolver",
-  "updated_at": "2026-10-21T05:49:14.228034890Z"
+  "updated_at": "2026-10-21T21:07:16.057597829Z"
 }

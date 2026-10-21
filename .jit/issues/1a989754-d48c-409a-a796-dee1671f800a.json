@@ -28,9 +28,9 @@
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
-      "run_id": "2b970cb0-4cb2-47b2-badd-d0d86a1237d9",
-      "status": "failed",
-      "updated_at": "2026-10-21T20:55:15.509616161Z",
+      "run_id": "bfe2115e-bed5-4f21-8bc5-1493f9eb0016",
+      "status": "passed",
+      "updated_at": "2026-10-21T21:05:59.439623684Z",
       "updated_by": "auto:executor"
     }
   },
@@ -47,5 +47,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the profile selector tags",
-  "updated_at": "2026-10-21T20:55:15.509616161Z"
+  "updated_at": "2026-10-21T21:05:59.439623684Z"
 }

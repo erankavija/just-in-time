@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "926991e434396337477805f6310fe19363d8f5ab",
+  "completed_at": "2026-10-21T20:59:37.939064768Z",
+  "duration_ms": 81391,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The lifecycle-timestamp backfill removal is accurately and concisely reflected throughout its documentation impact cone.",
+    "verdict": "pass"
+  },
+  "gate_key": "doc-review",
+  "issue_id": "2492ab29-2047-4bae-9cdc-d17749f1e515",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "822a21b4-713e-48b5-addd-2e719798d0d6",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T20:58:16.547176414Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: leaf task (type level 4; no resolved children). I inspected tagged commits `bd8d1b7` and merge `e608637` separately with rename detection. Their union removes the obsolete command/event and its documentation. Current CLI has no `migrate` command; validation passes with the retained retired event record; the generated event-reference freshness test was started but did not complete within the review window.\n\nDocumentation impact: the affected reference, grammar, storage, guarantees, and event catalog pages accurately remove the obsolete surface without leaving stale links or duplicate guidance. No README update is needed for this removed maintenance command.\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The lifecycle-timestamp backfill removal is accurately and concisely reflected throughout its documentation impact cone.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
