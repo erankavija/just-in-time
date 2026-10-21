@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "7c5a78a60bc75df9b594554f4b2cf71682cfffdc",
+  "completed_at": "2026-10-21T06:08:08.171823081Z",
+  "duration_ms": 332465,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are satisfied by the attributed manifest and enforcement-prose changes.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "9ca31c64-f3ee-419b-b31c-2c883ae6132e",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "8c50d75f-d7c0-4513-a312-06effaa6526f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:02:35.706196662Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: e84318f92, 10c8ac052 (jit:9ca31c64)\nPolicy sources: AGENTS.md\nResolved items: @/issue/df129d9e/requirement/REQ-06 (.jit issue Markdown); @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T05:59:32Z)\nTruncation recovery: targeted reads of plan.md lines 1-30, 89-93, and 497-501; remaining generated decomposition was outside this footprint\n\n1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are satisfied by the attributed manifest and enforcement-prose changes.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\n\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
