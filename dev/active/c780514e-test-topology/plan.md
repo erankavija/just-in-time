@@ -18,7 +18,7 @@ Fixtures land first, then the per-target migrations onto them; owners gain missi
 | REQ-07 | `shipped-item-kinds-fixture` derivation (wave 1), then one adoption each for the harness tables, command unit tests, `cli_item_validate` and `fast_rules`. | §1 #20–#21 |
 | REQ-08 | `issue-store-conformance` (absorbs the three ad-hoc tests), then the in-memory path-read fix, then backend-test pruning. | §1 #22–#24 |
 | REQ-09 | The receipt env lock goes with the runner hook; an audit puts unguarded environment readers under `EnvGuard`. | §1 #25, §4 |
-| REQ-10 | `script-self-test-gates`: every repository shell-script self-test becomes a declared gate (investigation §D.7). The three that the default suite wraps leave it, and seven that ran nowhere or only in CI gain gates, including three skill-script suites under `.agents/`. The corpus setup's nested cargo test is replaced by an in-suite fixture, and the cargo and node skips fail. | §1 #26–#28, #32, §D.5, §D.7 |
+| REQ-10 | `script-self-test-gates`: every repository shell-script self-test becomes a declared gate (investigation §D.7). The three that the default suite wraps leave it, and seven that ran nowhere or only in CI gain gates, including three skill-script suites under `.agents/`. The corpus setup's nested cargo test is replaced by an in-suite fixture, and every skip-and-pass path fails instead: the cargo and node skips, the root-only lock tests, and the read-bit and actionlint skips inside the docs-check and workflow-contract self-tests. | §1 #26–#28, #32, §D.5, §D.7 |
 | REQ-11 | `input-keyed-fixture-cache`, then removal of the hidden subcommand, receipts and setup scripts. | §1 #29–#32, §A |
 | REQ-12 | Final footprint report under `suite-measurement-protocol`. | §1 #34, §C |
 | REQ-13 | Early relief: input key, in-memory rule-warning tests, short-deadline server drain, doctest pruning. Final suite-clock report. | §A; D-01 |
@@ -70,7 +70,7 @@ This covers every shell-script self-test in the repository (investigation §D.7)
 
 Shell files that test no script (CI replays, product walkthroughs, image smoke, the MCP test runner) are recorded as such in §D.7.
 
-`scripts/setup-recorded-failure-corpus.sh --self-test` is deleted together with its script. Each self-test is a `.jit/gates.toml` gate with `[gates.inputs]` covering the script and what it exercises. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test, and no test passes by printing a skip notice. New gates carry `mode` and no deprecated `auto` key.
+`scripts/setup-recorded-failure-corpus.sh --self-test` is deleted together with its script. Each self-test is a `.jit/gates.toml` gate with `[gates.inputs]` covering the script and what it exercises. Any non-zero exit fails the gate, including exit 2 for a missing tool. No default-suite test wraps a script self-test. No test or self-test passes by printing a skip notice, whether a tool is missing or a host precondition such as an enforced read bit is absent: it establishes the precondition or fails. Investigation §D.5 lists each skip-and-pass path and its owner, and the matches that are not test skips. New gates carry `mode` and no deprecated `auto` key.
 
 ### `suite-measurement-protocol` [plan-fixed] — How suite cost is measured
 
@@ -111,7 +111,7 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | profile-suite-selftest-gate | Suite-profiler self-test runs as a declared gate | task | The suite profiler self-test runs as its own gate over the script, outside the default suite. | script-self-test-gates | REQ-10 | touches 2 | — | — |
 | build-budget-selftest-gate | Build-budget checker self-test runs as a declared gate | task | The build-budget checker's cases run as the script's own self-test under a declared gate. | script-self-test-gates | REQ-10 | touches 4 | — | — |
 | dependency-policy-tool-failure | Dependency-feature policy tests fail when cargo is missing | task | The dependency-feature policy tests use the running toolchain's cargo and fail rather than skip. | script-self-test-gates | REQ-10 | touches 1 | — | — |
-| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, server-shutdown-test-bound, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure, docs-check-selftest-gate, shipped-policy-regions-selftest-gate, workflow-contract-selftest-gate, session-cost-benchmark-selftest-gate, standards-scan-test-gate, standards-fix-test-gate, manifest-tool-test-gate |
+| build-footprint-report | Build-footprint figures before and after the epic are reported | task | A benchmark note records integration targets and active test-executable bytes before and after. | suite-measurement-protocol | REQ-12 | creates 1 | — | exit-code-envelope-ownership, query-graph-ownership, storage-contracts, shared-test-fixtures, failure-corpus-in-suite, server-shutdown-test-bound, doctest-substep-bound, cargo-ci-selftest-gate, profile-suite-selftest-gate, build-budget-selftest-gate, dependency-policy-tool-failure, mcp-parity-tool-failure, docs-check-selftest-gate, shipped-policy-regions-selftest-gate, workflow-contract-selftest-gate, session-cost-benchmark-selftest-gate, standards-scan-test-gate, standards-fix-test-gate, manifest-tool-test-gate, lock-tests-deterministic-precondition |
 | suite-clock-report | Suite clock before and after the epic is reported | task | The benchmark note records the suite clock before and after, and a per-test profile with no test over 5 s. | suite-measurement-protocol | REQ-13, D-01 | touches 1 | — | build-footprint-report |
 | exit-code-envelope-case-moves | Blocked-transition and startup envelope cases move beside their owners | task | Blocked-transition and startup-envelope cases live in the error-envelope suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness |
 | exit-code-claim-delete-case-moves | Claim and confirmed-delete cases move beside their owners | task | Claim and confirmed-delete cases live in the claim and lifecycle suites with their non-exit assertions. | exit-code-projection-ownership, cli-process-fixture | REQ-01, D-04 | touches 2 | — | exit-code-binding-completeness, cli-repo-checkout-migration, cli-repo-workflow-migration |
@@ -164,13 +164,14 @@ Shell files that test no script (CI replays, product walkthroughs, image smoke, 
 | auto-transition-harness-owner | Lifecycle harness tests stop re-proving the auto-transition cascade | task | Lifecycle harness tests assert timestamps only, and one harness test owns the cascade wiring. | domain-query-ownership | REQ-02 | touches 1 | — | auto-transition-domain-decision |
 | batch-cycle-adapter-reproof-removal | Batch-create stops re-proving keyed cycle detection | task | Batch-create keeps at most one adapter wiring test, and graph tests own keyed cycle detection. | domain-query-ownership | REQ-02 | touches 1 | — | — |
 | cli-cycle-reproof-removal | Workflow CLI tests stop re-proving dependency cycle rejection | task | integration_test.rs holds no dependency cycle re-proof. | domain-query-ownership | REQ-02 | touches 1 | — | cli-repo-workflow-migration |
-| docs-check-selftest-gate | Documentation checker self-test runs as a declared gate | task | The documentation checker self-test runs as its own gate over the checkers. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| docs-check-selftest-gate | Documentation checker self-test runs as a declared gate | task | The documentation checker self-test runs as its own gate over the checkers. | script-self-test-gates | REQ-10 | touches 2, uncertain | — | — |
 | shipped-policy-regions-selftest-gate | Shipped-policy region generator self-test runs as a declared gate | task | The shipped-policy region generator self-test runs as its own gate over the generator. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
-| workflow-contract-selftest-gate | Workflow-contract harness self-test runs as a declared gate | task | The workflow-contract self-test runs as its own gate over the harness and its vectors. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| workflow-contract-selftest-gate | Workflow-contract harness self-test runs as a declared gate | task | The workflow-contract self-test runs as its own gate over the harness and its vectors. | script-self-test-gates | REQ-10 | touches 2, uncertain | — | — |
 | session-cost-benchmark-selftest-gate | Session-cost benchmark self-test runs as a declared gate | task | The session-cost benchmark self-test runs as its own gate over the benchmark script. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
 | standards-scan-test-gate | Standards-scan test suite runs as a declared gate | task | The standards-scan test suite runs as its own gate over the scanner. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
 | standards-fix-test-gate | Standards-fix test suite runs as a declared gate | task | The standards-fix test suite runs as its own gate over the fixer. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
 | manifest-tool-test-gate | Breakdown-manifest tool test suite runs as a declared gate | task | The breakdown-manifest tool test suite runs as its own gate over the tool and its fixtures. | script-self-test-gates | REQ-10 | touches 1, uncertain | — | — |
+| lock-tests-deterministic-precondition | Read-only lock tests establish their precondition on any host | task | The four read-only lock tests run their assertions on any host and never pass by skipping. | — | REQ-10 | touches 1 | — | — |
 | exit-code-envelope-ownership | Exit codes and list envelopes each have one owning test | story | command exit codes and the list-envelope count each have one owning test | — | REQ-01, REQ-04 | — | — | exit-code-reproof-deletion, cli-issue-list-envelope-reassertion-removal, cli-query-graph-list-envelope-reassertion-removal, cli-repo-workflow-list-envelope-reassertion-removal, exit-code-reassertion-cli-gate, exit-code-reassertion-cli-issue, exit-code-reassertion-cli-query-graph, exit-code-reassertion-cli-item-validate, exit-code-reassertion-cli-repo-workflow |
 | query-graph-ownership | Query, transition and cycle semantics are proven at the domain and graph layers | story | query filters, auto-transitions and cycle detection are owned by domain and graph tests, with CLI and harness tests reduced to wiring | — | REQ-02 | — | — | query-cli-wiring-reduction, auto-transition-wiring-reduction, auto-transition-harness-owner, batch-cycle-adapter-reproof-removal, cli-cycle-reproof-removal, harness-demo-deletion, label-query-cli-wiring-reduction, label-query-harness-reduction |
 | storage-contracts | Storage behaviour is proven once per contract | story | finalization is proven in repository state and every IssueStore backend runs one conformance suite | — | REQ-03, REQ-08 | — | — | backend-specific-test-pruning |
@@ -269,11 +270,12 @@ flowchart LR
     N87["standards-scan-test-gate: Standards-scan test suite runs as a declared gate"]
     N88["standards-fix-test-gate: Standards-fix test suite runs as a declared gate"]
     N89["manifest-tool-test-gate: Breakdown-manifest tool test suite runs as a declared gate"]
-    N90["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
-    N91["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
-    N92["storage-contracts: Storage behaviour is proven once per contract"]
-    N93["shared-test-fixtures: Tests run on shared fixtures and guards"]
-    N94["suite-cost: The default suite runs within its time and footprint budgets"]
+    N90["lock-tests-deterministic-precondition: Read-only lock tests establish their precondition on any host"]
+    N91["exit-code-envelope-ownership: Exit codes and list envelopes each have one owning test"]
+    N92["query-graph-ownership: Query, transition and cycle semantics are proven at the domain and graph layers"]
+    N93["storage-contracts: Storage behaviour is proven once per contract"]
+    N94["shared-test-fixtures: Tests run on shared fixtures and guards"]
+    N95["suite-cost: The default suite runs within its time and footprint budgets"]
     N0 --> N1
     N0 --> N2
     N44 --> N2
@@ -304,10 +306,10 @@ flowchart LR
     N21 --> N22
     N22 --> N23
     N3 --> N23
-    N90 --> N30
     N91 --> N30
     N92 --> N30
     N93 --> N30
+    N94 --> N30
     N23 --> N30
     N43 --> N30
     N25 --> N30
@@ -323,6 +325,7 @@ flowchart LR
     N87 --> N30
     N88 --> N30
     N89 --> N30
+    N90 --> N30
     N30 --> N31
     N10 --> N32
     N10 --> N33
@@ -390,48 +393,48 @@ flowchart LR
     N8 --> N79
     N13 --> N80
     N8 --> N82
-    N11 --> N90
-    N72 --> N90
-    N73 --> N90
-    N74 --> N90
-    N34 --> N90
-    N35 --> N90
-    N36 --> N90
-    N37 --> N90
-    N38 --> N90
-    N76 --> N91
-    N79 --> N91
-    N80 --> N91
-    N81 --> N91
-    N82 --> N91
-    N15 --> N91
-    N77 --> N91
-    N78 --> N91
-    N20 --> N92
-    N1 --> N93
-    N2 --> N93
-    N3 --> N93
-    N5 --> N93
-    N6 --> N93
-    N7 --> N93
-    N8 --> N93
-    N59 --> N93
-    N60 --> N93
-    N61 --> N93
-    N46 --> N93
-    N47 --> N93
-    N48 --> N93
-    N49 --> N93
-    N55 --> N93
-    N56 --> N93
-    N57 --> N93
-    N58 --> N93
-    N63 --> N93
-    N64 --> N93
-    N66 --> N93
-    N68 --> N93
-    N9 --> N93
-    N31 --> N94
+    N11 --> N91
+    N72 --> N91
+    N73 --> N91
+    N74 --> N91
+    N34 --> N91
+    N35 --> N91
+    N36 --> N91
+    N37 --> N91
+    N38 --> N91
+    N76 --> N92
+    N79 --> N92
+    N80 --> N92
+    N81 --> N92
+    N82 --> N92
+    N15 --> N92
+    N77 --> N92
+    N78 --> N92
+    N20 --> N93
+    N1 --> N94
+    N2 --> N94
+    N3 --> N94
+    N5 --> N94
+    N6 --> N94
+    N7 --> N94
+    N8 --> N94
+    N59 --> N94
+    N60 --> N94
+    N61 --> N94
+    N46 --> N94
+    N47 --> N94
+    N48 --> N94
+    N49 --> N94
+    N55 --> N94
+    N56 --> N94
+    N57 --> N94
+    N58 --> N94
+    N63 --> N94
+    N64 --> N94
+    N66 --> N94
+    N68 --> N94
+    N9 --> N94
+    N31 --> N95
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -451,7 +454,7 @@ flowchart LR
 | Doctest bound | Chosen: prune rustdoc examples that restate unit-tested properties (`@/inv/essential-code-prose`) until the substep meets the bound. Rejected: an edition-2024 bump for merged doctests, a workspace-wide migration outside this epic. |
 | Server drain test | Chosen: a unit test of `run_shutdown_sequence` passes a short deadline (its existing parameter) to own the entitlement, and the process test uses the existing short-deadline seam. Rejected: a paused tokio clock, which needs the `test-util` dependency feature (`@/inv/bounded-rust-build-footprint`); shortening `GRACEFUL_DRAIN_TIMEOUT`, which changes product behaviour. |
 | A test over 5 s at report time | `suite-clock-report`'s criterion fails if any test exceeds 5 s, so the report cannot pass over a regression. The execution lead adds a remediation terminal under `suite-cost` for each named test (owning the move down a layer, like the rule-warning and server cases), makes the report depend on it, and re-runs the report. The likeliest candidates are the two `profile_cli_tests` cases (3.66 s quiet). |
-| Root-only lock-test skip | `storage/lock.rs:652` skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool, so it is outside REQ-10. It stays and is recorded in investigation §D.5. |
+| Steward ruling: execution order | Waves 1–2 are on 2195c98f's critical path: the IssueId retype chain (0af95f14 onward) depends on the overlap-derived c780514e terminals in the external-edge table; the steward assigns c780514e execution with waves 1–2 first. |
 | Measurement ordering | Chosen: `build-footprint-report` depends on the four other stories and the remaining suite-cost terminals, so "after" covers all changes. Risk: the stories' holistic reviews then sit on the critical path to the report. |
 | Same-file ordering | `exit-code-dependency-guard-case-moves` → `label-query-cli-wiring-reduction` → `exit-code-reassertion-cli-query-graph` serialises `query_json_tests.rs` and `label_query_json_tests.rs`; the wiring cut keeps the moved parent-filter guard. `fast-rules-memory-executor-adoption` → `fast-rules-memory-setup-adoption` → `label-query-harness-reduction` and `fast-rules-shipped-item-kinds` serialise the `fast_rules` executor files. The rule-warning move precedes `fast-rules-file-setup-adoption`, and `cli-query-graph-fixture-issue-adoption` precedes `cli-query-graph-migration` (`main.rs`). Query reductions depend on `query-domain-owner-gaps`, so each cut lands with its domain owner already present. |
 | Shared-file contention | `test_utils.rs`, `dev/TESTING.md`, `.jit/gates.toml`, `.config/nextest.toml`, `repository_state_store_tests.rs` and `commands/issue.rs` are edited by several entries. Edges serialise same-region rewrites: query extraction before the auto-transition decision, finalization deletion before the conformance suite, hook removal before the corpus fixture, and migrations before the re-assertion and wiring cuts in their files. Workers rebase over the remaining advisories. |

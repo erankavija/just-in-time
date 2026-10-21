@@ -136,7 +136,7 @@ Each invariant was resolved with `jit item show`.
 
 - `@/inv/orthogonal-tests`: violated by claims 2–10. REQ-09's half ("passes alone, in any order, in parallel") is enforced for env and cwd by `process_state_policy_tests.rs`. The receipt env lock and fixture-cache lock contention (§A) remain order- and load-sensitive.
 - `@/inv/shared-test-contracts`: violated by #11–#24. No `IssueStore` suite exists, and `memory_executor`, `fixture_issue`, and `TaxonomyRepo` each have parallel copies.
-- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 18 tool-missing skip paths pass silently (#26, §D.5). These are held-out tests in substance.
+- `@/inv/no-ignored-tests`: `cargo-ci` reports 0 ignored, but 25 skip-and-pass paths pass silently: 18 in Rust tests when a tool is missing, 4 root-only lock tests, and 3 inside shell self-tests (#26, §D.5). These are held-out tests in substance.
 - `@/inv/bounded-rust-build-footprint`: passes at 10/12 targets and 1.61/2 GiB. The fixture cache's 747 MB in `target/` is unbudgeted. A new integration target for a shared fixture is not needed; the test-support surface already compiles once.
 - `@/inv/domain-agnostic`: the `CANONICAL_ITEM_KINDS` copies and `D-[0-9]+` literals are test-side copies of package vocabulary. REQ-07's derivation from `profiles/jit-default` must stay in test support and out of engine code.
 
@@ -309,16 +309,27 @@ The following carry a `count` that is not a list envelope:
 
 `list_envelope_tests.rs` covers every fallback command except `claim status`, `project render` and the three archive commands.
 
-### D.5 Tool-missing skips
+### D.5 Skip-and-pass paths
 
-| Site | Tool | Count |
+The sweep covered every Rust test (`eprintln!`/`println!` skip notices, early returns guarded by a host or tool probe) and every committed shell, Python and JavaScript test. Shell files were searched for `SKIP` and `skip`, Python for `unittest.skip*`/`pytest.mark.skip`, and JavaScript for `.skip`/`.todo`/`skipIf`. These pass without running their assertions:
+
+| Site | Condition | Count |
 | --- | --- | ---: |
-| `scratch_build/merged_tree_gate_verification_tests.rs:48-53` | git, cargo or jq (script exit 2) | 1 |
-| `scratch_build/rust_build_budget_checker_tests.rs:175`…`:521` | jq | 14 |
-| `scratch_build/dependency_feature_policy_tests.rs:168,185` | cargo | 2 |
-| `cli_item_validate/validate_cli_rule_tests.rs:930-935` | node | 1 |
+| `scratch_build/merged_tree_gate_verification_tests.rs:48-53` | git, cargo or jq missing (script exit 2) | 1 |
+| `scratch_build/rust_build_budget_checker_tests.rs:175`…`:521` | jq missing | 14 |
+| `scratch_build/dependency_feature_policy_tests.rs:168,185` | cargo missing | 2 |
+| `cli_item_validate/validate_cli_rule_tests.rs:930-935` | node missing | 1 |
+| `crates/jit/src/storage/lock.rs:652` (`skip_unless_write_is_denied`, called at `:676`, `:729`, `:773`, `:805`) | the process can write a read-only file, as root can | 4 |
+| `scripts/docs-check-selftest.sh:197,201` | the read bit is not enforced (root) | 2 |
+| `scripts/workflow-contract-selftest.sh:125` | actionlint unavailable (entry point exit 2) | 1 |
 
-`storage/lock.rs:652` (`skip_unless_write_is_denied`) skips when the process can write a read-only file, as root can. That is an environment precondition, not a missing tool.
+Matches that are not a test passing on a skip:
+
+- `.agents/skills/jit-project-lead/scripts/standards-fix.sh:137-149,438`: `SKIPFILE` holds the fixer's own "skipped" records for findings it cannot fix. That is product output, which `test-standards-fix.sh` asserts.
+- `scripts/benchmark-rust-build.sh` (`BENCH_SKIP_SAMPLING`): a benchmark mode that assembles a report from existing samples. It is not a test.
+- `scripts/hooks/pre-commit:60` and `scripts/hooks/pre-push:29`: git hooks that skip lease validation without jq. They are local hooks, not tests.
+- `test-vectors/container-image/test_image_contract.py:219` (`skipUnless(RUNTIME_ENABLED)`): an opt-in runtime tier selected by `JIT_IMAGE_RUNTIME=1`, which `scripts/test-podman.sh` and `.github/workflows/docker.yml` set. It does not depend on a missing tool.
+- The `skip` wording in `cargo-ci-selftest.sh`, `test-standards-fix.sh` and `reclaim-worker-worktree.sh`: reported counts and records, not skipped assertions.
 
 ### D.6 In-process private setups outside the CLI targets
 

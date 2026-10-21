@@ -1551,7 +1551,8 @@
       "session-cost-benchmark-selftest-gate",
       "standards-scan-test-gate",
       "standards-fix-test-gate",
-      "manifest-tool-test-gate"
+      "manifest-tool-test-gate",
+      "lock-tests-deterministic-precondition"
     ],
     "planning": {
       "outcome": "A benchmark note records integration targets and active test-executable bytes before and after.",
@@ -4012,7 +4013,7 @@
   {
     "key": "docs-check-selftest-gate",
     "title": "Documentation checker self-test runs as a declared gate",
-    "description": "Run the `scripts/docs-check-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. The `docs-mechanical` gate runs the checkers over the tree, not their self-test.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/docs-check-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Run the `scripts/docs-check-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/docs-check-selftest.sh` is a re-runnable self-test of the documentation mechanical checkers (`scripts/docs-check-*.sh`) and their orchestrator `scripts/docs-mechanical.sh`, seeding each checker's defect class and asserting it fails, then asserting it passes once the seed is reverted. It exits 2 when `jit` or `jq` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. The `docs-mechanical` gate runs the checkers over the tree, not their self-test.\n\nThe self-test prints `SKIP` and continues to a passing exit when the read bit is not enforced, as for root: `:197` skips the nested-traversal assertions and `:201` skips the unreadable-path assertions, so on such a host the checkers' environment-error exits go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/docs-check-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: The unreadable-path and nested-traversal assertions run on every host. Where the read bit is not enforced, the self-test either establishes an unreadable input another way or exits non-zero naming the precondition it could not establish. No branch prints a skip notice and continues to a passing exit.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4043,10 +4044,11 @@
       "terminal": {
         "consumer_family": "docs-check-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One gate declaration over an existing self-test script, plus that script's own skip branch.",
         "footprint": {
           "touches": [
-            ".jit/gates.toml"
+            ".jit/gates.toml",
+            "scripts/docs-check-selftest.sh"
           ],
           "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
         }
@@ -4100,7 +4102,7 @@
   {
     "key": "workflow-contract-selftest-gate",
     "title": "Workflow-contract harness self-test runs as a declared gate",
-    "description": "Run the `scripts/workflow-contract-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/workflow-contract-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n",
+    "description": "Run the `scripts/workflow-contract-selftest.sh` self-test as a declared gate over the script it tests.\n\n## Background\n\n`scripts/workflow-contract-selftest.sh` is a re-runnable self-test of `scripts/workflow-contract.sh` over the case vectors in `test-vectors/workflow-contract/`, showing that the harness rejects the defects it claims to reject. It exits 2 when `python3` is missing. `.jit/gates.toml` declares no gate that runs it, so nothing in the repository's own gate set exercises it. Only `.github/workflows/ci.yml:54` runs it today, so a local gate run never does.\n\nIts actionlint-wiring layer (`:119-135`) prints `SKIP` and passes when the entry point reports an environment error because actionlint is unavailable, so the actionlint defect seeds go unproven.\n\n## Success Criteria\n\n- [hard] REQ-01: `.jit/gates.toml` declares a gate that runs `scripts/workflow-contract-selftest.sh`. Its `[gates.inputs]` cover the self-test, the script it exercises and that script's fixtures, and it declares `mode` with no `auto` key.\n- [hard] REQ-02: The gate fails whenever the self-test exits non-zero, including exit 2 for a missing tool, and passes on the current tree.\n- [hard] REQ-03: When actionlint is unavailable, the self-test exits non-zero naming the missing tool; no branch prints a skip notice and continues to a passing exit.\n",
     "type": "task",
     "priority": "normal",
     "labels": [
@@ -4131,10 +4133,11 @@
       "terminal": {
         "consumer_family": "workflow-contract-selftest.sh self-test",
         "test_boundary": "declared script gate",
-        "worker_sized_reason": "One gate declaration over an existing self-test script.",
+        "worker_sized_reason": "One gate declaration over an existing self-test script, plus that script's own skip branch.",
         "footprint": {
           "touches": [
-            ".jit/gates.toml"
+            ".jit/gates.toml",
+            "scripts/workflow-contract-selftest.sh"
           ],
           "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
         }
@@ -4313,6 +4316,46 @@
             ".jit/gates.toml"
           ],
           "uncertainty": "If the self-test does not pass on the current tree, the script defect it reports is fixed in the same change."
+        }
+      }
+    }
+  },
+  {
+    "key": "lock-tests-deterministic-precondition",
+    "title": "Read-only lock tests establish their precondition on any host",
+    "description": "Make the four lock tests that skip when a read-only file is writable establish that precondition on every host, or fail, instead of passing.\n\n## Background\n\n`crates/jit/src/storage/lock.rs` defines `skip_unless_write_is_denied` (`:652`). Four tests call it (`:676`, `:729`, `:773`, `:805`), among them `test_lock_shared_is_granted_when_the_lock_file_cannot_be_opened_for_writing`. When the process can still write a file whose mode denies writing, as root can, the helper prints \"skipping …\" and the test returns early and passes. `@/inv/no-ignored-tests` treats a test held out of the run as a property nobody checks.\n\n## Success Criteria\n\n- [hard] REQ-01: `skip_unless_write_is_denied` no longer exists, and none of the four tests returns early because of the host.\n- [hard] REQ-02: Each test establishes a lock path that the process cannot open for writing on every host, for example a path whose parent is not a directory or a read-only bind it creates itself, or fails naming the precondition it could not establish.\n- [hard] REQ-03: Each test asserts what it asserted before.\n",
+    "type": "task",
+    "priority": "normal",
+    "labels": [
+      "epic:test-topology",
+      "milestone:v1.0",
+      "story:suite-cost",
+      "component:testing",
+      "component:storage",
+      "satisfies:c780514e/REQ-10",
+      "per:@/charter/D-18",
+      "enforces:@/invariant/no-ignored-tests"
+    ],
+    "gates": [
+      "cargo-ci",
+      "code-review"
+    ],
+    "depends_on": [],
+    "planning": {
+      "outcome": "The four read-only lock tests run their assertions on any host and never pass by skipping.",
+      "contract_refs": [],
+      "produces_contracts": [],
+      "source_refs": [
+        "REQ-10"
+      ],
+      "terminal": {
+        "consumer_family": "read-only lock tests",
+        "test_boundary": "library unit tests",
+        "worker_sized_reason": "Four tests in one module replace one precondition helper.",
+        "footprint": {
+          "touches": [
+            "crates/jit/src/storage/lock.rs"
+          ]
         }
       }
     }
