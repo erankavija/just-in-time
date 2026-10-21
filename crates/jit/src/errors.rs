@@ -537,7 +537,7 @@ impl RedundantDependencyError {
 ///
 /// Each rejected edge keeps its own originating typed error so a caller (the
 /// CLI) can still classify it individually — by downcast, never by message
-/// text — for a per-edge JSON `code`, while the binary's exit-code classifier
+/// text — for a per-edge JSON `code`, while `output::failure::classify`
 /// can downcast this wrapper directly and pick a single dominant exit code
 /// across the whole batch.
 #[derive(Debug, thiserror::Error)]
