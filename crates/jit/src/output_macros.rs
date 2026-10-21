@@ -1,22 +1,5 @@
 //! Output helper macros for reducing JSON boilerplate in main.rs
 
-/// Output a simple message: either JSON-wrapped or plain text
-/// Respects --quiet flag to suppress non-essential output
-#[macro_export]
-macro_rules! output_message {
-    ($quiet:expr, $json:expr, $($arg:tt)*) => {
-        if $json {
-            use jit::output::JsonOutput;
-            use serde_json::json;
-            let msg = format!($($arg)*);
-            let output = JsonOutput::success(json!({"message": msg}));
-            println!("{}", output.to_json_string()?);
-        } else if !$quiet {
-            println!($($arg)*);
-        }
-    };
-}
-
 /// Output data as JSON or custom human-readable format
 /// Data output is preserved in quiet mode (essential output)
 #[macro_export]
@@ -25,39 +8,6 @@ macro_rules! output_data {
         if $json {
             use jit::output::JsonOutput;
             let output = JsonOutput::success(&$data).with_message($msg);
-            println!("{}", output.to_json_string()?);
-        } else {
-            $human_block
-        }
-    };
-    ($quiet:expr, $json:expr, $data:expr, $human_block:block) => {
-        if $json {
-            use jit::output::JsonOutput;
-            let output = JsonOutput::success(&$data);
-            println!("{}", output.to_json_string()?);
-        } else {
-            $human_block
-        }
-    };
-}
-
-/// Output structured JSON data with custom human formatting
-/// Human output preserved in quiet mode (essential data)
-#[macro_export]
-macro_rules! output_json {
-    ($quiet:expr, $json:expr, $json_data:expr, $msg:expr, $human_block:block) => {
-        if $json {
-            use jit::output::JsonOutput;
-            let output = JsonOutput::success($json_data).with_message($msg);
-            println!("{}", output.to_json_string()?);
-        } else {
-            $human_block
-        }
-    };
-    ($quiet:expr, $json:expr, $json_data:expr, $human_block:block) => {
-        if $json {
-            use jit::output::JsonOutput;
-            let output = JsonOutput::success($json_data);
             println!("{}", output.to_json_string()?);
         } else {
             $human_block

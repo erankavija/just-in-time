@@ -5,6 +5,7 @@
 //! available commands, arguments, and types.
 
 use crate::domain::EventTagDoc;
+use crate::output::ExitCode;
 use clap::{Arg, ArgAction, CommandFactory};
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -833,53 +834,13 @@ impl CommandSchema {
     }
 
     fn generate_exit_codes() -> Vec<ExitCodeDoc> {
-        vec![
-            ExitCodeDoc {
-                code: 0,
-                description: "Command succeeded".to_string(),
-            },
-            ExitCodeDoc {
-                code: 1,
-                description: "Generic error occurred".to_string(),
-            },
-            ExitCodeDoc {
-                code: 2,
-                description: "Invalid arguments or usage error".to_string(),
-            },
-            ExitCodeDoc {
-                code: 3,
-                description: "Resource not found (issue, gate, etc.)".to_string(),
-            },
-            ExitCodeDoc {
-                code: 4,
-                description: "Validation failed (cycle detected, broken references, etc.)"
-                    .to_string(),
-            },
-            ExitCodeDoc {
-                code: 5,
-                description: "Permission denied".to_string(),
-            },
-            ExitCodeDoc {
-                code: 6,
-                description: "Resource already exists".to_string(),
-            },
-            ExitCodeDoc {
-                code: 10,
-                description: "External dependency failed (git, file system, etc.)".to_string(),
-            },
-            ExitCodeDoc {
-                code: 11,
-                description:
-                    "A lock wait expired while another jit process held the lock; retrying may succeed"
-                        .to_string(),
-            },
-            ExitCodeDoc {
-                code: 141,
-                description: "Downstream reader closed the pipe while jit was writing \
-                    (128 + SIGPIPE)"
-                    .to_string(),
-            },
-        ]
+        ExitCode::ALL
+            .into_iter()
+            .map(|code| ExitCodeDoc {
+                code: code.code(),
+                description: code.description().to_string(),
+            })
+            .collect()
     }
 
     /// Project the per-command-family exit-code mappings.
