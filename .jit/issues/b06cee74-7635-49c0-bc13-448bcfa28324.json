@@ -1,0 +1,44 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T05:40:14.218828181Z",
+  "dependencies": [
+    "5e615dc2-5ca4-4a8c-b94a-dd8689894069"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Restructure storage so reads never scale with project history (f8a6b298) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-21T05:40:14.218828181Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-21T05:40:14.218828181Z",
+      "updated_by": null
+    }
+  },
+  "id": "b06cee74-7635-49c0-bc13-448bcfa28324",
+  "labels": [
+    "epic:history-independent-reads",
+    "milestone:v1.0",
+    "component:storage",
+    "component:core",
+    "component:gates",
+    "component:cli",
+    "per:@/charter/D-19",
+    "per:@/charter/D-17",
+    "per:@/charter/D-18",
+    "type:breakdown",
+    "brackets:f8a6b298"
+  ],
+  "priority": "high",
+  "state": "backlog",
+  "title": "breakdown: Restructure storage so reads never scale with project history",
+  "updated_at": "2026-10-21T05:40:14.218828181Z"
+}
