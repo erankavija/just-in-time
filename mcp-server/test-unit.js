@@ -216,6 +216,31 @@ await runTest('tool description comes from command', () => {
   assert.strictEqual(statusTool.description, 'Show overall status');
 });
 
+await runTest('a global json option adds no tool property while leaf flags still do', () => {
+  const schema = {
+    version: '0.0.0-test',
+    global_options: [
+      { name: 'quiet', type: 'boolean', required: false },
+      { name: 'json', type: 'boolean', required: false },
+    ],
+    commands: {
+      issue: {
+        description: 'Issue commands',
+        subcommands: {
+          create: {
+            description: 'Create a new issue',
+            args: [],
+            flags: [{ name: 'title', type: 'string', required: true }],
+          },
+        },
+      },
+    },
+  };
+  const createTool = generateTools(schema).find(t => t.name === 'jit_issue_create');
+  assert.ok(!('json' in createTool.inputSchema.properties), 'global json must not become a tool property');
+  assert.ok(createTool.inputSchema.properties.title, 'leaf flag should still be a tool property');
+});
+
 await runTest('propagates hidden flag to generated tool as _hidden', () => {
   const tools = generateTools(testSchema);
   const defineTool = tools.find(t => t.name === 'jit_gate_define');
@@ -809,6 +834,42 @@ await runTest('does not duplicate --json when already provided', () => {
   const result = buildCliArgs(['status'], { json: true }, cmdDef);
   const jsonCount = result.filter(a => a === '--json').length;
   assert.strictEqual(jsonCount, 1, 'should have exactly one --json');
+});
+
+await runTest('injects one --json when only the global options declare json', () => {
+  const cmdDef = {
+    args: [],
+    flags: [
+      { name: 'title', type: 'string' },
+    ],
+  };
+  const globalOptions = [{ name: 'quiet', type: 'boolean' }, { name: 'json', type: 'boolean' }];
+  const result = buildCliArgs(['issue', 'create'], { title: 'Test' }, cmdDef, globalOptions);
+  assert.strictEqual(result.filter(a => a === '--json').length, 1, 'should inject exactly one --json');
+});
+
+await runTest('injects one --json when both the leaf and the global options declare json', () => {
+  const cmdDef = {
+    args: [],
+    flags: [
+      { name: 'json', type: 'boolean' },
+    ],
+  };
+  const globalOptions = [{ name: 'json', type: 'boolean' }];
+  const result = buildCliArgs(['status'], {}, cmdDef, globalOptions);
+  assert.strictEqual(result.filter(a => a === '--json').length, 1, 'should inject exactly one --json');
+});
+
+await runTest('does not inject --json when neither the leaf nor the global options declare json', () => {
+  const cmdDef = {
+    args: [],
+    flags: [
+      { name: 'title', type: 'string' },
+    ],
+  };
+  const globalOptions = [{ name: 'quiet', type: 'boolean' }];
+  const result = buildCliArgs(['issue', 'create'], { title: 'Test' }, cmdDef, globalOptions);
+  assert.ok(!result.includes('--json'), 'should not inject --json');
 });
 
 await runTest('skips undefined and empty string values', () => {

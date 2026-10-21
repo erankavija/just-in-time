@@ -283,7 +283,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Execute command with concurrency limiting
     const result = await concurrencyLimiter.run(async () => {
       const timeout = getTimeoutForCommand(cmdPath);
-      return await executeCommand(cmdPath, validation.data, cmdDef, timeout);
+      return await executeCommand(cmdPath, validation.data, cmdDef, timeout, jitSchema.global_options ?? []);
     });
     
     // Check if result is an error

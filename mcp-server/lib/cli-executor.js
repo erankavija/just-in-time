@@ -22,10 +22,11 @@ const LONG_TIMEOUT = 600000;
  * @param {Object} args - Command arguments
  * @param {Object} cmdDef - Command definition from schema
  * @param {number} timeout - Timeout in milliseconds
+ * @param {Object[]} globalOptions - The schema's `global_options`
  * @returns {Promise<Object>} Parsed command output
  */
-export async function executeCommand(cmdPath, args, cmdDef, timeout = DEFAULT_TIMEOUT) {
-  const cliArgs = buildCliArgs(cmdPath, args, cmdDef);
+export async function executeCommand(cmdPath, args, cmdDef, timeout = DEFAULT_TIMEOUT, globalOptions = []) {
+  const cliArgs = buildCliArgs(cmdPath, args, cmdDef, globalOptions);
   
   try {
     const { stdout, stderr } = await execFileAsync('jit', cliArgs, {
@@ -91,9 +92,11 @@ export async function executeCommand(cmdPath, args, cmdDef, timeout = DEFAULT_TI
  * @param {string[]} cmdPath - Command path (e.g., ['doc', 'assets', 'list'])
  * @param {Object} args - Command arguments
  * @param {Object} cmdDef - Command definition from schema
+ * @param {Object[]} globalOptions - The schema's `global_options`; a `json`
+ *   entry there means every leaf accepts `--json`
  * @returns {string[]} CLI arguments array
  */
-export function buildCliArgs(cmdPath, args, cmdDef) {
+export function buildCliArgs(cmdPath, args, cmdDef, globalOptions = []) {
   const cliArgs = [...cmdPath]; // Start with command path
   
   // Get positional argument names from schema
@@ -115,7 +118,8 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
   
   // Add flag arguments
   const positionalSet = new Set(positionalArgNames);
-  const hasJsonFlag = cmdDef.flags?.some(flag => flag.name === "json");
+  const acceptsJson = cmdDef.flags?.some(flag => flag.name === "json")
+    || globalOptions.some(option => option.name === "json");
   
   for (const [key, value] of Object.entries(args)) {
     // Skip positional args (already added)
@@ -135,8 +139,8 @@ export function buildCliArgs(cmdPath, args, cmdDef) {
     }
   }
   
-  // Add --json flag if supported and not already present
-  if (hasJsonFlag && !cliArgs.includes('--json') && !args.json) {
+  // Add --json flag if the leaf or the global options accept it and it is not already present
+  if (acceptsJson && !cliArgs.includes('--json') && !args.json) {
     cliArgs.push('--json');
   }
   
