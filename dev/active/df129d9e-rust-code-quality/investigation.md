@@ -457,7 +457,7 @@ Each unified renderer will have to pick one behaviour, and every difference belo
 
 **Gate run status.**
 - The "Gate '{k}' has not been run yet for issue {id}. Use 'jit gate evaluate' to run it." message has 3 identical copies in `GateCommands::Status` (findings 4693, flat 4804, default 4883) and one human-only copy in `GateCommands::StatusAll` (~4991), where it sits beside "Gate '{k}' status: passed|failed".
-- The pass line "Passed gate '{k}' for issue {id}{suffix}" appears in `GateCommands::Evaluate` (~5122), `EvaluateAll` (~5187) and `EvaluateMany` (~5225). `Evaluate` uses a different already-passed text ("already passed at HEAD for issue X, skipping (use --force to re-run)"); the others use the suffix " (already passed at HEAD)".
+- The pass line "Passed gate '{k}' for issue {id}" appears in `GateCommands::Evaluate`, `EvaluateAll` and `EvaluateMany`. 72d89161 removed the already-passed skip and its text (D-24).
 - `print_gate_run_details` (1633) and `render_gate_pass_error` (665) are already shared.
 - `print_issue_show_human` shows "(last run: never run)" (2101), a separate view.
 
@@ -616,7 +616,7 @@ Per-file inventory, grouped by family (`pub` methods; `pub(crate)` methods are m
   - `events.rs:5` (2): `tail_events`, `query_events`
 - **gates**:
   - `gate.rs:694` (19): `add_gate`, `add_gates`, `remove_gates`, `pass_gate`, `pass_all_gates`, `pass_gate_many`, `fail_gate`, `list_gates`, `add_gate_definition`, `define_gate`, `update_gate`, `remove_gate_definition`, `show_gate_definition`, `list_gate_presets`, `show_gate_preset`, `apply_gate_preset`, `list_gate_runs`, `get_gate_run_result`, `create_gate_preset`
-  - `gate_check.rs:674` (5 + 3c): `check_gate`, `check_gate_with`, `get_last_gate_run`, `get_last_gate_runs_for_issue`, `get_required_gate_statuses_for_issue`, plus *(c)* `checker_repo_root`, `real_repo_root`, `run_postchecks`
+  - `gate_check.rs:674` (5 + 3c): `check_gate`, `check_gate_with`, `get_last_gate_run`, `get_last_gate_runs_for_issue`, `get_required_gate_statuses_for_issue`, plus *(c)* `checker_repo_root`, `real_repo_layout`, `run_postchecks`
 - **documents** `document.rs:94` (16): `add_document_reference`, `list_document_references`, `resolve_issue_artifact_directory`, `report_artifact_conformance`, `remove_document_reference`, `show_document_content`, `document_history`, `document_diff`, `read_document_content`, `read_document_bytes`, `get_document_history`, `get_document_diff`, `get_linked_document_paths`, `read_path_bytes`, `list_document_assets`, `check_document_links`
 - **templates/breakdown**:
   - `template.rs:96` (3 + 1c): `container_anchor`, `apply_template`, `apply_template_with`, *(c)* `template_roles`
