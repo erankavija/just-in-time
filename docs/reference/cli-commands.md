@@ -1367,9 +1367,10 @@ jit issue search task --state ready --json
   filter present the search matches all issues and the filters narrow it.
 - Providing **neither** a query **nor** any filter is a usage error (exit code
   `2`): "provide a search query or at least one filter".
-- `--label`/`-l` (format `namespace:value`) is repeatable. Multiple labels are
-  **ANDed**: an issue is returned only when it carries every requested label. A
-  malformed label is a usage error.
+- `--label`/`-l` takes an exact `namespace:value` label or a `namespace:*`
+  wildcard and is repeatable. Multiple patterns are **ANDed**: an issue is
+  returned only when it matches every requested pattern. A malformed pattern is
+  a usage error.
 - `--full` returns full issue objects; the default `--json` shape uses compact
   `MinimalIssue` summaries. The `query` field is `null` when no positional query
   was given.

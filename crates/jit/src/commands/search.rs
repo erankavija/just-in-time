@@ -46,7 +46,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     ) -> Result<Vec<Issue>> {
         label_filters
             .iter()
-            .try_for_each(|pattern| super::query::validate_label_pattern(pattern))?;
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
         let mut results = self.search_issues(query)?;
 
         // Apply additional filters
