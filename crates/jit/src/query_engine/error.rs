@@ -5,12 +5,11 @@
 //! matching nothing. In particular, an unknown filter field or an invalid
 //! `state:`/`priority:` value is a hard parse error, not a fail-open no-match.
 
-/// The set of lifecycle state tokens accepted in a `state:` filter, listed in
-/// an [`QueryParseError::InvalidState`] message. Mirrors [`crate::domain::State`]'s
-/// `FromStr` (aliases such as `open`/`inprogress` are also accepted by the
-/// parser but omitted from this user-facing list to keep it canonical).
-pub(super) const STATE_VALUES: &str =
-    "backlog, ready, in_progress, gated, done, rejected, archived";
+/// The canonical lifecycle state tokens accepted in a `state:` filter, listed
+/// in an [`QueryParseError::InvalidState`] message.
+pub(super) fn state_values() -> String {
+    crate::domain::State::all().map(|s| s.as_str()).join(", ")
+}
 
 /// The set of priority tokens accepted in a `priority:` filter, listed in an
 /// [`QueryParseError::InvalidPriority`] message.

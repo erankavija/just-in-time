@@ -1378,7 +1378,7 @@ fn test_query_bare_label_filter() {
 }
 
 /// A parent-level filter placed before a query subcommand must be rejected with
-/// an actionable error, not silently ignored. `jit query -s open available`
+/// an actionable error, not silently ignored. `jit query -s ready available`
 /// (and the `--state`/`--priority`/etc. long forms) would otherwise drop the
 /// filter and return wrong results to `--json` consumers.
 #[test]
@@ -1389,7 +1389,7 @@ fn test_query_subcommand_rejects_parent_filter() {
     // Filter supplied BEFORE the subcommand binds to the parent `query` and is
     // not honored by the subcommand — this must error rather than run.
     let output = Command::new(jit)
-        .args(["query", "-s", "open", "available"])
+        .args(["query", "-s", "ready", "available"])
         .current_dir(temp.path())
         .output()
         .unwrap();
