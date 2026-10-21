@@ -434,10 +434,10 @@ the review agent to append this block after the human-readable findings list.
 Keep transport and repository policy separate. The `ai-review.sh` checker is a
 tool-agnostic wrapper. The reviewer emits human-readable findings, a structured
 findings block, and a terminal verdict. The wrapper transports the prompt and
-context and determines its checker exit code from the terminal verdict: `0` for a pass,
-`1` for a review that found defects, and `75` when it could not judge (no agent
-output, an unparseable verdict, or a missing reviewer tool). jit
-parses and persists the structured findings block. A repository-specific prompt
+context and determines its checker exit code from the terminal verdict.
+The code is `0` for a pass, `1` for a review that found defects, and `75` when
+it could not judge (no agent output, an unparseable verdict, or a missing
+reviewer tool). jit parses and persists the structured findings block. A repository-specific prompt
 owns the inspection procedure but should not copy an engineering rubric or
 registry statement.
 
