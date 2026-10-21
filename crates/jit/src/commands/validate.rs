@@ -2050,7 +2050,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         let blocked = issues.iter().filter(|i| i.is_blocked(&resolved)).count();
 
         Ok(StatusSummary {
-            open: backlog, // Keep 'open' field name for backward compatibility
+            backlog,
             ready,
             in_progress,
             done,

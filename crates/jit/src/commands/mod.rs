@@ -1855,7 +1855,7 @@ pub struct CommitInfo {
 /// Status summary for all issues
 #[derive(Debug, Serialize)]
 pub struct StatusSummary {
-    pub open: usize, // Backlog count (kept as 'open' for compatibility)
+    pub backlog: usize,
     pub ready: usize,
     pub in_progress: usize,
     pub gated: usize,

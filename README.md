@@ -157,7 +157,7 @@ jit gate status <issue> unit-tests --findings   # structured findings view
 - **Manual**: Passed explicitly by a human or agent, like a checklist item.
 
 **Gate stages:**
-- **Precheck**: `jit issue claim` runs these when it moves a Ready issue into InProgress (e.g. "acknowledge TDD")
+- **Precheck**: `jit issue claim` runs these when it moves a ready issue into in_progress (e.g. "acknowledge TDD")
 - **Postcheck**: Must pass before completion (tests, linting, reviews)
 
 ### Built for Orchestration

@@ -458,7 +458,7 @@ mod tests {
         let dot = export_dot(&graph);
 
         assert!(dot.contains("lightgreen")); // Done state
-        assert!(dot.contains("yellow")); // InProgress state
+        assert!(dot.contains("yellow")); // in_progress state
     }
 
     #[test]

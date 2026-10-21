@@ -213,7 +213,7 @@ web/
 #### 2.3 Interactive Graph Visualization
 **Actions:**
 - [ ] Render dependency graph with React Flow
-- [ ] Node styling by state (open, in-progress, done)
+- [ ] Node styling by state (backlog, in_progress, done)
 - [ ] Click node → show issue detail in side panel
 - [ ] Hover → show issue title tooltip
 - [ ] Pan and zoom controls

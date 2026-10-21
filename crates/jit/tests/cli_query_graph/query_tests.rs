@@ -36,7 +36,7 @@ fn test_query_ready_returns_unblocked_issues() {
         .unwrap()
         .to_string();
 
-    // Create task 3 with a gate to keep it in Open state
+    // Create task 3 with a gate to keep it in ready state
     Command::new(jit)
         .args([
             "gate",

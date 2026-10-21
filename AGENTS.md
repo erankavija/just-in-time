@@ -37,7 +37,7 @@ Adjacent subsystems include `validation/`, `document/`, `query_engine/`, and `se
 
 ### Issue Lifecycle States
 
-`Backlog → Ready → InProgress → Gated → Done`
+`backlog → ready → in_progress → gated → done`
 
 - `Rejected` and `Archived` are reachable from any state.
 - Dependencies must reach a terminal state (`Done` or `Rejected`) before an issue becomes `Ready`.

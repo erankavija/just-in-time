@@ -73,11 +73,11 @@ const testSchema = {
           title: 'StatusResponse',
           type: 'object',
           properties: {
-            open: { type: 'integer' },
+            backlog: { type: 'integer' },
             done: { type: 'integer' },
             total: { type: 'integer' },
           },
-          required: ['open', 'done', 'total'],
+          required: ['backlog', 'done', 'total'],
         },
         success: 'StatusResponse',
         error: 'ErrorResponse',

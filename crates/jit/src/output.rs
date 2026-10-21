@@ -1249,7 +1249,7 @@ pub struct InitResponse {
 /// Response for `status` command
 #[derive(Debug, Serialize, JsonSchema)]
 pub struct StatusResponse {
-    pub open: usize,
+    pub backlog: usize,
     pub ready: usize,
     pub in_progress: usize,
     pub gated: usize,

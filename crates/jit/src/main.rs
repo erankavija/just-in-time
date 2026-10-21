@@ -6471,19 +6471,19 @@ fn run() -> Result<()> {
 
             if json {
                 let msg = format!(
-                    "{} open, {} ready, {} in progress, {} done",
-                    summary.open, summary.ready, summary.in_progress, summary.done
+                    "{} backlog, {} ready, {} in_progress, {} done",
+                    summary.backlog, summary.ready, summary.in_progress, summary.done
                 );
                 let output = JsonOutput::success(&summary).with_message(msg);
                 println!("{}", output.to_json_string()?);
             } else {
                 output_ctx.print_data("Status:")?;
-                output_ctx.print_data(format!("  Open: {}", summary.open))?;
-                output_ctx.print_data(format!("  Ready: {}", summary.ready))?;
-                output_ctx.print_data(format!("  In Progress: {}", summary.in_progress))?;
-                output_ctx.print_data(format!("  Done: {}", summary.done))?;
-                output_ctx.print_data(format!("  Rejected: {}", summary.rejected))?;
-                output_ctx.print_data(format!("  Blocked: {}", summary.blocked))?;
+                output_ctx.print_data(format!("  backlog: {}", summary.backlog))?;
+                output_ctx.print_data(format!("  ready: {}", summary.ready))?;
+                output_ctx.print_data(format!("  in_progress: {}", summary.in_progress))?;
+                output_ctx.print_data(format!("  done: {}", summary.done))?;
+                output_ctx.print_data(format!("  rejected: {}", summary.rejected))?;
+                output_ctx.print_data(format!("  blocked: {}", summary.blocked))?;
             }
         }
         Commands::Validate {

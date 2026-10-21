@@ -840,7 +840,7 @@ fn test_short_hash_with_json_flag() {
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains(&full_id), "Should return full ID in JSON");
-    assert!(stdout.contains("in_progress") || stdout.contains("in-progress"));
+    assert!(stdout.contains("in_progress"));
 
     // Test other commands with short hash and --json
     let output = run_jit(&temp, &["issue", "show", short_hash, "--json"]);
