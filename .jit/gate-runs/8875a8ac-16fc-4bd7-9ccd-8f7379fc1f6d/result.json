@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:copilot",
+  "command": "",
+  "commit": null,
+  "completed_at": "2025-12-20T08:37:38.192658530Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "clippy",
+  "issue_id": "544fd21b-ece7-4d81-993a-062fd3545459",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "8875a8ac-16fc-4bd7-9ccd-8f7379fc1f6d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2025-12-20T08:37:38.192658530Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

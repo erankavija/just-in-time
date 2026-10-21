@@ -1,40 +1,42 @@
 {
-  "id": "e75805f6-96cb-4d5a-82cc-67225b3f79ba",
-  "title": "Atomically switch the scaffold and update breakdown",
-  "description": "In one slice, flip the scaffold and update breakdown **together**, so no intermediate state has `apply plan`'s graph incompatible with breakdown: make `jit apply plan` the scaffold (producing C→B→P), refactor breakdown to consume the pre-created breakdown node (locate B, then the approved planning node through it, preserving the plan-review precondition), and remove the old scaffold command and its create-time flag.\n\n## Success Criteria\n- [ ] [hard] SCFB-01: after this task `jit apply plan <container>` is the scaffold and breakdown consumes the pre-created B against the C→B→P shape.\n- [ ] [hard] SCFB-02: the old command and flag are removed and the bracket workflow is green before and after — no broken intermediate.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-23T17:38:07.441354148Z",
+  "context": {},
+  "created_at": "2026-06-22T22:28:29.409261630Z",
   "dependencies": [
     "9cccfe0c-46bb-4b80-9909-f7b13d6fa6f1"
   ],
+  "description": "In one slice, flip the scaffold and update breakdown **together**, so no intermediate state has `apply plan`'s graph incompatible with breakdown: make `jit apply plan` the scaffold (producing C→B→P), refactor breakdown to consume the pre-created breakdown node (locate B, then the approved planning node through it, preserving the plan-review precondition), and remove the old scaffold command and its create-time flag.\n\n## Success Criteria\n- [ ] [hard] SCFB-01: after this task `jit apply plan <container>` is the scaffold and breakdown consumes the pre-created B against the C→B→P shape.\n- [ ] [hard] SCFB-02: the old command and flag are removed and the bracket workflow is green before and after — no broken intermediate.",
+  "documents": [],
+  "done_at": "2026-06-23T18:13:00.205763672Z",
+  "first_ready_at": "2026-06-23T17:37:56.169460723Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "4cd3c6d0-e223-45a7-9c0b-d8350483413f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T18:04:43.937192869Z"
+      "updated_at": "2026-06-23T18:04:43.937192869Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "253ca044-218e-4762-ab0f-a2ea653df355",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T18:10:47.885729115Z"
+      "updated_at": "2026-06-23T18:10:47.885729115Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "e75805f6-96cb-4d5a-82cc-67225b3f79ba",
   "labels": [
     "type:task",
     "story:scaffold-switch",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:28:29.409261630Z",
-  "updated_at": "2026-07-05T19:51:13.105637792Z",
-  "first_ready_at": "2026-06-23T17:37:56.169460723Z",
-  "claimed_at": "2026-06-23T17:38:07.441354148Z",
-  "done_at": "2026-06-23T18:13:00.205763672Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Atomically switch the scaffold and update breakdown",
+  "updated_at": "2026-07-05T19:51:13.105637792Z"
 }

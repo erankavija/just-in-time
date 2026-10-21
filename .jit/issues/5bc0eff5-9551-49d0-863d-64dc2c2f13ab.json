@@ -1,13 +1,14 @@
 {
-  "id": "5bc0eff5-9551-49d0-863d-64dc2c2f13ab",
-  "title": "Implement claims JSONL append-only log",
-  "description": "Implement `claims.jsonl` append-only log with schema version, sequence numbers, and operation types (acquire, renew, release, auto-evict, force-evict). Use fsync after append for durability. See design doc section \"Claims JSONL\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.569321196Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement `claims.jsonl` append-only log with schema version, sequence numbers, and operation types (acquire, renew, release, auto-evict, force-evict). Use fsync after append for durability. See design doc section \"Claims JSONL\".",
+  "documents": [],
+  "done_at": "2026-01-07T18:52:23.632395244Z",
+  "first_ready_at": "2026-01-06T21:01:34.445822483Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:52:14.948467380Z"
-    },
     "clippy": {
+      "run_id": "b39ae4aa-207d-4d37-88c2-6eecd9729a80",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:52:14.948464900Z"
+      "updated_at": "2026-01-07T18:52:14.948464900Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "b3458108-b18b-47b7-ac32-376032b666e5",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-07T18:52:14.939535937Z"
+      "updated_at": "2026-01-07T18:52:14.939535937Z",
+      "updated_by": null
     },
-    "tests": {
+    "fmt": {
+      "run_id": "1c623f92-6646-4d32-9abe-7c1076b41af4",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:52:14.948464880Z"
+      "updated_at": "2026-01-07T18:52:14.948467380Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "018ddc5a-3e45-4fb0-9fdd-589705c3cafc",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-07T18:52:14.938302377Z"
+      "updated_at": "2026-01-07T18:52:14.938302377Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "f5f9c2e4-4a71-4881-8507-6d480c6536b5",
+      "status": "passed",
+      "updated_at": "2026-01-07T18:52:14.948464880Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "5bc0eff5-9551-49d0-863d-64dc2c2f13ab",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.569321196Z",
-  "updated_at": "2026-07-05T19:51:12.978135079Z",
-  "first_ready_at": "2026-01-06T21:01:34.445822483Z",
-  "done_at": "2026-01-07T18:52:23.632395244Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement claims JSONL append-only log",
+  "updated_at": "2026-07-05T19:51:12.978135079Z"
 }

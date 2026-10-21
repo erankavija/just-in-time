@@ -25,56 +25,67 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "64b06290-c857-4c8c-8bbc-66c66f43b8d9",
       "status": "passed",
       "updated_at": "2026-07-23T09:13:39.722097972Z",
       "updated_by": "auto:executor"
     },
     "cargo-ci-features": {
+      "run_id": "f7bdfede-08be-402b-95b4-7c217fd6d1fb",
       "status": "passed",
       "updated_at": "2026-07-23T09:16:55.550910174Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "4a8a40ae-9bcd-482e-80a9-784c420d2be9",
       "status": "passed",
       "updated_at": "2026-07-23T09:33:43.286665906Z",
       "updated_by": "auto:executor"
     },
     "dependency-audit": {
+      "run_id": "6664b9a7-70fc-49b7-a23d-a6b81a5d8320",
       "status": "passed",
       "updated_at": "2026-07-23T09:26:05.451573972Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "0fc7190f-4f60-4e8a-9949-4a743e5a2062",
       "status": "passed",
       "updated_at": "2026-07-23T09:21:43.189722408Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
+      "run_id": "ad592a21-2017-46db-a298-05e40d81314b",
       "status": "passed",
       "updated_at": "2026-07-23T09:23:07.781203483Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "81072276-d347-4c29-a1a6-e2bf3d286a10",
       "status": "passed",
       "updated_at": "2026-07-23T09:20:07.628540089Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
+      "run_id": "da050af5-c877-4bfe-972e-4e6c9fb2f331",
       "status": "passed",
       "updated_at": "2026-07-23T09:18:54.747382950Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "a6cdbbfc-0b30-4703-9533-6bcb7930a06e",
       "status": "passed",
       "updated_at": "2026-07-23T09:24:37.211635635Z",
       "updated_by": "auto:executor"
     },
     "secret-detection": {
+      "run_id": "31af41f5-4c70-4366-a0e0-5bd099a4dd04",
       "status": "passed",
       "updated_at": "2026-07-23T09:27:38.861959099Z",
       "updated_by": "auto:executor"
     },
     "security-review": {
+      "run_id": "62c0d63b-8837-4c3e-b3a3-cb539b8d6d1c",
       "status": "passed",
       "updated_at": "2026-07-23T09:35:18.064132564Z",
       "updated_by": "agent:jit-execution-lead"

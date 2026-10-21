@@ -1,35 +1,37 @@
 {
-  "id": "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
-  "title": "Type validation finding kinds and severities",
-  "description": "Type the validation finding kinds and severities (report stringly findings). JSON output must stay byte-compatible.\n\n## Sites\n- `validation/graph.rs:98-102` (`is_config_error`) — detects the config-error kind via `message.starts_with(CONFIG_ERROR_PREFIX)`, which drives a real transition guard at `commands/mod.rs:692-708`. Add an `is_config_error: bool` (or a `FindingKind` enum) field to `GraphFinding`, set it in `config_error()`, and read the field instead of scanning the message.\n- `validation/report.rs:39-49` — `ReportedFinding.severity` and `RuleOutcome.severity`/`scope` are `String` where `Severity`/`Scope` enums already exist; predicates round-trip via `.token()`. Derive `Serialize(rename_all=\"snake_case\")` on both enums, type the fields, and reduce `is_error()`/`has_errors()` to `== Severity::Error`.\n\n## Success Criteria\n- [ ] The config-error transition guard reads a typed field (`is_config_error` bool or `FindingKind`) on `GraphFinding`; no `message.starts_with(CONFIG_ERROR_PREFIX)` classification remains in the control path.\n- [ ] `ReportedFinding.severity` and `RuleOutcome.severity`/`scope` are typed `Severity`/`Scope`; `is_error()`/`has_errors()` are enum comparisons, not string token round-trips.\n- [ ] Serialized validation JSON is byte-identical to before (snake_case), verified by an existing or added snapshot/round-trip test.\n- [ ] `cargo-ci` and `code-review` pass.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-26T14:04:42.329045171Z",
+  "context": {},
+  "created_at": "2026-06-25T21:41:24.623368656Z",
   "dependencies": [],
+  "description": "Type the validation finding kinds and severities (report stringly findings). JSON output must stay byte-compatible.\n\n## Sites\n- `validation/graph.rs:98-102` (`is_config_error`) — detects the config-error kind via `message.starts_with(CONFIG_ERROR_PREFIX)`, which drives a real transition guard at `commands/mod.rs:692-708`. Add an `is_config_error: bool` (or a `FindingKind` enum) field to `GraphFinding`, set it in `config_error()`, and read the field instead of scanning the message.\n- `validation/report.rs:39-49` — `ReportedFinding.severity` and `RuleOutcome.severity`/`scope` are `String` where `Severity`/`Scope` enums already exist; predicates round-trip via `.token()`. Derive `Serialize(rename_all=\"snake_case\")` on both enums, type the fields, and reduce `is_error()`/`has_errors()` to `== Severity::Error`.\n\n## Success Criteria\n- [ ] The config-error transition guard reads a typed field (`is_config_error` bool or `FindingKind`) on `GraphFinding`; no `message.starts_with(CONFIG_ERROR_PREFIX)` classification remains in the control path.\n- [ ] `ReportedFinding.severity` and `RuleOutcome.severity`/`scope` are typed `Severity`/`Scope`; `is_error()`/`has_errors()` are enum comparisons, not string token round-trips.\n- [ ] Serialized validation JSON is byte-identical to before (snake_case), verified by an existing or added snapshot/round-trip test.\n- [ ] `cargo-ci` and `code-review` pass.",
+  "documents": [],
+  "done_at": "2026-06-26T14:34:51.705262897Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "111284e4-a15e-42ac-a686-bfcee4cf6825",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T14:27:14.748704031Z"
+      "updated_at": "2026-06-26T14:27:14.748704031Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "a5286e6a-0186-453b-b86a-54e0d2728dcb",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T14:31:35.269346536Z"
+      "updated_at": "2026-06-26T14:31:35.269346536Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "99908d7b-e777-44c4-90f1-33ca3e87b0d6",
   "labels": [
     "type:task",
     "epic:code-smell-cleanup"
   ],
-  "created_at": "2026-06-25T21:41:24.623368656Z",
-  "updated_at": "2026-07-05T19:51:13.043487507Z",
-  "claimed_at": "2026-06-26T14:04:42.329045171Z",
-  "done_at": "2026-06-26T14:34:51.705262897Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Type validation finding kinds and severities",
+  "updated_at": "2026-07-05T19:51:13.043487507Z"
 }

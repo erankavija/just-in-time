@@ -1,11 +1,13 @@
 {
-  "id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
-  "title": "Make jit doc add idempotent for an existing identical link",
-  "description": "Re-running `jit doc add` with a path already linked to the issue appends a duplicate document reference and a duplicate event instead of re-pointing the existing link.\n\n## Background\n\nObserved while dogfooding charter linkage: the v1.0 charter was already doc-linked to its milestone, and a second `jit doc add` with the same path appended a second reference rather than updating the first. The vision-charter workflow explicitly re-runs `jit doc add` after updates (\"re-running jit doc add after an update re-points the link at the current commit\"), so the append behavior contradicts the documented steward workflow and accretes duplicate rows in `jit doc list`.\n\n## Success Criteria\n\n- [hard] REQ-01: Running `jit doc add` for an issue and path that are already linked updates the existing reference in place; `jit doc list` shows one entry for that path afterwards.\n- [hard] REQ-02: The idempotent re-add records the refresh in the event log as an update, not a second add.\n- [hard] REQ-03: Adding a genuinely new path still appends a new reference, and a regression test covers both behaviors.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-16T08:40:04.575416376Z",
+  "context": {},
+  "created_at": "2026-07-07T07:52:08.539780520Z",
   "dependencies": [],
+  "description": "Re-running `jit doc add` with a path already linked to the issue appends a duplicate document reference and a duplicate event instead of re-pointing the existing link.\n\n## Background\n\nObserved while dogfooding charter linkage: the v1.0 charter was already doc-linked to its milestone, and a second `jit doc add` with the same path appended a second reference rather than updating the first. The vision-charter workflow explicitly re-runs `jit doc add` after updates (\"re-running jit doc add after an update re-points the link at the current commit\"), so the append behavior contradicts the documented steward workflow and accretes duplicate rows in `jit doc list`.\n\n## Success Criteria\n\n- [hard] REQ-01: Running `jit doc add` for an issue and path that are already linked updates the existing reference in place; `jit doc list` shows one entry for that path afterwards.\n- [hard] REQ-02: The idempotent re-add records the refresh in the event log as an update, not a second add.\n- [hard] REQ-03: Adding a genuinely new path still appends a new reference, and a regression test covers both behaviors.",
+  "documents": [],
+  "done_at": "2026-07-17T06:44:02.977351197Z",
+  "first_ready_at": "2026-07-07T07:52:08.539790120Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -14,36 +16,38 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "f823f81a-8798-4ad3-8539-2753eac39fbf",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:21:50.319826305Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T03:41:41.794548880Z"
+      "updated_at": "2026-07-17T00:21:50.319826305Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "e0e08526-a9a6-462e-96cd-26cf4f3d4a78",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T15:09:18.315147179Z"
+      "updated_at": "2026-07-16T15:09:18.315147179Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "28c89e67-f848-4836-a619-aa393d25b974",
+      "status": "passed",
+      "updated_at": "2026-07-17T03:41:41.794548880Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "76dd319d-2d8a-4c2c-9e3f-10f90469ef00",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:31:35.167693763Z"
+      "updated_at": "2026-07-17T00:31:35.167693763Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "8917c558-2c6d-4425-96ed-9dad1dbe7f2b",
   "labels": [
     "type:bug",
     "epic:core-maintenance",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-07T07:52:08.539780520Z",
-  "updated_at": "2026-07-17T06:44:02.977351817Z",
-  "first_ready_at": "2026-07-07T07:52:08.539790120Z",
-  "claimed_at": "2026-07-16T08:40:04.575416376Z",
-  "done_at": "2026-07-17T06:44:02.977351197Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Make jit doc add idempotent for an existing identical link",
+  "updated_at": "2026-07-17T06:44:02.977351817Z"
 }

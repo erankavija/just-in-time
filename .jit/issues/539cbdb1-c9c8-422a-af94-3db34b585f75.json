@@ -1,40 +1,42 @@
 {
-  "id": "539cbdb1-c9c8-422a-af94-3db34b585f75",
-  "title": "SDD example ruleset with the bracket",
-  "description": "Extend the SDD example ruleset to declare the epic breakable, add the bracket types, wire both gates, and use lifecycle-scoped coverage.\n\n## Success Criteria\n\n- [ ] The SDD example declares its breakable container and bracket types and wires plan-review and coverage-preview.\n- [ ] An uncovered hard criterion is blocked at the breakdown gate in the example tests.\n- [ ] The example uses child-type-exclude to drop the bracket types from coverage, and uses lifecycle-scoped coverage wording.\n- [ ] No methodology-specific strings are added to engine Rust.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-17T00:03:48.774654325Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.110467232Z",
   "dependencies": [
     "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
     "c78168d8-152a-4809-bb54-8de877197331"
   ],
+  "description": "Extend the SDD example ruleset to declare the epic breakable, add the bracket types, wire both gates, and use lifecycle-scoped coverage.\n\n## Success Criteria\n\n- [ ] The SDD example declares its breakable container and bracket types and wires plan-review and coverage-preview.\n- [ ] An uncovered hard criterion is blocked at the breakdown gate in the example tests.\n- [ ] The example uses child-type-exclude to drop the bracket types from coverage, and uses lifecycle-scoped coverage wording.\n- [ ] No methodology-specific strings are added to engine Rust.",
+  "documents": [],
+  "done_at": "2026-06-17T01:12:49.514274720Z",
+  "first_ready_at": "2026-06-16T18:30:17.826346888Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T00:44:58.587759194Z"
-    },
     "cargo-ci": {
+      "run_id": "960cbc14-6791-46f5-9eeb-712c5476d001",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-17T00:31:26.569703244Z"
+      "updated_at": "2026-06-17T00:31:26.569703244Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "a8369d64-c4b9-4a46-94dc-7f7a93acf3e0",
+      "status": "passed",
+      "updated_at": "2026-06-17T00:44:58.587759194Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "539cbdb1-c9c8-422a-af94-3db34b585f75",
   "labels": [
     "type:task",
     "story:examples-and-docs",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.110467232Z",
-  "updated_at": "2026-07-05T19:51:12.968002902Z",
-  "first_ready_at": "2026-06-16T18:30:17.826346888Z",
-  "claimed_at": "2026-06-17T00:03:48.774654325Z",
-  "done_at": "2026-06-17T01:12:49.514274720Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "SDD example ruleset with the bracket",
+  "updated_at": "2026-07-05T19:51:12.968002902Z"
 }

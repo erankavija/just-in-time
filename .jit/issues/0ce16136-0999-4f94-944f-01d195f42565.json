@@ -1,11 +1,12 @@
 {
-  "id": "0ce16136-0999-4f94-944f-01d195f42565",
-  "title": "Improve gate CLI help text clarity",
-  "description": "Improve clarity of gate-related CLI help text to better distinguish gates from labels and guide users to the correct commands. Update help text for 'jit issue create --gate' flag to explicitly mention that gate keys must exist in the registry and provide examples (e.g., 'code-review', 'tests', 'clippy'). Add similar clarifications to 'jit gate add' help text. Include examples in help output showing both single and multiple gate usage patterns. Update INSTALL.md or user documentation to explain the gate vs. label distinction clearly, emphasizing that gates are quality checkpoints defined in the registry, while labels are arbitrary key-value tags for organization. This improvement helps both human users and AI agents understand the gate system correctly without trial-and-error, reducing confusion between the two similar-looking but distinct concepts.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot",
+  "claimed_at": "2025-12-20T00:16:16.360743181Z",
+  "context": {},
+  "created_at": "2025-12-20T00:20:35.326188351Z",
   "dependencies": [],
+  "description": "Improve clarity of gate-related CLI help text to better distinguish gates from labels and guide users to the correct commands. Update help text for 'jit issue create --gate' flag to explicitly mention that gate keys must exist in the registry and provide examples (e.g., 'code-review', 'tests', 'clippy'). Add similar clarifications to 'jit gate add' help text. Include examples in help output showing both single and multiple gate usage patterns. Update INSTALL.md or user documentation to explain the gate vs. label distinction clearly, emphasizing that gates are quality checkpoints defined in the registry, while labels are arbitrary key-value tags for organization. This improvement helps both human users and AI agents understand the gate system correctly without trial-and-error, reducing confusion between the two similar-looking but distinct concepts.",
+  "documents": [],
+  "done_at": "2025-12-20T00:20:40.667715530Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,42 +15,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T00:19:53.909329102Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T00:20:32.835546139Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T00:20:37.769411420Z"
-    },
     "clippy": {
+      "run_id": "a1090044-1590-4b48-b01d-8ae2761e6ca4",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T00:20:35.326004871Z"
+      "updated_at": "2025-12-20T00:20:35.326004871Z",
+      "updated_by": "agent:copilot"
     },
     "code-review": {
+      "run_id": "5e8bfd13-51ea-4ed5-adb2-a2542467b960",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T00:20:23.788334960Z"
+      "updated_at": "2025-12-20T00:20:23.788334960Z",
+      "updated_by": "agent:copilot"
+    },
+    "fmt": {
+      "run_id": "b8bb1f54-d5fd-4742-842c-ac08d9272d1c",
+      "status": "passed",
+      "updated_at": "2025-12-20T00:20:32.835546139Z",
+      "updated_by": "agent:copilot"
+    },
+    "tdd-reminder": {
+      "run_id": "dd9535bd-af3f-491a-ac5b-ebd792dee772",
+      "status": "passed",
+      "updated_at": "2025-12-20T00:19:53.909329102Z",
+      "updated_by": "agent:copilot"
+    },
+    "tests": {
+      "run_id": "a76ba241-de2d-424d-98de-c125497982c5",
+      "status": "passed",
+      "updated_at": "2025-12-20T00:20:37.769411420Z",
+      "updated_by": "agent:copilot"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0ce16136-0999-4f94-944f-01d195f42565",
   "labels": [
     "type:task",
     "epic:phase5.2",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2025-12-20T00:20:35.326188351Z",
-  "updated_at": "2026-07-05T19:51:12.907186618Z",
-  "claimed_at": "2025-12-20T00:16:16.360743181Z",
-  "done_at": "2025-12-20T00:20:40.667715530Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Improve gate CLI help text clarity",
+  "updated_at": "2026-07-05T19:51:12.907186618Z"
 }

@@ -1,13 +1,14 @@
 {
-  "id": "78460609-595f-49fc-9255-1af163680e6e",
-  "title": "Prevent manual pass/fail of automated gates",
-  "description": "Automated gates (mode=auto) should only be passable via their checker command execution (jit gate check). Currently, you can manually pass automated gates like fmt/tests/clippy with 'jit gate pass', which defeats the purpose of automation. Add validation in pass_gate/fail_gate to reject manual operations on automated gates. Users should use 'jit gate check' instead, which runs the checker and auto-passes/fails based on exit code.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot",
+  "claimed_at": "2025-12-20T08:47:05.345053026Z",
+  "context": {},
+  "created_at": "2025-12-20T08:55:10.969938347Z",
   "dependencies": [
     "544fd21b-ece7-4d81-993a-062fd3545459"
   ],
+  "description": "Automated gates (mode=auto) should only be passable via their checker command execution (jit gate check). Currently, you can manually pass automated gates like fmt/tests/clippy with 'jit gate pass', which defeats the purpose of automation. Add validation in pass_gate/fail_gate to reject manual operations on automated gates. Users should use 'jit gate check' instead, which runs the checker and auto-passes/fails based on exit code.",
+  "documents": [],
+  "done_at": "2025-12-20T11:12:13.700582689Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -17,33 +18,37 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "c8a75bd5-9028-4db1-8f51-e70f1ebf9615",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T08:55:14.173648429Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T08:54:59.240822424Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T11:12:13.697501505Z"
+      "updated_at": "2025-12-20T08:55:14.173648429Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "30b42680-d842-437e-8d01-7e5f7497e5cf",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2025-12-20T08:55:10.969801536Z"
+      "updated_at": "2025-12-20T08:55:10.969801536Z",
+      "updated_by": "agent:copilot"
     },
     "fmt": {
+      "run_id": "d8245a92-2c2f-4954-b02d-c001c9d55822",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T08:55:12.404961713Z"
+      "updated_at": "2025-12-20T08:55:12.404961713Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "e03a7d0d-b5b4-4913-a04f-a5c9a6de5c96",
+      "status": "passed",
+      "updated_at": "2025-12-20T11:12:13.697501505Z",
+      "updated_by": "agent:copilot"
+    },
+    "tests": {
+      "run_id": "24ee41c8-f772-4f6f-8a56-36fde15e1944",
+      "status": "passed",
+      "updated_at": "2025-12-20T08:54:59.240822424Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "78460609-595f-49fc-9255-1af163680e6e",
   "labels": [
     "type:task",
     "component:cli",
@@ -51,8 +56,8 @@
     "milestone:v1.0",
     "epic:ai-agent-validation"
   ],
-  "created_at": "2025-12-20T08:55:10.969938347Z",
-  "updated_at": "2026-07-05T19:51:13.010472033Z",
-  "claimed_at": "2025-12-20T08:47:05.345053026Z",
-  "done_at": "2025-12-20T11:12:13.700582689Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Prevent manual pass/fail of automated gates",
+  "updated_at": "2026-07-05T19:51:13.010472033Z"
 }

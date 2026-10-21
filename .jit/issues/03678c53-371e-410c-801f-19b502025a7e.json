@@ -17,16 +17,19 @@
   ],
   "gates_status": {
     "doc-review": {
+      "run_id": "95920043-ea7d-4b1f-a9e3-f6bbe2ba0f0b",
       "status": "passed",
       "updated_at": "2026-08-16T19:04:57.877421888Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "725438a1-fd5c-4502-8832-d4d3e4312560",
       "status": "passed",
       "updated_at": "2026-08-16T19:02:40.134709660Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "f8339429-4def-409a-a282-8ac11670650d",
       "status": "passed",
       "updated_at": "2026-08-16T19:02:42.753586169Z",
       "updated_by": "auto:executor"

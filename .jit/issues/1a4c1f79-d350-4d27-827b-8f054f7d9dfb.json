@@ -1,13 +1,14 @@
 {
-  "id": "1a4c1f79-d350-4d27-827b-8f054f7d9dfb",
-  "title": "Implement lease renewal, release, and force-evict operations",
-  "description": "Implement lease renewal (extend TTL or update heartbeat), release (explicit), and force-evict (admin) operations. All operations append to log and update index under lock. Verify ownership for renew/release.\n\n## Renewal Behavior\n- Finite leases (ttl_secs > 0): extend `expires_at` by TTL\n- Indefinite leases (ttl_secs = 0): update `last_beat` timestamp via heartbeat operation\n\nSee design doc section \"Lease Operations\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.576291818Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement lease renewal (extend TTL or update heartbeat), release (explicit), and force-evict (admin) operations. All operations append to log and update index under lock. Verify ownership for renew/release.\n\n## Renewal Behavior\n- Finite leases (ttl_secs > 0): extend `expires_at` by TTL\n- Indefinite leases (ttl_secs = 0): update `last_beat` timestamp via heartbeat operation\n\nSee design doc section \"Lease Operations\".",
+  "documents": [],
+  "done_at": "2026-01-07T19:28:33.970385243Z",
+  "first_ready_at": "2026-01-06T21:01:34.452214742Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
+      "run_id": "fe993f02-fa00-40bf-85ee-9ebb69e3038d",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-07T19:28:27.459860950Z"
+      "updated_at": "2026-01-07T19:28:27.462340461Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "1258a466-d714-4213-a778-45f65a601383",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-07T19:28:27.464419291Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:28:27.462340461Z"
+      "updated_at": "2026-01-07T19:28:27.464419291Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "bdf067d2-b18b-4d85-861c-2f5ef5f9031d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:28:27.463276031Z"
+      "updated_at": "2026-01-07T19:28:27.463276031Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "81621927-3161-456b-a17a-c0fc6a1f00eb",
+      "status": "passed",
+      "updated_at": "2026-01-07T19:28:27.459860950Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "aa055e21-3d69-45b4-93ab-d6cd467ef540",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T19:28:27.461052460Z"
+      "updated_at": "2026-01-07T19:28:27.461052460Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "1a4c1f79-d350-4d27-827b-8f054f7d9dfb",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.576291818Z",
-  "updated_at": "2026-07-05T19:51:12.918426206Z",
-  "first_ready_at": "2026-01-06T21:01:34.452214742Z",
-  "done_at": "2026-01-07T19:28:33.970385243Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement lease renewal, release, and force-evict operations",
+  "updated_at": "2026-07-05T19:51:12.918426206Z"
 }

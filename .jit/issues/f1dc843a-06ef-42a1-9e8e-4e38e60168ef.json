@@ -134,26 +134,31 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "095382cf-5e5e-425f-b3e0-a2ca6c8defe2",
       "status": "passed",
       "updated_at": "2026-10-01T23:16:30.423023756Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "801a7183-0015-4e32-8400-a27633b1e883",
       "status": "passed",
       "updated_at": "2026-10-01T23:19:50.607539257Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "a7471b57-c7de-4c2b-8eb2-2fad309d7cc7",
       "status": "passed",
       "updated_at": "2026-10-01T23:16:57.700896020Z",
       "updated_by": "auto:executor"
     },
     "holistic-review": {
+      "run_id": "dd402a61-985f-4871-aafc-e88c7c0e3c56",
       "status": "passed",
       "updated_at": "2026-10-01T23:21:45.470488603Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "5d70c8da-aba0-432f-962f-81005341d843",
       "status": "passed",
       "updated_at": "2026-10-01T23:16:35.566481710Z",
       "updated_by": "auto:executor"

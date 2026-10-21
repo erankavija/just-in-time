@@ -1,34 +1,35 @@
 {
-  "id": "c0cb6056-fc91-4e03-9a35-a28663093a14",
-  "title": "Write parallel work setup tutorial",
-  "description": "Write step-by-step tutorial for setting up parallel work: create worktree, configure agent identity, claim issues, work in isolation, merge back. Target: complete in 15 minutes. Place in docs/tutorials/.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T17:26:39.839934216Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:20.939176141Z",
   "dependencies": [
     "730d25b5-f16c-4327-99fd-fb337e65edb9"
   ],
+  "description": "Write step-by-step tutorial for setting up parallel work: create worktree, configure agent identity, claim issues, work in isolation, merge back. Target: complete in 15 minutes. Place in docs/tutorials/.",
+  "documents": [],
+  "done_at": "2026-02-02T17:28:59.964305196Z",
+  "first_ready_at": "2026-02-01T23:40:15.425834436Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "263b60da-8fee-46fe-89cd-ed7a970cf5f2",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:28:59.957159644Z"
+      "updated_at": "2026-02-02T17:28:59.957159644Z",
+      "updated_by": null
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c0cb6056-fc91-4e03-9a35-a28663093a14",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:docs",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:20.939176141Z",
-  "updated_at": "2026-07-05T19:51:13.078353692Z",
-  "first_ready_at": "2026-02-01T23:40:15.425834436Z",
-  "claimed_at": "2026-02-02T17:26:39.839934216Z",
-  "done_at": "2026-02-02T17:28:59.964305196Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Write parallel work setup tutorial",
+  "updated_at": "2026-07-05T19:51:13.078353692Z"
 }

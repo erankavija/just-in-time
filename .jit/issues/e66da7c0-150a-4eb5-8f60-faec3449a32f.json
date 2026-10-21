@@ -1,13 +1,14 @@
 {
-  "id": "e66da7c0-150a-4eb5-8f60-faec3449a32f",
-  "title": "Implement automatic lease expiration with monotonic time",
-  "description": "Implement lazy expiration during claim operations with support for both finite and indefinite leases.\n\n## Finite Leases (ttl_secs > 0)\nUse monotonic clock (`Instant`) for TTL checks to avoid wall-clock issues. Reconstruct `Instant` from UTC timestamps on index load. Filter out expired leases (`now > expires_at`) and append `auto-evict` to log.\n\n## Indefinite Leases (ttl_secs = 0)\nNo time-based expiry. Mark as `stale: true` if `now - last_beat > stale_threshold_secs`. Stale leases block structural edits but aren't auto-evicted (require explicit force-evict).\n\nSee design doc sections \"Automatic Expiration and Staleness\" and \"Monotonic Time Semantics\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.578449879Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement lazy expiration during claim operations with support for both finite and indefinite leases.\n\n## Finite Leases (ttl_secs > 0)\nUse monotonic clock (`Instant`) for TTL checks to avoid wall-clock issues. Reconstruct `Instant` from UTC timestamps on index load. Filter out expired leases (`now > expires_at`) and append `auto-evict` to log.\n\n## Indefinite Leases (ttl_secs = 0)\nNo time-based expiry. Mark as `stale: true` if `now - last_beat > stale_threshold_secs`. Stale leases block structural edits but aren't auto-evicted (require explicit force-evict).\n\nSee design doc sections \"Automatic Expiration and Staleness\" and \"Monotonic Time Semantics\".",
+  "documents": [],
+  "done_at": "2026-01-07T18:58:38.960587216Z",
+  "first_ready_at": "2026-01-06T21:01:34.454344041Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
+      "run_id": "d0d29b7f-7f32-4e52-8eca-4699a4564413",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:58:31.776970641Z"
+      "updated_at": "2026-01-07T18:58:26.765202627Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "293526c4-c016-4fea-9f5b-86327d4a5461",
       "status": "passed",
-      "updated_by": "agent:agent-3",
-      "updated_at": "2026-01-07T18:58:32.182688157Z"
+      "updated_at": "2026-01-07T18:58:32.182688157Z",
+      "updated_by": "agent:agent-3"
+    },
+    "fmt": {
+      "run_id": "9bd5d520-0986-4651-87fe-7ff30c3ee150",
+      "status": "passed",
+      "updated_at": "2026-01-07T18:58:31.776970641Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "43c91cd2-8b69-4729-a635-eee017c4a16e",
       "status": "passed",
-      "updated_by": "agent:agent-3",
-      "updated_at": "2026-01-07T18:58:25.355042254Z"
+      "updated_at": "2026-01-07T18:58:25.355042254Z",
+      "updated_by": "agent:agent-3"
     },
     "tests": {
+      "run_id": "43cc6a50-c206-4d2a-8833-6d49c15082e5",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:58:25.358103965Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-07T18:58:26.765202627Z"
+      "updated_at": "2026-01-07T18:58:25.358103965Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "e66da7c0-150a-4eb5-8f60-faec3449a32f",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.578449879Z",
-  "updated_at": "2026-07-05T19:51:13.104696441Z",
-  "first_ready_at": "2026-01-06T21:01:34.454344041Z",
-  "done_at": "2026-01-07T18:58:38.960587216Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement automatic lease expiration with monotonic time",
+  "updated_at": "2026-07-05T19:51:13.104696441Z"
 }

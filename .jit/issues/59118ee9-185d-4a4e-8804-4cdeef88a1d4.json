@@ -1,40 +1,42 @@
 {
-  "id": "59118ee9-185d-4a4e-8804-4cdeef88a1d4",
-  "title": "Breakdown: Graph templates: configurable parameterized subgraphs applied to the work DAG",
-  "description": "Breakdown node bracketing epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nHolds the decomposition of the approved plan into well-ordered child issues that cover the container's `[hard]` success criteria (REQ-01–REQ-08).",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-22T22:29:17.574451040Z",
+  "context": {},
+  "created_at": "2026-06-21T23:20:16.975529561Z",
   "dependencies": [
     "7d88e37d-2946-4ea8-9f71-e3956e5bc96d"
   ],
+  "description": "Breakdown node bracketing epic **Graph templates: configurable parameterized subgraphs applied to the work DAG** (`9ac9fdac`).\n\nHolds the decomposition of the approved plan into well-ordered child issues that cover the container's `[hard]` success criteria (REQ-01–REQ-08).",
+  "documents": [],
+  "done_at": "2026-06-23T06:28:17.161924380Z",
+  "first_ready_at": "2026-06-22T22:35:32.159180080Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
     "breakdown-review": {
+      "run_id": "06b3232b-923d-49e8-b829-af62b396ed5c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T06:26:27.811366005Z"
+      "updated_at": "2026-06-23T06:26:27.811366005Z",
+      "updated_by": "auto:executor"
     },
     "coverage-preview": {
+      "run_id": "87e0819c-0946-4684-9644-50553ca87656",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T00:15:41.531728215Z"
+      "updated_at": "2026-06-23T00:15:41.531728215Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "59118ee9-185d-4a4e-8804-4cdeef88a1d4",
   "labels": [
     "type:breakdown",
     "brackets:9ac9fdac",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-21T23:20:16.975529561Z",
-  "updated_at": "2026-07-05T19:51:12.975899058Z",
-  "first_ready_at": "2026-06-22T22:35:32.159180080Z",
-  "claimed_at": "2026-06-22T22:29:17.574451040Z",
-  "done_at": "2026-06-23T06:28:17.161924380Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Breakdown: Graph templates: configurable parameterized subgraphs applied to the work DAG",
+  "updated_at": "2026-07-05T19:51:12.975899058Z"
 }

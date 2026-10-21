@@ -1,13 +1,14 @@
 {
-  "id": "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
-  "title": "Implement jit claim acquire command",
-  "description": "Implement `jit claim acquire <issue-id>` with `--ttl <seconds>` and `--agent-id <id>` options. Return lease ID on success, clear error if already claimed. Support `--json` output.\n\n## TTL=0 Support\nWhen `--ttl 0`, require `--reason <text>` flag and enforce:\n- Repository policy permits indefinite leases\n- Per-agent limit: max_indefinite_leases_per_agent\n- Per-repository limit: max_indefinite_leases_per_repo\n\nSee design doc sections \"New Commands\" and \"TTL=0 constraints\".",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli-commands",
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.594972653Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `jit claim acquire <issue-id>` with `--ttl <seconds>` and `--agent-id <id>` options. Return lease ID on success, clear error if already claimed. Support `--json` output.\n\n## TTL=0 Support\nWhen `--ttl 0`, require `--reason <text>` flag and enforce:\n- Repository policy permits indefinite leases\n- Per-agent limit: max_indefinite_leases_per_agent\n- Per-repository limit: max_indefinite_leases_per_repo\n\nSee design doc sections \"New Commands\" and \"TTL=0 constraints\".",
+  "documents": [],
+  "done_at": "2026-01-08T21:23:10.207252627Z",
+  "first_ready_at": "2026-01-07T23:32:21.494959911Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
+      "run_id": "6fc7deb6-0beb-481d-a63e-cbbf5d36974d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:13:41.562260242Z"
+      "updated_at": "2026-01-08T21:13:41.538823315Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "edc0d88c-56de-4f24-9c07-78dd1fc4d2f3",
       "status": "passed",
-      "updated_by": "agent:copilot-cli-commands",
-      "updated_at": "2026-01-08T21:13:41.531995350Z"
+      "updated_at": "2026-01-08T21:13:41.531995350Z",
+      "updated_by": "agent:copilot-cli-commands"
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "e264d87a-329b-4e6d-94f6-144db141df26",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:13:41.538823315Z"
+      "updated_at": "2026-01-08T21:13:41.562260242Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "11f4d8e5-e094-4aa7-80d0-57d4f490aecb",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-08T20:57:54.184390791Z"
+      "updated_at": "2026-01-08T20:57:54.184390791Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "8062f442-4554-4104-bc35-be1ab1878cab",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T21:23:10.187244722Z"
+      "updated_at": "2026-01-08T21:23:10.187244722Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "ee20327b-2f2a-48f8-80d6-06cb1cb31a6e",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.594972653Z",
-  "updated_at": "2026-07-05T19:51:13.111279456Z",
-  "first_ready_at": "2026-01-07T23:32:21.494959911Z",
-  "done_at": "2026-01-08T21:23:10.207252627Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit claim acquire command",
+  "updated_at": "2026-07-05T19:51:13.111279456Z"
 }

@@ -16,11 +16,13 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "26c7e5b6-cadd-4137-aabf-0c55d74d2fdb",
       "status": "passed",
       "updated_at": "2026-10-21T11:37:27.158529199Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "85469489-56be-4242-98ac-e4429f790a54",
       "status": "passed",
       "updated_at": "2026-10-21T11:33:25.053776318Z",
       "updated_by": "auto:executor"

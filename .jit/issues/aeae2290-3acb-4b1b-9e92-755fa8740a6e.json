@@ -1,13 +1,15 @@
 {
-  "id": "aeae2290-3acb-4b1b-9e92-755fa8740a6e",
-  "title": "Define agent config.toml schema",
-  "description": "Define `~/.config/jit/agent.toml` schema with `[agent]` section (id, created_at, description, default_ttl) and `[behavior]` section (auto_heartbeat, heartbeat_interval). See design doc section \"Agent Configuration\".",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T16:39:54.923008963Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.077269794Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Define `~/.config/jit/agent.toml` schema with `[agent]` section (id, created_at, description, default_ttl) and `[behavior]` section (auto_heartbeat, heartbeat_interval). See design doc section \"Agent Configuration\".",
+  "documents": [],
+  "done_at": "2026-02-02T16:45:37.088531348Z",
+  "first_ready_at": "2026-01-06T21:01:34.498972744Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -17,42 +19,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "4a1d69f4-987f-4db7-840f-5a80b103e992",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:41:58.138119045Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:42:00.442606335Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:39:54.919890902Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:41:38.322832476Z"
+      "updated_at": "2026-02-02T16:41:58.138119045Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "facf75f4-6a4a-432c-9245-91cb9f4d6f9f",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:45:37.085394307Z"
+      "updated_at": "2026-02-02T16:45:37.085394307Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "run_id": "2196a76d-6630-49da-9e1e-7da201f69bcf",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:42:00.442606335Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "8b325c60-63aa-43ba-ab8a-55fa18ae3200",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:39:54.919890902Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "cdf455e9-af21-482e-90c8-cf8587bd51d9",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:41:38.322832476Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "aeae2290-3acb-4b1b-9e92-755fa8740a6e",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.077269794Z",
-  "updated_at": "2026-07-05T19:51:13.057012387Z",
-  "first_ready_at": "2026-01-06T21:01:34.498972744Z",
-  "claimed_at": "2026-02-02T16:39:54.923008963Z",
-  "done_at": "2026-02-02T16:45:37.088531348Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Define agent config.toml schema",
+  "updated_at": "2026-07-05T19:51:13.057012387Z"
 }

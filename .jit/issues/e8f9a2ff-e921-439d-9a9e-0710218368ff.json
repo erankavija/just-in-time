@@ -1,13 +1,14 @@
 {
-  "id": "e8f9a2ff-e921-439d-9a9e-0710218368ff",
-  "title": "Implement index consistency validation",
-  "description": "Implement `verify_index_consistency()` to detect: duplicate leases per issue, expired entries in index, missing sequence numbers, schema version mismatches. Return detailed validation results. See design doc section \"Index Consistency Validation\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.069431462Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `verify_index_consistency()` to detect: duplicate leases per issue, expired entries in index, missing sequence numbers, schema version mismatches. Return detailed validation results. See design doc section \"Index Consistency Validation\".",
+  "documents": [],
+  "done_at": "2026-02-02T11:11:54.224158922Z",
+  "first_ready_at": "2026-01-07T23:32:21.574283529Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,42 +17,46 @@
     "code-review"
   ],
   "gates_status": {
-    "fmt": {
+    "clippy": {
+      "run_id": "09ef2600-7ad3-4e6c-82c5-6adac780350b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T11:23:32.939925976Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T11:23:10.920602186Z"
+      "updated_at": "2026-02-02T11:23:30.635735447Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "c64a57cf-7e9f-41a6-8b69-4de92a01abb6",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T11:10:59.700403152Z"
+      "updated_at": "2026-02-02T11:10:59.700403152Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "fmt": {
+      "run_id": "215170c9-2ebb-4a3b-9eaa-350ee8e4fa77",
+      "status": "passed",
+      "updated_at": "2026-02-02T11:23:32.939925976Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "223a34d4-0df8-4d50-9317-999499227cba",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T11:06:53.236641759Z"
+      "updated_at": "2026-02-02T11:06:53.236641759Z",
+      "updated_by": "agent:copilot-session"
     },
-    "clippy": {
+    "tests": {
+      "run_id": "b2d43bbd-f623-49bf-8f90-4b0e9060e24c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T11:23:30.635735447Z"
+      "updated_at": "2026-02-02T11:23:10.920602186Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "e8f9a2ff-e921-439d-9a9e-0710218368ff",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.069431462Z",
-  "updated_at": "2026-07-05T19:51:13.107196263Z",
-  "first_ready_at": "2026-01-07T23:32:21.574283529Z",
-  "done_at": "2026-02-02T11:11:54.224158922Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement index consistency validation",
+  "updated_at": "2026-07-05T19:51:13.107196263Z"
 }

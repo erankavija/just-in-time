@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "human:authorized-invoker",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-07-15T12:22:30.221548297Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "security-review",
+  "issue_id": "866a5bbd-c98d-4588-83e8-7423f3b12005",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "d3ca2a1c-2ccb-4c3e-9fa9-18bb67a03703",
+  "schema_version": 1,
+  "stage": "precheck",
+  "started_at": "2026-07-15T12:22:30.221548297Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

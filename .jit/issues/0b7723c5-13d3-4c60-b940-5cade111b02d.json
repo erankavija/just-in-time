@@ -1,11 +1,12 @@
 {
-  "id": "0b7723c5-13d3-4c60-b940-5cade111b02d",
-  "title": "Add Rejected state to State enum",
-  "description": "Add Rejected variant to State enum in domain.rs. Update serde serialization to support 'rejected' string. Add is_terminal() helper method that returns true for Done and Rejected states.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session-1",
+  "claimed_at": "2025-12-20T19:53:24.338346091Z",
+  "context": {},
+  "created_at": "2025-12-20T19:56:41.802344799Z",
   "dependencies": [],
+  "description": "Add Rejected variant to State enum in domain.rs. Update serde serialization to support 'rejected' string. Add is_terminal() helper method that returns true for Done and Rejected states.",
+  "documents": [],
+  "done_at": "2025-12-20T19:58:59.518626126Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,42 +15,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
+      "run_id": "20aab49d-db8f-4a39-a69d-3ab7ead3745f",
       "status": "passed",
-      "updated_by": "agent:copilot-session-1",
-      "updated_at": "2025-12-20T19:52:33.105670119Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:56:43.612086683Z"
+      "updated_at": "2025-12-20T19:56:41.805348152Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "bb82fb48-ef1e-4fbb-b0ed-de7a1f8948f0",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T19:58:59.515307842Z"
+      "updated_at": "2025-12-20T19:58:59.515307842Z",
+      "updated_by": "human:user"
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "7be79e6e-b794-4ffa-a3d5-141dff8c012e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:56:41.805348152Z"
+      "updated_at": "2025-12-20T19:56:43.612086683Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "68a2a178-1b1a-4427-877e-d4566992459e",
+      "status": "passed",
+      "updated_at": "2025-12-20T19:52:33.105670119Z",
+      "updated_by": "agent:copilot-session-1"
     },
     "tests": {
+      "run_id": "68569a9c-4d6f-4866-8ab7-1fa4e5fd3759",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T19:56:38.095283708Z"
+      "updated_at": "2025-12-20T19:56:38.095283708Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0b7723c5-13d3-4c60-b940-5cade111b02d",
   "labels": [
     "type:task",
     "epic:rejection-state",
     "milestone:v1.0",
     "component:core"
   ],
-  "created_at": "2025-12-20T19:56:41.802344799Z",
-  "updated_at": "2026-07-05T19:51:12.903785625Z",
-  "claimed_at": "2025-12-20T19:53:24.338346091Z",
-  "done_at": "2025-12-20T19:58:59.518626126Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add Rejected state to State enum",
+  "updated_at": "2026-07-05T19:51:12.903785625Z"
 }

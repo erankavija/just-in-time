@@ -1,14 +1,16 @@
 {
-  "id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5",
-  "title": "Remove the legacy document-archive command",
-  "description": "Remove `jit doc archive` as a clean cut with no alias or compatibility stub. Remove its CLI and main dispatch, `archive_document`, `ArchiveResult`, obsolete event catalog/schema references, tests and fixtures, and all adopter-facing docs/README references. Regenerate and test the MCP tool set so the removed subcommand disappears. Retire the legacy `[documentation.categories]` loader field, documentation, and this repository's config entries in the same change; archival has no category input and uses only the repository-relative mirror layout. Historical development records may remain clearly historical. `crates/server` and `web` require verification but have no expected live command consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: A tree-wide search for `doc archive`, `archive_document`, and `ArchiveResult` across `crates/`, `mcp-server/`, `web/`, `docs/`, and `dev/` finds no live production or test reference; only clearly historical `dev/` records may mention the removed surface, the generated MCP schema/tests expose no legacy tool, `[documentation.categories]` has no live loader/config/docs reference, and all affected Rust and MCP tests pass.\n",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:legacy-removal",
+  "claimed_at": "2026-07-13T22:00:15.732133542Z",
+  "context": {},
+  "created_at": "2026-07-13T00:59:48.566160952Z",
   "dependencies": [
     "a9f8e04d-b6fc-4f2f-96be-bc751e6bc66b",
     "f205aa7e-dc5f-4d1f-95c4-ec76cb48538b"
   ],
+  "description": "Remove `jit doc archive` as a clean cut with no alias or compatibility stub. Remove its CLI and main dispatch, `archive_document`, `ArchiveResult`, obsolete event catalog/schema references, tests and fixtures, and all adopter-facing docs/README references. Regenerate and test the MCP tool set so the removed subcommand disappears. Retire the legacy `[documentation.categories]` loader field, documentation, and this repository's config entries in the same change; archival has no category input and uses only the repository-relative mirror layout. Historical development records may remain clearly historical. `crates/server` and `web` require verification but have no expected live command consumer.\n\n## Success Criteria\n\n- [hard] REQ-01: A tree-wide search for `doc archive`, `archive_document`, and `ArchiveResult` across `crates/`, `mcp-server/`, `web/`, `docs/`, and `dev/` finds no live production or test reference; only clearly historical `dev/` records may mention the removed surface, the generated MCP schema/tests expose no legacy tool, `[documentation.categories]` has no live loader/config/docs reference, and all affected Rust and MCP tests pass.\n",
+  "documents": [],
+  "done_at": "2026-07-13T22:43:26.905620502Z",
+  "first_ready_at": "2026-07-13T00:59:48.566161202Z",
   "gates_required": [
     "cargo-ci",
     "mcp-ci",
@@ -18,40 +20,43 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "b05fda26-1f5c-4cf0-8c03-f28626f0692b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T22:31:47.761738401Z"
-    },
-    "docs-mechanical": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T22:43:16.315263791Z"
+      "updated_at": "2026-07-13T22:31:47.761738401Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "0cb1182a-379a-4f1f-b3a0-e89492aa259e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T22:36:46.363085997Z"
-    },
-    "mcp-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T22:36:34.491160714Z"
+      "updated_at": "2026-07-13T22:36:46.363085997Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "26fa336e-32ea-4b1e-9d32-7013ccd94f0f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-13T22:41:03.806175243Z"
+      "updated_at": "2026-07-13T22:41:03.806175243Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "4f821628-f586-4ab8-b200-b43ffeb04f2f",
+      "status": "passed",
+      "updated_at": "2026-07-13T22:43:16.315263791Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "run_id": "772f7f6c-80f8-4b3e-9f4d-14e7d9e6d9ab",
+      "status": "passed",
+      "updated_at": "2026-07-13T22:36:34.491160714Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "271dc224-a0cf-4f49-bfdb-a8be33f9e7d5",
   "labels": [
     "type:task",
     "epic:artifact-archival"
   ],
-  "created_at": "2026-07-13T00:59:48.566160952Z",
-  "updated_at": "2026-07-13T22:43:26.905621052Z",
-  "first_ready_at": "2026-07-13T00:59:48.566161202Z",
-  "claimed_at": "2026-07-13T22:00:15.732133542Z",
-  "done_at": "2026-07-13T22:43:26.905620502Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Remove the legacy document-archive command",
+  "updated_at": "2026-07-13T22:43:26.905621052Z"
 }

@@ -1,36 +1,38 @@
 {
-  "id": "9067c337-d849-4e74-906e-6e2c7ba8686a",
-  "title": "jit doc add/remove append no event (violates INV-EVENT-LOG)",
-  "description": "`jit doc add` and `jit doc remove` mutate an issue's `documents` field and save it without appending any event to `events.jsonl`. Every other issue mutation path (`issue update`, `bulk_update`, dependency commands, template apply) appends an `issue_updated` event with the changed fields. This violates INV-EVENT-LOG (every state change appends an event).\n\nDiscovered by the code-review gate on faed8ffa, which flagged a documents entry in the issue file with no matching event.\n\n## Success Criteria\n\n- [hard] REQ-01: `add_document_reference` and `remove_document_reference` (crates/jit/src/commands/document.rs) append an `issue_updated` event with `fields: [\"documents\"]` after saving the issue, mirroring the `issue.rs`/`bulk_update.rs` pattern.\n- [hard] REQ-02: Tests cover both paths: after `jit doc add` and after `jit doc remove`, the last event in the log is `issue_updated` for that issue with `fields` containing `documents` (TestHarness-level tests).\n- [hard] REQ-03: cargo fmt, clippy (zero warnings), and the full test suite pass.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-02T07:34:41.073441366Z",
+  "context": {},
+  "created_at": "2026-07-02T07:34:30.654083549Z",
   "dependencies": [],
+  "description": "`jit doc add` and `jit doc remove` mutate an issue's `documents` field and save it without appending any event to `events.jsonl`. Every other issue mutation path (`issue update`, `bulk_update`, dependency commands, template apply) appends an `issue_updated` event with the changed fields. This violates INV-EVENT-LOG (every state change appends an event).\n\nDiscovered by the code-review gate on faed8ffa, which flagged a documents entry in the issue file with no matching event.\n\n## Success Criteria\n\n- [hard] REQ-01: `add_document_reference` and `remove_document_reference` (crates/jit/src/commands/document.rs) append an `issue_updated` event with `fields: [\"documents\"]` after saving the issue, mirroring the `issue.rs`/`bulk_update.rs` pattern.\n- [hard] REQ-02: Tests cover both paths: after `jit doc add` and after `jit doc remove`, the last event in the log is `issue_updated` for that issue with `fields` containing `documents` (TestHarness-level tests).\n- [hard] REQ-03: cargo fmt, clippy (zero warnings), and the full test suite pass.",
+  "documents": [],
+  "done_at": "2026-07-02T07:46:58.308840726Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "581341c4-5944-47b7-910a-59e5019201db",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:41:51.154278780Z"
+      "updated_at": "2026-07-02T07:41:51.154278780Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "3376ca70-4692-438a-a13c-fce81ee0a4e2",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:44:46.413582195Z"
+      "updated_at": "2026-07-02T07:44:46.413582195Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9067c337-d849-4e74-906e-6e2c7ba8686a",
   "labels": [
     "component:cli",
     "type:bug",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-02T07:34:30.654083549Z",
-  "updated_at": "2026-07-05T19:51:13.032072788Z",
-  "claimed_at": "2026-07-02T07:34:41.073441366Z",
-  "done_at": "2026-07-02T07:46:58.308840726Z"
+  "priority": "high",
+  "state": "done",
+  "title": "jit doc add/remove append no event (violates INV-EVENT-LOG)",
+  "updated_at": "2026-07-05T19:51:13.032072788Z"
 }

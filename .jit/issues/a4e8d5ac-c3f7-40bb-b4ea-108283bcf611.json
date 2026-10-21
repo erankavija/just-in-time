@@ -17,16 +17,19 @@
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "0eb1334f-dbee-4465-992f-5cf5daea5825",
       "status": "passed",
       "updated_at": "2026-07-09T21:39:44.811010152Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "eed628c1-5b65-4628-ab18-5052420be73b",
       "status": "passed",
       "updated_at": "2026-07-09T21:38:26.137424132Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
+      "run_id": "9634ce60-000c-46ce-aebf-3f4f86f4ad8e",
       "status": "passed",
       "updated_at": "2026-07-09T21:01:55.754635788Z",
       "updated_by": "auto:executor"

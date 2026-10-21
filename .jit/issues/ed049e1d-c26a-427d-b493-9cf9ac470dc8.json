@@ -1,13 +1,23 @@
 {
-  "id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
-  "title": "Project runtime coordination and recovery defaults",
-  "description": "Operational defaults for heartbeat cadence, lock timeout/polling, temporary-file cleanup, and claim TTL are source-defined but lack one maintained complete projection.\n\nSource: `crates/jit/src/agent_config.rs:43-65`; `crates/jit/src/storage/json.rs:107-123`; `crates/jit/src/storage/lock.rs:118-155`; `crates/jit/src/commands/claim.rs:830-848`; `crates/jit/src/cli.rs:2551-2572`; `docs/reference/configuration.md:261-280`.\n\n## Success Criteria\n\n- [hard] REQ-01: One source-derived surface presents the default heartbeat interval, lock timeout/polling, temporary-file cleanup threshold, and claim TTL with units and operational scope.\n- [hard] REQ-02: Existing coordination documentation consumes or is mechanically checked against that surface.\n- [hard] REQ-03: Conformance coverage fails when a listed default changes without projection refresh.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-11T22:50:02.181680330Z",
+  "context": {},
+  "created_at": "2026-07-11T13:35:35.556182403Z",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
+  "description": "Operational defaults for heartbeat cadence, lock timeout/polling, temporary-file cleanup, and claim TTL are source-defined but lack one maintained complete projection.\n\nSource: `crates/jit/src/agent_config.rs:43-65`; `crates/jit/src/storage/json.rs:107-123`; `crates/jit/src/storage/lock.rs:118-155`; `crates/jit/src/commands/claim.rs:830-848`; `crates/jit/src/cli.rs:2551-2572`; `docs/reference/configuration.md:261-280`.\n\n## Success Criteria\n\n- [hard] REQ-01: One source-derived surface presents the default heartbeat interval, lock timeout/polling, temporary-file cleanup threshold, and claim TTL with units and operational scope.\n- [hard] REQ-02: Existing coordination documentation consumes or is mechanically checked against that surface.\n- [hard] REQ-03: Conformance coverage fails when a listed default changes without projection refresh.",
+  "documents": [
+    {
+      "commit": null,
+      "doc_type": "reference",
+      "format": "markdown",
+      "label": "Runtime Coordination Defaults",
+      "path": "docs/reference/runtime-defaults.md"
+    }
+  ],
+  "done_at": "2026-07-12T08:00:27.913207814Z",
+  "first_ready_at": "2026-07-11T13:35:35.556182633Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -16,45 +26,39 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "6a2cba55-14d3-4d66-ad74-d91a17339be8",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T07:49:48.958115711Z"
-    },
-    "doc-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T07:56:59.994288940Z"
+      "updated_at": "2026-07-12T07:49:48.958115711Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "78b690e6-53ef-4927-b852-96fe9edd4f7d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T07:55:24.500466319Z"
+      "updated_at": "2026-07-12T07:55:24.500466319Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "run_id": "323337c9-bbe9-4e78-a235-3c4a2dda3455",
+      "status": "passed",
+      "updated_at": "2026-07-12T07:56:59.994288940Z",
+      "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "c5857735-312a-4c46-8e24-9e416be46c18",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T07:59:59.598113693Z"
+      "updated_at": "2026-07-12T07:59:59.598113693Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "docs/reference/runtime-defaults.md",
-      "commit": null,
-      "label": "Runtime Coordination Defaults",
-      "doc_type": "reference",
-      "format": "markdown"
-    }
-  ],
+  "id": "ed049e1d-c26a-427d-b493-9cf9ac470dc8",
   "labels": [
     "type:task",
     "milestone:v1.0",
     "component:core",
     "epic:documentation-contract-followups"
   ],
-  "created_at": "2026-07-11T13:35:35.556182403Z",
-  "updated_at": "2026-07-12T08:00:27.913208454Z",
-  "first_ready_at": "2026-07-11T13:35:35.556182633Z",
-  "claimed_at": "2026-07-11T22:50:02.181680330Z",
-  "done_at": "2026-07-12T08:00:27.913207814Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Project runtime coordination and recovery defaults",
+  "updated_at": "2026-07-12T08:00:27.913208454Z"
 }

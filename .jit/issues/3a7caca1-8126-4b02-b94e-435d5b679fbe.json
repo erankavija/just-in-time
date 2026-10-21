@@ -1,11 +1,13 @@
 {
-  "id": "3a7caca1-8126-4b02-b94e-435d5b679fbe",
-  "title": "Implement jit serve command for background API and web UI server",
-  "description": "Add a `jit serve` command to the jit CLI that starts the jit-server API and web UI as a detached background process (not tied to the terminal), with PID-file-based collision detection and automatic port selection for multi-repo hosts.\n\n## Acceptance Criteria\n\n- `jit serve` starts the jit-server binary as a daemon process (detached from terminal)\n- `jit serve --stop` stops the server for the current repo\n- `jit serve --status` shows whether the server is running (port, PID, uptime)\n- Multiple repos on the same host can run servers simultaneously (auto port selection 3000–3099)\n- If server already running for this repo, `jit serve` prints its info and exits 0 (idempotent)\n- Stale PID files (dead process) are cleaned up automatically\n- `--json` flag provides machine-readable output\n- `jit serve` is excluded from default MCP tool listing (hidden flag in schema)\n- `crates/server` is enhanced with `--web-dir` to serve built web UI static files\n\n## Command Interface\n```\njit serve [--port PORT] [--stop] [--status] [--fg] [--log FILE] [--json]\n```\n\n## PID File\n`.jit/server.pid.json` — stores pid, port, started_at, data_dir, log_file\n\n## Output\n- Start: `Server started on http://localhost:3000 (PID 12345)`\n- Already running: `Server is already running on http://localhost:3000 (PID 12345)`\n- Stop: `Server stopped (was PID 12345 on port 3000)`\n- Status: `Server is running: http://localhost:3000 (PID 12345, started ...)`",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot",
+  "claimed_at": "2026-03-09T21:17:37.888236568Z",
+  "context": {},
+  "created_at": "2026-03-09T21:17:31.159919453Z",
   "dependencies": [],
+  "description": "Add a `jit serve` command to the jit CLI that starts the jit-server API and web UI as a detached background process (not tied to the terminal), with PID-file-based collision detection and automatic port selection for multi-repo hosts.\n\n## Acceptance Criteria\n\n- `jit serve` starts the jit-server binary as a daemon process (detached from terminal)\n- `jit serve --stop` stops the server for the current repo\n- `jit serve --status` shows whether the server is running (port, PID, uptime)\n- Multiple repos on the same host can run servers simultaneously (auto port selection 3000–3099)\n- If server already running for this repo, `jit serve` prints its info and exits 0 (idempotent)\n- Stale PID files (dead process) are cleaned up automatically\n- `--json` flag provides machine-readable output\n- `jit serve` is excluded from default MCP tool listing (hidden flag in schema)\n- `crates/server` is enhanced with `--web-dir` to serve built web UI static files\n\n## Command Interface\n```\njit serve [--port PORT] [--stop] [--status] [--fg] [--log FILE] [--json]\n```\n\n## PID File\n`.jit/server.pid.json` — stores pid, port, started_at, data_dir, log_file\n\n## Output\n- Start: `Server started on http://localhost:3000 (PID 12345)`\n- Already running: `Server is already running on http://localhost:3000 (PID 12345)`\n- Stop: `Server stopped (was PID 12345 on port 3000)`\n- Status: `Server is running: http://localhost:3000 (PID 12345, started ...)`",
+  "documents": [],
+  "done_at": "2026-03-10T22:33:02.174664327Z",
+  "first_ready_at": "2026-03-09T21:19:05.859169606Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,34 +16,38 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
+    "clippy": {
+      "run_id": "77e28f4a-7044-4816-8585-7761fd50852d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-10T22:10:58.389965120Z"
+      "updated_at": "2026-03-10T22:10:55.375970347Z",
+      "updated_by": "auto:executor"
     },
-    "tdd-reminder": {
+    "code-review": {
+      "run_id": "7ee48065-df12-4e63-ac18-55d5596a2e67",
       "status": "passed",
-      "updated_by": "agent:copilot",
-      "updated_at": "2026-03-09T21:35:00.330707443Z"
+      "updated_at": "2026-03-10T22:10:58.389965120Z",
+      "updated_by": "auto:executor"
     },
     "fmt": {
+      "run_id": "a2f33991-3e22-416e-9e05-bf3fb2320097",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-10T22:10:57.880744744Z"
+      "updated_at": "2026-03-10T22:10:57.880744744Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "ec47551d-1d64-4f68-9ea2-850f05f889e9",
+      "status": "passed",
+      "updated_at": "2026-03-09T21:35:00.330707443Z",
+      "updated_by": "agent:copilot"
     },
     "tests": {
+      "run_id": "ef0cfaf9-71c9-41c8-8999-ffd0d9edca8a",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-10T22:10:32.454472559Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-10T22:10:55.375970347Z"
+      "updated_at": "2026-03-10T22:10:32.454472559Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "3a7caca1-8126-4b02-b94e-435d5b679fbe",
   "labels": [
     "type:task",
     "epic:usability",
@@ -49,9 +55,8 @@
     "component:cli",
     "component:web"
   ],
-  "created_at": "2026-03-09T21:17:31.159919453Z",
-  "updated_at": "2026-07-05T19:51:12.946667476Z",
-  "first_ready_at": "2026-03-09T21:19:05.859169606Z",
-  "claimed_at": "2026-03-09T21:17:37.888236568Z",
-  "done_at": "2026-03-10T22:33:02.174664327Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit serve command for background API and web UI server",
+  "updated_at": "2026-07-05T19:51:12.946667476Z"
 }

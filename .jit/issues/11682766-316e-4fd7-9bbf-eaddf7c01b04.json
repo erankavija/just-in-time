@@ -23,21 +23,25 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "08f5f3f3-470e-4e23-956f-9fc0381eed44",
       "status": "passed",
       "updated_at": "2026-01-10T22:17:50.594321139Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "3ee52fc6-9b4a-4a09-bb6e-3dbe5df38090",
       "status": "passed",
       "updated_at": "2026-01-10T22:18:17.484349582Z",
       "updated_by": null
     },
     "fmt": {
+      "run_id": "7a1e4521-bbef-4917-99c5-ec3713c63a26",
       "status": "passed",
       "updated_at": "2026-01-10T22:17:50.594354379Z",
       "updated_by": "auto:executor"
     },
     "tests": {
+      "run_id": "497e756f-1bef-4869-90f1-f03729654f5f",
       "status": "passed",
       "updated_at": "2026-01-10T22:17:50.594334749Z",
       "updated_by": "auto:executor"

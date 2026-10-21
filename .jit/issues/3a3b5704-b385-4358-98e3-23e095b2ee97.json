@@ -20,31 +20,37 @@
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "66d76cde-d189-432e-9189-ac89707dc5c6",
       "status": "passed",
       "updated_at": "2026-07-30T17:42:31.596530736Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "b66a89db-9d08-44be-ae22-8599a4f96857",
       "status": "passed",
       "updated_at": "2026-07-30T18:07:12.918775671Z",
       "updated_by": "auto:executor"
     },
     "jit-validate": {
+      "run_id": "c6c0af36-e832-443f-b3b6-583f8bdaaef6",
       "status": "passed",
       "updated_at": "2026-07-30T17:35:00.815314363Z",
       "updated_by": "auto:executor"
     },
     "mcp-ci": {
+      "run_id": "0e70bc09-3627-4214-9b27-21a38fa31be4",
       "status": "passed",
       "updated_at": "2026-07-30T17:34:54.671785396Z",
       "updated_by": "auto:executor"
     },
     "npm-ci": {
+      "run_id": "3f2dbb42-734f-4347-81b9-95c69c41213e",
       "status": "passed",
       "updated_at": "2026-07-30T17:34:51.711641402Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "67ecfe7a-7c80-47f5-9277-ae3f6c0cd596",
       "status": "passed",
       "updated_at": "2026-07-30T17:34:57.748299937Z",
       "updated_by": "auto:executor"

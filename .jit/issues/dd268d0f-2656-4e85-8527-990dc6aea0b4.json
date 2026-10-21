@@ -22,11 +22,13 @@
   ],
   "gates_status": {
     "holistic-review": {
+      "run_id": "e4c35f96-6e79-41b1-b1d5-8a36a0ec35b3",
       "status": "passed",
       "updated_at": "2026-08-13T18:51:58.014727430Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "9501f9e8-8e68-43b0-b4f5-273619a5123d",
       "status": "passed",
       "updated_at": "2026-08-13T18:49:40.139842714Z",
       "updated_by": "auto:executor"

@@ -1,40 +1,42 @@
 {
-  "id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
-  "title": "Plan-review and coverage-preview gate presets",
-  "description": "Define a `plan-review` preset (agent gate on the planning node) and a `coverage-preview` preset (deterministic gate on the breakdown node running scoped validation), plus the preview coverage rule that omits child-state.\n\n## Success Criteria\n\n- [ ] Applying `plan-review` attaches an agent review gate to a planning node.\n- [ ] Applying `coverage-preview` attaches a gate whose checker runs scoped validation for the container resolved from the breakdown node.\n- [ ] The preview coverage rule omits `child-state` (any state) while the closure rule requires done.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-16T22:26:11.164528320Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.105103511Z",
   "dependencies": [
     "4aa44224-b7b6-4e7d-8a1c-a63f6f726106",
     "64c7df93-3fb6-4ee7-97e1-51d8254ed33a"
   ],
+  "description": "Define a `plan-review` preset (agent gate on the planning node) and a `coverage-preview` preset (deterministic gate on the breakdown node running scoped validation), plus the preview coverage rule that omits child-state.\n\n## Success Criteria\n\n- [ ] Applying `plan-review` attaches an agent review gate to a planning node.\n- [ ] Applying `coverage-preview` attaches a gate whose checker runs scoped validation for the container resolved from the breakdown node.\n- [ ] The preview coverage rule omits `child-state` (any state) while the closure rule requires done.",
+  "documents": [],
+  "done_at": "2026-06-17T00:02:07.533728940Z",
+  "first_ready_at": "2026-06-16T18:30:17.806825933Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T23:08:06.991543614Z"
-    },
     "cargo-ci": {
+      "run_id": "177a8622-e978-467f-8b18-fd67b48b5ccb",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T22:57:08.882190647Z"
+      "updated_at": "2026-06-16T22:57:08.882190647Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "97caa523-f98e-4010-9fcc-132d61c033b6",
+      "status": "passed",
+      "updated_at": "2026-06-16T23:08:06.991543614Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "6a82ca5d-234a-405e-9ba3-ee8c95ac5cd4",
   "labels": [
     "type:task",
     "story:scaffolding-and-gates",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.105103511Z",
-  "updated_at": "2026-07-05T19:51:12.996181132Z",
-  "first_ready_at": "2026-06-16T18:30:17.806825933Z",
-  "claimed_at": "2026-06-16T22:26:11.164528320Z",
-  "done_at": "2026-06-17T00:02:07.533728940Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Plan-review and coverage-preview gate presets",
+  "updated_at": "2026-07-05T19:51:12.996181132Z"
 }

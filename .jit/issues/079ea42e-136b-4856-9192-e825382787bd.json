@@ -23,6 +23,7 @@
   ],
   "gates_status": {
     "repo-validate": {
+      "run_id": "376df8d6-4e07-45fb-8e92-db715c8864f3",
       "status": "passed",
       "updated_at": "2026-07-27T12:04:01.867681041Z",
       "updated_by": "auto:executor"

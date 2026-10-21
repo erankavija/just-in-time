@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": "agent:copilot-claim-coordination",
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-01-07T23:32:17.629123360Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "code-review",
+  "issue_id": "b74af86f-388d-49a2-a172-bc9fdaa7bb9c",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "6e5d735b-c090-454d-899c-736f356843fd",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-01-07T23:32:17.629123360Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

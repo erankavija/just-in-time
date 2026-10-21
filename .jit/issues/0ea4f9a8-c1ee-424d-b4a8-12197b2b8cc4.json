@@ -1,34 +1,35 @@
 {
-  "id": "0ea4f9a8-c1ee-424d-b4a8-12197b2b8cc4",
-  "title": "Add live update support to Web UI frontend",
-  "description": "Connect the React frontend to the server's SSE endpoint so the UI updates automatically:\n\n1. Create `useEventStream` hook using browser-native `EventSource` API\n2. Export `API_BASE` from `web/src/api/client.ts` for SSE URL\n3. Update `App.tsx`: replace one-shot fetch with live data via SSE, maintain version state, pass to children, add connection indicator to footer\n4. Update `GraphView.tsx`: accept `version` prop, re-fetch on change, smart diff to avoid viewport reset on state-only changes\n5. Update `IssueDetail.tsx`: accept `version` prop, re-fetch on change\n\nNew file: `web/src/hooks/useEventStream.ts`\nModified: `client.ts`, `App.tsx`, `GraphView.tsx`, `IssueDetail.tsx`",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude-opus",
+  "claimed_at": "2026-03-09T20:28:02.119645794Z",
+  "context": {},
+  "created_at": "2026-03-09T20:10:43.256390563Z",
   "dependencies": [
     "eb5b6ffe-f47c-4405-97c9-59b1b3b05bf2"
   ],
+  "description": "Connect the React frontend to the server's SSE endpoint so the UI updates automatically:\n\n1. Create `useEventStream` hook using browser-native `EventSource` API\n2. Export `API_BASE` from `web/src/api/client.ts` for SSE URL\n3. Update `App.tsx`: replace one-shot fetch with live data via SSE, maintain version state, pass to children, add connection indicator to footer\n4. Update `GraphView.tsx`: accept `version` prop, re-fetch on change, smart diff to avoid viewport reset on state-only changes\n5. Update `IssueDetail.tsx`: accept `version` prop, re-fetch on change\n\nNew file: `web/src/hooks/useEventStream.ts`\nModified: `client.ts`, `App.tsx`, `GraphView.tsx`, `IssueDetail.tsx`",
+  "documents": [],
+  "done_at": "2026-03-09T20:41:26.244926966Z",
+  "first_ready_at": "2026-03-09T20:40:31.517048648Z",
   "gates_required": [
     "code-review"
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "f67ac5e4-3218-4d0a-b42a-f17ef6201a69",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2026-03-09T20:41:22.100839200Z"
+      "updated_at": "2026-03-09T20:41:22.100839200Z",
+      "updated_by": "human:user"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0ea4f9a8-c1ee-424d-b4a8-12197b2b8cc4",
   "labels": [
     "type:task",
     "epic:usability",
     "milestone:v1.0",
     "component:web"
   ],
-  "created_at": "2026-03-09T20:10:43.256390563Z",
-  "updated_at": "2026-07-05T19:51:12.909932830Z",
-  "first_ready_at": "2026-03-09T20:40:31.517048648Z",
-  "claimed_at": "2026-03-09T20:28:02.119645794Z",
-  "done_at": "2026-03-09T20:41:26.244926966Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add live update support to Web UI frontend",
+  "updated_at": "2026-07-05T19:51:12.909932830Z"
 }

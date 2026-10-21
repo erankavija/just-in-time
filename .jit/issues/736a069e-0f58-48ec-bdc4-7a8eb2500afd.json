@@ -33,16 +33,19 @@
   ],
   "gates_status": {
     "doc-review": {
+      "run_id": "1f5653d1-7384-4733-b7fc-0fa42d568fcd",
       "status": "passed",
       "updated_at": "2026-07-11T08:52:04.619841676Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "c79330c5-914a-4240-9ab8-e5e8fde4cb30",
       "status": "passed",
       "updated_at": "2026-07-11T08:52:01.427993785Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "0e68d736-1753-4547-9d9f-f49009d3b3e9",
       "status": "passed",
       "updated_at": "2026-07-11T08:53:11.801153549Z",
       "updated_by": "auto:executor"

@@ -22,11 +22,13 @@
   ],
   "gates_status": {
     "docs-mechanical": {
+      "run_id": "6b0a5baa-c808-419c-91e9-495cc7444f86",
       "status": "passed",
       "updated_at": "2026-07-11T14:53:49.891086192Z",
       "updated_by": "auto:executor"
     },
     "repo-validate": {
+      "run_id": "9f73b6b8-fb68-406f-b896-8f95e67bf58e",
       "status": "passed",
       "updated_at": "2026-07-11T14:53:49.579744935Z",
       "updated_by": "auto:executor"

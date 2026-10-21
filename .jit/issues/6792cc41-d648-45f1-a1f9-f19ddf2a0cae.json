@@ -16,11 +16,13 @@
   ],
   "gates_status": {
     "breakdown-review": {
+      "run_id": "4d75457f-9a46-4802-ae52-2eb2e6425691",
       "status": "passed",
       "updated_at": "2026-10-21T01:00:55.394315013Z",
       "updated_by": "auto:executor"
     },
     "coverage-preview": {
+      "run_id": "86f5b60e-073a-426b-8dd7-9ea456481391",
       "status": "passed",
       "updated_at": "2026-10-21T00:55:03.966546117Z",
       "updated_by": "auto:executor"

@@ -1,36 +1,38 @@
 {
-  "id": "8689e255-1566-460f-931d-7a01c6be1120",
-  "title": "Flaky test-binary spawn: use CARGO_BIN_EXE_jit instead of current_exe-derived path",
-  "description": "`validation_lease_tests.rs` and `query_tests.rs` locate the jit binary by popping `current_exe()` (`target/debug/deps/..` → `target/debug/jit`). A concurrent cargo rebuild relinking the binary makes the spawn fail with NotFound (observed: `test_validate_leases_all_valid_succeeds` panicked at validation_lease_tests.rs:98 during a review-gate suite run). Every other integration test uses `env!(\"CARGO_BIN_EXE_jit\")`, which cargo guarantees is built for the test.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation_lease_tests.rs` and `query_tests.rs` locate the jit binary via `env!(\"CARGO_BIN_EXE_jit\")`; no `current_exe()`-derived binary path remains under `crates/jit/tests/`.\n- [hard] REQ-02: cargo fmt, clippy (zero warnings), and the full test suite pass.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-02T07:52:03.092056857Z",
+  "context": {},
+  "created_at": "2026-07-02T07:51:53.343433178Z",
   "dependencies": [],
+  "description": "`validation_lease_tests.rs` and `query_tests.rs` locate the jit binary by popping `current_exe()` (`target/debug/deps/..` → `target/debug/jit`). A concurrent cargo rebuild relinking the binary makes the spawn fail with NotFound (observed: `test_validate_leases_all_valid_succeeds` panicked at validation_lease_tests.rs:98 during a review-gate suite run). Every other integration test uses `env!(\"CARGO_BIN_EXE_jit\")`, which cargo guarantees is built for the test.\n\n## Success Criteria\n\n- [hard] REQ-01: `validation_lease_tests.rs` and `query_tests.rs` locate the jit binary via `env!(\"CARGO_BIN_EXE_jit\")`; no `current_exe()`-derived binary path remains under `crates/jit/tests/`.\n- [hard] REQ-02: cargo fmt, clippy (zero warnings), and the full test suite pass.",
+  "documents": [],
+  "done_at": "2026-07-02T07:59:20.707617360Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:58:00.687413252Z"
-    },
     "cargo-ci": {
+      "run_id": "4fcb5e76-1eeb-4cf3-8417-f03474abe4e5",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-02T07:55:56.864136450Z"
+      "updated_at": "2026-07-02T07:55:56.864136450Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "268b3fea-364e-40ee-946e-32c8fd41af85",
+      "status": "passed",
+      "updated_at": "2026-07-02T07:58:00.687413252Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "8689e255-1566-460f-931d-7a01c6be1120",
   "labels": [
     "component:cli",
     "type:bug",
     "milestone:v1.0"
   ],
-  "created_at": "2026-07-02T07:51:53.343433178Z",
-  "updated_at": "2026-07-05T19:51:13.024133493Z",
-  "claimed_at": "2026-07-02T07:52:03.092056857Z",
-  "done_at": "2026-07-02T07:59:20.707617360Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Flaky test-binary spawn: use CARGO_BIN_EXE_jit instead of current_exe-derived path",
+  "updated_at": "2026-07-05T19:51:13.024133493Z"
 }

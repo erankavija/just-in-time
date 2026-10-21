@@ -1,40 +1,42 @@
 {
-  "id": "45e7f203-ffa9-414a-927a-33fe32ee3d32",
-  "title": "Template and node types; templates.toml loader",
-  "description": "Define the graph-template types and load `.jit/templates.toml`, validated at config load.\n\n## Success Criteria\n- [ ] [hard] REGA-01: the template, node, anchor, edge, and transform types compile and round-trip through (de)serialization.\n- [ ] [hard] REGA-02: `.jit/templates.toml` loads at config time and an invalid template fails with a clear error.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-23T06:36:36.943689929Z",
+  "context": {},
+  "created_at": "2026-06-22T22:28:29.315977004Z",
   "dependencies": [
     "59118ee9-185d-4a4e-8804-4cdeef88a1d4"
   ],
+  "description": "Define the graph-template types and load `.jit/templates.toml`, validated at config load.\n\n## Success Criteria\n- [ ] [hard] REGA-01: the template, node, anchor, edge, and transform types compile and round-trip through (de)serialization.\n- [ ] [hard] REGA-02: `.jit/templates.toml` loads at config time and an invalid template fails with a clear error.",
+  "documents": [],
+  "done_at": "2026-06-23T12:48:38.803617252Z",
+  "first_ready_at": "2026-06-23T06:28:17.234757281Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "6860f839-58fc-4c66-9152-24c6c1b35d6e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T12:40:32.821740422Z"
+      "updated_at": "2026-06-23T12:40:32.821740422Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "e50ea625-b24e-4645-a71a-66bbd5a33882",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-23T12:47:00.466540458Z"
+      "updated_at": "2026-06-23T12:47:00.466540458Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "45e7f203-ffa9-414a-927a-33fe32ee3d32",
   "labels": [
     "type:task",
     "story:template-registry",
     "epic:graph-templates",
     "milestone:v1.0"
   ],
-  "created_at": "2026-06-22T22:28:29.315977004Z",
-  "updated_at": "2026-07-05T19:51:12.958121795Z",
-  "first_ready_at": "2026-06-23T06:28:17.234757281Z",
-  "claimed_at": "2026-06-23T06:36:36.943689929Z",
-  "done_at": "2026-06-23T12:48:38.803617252Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Template and node types; templates.toml loader",
+  "updated_at": "2026-07-05T19:51:12.958121795Z"
 }

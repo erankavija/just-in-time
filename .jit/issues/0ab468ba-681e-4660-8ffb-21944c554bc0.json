@@ -1,34 +1,36 @@
 {
-  "id": "0ab468ba-681e-4660-8ffb-21944c554bc0",
-  "title": "Full-record bulk export behind a --full flag",
-  "description": "An external-tooling session bypassed the CLI entirely, globbing raw issue files and streaming the event log, because the JSON graph export emits only id, short id, title, state, priority, and labels, and lifecycle timing exists nowhere on the issue record.\n\n## Background\n\nBulk consumers need complete node records; default outputs stay lean for orchestration loops. Convention for this epic: single-issue commands stay full-fidelity, bulk-emitting commands default to the summary shape and take an explicit `--full` opt-in for complete records. Decided: lifecycle timestamps are stored on the issue record at transition time (first ready, claimed, done), with a one-time backfill derived from the event log for existing issues.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Graph export in JSON format with `--full` emits complete issue records — assignee, labels, gates with statuses, created/updated, dependencies — plus the edge list.\n- [ ] [hard] REQ-02: The issue record stores lifecycle timestamps (first ready, claimed, done) written at state-transition time; existing issues are backfilled from the event log by a one-time migration.\n- [ ] [hard] REQ-03: Export output without the flag is byte-compatible with the current summary shape.\n- [ ] [hard] REQ-04: The export schema, both shapes, is documented.\n\n## Notes\n\nThe timestamp fields are additive; assess whether the storage format version needs a bump under the fail-fast policy before shipping.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "context": {},
+  "created_at": "2026-07-05T10:02:41.533658649Z",
   "dependencies": [],
+  "description": "An external-tooling session bypassed the CLI entirely, globbing raw issue files and streaming the event log, because the JSON graph export emits only id, short id, title, state, priority, and labels, and lifecycle timing exists nowhere on the issue record.\n\n## Background\n\nBulk consumers need complete node records; default outputs stay lean for orchestration loops. Convention for this epic: single-issue commands stay full-fidelity, bulk-emitting commands default to the summary shape and take an explicit `--full` opt-in for complete records. Decided: lifecycle timestamps are stored on the issue record at transition time (first ready, claimed, done), with a one-time backfill derived from the event log for existing issues.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: Graph export in JSON format with `--full` emits complete issue records — assignee, labels, gates with statuses, created/updated, dependencies — plus the edge list.\n- [ ] [hard] REQ-02: The issue record stores lifecycle timestamps (first ready, claimed, done) written at state-transition time; existing issues are backfilled from the event log by a one-time migration.\n- [ ] [hard] REQ-03: Export output without the flag is byte-compatible with the current summary shape.\n- [ ] [hard] REQ-04: The export schema, both shapes, is documented.\n\n## Notes\n\nThe timestamp fields are additive; assess whether the storage format version needs a bump under the fail-fast policy before shipping.",
+  "documents": [],
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T19:51:26.681731244Z"
-    },
     "cargo-ci": {
+      "run_id": "feb87e05-f327-4f09-bb62-9ec05880bc3f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T19:46:57.533085856Z"
+      "updated_at": "2026-07-05T19:46:57.533085856Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "577a48ce-cbc6-4b2a-8d07-1b70fdebe64f",
+      "status": "passed",
+      "updated_at": "2026-07-05T19:51:26.681731244Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0ab468ba-681e-4660-8ffb-21944c554bc0",
   "labels": [
     "type:enhancement",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T10:02:41.533658649Z",
+  "priority": "normal",
+  "state": "done",
+  "title": "Full-record bulk export behind a --full flag",
   "updated_at": "2026-07-05T19:54:05.608631602Z"
 }

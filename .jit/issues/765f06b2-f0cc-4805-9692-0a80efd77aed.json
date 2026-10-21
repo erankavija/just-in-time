@@ -1,13 +1,15 @@
 {
-  "id": "765f06b2-f0cc-4805-9692-0a80efd77aed",
-  "title": "Implement jit config show/get/set commands",
-  "description": "Implement `jit config show` (display effective config), `jit config get <key>` (get specific value), `jit config set <key> <value>` (set repo-level), `jit config set --global <key> <value>` (set user-level). Support `--json` output.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T16:55:22.184017655Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.082048896Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement `jit config show` (display effective config), `jit config get <key>` (get specific value), `jit config set <key> <value>` (set repo-level), `jit config set --global <key> <value>` (set user-level). Support `--json` output.",
+  "documents": [],
+  "done_at": "2026-02-02T17:08:54.305990545Z",
+  "first_ready_at": "2026-01-06T21:01:34.502899704Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -17,42 +19,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "91fe1f4a-d1c5-4f50-a8a7-029196f027e5",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:08:12.909965451Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:07:52.995123273Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T17:08:13.112624749Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:55:22.180863174Z"
+      "updated_at": "2026-02-02T17:08:12.909965451Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "2bd5cfa1-90a2-4a0a-ba71-9a56ea34522e",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T17:08:50.268078629Z"
+      "updated_at": "2026-02-02T17:08:50.268078629Z",
+      "updated_by": null
+    },
+    "fmt": {
+      "run_id": "75aa27df-bb5d-4eea-8165-7d700be081e6",
+      "status": "passed",
+      "updated_at": "2026-02-02T17:08:13.112624749Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "e0eb75fa-12ee-4c86-bc69-69ed76ce95dc",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:55:22.180863174Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "a2336aa6-b5df-4791-a374-6427f5f892ac",
+      "status": "passed",
+      "updated_at": "2026-02-02T17:07:52.995123273Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "765f06b2-f0cc-4805-9692-0a80efd77aed",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.082048896Z",
-  "updated_at": "2026-07-05T19:51:13.008419341Z",
-  "first_ready_at": "2026-01-06T21:01:34.502899704Z",
-  "claimed_at": "2026-02-02T16:55:22.184017655Z",
-  "done_at": "2026-02-02T17:08:54.305990545Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Implement jit config show/get/set commands",
+  "updated_at": "2026-07-05T19:51:13.008419341Z"
 }

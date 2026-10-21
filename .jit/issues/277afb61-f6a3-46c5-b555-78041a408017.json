@@ -1,11 +1,12 @@
 {
-  "id": "277afb61-f6a3-46c5-b555-78041a408017",
-  "title": "Add tests for parse_state and parse_priority CLI parsers",
-  "description": "The parse_state() and parse_priority() functions in commands/mod.rs lack unit tests, which allowed the Rejected state to be added to the State enum without updating the CLI parser. Add comprehensive tests covering all valid states and priorities, case-insensitive matching, aliases (e.g., 'open' -> Backlog), and error cases for invalid inputs. This will prevent similar gaps in future state additions.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2025-12-20T21:19:01.455596177Z",
+  "context": {},
+  "created_at": "2025-12-20T21:25:07.907418264Z",
   "dependencies": [],
+  "description": "The parse_state() and parse_priority() functions in commands/mod.rs lack unit tests, which allowed the Rejected state to be added to the State enum without updating the CLI parser. Add comprehensive tests covering all valid states and priorities, case-insensitive matching, aliases (e.g., 'open' -> Backlog), and error cases for invalid inputs. This will prevent similar gaps in future state additions.",
+  "documents": [],
+  "done_at": "2025-12-20T21:25:26.340103328Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,37 +15,41 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T21:25:26.337008324Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2025-12-20T21:18:55.360778537Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:25:06.498038188Z"
-    },
     "clippy": {
+      "run_id": "edf9f572-b622-4335-a0af-a71aa52b2ac9",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:25:07.704872727Z"
+      "updated_at": "2025-12-20T21:25:07.704872727Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "7dcff7db-eccc-48b5-8527-5898357fccec",
+      "status": "passed",
+      "updated_at": "2025-12-20T21:25:26.337008324Z",
+      "updated_by": "human:user"
     },
     "fmt": {
+      "run_id": "7f5f8fb1-74bb-4df7-82be-8ffdc6557ce1",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T21:25:07.910025937Z"
+      "updated_at": "2025-12-20T21:25:07.910025937Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "e49ec872-c07c-4143-bb28-fe8ea14672ef",
+      "status": "passed",
+      "updated_at": "2025-12-20T21:18:55.360778537Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "tests": {
+      "run_id": "3943fb84-9efa-4eac-ab80-b8d7f265f43e",
+      "status": "passed",
+      "updated_at": "2025-12-20T21:25:06.498038188Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "277afb61-f6a3-46c5-b555-78041a408017",
   "labels": [],
-  "created_at": "2025-12-20T21:25:07.907418264Z",
-  "updated_at": "2026-07-05T19:51:12.928748193Z",
-  "claimed_at": "2025-12-20T21:19:01.455596177Z",
-  "done_at": "2025-12-20T21:25:26.340103328Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add tests for parse_state and parse_priority CLI parsers",
+  "updated_at": "2026-07-05T19:51:12.928748193Z"
 }

@@ -1,37 +1,39 @@
 {
-  "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
-  "title": "Improve state and gate blocking remediation",
-  "description": "Make state-transition and gate-blocking failures actionable so users and agents know what prevented progress and exactly what to run next.\n\n## Background\n\nCLI usability planning identified gate and state-transition failures as the highest-value error UX target after version provenance. The goal is to improve blocked completion, claim, and state-change flows before broadening to validation, document, or ID-resolution errors.\n\n## Success Criteria\n\n- [ ] State-transition failures caused by pending dependencies or gates identify each blocker clearly.\n- [ ] Human-readable errors include concrete next commands for inspecting or resolving blockers.\n- [ ] JSON error output includes structured blocker/remediation fields suitable for MCP and agent consumers.\n- [ ] Existing successful transition behavior is unchanged.\n- [ ] Tests cover at least one gate-blocked transition and one dependency-blocked transition.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot",
+  "claimed_at": "2026-04-28T17:27:36.592884743Z",
+  "context": {},
+  "created_at": "2026-04-27T22:07:50.493669096Z",
   "dependencies": [],
+  "description": "Make state-transition and gate-blocking failures actionable so users and agents know what prevented progress and exactly what to run next.\n\n## Background\n\nCLI usability planning identified gate and state-transition failures as the highest-value error UX target after version provenance. The goal is to improve blocked completion, claim, and state-change flows before broadening to validation, document, or ID-resolution errors.\n\n## Success Criteria\n\n- [ ] State-transition failures caused by pending dependencies or gates identify each blocker clearly.\n- [ ] Human-readable errors include concrete next commands for inspecting or resolving blockers.\n- [ ] JSON error output includes structured blocker/remediation fields suitable for MCP and agent consumers.\n- [ ] Existing successful transition behavior is unchanged.\n- [ ] Tests cover at least one gate-blocked transition and one dependency-blocked transition.",
+  "documents": [],
+  "done_at": "2026-04-28T18:30:02.512906119Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-28T18:26:17.762210397Z"
-    },
     "cargo-ci": {
+      "run_id": "27ae9058-47af-43e1-a77e-1bdf26998f10",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-28T18:25:16.699033997Z"
+      "updated_at": "2026-04-28T18:25:16.699033997Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "2b46eefc-8bba-41b0-8217-3c35d5140347",
+      "status": "passed",
+      "updated_at": "2026-04-28T18:26:17.762210397Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "5c581575-bef8-4ee6-be83-7598fd22b557",
   "labels": [
     "type:task",
     "epic:usability",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2026-04-27T22:07:50.493669096Z",
-  "updated_at": "2026-07-05T19:51:12.979871920Z",
-  "claimed_at": "2026-04-28T17:27:36.592884743Z",
-  "done_at": "2026-04-28T18:30:02.512906119Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Improve state and gate blocking remediation",
+  "updated_at": "2026-07-05T19:51:12.979871920Z"
 }

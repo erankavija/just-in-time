@@ -1,13 +1,15 @@
 {
-  "id": "d41c6a08-81ce-491f-8bf9-6aab78febcbf",
-  "title": "Implement config loading with priority and merging",
-  "description": "Implement config loading with priority: repo config > user config > system config > defaults. Support merging across levels. Validate schema on load.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T16:46:23.594536023Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.079639845Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Implement config loading with priority: repo config > user config > system config > defaults. Support merging across levels. Validate schema on load.",
+  "documents": [],
+  "done_at": "2026-02-02T16:53:11.711623806Z",
+  "first_ready_at": "2026-01-06T21:01:34.500953454Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
+      "run_id": "e7d911c1-4c13-4c73-bf48-f560dc14d095",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:46:23.591209762Z"
+      "updated_at": "2026-02-02T16:49:08.142607801Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "316dd1e7-2667-4a8e-9217-de7e63da09a4",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:53:07.890784093Z"
-    },
-    "clippy": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:49:08.142607801Z"
+      "updated_at": "2026-02-02T16:53:07.890784093Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "6861e91f-8a81-429e-81bb-68a8fc811283",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:49:10.346517991Z"
+      "updated_at": "2026-02-02T16:49:10.346517991Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "30ef37d3-7740-46fb-b860-3c24fcd8df6f",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:46:23.591209762Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "6f9cc59d-ed8e-45a7-ba51-f0076f1d16f5",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:48:45.824907546Z"
+      "updated_at": "2026-02-02T16:48:45.824907546Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "d41c6a08-81ce-491f-8bf9-6aab78febcbf",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.079639845Z",
-  "updated_at": "2026-07-05T19:51:13.095171184Z",
-  "first_ready_at": "2026-01-06T21:01:34.500953454Z",
-  "claimed_at": "2026-02-02T16:46:23.594536023Z",
-  "done_at": "2026-02-02T16:53:11.711623806Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Implement config loading with priority and merging",
+  "updated_at": "2026-07-05T19:51:13.095171184Z"
 }

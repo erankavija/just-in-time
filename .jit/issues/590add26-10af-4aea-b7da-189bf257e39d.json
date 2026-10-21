@@ -1,39 +1,41 @@
 {
-  "id": "590add26-10af-4aea-b7da-189bf257e39d",
-  "title": "Re-sequence jit-breakdown for the bracket",
-  "description": "Re-sequence the jit-breakdown skill to consume an approved plan, create the breakdown node, draft children in backlog, wire the source and sink spine, and run the coverage-preview gate. Replaces the parent-centric wiring of the current breakdown helper.\n\n## Success Criteria\n\n- [ ] Breaking down a breakable container creates the breakdown node (brackets label, coverage gate) depending on the planning node, and drafts children in backlog.\n- [ ] Source children depend on the breakdown node and sink children gate the container, in reduced form.\n- [ ] The skill does not reuse the parent-centric breakdown wiring.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-17T01:14:05.552697875Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.127458397Z",
   "dependencies": [
     "17eb97ba-0564-495d-bbf5-6ee5cb890b20"
   ],
+  "description": "Re-sequence the jit-breakdown skill to consume an approved plan, create the breakdown node, draft children in backlog, wire the source and sink spine, and run the coverage-preview gate. Replaces the parent-centric wiring of the current breakdown helper.\n\n## Success Criteria\n\n- [ ] Breaking down a breakable container creates the breakdown node (brackets label, coverage gate) depending on the planning node, and drafts children in backlog.\n- [ ] Source children depend on the breakdown node and sink children gate the container, in reduced form.\n- [ ] The skill does not reuse the parent-centric breakdown wiring.",
+  "documents": [],
+  "done_at": "2026-06-18T19:12:45.770752643Z",
+  "first_ready_at": "2026-06-16T18:30:17.865225960Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-18T19:07:49.298648612Z"
-    },
     "cargo-ci": {
+      "run_id": "a947e079-b203-42dd-a22c-a223242005f3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-18T18:35:46.381992681Z"
+      "updated_at": "2026-06-18T18:35:46.381992681Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "15d3b297-a1fc-4036-9512-01648b41fe65",
+      "status": "passed",
+      "updated_at": "2026-06-18T19:07:49.298648612Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "590add26-10af-4aea-b7da-189bf257e39d",
   "labels": [
     "type:task",
     "story:skills-and-eval",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.127458397Z",
-  "updated_at": "2026-07-05T19:51:12.974863337Z",
-  "first_ready_at": "2026-06-16T18:30:17.865225960Z",
-  "claimed_at": "2026-06-17T01:14:05.552697875Z",
-  "done_at": "2026-06-18T19:12:45.770752643Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Re-sequence jit-breakdown for the bracket",
+  "updated_at": "2026-07-05T19:51:12.974863337Z"
 }

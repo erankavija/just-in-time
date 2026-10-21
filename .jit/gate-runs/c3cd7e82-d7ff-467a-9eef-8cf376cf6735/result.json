@@ -1,0 +1,23 @@
+{
+  "branch": null,
+  "by": null,
+  "command": "",
+  "commit": null,
+  "completed_at": "2026-05-06T15:55:11.808457591Z",
+  "duration_ms": null,
+  "evaluation_stability": "stable",
+  "exit_code": null,
+  "gate_key": "tdd-reminder",
+  "issue_id": "3323ceb5-c5c6-4c10-a322-bbb8b979b96c",
+  "message": null,
+  "origin": {
+    "derivation": "attested"
+  },
+  "run_id": "c3cd7e82-d7ff-467a-9eef-8cf376cf6735",
+  "schema_version": 1,
+  "stage": "precheck",
+  "started_at": "2026-05-06T15:55:11.808457591Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": ""
+}

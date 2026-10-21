@@ -26,11 +26,13 @@
   ],
   "gates_status": {
     "doc-review": {
+      "run_id": "44843f0f-3eb9-4f61-ab9e-ea29988e0917",
       "status": "passed",
       "updated_at": "2026-07-25T05:01:29.821917332Z",
       "updated_by": "auto:executor"
     },
     "docs-mechanical": {
+      "run_id": "bcf126e0-66ff-487c-b932-1c636d1c3fc9",
       "status": "passed",
       "updated_at": "2026-07-25T04:59:04.132690931Z",
       "updated_by": "auto:executor"

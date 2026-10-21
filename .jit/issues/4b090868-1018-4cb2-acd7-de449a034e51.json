@@ -1,37 +1,39 @@
 {
-  "id": "4b090868-1018-4cb2-acd7-de449a034e51",
-  "title": "Breakdown: planning-bracket fan-out",
-  "description": "Fan-out node for the plan-before-fan-out bracket. Created at breakdown of the approved plan; depends on the planning node; carries the coverage-preview and breakdown-review gates.\n\n## Success Criteria\n\n- [ ] All planned child issues exist and are wired into the container spine (sources depend on this node; sinks gate the container).\n- [ ] The breakdown gates on this node (coverage-preview, breakdown-review) pass before it is marked done.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude-opus",
+  "context": {},
+  "created_at": "2026-06-15T18:22:14.687706630Z",
   "dependencies": [
     "8646a474-4324-47f3-bc75-89ea4cd0e516"
   ],
+  "description": "Fan-out node for the plan-before-fan-out bracket. Created at breakdown of the approved plan; depends on the planning node; carries the coverage-preview and breakdown-review gates.\n\n## Success Criteria\n\n- [ ] All planned child issues exist and are wired into the container spine (sources depend on this node; sinks gate the container).\n- [ ] The breakdown gates on this node (coverage-preview, breakdown-review) pass before it is marked done.",
+  "documents": [],
+  "done_at": "2026-06-16T20:31:13.714684164Z",
   "gates_required": [
     "breakdown-review",
     "jit-validate"
   ],
   "gates_status": {
-    "jit-validate": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T20:19:02.123082704Z"
-    },
     "breakdown-review": {
+      "run_id": "7c635d9e-cbd7-444d-b25a-7c8fc8694218",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-16T20:27:02.166191776Z"
+      "updated_at": "2026-06-16T20:27:02.166191776Z",
+      "updated_by": "auto:executor"
+    },
+    "jit-validate": {
+      "run_id": "5d726bcd-dd20-4af5-8eae-7c7641407ab9",
+      "status": "passed",
+      "updated_at": "2026-06-16T20:19:02.123082704Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "4b090868-1018-4cb2-acd7-de449a034e51",
   "labels": [
     "type:breakdown",
     "epic:planning-bracket",
     "brackets:2fbd2a82"
   ],
-  "created_at": "2026-06-15T18:22:14.687706630Z",
-  "updated_at": "2026-07-05T19:51:12.962795728Z",
-  "done_at": "2026-06-16T20:31:13.714684164Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Breakdown: planning-bracket fan-out",
+  "updated_at": "2026-07-05T19:51:12.962795728Z"
 }

@@ -30,26 +30,31 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "cea26885-6fee-4231-a966-d682ab1e07cd",
       "status": "passed",
       "updated_at": "2026-02-01T23:40:01.462758541Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "cf6d646f-3b4b-41e7-bde1-bcd7a2505b1e",
       "status": "passed",
       "updated_at": "2026-02-01T23:39:43.951778401Z",
       "updated_by": "agent:copilot-session"
     },
     "fmt": {
+      "run_id": "934b84ee-19fc-4e33-ab45-ef360268a3f4",
       "status": "passed",
       "updated_at": "2026-02-01T23:40:01.665555339Z",
       "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "5b2a3b49-adbd-4612-9018-26881e16a8fc",
       "status": "passed",
       "updated_at": "2026-02-01T23:39:43.950406061Z",
       "updated_by": "agent:copilot-session"
     },
     "tests": {
+      "run_id": "895049fb-79ba-43f5-aa00-01357b790ccc",
       "status": "passed",
       "updated_at": "2026-02-01T23:39:43.949495241Z",
       "updated_by": "auto:executor"

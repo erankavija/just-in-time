@@ -1,13 +1,15 @@
 {
-  "id": "3a043943-7f75-40a9-8cf1-13592e903972",
-  "title": "Define repository config.toml schema",
-  "description": "Define `.jit/config.toml` schema with sections: `[worktree]` (mode), `[coordination]` (ttl, heartbeat, enforcement), `[global_operations]` (require_main_history), `[locks]` (max_age, metadata), `[events]` (sequences, envelope). See design doc section \"Repository Configuration\".",
-  "state": "done",
-  "priority": "normal",
   "assignee": "copilot:cli-session",
+  "claimed_at": "2026-02-02T16:28:14.798794456Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.075294664Z",
   "dependencies": [
     "65e7dccd-a7f0-4274-90c3-2d0a9384005b"
   ],
+  "description": "Define `.jit/config.toml` schema with sections: `[worktree]` (mode), `[coordination]` (ttl, heartbeat, enforcement), `[global_operations]` (require_main_history), `[locks]` (max_age, metadata), `[events]` (sequences, envelope). See design doc section \"Repository Configuration\".",
+  "documents": [],
+  "done_at": "2026-02-02T16:39:39.174339708Z",
+  "first_ready_at": "2026-01-06T21:01:34.496995455Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -17,42 +19,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "24ef0dd0-3594-4d53-b9d0-f1764d9332a3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:34:00.802191739Z"
+      "updated_at": "2026-02-02T16:34:00.802191739Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "da176b75-d916-4e95-acd0-d7f53f95a3b3",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:39:39.171184877Z"
+      "updated_at": "2026-02-02T16:39:39.171184877Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "84bbd8d6-ff34-4e8f-9b74-b20e196a6c21",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:34:03.106680238Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T16:33:38.585257542Z"
+      "updated_at": "2026-02-02T16:34:03.106680238Z",
+      "updated_by": "auto:executor"
     },
     "tdd-reminder": {
+      "run_id": "a3b692c1-9be4-40af-960d-68c85073b541",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-02-02T16:28:10.649644319Z"
+      "updated_at": "2026-02-02T16:28:10.649644319Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "7f965c3c-6173-44c6-8d58-d2fb54e62dd1",
+      "status": "passed",
+      "updated_at": "2026-02-02T16:33:38.585257542Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "3a043943-7f75-40a9-8cf1-13592e903972",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.075294664Z",
-  "updated_at": "2026-07-05T19:51:12.946206846Z",
-  "first_ready_at": "2026-01-06T21:01:34.496995455Z",
-  "claimed_at": "2026-02-02T16:28:14.798794456Z",
-  "done_at": "2026-02-02T16:39:39.174339708Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Define repository config.toml schema",
+  "updated_at": "2026-07-05T19:51:12.946206846Z"
 }

@@ -17,11 +17,13 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "passed",
-      "updated_at": "2026-10-21T16:56:48.947216753Z",
+      "run_id": "378011f6-5513-40c2-8f84-f5999b408545",
+      "status": "failed",
+      "updated_at": "2026-10-21T20:43:31.625136483Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "f62e6287-876c-439c-9b3a-d6c7ac176f29",
       "status": "failed",
       "updated_at": "2026-10-21T17:03:15.093216724Z",
       "updated_by": "auto:executor"
@@ -41,5 +43,5 @@
   "priority": "high",
   "state": "ready",
   "title": "State each configuration default once",
-  "updated_at": "2026-10-21T17:03:15.093216724Z"
+  "updated_at": "2026-10-21T20:43:31.625136483Z"
 }

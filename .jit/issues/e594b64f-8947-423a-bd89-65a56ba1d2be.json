@@ -1,11 +1,12 @@
 {
-  "id": "e594b64f-8947-423a-bd89-65a56ba1d2be",
-  "title": "Smart 'jit gate pass' command - auto-detect and run automated gates",
-  "description": "Current UX confusion: Users must know if a gate is 'auto' or 'manual' before using it. 'jit gate pass' only works for manual gates and gives cryptic errors for automated gates, forcing users to use 'jit gate check' instead.\n\nProposed solution: Make 'jit gate pass <issue> <gate>' intelligent:\n- If gate is manual → mark as passed (current behavior)  \n- If gate is auto → run checker automatically, then mark based on result\n- Display helpful message indicating what's happening\n\nBenefits:\n- Single command for most workflows\n- No leaky abstraction - users don't need to know implementation details\n- Keep 'jit gate check' for debugging/testing without updating status\n\nExample workflow after fix:\n  jit gate pass <issue> tests      # Runs cargo test, updates status\n  jit gate pass <issue> code-review # Marks manual gate as passed\n  \nBoth work intuitively without errors.",
-  "state": "done",
-  "priority": "critical",
   "assignee": "agent:copilot-session-1",
+  "claimed_at": "2025-12-20T20:07:00.911851913Z",
+  "context": {},
+  "created_at": "2025-12-20T20:11:37.480181064Z",
   "dependencies": [],
+  "description": "Current UX confusion: Users must know if a gate is 'auto' or 'manual' before using it. 'jit gate pass' only works for manual gates and gives cryptic errors for automated gates, forcing users to use 'jit gate check' instead.\n\nProposed solution: Make 'jit gate pass <issue> <gate>' intelligent:\n- If gate is manual → mark as passed (current behavior)  \n- If gate is auto → run checker automatically, then mark based on result\n- Display helpful message indicating what's happening\n\nBenefits:\n- Single command for most workflows\n- No leaky abstraction - users don't need to know implementation details\n- Keep 'jit gate check' for debugging/testing without updating status\n\nExample workflow after fix:\n  jit gate pass <issue> tests      # Runs cargo test, updates status\n  jit gate pass <issue> code-review # Marks manual gate as passed\n  \nBoth work intuitively without errors.",
+  "documents": [],
+  "done_at": "2025-12-20T20:12:00.360229344Z",
   "gates_required": [
     "tests",
     "clippy",
@@ -13,36 +14,39 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
+      "run_id": "a0c0cc91-cb8e-4c69-8057-ca5fcf191345",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:11:33.966801339Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:11:37.483064737Z"
+      "updated_at": "2025-12-20T20:11:36.176807431Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "905c1b66-e30d-479c-93d3-0325a89ca688",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2025-12-20T20:11:37.788496824Z"
+      "updated_at": "2025-12-20T20:11:37.788496824Z",
+      "updated_by": "human:user"
     },
-    "clippy": {
+    "fmt": {
+      "run_id": "3e50c174-e7c6-441a-a7b6-7c308c8d926c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2025-12-20T20:11:36.176807431Z"
+      "updated_at": "2025-12-20T20:11:37.483064737Z",
+      "updated_by": "auto:executor"
+    },
+    "tests": {
+      "run_id": "e4bff8a3-dc6f-4c41-9b31-b68f056ba780",
+      "status": "passed",
+      "updated_at": "2025-12-20T20:11:33.966801339Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "e594b64f-8947-423a-bd89-65a56ba1d2be",
   "labels": [
     "type:task",
     "epic:phase-5.2",
     "component:cli"
   ],
-  "created_at": "2025-12-20T20:11:37.480181064Z",
-  "updated_at": "2026-07-05T19:51:13.104259241Z",
-  "claimed_at": "2025-12-20T20:07:00.911851913Z",
-  "done_at": "2025-12-20T20:12:00.360229344Z"
+  "priority": "critical",
+  "state": "done",
+  "title": "Smart 'jit gate pass' command - auto-detect and run automated gates",
+  "updated_at": "2026-07-05T19:51:13.104259241Z"
 }

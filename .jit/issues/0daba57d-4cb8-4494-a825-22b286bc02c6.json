@@ -1,11 +1,13 @@
 {
-  "id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
-  "title": "Refused issue deletion exits nonzero",
-  "description": "Deleting an issue without the confirmation environment variable prints a refusal and exits 0, so scripts treat the refusal as success. Hit live during tracker hygiene: a cleanup step believed a deletion had happened when it had not.\n\n## Success Criteria\n\n- [hard] REQ-01: A deletion refused for missing confirmation exits nonzero (invalid-argument family, exit 2) in both text and JSON modes.\n- [hard] REQ-02: Under --json the refusal emits the structured error envelope with a distinguishing code and the confirmation hint in suggestions.\n- [hard] REQ-03: A confirmed deletion's exit code and output are unchanged.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-16T08:40:04.558426374Z",
+  "context": {},
+  "created_at": "2026-07-05T22:41:02.663869625Z",
   "dependencies": [],
+  "description": "Deleting an issue without the confirmation environment variable prints a refusal and exits 0, so scripts treat the refusal as success. Hit live during tracker hygiene: a cleanup step believed a deletion had happened when it had not.\n\n## Success Criteria\n\n- [hard] REQ-01: A deletion refused for missing confirmation exits nonzero (invalid-argument family, exit 2) in both text and JSON modes.\n- [hard] REQ-02: Under --json the refusal emits the structured error envelope with a distinguishing code and the confirmation hint in suggestions.\n- [hard] REQ-03: A confirmed deletion's exit code and output are unchanged.",
+  "documents": [],
+  "done_at": "2026-07-17T06:44:04.577425420Z",
+  "first_ready_at": "2026-07-05T22:41:02.663883645Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -13,37 +15,39 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "docs-mechanical": {
+    "cargo-ci": {
+      "run_id": "4fea29bf-757e-4571-984c-3e83d2e50529",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T00:31:37.381758753Z"
+      "updated_at": "2026-07-16T21:21:19.717517740Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "b93a854e-06c7-4666-ba8f-165dd0673344",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T03:02:58.196456845Z"
-    },
-    "cargo-ci": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-16T21:21:19.717517740Z"
+      "updated_at": "2026-07-17T03:02:58.196456845Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "d1504c06-2a67-4327-9cab-a4805ff9fe91",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-17T03:59:00.510774599Z"
+      "updated_at": "2026-07-17T03:59:00.510774599Z",
+      "updated_by": "auto:executor"
+    },
+    "docs-mechanical": {
+      "run_id": "08d1dffa-3440-41da-a4bf-b721410aca4d",
+      "status": "passed",
+      "updated_at": "2026-07-17T00:31:37.381758753Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "0daba57d-4cb8-4494-a825-22b286bc02c6",
   "labels": [
     "type:bug",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T22:41:02.663869625Z",
-  "updated_at": "2026-07-17T06:44:04.577425950Z",
-  "first_ready_at": "2026-07-05T22:41:02.663883645Z",
-  "claimed_at": "2026-07-16T08:40:04.558426374Z",
-  "done_at": "2026-07-17T06:44:04.577425420Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Refused issue deletion exits nonzero",
+  "updated_at": "2026-07-17T06:44:04.577425950Z"
 }

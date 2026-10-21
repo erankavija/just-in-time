@@ -1,13 +1,15 @@
 {
-  "id": "9262f487-89b9-4271-a412-3daff40d258d",
-  "title": "Implement jit worktree list command",
-  "description": "Implement `jit worktree list` showing all git worktrees with their JIT status: worktree ID, branch, active claims count. Support `--json` output.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli",
+  "claimed_at": "2026-01-10T22:29:46.251066610Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.059190289Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `jit worktree list` showing all git worktrees with their JIT status: worktree ID, branch, active claims count. Support `--json` output.",
+  "documents": [],
+  "done_at": "2026-01-10T23:03:54.434583500Z",
+  "first_ready_at": "2026-01-07T23:32:21.541198344Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tdd-reminder": {
+    "clippy": {
+      "run_id": "69276874-7d70-4d24-9a30-673e8ef6037e",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-10T22:29:46.247694899Z"
+      "updated_at": "2026-01-10T22:38:43.333411040Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "026f4c9b-1935-48b8-8c6e-b00dc33212d7",
       "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-10T22:38:43.336317991Z"
+      "updated_at": "2026-01-10T22:38:43.336317991Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "dfb8e489-edc7-4599-8323-678dcb92a8c9",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-10T22:38:43.334888201Z"
+      "updated_at": "2026-01-10T22:38:43.334888201Z",
+      "updated_by": "auto:executor"
     },
-    "clippy": {
+    "tdd-reminder": {
+      "run_id": "40361fc2-22d5-4177-b0c0-96a719bf8ba2",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-10T22:38:43.333411040Z"
+      "updated_at": "2026-01-10T22:29:46.247694899Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "23c0dcfb-2c93-4eb9-b0bc-08d6d6db4507",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-10T22:38:43.332433400Z"
+      "updated_at": "2026-01-10T22:38:43.332433400Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "9262f487-89b9-4271-a412-3daff40d258d",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.059190289Z",
-  "updated_at": "2026-07-05T19:51:13.035619191Z",
-  "first_ready_at": "2026-01-07T23:32:21.541198344Z",
-  "claimed_at": "2026-01-10T22:29:46.251066610Z",
-  "done_at": "2026-01-10T23:03:54.434583500Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit worktree list command",
+  "updated_at": "2026-07-05T19:51:13.035619191Z"
 }

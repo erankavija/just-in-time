@@ -1,13 +1,15 @@
 {
-  "id": "26893ec6-2110-4e2c-b787-45b85664caaa",
-  "title": "Implement claims index rebuild from JSONL log",
-  "description": "Implement `rebuild_index_from_log()` to reconstruct claims index from append-only JSONL. Verify sequence continuity, apply operations in order, filter expired leases. See design doc section \"Rebuilding\".",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2026-02-02T10:14:40.027914361Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:15.067474261Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `rebuild_index_from_log()` to reconstruct claims index from append-only JSONL. Verify sequence continuity, apply operations in order, filter expired leases. See design doc section \"Rebuilding\".",
+  "documents": [],
+  "done_at": "2026-02-02T10:24:40.549678801Z",
+  "first_ready_at": "2026-01-07T23:32:21.567632790Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "tests": {
+    "clippy": {
+      "run_id": "f10d40fb-6a90-4663-af41-2548b2069f8e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:23:29.323914003Z"
+      "updated_at": "2026-02-02T10:23:46.247300655Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "7811bac9-5d66-40c3-b6da-4fede0853798",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:16:02.440227559Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-02T10:14:40.024651860Z"
+      "updated_at": "2026-02-02T10:16:02.440227559Z",
+      "updated_by": "agent:copilot-session"
     },
     "fmt": {
+      "run_id": "08066348-fa85-4404-af03-41d3fa44e2ea",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:24:38.139683112Z"
+      "updated_at": "2026-02-02T10:24:38.139683112Z",
+      "updated_by": "auto:executor"
     },
-    "clippy": {
+    "tdd-reminder": {
+      "run_id": "7fdbf375-140a-46d0-8589-4aced85afe10",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-02T10:23:46.247300655Z"
+      "updated_at": "2026-02-02T10:14:40.024651860Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "tests": {
+      "run_id": "c22c2ba3-3e78-4457-b47b-b62e30599512",
+      "status": "passed",
+      "updated_at": "2026-02-02T10:23:29.323914003Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "26893ec6-2110-4e2c-b787-45b85664caaa",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:15.067474261Z",
-  "updated_at": "2026-07-05T19:51:12.927829633Z",
-  "first_ready_at": "2026-01-07T23:32:21.567632790Z",
-  "claimed_at": "2026-02-02T10:14:40.027914361Z",
-  "done_at": "2026-02-02T10:24:40.549678801Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement claims index rebuild from JSONL log",
+  "updated_at": "2026-07-05T19:51:12.927829633Z"
 }

@@ -1,36 +1,38 @@
 {
-  "id": "b2f9f390-912f-45fe-920f-3f196948be25",
-  "title": "Support appending to an issue description instead of whole-text replacement",
-  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03).\n\n`jit issue update --description` replaces the entire description. Recording a mid-execution amendment (this session appended plan-amendment notes to three issues: 7f22d6cf REQ-04 scope extension, f4b5e3f4 D3-A alignment, 37506c12 ownership-split context) requires: fetch the description with `issue show --json | jq -r .description`, write it to a temp file, append, and push the whole text back through a shell command substitution. That round-trip is racy against concurrent editors, fragile with large multi-thousand-character descriptions in argv, and easy to get wrong (one attempt in this session ran from the wrong cwd and failed repo discovery mid-chain).\n\nProposal:\n1. `jit issue update <id> --append-description <TEXT>` appending with a separating blank line.\n2. `--description-file <path>` (and `--append-description-file <path>`) reading content from a file to avoid argv limits and quoting hazards; `-` for stdin.\n\n## Success Criteria\n- [hard] REQ-01: an append flag adds text to the end of an existing description without touching the rest, covered by a CLI test (including appending to an empty description).\n- [hard] REQ-02: file/stdin variants exist for both replace and append forms and are covered by tests, including a multi-kilobyte description.\n- [hard] REQ-03: help text documents replace vs append semantics; events.jsonl records the update as today.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T05:30:01.335035923Z",
+  "context": {},
+  "created_at": "2026-07-03T11:10:59.918014990Z",
   "dependencies": [],
+  "description": "Friction observed while lead-driving epic 2821e177 (2026-07-03).\n\n`jit issue update --description` replaces the entire description. Recording a mid-execution amendment (this session appended plan-amendment notes to three issues: 7f22d6cf REQ-04 scope extension, f4b5e3f4 D3-A alignment, 37506c12 ownership-split context) requires: fetch the description with `issue show --json | jq -r .description`, write it to a temp file, append, and push the whole text back through a shell command substitution. That round-trip is racy against concurrent editors, fragile with large multi-thousand-character descriptions in argv, and easy to get wrong (one attempt in this session ran from the wrong cwd and failed repo discovery mid-chain).\n\nProposal:\n1. `jit issue update <id> --append-description <TEXT>` appending with a separating blank line.\n2. `--description-file <path>` (and `--append-description-file <path>`) reading content from a file to avoid argv limits and quoting hazards; `-` for stdin.\n\n## Success Criteria\n- [hard] REQ-01: an append flag adds text to the end of an existing description without touching the rest, covered by a CLI test (including appending to an empty description).\n- [hard] REQ-02: file/stdin variants exist for both replace and append forms and are covered by tests, including a multi-kilobyte description.\n- [hard] REQ-03: help text documents replace vs append semantics; events.jsonl records the update as today.",
+  "documents": [],
+  "done_at": "2026-07-05T05:56:27.157171385Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "111022f1-28a9-492b-8af1-062a7e0d4061",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T05:46:47.828820842Z"
+      "updated_at": "2026-07-05T05:46:47.828820842Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "222f0008-7774-4a1d-88d0-bcb6ca4d0190",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T05:54:37.547385250Z"
+      "updated_at": "2026-07-05T05:54:37.547385250Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "b2f9f390-912f-45fe-920f-3f196948be25",
   "labels": [
     "epic:core-maintenance",
     "component:cli",
     "type:enhancement"
   ],
-  "created_at": "2026-07-03T11:10:59.918014990Z",
-  "updated_at": "2026-07-05T19:51:13.060858579Z",
-  "claimed_at": "2026-07-05T05:30:01.335035923Z",
-  "done_at": "2026-07-05T05:56:27.157171385Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Support appending to an issue description instead of whole-text replacement",
+  "updated_at": "2026-07-05T19:51:13.060858579Z"
 }

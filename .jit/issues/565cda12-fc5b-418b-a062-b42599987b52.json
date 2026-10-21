@@ -1,11 +1,11 @@
 {
-  "id": "565cda12-fc5b-418b-a062-b42599987b52",
-  "title": "Create control plane directory structure",
-  "description": "Create `.git/jit/` control plane directory structure with proper 0700 permissions. Create subdirectories: `locks/`, `heartbeat/`, `events/`. Ensure atomic directory creation. See design doc section \"Directory Layout\".",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.566618285Z",
   "dependencies": [],
+  "description": "Create `.git/jit/` control plane directory structure with proper 0700 permissions. Create subdirectories: `locks/`, `heartbeat/`, `events/`. Ensure atomic directory creation. See design doc section \"Directory Layout\".",
+  "documents": [],
+  "done_at": "2026-01-06T20:50:50.719066952Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -14,41 +14,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-06T20:50:40.493997857Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-06T20:50:35.270669196Z"
-    },
     "clippy": {
+      "run_id": "e7e83ca3-0f43-4ed6-b15e-1c967c731412",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:50:36.580051063Z"
+      "updated_at": "2026-01-06T20:50:36.580051063Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "61e2dd0e-13a4-4791-8fbd-cea09d6e028b",
+      "status": "passed",
+      "updated_at": "2026-01-06T20:50:40.493997857Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "a533562f-93c8-45af-89dd-2d5dd6bc0b5c",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:50:40.087951650Z"
+      "updated_at": "2026-01-06T20:50:40.087951650Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "629d8ac7-e442-4d7d-8c7f-cd0c373ca0d5",
+      "status": "passed",
+      "updated_at": "2026-01-06T20:50:35.270669196Z",
+      "updated_by": null
     },
     "tests": {
+      "run_id": "55094072-4344-4a65-baba-0e518dc2e53f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-06T20:50:35.273624676Z"
+      "updated_at": "2026-01-06T20:50:35.273624676Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "565cda12-fc5b-418b-a062-b42599987b52",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:storage",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.566618285Z",
-  "updated_at": "2026-07-05T19:51:12.971573934Z",
-  "done_at": "2026-01-06T20:50:50.719066952Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Create control plane directory structure",
+  "updated_at": "2026-07-05T19:51:12.971573934Z"
 }

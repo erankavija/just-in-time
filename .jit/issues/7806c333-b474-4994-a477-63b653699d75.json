@@ -1,37 +1,39 @@
 {
-  "id": "7806c333-b474-4994-a477-63b653699d75",
-  "title": "Bug: worktree list shows stale active_claims count after lease expiry",
-  "description": "## Problem\n\n`jit worktree list` reports `active_claims: 1` for a worktree after its lease has expired, while `jit claim list` correctly returns 0 leases. The `active_claims` count in worktree list is not reconciled against actual live leases.\n\n## Steps to Reproduce\n\n1. Acquire a lease on an issue (`jit claim acquire <issue>`)\n2. Wait for the TTL to expire (default 600s)\n3. Run `jit worktree list` — shows `active_claims: 1`\n4. Run `jit claim list` — shows 0 leases\n5. Run `jit recover` — evicts the stale lease, after which `jit worktree list` correctly shows `active_claims: 0`\n\n## Expected Behavior\n\n`jit worktree list` should not count expired leases. Either:\n- **Eager**: Evict leases on TTL expiry automatically\n- **Lazy**: Filter out expired leases when computing `active_claims` in `worktree list`\n\n## Workaround\n\nRun `jit recover` to clean up stale leases manually.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-01T22:35:04.050739982Z",
+  "context": {},
+  "created_at": "2026-02-17T20:28:46.115840798Z",
   "dependencies": [],
+  "description": "## Problem\n\n`jit worktree list` reports `active_claims: 1` for a worktree after its lease has expired, while `jit claim list` correctly returns 0 leases. The `active_claims` count in worktree list is not reconciled against actual live leases.\n\n## Steps to Reproduce\n\n1. Acquire a lease on an issue (`jit claim acquire <issue>`)\n2. Wait for the TTL to expire (default 600s)\n3. Run `jit worktree list` — shows `active_claims: 1`\n4. Run `jit claim list` — shows 0 leases\n5. Run `jit recover` — evicts the stale lease, after which `jit worktree list` correctly shows `active_claims: 0`\n\n## Expected Behavior\n\n`jit worktree list` should not count expired leases. Either:\n- **Eager**: Evict leases on TTL expiry automatically\n- **Lazy**: Filter out expired leases when computing `active_claims` in `worktree list`\n\n## Workaround\n\nRun `jit recover` to clean up stale leases manually.",
+  "documents": [],
+  "done_at": "2026-06-01T23:00:11.977948793Z",
   "gates_required": [
     "code-review",
     "cargo-ci"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "0073b067-cb70-47fb-87c8-64617320579d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-01T22:56:11.724098146Z"
+      "updated_at": "2026-06-01T22:56:11.724098146Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "329de3f2-9973-40f1-b570-519e31f7bfaa",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-01T22:57:16.564634017Z"
+      "updated_at": "2026-06-01T22:57:16.564634017Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "7806c333-b474-4994-a477-63b653699d75",
   "labels": [
     "type:bug",
     "epic:production-stability",
     "milestone:v1.0",
     "component:core"
   ],
-  "created_at": "2026-02-17T20:28:46.115840798Z",
-  "updated_at": "2026-07-05T19:51:13.009451512Z",
-  "claimed_at": "2026-06-01T22:35:04.050739982Z",
-  "done_at": "2026-06-01T23:00:11.977948793Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Bug: worktree list shows stale active_claims count after lease expiry",
+  "updated_at": "2026-07-05T19:51:13.009451512Z"
 }

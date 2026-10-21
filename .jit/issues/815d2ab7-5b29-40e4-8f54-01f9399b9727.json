@@ -1,37 +1,39 @@
 {
-  "id": "815d2ab7-5b29-40e4-8f54-01f9399b9727",
-  "title": "Support figure and implementation document types in Web UI document viewer",
-  "description": "Extend the Web UI document viewer to render image files and Python/script files, which appear as linked documents on issues from other JIT projects (e.g. `figure` and `implementation` doc types).\n\n## Background\n\nThe document viewer renderer registry currently recognises `.csv`, `.txt`, `.rs`, and `.cpp` by extension, with a markdown catch-all. Two document types found on issues in associated projects are not handled:\n\n- **Figure documents** (`.png`, `.svg`, `.jpg`) -- rendered as raw text or broken markdown because no image renderer exists.\n- **Implementation scripts** (`.py`, and other common script extensions) -- fall through to the markdown catch-all, losing syntax highlighting.\n\nThe `DocumentReference` type already carries a `doc_type` field (`string | undefined`), which `pickRenderer` can use as a secondary matching signal alongside file extension.\n\n## Success Criteria\n\n- [ ] `.png`, `.svg`, and `.jpg` files render as inline images in the document viewer (not as raw text or broken markdown).\n- [ ] `.py` files render with syntax highlighting via `TextCodeRenderer` or an equivalent renderer.\n- [ ] `pickRenderer` matches image extensions (and optionally `doc_type === \"figure\"`) before falling through to the catch-all.\n- [ ] `pickRenderer` matches `.py` (and optionally other common script extensions: `.sh`, `.js`, `.ts`) before falling through to the catch-all.\n- [ ] All new renderer paths have unit test coverage in `renderers.test.tsx`.\n- [ ] `npm-ci` gate passes (vitest, ESLint, build).",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude",
+  "claimed_at": "2026-05-15T20:56:16.232324184Z",
+  "context": {},
+  "created_at": "2026-05-15T20:55:38.682104921Z",
   "dependencies": [],
+  "description": "Extend the Web UI document viewer to render image files and Python/script files, which appear as linked documents on issues from other JIT projects (e.g. `figure` and `implementation` doc types).\n\n## Background\n\nThe document viewer renderer registry currently recognises `.csv`, `.txt`, `.rs`, and `.cpp` by extension, with a markdown catch-all. Two document types found on issues in associated projects are not handled:\n\n- **Figure documents** (`.png`, `.svg`, `.jpg`) -- rendered as raw text or broken markdown because no image renderer exists.\n- **Implementation scripts** (`.py`, and other common script extensions) -- fall through to the markdown catch-all, losing syntax highlighting.\n\nThe `DocumentReference` type already carries a `doc_type` field (`string | undefined`), which `pickRenderer` can use as a secondary matching signal alongside file extension.\n\n## Success Criteria\n\n- [ ] `.png`, `.svg`, and `.jpg` files render as inline images in the document viewer (not as raw text or broken markdown).\n- [ ] `.py` files render with syntax highlighting via `TextCodeRenderer` or an equivalent renderer.\n- [ ] `pickRenderer` matches image extensions (and optionally `doc_type === \"figure\"`) before falling through to the catch-all.\n- [ ] `pickRenderer` matches `.py` (and optionally other common script extensions: `.sh`, `.js`, `.ts`) before falling through to the catch-all.\n- [ ] All new renderer paths have unit test coverage in `renderers.test.tsx`.\n- [ ] `npm-ci` gate passes (vitest, ESLint, build).",
+  "documents": [],
+  "done_at": "2026-05-15T21:18:19.111106192Z",
   "gates_required": [
     "code-review",
     "npm-ci"
   ],
   "gates_status": {
     "code-review": {
+      "run_id": "e6dd694c-4f1b-480a-a60e-096adfeae166",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-15T21:14:39.757476875Z"
+      "updated_at": "2026-05-15T21:14:39.757476875Z",
+      "updated_by": "auto:executor"
     },
     "npm-ci": {
+      "run_id": "7d5b51e5-e18e-4d8c-a1fc-0dc89e382995",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-05-15T21:00:07.358473849Z"
+      "updated_at": "2026-05-15T21:00:07.358473849Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "815d2ab7-5b29-40e4-8f54-01f9399b9727",
   "labels": [
     "type:task",
     "epic:usability",
     "milestone:v1.0",
     "component:web"
   ],
-  "created_at": "2026-05-15T20:55:38.682104921Z",
-  "updated_at": "2026-07-05T19:51:13.017716788Z",
-  "claimed_at": "2026-05-15T20:56:16.232324184Z",
-  "done_at": "2026-05-15T21:18:19.111106192Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Support figure and implementation document types in Web UI document viewer",
+  "updated_at": "2026-07-05T19:51:13.017716788Z"
 }

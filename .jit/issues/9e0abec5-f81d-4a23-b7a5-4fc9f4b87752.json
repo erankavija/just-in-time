@@ -1,13 +1,33 @@
 {
-  "id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
-  "title": "Add a projector for built-in gate presets",
-  "description": "Built-in gate presets are defined in Rust and can change without a maintained documentation surface. Add a deterministic projection that distinguishes shipped presets from project-local registries.\n\nSource: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372`; `crates/jit/src/gate_presets/manager.rs:27-44,111-137`; `crates/jit/src/commands/invariant.rs:1-23`; `crates/jit/src/commands/reference.rs:1-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: A deterministic discoverable projection renders every built-in preset with gate keys, stages, modes, descriptions, and relevant checker metadata.\n- [hard] REQ-02: The rendered surface distinguishes shipped presets from project-local/custom configuration.\n- [hard] REQ-03: Freshness coverage fails when a built-in preset or gate definition changes without regeneration.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:worker",
+  "claimed_at": "2026-07-12T09:21:16.085050668Z",
+  "context": {},
+  "created_at": "2026-07-11T13:35:35.555687123Z",
   "dependencies": [
     "6d82de03-1018-47bc-ae0b-659366ad3f44"
   ],
+  "description": "Built-in gate presets are defined in Rust and can change without a maintained documentation surface. Add a deterministic projection that distinguishes shipped presets from project-local registries.\n\nSource: `crates/jit/src/gate_presets/builtin.rs:1-6,43-117,313-372`; `crates/jit/src/gate_presets/manager.rs:27-44,111-137`; `crates/jit/src/commands/invariant.rs:1-23`; `crates/jit/src/commands/reference.rs:1-19`.\n\n## Success Criteria\n\n- [hard] REQ-01: A deterministic discoverable projection renders every built-in preset with gate keys, stages, modes, descriptions, and relevant checker metadata.\n- [hard] REQ-02: The rendered surface distinguishes shipped presets from project-local/custom configuration.\n- [hard] REQ-03: Freshness coverage fails when a built-in preset or gate definition changes without regeneration.",
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "b76d880783e59a3896e41a1b3215849a0c72b2c4bdd6b297125b0445332a02ec",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "rules-and-gates.md",
+          "resolved_path": "docs/reference/rules-and-gates.md"
+        }
+      ],
+      "commit": null,
+      "doc_type": null,
+      "format": "markdown",
+      "label": "Built-in Gate Presets",
+      "path": "docs/reference/gate-presets.md"
+    }
+  ],
+  "done_at": "2026-07-12T12:07:21.881793998Z",
+  "first_ready_at": "2026-07-11T13:35:35.555687363Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -15,56 +35,40 @@
     "docs-mechanical"
   ],
   "gates_status": {
-    "code-review": {
+    "cargo-ci": {
+      "run_id": "561bb1fc-01bc-45a1-8239-8f728181d1d6",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:05:58.899521365Z"
+      "updated_at": "2026-07-12T11:58:22.622850452Z",
+      "updated_by": "auto:executor"
     },
-    "docs-mechanical": {
+    "code-review": {
+      "run_id": "87633e3c-4fc2-4e28-aa98-863c042ee36f",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:02:05.175857887Z"
+      "updated_at": "2026-07-12T12:05:58.899521365Z",
+      "updated_by": "auto:executor"
     },
     "doc-review": {
+      "run_id": "351b54a7-f951-4da5-88d4-e48d9249fea3",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T12:02:05.980159442Z"
+      "updated_at": "2026-07-12T12:02:05.980159442Z",
+      "updated_by": "auto:executor"
     },
-    "cargo-ci": {
+    "docs-mechanical": {
+      "run_id": "8ecd7832-e7c9-4706-8e39-54f6bb64927e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-12T11:58:22.622850452Z"
+      "updated_at": "2026-07-12T12:02:05.175857887Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [
-    {
-      "path": "docs/reference/gate-presets.md",
-      "commit": null,
-      "label": "Built-in Gate Presets",
-      "doc_type": null,
-      "format": "markdown",
-      "assets": [
-        {
-          "original_path": "rules-and-gates.md",
-          "resolved_path": "docs/reference/rules-and-gates.md",
-          "asset_type": "local",
-          "mime_type": "text/markdown",
-          "content_hash": "b76d880783e59a3896e41a1b3215849a0c72b2c4bdd6b297125b0445332a02ec",
-          "is_shared": false
-        }
-      ]
-    }
-  ],
+  "id": "9e0abec5-f81d-4a23-b7a5-4fc9f4b87752",
   "labels": [
     "type:task",
     "milestone:v1.0",
     "component:gates",
     "epic:documentation-contract-followups"
   ],
-  "created_at": "2026-07-11T13:35:35.555687123Z",
-  "updated_at": "2026-07-12T12:07:21.881794508Z",
-  "first_ready_at": "2026-07-11T13:35:35.555687363Z",
-  "claimed_at": "2026-07-12T09:21:16.085050668Z",
-  "done_at": "2026-07-12T12:07:21.881793998Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Add a projector for built-in gate presets",
+  "updated_at": "2026-07-12T12:07:21.881794508Z"
 }

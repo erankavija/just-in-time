@@ -1,36 +1,38 @@
 {
-  "id": "c8518f2a-20d7-4564-a31c-bd8fb5908953",
-  "title": "Atomic variadic dependency add",
-  "description": "A variadic dependency add that fails per-edge validation partially commits: adding two edges where the second is redundant applies the first edge, then exits nonzero. This contradicts the all-or-nothing behavior of batch issue creation and leaves callers unable to trust the exit code as a no-op signal. Confirmed live during the epic fix audit.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A variadic dependency add that fails validation for any edge leaves the dependency set unchanged.\n- [ ] [hard] REQ-02: The error names every rejected edge, not only the first.\n- [ ] [hard] REQ-03: The event log reflects only edges that were actually applied.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-07-05T14:08:23.967433995Z",
+  "context": {},
+  "created_at": "2026-07-05T10:03:40.045294568Z",
   "dependencies": [],
+  "description": "A variadic dependency add that fails per-edge validation partially commits: adding two edges where the second is redundant applies the first edge, then exits nonzero. This contradicts the all-or-nothing behavior of batch issue creation and leaves callers unable to trust the exit code as a no-op signal. Confirmed live during the epic fix audit.\n\n## Success Criteria\n\n- [ ] [hard] REQ-01: A variadic dependency add that fails validation for any edge leaves the dependency set unchanged.\n- [ ] [hard] REQ-02: The error names every rejected edge, not only the first.\n- [ ] [hard] REQ-03: The event log reflects only edges that were actually applied.",
+  "documents": [],
+  "done_at": "2026-07-05T15:19:49.526569722Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T15:17:30.441745883Z"
-    },
     "cargo-ci": {
+      "run_id": "0cf45cab-a4d5-4731-b7bf-20ca08852a05",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-05T15:14:45.661886419Z"
+      "updated_at": "2026-07-05T15:14:45.661886419Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "cde7f71a-5637-4dd0-8b51-a1264a292db2",
+      "status": "passed",
+      "updated_at": "2026-07-05T15:17:30.441745883Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "c8518f2a-20d7-4564-a31c-bd8fb5908953",
   "labels": [
     "type:bug",
     "epic:core-maintenance",
     "component:cli"
   ],
-  "created_at": "2026-07-05T10:03:40.045294568Z",
-  "updated_at": "2026-07-05T19:51:13.084910717Z",
-  "claimed_at": "2026-07-05T14:08:23.967433995Z",
-  "done_at": "2026-07-05T15:19:49.526569722Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Atomic variadic dependency add",
+  "updated_at": "2026-07-05T19:51:13.084910717Z"
 }

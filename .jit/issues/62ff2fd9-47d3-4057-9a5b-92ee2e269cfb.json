@@ -1,13 +1,15 @@
 {
-  "id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
-  "title": "Create pre-push hook for lease validation",
-  "description": "Create pre-push hook template for strict teams that validates leases referenced in commit trailers are still active and non-stale. Parse JIT-Lease trailer from commits being pushed. Check `.stale != true` in claims index.\n\nSee design doc section \"Pre-Push Hook\".",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-session",
+  "claimed_at": "2026-02-01T23:32:24.039784852Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.587779071Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Create pre-push hook template for strict teams that validates leases referenced in commit trailers are still active and non-stale. Parse JIT-Lease trailer from commits being pushed. Check `.stale != true` in claims index.\n\nSee design doc section \"Pre-Push Hook\".",
+  "documents": [],
+  "done_at": "2026-02-01T23:38:57.403024964Z",
+  "first_ready_at": "2026-01-07T23:32:21.475121314Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -17,42 +19,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "dbf2fcbd-a54a-4a05-94d1-e6d435067a17",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:38:40.294623289Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:38:21.379895567Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:32:08.667318064Z"
+      "updated_at": "2026-02-01T23:38:40.294623289Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "7b430fe2-6a31-4839-9977-890a45ab412c",
       "status": "passed",
-      "updated_by": "agent:copilot-session",
-      "updated_at": "2026-02-01T23:37:36.650442190Z"
+      "updated_at": "2026-02-01T23:37:36.650442190Z",
+      "updated_by": "agent:copilot-session"
     },
     "fmt": {
+      "run_id": "c16a1cf1-6a0d-410b-a894-c88d8477553e",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-02-01T23:38:42.499004160Z"
+      "updated_at": "2026-02-01T23:38:42.499004160Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "5b7e59d9-b2c3-47a0-9e02-56db09dff163",
+      "status": "passed",
+      "updated_at": "2026-02-01T23:32:08.667318064Z",
+      "updated_by": "agent:copilot-session"
+    },
+    "tests": {
+      "run_id": "f4593b17-4229-413b-a8e3-c70524ae163b",
+      "status": "passed",
+      "updated_at": "2026-02-01T23:38:21.379895567Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "62ff2fd9-47d3-4057-9a5b-92ee2e269cfb",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.587779071Z",
-  "updated_at": "2026-07-05T19:51:12.987769816Z",
-  "first_ready_at": "2026-01-07T23:32:21.475121314Z",
-  "claimed_at": "2026-02-01T23:32:24.039784852Z",
-  "done_at": "2026-02-01T23:38:57.403024964Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Create pre-push hook for lease validation",
+  "updated_at": "2026-07-05T19:51:12.987769816Z"
 }

@@ -1,37 +1,39 @@
 {
-  "id": "2b82c12c-1f63-45b3-a123-d652719fbd3c",
-  "title": "Add local CLI version provenance",
-  "description": "Add local build provenance to the CLI so humans and agents can identify exactly which `jit` binary they are running without relying on shell inspection.\n\n## Background\n\nThe current CLI rejects both `jit --version` and `jit version`, which makes installed binary provenance opaque. The first slice intentionally stays local and deterministic: it does not check GitHub releases, PATH conflicts, or whether the binary matches the current repository checkout.\n\n## Success Criteria\n\n- [ ] `jit --version` prints the package version and local build provenance in a concise human-readable form.\n- [ ] `jit version` prints crate version, short commit hash, full commit hash, dirty flag, build profile, build timestamp, and target metadata when available.\n- [ ] `jit version --json` returns the same provenance in a stable machine-readable structure.\n- [ ] Builds outside a Git checkout still succeed and report explicit unknown/unavailable provenance values rather than failing.\n- [ ] Tests cover human output, JSON output, and missing Git metadata behavior.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot",
+  "claimed_at": "2026-04-27T22:08:16.779207096Z",
+  "context": {},
+  "created_at": "2026-04-27T22:07:50.489167825Z",
   "dependencies": [],
+  "description": "Add local build provenance to the CLI so humans and agents can identify exactly which `jit` binary they are running without relying on shell inspection.\n\n## Background\n\nThe current CLI rejects both `jit --version` and `jit version`, which makes installed binary provenance opaque. The first slice intentionally stays local and deterministic: it does not check GitHub releases, PATH conflicts, or whether the binary matches the current repository checkout.\n\n## Success Criteria\n\n- [ ] `jit --version` prints the package version and local build provenance in a concise human-readable form.\n- [ ] `jit version` prints crate version, short commit hash, full commit hash, dirty flag, build profile, build timestamp, and target metadata when available.\n- [ ] `jit version --json` returns the same provenance in a stable machine-readable structure.\n- [ ] Builds outside a Git checkout still succeed and report explicit unknown/unavailable provenance values rather than failing.\n- [ ] Tests cover human output, JSON output, and missing Git metadata behavior.",
+  "documents": [],
+  "done_at": "2026-04-27T23:32:18.198917778Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-27T23:06:09.651605853Z"
-    },
     "cargo-ci": {
+      "run_id": "128cfc35-8643-4a1b-93db-46b425686b56",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-04-27T23:04:56.408706208Z"
+      "updated_at": "2026-04-27T23:04:56.408706208Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "83c11662-3a79-4c47-8d7d-c02b4e21ff52",
+      "status": "passed",
+      "updated_at": "2026-04-27T23:06:09.651605853Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "2b82c12c-1f63-45b3-a123-d652719fbd3c",
   "labels": [
     "type:task",
     "epic:usability",
     "milestone:v1.0",
     "component:cli"
   ],
-  "created_at": "2026-04-27T22:07:50.489167825Z",
-  "updated_at": "2026-07-05T19:51:12.932246816Z",
-  "claimed_at": "2026-04-27T22:08:16.779207096Z",
-  "done_at": "2026-04-27T23:32:18.198917778Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add local CLI version provenance",
+  "updated_at": "2026-07-05T19:51:12.932246816Z"
 }

@@ -1,39 +1,41 @@
 {
-  "id": "af0a499f-ecec-4b08-a662-531afa0e3c01",
-  "title": "Steering scenarios for the bracket",
-  "description": "Steering scenarios over the bracket reusing the existing eval harness: a plan rejected at the quality gate, a coverage gap caught at the breakdown gate, and a clean green path.\n\n## Success Criteria\n\n- [ ] A scenario asserts the plan-review gate blocks a deficient plan.\n- [ ] A scenario asserts the breakdown gate blocks an uncovered hard criterion.\n- [ ] A scenario asserts a well-formed bracket passes end-to-end.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-18T19:44:00.820556529Z",
+  "context": {},
+  "created_at": "2026-06-15T18:34:31.138877221Z",
   "dependencies": [
     "4d321a11-e6eb-4331-97af-7b9557bee6ac"
   ],
+  "description": "Steering scenarios over the bracket reusing the existing eval harness: a plan rejected at the quality gate, a coverage gap caught at the breakdown gate, and a clean green path.\n\n## Success Criteria\n\n- [ ] A scenario asserts the plan-review gate blocks a deficient plan.\n- [ ] A scenario asserts the breakdown gate blocks an uncovered hard criterion.\n- [ ] A scenario asserts a well-formed bracket passes end-to-end.",
+  "documents": [],
+  "done_at": "2026-06-18T20:08:56.498526256Z",
+  "first_ready_at": "2026-06-18T19:41:04.030568499Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
     "cargo-ci": {
+      "run_id": "b6abdbde-1220-4206-8628-db87d69d8d3b",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-18T20:00:20.247918616Z"
+      "updated_at": "2026-06-18T20:00:20.247918616Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "6f497982-73f3-423f-bca9-52a9d6c1f9e2",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-18T20:07:34.792770710Z"
+      "updated_at": "2026-06-18T20:07:34.792770710Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "af0a499f-ecec-4b08-a662-531afa0e3c01",
   "labels": [
     "type:task",
     "story:skills-and-eval",
     "epic:planning-bracket"
   ],
-  "created_at": "2026-06-15T18:34:31.138877221Z",
-  "updated_at": "2026-07-05T19:51:13.057456317Z",
-  "first_ready_at": "2026-06-18T19:41:04.030568499Z",
-  "claimed_at": "2026-06-18T19:44:00.820556529Z",
-  "done_at": "2026-06-18T20:08:56.498526256Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Steering scenarios for the bracket",
+  "updated_at": "2026-07-05T19:51:13.057456317Z"
 }

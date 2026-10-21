@@ -1,35 +1,37 @@
 {
-  "id": "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
-  "title": "Typed scope/format/blocked-reason enums",
-  "description": "Introduce typed scope/format/blocked-reason enums (report stringly findings).\n\n## Sites\n- `main.rs:3394-3406` + `domain/queries.rs` — `query_blocked` formats `\"dependency:…\"`/`\"gate:…\"` strings that the CLI re-parses via `splitn(2,':')` with a silent `_ => Dependency` fallback. Return `Vec<(Issue, Vec<BlockingReason>)>` with a `BlockingReason { Dependency{…}, Gate{…} }` enum from `domain/queries.rs`; the CLI maps to its `BlockedReason` without splitting.\n- `commands/document.rs:753-776` (`check_document_links`) — `scope == \"all\"` / `strip_prefix(\"issue:\")` inline protocol. Introduce `DocumentScope { All, Issue(String) }` with `FromStr`, parse at the CLI call site, then match — mirroring the existing `SnapshotScope` pattern (`snapshot.rs:140-183`).\n- `commands/graph.rs:172-185` (`export_graph(format: &str)`) — `format.to_lowercase()` match over dot/mermaid/json. Add a `GraphExportFormat` enum (clap `ValueEnum`) consumed directly so clap rejects bad input at parse time.\n\n## Success Criteria\n- [ ] `query_blocked` returns a typed `BlockingReason` enum from the domain; the CLI consumes it without re-parsing formatted strings, and the silent `_ => Dependency` fallback is gone.\n- [ ] Document link-check scope is a `DocumentScope` enum with `FromStr` (mirroring `SnapshotScope`); no inline `== \"all\"`/`strip_prefix(\"issue:\")` remains.\n- [ ] Graph export format is a `GraphExportFormat` `ValueEnum`; an invalid format is rejected by clap at parse time, not via `to_lowercase()` matching.\n- [ ] `cargo-ci` and `code-review` pass; CLI output and accepted inputs are unchanged for valid values.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-26T13:31:57.408572002Z",
+  "context": {},
+  "created_at": "2026-06-25T21:41:24.593334088Z",
   "dependencies": [],
+  "description": "Introduce typed scope/format/blocked-reason enums (report stringly findings).\n\n## Sites\n- `main.rs:3394-3406` + `domain/queries.rs` — `query_blocked` formats `\"dependency:…\"`/`\"gate:…\"` strings that the CLI re-parses via `splitn(2,':')` with a silent `_ => Dependency` fallback. Return `Vec<(Issue, Vec<BlockingReason>)>` with a `BlockingReason { Dependency{…}, Gate{…} }` enum from `domain/queries.rs`; the CLI maps to its `BlockedReason` without splitting.\n- `commands/document.rs:753-776` (`check_document_links`) — `scope == \"all\"` / `strip_prefix(\"issue:\")` inline protocol. Introduce `DocumentScope { All, Issue(String) }` with `FromStr`, parse at the CLI call site, then match — mirroring the existing `SnapshotScope` pattern (`snapshot.rs:140-183`).\n- `commands/graph.rs:172-185` (`export_graph(format: &str)`) — `format.to_lowercase()` match over dot/mermaid/json. Add a `GraphExportFormat` enum (clap `ValueEnum`) consumed directly so clap rejects bad input at parse time.\n\n## Success Criteria\n- [ ] `query_blocked` returns a typed `BlockingReason` enum from the domain; the CLI consumes it without re-parsing formatted strings, and the silent `_ => Dependency` fallback is gone.\n- [ ] Document link-check scope is a `DocumentScope` enum with `FromStr` (mirroring `SnapshotScope`); no inline `== \"all\"`/`strip_prefix(\"issue:\")` remains.\n- [ ] Graph export format is a `GraphExportFormat` `ValueEnum`; an invalid format is rejected by clap at parse time, not via `to_lowercase()` matching.\n- [ ] `cargo-ci` and `code-review` pass; CLI output and accepted inputs are unchanged for valid values.",
+  "documents": [],
+  "done_at": "2026-06-26T14:00:22.731922219Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T13:57:51.050634273Z"
-    },
     "cargo-ci": {
+      "run_id": "7943b007-f064-4aae-8175-b935324a581d",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T13:55:32.676418974Z"
+      "updated_at": "2026-06-26T13:55:32.676418974Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "6f1893b2-7e66-49f0-9eba-2485d51927ac",
+      "status": "passed",
+      "updated_at": "2026-06-26T13:57:51.050634273Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "6e7f54a7-b3be-46ac-8bec-7fc1040b73f8",
   "labels": [
     "type:task",
     "epic:code-smell-cleanup"
   ],
-  "created_at": "2026-06-25T21:41:24.593334088Z",
-  "updated_at": "2026-07-05T19:51:12.998751344Z",
-  "claimed_at": "2026-06-26T13:31:57.408572002Z",
-  "done_at": "2026-06-26T14:00:22.731922219Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "Typed scope/format/blocked-reason enums",
+  "updated_at": "2026-07-05T19:51:12.998751344Z"
 }

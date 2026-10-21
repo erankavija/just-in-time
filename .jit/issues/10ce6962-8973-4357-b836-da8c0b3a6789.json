@@ -1,40 +1,42 @@
 {
-  "id": "10ce6962-8973-4357-b836-da8c0b3a6789",
-  "title": "breakdown: Generalize addressable items to declarative kinds over markdown/toml sources",
-  "description": "Breakdown node bracketing Generalize addressable items to declarative kinds over markdown/toml sources (90a2dbfd). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "done",
-  "priority": "normal",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-26T20:52:57.380205809Z",
+  "context": {},
+  "created_at": "2026-06-26T20:06:57.413260306Z",
   "dependencies": [
     "fbc37f87-478f-4188-8bad-6da1ed8eccbf"
   ],
+  "description": "Breakdown node bracketing Generalize addressable items to declarative kinds over markdown/toml sources (90a2dbfd). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "done_at": "2026-06-26T21:19:00.557331697Z",
+  "first_ready_at": "2026-06-26T20:31:00.924929328Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T20:53:11.035241976Z"
-    },
     "breakdown-review": {
+      "run_id": "c915e236-3b70-47b3-ba2c-0ec68895da76",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T21:17:53.907632539Z"
+      "updated_at": "2026-06-26T21:17:53.907632539Z",
+      "updated_by": "auto:executor"
+    },
+    "coverage-preview": {
+      "run_id": "efec2a95-11c7-4bda-bc1e-45d5cf7177f7",
+      "status": "passed",
+      "updated_at": "2026-06-26T20:53:11.035241976Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "10ce6962-8973-4357-b836-da8c0b3a6789",
   "labels": [
     "milestone:v1.0",
     "type:breakdown",
     "brackets:90a2dbfd",
     "epic:item-sources"
   ],
-  "created_at": "2026-06-26T20:06:57.413260306Z",
-  "updated_at": "2026-07-05T19:51:12.911910321Z",
-  "first_ready_at": "2026-06-26T20:31:00.924929328Z",
-  "claimed_at": "2026-06-26T20:52:57.380205809Z",
-  "done_at": "2026-06-26T21:19:00.557331697Z"
+  "priority": "normal",
+  "state": "done",
+  "title": "breakdown: Generalize addressable items to declarative kinds over markdown/toml sources",
+  "updated_at": "2026-07-05T19:51:12.911910321Z"
 }

@@ -1,13 +1,15 @@
 {
-  "id": "6e020dc9-144c-400f-82b2-703c93e5b111",
-  "title": "Implement jit claim list command",
-  "description": "Implement `jit claim list` showing all active claims across all agents/worktrees. Include lease ID, issue ID, agent, worktree, expiry. Support `--json` output.",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:copilot-cli-commands",
+  "claimed_at": "2026-01-08T22:21:25.613517073Z",
+  "context": {},
+  "created_at": "2026-01-03T20:37:07.605163996Z",
   "dependencies": [
     "b74af86f-388d-49a2-a172-bc9fdaa7bb9c"
   ],
+  "description": "Implement `jit claim list` showing all active claims across all agents/worktrees. Include lease ID, issue ID, agent, worktree, expiry. Support `--json` output.",
+  "documents": [],
+  "done_at": "2026-01-08T22:24:01.959418474Z",
+  "first_ready_at": "2026-01-07T23:32:21.527989046Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -16,43 +18,46 @@
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-08T22:23:57.577734448Z"
-    },
     "clippy": {
+      "run_id": "fc3b231e-2bd7-4d1e-9250-4da8cbd0d184",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:23:54.763696811Z"
+      "updated_at": "2026-01-08T22:23:54.763696811Z",
+      "updated_by": "auto:executor"
     },
-    "tests": {
+    "code-review": {
+      "run_id": "366a269e-530e-44a3-a6f9-7d08c6148401",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:23:38.947592010Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": null,
-      "updated_at": "2026-01-08T22:21:25.610199730Z"
+      "updated_at": "2026-01-08T22:23:57.577734448Z",
+      "updated_by": null
     },
     "fmt": {
+      "run_id": "cf600f14-fdcd-45d6-a689-bd27db7111db",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-01-08T22:23:57.171296092Z"
+      "updated_at": "2026-01-08T22:23:57.171296092Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "a7575381-7d42-4f23-9d7f-0a6a5bd1a1ea",
+      "status": "passed",
+      "updated_at": "2026-01-08T22:21:25.610199730Z",
+      "updated_by": null
+    },
+    "tests": {
+      "run_id": "0a6338bc-8b8a-41c6-a0f4-86ca8b49bb91",
+      "status": "passed",
+      "updated_at": "2026-01-08T22:23:38.947592010Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "6e020dc9-144c-400f-82b2-703c93e5b111",
   "labels": [
     "epic:parallel-work",
     "milestone:v1.0",
     "component:cli",
     "type:task"
   ],
-  "created_at": "2026-01-03T20:37:07.605163996Z",
-  "updated_at": "2026-07-05T19:51:12.997904554Z",
-  "first_ready_at": "2026-01-07T23:32:21.527989046Z",
-  "claimed_at": "2026-01-08T22:21:25.613517073Z",
-  "done_at": "2026-01-08T22:24:01.959418474Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Implement jit claim list command",
+  "updated_at": "2026-07-05T19:51:12.997904554Z"
 }

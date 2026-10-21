@@ -1,11 +1,12 @@
 {
-  "id": "eb5b6ffe-f47c-4405-97c9-59b1b3b05bf2",
-  "title": "Add SSE endpoint and file-watching change tracker to web server",
-  "description": "Add real-time change notification infrastructure to the jit-server:\n\n1. Add `notify` crate for filesystem watching of `.jit/` directory\n2. Create `ChangeTracker` module with monotonic version counter and broadcast channel\n3. Add SSE endpoint `GET /api/events/stream` that streams `{\"version\": N}` on changes\n4. Add `GET /api/changes` endpoint returning current version\n5. Debounce filesystem events (~200ms) to coalesce burst writes\n6. Update `AppState` to carry both `CommandExecutor` and `ChangeTracker`\n\nNew files: `crates/server/src/watcher.rs`, `crates/server/src/sse.rs`\nModified: `Cargo.toml`, `lib.rs`, `main.rs`, `routes.rs`",
-  "state": "done",
-  "priority": "high",
   "assignee": "agent:claude-opus",
+  "claimed_at": "2026-03-09T20:14:23.847351344Z",
+  "context": {},
+  "created_at": "2026-03-09T20:10:37.485302172Z",
   "dependencies": [],
+  "description": "Add real-time change notification infrastructure to the jit-server:\n\n1. Add `notify` crate for filesystem watching of `.jit/` directory\n2. Create `ChangeTracker` module with monotonic version counter and broadcast channel\n3. Add SSE endpoint `GET /api/events/stream` that streams `{\"version\": N}` on changes\n4. Add `GET /api/changes` endpoint returning current version\n5. Debounce filesystem events (~200ms) to coalesce burst writes\n6. Update `AppState` to carry both `CommandExecutor` and `ChangeTracker`\n\nNew files: `crates/server/src/watcher.rs`, `crates/server/src/sse.rs`\nModified: `Cargo.toml`, `lib.rs`, `main.rs`, `routes.rs`",
+  "documents": [],
+  "done_at": "2026-03-09T20:40:31.457860511Z",
   "gates_required": [
     "tdd-reminder",
     "tests",
@@ -15,41 +16,45 @@
   ],
   "gates_status": {
     "clippy": {
+      "run_id": "e5e86670-1f08-4691-b305-23f36a6491f8",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T20:27:31.069284520Z"
-    },
-    "tests": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T20:27:06.749966892Z"
-    },
-    "fmt": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-03-09T20:27:35.776599607Z"
-    },
-    "tdd-reminder": {
-      "status": "passed",
-      "updated_by": "agent:claude-opus",
-      "updated_at": "2026-03-09T20:14:20.781990707Z"
+      "updated_at": "2026-03-09T20:27:31.069284520Z",
+      "updated_by": "auto:executor"
     },
     "code-review": {
+      "run_id": "5bdbb1b3-ca79-498a-95e7-cb010bb92db4",
       "status": "passed",
-      "updated_by": "human:user",
-      "updated_at": "2026-03-09T20:41:21.938488214Z"
+      "updated_at": "2026-03-09T20:41:21.938488214Z",
+      "updated_by": "human:user"
+    },
+    "fmt": {
+      "run_id": "313c805e-2659-4b72-bd0b-a79b1d9a7972",
+      "status": "passed",
+      "updated_at": "2026-03-09T20:27:35.776599607Z",
+      "updated_by": "auto:executor"
+    },
+    "tdd-reminder": {
+      "run_id": "b75fb08e-4243-4c18-b403-228a0d474aaa",
+      "status": "passed",
+      "updated_at": "2026-03-09T20:14:20.781990707Z",
+      "updated_by": "agent:claude-opus"
+    },
+    "tests": {
+      "run_id": "94f73f5c-c76b-4fb6-8b67-8db164318ac7",
+      "status": "passed",
+      "updated_at": "2026-03-09T20:27:06.749966892Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "eb5b6ffe-f47c-4405-97c9-59b1b3b05bf2",
   "labels": [
     "type:task",
     "epic:usability",
     "milestone:v1.0",
     "component:web"
   ],
-  "created_at": "2026-03-09T20:10:37.485302172Z",
-  "updated_at": "2026-07-05T19:51:13.109491285Z",
-  "claimed_at": "2026-03-09T20:14:23.847351344Z",
-  "done_at": "2026-03-09T20:40:31.457860511Z"
+  "priority": "high",
+  "state": "done",
+  "title": "Add SSE endpoint and file-watching change tracker to web server",
+  "updated_at": "2026-07-05T19:51:13.109491285Z"
 }

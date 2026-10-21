@@ -1,39 +1,41 @@
 {
-  "id": "f59d1b6b-02e1-492d-afad-425a432154fc",
-  "title": "breakdown: jit-project-lead skill: milestone-level vision steward above the epic lead",
-  "description": "Breakdown node bracketing jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
-  "state": "done",
-  "priority": "high",
   "assignee": null,
+  "context": {},
+  "created_at": "2026-06-24T17:28:58.569413486Z",
   "dependencies": [
     "8f5de6bc-a563-424a-8c13-746948680418"
   ],
+  "description": "Breakdown node bracketing jit-project-lead skill: milestone-level vision steward above the epic lead (f2532a2d). Holds the decomposition of the approved plan into well-ordered child issues that cover the container's [hard] success criteria.",
+  "documents": [],
+  "done_at": "2026-07-01T22:28:42.273484688Z",
+  "first_ready_at": "2026-07-01T21:57:14.136854170Z",
   "gates_required": [
     "coverage-preview",
     "breakdown-review"
   ],
   "gates_status": {
-    "coverage-preview": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T22:09:18.048618562Z"
-    },
     "breakdown-review": {
+      "run_id": "4e3e6e9f-757c-430d-91e8-b30403f53196",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-07-01T22:26:10.713404687Z"
+      "updated_at": "2026-07-01T22:26:10.713404687Z",
+      "updated_by": "auto:executor"
+    },
+    "coverage-preview": {
+      "run_id": "c515d666-1483-4cdf-8aaa-cdd9425c64ec",
+      "status": "passed",
+      "updated_at": "2026-07-01T22:09:18.048618562Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "f59d1b6b-02e1-492d-afad-425a432154fc",
   "labels": [
     "milestone:v1.0",
     "epic:jit-project-lead",
     "type:breakdown",
     "brackets:f2532a2d"
   ],
-  "created_at": "2026-06-24T17:28:58.569413486Z",
-  "updated_at": "2026-07-05T19:51:13.118221101Z",
-  "first_ready_at": "2026-07-01T21:57:14.136854170Z",
-  "done_at": "2026-07-01T22:28:42.273484688Z"
+  "priority": "high",
+  "state": "done",
+  "title": "breakdown: jit-project-lead skill: milestone-level vision steward above the epic lead",
+  "updated_at": "2026-07-05T19:51:13.118221101Z"
 }

@@ -1,35 +1,37 @@
 {
-  "id": "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
-  "title": "Domain newtype nits: timestamps, Assignee, group_labels",
-  "description": "Resolve the low-severity domain newtype nits (report nits). In scope despite low severity — the quality bar is high and we are not deferring these.\n\n## Sites\n- `domain/types.rs:205-207` — `Issue.created_at`/`updated_at` are raw RFC-3339 `String` while the sibling `GateState.updated_at` and all `Event`/`GateRunResult` timestamps use `DateTime<Utc>`. Change both to `DateTime<Utc>` (chrono's default serde emits RFC 3339); the constructors already build a `DateTime`. Update the storage assignment sites (`storage/json.rs`, `storage/memory.rs`) to assign the `DateTime` directly.\n- `domain/types.rs:163-168,184` — `Issue.assignee`/`GateState.updated_by` are `Option<String>` holding the documented `{type}:{identifier}` format, validated inconsistently (`bulk_update.rs:530` checks; `issue.rs:554`/`claim.rs:99` don't). Introduce an `Assignee { kind: String, identifier: String }` newtype with `FromStr` (typed error) + `Display` (renders `kind:identifier`); use `Option<Assignee>` and centralize the duplicated colon-split (`labels.rs:185` validate_assignee_format, `agent_config.rs:196`). Event fields using the same format follow suit.\n- `domain/projection.rs:150-160` (`group_labels`) — inline `split_once(':')` duplicates `crate::labels::parse_label` (already re-exported into `domain/`); fold over `parse_label(label).ok()` instead.\n\n## Success Criteria\n- [ ] `Issue.created_at`/`updated_at` are `DateTime<Utc>`; no RFC-3339 `String` timestamp field remains on `Issue`, and serialized JSON stays RFC-3339.\n- [ ] An `Assignee` newtype with `FromStr`/`Display` represents the `{type}:{identifier}` format; `Issue.assignee` and `GateState.updated_by` use `Option<Assignee>`, and the assignee format is validated through one path (no caller sets a raw unvalidated string).\n- [ ] `group_labels` parses labels via the shared `parse_label`, with no inline `split_once(':')`.\n- [ ] `cargo-ci` and `code-review` pass; existing issue JSON files continue to deserialize (single-consumer repo — no broad migration required, but the project's own `.jit/` data must still load).",
-  "state": "done",
-  "priority": "low",
   "assignee": "agent:claude",
+  "claimed_at": "2026-06-25T21:59:16.234733877Z",
+  "context": {},
+  "created_at": "2026-06-25T21:41:24.658322426Z",
   "dependencies": [],
+  "description": "Resolve the low-severity domain newtype nits (report nits). In scope despite low severity — the quality bar is high and we are not deferring these.\n\n## Sites\n- `domain/types.rs:205-207` — `Issue.created_at`/`updated_at` are raw RFC-3339 `String` while the sibling `GateState.updated_at` and all `Event`/`GateRunResult` timestamps use `DateTime<Utc>`. Change both to `DateTime<Utc>` (chrono's default serde emits RFC 3339); the constructors already build a `DateTime`. Update the storage assignment sites (`storage/json.rs`, `storage/memory.rs`) to assign the `DateTime` directly.\n- `domain/types.rs:163-168,184` — `Issue.assignee`/`GateState.updated_by` are `Option<String>` holding the documented `{type}:{identifier}` format, validated inconsistently (`bulk_update.rs:530` checks; `issue.rs:554`/`claim.rs:99` don't). Introduce an `Assignee { kind: String, identifier: String }` newtype with `FromStr` (typed error) + `Display` (renders `kind:identifier`); use `Option<Assignee>` and centralize the duplicated colon-split (`labels.rs:185` validate_assignee_format, `agent_config.rs:196`). Event fields using the same format follow suit.\n- `domain/projection.rs:150-160` (`group_labels`) — inline `split_once(':')` duplicates `crate::labels::parse_label` (already re-exported into `domain/`); fold over `parse_label(label).ok()` instead.\n\n## Success Criteria\n- [ ] `Issue.created_at`/`updated_at` are `DateTime<Utc>`; no RFC-3339 `String` timestamp field remains on `Issue`, and serialized JSON stays RFC-3339.\n- [ ] An `Assignee` newtype with `FromStr`/`Display` represents the `{type}:{identifier}` format; `Issue.assignee` and `GateState.updated_by` use `Option<Assignee>`, and the assignee format is validated through one path (no caller sets a raw unvalidated string).\n- [ ] `group_labels` parses labels via the shared `parse_label`, with no inline `split_once(':')`.\n- [ ] `cargo-ci` and `code-review` pass; existing issue JSON files continue to deserialize (single-consumer repo — no broad migration required, but the project's own `.jit/` data must still load).",
+  "documents": [],
+  "done_at": "2026-06-26T00:24:38.777743626Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
   "gates_status": {
-    "code-review": {
-      "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T00:21:10.368759089Z"
-    },
     "cargo-ci": {
+      "run_id": "860c3095-40b3-434a-8fbd-be160a7a6c53",
       "status": "passed",
-      "updated_by": "auto:executor",
-      "updated_at": "2026-06-26T00:19:37.847937949Z"
+      "updated_at": "2026-06-26T00:19:37.847937949Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "run_id": "0870d531-e5fc-4cff-a7bd-a5be44a01692",
+      "status": "passed",
+      "updated_at": "2026-06-26T00:21:10.368759089Z",
+      "updated_by": "auto:executor"
     }
   },
-  "context": {},
-  "documents": [],
+  "id": "bf0034e1-dc29-4dcd-bb4a-d64dd96fed8b",
   "labels": [
     "type:task",
     "epic:code-smell-cleanup"
   ],
-  "created_at": "2026-06-25T21:41:24.658322426Z",
-  "updated_at": "2026-07-05T19:51:13.076742861Z",
-  "claimed_at": "2026-06-25T21:59:16.234733877Z",
-  "done_at": "2026-06-26T00:24:38.777743626Z"
+  "priority": "low",
+  "state": "done",
+  "title": "Domain newtype nits: timestamps, Assignee, group_labels",
+  "updated_at": "2026-07-05T19:51:13.076742861Z"
 }
