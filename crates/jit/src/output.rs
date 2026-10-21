@@ -361,21 +361,6 @@ impl OutputContext {
             Ok(())
         }
     }
-
-    /// Print error (always shown to stderr)
-    pub fn print_error(&self, msg: impl Display) -> io::Result<()> {
-        writeln_safe_stderr(&format!("Error: {}", msg))
-    }
-
-    /// Check if quiet mode is enabled
-    pub fn is_quiet(&self) -> bool {
-        self.quiet
-    }
-
-    /// Check if JSON mode is enabled
-    pub fn is_json(&self) -> bool {
-        self.json
-    }
 }
 
 /// Safe println that handles broken pipes gracefully
@@ -460,13 +445,11 @@ impl<T: Serialize> JsonOutput<T> {
 }
 
 /// Wrapper for error output with suggestions (simplified, no envelope)
-#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct JsonError {
     pub error: ErrorDetail,
 }
 
-#[allow(dead_code)]
 impl JsonError {
     /// Create an error whose code belongs to the registered vocabulary.
     ///
@@ -481,18 +464,6 @@ impl JsonError {
                 suggestions: Vec::new(),
             },
         }
-    }
-
-    /// Resolve a textual code and construct its registered error envelope.
-    ///
-    /// Unknown text is returned to the caller and is never assigned a fallback
-    /// process status.
-    pub fn from_code_text(
-        code: &str,
-        message: impl Into<String>,
-    ) -> Result<Self, UnknownErrorCode> {
-        code.parse::<ErrorCode>()
-            .map(|code| Self::new(code, message))
     }
 
     /// Add details to the error
@@ -525,7 +496,6 @@ impl JsonError {
 }
 
 /// Error details including code, message, and suggestions
-#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct ErrorDetail {
     /// Typed error code serialized using its registered wire spelling.
@@ -550,7 +520,6 @@ pub struct ErrorDetail {
 /// for automation and scripting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i32)]
-#[allow(dead_code)] // Part of public API
 pub enum ExitCode {
     /// Command succeeded (0)
     Success = 0,
@@ -589,8 +558,21 @@ pub enum ExitCode {
     BrokenPipe = 141,
 }
 
-#[allow(dead_code)] // Part of public API
 impl ExitCode {
+    /// Every exit code, in documentation order.
+    pub const ALL: [ExitCode; 10] = [
+        ExitCode::Success,
+        ExitCode::GenericError,
+        ExitCode::InvalidArgument,
+        ExitCode::NotFound,
+        ExitCode::ValidationFailed,
+        ExitCode::PermissionDenied,
+        ExitCode::AlreadyExists,
+        ExitCode::ExternalError,
+        ExitCode::LockTimeout,
+        ExitCode::BrokenPipe,
+    ];
+
     /// Convert exit code to i32 for `std::process::exit`
     pub fn code(self) -> i32 {
         self as i32
@@ -616,43 +598,6 @@ impl ExitCode {
                 "Downstream reader closed the pipe while jit was writing (128 + SIGPIPE)"
             }
         }
-    }
-
-    /// Get all exit codes as a formatted string for documentation
-    pub fn all_codes_documentation() -> String {
-        format!(
-            "Exit Codes:\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {}  - {}\n\
-             {} - {}\n\
-             {} - {}\n\
-             {} - {}",
-            ExitCode::Success.code(),
-            ExitCode::Success.description(),
-            ExitCode::GenericError.code(),
-            ExitCode::GenericError.description(),
-            ExitCode::InvalidArgument.code(),
-            ExitCode::InvalidArgument.description(),
-            ExitCode::NotFound.code(),
-            ExitCode::NotFound.description(),
-            ExitCode::ValidationFailed.code(),
-            ExitCode::ValidationFailed.description(),
-            ExitCode::PermissionDenied.code(),
-            ExitCode::PermissionDenied.description(),
-            ExitCode::AlreadyExists.code(),
-            ExitCode::AlreadyExists.description(),
-            ExitCode::ExternalError.code(),
-            ExitCode::ExternalError.description(),
-            ExitCode::LockTimeout.code(),
-            ExitCode::LockTimeout.description(),
-            ExitCode::BrokenPipe.code(),
-            ExitCode::BrokenPipe.description(),
-        )
     }
 }
 
@@ -1176,7 +1121,6 @@ pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError 
 }
 
 /// Helper to create common error responses
-#[allow(dead_code)]
 impl JsonError {
     pub fn issue_not_found(issue_id: &str) -> Self {
         Self::new(
@@ -1206,44 +1150,6 @@ impl JsonError {
         .with_details(serde_json::json!({"from": from, "to": to}))
         .with_suggestion("Remove existing dependencies that create the cycle")
         .with_suggestion("Use 'jit graph show' to visualize the dependency graph")
-    }
-
-    pub fn invalid_state(state: &str) -> Self {
-        Self::new(ErrorCode::InvalidState, format!("Invalid state: {}", state))
-            .with_details(serde_json::json!({"invalid_state": state}))
-            .with_suggestion("Valid states are: open, ready, in_progress, done")
-    }
-
-    pub fn invalid_priority(priority: &str) -> Self {
-        Self::new(
-            ErrorCode::InvalidArgument,
-            format!("Invalid priority: {}", priority),
-        )
-        .with_details(serde_json::json!({"invalid_priority": priority}))
-        .with_suggestion("Valid priorities are: low, normal, high, critical")
-    }
-
-    pub fn gate_validation_failed(unpassed_gates: &[String], issue_id: &str) -> Self {
-        Self::new(
-            ErrorCode::ValidationFailed,
-            format!(
-                "Cannot transition to 'done' - {} gate(s) not passed: {}",
-                unpassed_gates.len(),
-                unpassed_gates.join(", ")
-            ),
-        )
-        .with_details(serde_json::json!({
-            "issue_id": issue_id,
-            "requested_state": "done",
-            "actual_state": "gated",
-            "unpassed_gates": unpassed_gates
-        }))
-        .with_suggestion("Issue automatically transitioned to 'gated' (awaiting gate approval)")
-        .with_suggestion("The issue will auto-transition to 'done' when all gates pass")
-        .with_suggestion(format!(
-            "To complete: jit gate evaluate {} <gate_key>",
-            issue_id
-        ))
     }
 
     /// Build a JSON error for a blocked state transition.
@@ -3357,13 +3263,6 @@ mod tests {
     }
 
     #[test]
-    fn test_json_error_text_constructor_rejects_unknown_code() {
-        let unresolved = JsonError::from_code_text("UNREGISTERED_ERROR", "unregistered failure")
-            .expect_err("an unregistered code must remain unresolved");
-        assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
-    }
-
-    #[test]
     fn test_gate_failed_error_code_is_validation_failure() {
         assert_eq!(
             ErrorCode::GateFailed.exit_code(),
@@ -3644,8 +3543,7 @@ mod tests {
     fn test_error_code_strings_round_trip_and_unknown_is_unresolved() {
         for code in ErrorCode::ALL {
             assert_eq!(code.as_str().parse::<ErrorCode>(), Ok(code));
-            let error = JsonError::from_code_text(code.as_str(), "failure")
-                .expect("every registered text code should construct an envelope");
+            let error = JsonError::new(code, "failure");
             assert_eq!(error.error.code, code);
             assert_eq!(error.exit_code(), code.exit_code());
         }
@@ -3654,6 +3552,29 @@ mod tests {
             .parse::<ErrorCode>()
             .expect_err("unknown input should stay unresolved");
         assert_eq!(unresolved.as_str(), "UNREGISTERED_ERROR");
+    }
+
+    #[test]
+    fn test_exit_code_all_lists_every_variant_with_a_distinct_described_status() {
+        // Exhaustive match: adding a variant fails compilation here until listed.
+        fn is_listed(code: ExitCode) -> bool {
+            match code {
+                ExitCode::Success
+                | ExitCode::GenericError
+                | ExitCode::InvalidArgument
+                | ExitCode::NotFound
+                | ExitCode::ValidationFailed
+                | ExitCode::PermissionDenied
+                | ExitCode::AlreadyExists
+                | ExitCode::ExternalError
+                | ExitCode::LockTimeout
+                | ExitCode::BrokenPipe => ExitCode::ALL.contains(&code),
+            }
+        }
+        assert!(ExitCode::ALL.into_iter().all(is_listed));
+        let statuses: BTreeSet<i32> = ExitCode::ALL.iter().map(|c| c.code()).collect();
+        assert_eq!(statuses.len(), ExitCode::ALL.len());
+        assert!(ExitCode::ALL.iter().all(|c| !c.description().is_empty()));
     }
 
     #[test]
