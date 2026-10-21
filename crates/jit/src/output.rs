@@ -1450,16 +1450,6 @@ impl DependencyTreeNode {
     }
 }
 
-/// Human-output symbol for a lifecycle state: `✓` when effectively terminal
-/// (`done`, `rejected`, or `archived` from one of those), `○` otherwise.
-pub fn state_symbol(state: State, archived_from: Option<State>) -> &'static str {
-    if crate::domain::is_effectively_terminal(state, archived_from) {
-        "✓"
-    } else {
-        "○"
-    }
-}
-
 /// Response for `graph deps` with tree structure.
 ///
 /// `count` is the number of top-level entries in `nodes` (the immediate
@@ -2763,7 +2753,7 @@ mod tests {
     /// non-terminal state stays non-terminal.
     #[test]
     fn test_dependency_tree_node_effective_terminality() {
-        let mut issue = crate::domain::MinimalIssue {
+        let issue = crate::domain::MinimalIssue {
             id: "a".repeat(36),
             title: "Archived dep".to_string(),
             state: State::Archived,
@@ -2774,13 +2764,72 @@ mod tests {
         };
         let node = DependencyTreeNode::from_minimal(&issue, 1);
         assert_eq!(node.archived_from, Some(State::Done));
-        assert_eq!(state_symbol(node.state, node.archived_from), "✓");
         let serialized = serde_json::to_value(&node).unwrap();
         assert_eq!(serialized["archived_from"], json!("done"));
+    }
 
-        issue.archived_from = Some(State::InProgress);
-        let parked = DependencyTreeNode::from_minimal(&issue, 1);
-        assert_eq!(state_symbol(parked.state, parked.archived_from), "○");
+    /// Status markers (check marks, crosses, warning and info signs, circles,
+    /// status-colored squares). Type icons are a separate, allowed mechanism.
+    const STATUS_MARKERS: &[char] = &[
+        '\u{2705}',
+        '\u{274C}',
+        '\u{26A0}',
+        '\u{2713}',
+        '\u{2714}',
+        '\u{2717}',
+        '\u{2718}',
+        '\u{2716}',
+        '\u{2139}',
+        '\u{25CB}',
+        '\u{25CF}',
+        '\u{1F310}',
+        '\u{2757}',
+        '\u{26D4}',
+        '\u{1F6AB}',
+        '\u{1F534}',
+        '\u{1F7E1}',
+        '\u{1F7E2}',
+        '\u{23F3}',
+        '\u{2B55}',
+    ];
+
+    fn rust_sources(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(dir)
+            .unwrap()
+            .flat_map(|entry| {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    rust_sources(&path)
+                } else if path.extension().is_some_and(|ext| ext == "rs") {
+                    vec![path]
+                } else {
+                    Vec::new()
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_cli_sources_contain_no_pictographic_status_marker() {
+        let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let offenders: Vec<String> = rust_sources(&src)
+            .iter()
+            .flat_map(|path| {
+                std::fs::read_to_string(path)
+                    .unwrap()
+                    .lines()
+                    .enumerate()
+                    .filter(|(_, line)| !line.trim_start().starts_with("//"))
+                    .filter(|(_, line)| line.contains(STATUS_MARKERS))
+                    .map(|(n, line)| format!("{}:{}: {}", path.display(), n + 1, line.trim()))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "status markers must be words:\n{}",
+            offenders.join("\n")
+        );
     }
 
     #[test]
