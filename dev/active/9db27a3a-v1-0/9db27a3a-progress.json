@@ -375,6 +375,14 @@
       "date": "2026-10-21",
       "decision": "@/charter/D-18",
       "summary": "Ordering of 2195c98f cli-issue-id-boundary against df129d9e's handler migrations. Chosen (c): df129d9e's handler tasks depend on cli-issue-id-boundary, so handlers move typed code and the IssueId flip lands early for wave 4. Rejected (a), boundary after the handlers: it serialises the IssueId flip and all of wave 4 behind df129d9e's command-dispatch story. Rejected (b), no edge: a large main.rs conflict. Edges are wired at 2195c98f's breakdown, together with 0eca332a -> error-code-vocabulary."
+    },
+    {
+      "container_short_id": "8376299c",
+      "issue": "bedf0962",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/inv/convention-convergence, @/charter/D-20",
+      "summary": "The coordination lease limits are reported layer-merged by config show but enforced repository-only. Chosen (B): fold into 842b0ac6's config work as its new REQ-26 plus a task depending on bedf0962 (just-in-time-7e adds both). Rejected (A), a separate bug: a second pass over the same config.rs regions. Rejected (C), widening bedf0962: scope creep on a nearly-done bug."
     }
   ],
   "notes": [
