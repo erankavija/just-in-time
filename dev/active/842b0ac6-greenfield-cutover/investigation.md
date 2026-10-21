@@ -1142,3 +1142,32 @@ Delete one 133-line file. Verification: `cd web && npm test && npm run lint && n
 8. **REQ-25 guard.** No existing lint. (a) Delete only; (b) add a vitest import-graph test or knip. Recommend (a) (D-18; REQ-25 doesn't ask for a guard).
 9. **Out-of-slice shim found.** Archive "legacy" short-id destination fallback (`artifact_classifier.rs:417-431`, `storage/artifact_planning.rs:27-75`, `commands/archive.rs:203-224`). Not in 842b0ac6's Background. Recommend recording it as a follow-up rather than widening REQ-21.
 
+## Shared-file coordination
+
+Coordination for files that two or more unordered leaves touch. *Edge* means the regions interact and the graph orders them. *Rebase* means the regions are disjoint, so whichever leaf lands second rebases with conflicts at most textual.
+
+| File | Leaves: region | Coordination |
+|---|---|---|
+| `config.rs` | `remove-inert-config-keys`: inert fields, `WorktreeMode`, `Merged*` sections; `state-config-defaults-once`: per-layer and `Merged*` accessors, default constants; `strict-config-toml-loading`: struct attributes, `load` error cause, tolerance tests; `unify-agent-configuration`: `AgentConfig`/`AgentIdentity` `:1434-1481` and its tests | Edge: inert keys → defaults once → strict loading, because the last two rewrite the same structs. Agent config: rebase |
+| `main.rs` | `drop-claim-type-parameter` `:8275-8519`; `move-state-symbol-to-output` `:2088`; `remove-gate-auto-fields` `:4225,4305,4525`; `remove-inert-config-keys` `:6804-6897,7006-7018`; `state-config-defaults-once`: `config show`; `strict-config-toml-loading` `:6989,6999`; `remove-lifecycle-backfill` `:23,7873-7895`; `remove-skipped-gate-run-status` `:1447-1451` | The config leaves are ordered by edge; the rest rebase |
+| `cli.rs` | `remove-gate-auto-fields` `:1366-1370`; `remove-lifecycle-backfill` `:435-440,2310-2330,3265-3870`; `remove-skipped-gate-run-status` `:1734,1780` | Rebase |
+| `commands/mod.rs` | `remove-bracket-breakdown` `:31,74`; `remove-lifecycle-backfill` `:48,87`; `remove-gate-auto-fields` `:3528-3546,3675`; `require-archived-from` `:1030-1045` | Rebase (adjacent module-list lines only) |
+| `commands/gate_check.rs` | `remove-linked-worktree-evidence` `:91-94,412-425`; `remove-gate-auto-fields`: test gate literals; `unify-gate-not-required-error` `:204-209`; `remove-test-only-gate-entry-points` `:928,1043-1049`; `remove-reference-builders`: one test site | The gate leaves are ordered by edge; linked evidence and builders rebase |
+| `commands/validate.rs` | `remove-silent-integrity-validator` `:1835-2640`; `keep-one-enforcement-drift` `:1743,1777`; `remove-taxonomy-dead-errors` `:1509-1518` | Rebase |
+| `commands/archive.rs` | `require-archived-from`: tests `:965,2572`; `remove-reference-builders`: 14 test sites | Rebase |
+| `declarations/rules.rs` | `canonical-state-tokens`: `token_to_state` `:368-383`; `strict-rule-declarations`: `Selector`, `RawRule`, typed label-coverage tables carrying `child-state`; `remove-reference-builders`: one test site | Edge: state tokens → rule strictness, because the typed label-coverage struct parses `child-state` through `State::from_str`. Builders rebase |
+| `domain/types.rs` | `canonical-state-tokens` `:160-164`; `remove-small-domain-helpers` `:64,3376` (ordered after it); `require-archived-from` `:113-126,411,475-489`; `move-state-symbol-to-output` `:746`; `remove-reference-builders` `:848-899` and tests; `remove-lifecycle-backfill` `:1553-2010`; `remove-skipped-gate-run-status` `:1111` | Rebase |
+| `domain/artifact_classifier.rs` | `require-archived-from`: tests `:1916,1923`; `collapse-container-destination-states` `:193-257,536-639,966,1602-1628` and fact tests | Rebase |
+| `domain/event_catalog.rs` | `remove-lifecycle-backfill`: the backfill tag entries; `gate-reference-renderers`: render helpers `:504-525` | Rebase |
+| `gate_execution.rs` | `remove-test-only-gate-entry-points` `:26-39` and its test calls; `remove-reference-builders`: one test site | Rebase |
+| `output.rs` | `prune-output-surface` `:366-622,1179-1226`; `gate-reference-renderers` `:1016-1035` (ordered after prune); `remove-gate-auto-fields` `:2730-2753`; `move-state-symbol-to-output` `:1607,1866` | Rebase |
+| `repository_state/mod.rs` | `remove-linked-worktree-evidence` `:60-61` and `close` sites; `remove-repository-state-cfg-twins` `:34-51,80-99,214-230` (ordered after it); `remove-gate-auto-fields`: test literal `:1471` | Rebase |
+| `repository_state/{archive,mutation,materialize}.rs` | `remove-linked-worktree-evidence`: `close` arguments; `remove-reference-builders`: archive tests; `remove-lifecycle-backfill`: mutation `:372-380,941-953,2400-2430`; `strict-config-toml-loading`: materialize test strings | Rebase |
+| `storage/json.rs` | `remove-read-lock-sidecar-sweep` `:395-442,1304-1333`; `converge-memory-event-parsing`: test `:1830`; `remove-storage-cfg-twins` `:453-482` (ordered after converge) | Rebase |
+| `storage/lock.rs` | `remove-read-lock-sidecar-sweep` `:440-492,1015-1080`; `single-file-lock-poll-loop` `:113-395` and tests `:512-827` | Rebase |
+| `storage/mod.rs` | `remove-read-lock-sidecar-sweep`: trait `:193-224`; `gate-reference-renderers`: re-export `:78` | Rebase |
+| `storage/repository_state_store_tests.rs` | `remove-linked-worktree-evidence` `:140-166,2791`; `converge-memory-event-parsing`: new matrix test after `:660` | Rebase |
+| `test_utils.rs` | `adopt-manifest-version-two`: inline manifest; `strict-config-toml-loading`: inline config strings; `remove-reference-builders`: new fixture | Rebase |
+| `tests/…` shared files | `bracket_coverage_gate_run_test.rs` (breakdown doc `:16-18,151`, gate TOML `:130`); `failure_lever_registry.toml` (`:129-136`, `:924-925`); `integration_test.rs` (`:255`, `:431`); `harness_demo.rs` (gate helper calls, `:502`); `template_apply_atomicity_tests.rs` (`:399`, `:768`) | Rebase |
+| `profiles/jit-default/manifest.toml` | `adopt-manifest-version-two` `:10-13`; `remove-inert-config-keys` → `state-config-defaults-once` (ordered): comment block `:440-466` | Rebase (no pinned `jit-default` hash) |
+| Docs | `configuration.md` (inert `:29,582-670`, defaults `:482,560,564`, agent `:592-623`); `cli-commands.md` (auto `:1764,1924`, skipped `:1997`, backfill `:3904-3925`, inert `:3970-4005`); `storage-format.md` (sweep `:77-82`, backfill `:233-256,427`); `dev/architecture/core-system-design.md` (auto `:61`, states `:123`) | Rebase |
