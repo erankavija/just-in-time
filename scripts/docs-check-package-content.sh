@@ -18,7 +18,7 @@ set -euo pipefail
 # Exit codes:
 #   0 — citations resolve and no package carries prohibited content
 #   1 — DANGLING / FORBIDDEN findings
-#   2 — usage/environment error (tooling, work tree, manifest, or capture)
+#   2 — usage/environment error (tooling, work tree, manifest, or pack)
 
 exec python3 - "$@" <<'PY'
 import json
@@ -127,7 +127,7 @@ if not packages:
     fail(f"{PACKAGE_SOURCES} publishes no profile package")
 
 findings = []
-# Capture refuses a destination outside the worktree, hence the ignored build dir.
+# `profile add` refuses a destination outside the worktree, hence the ignored build dir.
 build = os.path.join(root, "target")
 try:
     os.makedirs(build, exist_ok=True)
@@ -137,13 +137,24 @@ scratch = tempfile.mkdtemp(prefix=f"{ME}.", dir=build)
 try:
     for package in packages:
         assembled = os.path.join(scratch, package)
+        archive = f"{assembled}.tar"
         run(
             "jit",
             "profile",
-            "capture",
+            "pack",
             "--quiet",
             "--source",
             os.path.join(PACKAGE_SOURCES, package),
+            "--output",
+            archive,
+        )
+        run(
+            "jit",
+            "profile",
+            "add",
+            "--quiet",
+            "--archive",
+            archive,
             "--destination",
             assembled,
         )
@@ -170,7 +181,7 @@ try:
                 with open(os.path.join(assembled, source), "rb") as handle:
                     text = handle.read().decode("utf-8", errors="ignore")
             except OSError as error:
-                fail(f"cannot read captured package source {package}/{source}: {error}")
+                fail(f"cannot read packed package source {package}/{source}: {error}")
             for leader, identifier in dict.fromkeys(CITATION.findall(text)):
                 if leader not in table_of_leader:
                     continue
