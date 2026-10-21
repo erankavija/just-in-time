@@ -11,7 +11,8 @@
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
-    "code-review"
+    "code-review",
+    "mcp-ci"
   ],
   "gates_status": {
     "cargo-ci": {
@@ -23,6 +24,11 @@
       "status": "failed",
       "updated_at": "2026-10-21T11:59:43.860258747Z",
       "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "pending",
+      "updated_at": "2026-10-21T12:14:04.413794828Z",
+      "updated_by": null
     }
   },
   "id": "66bd4b5c-bfbc-4ec9-aca4-049525a11700",
@@ -37,5 +43,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Parse lifecycle states from canonical tokens only",
-  "updated_at": "2026-10-21T11:59:43.860258747Z"
+  "updated_at": "2026-10-21T12:14:04.413794828Z"
 }
