@@ -2606,10 +2606,10 @@ pub enum ConfigCommands {
     /// Get a specific configuration value
     ///
     /// Examples:
-    ///   jit config get coordination.default_ttl_secs
+    ///   jit config get coordination.max_indefinite_leases_per_agent
     ///   jit config get worktree.mode
     Get {
-        /// Configuration key (e.g., coordination.default_ttl_secs)
+        /// Configuration key (e.g., coordination.max_indefinite_leases_per_agent)
         key: String,
         #[arg(long)]
         json: bool,
@@ -2621,10 +2621,10 @@ pub enum ConfigCommands {
     /// Use --global to set in user config (~/.config/jit/config.toml).
     ///
     /// Examples:
-    ///   jit config set coordination.default_ttl_secs 1200
+    ///   jit config set coordination.max_indefinite_leases_per_agent 3
     ///   jit config set --global worktree.enforce_leases warn
     Set {
-        /// Configuration key (e.g., coordination.default_ttl_secs)
+        /// Configuration key (e.g., coordination.max_indefinite_leases_per_agent)
         key: String,
         /// Value to set
         value: String,

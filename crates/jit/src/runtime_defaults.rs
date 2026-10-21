@@ -3,7 +3,7 @@
 //! These constants are the single source of truth for the operational defaults
 //! that govern multi-agent lease coordination and recovery cleanup: the
 //! file-lock acquisition timeout and poll interval, the orphaned temp-file
-//! cleanup threshold, and the default claim lease TTL. Call sites reference the
+//! cleanup threshold, and the claim lease defaults. Call sites reference the
 //! constants here instead of inline literals, so each default value has one
 //! definition.
 //!
@@ -36,6 +36,10 @@ pub const TEMP_CLEANUP_THRESHOLD_SECS: u64 = 3600;
 /// Default time-to-live, in seconds, for a lease created by `jit claim acquire`,
 /// and the default extension applied by `jit claim renew` (1 hour).
 pub const CLAIM_TTL_SECS: u64 = 3600;
+
+/// Seconds without a heartbeat after which an indefinite claim lease is stale
+/// (1 hour).
+pub const CLAIM_STALE_THRESHOLD_SECS: u64 = 3600;
 
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) mod test_support {
@@ -76,6 +80,11 @@ pub fn render_reference_markdown() -> String {
             "Claim lease TTL",
             format!("{CLAIM_TTL_SECS} seconds"),
             "Default time-to-live for a lease from `jit claim acquire`, and the default extension for `jit claim renew`.",
+        ),
+        (
+            "Claim stale threshold",
+            format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
+            "Time without a heartbeat after which an indefinite lease is stale. A stale lease no longer counts as active for lease enforcement and is not evicted automatically.",
         ),
     ];
 
@@ -137,6 +146,7 @@ mod tests {
             format!("{LOCK_POLL_INTERVAL_MS} milliseconds"),
             format!("{TEMP_CLEANUP_THRESHOLD_SECS} seconds"),
             format!("{CLAIM_TTL_SECS} seconds"),
+            format!("{CLAIM_STALE_THRESHOLD_SECS} seconds"),
         ] {
             assert!(doc.contains(&expected), "missing {expected} in:\n{doc}");
         }

@@ -117,7 +117,6 @@ fn write_claims_index(repo_path: &Path, leases: Vec<Value>) {
         "schema_version": 1,
         "generated_at": Utc::now(),
         "last_seq": leases.len(),
-        "stale_threshold_secs": 3600,
         "leases": leases
     });
 
@@ -188,7 +187,6 @@ fn test_validate_repository_detects_invalid_claims_index() {
             "schema_version": 2,
             "generated_at": Utc::now(),
             "last_seq": 0,
-            "stale_threshold_secs": 3600,
             "leases": []
         })
         .to_string(),

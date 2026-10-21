@@ -441,15 +441,12 @@ value = "dev/presentations"
 #   mode = "auto"              # "auto" | "on" | "off"
 #   enforce_leases = "strict"  # "strict" | "warn" | "off"
 #
-# Multi-agent lease coordination. The claim TTL before expiry
-# (`default_ttl_secs`) and the age at which an indefinite lease is considered
-# stale (`stale_threshold_secs`) each fall back to an engine constant. This
-# package is bytes and projects nothing, so their defaults are read from the
-# projected reference at `docs/reference/runtime-defaults.md` rather than
-# restated here:
+# Multi-agent lease coordination. The default claim TTL and the age at which
+# an indefinite lease is considered stale are engine constants, not
+# configuration. This package is bytes and projects nothing, so their values
+# are read from the projected reference at `docs/reference/runtime-defaults.md`
+# rather than restated here:
 #   [coordination]
-#   default_ttl_secs
-#   stale_threshold_secs
 #   max_indefinite_leases_per_agent = 2
 #   max_indefinite_leases_per_repo = 10
 #

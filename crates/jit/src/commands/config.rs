@@ -176,7 +176,7 @@ fn edit_config_document(doc: &mut toml_edit::DocumentMut, key: &str, value: &str
     let parts: Vec<&str> = key.split('.').collect();
     if parts.len() != 2 {
         anyhow::bail!(
-            "Config key must be in format 'section.field' (e.g., coordination.default_ttl_secs)"
+            "Config key must be in format 'section.field' (e.g., coordination.max_indefinite_leases_per_agent)"
         );
     }
     let (section, field) = (parts[0], parts[1]);
@@ -498,12 +498,14 @@ mod tests {
         }
 
         // Defaulted merged-config leaf still resolves without any config.toml.
-        let ttl = executor
-            .get_config("coordination.default_ttl_secs")
+        let cap = executor
+            .get_config("coordination.max_indefinite_leases_per_agent")
             .unwrap();
         assert_eq!(
-            ttl.value,
-            serde_json::json!(crate::runtime_defaults::CLAIM_TTL_SECS)
+            cap.value,
+            serde_json::json!(
+                crate::config::CoordinationConfig::default().max_indefinite_leases_per_agent()
+            )
         );
     }
 

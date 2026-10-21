@@ -245,7 +245,7 @@ jit claim heartbeat [OPTIONS] <LEASE_ID>
 
 ### Description
 
-Updates the `last_beat` timestamp for an indefinite (TTL=0) lease without changing expiration. This signals that the agent is still actively working on the issue. Indefinite leases become stale after a hardcoded one-hour threshold without a heartbeat.
+Updates the `last_beat` timestamp for an indefinite (TTL=0) lease without changing expiration. This signals that the agent is still actively working on the issue. Indefinite leases become stale after the built-in stale threshold without a heartbeat (see [Staleness](#staleness)).
 
 ### Arguments
 
@@ -273,10 +273,11 @@ jit claim heartbeat abc12345-6789-... --json
 
 Indefinite leases become **stale** when:
 
-$$\mathrm{now} - \mathrm{last\_beat} > 3600\ \mathrm{seconds}$$
+$$\mathrm{now} - \mathrm{last\_beat} > \text{claim stale threshold}$$
 
-The one-hour threshold is hardcoded. The `[coordination].stale_threshold_secs`
-field is accepted and shown by config commands but does not currently change it.
+The threshold is a built-in constant listed in
+[Runtime Coordination Defaults](runtime-defaults.md); configuration does not
+change it.
 
 A stale lease is:
 - Marked stale in `jit claim status`

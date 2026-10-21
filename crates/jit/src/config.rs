@@ -1330,16 +1330,11 @@ impl WorktreeConfig {
     }
 }
 
-/// Coordination settings for leases and multi-agent work.
+/// Coordination settings for leases and multi-agent work. Unknown keys are
+/// rejected, so a key the coordinator does not apply fails to load.
 #[derive(Debug, Clone, Deserialize, Default)]
+#[serde(deny_unknown_fields)]
 pub struct CoordinationConfig {
-    /// Default TTL for new leases in seconds (default:
-    /// [`crate::runtime_defaults::CLAIM_TTL_SECS`]).
-    pub default_ttl_secs: Option<u64>,
-    /// Warn when lease has less than this percentage of TTL remaining (default: 10).
-    pub lease_renewal_threshold_pct: Option<u8>,
-    /// Staleness threshold for TTL=0 leases in seconds (default: 3600).
-    pub stale_threshold_secs: Option<u64>,
     /// Maximum concurrent TTL=0 leases per agent (default: 2).
     pub max_indefinite_leases_per_agent: Option<u32>,
     /// Maximum concurrent TTL=0 leases per repository (default: 10).
@@ -1347,19 +1342,6 @@ pub struct CoordinationConfig {
 }
 
 impl CoordinationConfig {
-    pub fn default_ttl_secs(&self) -> u64 {
-        self.default_ttl_secs
-            .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
-    }
-
-    pub fn lease_renewal_threshold_pct(&self) -> u8 {
-        self.lease_renewal_threshold_pct.unwrap_or(10)
-    }
-
-    pub fn stale_threshold_secs(&self) -> u64 {
-        self.stale_threshold_secs.unwrap_or(3600)
-    }
-
     pub fn max_indefinite_leases_per_agent(&self) -> u32 {
         self.max_indefinite_leases_per_agent.unwrap_or(2)
     }
@@ -1971,9 +1953,6 @@ impl EffectiveConfig {
         map.insert(
             "coordination".to_string(),
             serde_json::json!({
-                "default_ttl_secs": self.coordination().default_ttl_secs(),
-                "lease_renewal_threshold_pct": self.coordination().lease_renewal_threshold_pct(),
-                "stale_threshold_secs": self.coordination().stale_threshold_secs(),
                 "max_indefinite_leases_per_agent": self.coordination().max_indefinite_leases_per_agent(),
                 "max_indefinite_leases_per_repo": self.coordination().max_indefinite_leases_per_repo(),
             }),
@@ -2013,41 +1992,6 @@ pub struct MergedCoordinationConfig {
 }
 
 impl MergedCoordinationConfig {
-    pub fn default_ttl_secs(&self) -> u64 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.default_ttl_secs)
-            .or_else(|| self.user.as_ref().and_then(|c| c.default_ttl_secs))
-            .or_else(|| self.system.as_ref().and_then(|c| c.default_ttl_secs))
-            .unwrap_or(crate::runtime_defaults::CLAIM_TTL_SECS)
-    }
-
-    pub fn lease_renewal_threshold_pct(&self) -> u8 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.lease_renewal_threshold_pct)
-            .or_else(|| {
-                self.user
-                    .as_ref()
-                    .and_then(|c| c.lease_renewal_threshold_pct)
-            })
-            .or_else(|| {
-                self.system
-                    .as_ref()
-                    .and_then(|c| c.lease_renewal_threshold_pct)
-            })
-            .unwrap_or(10)
-    }
-
-    pub fn stale_threshold_secs(&self) -> u64 {
-        self.repo
-            .as_ref()
-            .and_then(|c| c.stale_threshold_secs)
-            .or_else(|| self.user.as_ref().and_then(|c| c.stale_threshold_secs))
-            .or_else(|| self.system.as_ref().and_then(|c| c.stale_threshold_secs))
-            .unwrap_or(3600)
-    }
-
     pub fn max_indefinite_leases_per_agent(&self) -> u32 {
         self.repo
             .as_ref()
@@ -3473,17 +3417,11 @@ mode = "maybe"
     fn test_coordination_config_full() {
         let config_toml = r#"
 [coordination]
-default_ttl_secs = 600
-lease_renewal_threshold_pct = 10
-stale_threshold_secs = 3600
 max_indefinite_leases_per_agent = 2
 max_indefinite_leases_per_repo = 10
 "#;
         let config: JitConfig = toml::from_str(config_toml).unwrap();
         let coord = config.coordination.unwrap();
-        assert_eq!(coord.default_ttl_secs, Some(600));
-        assert_eq!(coord.lease_renewal_threshold_pct, Some(10));
-        assert_eq!(coord.stale_threshold_secs, Some(3600));
         assert_eq!(coord.max_indefinite_leases_per_agent, Some(2));
         assert_eq!(coord.max_indefinite_leases_per_repo, Some(10));
     }
@@ -3491,30 +3429,26 @@ max_indefinite_leases_per_repo = 10
     #[test]
     fn test_coordination_config_defaults() {
         let coord = CoordinationConfig::default();
-        assert_eq!(
-            coord.default_ttl_secs(),
-            crate::runtime_defaults::CLAIM_TTL_SECS
-        );
-        assert_eq!(coord.lease_renewal_threshold_pct(), 10);
-        assert_eq!(coord.stale_threshold_secs(), 3600);
         assert_eq!(coord.max_indefinite_leases_per_agent(), 2);
         assert_eq!(coord.max_indefinite_leases_per_repo(), 10);
     }
 
-    /// A `[coordination]` block carrying the removed auto-heartbeat daemon keys
-    /// (`heartbeat_interval_secs`, `auto_renew_leases`) still parses: the unknown
-    /// keys are ignored, and the surviving keys resolve normally.
+    /// The removed coordination timing keys are rejected as unknown keys.
     #[test]
-    fn test_coordination_config_ignores_legacy_heartbeat_keys() {
-        let config_toml = r#"
-[coordination]
-default_ttl_secs = 600
-heartbeat_interval_secs = 30
-auto_renew_leases = false
-"#;
-        let config: JitConfig = toml::from_str(config_toml).unwrap();
-        let coord = config.coordination.unwrap();
-        assert_eq!(coord.default_ttl_secs, Some(600));
+    fn test_coordination_config_rejects_removed_timing_keys() {
+        for key in [
+            "default_ttl_secs",
+            "lease_renewal_threshold_pct",
+            "stale_threshold_secs",
+        ] {
+            let err = toml::from_str::<JitConfig>(&format!("[coordination]\n{key} = 60\n"))
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("unknown field") && err.contains(key),
+                "{key} must be rejected as unknown: {err}"
+            );
+        }
     }
 
     #[test]
@@ -3588,7 +3522,7 @@ mode = "auto"
 enforce_leases = "strict"
 
 [coordination]
-default_ttl_secs = 600
+max_indefinite_leases_per_agent = 3
 
 [global_operations]
 require_main_history = true
@@ -3618,7 +3552,7 @@ use_unified_envelope = true
 
         // Verify coordination
         let coord = config.coordination.unwrap();
-        assert_eq!(coord.default_ttl_secs(), 600); // declared above, not the default
+        assert_eq!(coord.max_indefinite_leases_per_agent(), 3); // declared above, not the default
     }
 
     // ============================================================
@@ -3726,11 +3660,7 @@ description = "Test agent"
         let config = loader.build();
 
         // Should have all defaults
-        assert_eq!(
-            config.coordination().default_ttl_secs(),
-            crate::runtime_defaults::CLAIM_TTL_SECS
-        );
-        assert_eq!(config.coordination().stale_threshold_secs(), 3600);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
         assert!(config.global_operations().require_main_history());
         assert_eq!(config.locks().max_age_secs(), 3600);
         assert!(config.events().enable_sequences());
@@ -3741,7 +3671,7 @@ description = "Test agent"
         let temp_dir = TempDir::new().unwrap();
         let config_toml = r#"
 [coordination]
-default_ttl_secs = 1200
+max_indefinite_leases_per_agent = 5
 "#;
         std::fs::write(temp_dir.path().join("config.toml"), config_toml).unwrap();
 
@@ -3751,9 +3681,9 @@ default_ttl_secs = 1200
         let config = loader.build();
 
         // Repo value overrides default
-        assert_eq!(config.coordination().default_ttl_secs(), 1200);
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 5);
         // Other defaults preserved
-        assert_eq!(config.coordination().stale_threshold_secs(), 3600);
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 10);
     }
 
     #[test]
@@ -3761,18 +3691,18 @@ default_ttl_secs = 1200
         let user_dir = TempDir::new().unwrap();
         let repo_dir = TempDir::new().unwrap();
 
-        // User config sets TTL to 900
+        // User config sets both caps
         let user_config = r#"
 [coordination]
-default_ttl_secs = 900
-stale_threshold_secs = 1800
+max_indefinite_leases_per_agent = 4
+max_indefinite_leases_per_repo = 20
 "#;
         std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
 
-        // Repo config sets TTL to 1200 (overrides user)
+        // Repo config sets the per-agent cap (overrides user)
         let repo_config = r#"
 [coordination]
-default_ttl_secs = 1200
+max_indefinite_leases_per_agent = 6
 "#;
         std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
 
@@ -3783,10 +3713,10 @@ default_ttl_secs = 1200
             .unwrap();
         let config = loader.build();
 
-        // Repo overrides user for TTL
-        assert_eq!(config.coordination().default_ttl_secs(), 1200);
-        // User value used for stale threshold (not in repo config)
-        assert_eq!(config.coordination().stale_threshold_secs(), 1800);
+        // Repo overrides user for the per-agent cap
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 6);
+        // User value used for the per-repo cap (not in repo config)
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 20);
     }
 
     #[test]
@@ -3798,16 +3728,14 @@ default_ttl_secs = 1200
         // System config (lowest priority after defaults)
         let system_config = r#"
 [coordination]
-default_ttl_secs = 300
 max_indefinite_leases_per_agent = 1
-stale_threshold_secs = 1800
+max_indefinite_leases_per_repo = 30
 "#;
         std::fs::write(system_dir.path().join("config.toml"), system_config).unwrap();
 
         // User config overrides system
         let user_config = r#"
 [coordination]
-default_ttl_secs = 600
 max_indefinite_leases_per_agent = 7
 "#;
         std::fs::write(user_dir.path().join("config.toml"), user_config).unwrap();
@@ -3815,7 +3743,7 @@ max_indefinite_leases_per_agent = 7
         // Repo config overrides user
         let repo_config = r#"
 [coordination]
-default_ttl_secs = 1200
+max_indefinite_leases_per_repo = 40
 "#;
         std::fs::write(repo_dir.path().join("config.toml"), repo_config).unwrap();
 
@@ -3828,12 +3756,10 @@ default_ttl_secs = 1200
             .unwrap();
         let config = loader.build();
 
-        // Repo wins for TTL
-        assert_eq!(config.coordination().default_ttl_secs(), 1200);
-        // User wins for the per-agent indefinite-lease cap (not in repo)
+        // User wins over system for the per-agent cap (not in repo)
         assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 7);
-        // System wins for stale_threshold (not in user or repo)
-        assert_eq!(config.coordination().stale_threshold_secs(), 1800);
+        // Repo wins over system for the per-repo cap
+        assert_eq!(config.coordination().max_indefinite_leases_per_repo(), 40);
     }
 
     #[test]
@@ -3851,10 +3777,7 @@ default_ttl_secs = 1200
         let config = loader.build();
 
         // All defaults
-        assert_eq!(
-            config.coordination().default_ttl_secs(),
-            crate::runtime_defaults::CLAIM_TTL_SECS
-        );
+        assert_eq!(config.coordination().max_indefinite_leases_per_agent(), 2);
     }
 
     #[test]
