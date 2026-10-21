@@ -2,7 +2,7 @@
  {
   "key": "git-cli-test-fixture",
   "title": "Shared git repository and counting stand-in test fixtures",
-  "description": "Give tests one way to build a git repository through the git CLI and one counting stand-in for the git executable, and move the libgit2-built document fixture onto the repository fixture.\n\n## Background\n\n- `test_add_pinned_document_uses_pinned_document_and_asset_bytes` (`crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:253`) builds its commit through libgit2 (`git2::Repository::init` at `:259`, `git2::Signature` at `:272`), reaching the crate's normal `git2` dependency.\n- Two counting wrappers exist: `counted_git` (`crates/jit/tests/fast_docs_templates/git_revision_tests.rs:166-181`) and `capture_git_fixture` (`crates/jit/src/storage/repository_state_store_tests.rs:2591-2638`). Each writes a `#!/bin/sh` script that logs `$*` and runs `exec git \"$@\"`. Placed first on `PATH` under the name `git`, such a script would run itself, so a stand-in for the executable must run the real git by absolute path.\n- Shared test helpers live in the library's test-support surface, `jit::test_harness` (`crates/jit/src/test_harness.rs`), compiled under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:36`). The crate's own tests and every integration suite enable `test-support`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit::test_harness` offers a git repository fixture that initializes a repository through the git CLI with a repository-local user name and email, writes files, and commits them, returning the new commit's id.\n- [hard] REQ-02: `jit::test_harness` offers, on Unix, a counting stand-in for the git executable: a file named `git` in its own directory that records each invocation's arguments and then runs the real git, resolved to an absolute path when the stand-in is created. Each recorded invocation exposes its arguments with a leading `-C <dir>` pair removed, since the git module starts every process that way. A test can read the recorded invocations, pass the stand-in as an explicit program, or put its directory first on a child process's `PATH`.\n- [hard] REQ-03: Fixture tests show that the stand-in records each invocation's arguments in order, with and without a leading `-C <dir>` pair, and returns the real git's output and exit status, and that the repository fixture's commit id is the repository's `HEAD`.\n- [hard] REQ-04: `test_add_pinned_document_uses_pinned_document_and_asset_bytes` builds its commit with the repository fixture, names no `git2` item, and asserts what it asserts today.\n\n## Notes\n\n- The stand-in is `#[cfg(unix)]`, as both existing wrappers are.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Give tests one way to build a git repository through the git CLI and one counting stand-in for the git executable, and move the libgit2-built document fixture onto the repository fixture.\n\n## Background\n\n- `test_add_pinned_document_uses_pinned_document_and_asset_bytes` (`crates/jit/tests/fast_docs_templates/document_event_log_tests.rs:253`) builds its commit through libgit2 (`git2::Repository::init` at `:259`, `git2::Signature` at `:272`), reaching the crate's normal `git2` dependency.\n- Two counting wrappers exist: `counted_git` (`crates/jit/tests/fast_docs_templates/git_revision_tests.rs:166-181`) and `capture_git_fixture` (`crates/jit/src/storage/repository_state_store_tests.rs:2585-2632`). Each writes a `#!/bin/sh` script that logs `$*` and runs `exec git \"$@\"`. Placed first on `PATH` under the name `git`, such a script would run itself, so a stand-in for the executable must run the real git by absolute path.\n- Shared test helpers live in the library's test-support surface, `jit::test_harness` (`crates/jit/src/test_harness.rs`), compiled under `cfg(any(test, feature = \"test-support\"))` (`crates/jit/src/lib.rs:36`). The crate's own tests and every integration suite enable `test-support`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit::test_harness` offers a git repository fixture that initializes a repository through the git CLI with a repository-local user name and email, writes files, and commits them, returning the new commit's id.\n- [hard] REQ-02: `jit::test_harness` offers, on Unix, a counting stand-in for the git executable: a file named `git` in its own directory that records each invocation's arguments and then runs the real git, resolved to an absolute path when the stand-in is created. Each recorded invocation exposes its arguments with a leading `-C <dir>` pair removed, since the git module starts every process that way. A test can read the recorded invocations, pass the stand-in as an explicit program, or put its directory first on a child process's `PATH`.\n- [hard] REQ-03: Fixture tests show that the stand-in records each invocation's arguments in order, with and without a leading `-C <dir>` pair, and returns the real git's output and exit status, and that the repository fixture's commit id is the repository's `HEAD`.\n- [hard] REQ-04: `test_add_pinned_document_uses_pinned_document_and_asset_bytes` builds its commit with the repository fixture, names no `git2` item, and asserts what it asserts today.\n\n## Notes\n\n- The stand-in is `#[cfg(unix)]`, as both existing wrappers are.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -49,7 +49,7 @@
  {
   "key": "git-module-foundation",
   "title": "Storage-owned git module with a one-process probe",
-  "description": "Create the storage-owned module that is the only place jit starts git, with the one-process probe that classifies a directory.\n\n## Background\n\n- Ten production files start git today, each naming the literal `git`, among them layout detection (`crates/jit/src/storage/worktree_paths.rs:58-141`), claims, worktree commands, validation, init and gate execution. Charter decision `@/charter/D-21` gives git one storage-owned module that runs the CLI.\n- `git -C <dir> rev-parse --git-common-dir --show-toplevel` answers both layout facts in one process. It succeeds in a primary checkout, a linked checkout and a repository without commits, and exits nonzero outside a repository and inside a `.git` directory. A relative common directory is resolved against the probed directory, as `:104-109` does today. A failure to start git means no executable is available.\n- No production setting names a git executable. `JsonFileStorage.git_program` (`crates/jit/src/storage/json.rs:403`) defaults to `git` (`:441`) and only a `#[cfg(test)]` constructor changes it (`crates/jit/src/storage/json.rs:481-488`).\n- `WorktreePaths` (`crates/jit/src/storage/worktree_paths.rs:13`) is the layout value the CLI detects once (`crates/jit/src/main.rs:1904`) and hands to storage, the executor, claims and worktree commands; `is_git_repository()` (`crates/jit/src/storage/worktree_paths.rs:144`) says whether it is a git checkout.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/storage/git.rs` (`storage::git`, public) holds a `Git` value naming the git executable. Its default is the bare name `git`, looked up on `PATH` when a process starts, and every process the module starts uses its `Git`. A constructor taking another program compiles only under `test-support`.\n- [hard] REQ-02: Every git process the module starts runs as `<program> -C <directory> …`, never in the process working directory. A failure to start one is the module error for an unavailable executable, naming the program.\n- [hard] REQ-03: `GitCheckout` pairs a `Git` with a checkout's worktree root and carries the module's git operations. `WorktreePaths::git()` returns one for a git checkout, built with the default executable, and `None` otherwise.\n- [hard] REQ-04: `Git::probe(dir)` classifies a directory with one git process. A primary checkout, a linked checkout and a repository without commits yield the common directory and the top-level path; a directory outside a repository, a `.git` directory, and an executable that cannot start yield no checkout.\n- [hard] REQ-05: The module's behaviour suite, a new module of the `fast_docs_templates` suite, proves REQ-04 against real repositories and counts one process per probe with the shared counting stand-in.\n\n## Notes\n\n- The module gains one operation for each git fact production code needs, and exposes none without a production caller. Without an executable, core commands behave as outside git (`@/charter/D-4`).\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Create the storage-owned module that is the only place jit starts git, with the one-process probe that classifies a directory.\n\n## Background\n\n- Ten production files start git today, each naming the literal `git`, among them layout detection (`crates/jit/src/storage/worktree_paths.rs:58-141`), claims, worktree commands, validation, init and gate execution. Charter decision `@/charter/D-21` gives git one storage-owned module that runs the CLI.\n- `git -C <dir> rev-parse --git-common-dir --show-toplevel` answers both layout facts in one process. It succeeds in a primary checkout, a linked checkout and a repository without commits, and exits nonzero outside a repository and inside a `.git` directory. A relative common directory is resolved against the probed directory, as `:104-109` does today. A failure to start git means no executable is available.\n- No production setting names a git executable. `JsonFileStorage.git_program` (`crates/jit/src/storage/json.rs:403`) defaults to `git` (`:441`) and only a `#[cfg(test)]` constructor changes it (`crates/jit/src/storage/json.rs:481-488`).\n- `WorktreePaths` (`crates/jit/src/storage/worktree_paths.rs:13`) is the layout value the CLI detects once (`crates/jit/src/main.rs:1903`) and hands to storage, the executor, claims and worktree commands; `is_git_repository()` (`crates/jit/src/storage/worktree_paths.rs:144`) says whether it is a git checkout.\n\n## Success Criteria\n\n- [hard] REQ-01: `crates/jit/src/storage/git.rs` (`storage::git`, public) holds a `Git` value naming the git executable, whose default is the bare name `git` looked up on `PATH`, and `Git::with_program` names another. Every process the module starts runs as `<program> -C <directory> …`, never in the process working directory, and a failure to start one is the module error for an unavailable executable, naming the program.\n- [hard] REQ-02: `GitCheckout` pairs a `Git` with a checkout's worktree root and carries the module's git operations. `WorktreePaths::git()` returns one for a git checkout, built with the default executable, and `None` otherwise.\n- [hard] REQ-03: `Git::probe(dir)` classifies a directory with one git process. A primary checkout, a linked checkout and a repository without commits yield the common directory and the top-level path; a directory outside a repository, a `.git` directory, and an executable that cannot start yield no checkout.\n- [hard] REQ-04: The module's behaviour suite, a new module of the `fast_docs_templates` suite, proves REQ-03 against real repositories and counts one process per probe with the shared counting stand-in.\n\n## Notes\n\n- The module gains one operation for each git fact production code needs, and exposes none without a production caller. Without an executable, core commands behave as outside git (`@/charter/D-4`).\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -153,7 +153,7 @@
  {
   "key": "server-layout-from-data-root",
   "title": "Server detects its layout once from the selected data root",
-  "description": "Make `jit-server` detect the layout of the checkout holding `--data-dir` once at startup and hand that value to its storage and executor, so it stops classifying the process working directory and its handles stop detecting again.\n\n## Background\n\n- Server startup calls `WorktreePaths::detect()` (`crates/server/src/main.rs:67`), which detects from the process working directory (`crates/jit/src/storage/worktree_paths.rs:28-30`), keeps only its worktree root, and builds the repository layout from it (`crates/server/src/main.rs:70`). Storage comes from `prepare_server_storage` (`crates/server/src/lib.rs:65-81`) and the executor from `CommandExecutor::new(storage).with_layout(..)` (`crates/server/src/main.rs:76`); neither receives the detected paths.\n- Each handle then detects again on first use through its lazy fallback: `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) and `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2229-2245`). A server can therefore run three detections, the first against the wrong directory when it is started outside its repository.\n- The CLI already detects once from the selected data root (`crates/jit/src/main.rs:1904`) and passes the value to storage (`crates/jit/src/main.rs:1927`) and the executor (`crates/jit/src/main.rs:1969`).\n- `detect()` has no other production caller.\n\n## Success Criteria\n\n- [hard] REQ-01: A server-library function derives the startup layout once through `WorktreePaths::detect_for_data_root`, with the `--data-dir` directory as the selected root and the process directory as the non-git fallback root. Startup configures its storage handle and executor with that value.\n- [hard] REQ-02: A test starts the derivation from a directory outside the repository with the data directory inside a git checkout and asserts that the worktree root is that checkout's root and that the paths classify it as a git checkout. Against today's derivation, which detects the process directory, both assertions fail.\n\n## Notes\n\n- Behaviour change: a server started outside its repository classifies the checkout holding its data directory, not the directory it was started from.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit-server` detect the layout of the checkout holding `--data-dir` once at startup and hand that value to its storage and executor, so it stops classifying the process working directory and its handles stop detecting again.\n\n## Background\n\n- Server startup calls `WorktreePaths::detect()` (`crates/server/src/main.rs:67`), which detects from the process working directory (`crates/jit/src/storage/worktree_paths.rs:28-30`), keeps only its worktree root, and builds the repository layout from it (`crates/server/src/main.rs:70`). Storage comes from `prepare_server_storage` (`crates/server/src/lib.rs:65-81`) and the executor from `CommandExecutor::new(storage).with_layout(..)` (`crates/server/src/main.rs:76`); neither receives the detected paths.\n- Each handle then detects again on first use through its lazy fallback: `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) and `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2249-2265`). A server can therefore run three detections, the first against the wrong directory when it is started outside its repository.\n- The CLI already detects once from the selected data root (`crates/jit/src/main.rs:1903`) and passes the value to storage (`crates/jit/src/main.rs:1926`) and the executor (`crates/jit/src/main.rs:1968`).\n- `detect()` has no other production caller.\n\n## Success Criteria\n\n- [hard] REQ-01: A server-library function derives the startup layout once through `WorktreePaths::detect_for_data_root`, with the `--data-dir` directory as the selected root and the process directory as the non-git fallback root. Startup configures its storage handle and executor with that value.\n- [hard] REQ-02: A test starts the derivation from a directory outside the repository with the data directory inside a git checkout and asserts that the worktree root is that checkout's root and that the paths classify it as a git checkout. Against today's derivation, which detects the process directory, both assertions fail.\n\n## Notes\n\n- Behaviour change: a server started outside its repository classifies the checkout holding its data directory, not the directory it was started from.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -200,7 +200,7 @@
  {
   "key": "layout-fallback-removal",
   "title": "Storage and executor stop re-detecting the layout",
-  "description": "Remove the lazy layout detection inside storage and the command executor, so each handle uses the layout its constructor's caller supplied and never starts git to find one.\n\n## Background\n\n- `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) runs `WorktreePaths::detect_for_data_root` when no paths were configured. Its callers are the primary-checkout read tier, `load_index_from_main_worktree` (`crates/jit/src/storage/json.rs:866-880`) and `load_issue_from_main_worktree` (`crates/jit/src/storage/json.rs:931-945`).\n- `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2229-2245`) detects lazily when `with_worktree_paths` (`crates/jit/src/commands/mod.rs:2223-2226`) was not called. Its callers are the lease guard of guarded mutations, `claims_mutation_guard` (`crates/jit/src/commands/mod.rs:755-774`, called from `commands/dependency.rs`, `commands/issue.rs`, `commands/gate.rs` and `commands/mod.rs`), template lease warnings (`crates/jit/src/commands/template.rs:189`) and `validate --leases` (`crates/jit/src/commands/validate.rs:2227`).\n- Production handles receive their paths at construction: the CLI configures storage and the executor from its one detection, and the server does the same from its data root. `jit recover` builds an executor without paths (`crates/jit/src/commands/claim.rs:724`), but derived-state repair reaches none of the callers above.\n- A grep of in-process tests that build a git repository and a storage handle or executor finds one group that relies on the lazy detection through a caller above: the primary-checkout tier tests (`crates/jit/src/storage/json.rs:2382`, `:2578`, `:2620`). The tests in `commands/mod.rs` supply their paths, and the claim tests build theirs by hand. The other in-process tests over git repositories read git through libgit2 or the layout, not through these callers.\n\n## Success Criteria\n\n- [hard] REQ-01: A `JsonFileStorage` with no configured paths reads only its own data root: it has no primary-checkout tier and starts no git process to find one.\n- [hard] REQ-02: An executor built without `with_worktree_paths` answers `require_worktree_paths` with non-git paths derived from its layout, or from its storage root when it has no layout, without starting a process. A guarded mutation on such an executor takes no lease guard.\n- [hard] REQ-03: No production code in `storage/json.rs` or `commands/mod.rs` calls a `WorktreePaths` detection function.\n- [hard] REQ-04: Two unit tests fail on today's code. Storage over a linked checkout's data root with no configured paths does not list an issue only the primary checkout holds, and lists it once the paths are configured. `require_worktree_paths` on an executor over a git repository built without paths reports a non-git checkout.\n- [hard] REQ-05: The three primary-checkout tier tests configure their storage's paths and pass.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Remove the lazy layout detection inside storage and the command executor, so each handle uses the layout its constructor's caller supplied and never starts git to find one.\n\n## Background\n\n- `JsonFileStorage::configured_worktree_paths` (`crates/jit/src/storage/json.rs:556-575`) runs `WorktreePaths::detect_for_data_root` when no paths were configured. Its callers are the primary-checkout read tier, `load_index_from_main_worktree` (`crates/jit/src/storage/json.rs:866-880`) and `load_issue_from_main_worktree` (`crates/jit/src/storage/json.rs:931-945`).\n- `CommandExecutor::require_worktree_paths` (`crates/jit/src/commands/mod.rs:2249-2265`) detects lazily when `with_worktree_paths` (`crates/jit/src/commands/mod.rs:2243-2246`) was not called. Its callers are the lease guard of guarded mutations, `claims_mutation_guard` (`crates/jit/src/commands/mod.rs:755-774`, called from `commands/dependency.rs`, `commands/issue.rs`, `commands/gate.rs` and `commands/mod.rs`), template lease warnings (`crates/jit/src/commands/template.rs:194`) and `validate --leases` (`crates/jit/src/commands/validate.rs:2228`).\n- Production handles receive their paths at construction: the CLI configures storage and the executor from its one detection, and the server does the same from its data root. `jit recover` builds an executor without paths (`crates/jit/src/commands/claim.rs:732`), but derived-state repair reaches none of the callers above.\n- A grep of in-process tests that build a git repository and a storage handle or executor finds one group that relies on the lazy detection through a caller above: the primary-checkout tier tests (`crates/jit/src/storage/json.rs:2381`, `:2577`, `:2619`). The tests in `commands/mod.rs` supply their paths, and the claim tests build theirs by hand. The other in-process tests over git repositories read git through libgit2 or the layout, not through these callers.\n\n## Success Criteria\n\n- [hard] REQ-01: A `JsonFileStorage` with no configured paths reads only its own data root: it has no primary-checkout tier and starts no git process to find one.\n- [hard] REQ-02: An executor built without `with_worktree_paths` answers `require_worktree_paths` with non-git paths derived from its layout, or from its storage root when it has no layout, without starting a process. A guarded mutation on such an executor takes no lease guard.\n- [hard] REQ-03: No production code in `storage/json.rs` or `commands/mod.rs` calls a `WorktreePaths` detection function.\n- [hard] REQ-04: Two unit tests fail on today's code, and the three primary-checkout tier tests configure their storage's paths and pass. Storage over a linked checkout's data root with no configured paths does not list an issue only the primary checkout holds, and lists it once the paths are configured. `require_worktree_paths` on an executor over a git repository built without paths reports a non-git checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -247,7 +247,7 @@
  {
   "key": "init-git-classification-from-layout",
   "title": "Init reads git classification from the invocation's layout",
-  "description": "Make `jit init` decide whether to claim the `.gitattributes` merge driver from the layout the invocation already detected, instead of starting `git rev-parse --is-inside-work-tree` again.\n\n## Background\n\n- `gitattributes_claim` (`crates/jit/src/commands/init.rs:524-535`), called once per initialization (`crates/jit/src/commands/init.rs:175`), calls `worktree_is_git_work_tree` (`crates/jit/src/commands/init.rs:539-548`), which starts git a second time per `jit init`.\n- The executor holds the invocation's `WorktreePaths` (`require_worktree_paths`, `crates/jit/src/commands/mod.rs:2229`), which already say whether the worktree is a git checkout.\n- CLI tests assert the merge-driver line in a git repository (`crates/jit/tests/cli_repo_workflow/init_tests.rs:519`).\n- Kept as one change for a build reason: `worktree_is_git_work_tree` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: The merge-driver claim is eligible exactly when the executor's paths are a git checkout and the data root lies beneath the worktree root. `worktree_is_git_work_tree` no longer exists and `commands/init.rs` starts no process.\n- [hard] REQ-02: A unit test initializes a real git work tree through an executor whose paths classify it as outside git and asserts no merge-driver claim; today's code claims one because it asks git directly.\n- [hard] REQ-03: The init CLI tests pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit init` decide whether to claim the `.gitattributes` merge driver from the layout the invocation already detected, instead of starting `git rev-parse --is-inside-work-tree` again.\n\n## Background\n\n- `gitattributes_claim` (`crates/jit/src/commands/init.rs:524-535`), called once per initialization (`crates/jit/src/commands/init.rs:175`), calls `worktree_is_git_work_tree` (`crates/jit/src/commands/init.rs:539-548`), which starts git a second time per `jit init`.\n- The executor holds the invocation's `WorktreePaths` (`require_worktree_paths`, `crates/jit/src/commands/mod.rs:2249`), which already say whether the worktree is a git checkout.\n- CLI tests assert the merge-driver line in a git repository (`crates/jit/tests/cli_repo_workflow/init_tests.rs:519`).\n- Kept as one change for a build reason: `worktree_is_git_work_tree` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: The merge-driver claim is eligible exactly when the executor's paths are a git checkout and the data root lies beneath the worktree root. `worktree_is_git_work_tree` no longer exists and `commands/init.rs` starts no process.\n- [hard] REQ-02: A unit test initializes a real git work tree through an executor whose paths classify it as outside git and asserts no merge-driver claim; today's code claims one because it asks git directly.\n- [hard] REQ-03: The init CLI tests pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -292,7 +292,7 @@
  {
   "key": "hooks-install-from-layout",
   "title": "Hook installation targets the selected repository's common directory",
-  "description": "Make `jit hooks install` write into the hooks directory of the repository the invocation selected, using the common directory the layout already holds, instead of walking up from the process working directory and parsing `.git` files itself.\n\n## Background\n\n- `install_hooks(git_dir: Option<PathBuf>)` (`crates/jit/src/commands/hooks.rs:25-68`) falls back to `find_git_dir` (`crates/jit/src/commands/hooks.rs:82-129`). That function walks up from `std::env::current_dir()`, honours `GIT_CEILING_DIRECTORIES`, and parses a `.git` file's `gitdir:` line to reach a linked checkout's common directory: a second, hand-written layout detection.\n- The CLI calls `install_hooks(None)` (`crates/jit/src/main.rs:6306`), and its unit tests pass `Some(..)` (`crates/jit/src/commands/hooks.rs:188`, `:220`, `:272`), while the CLI holds the invocation's `WorktreePaths`, whose `common_dir` is the common git directory of a primary or linked checkout.\n- The failure-lever registry expects `HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)` with exit 1 outside git (`crates/jit/tests/cli_issue/failure_lever_registry.toml:932`).\n- Kept as one change for a build reason: `find_git_dir` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `install_hooks` takes the git directory as a required argument, and its unit tests pass it directly. The CLI passes the invocation's common directory for a git checkout; outside one the command fails with the error the failure-lever registry expects.\n- [hard] REQ-02: `find_git_dir` and `test_find_git_dir` no longer exist.\n- [hard] REQ-03: A CLI test with `JIT_DATA_DIR` selecting a repository other than the process directory's installs the hooks into the selected repository's common directory. Against today's code they land in the process directory's repository, so the test fails.\n\n## Notes\n\n- Behaviour change: hooks follow the selected data root, as every other command does.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit hooks install` write into the hooks directory of the repository the invocation selected, using the common directory the layout already holds, instead of walking up from the process working directory and parsing `.git` files itself.\n\n## Background\n\n- `install_hooks(git_dir: Option<PathBuf>)` (`crates/jit/src/commands/hooks.rs:25-68`) falls back to `find_git_dir` (`crates/jit/src/commands/hooks.rs:82-129`). That function walks up from `std::env::current_dir()`, honours `GIT_CEILING_DIRECTORIES`, and parses a `.git` file's `gitdir:` line to reach a linked checkout's common directory: a second, hand-written layout detection.\n- The CLI calls `install_hooks(None)` (`crates/jit/src/main.rs:6309`), and its unit tests pass `Some(..)` (`crates/jit/src/commands/hooks.rs:188`, `:220`, `:272`), while the CLI holds the invocation's `WorktreePaths`, whose `common_dir` is the common git directory of a primary or linked checkout.\n- The failure-lever registry expects `HOOKS_INSTALL_ERROR: Not in a git repository (no .git directory found)` with exit 1 outside git (`crates/jit/tests/cli_issue/failure_lever_registry.toml:932`).\n- Kept as one change for a build reason: `find_git_dir` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `install_hooks` takes the git directory as a required argument, and its unit tests pass it directly. The CLI passes the invocation's common directory for a git checkout; outside one the command fails with the error the failure-lever registry expects.\n- [hard] REQ-02: `find_git_dir` and `test_find_git_dir` no longer exist.\n- [hard] REQ-03: A CLI test with `JIT_DATA_DIR` selecting a repository other than the process directory's installs the hooks into the selected repository's common directory. Against today's code they land in the process directory's repository, so the test fails.\n\n## Notes\n\n- Behaviour change: hooks follow the selected data root, as every other command does.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -391,7 +391,7 @@
  {
   "key": "git-head-lookup",
   "title": "One head lookup in the git module",
-  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one operation backed by one git process.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:45-63` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3334` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\n`git rev-parse HEAD --abbrev-ref HEAD` prints the commit and the abbreviated ref in one process (`HEAD` when detached) and exits nonzero on an unborn branch. The domain's canonical commit type is `CanonicalCommitOid` (`crates/jit/src/domain/artifact_plan.rs:112`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts one git process. It returns `Ok(None)` on an unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. A nonzero exit is an unborn branch, since a `GitCheckout` exists only for a checkout git already recognized.\n- [hard] REQ-04: The behaviour suite covers a branch, a detached HEAD, an unborn branch and a missing executable, and counts one process per lookup.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Add the module's single lookup of the checked-out commit and branch, so every consumer of either fact asks one operation backed by one git process.\n\n## Background\n\nSix branch lookups exist, with differing semantics:\n\n| Site | Command | Detached HEAD | Unborn branch |\n|---|---|---|---|\n| `crates/jit/src/commands/claim.rs:46-64` | `rev-parse --abbrev-ref HEAD` | `HEAD` | second process, then a typed no-commits error |\n| `crates/jit/src/commands/worktree.rs:46-63` | same | `HEAD` | generic error |\n| `crates/jit/src/storage/claim_coordinator.rs:974-993` | same | `HEAD` | error, read as no branch |\n| `crates/jit/src/commands/mod.rs:3359` | `branch --show-current` | empty string | the unborn branch's name |\n| `crates/jit/src/gate_execution.rs:551`, `crates/jit/src/gate_execution.rs:567` | `rev-parse HEAD`, `rev-parse --abbrev-ref HEAD` | `HEAD` | none |\n| `crates/jit/src/commands/snapshot.rs:25-29` | libgit2 `head().shorthand()` | `HEAD` | none |\n\n`git rev-parse HEAD --abbrev-ref HEAD` prints the commit and the abbreviated ref in one process (`HEAD` when detached) and exits nonzero on an unborn branch. The domain's canonical commit type is `CanonicalCommitOid` (`crates/jit/src/domain/artifact_plan.rs:112`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::head()` starts one git process. It returns `Ok(None)` on an unborn branch, and otherwise a `Head` holding the commit as `CanonicalCommitOid` and the branch name, absent on a detached HEAD.\n- [hard] REQ-02: `Head` renders its branch as the branch name, or `HEAD` when detached, which is what `git rev-parse --abbrev-ref HEAD` prints.\n- [hard] REQ-03: An executable that cannot start returns the module's unavailable error. A nonzero exit is an unborn branch, since a `GitCheckout` exists only for a checkout git already recognized.\n- [hard] REQ-04: The behaviour suite covers a branch, a detached HEAD, an unborn branch and a missing executable, and counts one process per lookup.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -438,7 +438,7 @@
  {
   "key": "gate-evidence-through-module",
   "title": "Gate runs take commit and branch evidence from the module",
-  "description": "Pass gate execution the selected worktree's head from the git module, instead of having it start git in the checker's working directory.\n\n## Background\n\n- `execute_gate_checker_with_context` (`crates/jit/src/gate_execution.rs:90-187`) calls `get_git_commit` (`crates/jit/src/gate_execution.rs:551-565`) and `get_git_branch` (`crates/jit/src/gate_execution.rs:567-582`): two processes per exec gate run, each naming the literal `git` and running in `working_dir`.\n- `working_dir` is the worktree root or the checker's declared subdirectory (`execute_captured_gate`, `crates/jit/src/commands/gate_check.rs:1295-1335`). A declared subdirectory that is a separate git repository supplies that repository's head. With in-memory storage the working directory is the process directory (`checker_repo_root`, `crates/jit/src/commands/gate_check.rs:668-674`), so evidence comes from whichever repository the process runs in.\n- The evidence lands in `GateRunResult.commit` and `.branch` (`crates/jit/src/domain/types.rs:934`, `:937`).\n- Callers of the entry point: `crates/jit/src/commands/gate_check.rs:1316` and the unit tests in `crates/jit/src/gate_execution.rs`'s test module. `test_execute_gate_checker_records_head_commit` (`crates/jit/src/gate_execution.rs:1112-1131`) compares the recorded commit with `get_git_commit`, and `test_git_context_graceful_degradation` (`crates/jit/src/gate_execution.rs:720-729`) probes both helpers directly.\n- Kept as one change for a build reason: `get_git_commit` and `get_git_branch` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `execute_gate_checker_with_context` takes the run's head evidence as an argument and starts no git process. `get_git_commit` and `get_git_branch` no longer exist, and `gate_execution.rs` names no git executable.\n- [hard] REQ-02: The executor passes the head of `require_worktree_paths()?.git()`, so a run records the selected worktree's commit and branch label whatever the checker's working directory; a store without a git checkout records neither.\n- [hard] REQ-03: Two tests assert the behaviour change and fail on today's code. An exec gate whose declared working directory is a separate nested git repository records the selected worktree's commit, where today it records the nested repository's. An exec gate run on in-memory storage while the process directory is a git repository, set through `CurrentDirGuard`, records no commit, where today it records the process directory's.\n- [hard] REQ-04: Every caller of the entry point, unit tests included, passes evidence. `test_execute_gate_checker_records_head_commit` asserts that the evidence passed in is the evidence recorded, and `test_git_context_graceful_degradation` is removed because the module owns lookup failures.\n\n## Notes\n\n- Behaviour change: gate evidence always describes the selected worktree, and in-memory runs carry none.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Pass gate execution the selected worktree's head from the git module, instead of having it start git in the checker's working directory.\n\n## Background\n\n- `execute_gate_checker_with_context` (`crates/jit/src/gate_execution.rs:90-187`) calls `get_git_commit` (`crates/jit/src/gate_execution.rs:551-565`) and `get_git_branch` (`crates/jit/src/gate_execution.rs:567-582`): two processes per exec gate run, each naming the literal `git` and running in `working_dir`.\n- `working_dir` is the worktree root or the checker's declared subdirectory (`execute_captured_gate`, `crates/jit/src/commands/gate_check.rs:1303-1343`). A declared subdirectory that is a separate git repository supplies that repository's head. With in-memory storage the working directory is the process directory (`checker_repo_root`, `crates/jit/src/commands/gate_check.rs:668-674`), so evidence comes from whichever repository the process runs in.\n- The evidence lands in `GateRunResult.commit` and `.branch` (`crates/jit/src/domain/types.rs:934`, `:937`).\n- Callers of the entry point: `crates/jit/src/commands/gate_check.rs:1324` and the unit tests in `crates/jit/src/gate_execution.rs`'s test module. `test_execute_gate_checker_records_head_commit` (`crates/jit/src/gate_execution.rs:1112-1131`) compares the recorded commit with `get_git_commit`, and `test_git_context_graceful_degradation` (`crates/jit/src/gate_execution.rs:720-729`) probes both helpers directly.\n- Kept as one change for a build reason: `get_git_commit` and `get_git_branch` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `execute_gate_checker_with_context` takes the run's head evidence as an argument and starts no git process. `get_git_commit` and `get_git_branch` no longer exist, and `gate_execution.rs` names no git executable.\n- [hard] REQ-02: The executor passes the head of `require_worktree_paths()?.git()`, so a run records the selected worktree's commit and branch label whatever the checker's working directory; a store without a git checkout records neither.\n- [hard] REQ-03: Two tests assert the behaviour change and fail on today's code. An exec gate whose declared working directory is a separate nested git repository records the selected worktree's commit, where today it records the nested repository's. An exec gate run on in-memory storage while the process directory is a git repository, set through `CurrentDirGuard`, records no commit, where today it records the process directory's.\n- [hard] REQ-04: Every caller of the entry point, unit tests included, passes evidence. `test_execute_gate_checker_records_head_commit` asserts that the evidence passed in is the evidence recorded, and `test_git_context_graceful_degradation` is removed because the module owns lookup failures.\n\n## Notes\n\n- Behaviour change: gate evidence always describes the selected worktree, and in-memory runs carry none.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -538,7 +538,7 @@
  {
   "key": "init-identity-head-lookup",
   "title": "Init records the worktree branch through the module",
-  "description": "Make the worktree identity that `jit init` records take its branch from the git module's head lookup, the one branch lookup every other consumer uses.\n\n## Background\n\n- `initialize_worktree_identity` (`crates/jit/src/commands/mod.rs:3320-3356`) runs `git branch --show-current` (`crates/jit/src/commands/mod.rs:3334`): a detached HEAD yields an empty string, an unborn branch yields its name, and a failure yields `main`. The CLI calls it after initialization is published (`crates/jit/src/main.rs:2014`).\n- The head lookup reports a detached HEAD as `HEAD` and an unborn branch as no head.\n\n## Success Criteria\n\n- [hard] REQ-01: The identity's branch is the head lookup's branch label for the paths' git checkout, and `main` on an unborn branch. `commands/mod.rs` starts no git process for it.\n- [hard] REQ-02: Unit tests assert the behaviour change and fail on today's code: a detached checkout records `HEAD` (today an empty string), and a repository without commits on branch `trunk` records `main` (today `trunk`).\n\n## Notes\n\n- Behaviour change, limited to detached and commit-less repositories; every other recorded branch is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the worktree identity that `jit init` records take its branch from the git module's head lookup, the one branch lookup every other consumer uses.\n\n## Background\n\n- `initialize_worktree_identity` (`crates/jit/src/commands/mod.rs:3345-3381`) runs `git branch --show-current` (`crates/jit/src/commands/mod.rs:3359`): a detached HEAD yields an empty string, an unborn branch yields its name, and a failure yields `main`. The CLI calls it after initialization is published (`crates/jit/src/main.rs:2013`).\n- The head lookup reports a detached HEAD as `HEAD` and an unborn branch as no head.\n\n## Success Criteria\n\n- [hard] REQ-01: The identity's branch is the head lookup's branch label for the paths' git checkout, and `main` on an unborn branch. `commands/mod.rs` starts no git process for it.\n- [hard] REQ-02: Unit tests assert the behaviour change and fail on today's code: a detached checkout records `HEAD` (today an empty string), and a repository without commits on branch `trunk` records `main` (today `trunk`).\n\n## Notes\n\n- Behaviour change, limited to detached and commit-less repositories; every other recorded branch is unchanged.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -584,7 +584,7 @@
  {
   "key": "claims-head-lookup",
   "title": "Claims take their branch and git requirement from the module",
-  "description": "Make claim commands and the claim coordinator read the branch through the git module's head lookup, and turn every way git can be missing into the typed git-requirement error.\n\n## Background\n\n- `get_current_branch` (`crates/jit/src/commands/claim.rs:45-63`) runs `git rev-parse --abbrev-ref HEAD`. On a nonzero exit it calls `is_inside_git_work_tree` (`crates/jit/src/commands/claim.rs:24-32`), a second process, to choose between `GitRequirementGap::NoCommits` and `NoRepository` (`crates/jit/src/errors.rs:428`). A failure to start git goes through `.context(..)` and stays untyped.\n- Measured: `jit claim list --json` with no git on `PATH` fails with `REPOSITORY_NOT_FOUND` and exit 3. Outside a repository with git present it fails with `CLAIM_REQUIRES_GIT` and exit 10, the documented contract (`docs/concepts/guarantees.md`, `docs/reference/error-codes.md`).\n- Callers in `crates/jit/src/commands/claim.rs` at lines 99, 235, 345, 429, 477, 524, 565, 633, covering acquire, heartbeat, release by issue, renew, status, list, force-evict and recovery.\n- The coordinator has its own lookup, `get_current_branch` (`crates/jit/src/storage/claim_coordinator.rs:974-993`), used where it writes a lease's branch (`crates/jit/src/storage/claim_coordinator.rs:480`, `:613`, `:775`).\n- Tests: `test_get_current_branch_errors_when_git_fails` (`crates/jit/src/commands/claim.rs:1589`); CLI tests outside a repository (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1189` onwards) and without commits (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1364`, `:1392`).\n- Kept as one change for a build reason: both `get_current_branch` functions and `is_inside_git_work_tree` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: One claims function derives the branch from the paths. No git checkout, or an executable that cannot start, gives `ClaimRequiresGitError` with `NoRepository`; an unborn branch gives `NoCommits`; otherwise it returns the head's branch label. `is_inside_git_work_tree` and both `get_current_branch` functions no longer exist.\n- [hard] REQ-02: The coordinator records a lease's branch from the head lookup of its paths' git checkout and starts no git process of its own.\n- [hard] REQ-03: A unit test with a checkout whose executable does not exist asserts `ClaimRequiresGitError` with `NoRepository`; today's code returns an untyped error, so it fails. The CLI tests outside a repository and without commits pass unchanged.\n- [hard] REQ-04: Branch lookup in `commands/claim.rs` and `storage/claim_coordinator.rs` starts no git process outside the module.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make claim commands and the claim coordinator read the branch through the git module's head lookup, and turn every way git can be missing into the typed git-requirement error.\n\n## Background\n\n- `get_current_branch` (`crates/jit/src/commands/claim.rs:46-64`) runs `git rev-parse --abbrev-ref HEAD`. On a nonzero exit it calls `is_inside_git_work_tree` (`crates/jit/src/commands/claim.rs:25-33`), a second process, to choose between `GitRequirementGap::NoCommits` and `NoRepository` (`crates/jit/src/errors.rs:428`). A failure to start git goes through `.context(..)` and stays untyped.\n- Measured: `jit claim list --json` with no git on `PATH` fails with `REPOSITORY_NOT_FOUND` and exit 3. Outside a repository with git present it fails with `CLAIM_REQUIRES_GIT` and exit 10, the documented contract (`docs/concepts/guarantees.md`, `docs/reference/error-codes.md`).\n- Callers in `crates/jit/src/commands/claim.rs` at lines 100, 236, 346, 430, 485, 532, 573, 641, covering acquire, heartbeat, release by issue, renew, status, list, force-evict and recovery.\n- The coordinator has its own lookup, `get_current_branch` (`crates/jit/src/storage/claim_coordinator.rs:974-993`), used where it writes a lease's branch (`crates/jit/src/storage/claim_coordinator.rs:480`, `:613`, `:775`).\n- Tests: `test_get_current_branch_errors_when_git_fails` (`crates/jit/src/commands/claim.rs:1599`); CLI tests outside a repository (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1189` onwards) and without commits (`crates/jit/tests/cli_repo_workflow/claim_integration_tests.rs:1364`, `:1392`).\n- Kept as one change for a build reason: both `get_current_branch` functions and `is_inside_git_work_tree` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: One claims function derives the branch from the paths. No git checkout, or an executable that cannot start, gives `ClaimRequiresGitError` with `NoRepository`; an unborn branch gives `NoCommits`; otherwise it returns the head's branch label. `is_inside_git_work_tree` and both `get_current_branch` functions no longer exist.\n- [hard] REQ-02: The coordinator records a lease's branch from the head lookup of its paths' git checkout and starts no git process of its own.\n- [hard] REQ-03: A unit test with a checkout whose executable does not exist asserts `ClaimRequiresGitError` with `NoRepository`; today's code returns an untyped error, so it fails. The CLI tests outside a repository and without commits pass unchanged.\n- [hard] REQ-04: Branch lookup in `commands/claim.rs` and `storage/claim_coordinator.rs` starts no git process outside the module.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -634,9 +634,53 @@
   }
  },
  {
+  "key": "git-user-name",
+  "title": "User name query in the git module",
+  "description": "Add the git module's query for the repository's configured `user.name`.\n\n## Background\n\n- The claim-release actor fallback reads `user.name` with its own `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`), the last git spawn in the claim commands once their branch lookup goes through the module.\n- `git config user.name` prints the value and exits 1 when it is unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::user_name()` reads `user.name` with one git process and returns `None` when it is unset.\n- [hard] REQ-02: The behaviour suite covers a set and an unset name and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:git-operations",
+   "component:storage",
+   "per:@/charter/D-21",
+   "satisfies:f4d9502a/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "git-module-foundation"
+  ],
+  "planning": {
+   "outcome": "The git module answers the configured user name with one process.",
+   "contract_refs": [
+    "git-module"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-03",
+    "DEC-07"
+   ],
+   "terminal": {
+    "consumer_family": "user name query",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One small operation with two behaviour-suite cases.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "release-actor-through-module",
   "title": "Release actor reads git user.name through the module",
-  "description": "Give the git module a `user.name` query and make the claim-release actor fallback use it, removing the last git spawn from the claim commands.\n\n## Background\n\n- `resolve_release_actor` (`crates/jit/src/commands/claim.rs:297-315`) runs `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:307`) when no agent id resolves, and sanitizes the result with `sanitize_actor` (`crates/jit/src/commands/claim.rs:278`). Without either it fails with `errors::no_acting_identity`.\n- Its one caller is `execute_claim_release_by_issue` (`crates/jit/src/commands/claim.rs:353`).\n- Kept as one change for a build reason: the operation has exactly this one caller, and the module exposes only operations production code calls.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::user_name()` reads `user.name` with one git process and returns `None` when it is unset.\n- [hard] REQ-02: `resolve_release_actor` reads the name through the paths' git checkout and treats no checkout as an unset name. `commands/claim.rs` starts no git process.\n- [hard] REQ-03: The behaviour suite covers a set and an unset name, and the release tests in `commands/claim.rs` pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the claim-release actor fallback read `user.name` through the git module, removing the last git spawn from the claim commands.\n\n## Background\n\n- `resolve_release_actor` (`crates/jit/src/commands/claim.rs:298-316`) runs `git -C <worktree> config user.name` (`crates/jit/src/commands/claim.rs:308`) when no agent id resolves, and sanitizes the result with `sanitize_actor` (`crates/jit/src/commands/claim.rs:279`). Without either it fails with `errors::no_acting_identity`.\n- Its one caller is `execute_claim_release_by_issue` (`crates/jit/src/commands/claim.rs:354`).\n- `GitCheckout::user_name()` returns the configured name, or `None` when unset.\n\n## Success Criteria\n\n- [hard] REQ-01: `resolve_release_actor` reads the name through the paths' git checkout and treats no checkout as an unset name, and `commands/claim.rs` starts no git process.\n- [hard] REQ-02: The release tests in `commands/claim.rs` pass unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -644,7 +688,6 @@
    "milestone:v1.0",
    "story:git-operations",
    "component:cli",
-   "component:storage",
    "per:@/charter/D-21",
    "satisfies:f4d9502a/REQ-02",
    "satisfies:f4d9502a/REQ-03"
@@ -654,7 +697,8 @@
    "code-review"
   ],
   "depends_on": [
-   "claims-head-lookup"
+   "claims-head-lookup",
+   "git-user-name"
   ],
   "planning": {
    "outcome": "The claim-release actor fallback reads user.name through the module.",
@@ -669,13 +713,11 @@
    ],
    "terminal": {
     "consumer_family": "claim release actor",
-    "test_boundary": "git module behaviour suite",
-    "worker_sized_reason": "One small operation lands with its only caller, a single function in the claims family.",
+    "test_boundary": "claims unit tests",
+    "worker_sized_reason": "One function in the claims family switches to the module query at its single call site.",
     "footprint": {
      "touches": [
-      "crates/jit/src/storage/git.rs",
-      "crates/jit/src/commands/claim.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+      "crates/jit/src/commands/claim.rs"
      ]
     }
    }
@@ -684,7 +726,7 @@
  {
   "key": "git-worktree-listing",
   "title": "One worktree listing in the git module",
-  "description": "Add the module's single listing of a repository's worktrees, parsed once, so worktree commands and lease validation read one listing.\n\n## Background\n\n- Two parsers read `git worktree list --porcelain`. `parse_git_worktree_porcelain` (`crates/jit/src/commands/worktree.rs:90-123`) keeps paths and branch names and drops entries without a `branch` line; `jit worktree list` uses it (`crates/jit/src/commands/worktree.rs:232`). `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2421-2462`) reads only the `worktree` lines, once per lease.\n- The porcelain format is blank-line-separated blocks of `worktree <path>`, `HEAD <oid>`, and `branch refs/heads/<name>`, `detached` or `bare`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::list_worktrees()` starts one `git worktree list --porcelain` process and returns each worktree's path and branch name, the branch absent when the worktree is detached or bare.\n- [hard] REQ-02: The behaviour suite covers a primary checkout with linked, detached and slash-named-branch worktrees and counts one process per listing.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Add the module's single listing of a repository's worktrees, parsed once, so worktree commands and lease validation read one listing.\n\n## Background\n\n- Two parsers read `git worktree list --porcelain`. `parse_git_worktree_porcelain` (`crates/jit/src/commands/worktree.rs:90-123`) keeps paths and branch names and drops entries without a `branch` line; `jit worktree list` uses it (`crates/jit/src/commands/worktree.rs:232`). `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) reads only the `worktree` lines, once per lease.\n- The porcelain format is blank-line-separated blocks of `worktree <path>`, `HEAD <oid>`, and `branch refs/heads/<name>`, `detached` or `bare`.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::list_worktrees()` starts one `git worktree list --porcelain` process and returns each worktree's path and branch name, the branch absent when the worktree is detached or bare.\n- [hard] REQ-02: The behaviour suite covers a primary checkout with linked, detached and slash-named-branch worktrees and counts one process per listing.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -776,7 +818,7 @@
  {
   "key": "lease-validation-lists-once",
   "title": "Lease validation lists worktrees once per run",
-  "description": "Make `jit validate --leases` list worktrees once before examining leases, instead of once per lease, and state what it does without a git checkout.\n\n## Background\n\n- `validate_leases` (`crates/jit/src/commands/validate.rs:2221-2275`) calls `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2421-2462`) for every lease. Each call starts `git worktree list --porcelain` and reads every listed worktree's identity file. Measured: `jit validate --leases --json` in a repository with nine leases starts nine listings.\n- Without a git checkout (outside a repository, or with no git executable) leases can still be stored under `.git/jit/`. Today the first lease's listing then fails with the untyped \"Failed to execute git worktree list\" or \"git worktree list failed\" error.\n- The exit-code projection states that `validate --leases` exits 1 when it finds invalid leases or cannot run (`crates/jit/src/schema.rs:989`, `docs/reference/exit-codes.md`). Claim subcommands, not validation, carry the typed git-requirement error with exit 10 (`@/charter/D-4`).\n- CLI lease-validation tests: `crates/jit/tests/cli_item_validate/validation_lease_tests.rs:229` onwards. CLI suites plant leases through their shared lease-store test helper.\n- Kept as one change for a build reason: `check_worktree_exists` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_leases` lists worktrees once through the module before examining leases and reads each listed worktree's id once. `check_worktree_exists` no longer exists, and `commands/validate.rs` starts no git process for lease validation.\n- [hard] REQ-02: With a git checkout, findings and remedies are unchanged, and the lease-validation tests pass unchanged.\n- [hard] REQ-03: Without a git checkout, `validate --leases` reports no finding when no lease is stored. When leases are stored it fails with exit 1 and the message \"lease validation requires a git repository to check lease worktrees\", as the projected row states.\n- [hard] REQ-04: A CLI test plants three leases, puts the counting stand-in first on `PATH`, and asserts that `jit validate --leases --json` records exactly one `worktree list` invocation; today it records one per lease, so it fails.\n- [hard] REQ-05: A CLI test plants a lease, runs `jit validate --leases --json` with no git executable on `PATH`, and asserts exit 1 with REQ-03's message; today's message is the untyped listing failure, so it fails.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement instead of a failed `git worktree list`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit validate --leases` list worktrees once before examining leases, instead of once per lease, and state what it does without a git checkout.\n\n## Background\n\n- `validate_leases` (`crates/jit/src/commands/validate.rs:2222-2276`) calls `check_worktree_exists` (`crates/jit/src/commands/validate.rs:2422-2463`) for every lease. Each call starts `git worktree list --porcelain` and reads every listed worktree's identity file. Measured: `jit validate --leases --json` in a repository with nine leases starts nine listings.\n- Without a git checkout (outside a repository, or with no git executable) leases can still be stored under `.git/jit/`. Today the first lease's listing then fails with the untyped \"Failed to execute git worktree list\" or \"git worktree list failed\" error.\n- The exit-code projection states that `validate --leases` exits 1 when it finds invalid leases or cannot run (`crates/jit/src/schema.rs:989`, `docs/reference/exit-codes.md`). Claim subcommands, not validation, carry the typed git-requirement error with exit 10 (`@/charter/D-4`).\n- CLI lease-validation tests: `crates/jit/tests/cli_item_validate/validation_lease_tests.rs:229` onwards. CLI suites plant leases through their shared lease-store test helper.\n- Kept as one change for a build reason: `check_worktree_exists` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_leases` lists worktrees once through the module before examining leases and reads each listed worktree's id once; `check_worktree_exists` no longer exists, and `commands/validate.rs` starts no git process for lease validation. With a git checkout, findings and remedies are unchanged, and the lease-validation tests pass unchanged.\n- [hard] REQ-02: Without a git checkout, `validate --leases` reports no finding when no lease is stored. When leases are stored it fails with exit 1 and the message \"lease validation requires a git repository to check lease worktrees\", as the projected row states.\n- [hard] REQ-03: A CLI test plants three leases, puts the counting stand-in first on `PATH`, and asserts that `jit validate --leases --json` records exactly one `worktree list` invocation; today it records one per lease, so it fails.\n- [hard] REQ-04: A CLI test plants a lease, runs `jit validate --leases --json` with no git executable on `PATH`, and asserts exit 1 with REQ-02's message; today's message is the untyped listing failure, so it fails.\n\n## Notes\n\n- Behaviour change: the no-checkout failure names the requirement instead of a failed `git worktree list`.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -827,7 +869,7 @@
  {
   "key": "git-base-comparison",
   "title": "Base comparison operation in the git module",
-  "description": "Add the module's one comparison of `HEAD` with a base branch, with a typed outcome, so the branch-drift check and the main-history guard compute it once, in the selected worktree.\n\n## Background\n\n- `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`) and `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2161-2210`) each run `git merge-base HEAD origin/main` and `git rev-parse origin/main` with neither `-C` nor `current_dir`, so both inspect the process working directory. Both name the base as a literal.\n- They differ only in failure handling. The divergence check reads a failing merge base or a missing base as \"not diverged\"; the drift check reports each as its own error.\n- `git rev-parse --verify <base>^{commit}` fails when the base does not resolve, and `git merge-base HEAD <base>` exits 1 when the two share no history.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::compare_with_base(base)` runs in the checkout's worktree, takes the base as an argument, and returns a typed outcome: `Compared` with the merge base and the base's commit, `BaseUnresolved` when the base does not resolve to a commit, or `NoMergeBase` when `HEAD` and the base share no history.\n- [hard] REQ-02: The behaviour suite covers a base equal to the merge base, a diverged branch, a missing base and unrelated histories.\n\n## Notes\n\n- Which base branch the checks use, and whether they run, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Add the module's one comparison of `HEAD` with a base branch, with a typed outcome, so the branch-drift check and the main-history guard compute it once, in the selected worktree.\n\n## Background\n\n- `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`) and `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) each run `git merge-base HEAD origin/main` and `git rev-parse origin/main` with neither `-C` nor `current_dir`, so both inspect the process working directory. Both name the base as a literal.\n- They differ only in failure handling. The divergence check reads a failing merge base or a missing base as \"not diverged\"; the drift check reports each as its own error.\n- `git rev-parse --verify <base>^{commit}` fails when the base does not resolve, and `git merge-base HEAD <base>` exits 1 when the two share no history.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::compare_with_base(base)` runs in the checkout's worktree, takes the base as an argument, and returns a typed outcome: `Compared` with the merge base and the base's commit, `BaseUnresolved` when the base does not resolve to a commit, or `NoMergeBase` when `HEAD` and the base share no history.\n- [hard] REQ-02: The behaviour suite covers a base equal to the merge base, a diverged branch, a missing base and unrelated histories.\n\n## Notes\n\n- Which base branch the checks use, and whether they run, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -876,7 +918,7 @@
  {
   "key": "branch-drift-through-module",
   "title": "Branch drift validation compares in the selected worktree",
-  "description": "Make `jit validate --branch-drift` compare through the git module in the selected worktree, instead of running git in the process working directory, and report each outcome with its own message.\n\n## Background\n\n- `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2161-2210`) runs `git merge-base HEAD origin/main` and `git rev-parse origin/main` with no directory, so it inspects the process working directory even when `JIT_DATA_DIR` selects another repository. The CLI calls it at `crates/jit/src/main.rs:6767`.\n- Its failures quote git's stderr: \"Failed to get merge-base with origin/main: <stderr>\", reported for a missing `origin/main` and for unrelated histories alike, and \"Failed to get origin/main commit: <stderr>\". A drifted branch reports both commits and `git rebase origin/main`. Every failure exits 1, as the projected `validate --branch-drift` row states (`crates/jit/src/schema.rs:982`; `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:737`).\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:640` and `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:652`, built on `setup_repo` and `attach_origin_remote` in the same file.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_branch_drift` compares through the module's base comparison of `require_worktree_paths()?.git()` with base `origin/main`, and `commands/validate.rs` starts no git process for it.\n- [hard] REQ-02: Each outcome exits 1 with its own message: no git checkout gives \"branch drift validation requires a git repository\"; `BaseUnresolved` gives \"origin/main does not resolve to a commit\"; `NoMergeBase` gives \"HEAD shares no history with origin/main\"; a drifted branch reports both commits and the rebase, as today.\n- [hard] REQ-03: CLI tests assert REQ-02's messages for a repository without `origin/main` and for one whose `origin/main` has unrelated history; today both report the quoted merge-base failure, so they fail.\n- [hard] REQ-04: A CLI test runs `jit validate --branch-drift` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a drifted repository, and asserts the drift failure; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Behaviour change: failure messages name the missing fact and no longer quote git's stderr; the exit status is unchanged.\n- Whether the check runs, and against which base, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit validate --branch-drift` compare through the git module in the selected worktree, instead of running git in the process working directory, and report each outcome with its own message.\n\n## Background\n\n- `validate_branch_drift` (`crates/jit/src/commands/validate.rs:2162-2211`) runs `git merge-base HEAD origin/main` and `git rev-parse origin/main` with no directory, so it inspects the process working directory even when `JIT_DATA_DIR` selects another repository. The CLI calls it at `crates/jit/src/main.rs:6770`.\n- Its failures quote git's stderr: \"Failed to get merge-base with origin/main: <stderr>\", reported for a missing `origin/main` and for unrelated histories alike, and \"Failed to get origin/main commit: <stderr>\". A drifted branch reports both commits and `git rebase origin/main`. Every failure exits 1, as the projected `validate --branch-drift` row states (`crates/jit/src/schema.rs:982`; `crates/jit/tests/cli_issue/command_exit_code_projection_tests.rs:737`).\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- CLI tests: `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:640` and `crates/jit/tests/cli_repo_workflow/worktree_cli_tests.rs:652`, built on `setup_repo` and `attach_origin_remote` in the same file.\n\n## Success Criteria\n\n- [hard] REQ-01: `validate_branch_drift` compares through the module's base comparison of `require_worktree_paths()?.git()` with base `origin/main`, and `commands/validate.rs` starts no git process for it.\n- [hard] REQ-02: Each outcome exits 1 with its own message: no git checkout gives \"branch drift validation requires a git repository\"; `BaseUnresolved` gives \"origin/main does not resolve to a commit\"; `NoMergeBase` gives \"HEAD shares no history with origin/main\"; a drifted branch reports both commits and the rebase, as today.\n- [hard] REQ-03: CLI tests assert REQ-02's messages for a repository without `origin/main` and for one whose `origin/main` has unrelated history; today both report the quoted merge-base failure, so they fail.\n- [hard] REQ-04: A CLI test runs `jit validate --branch-drift` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a drifted repository, and asserts the drift failure; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Behaviour change: failure messages name the missing fact and no longer quote git's stderr; the exit status is unchanged.\n- Whether the check runs, and against which base, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -924,7 +966,7 @@
  {
   "key": "main-history-guard-through-module",
   "title": "Main-history guard runs against the selected worktree",
-  "description": "Make the guard on gate-registry changes compare through the git module in the selected worktree, instead of probing and comparing in the process working directory.\n\n## Background\n\n- `enforce_main_only_operations` (`crates/jit/src/commands/worktree.rs:448-477`) skips in test mode, runs `git rev-parse --git-dir` in the process directory to decide whether git applies, and then calls `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`), which also runs in the process directory and reads a failing merge base or a missing `origin/main` as \"not diverged\".\n- The executor methods `add_gate_definition`, `define_gate`, `update_gate` and `remove_gate_definition` call it (`crates/jit/src/commands/gate.rs:1098`, `:1147`, `:1243`, `:1258`).\n- Its unit tests `test_check_branch_divergence_on_main` (`crates/jit/src/commands/worktree.rs:1073-1081`) and `test_enforce_main_only_operations_when_diverged` (`crates/jit/src/commands/worktree.rs:1084-1087`) assert nothing.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- The two free functions become one executor method in the same change; keeping them beside it would leave two guard implementations (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: The guard is an executor method comparing through the module's base comparison of the executor's paths with base `origin/main`. It refuses only on a `Compared` outcome whose merge base differs from the base's commit, with today's message; without a git checkout, on `BaseUnresolved` and on `NoMergeBase` it allows the operation as today, and test mode still skips it.\n- [hard] REQ-02: `check_branch_divergence`, `enforce_main_only_operations` and their two empty tests no longer exist, and neither `commands/worktree.rs` nor `commands/gate.rs` starts a git process for the guard.\n- [hard] REQ-03: A CLI test runs `jit gate define` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a repository whose branch diverged, and asserts the guard's refusal; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Whether the guard runs at all, and against which remote branch, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the guard on gate-registry changes compare through the git module in the selected worktree, instead of probing and comparing in the process working directory.\n\n## Background\n\n- `enforce_main_only_operations` (`crates/jit/src/commands/worktree.rs:448-477`) skips in test mode, runs `git rev-parse --git-dir` in the process directory to decide whether git applies, and then calls `check_branch_divergence` (`crates/jit/src/commands/worktree.rs:388-420`), which also runs in the process directory and reads a failing merge base or a missing `origin/main` as \"not diverged\".\n- The executor methods `add_gate_definition`, `define_gate`, `update_gate` and `remove_gate_definition` call it (`crates/jit/src/commands/gate.rs:1108`, `:1157`, `:1253`, `:1268`).\n- Its unit tests `test_check_branch_divergence_on_main` (`crates/jit/src/commands/worktree.rs:1073-1081`) and `test_enforce_main_only_operations_when_diverged` (`crates/jit/src/commands/worktree.rs:1084-1087`) assert nothing.\n- The module's base comparison returns `Compared`, `BaseUnresolved` or `NoMergeBase`.\n- The two free functions become one executor method in the same change; keeping them beside it would leave two guard implementations (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: The guard is an executor method comparing through the module's base comparison of the executor's paths with base `origin/main`. It refuses only on a `Compared` outcome whose merge base differs from the base's commit, with today's message; without a git checkout, on `BaseUnresolved` and on `NoMergeBase` it allows the operation as today, and test mode still skips it.\n- [hard] REQ-02: `check_branch_divergence`, `enforce_main_only_operations` and their two empty tests no longer exist, and neither `commands/worktree.rs` nor `commands/gate.rs` starts a git process for the guard.\n- [hard] REQ-03: A CLI test runs `jit gate define` from a repository that matches its `origin/main`, with `JIT_DATA_DIR` selecting a repository whose branch diverged, and asserts the guard's refusal; today's code inspects the process directory and succeeds, so the test fails.\n\n## Notes\n\n- Whether the guard runs at all, and against which remote branch, is decided outside this change.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1024,7 +1066,7 @@
  {
   "key": "git-surface-trim",
   "title": "Trim the layout and git module surface to production callers",
-  "description": "Delete the layout detection entry point and accessors that only tests reach, and confirm that the git module exposes only operations production code calls and is the only production code that starts git.\n\n## Background\n\n- `WorktreePaths::detect_from` (`crates/jit/src/storage/worktree_paths.rs:54-56`) lost its production caller when repository validation stopped checking the claims index. Tests call it at `crates/jit/src/commands/mod.rs:4332`, `:4362` and `:4447`.\n- `WorktreePaths::detect` (`crates/jit/src/storage/worktree_paths.rs:28-30`) detects from the process working directory and has no production caller; its one test, `test_detect_in_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:271-287`), detects the test process's own checkout.\n- `WorktreePaths::is_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:174-176`) has one caller, a test at `crates/jit/src/commands/worktree.rs:1004`.\n- `storage::git` gained its operations together with their production callers. The constructors that take another executable exist for tests.\n- `crates/jit/tests/cli_repo_workflow/init_tests.rs:169` names `WorktreePaths::detect()` in a comment.\n- A grep of `crates/jit/src` and `crates/server/src` finds the remaining git spawns only in `#[cfg(test)]` modules and in `jit::test_harness`.\n\n## Success Criteria\n\n- [hard] REQ-01: `WorktreePaths` has one detection function, `detect_for_data_root`. `detect`, `detect_from`, `is_main_worktree` and `test_detect_in_main_worktree` no longer exist, the remaining test callers use `detect_for_data_root` and `is_worktree`, and no comment names a deleted detection entry point.\n- [hard] REQ-02: Every public item of `storage::git` has a production caller, and constructors taking another executable compile only under `test-support`.\n- [hard] REQ-03: Among production sources, only `crates/jit/src/storage/git.rs` constructs a process for git or names the git executable; `#[cfg(test)]` modules, code compiled only under `test-support` (`jit::test_harness`), and integration tests may.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Delete the layout detection entry point and accessors that only tests reach, and confirm that the git module exposes only operations production code calls and is the only production code that starts git.\n\n## Background\n\n- `WorktreePaths::detect_from` (`crates/jit/src/storage/worktree_paths.rs:54-56`) lost its production caller when repository validation stopped checking the claims index. Tests call it at `crates/jit/src/commands/mod.rs:4362`, `:4392` and `:4477`.\n- `WorktreePaths::detect` (`crates/jit/src/storage/worktree_paths.rs:28-30`) detects from the process working directory and has no production caller; its one test, `test_detect_in_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:271-287`), detects the test process's own checkout.\n- `WorktreePaths::is_main_worktree` (`crates/jit/src/storage/worktree_paths.rs:174-176`) has one caller, a test at `crates/jit/src/commands/worktree.rs:1004`.\n- `storage::git` gained its operations together with their production callers. The constructors that take another executable exist for tests.\n- `crates/jit/tests/cli_repo_workflow/init_tests.rs:169` names `WorktreePaths::detect()` in a comment.\n- A grep of `crates/jit/src` and `crates/server/src` finds the remaining git spawns only in `#[cfg(test)]` modules and in `jit::test_harness`.\n\n## Success Criteria\n\n- [hard] REQ-01: `WorktreePaths` has one detection function, `detect_for_data_root`. `detect`, `detect_from`, `is_main_worktree` and `test_detect_in_main_worktree` no longer exist, the remaining test callers use `detect_for_data_root` and `is_worktree`, and no comment names a deleted detection entry point.\n- [hard] REQ-02: Every public item of `storage::git` has a production caller, and constructors taking another executable compile only under `test-support`.\n- [hard] REQ-03: Among production sources, only `crates/jit/src/storage/git.rs` constructs a process for git or names the git executable; `#[cfg(test)]` modules, code compiled only under `test-support` (`jit::test_harness`), and integration tests may.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1054,7 +1096,7 @@
    "lease-validation-lists-once",
    "branch-drift-through-module",
    "main-history-guard-through-module",
-   "archive-pinned-reads-batched",
+   "git-revision-bridge-removal",
    "drop-libgit2"
   ],
   "planning": {
@@ -1089,7 +1131,7 @@
  {
   "key": "head-tier-removal",
   "title": "Issue reads stop consulting git HEAD",
-  "description": "Remove the git `HEAD` tier from issue reads, so reading issues starts no git process and loads no git object in any checkout, and a locally deleted issue stays deleted.\n\n## Background\n\n- Issue reads aggregate three sources: the checkout's own data root, the data root's files in the `HEAD` tree, and, in a linked checkout, the primary checkout's data root. `load_aggregated_index` (`crates/jit/src/storage/json.rs:752-803`) merges `load_index_from_git` (`crates/jit/src/storage/json.rs:822-863`), which opens libgit2 on every aggregated read, including in a primary checkout. `load_issue` (`crates/jit/src/storage/json.rs:1176-1214`) and `load_issue_or_not_found` (`crates/jit/src/storage/json.rs:1216-1254`) fall back to `load_issue_from_git` (`crates/jit/src/storage/json.rs:891-919`), one `git show` process per missing issue with the literal `git`.\n- The data root's own `.gitignore` ignores only `/tmp/`, so `index.json` and the issue records are tracked, and every checkout already has its `HEAD` tree's records on disk. The `HEAD` tier adds a record only when it is committed and absent from the checkout's files: an uncommitted local deletion.\n- Reproduced in a primary checkout: after committing an issue and deleting it with `JIT_ALLOW_DELETION=1 jit issue delete`, `jit issue show <full-id>` still returns it from `HEAD` through the full-id fast path of `resolve_issue_id` (`crates/jit/src/storage/json.rs:1256-1268`), while `jit issue show <prefix>` reports not found and `jit query all` lists nothing.\n- Tier tests: `crates/jit/src/storage/json.rs:2337`, `:2425`, `:2467`, `:2491`, `:2531`, `:2695`, `:2743`. CLI: `test_issue_show_reads_from_git_in_secondary_worktree` (`crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs:86`) passes without the tier, and `test_query_all_shows_issues_from_all_sources` (`:184`) names git in its messages.\n- `IssueNotFoundError::AcrossSources` reads \"not found in local storage, git, or main worktree\" (`crates/jit/src/storage/errors.rs:35`).\n\n## Success Criteria\n\n- [hard] REQ-01: Issue and index reads use the checkout's own data root and, in a linked checkout, the primary checkout's data root. `load_index_from_git` and `load_issue_from_git` no longer exist, and `storage/json.rs` reads issues through no git process or object.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: a committed issue deleted locally is not found by its full id, just as it is not found by prefix or in listings.\n- [hard] REQ-03: The unit tests of the `HEAD` tier are deleted; the precedence tests keep local over primary checkout. The secondary-worktree CLI test is renamed for what it proves (an issue committed before the linked checkout was made is read from that checkout's own store), and no CLI assertion message names git as a read source.\n- [hard] REQ-04: Rustdoc and the not-found message name only the checkout's own store and the primary checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Remove the git `HEAD` tier from issue reads, so reading issues starts no git process and loads no git object in any checkout, and a locally deleted issue stays deleted.\n\n## Background\n\n- Issue reads aggregate three sources: the checkout's own data root, the data root's files in the `HEAD` tree, and, in a linked checkout, the primary checkout's data root. `load_aggregated_index` (`crates/jit/src/storage/json.rs:752-803`) merges `load_index_from_git` (`crates/jit/src/storage/json.rs:822-863`), which opens libgit2 on every aggregated read, including in a primary checkout. `load_issue` (`crates/jit/src/storage/json.rs:1176-1214`) and `load_issue_or_not_found` (`crates/jit/src/storage/json.rs:1216-1254`) fall back to `load_issue_from_git` (`crates/jit/src/storage/json.rs:891-919`), one `git show` process per missing issue with the literal `git`.\n- The data root's own `.gitignore` ignores only `/tmp/`, so `index.json` and the issue records are tracked, and every checkout already has its `HEAD` tree's records on disk. The `HEAD` tier adds a record only when it is committed and absent from the checkout's files: an uncommitted local deletion.\n- Reproduced in a primary checkout: after committing an issue and deleting it with `JIT_ALLOW_DELETION=1 jit issue delete`, `jit issue show <full-id>` still returns it from `HEAD` through the full-id fast path of `resolve_issue_id` (`crates/jit/src/storage/json.rs:1256-1267`), while `jit issue show <prefix>` reports not found and `jit query all` lists nothing.\n- Tier tests: `crates/jit/src/storage/json.rs:2336`, `:2424`, `:2466`, `:2490`, `:2530`, `:2694`, `:2742`. CLI: `test_issue_show_reads_from_git_in_secondary_worktree` (`crates/jit/tests/cli_repo_workflow/cross_worktree_integration_tests.rs:86`) passes without the tier, and `test_query_all_shows_issues_from_all_sources` (`:184`) names git in its messages.\n- `IssueNotFoundError::AcrossSources` reads \"not found in local storage, git, or main worktree\" (`crates/jit/src/storage/errors.rs:35`).\n\n## Success Criteria\n\n- [hard] REQ-01: Issue and index reads use the checkout's own data root and, in a linked checkout, the primary checkout's data root. `load_index_from_git` and `load_issue_from_git` no longer exist, and `storage/json.rs` reads issues through no git process or object.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: a committed issue deleted locally is not found by its full id, just as it is not found by prefix or in listings.\n- [hard] REQ-03: The unit tests of the `HEAD` tier are deleted; the precedence tests keep local over primary checkout. The secondary-worktree CLI test is renamed for what it proves (an issue committed before the linked checkout was made is read from that checkout's own store), and no CLI assertion message names git as a read source.\n- [hard] REQ-04: Rustdoc and the not-found message name only the checkout's own store and the primary checkout.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1181,8 +1223,8 @@
  },
  {
   "key": "pinned-reads-into-module",
-  "title": "Pinned revision reads move into the git module",
-  "description": "Move commit resolution, pinned path reads and pinned target inspection from `storage/git_revision.rs` into the git module, so that file stops starting git and the module's executable replaces the storage test hook.\n\n## Background\n\n- `crates/jit/src/storage/git_revision.rs` holds `GitRevisionResolver` (repository root plus program; `new` names the literal `git` at `crates/jit/src/storage/git_revision.rs:131`, `with_git_program` at `:138`), `resolve_commit` (`crates/jit/src/storage/git_revision.rs:153`), `read_pinned_path` (`crates/jit/src/storage/git_revision.rs:170`), `inspect_pinned_targets` (`crates/jit/src/storage/git_revision.rs:213`), a `run` helper using `current_dir(repo_root)` (`crates/jit/src/storage/git_revision.rs:439-451`), and a write-all-then-read `git cat-file --batch` (`read_blob_batch`, `crates/jit/src/storage/git_revision.rs:508-606`; parser `parse_cat_file_batch`, `crates/jit/src/storage/git_revision.rs:640-691`). Its errors are `GitRevisionError` (`crates/jit/src/storage/git_revision.rs:25`).\n- Consumers: the re-export at `crates/jit/src/storage/mod.rs:58`; `JsonFileStorage::inspect_pinned_targets` (`crates/jit/src/storage/json.rs:490-504`), which builds a resolver from `git_program` (`crates/jit/src/storage/json.rs:403`), set only by `#[cfg(test)] with_git_program` (`crates/jit/src/storage/json.rs:481-488`), called at `crates/jit/src/storage/repository_state_store_tests.rs:2663`, `:2701`, `:2750`, `:2778`; the archive planner (`crates/jit/src/commands/archive.rs:184`, `:92`); and the behaviour suite `crates/jit/tests/fast_docs_templates/git_revision_tests.rs`, which builds resolvers at `:69`, `:92`, `:126` and `:157`, `:237`, `:351`, `:392`, `:426`, `:461`.\n- The module runs every git process as `<program> -C <dir> …`. The process-count assertions in both test files match logged arguments by their first word (`crates/jit/tests/fast_docs_templates/git_revision_tests.rs:364`, `:435`; `crates/jit/src/storage/repository_state_store_tests.rs:2677`, `:2770`), so they see the subcommand only after that prefix.\n- Kept as one change for a build reason: `inspect_pinned_targets` and the `with_git_program` callers compile only against the new checkout API.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout` offers `resolve_commit`, `read_pinned_path` and `inspect_pinned_targets` with today's semantics and results, spawning through the module's helper with `-C` the worktree root. `storage/git_revision.rs` no longer exists, and the module's error type carries its error variants.\n- [hard] REQ-02: `JsonFileStorage` holds a `Git` in place of `git_program`, its test-only constructor takes a `Git`, and pinned inspection runs on a checkout of that `Git` at the requested worktree root.\n- [hard] REQ-03: The temporary bridge `storage::GitRevisionResolver` remains, with only `new(repo_root)` and `read_pinned_path`, delegating to a default-executable `GitCheckout`. Its one user is the archive planner, which is otherwise untouched.\n- [hard] REQ-04: The behaviour suite moves from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` into `crates/jit/tests/fast_docs_templates/git_module_tests.rs` and runs against the module API. It and the storage capture tests keep their local wrappers, passed as an explicit program, and keep their process counts and subcommands, matched after the `-C <dir>` prefix.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "title": "Pinned revision reads move into the git module behind a bridge",
+  "description": "Move the logic of commit resolution, pinned path reads and pinned target inspection from `storage/git_revision.rs` into the git module, and leave `GitRevisionResolver` as a bridge that delegates to it, so the logic exists once and its callers move one at a time.\n\n## Background\n\n- `crates/jit/src/storage/git_revision.rs` holds `GitRevisionResolver` (repository root plus program; `new` at `crates/jit/src/storage/git_revision.rs:130`, `with_git_program` at `:138`), `resolve_commit` (`crates/jit/src/storage/git_revision.rs:153`), `read_pinned_path` (`crates/jit/src/storage/git_revision.rs:170`), `inspect_pinned_targets` (`crates/jit/src/storage/git_revision.rs:213`), a `run` helper using `current_dir(repo_root)` (`crates/jit/src/storage/git_revision.rs:439-451`), and a write-all-then-read `git cat-file --batch` (`read_blob_batch`, `crates/jit/src/storage/git_revision.rs:508-606`; parser `parse_cat_file_batch`, `crates/jit/src/storage/git_revision.rs:640-691`). Its errors are `GitRevisionError` (`crates/jit/src/storage/git_revision.rs:25`), re-exported at `crates/jit/src/storage/mod.rs:58`.\n- Its users are storage's pinned inspection (`crates/jit/src/storage/json.rs:490-504`), the archive planner (`crates/jit/src/commands/archive.rs:190`) and the behaviour suite `crates/jit/tests/fast_docs_templates/git_revision_tests.rs`.\n- The module starts every process with `-C <dir>`. The suite and the storage capture tests count processes with the shared stand-in, which records arguments after that prefix.\n- Kept as one change for a convergence reason: moving the logic and making the old type delegate to it are one step, so the logic never exists twice (`@/inv/convention-convergence`).\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout` offers `resolve_commit`, `read_pinned_path` and `inspect_pinned_targets` with today's semantics and results, spawning through the module's helper with `-C` the worktree root, and the module's error type carries `GitRevisionError`'s variants.\n- [hard] REQ-02: `storage/git_revision.rs` holds only the bridge: `GitRevisionResolver` keeps its public methods and delegates each to a `GitCheckout` built from its program and root, `GitRevisionError` names the module's error type, and the file starts no process.\n- [hard] REQ-03: The behaviour suite, the storage capture tests and the archive tests pass unchanged through the bridge.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1193,20 +1235,21 @@
    "per:@/charter/D-21",
    "enforces:@/invariant/convention-convergence",
    "satisfies:f4d9502a/REQ-02",
-   "satisfies:f4d9502a/REQ-03",
-   "satisfies:f4d9502a/REQ-11"
+   "satisfies:f4d9502a/REQ-03"
   ],
   "gates": [
    "cargo-ci",
    "code-review"
   ],
   "depends_on": [
-   "git-module-foundation"
+   "git-module-foundation",
+   "pinned-counting-wrappers-converge"
   ],
   "planning": {
-   "outcome": "Pinned revision reads live in the git module and git_revision.rs is gone.",
+   "outcome": "Pinned revision logic lives in the git module and the old resolver delegates to it.",
    "contract_refs": [
-    "git-module"
+    "git-module",
+    "git-test-fixtures"
    ],
    "produces_contracts": [
     "git-pinned-reads",
@@ -1215,21 +1258,108 @@
    "source_refs": [
     "REQ-02",
     "REQ-03",
-    "REQ-11",
     "DEC-07",
     "DEC-13"
    ],
    "terminal": {
     "consumer_family": "pinned revision reads",
     "test_boundary": "git module behaviour suite",
-    "worker_sized_reason": "One file's code moves into the module with its two production callers and its suite; a named bridge keeps the archive planner untouched.",
+    "worker_sized_reason": "One file's logic moves into the module while its type becomes a thin delegate, so no caller changes.",
     "footprint": {
      "touches": [
       "crates/jit/src/storage/git.rs",
       "crates/jit/src/storage/git_revision.rs",
-      "crates/jit/src/storage/mod.rs",
+      "crates/jit/src/storage/mod.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "storage-pinned-inspection-migration",
+  "title": "Storage pinned inspection runs on a module checkout",
+  "description": "Make storage's pinned target inspection run on a git module checkout and replace its test-only program path with an injectable `Git`.\n\n## Background\n\n- `JsonFileStorage::inspect_pinned_targets` (`crates/jit/src/storage/json.rs:490-504`) builds a `GitRevisionResolver` from `git_program` (`crates/jit/src/storage/json.rs:403`, default `:441`), which only `#[cfg(test)] with_git_program` (`crates/jit/src/storage/json.rs:481-488`) sets.\n- That constructor's callers are the storage capture tests at `crates/jit/src/storage/repository_state_store_tests.rs:2657`, `:2695`, `:2744` and `:2772`, which pass the shared counting stand-in.\n- `GitRevisionResolver` is a bridge over `GitCheckout`.\n\n## Success Criteria\n\n- [hard] REQ-01: `JsonFileStorage` holds a `Git` in place of `git_program`, its test-only constructor takes a `Git`, and pinned inspection calls `GitCheckout::inspect_pinned_targets` on a checkout of that `Git` at the requested worktree root, without the bridge.\n- [hard] REQ-02: The four capture tests construct storage with a `Git` naming the stand-in and keep their process counts and subcommands.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:storage",
+   "per:@/charter/D-21",
+   "satisfies:f4d9502a/REQ-03",
+   "satisfies:f4d9502a/REQ-11"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "pinned-reads-into-module"
+  ],
+  "planning": {
+   "outcome": "Storage pinned inspection uses a module checkout built from an injectable Git.",
+   "contract_refs": [
+    "git-pinned-reads",
+    "git-revision-resolver-bridge"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-03",
+    "REQ-11",
+    "DEC-07"
+   ],
+   "terminal": {
+    "consumer_family": "storage pinned inspection",
+    "test_boundary": "storage capture tests",
+    "worker_sized_reason": "One storage field, one constructor and one method change, with their four test callers.",
+    "footprint": {
+     "touches": [
       "crates/jit/src/storage/json.rs",
-      "crates/jit/src/storage/repository_state_store_tests.rs",
+      "crates/jit/src/storage/repository_state_store_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "pinned-read-suite-relocation",
+  "title": "Pinned-read behaviour suite moves into the git module suite",
+  "description": "Move the pinned-read behaviour suite into the git module's suite and point it at the module API instead of the bridge.\n\n## Background\n\n- `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` exercises `GitRevisionResolver` through `new` (`:69`, `:92`, `:126`) and `with_git_program` (`:157`, `:237`, `:351`, `:392`, `:426`, `:461`), and matches `GitRevisionError` variants. The type is a bridge over `GitCheckout`.\n- The module's behaviour suite is `crates/jit/tests/fast_docs_templates/git_module_tests.rs`; `crates/jit/tests/fast_docs_templates/main.rs` lists the suite's modules.\n\n## Success Criteria\n\n- [hard] REQ-01: The suite's cases live in `crates/jit/tests/fast_docs_templates/git_module_tests.rs` and build `GitCheckout` values with `Git::default()` or `Git::with_program`; `crates/jit/tests/fast_docs_templates/git_revision_tests.rs` and its module line no longer exist.\n- [hard] REQ-02: Every moved case keeps its assertions, matching the module's error variants.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:testing",
+   "per:@/charter/D-21",
+   "enforces:@/invariant/orthogonal-tests",
+   "satisfies:f4d9502a/REQ-02"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "pinned-reads-into-module"
+  ],
+  "planning": {
+   "outcome": "The pinned-read behaviour suite runs against the module API in the module suite.",
+   "contract_refs": [
+    "git-pinned-reads"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-02",
+    "DEC-16"
+   ],
+   "terminal": {
+    "consumer_family": "pinned-read behaviour suite",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One test file moves into another with a constructor swap and no assertion change.",
+    "footprint": {
+     "touches": [
       "crates/jit/tests/fast_docs_templates/git_revision_tests.rs",
       "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
       "crates/jit/tests/fast_docs_templates/main.rs"
@@ -1241,7 +1371,7 @@
  {
   "key": "pinned-counting-wrappers-converge",
   "title": "Pinned-read tests count processes with the shared stand-in",
-  "description": "Replace the two local counting wrappers in the pinned-read tests with the shared counting stand-in, so one fixture counts git processes.\n\n## Background\n\n- The module behaviour suite and the storage capture tests each write their own `#!/bin/sh` wrapper that logs `$*` and runs `exec git \"$@\"` (`counted_git` in `crates/jit/tests/fast_docs_templates/git_module_tests.rs`, moved from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:166-181`; `capture_git_fixture`, `crates/jit/src/storage/repository_state_store_tests.rs:2591-2638`), and both match logged lines after the module's `-C <dir>` prefix.\n- `jit::test_harness` provides a counting stand-in that records each invocation's arguments with the leading `-C <dir>` pair removed and can be passed as an explicit program.\n\n## Success Criteria\n\n- [hard] REQ-01: The behaviour suite and the storage capture tests count processes with the shared stand-in, and neither file defines its own wrapper or log reader.\n- [hard] REQ-02: Their process counts and subcommands are unchanged, matched on the stand-in's recorded arguments.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Replace the two local counting wrappers in the pinned-read tests with the shared counting stand-in, so one fixture counts git processes.\n\n## Background\n\n- The behaviour suite and the storage capture tests each write their own `#!/bin/sh` wrapper that logs `$*` and runs `exec git \"$@\"` (`counted_git`, `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:166-181`; `capture_git_fixture`, `crates/jit/src/storage/repository_state_store_tests.rs:2585-2632`), pass it as the program through `with_git_program`, and match logged lines by their first word (`crates/jit/tests/fast_docs_templates/git_revision_tests.rs:364`, `:435`; `crates/jit/src/storage/repository_state_store_tests.rs:2671`, `:2764`).\n- `jit::test_harness` provides a counting stand-in that can be passed as an explicit program and records each invocation's arguments with a leading `-C <dir>` pair removed, so its records stay the same when the reads start running through the git module.\n\n## Success Criteria\n\n- [hard] REQ-01: Both files count processes with the shared stand-in, and neither defines its own wrapper or log reader.\n- [hard] REQ-02: Their process counts and subcommands are unchanged.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1258,7 +1388,7 @@
    "code-review"
   ],
   "depends_on": [
-   "pinned-reads-into-module"
+   "git-cli-test-fixture"
   ],
   "planning": {
    "outcome": "Pinned-read tests count git processes through the shared stand-in only.",
@@ -1272,11 +1402,11 @@
    ],
    "terminal": {
     "consumer_family": "pinned-read process-count tests",
-    "test_boundary": "git module behaviour suite",
+    "test_boundary": "pinned-read test files",
     "worker_sized_reason": "Two test files swap a local wrapper for the shared fixture with no assertion change.",
     "footprint": {
      "touches": [
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
+      "crates/jit/tests/fast_docs_templates/git_revision_tests.rs",
       "crates/jit/src/storage/repository_state_store_tests.rs"
      ]
     }
@@ -1286,7 +1416,7 @@
  {
   "key": "git-object-reads",
   "title": "Object reader and presence check in the git module",
-  "description": "Give the git module one object reader that serves any number of reads through one `git cat-file --batch` process, and one presence check that serves any number of names through one `--batch-check` process.\n\n## Background\n\n- Pinned target inspection reads blobs with a write-all-then-read `cat-file --batch` over a list it knows upfront.\n- Readers that need objects use libgit2 today: storage reads at a commit (`crates/jit/src/storage/json.rs:1475-1531`), document show and diff (`read_file_from_git`, `crates/jit/src/commands/document.rs:823-837`), snapshot export (`read_from_git`, `crates/jit/src/commands/snapshot.rs:138-172`) and the asset presence check (`check_asset_in_git`, `crates/jit/src/commands/document.rs:1883-1898`). The archive planner starts three processes per pinned document (`inventory_issues_pinned_evidence`, `crates/jit/src/commands/archive.rs:90-105`).\n- Snapshot export learns which assets to read only after reading the documents that cite them, so a reader must accept requests after it has answered earlier ones.\n- `git cat-file --batch` without `--buffer` flushes each answer before reading the next request line, accepts names such as `<rev>:<path>` and `<rev>^{commit}`, and answers `<name> missing` for an absent object.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::object_reader()` starts one `cat-file --batch` process that answers reads until it is dropped. Each read returns the object's id, type and bytes, or absent when git reports the name missing; bytes holding NUL and newline round-trip.\n- [hard] REQ-02: `GitCheckout::object_types(names)` starts one `cat-file --batch-check` process and returns each name's object type, or absent.\n- [hard] REQ-03: A name containing a newline is rejected with the module's invalid-path error before git sees it.\n- [hard] REQ-04: Pinned target inspection reads its blobs through the same reader, so one `cat-file` answer parser remains.\n- [hard] REQ-05: The behaviour suite covers a blob, a tree, a missing path, an unresolvable revision, binary bytes and a missing executable, and counts one process per reader or presence call.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Give the git module one object reader that serves any number of reads through one `git cat-file --batch` process, and one presence check that serves any number of names through one `--batch-check` process.\n\n## Background\n\n- Readers that need objects use libgit2 today: storage reads at a commit (`crates/jit/src/storage/json.rs:1474-1530`), document show and diff (`read_file_from_git`, `crates/jit/src/commands/document.rs:848-862`), snapshot export (`read_from_git`, `crates/jit/src/commands/snapshot.rs:138-172`) and the asset presence check (`check_asset_in_git`, `crates/jit/src/commands/document.rs:1912-1927`). The archive planner starts three processes per pinned document (`inventory_issues_pinned_evidence`, `crates/jit/src/commands/archive.rs:90-105`).\n- Snapshot export learns which assets to read only after reading the documents that cite them, so a reader must accept requests after it has answered earlier ones.\n- `git cat-file --batch` without `--buffer` flushes each answer before reading the next request line, accepts names such as `<rev>:<path>` and `<rev>^{commit}`, and answers `<name> missing` for an absent object.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::object_reader()` starts one `cat-file --batch` process that answers reads until it is dropped. Each read returns the object's id, type and bytes, or absent when git reports the name missing; bytes holding NUL and newline round-trip.\n- [hard] REQ-02: `GitCheckout::object_types(names)` starts one `cat-file --batch-check` process and returns each name's object type, or absent.\n- [hard] REQ-03: A name containing a newline is rejected with the module's invalid-path error before git sees it.\n- [hard] REQ-04: The behaviour suite covers a blob, a tree, a missing path, an unresolvable revision, binary bytes and a missing executable, and counts one process per reader or presence call.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1295,7 +1425,6 @@
    "story:libgit2-removal",
    "component:storage",
    "per:@/charter/D-21",
-   "enforces:@/invariant/convention-convergence",
    "satisfies:f4d9502a/REQ-10"
   ],
   "gates": [
@@ -1303,7 +1432,7 @@
    "code-review"
   ],
   "depends_on": [
-   "pinned-reads-into-module"
+   "pinned-read-suite-relocation"
   ],
   "planning": {
    "outcome": "The git module reads many objects through one cat-file process per reader.",
@@ -1321,7 +1450,7 @@
    "terminal": {
     "consumer_family": "object reads",
     "test_boundary": "git module behaviour suite",
-    "worker_sized_reason": "One reader type and one presence call over one parser, with behaviour-suite cases.",
+    "worker_sized_reason": "One reader type and one presence call with behaviour-suite cases.",
     "footprint": {
      "touches": [
       "crates/jit/src/storage/git.rs",
@@ -1332,9 +1461,54 @@
   }
  },
  {
+  "key": "pinned-inspection-object-reader",
+  "title": "Pinned target inspection reads blobs through the object reader",
+  "description": "Make pinned target inspection read its blobs through the module's object reader, so one `cat-file` answer parser remains.\n\n## Background\n\n- `GitCheckout::inspect_pinned_targets` reads blobs with a write-all-then-read `cat-file --batch` and its own answer parser, moved from the revision resolver (`read_blob_batch` and `parse_cat_file_batch`).\n- The module's object reader answers the same requests through one process with its own parser.\n- The pinned-inspection cases in the module suite count processes per inspection.\n\n## Success Criteria\n\n- [hard] REQ-01: `inspect_pinned_targets` reads its blobs through one object reader, and the write-all-then-read batch and its parser no longer exist.\n- [hard] REQ-02: The pinned-inspection cases keep their results, process counts and subcommands.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:storage",
+   "per:@/charter/D-21",
+   "enforces:@/invariant/convention-convergence",
+   "satisfies:f4d9502a/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "git-object-reads"
+  ],
+  "planning": {
+   "outcome": "Pinned inspection reads blobs through the single object reader.",
+   "contract_refs": [
+    "git-object-reads",
+    "git-pinned-reads"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-10",
+    "DEC-13"
+   ],
+   "terminal": {
+    "consumer_family": "pinned target inspection",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One internal read path switches to the reader and its parallel parser goes.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/git.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "archive-pinned-reads-batched",
   "title": "Archive planning reads pinned evidence through one git process",
-  "description": "Make the archive planner resolve every pinned document through one module object reader on the invocation's checkout, removing the temporary resolver bridge.\n\n## Background\n\n- `plan_archive_target` (`crates/jit/src/commands/archive.rs:178-303`) builds `GitRevisionResolver::new(repo_root)` (`crates/jit/src/commands/archive.rs:184`), a bridge onto the git module with the default executable that ignores the invocation's checkout.\n- `inventory_issues_pinned_evidence` (`crates/jit/src/commands/archive.rs:90-105`) (called once, at `crates/jit/src/commands/archive.rs:242`) calls `read_pinned_path` for each pinned request, three git processes each (resolve, blob id, blob), and keeps only the resolved version: `Resolved(version)` on success, `Unavailable` otherwise.\n- `GitCheckout::read_pinned_path` has no other production caller. The module behaviour suite calls it in `test_git_revision_resolver_canonicalizes_symbolic_abbreviated_and_full_revisions` (moved from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:64`) and `test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blob_read` (moved from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:82`).\n- Archive preview CLI tests: `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs:339` onwards.\n\n## Success Criteria\n\n- [hard] REQ-01: The planner takes its git checkout from the executor's paths, and its in-process test fixture (`crates/jit/src/commands/archive.rs:884`) supplies detected paths. It resolves every pinned request through one object reader, reading `<rev>^{commit}` and `<rev>^{commit}:<path>`. Evidence is `Resolved(version)` exactly when the path names a file at the resolved commit, and `Unavailable` otherwise, including without a git checkout.\n- [hard] REQ-02: `GitRevisionResolver` and `GitCheckout::read_pinned_path` no longer exist. The behaviour-suite cases that call `read_pinned_path` keep their `resolve_commit` assertions and drop their pinned-path reads, whose unresolvable-revision and missing-path cases the object-reader suite owns.\n- [hard] REQ-03: A CLI test previews archives over one and over several pinned documents with the counting stand-in first on `PATH`, and asserts that both record the same number of git invocations; today's planner adds three per pinned document, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the archive planner resolve every pinned document through one module object reader on the invocation's checkout, instead of three processes per document through the revision resolver bridge.\n\n## Background\n\n- `plan_archive_target` (`crates/jit/src/commands/archive.rs:184-309`) builds `GitRevisionResolver::new(repo_root)` (`crates/jit/src/commands/archive.rs:190`), a bridge onto the git module with the default executable that ignores the invocation's checkout.\n- `inventory_issues_pinned_evidence` (`crates/jit/src/commands/archive.rs:90-105`), called once at `crates/jit/src/commands/archive.rs:248`, calls `read_pinned_path` for each pinned request, three git processes each (resolve, blob id, blob), and keeps only the resolved version: `Resolved(version)` on success, `Unavailable` otherwise.\n- The in-process test fixture `executor` (`crates/jit/src/commands/archive.rs:892-896`) builds executors without paths.\n- Archive preview CLI tests: `crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs:339` onwards.\n\n## Success Criteria\n\n- [hard] REQ-01: The planner takes its git checkout from the executor's paths, and its in-process test fixture supplies detected paths. It resolves every pinned request through one object reader, reading `<rev>^{commit}` and `<rev>^{commit}:<path>`.\n- [hard] REQ-02: Evidence is `Resolved(version)` exactly when the path names a file at the resolved commit, and `Unavailable` otherwise, including without a git checkout; `commands/archive.rs` no longer names `GitRevisionResolver`.\n- [hard] REQ-03: A CLI test previews archives over one and over several pinned documents with the counting stand-in first on `PATH`, and asserts that both record the same number of git invocations; today's planner adds three per pinned document, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1343,10 +1517,8 @@
    "story:libgit2-removal",
    "component:core",
    "per:@/charter/D-21",
-   "per:@/charter/D-18",
    "satisfies:f4d9502a/REQ-03",
-   "satisfies:f4d9502a/REQ-10",
-   "satisfies:f4d9502a/REQ-11"
+   "satisfies:f4d9502a/REQ-10"
   ],
   "gates": [
    "cargo-ci",
@@ -1367,20 +1539,68 @@
    "source_refs": [
     "REQ-03",
     "REQ-10",
-    "REQ-11",
     "DEC-13"
    ],
    "terminal": {
     "consumer_family": "archive planner",
     "test_boundary": "archive preview CLI tests",
-    "worker_sized_reason": "One evidence function switches to the reader and the bridge it used is deleted, with one counting test.",
+    "worker_sized_reason": "One evidence function switches from the bridge to the reader, with one counting test.",
     "footprint": {
      "touches": [
       "crates/jit/src/commands/archive.rs",
-      "crates/jit/src/storage/git.rs",
-      "crates/jit/src/storage/mod.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
       "crates/jit/tests/cli_repo_workflow/archive_preview_cli_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "git-revision-bridge-removal",
+  "title": "Remove the revision resolver bridge",
+  "description": "Delete the temporary `GitRevisionResolver` bridge and the single-path pinned read that only it and tests use.\n\n## Background\n\n- `crates/jit/src/storage/git_revision.rs` holds only `GitRevisionResolver`, a bridge delegating to `GitCheckout`, and the `GitRevisionError` name, re-exported at `crates/jit/src/storage/mod.rs:58`. Storage, the archive planner and the behaviour suite use the module API directly.\n- `GitCheckout::read_pinned_path` has no production caller once the archive planner reads through the object reader. The module suite calls it in `test_git_revision_resolver_canonicalizes_symbolic_abbreviated_and_full_revisions` and `test_git_revision_resolver_never_falls_back_on_invalid_revision_or_failed_blob_read` (moved from `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:64` and `crates/jit/tests/fast_docs_templates/git_revision_tests.rs:82`).\n\n## Success Criteria\n\n- [hard] REQ-01: `storage/git_revision.rs`, `GitRevisionResolver`, the `GitRevisionError` name and their re-exports no longer exist.\n- [hard] REQ-02: `GitCheckout::read_pinned_path` no longer exists. The two suite cases that call it keep their `resolve_commit` assertions and drop their pinned-path reads, whose unresolvable-revision and missing-path cases the object-reader cases own.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:storage",
+   "per:@/charter/D-21",
+   "per:@/charter/D-18",
+   "enforces:@/invariant/canonical-cutover",
+   "satisfies:f4d9502a/REQ-02",
+   "satisfies:f4d9502a/REQ-11"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "archive-pinned-reads-batched",
+   "storage-pinned-inspection-migration"
+  ],
+  "planning": {
+   "outcome": "The revision resolver bridge and the single-path pinned read are gone.",
+   "contract_refs": [
+    "git-revision-resolver-bridge",
+    "git-object-reads"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-02",
+    "REQ-11",
+    "DEC-13"
+   ],
+   "terminal": {
+    "consumer_family": "revision resolver bridge",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One bridge file and one method are deleted, with two suite cases trimmed.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/git_revision.rs",
+      "crates/jit/src/storage/mod.rs",
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
      ]
     }
    }
@@ -1389,7 +1609,7 @@
  {
   "key": "pinned-path-reads-through-module",
   "title": "Path reads at a commit go through the git module",
-  "description": "Make storage's read of a repository path at a commit use the git module's object reader instead of libgit2.\n\n## Background\n\n- `JsonFileStorage::read_path_bytes` (`crates/jit/src/storage/json.rs:1475-1531`) opens libgit2 for a read at a commit (`crates/jit/src/storage/json.rs:1493`), resolves the revision and peels it to a commit, and reads the path from its tree. It maps an unresolvable revision to `PathReadError::CommitNotFound`, an absent path to `NotFound` and other failures to `Other`, and labels the result with the commit's first seven hex digits. Working-tree reads use the confined reader.\n- Consumers: `CommandExecutor::read_path_bytes` (`crates/jit/src/commands/document.rs:815`), `read_document_content` and `read_document_bytes` (`crates/jit/src/commands/document.rs:641`, `crates/jit/src/commands/document.rs:675`), `IssueStore::read_path_text` (`crates/jit/src/storage/mod.rs:391`), and the server's raw document routes (`crates/server/src/routes.rs:369`, `:685`, `:739`).\n\n## Success Criteria\n\n- [hard] REQ-01: A read at a commit resolves the commit and reads the path through one object reader on a checkout of the storage's `Git` at the layout's worktree root, and `read_path_bytes` uses no git2.\n- [hard] REQ-02: Results and error variants are unchanged: the bytes, the first seven hex digits of the resolved commit, `CommitNotFound` for an unresolvable revision, `NotFound` for an absent path, and `InvalidPath` for a rejected path.\n- [hard] REQ-03: The existing `read_path_bytes` tests and the server document API tests pass, and a unit test reads a binary file and an absent path at a commit of a real repository.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make storage's read of a repository path at a commit use the git module's object reader instead of libgit2.\n\n## Background\n\n- `JsonFileStorage::read_path_bytes` (`crates/jit/src/storage/json.rs:1474-1530`) opens libgit2 for a read at a commit (`crates/jit/src/storage/json.rs:1492`), resolves the revision and peels it to a commit, and reads the path from its tree. It maps an unresolvable revision to `PathReadError::CommitNotFound`, an absent path to `NotFound` and other failures to `Other`, and labels the result with the commit's first seven hex digits. Working-tree reads use the confined reader.\n- Consumers: `CommandExecutor::read_path_bytes` (`crates/jit/src/commands/document.rs:840`), `read_document_content` and `read_document_bytes` (`crates/jit/src/commands/document.rs:666`, `crates/jit/src/commands/document.rs:700`), `IssueStore::read_path_text` (`crates/jit/src/storage/mod.rs:389`), and the server's raw document routes (`crates/server/src/routes.rs:369`, `:685`, `:739`).\n\n## Success Criteria\n\n- [hard] REQ-01: A read at a commit resolves the commit and reads the path through one object reader on a checkout of the storage's `Git` at the layout's worktree root, and `read_path_bytes` uses no git2.\n- [hard] REQ-02: Results and error variants are unchanged: the bytes, the first seven hex digits of the resolved commit, `CommitNotFound` for an unresolvable revision, `NotFound` for an absent path, and `InvalidPath` for a rejected path.\n- [hard] REQ-03: The existing `read_path_bytes` tests and the server document API tests pass, and a unit test reads a binary file and an absent path at a commit of a real repository.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1438,7 +1658,7 @@
  {
   "key": "document-show-reads-storage",
   "title": "Document show reads through storage at the version it names",
-  "description": "Make `jit doc show` read through storage at the version the request names, so an unpinned document is read from the working tree and the command holds no git code.\n\n## Background\n\n- `show_document_content` (`crates/jit/src/commands/document.rs:489-544`) opens libgit2 for `--at` or a pinned reference and reads through `read_file_from_git`. Without either, it reads `HEAD` when a repository opens and the working tree otherwise. An unpinned document therefore shows committed content, and an uncommitted derived file cannot be shown (`docs/reference/cli-commands.md:2993`).\n- Its git-side failures are `git2::Error` values wrapped in context, which classify as the generic error with exit 1. `IssueStore::read_path_text` fails with `PathReadError` instead, and the classifier maps each variant to its own code (`crates/jit/src/output/failure.rs:338`), as the path-read classification establishes: a missing document or unresolvable commit gets the document-not-found code in the not-found exit class (3), and a rejected or escaping path gets `INVALID_ARGUMENT`.\n- The server reads an unpinned document from the working tree (`read_document_content`, `crates/jit/src/commands/document.rs:641-659`).\n- Tests: `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:22`, `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:84`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:214`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:238`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit doc show` reads through `IssueStore::read_path_text` with the explicit `--at`, else the reference's pinned commit, else the working tree, and `show_document_content` uses no git2.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: an unpinned document with an uncommitted edit shows the edited content and reports `working-tree` as its commit. A pinned or `--at` read reports the requested reference, as today.\n- [hard] REQ-03: Read failures carry the path-read classification: `jit doc show --at <unresolvable>` reports the document-not-found code with exit 3, and a pinned read of a path absent at its commit reports the same. CLI tests assert both, including `test_doc_show_at_invalid_commit`; today both exit 1 with the generic code, so they fail.\n- [hard] REQ-04: Without git, an unpinned show works and a pinned show fails; `test_doc_show_at_head_by_default` is renamed for the working-tree read it now proves.\n\n## Notes\n\n- Behaviour change: an unpinned show reads the working tree, as the server already does, and read failures take the path-read codes.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make `jit doc show` read through storage at the version the request names, so an unpinned document is read from the working tree and the command holds no git code.\n\n## Background\n\n- `show_document_content` (`crates/jit/src/commands/document.rs:497-554`) opens libgit2 for `--at` or a pinned reference and reads through `read_file_from_git`. Without either, it reads `HEAD` when a repository opens and the working tree otherwise. An unpinned document therefore shows committed content, and an uncommitted derived file cannot be shown (`docs/reference/cli-commands.md:2993`).\n- Its git-side failures are `git2::Error` values wrapped in context, which classify as the generic error with exit 1. `IssueStore::read_path_text` fails with `PathReadError` instead, and the classifier maps each variant to its own code (`crates/jit/src/output/failure.rs:338`), as the path-read classification establishes: a missing document or unresolvable commit gets the document-not-found code in the not-found exit class (3), and a rejected or escaping path gets `INVALID_ARGUMENT`.\n- The server reads an unpinned document from the working tree (`read_document_content`, `crates/jit/src/commands/document.rs:666-684`).\n- Tests: `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:22`, `crates/jit/tests/cli_repo_workflow/doc_show_tests.rs:84`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:214`, `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:238`.\n\n## Success Criteria\n\n- [hard] REQ-01: `jit doc show` reads through `IssueStore::read_path_text` with the explicit `--at`, else the reference's pinned commit, else the working tree, and `show_document_content` uses no git2.\n- [hard] REQ-02: A test asserts the behaviour change and fails on today's code: an unpinned document with an uncommitted edit shows the edited content and reports `working-tree` as its commit. A pinned or `--at` read reports the requested reference, as today.\n- [hard] REQ-03: Read failures carry the path-read classification: `jit doc show --at <unresolvable>` reports the document-not-found code with exit 3, and a pinned read of a path absent at its commit reports the same. CLI tests assert both, including `test_doc_show_at_invalid_commit`; today both exit 1 with the generic code, so they fail.\n- [hard] REQ-04: Without git, an unpinned show works and a pinned show fails; `test_doc_show_at_head_by_default` is renamed for the working-tree read it now proves.\n\n## Notes\n\n- Behaviour change: an unpinned show reads the working tree, as the server already does, and read failures take the path-read codes.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1486,7 +1706,7 @@
  {
   "key": "document-diff-through-module",
   "title": "Document diff reads both versions through one git process",
-  "description": "Make the CLI and server document diff read both versions through one git module object reader, removing the last libgit2 blob reader in the document commands.\n\n## Background\n\n- `document_diff` (`crates/jit/src/commands/document.rs:569-618`) and `get_document_diff` (`crates/jit/src/commands/document.rs:739-789`) each open libgit2 and call `read_file_from_git` (`crates/jit/src/commands/document.rs:823-837`) twice, then render a unified diff with the `similar` crate.\n- Outside git the CLI variant fails with \"Not a git repository\", and the server variant returns `PathReadError::Other(\"Document diff not available (requires git repository with history)\")`.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:263`, `:305`, and the server's `crates/server/tests/server_integration/document_api_tests.rs`.\n- Kept as one change for a build reason: `read_file_from_git` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants read the two versions through one object reader on the executor's git checkout. `read_file_from_git` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: Diff output is byte-identical, so the CLI and server diff tests pass unchanged; outside git each variant fails as today.\n- [hard] REQ-03: A CLI test with the counting stand-in first on `PATH` asserts one `cat-file` invocation for `jit doc diff`; today the diff runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the CLI and server document diff read both versions through one git module object reader, removing the last libgit2 blob reader in the document commands.\n\n## Background\n\n- `document_diff` (`crates/jit/src/commands/document.rs:581-632`) and `get_document_diff` (`crates/jit/src/commands/document.rs:764-814`) each open libgit2 and call `read_file_from_git` (`crates/jit/src/commands/document.rs:848-862`) twice, then render a unified diff with the `similar` crate.\n- Outside git the CLI variant fails with \"Not a git repository\", and the server variant returns `PathReadError::Other(\"Document diff not available (requires git repository with history)\")`.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:263`, `:305`, and the server's `crates/server/tests/server_integration/document_api_tests.rs`.\n- Kept as one change for a build reason: `read_file_from_git` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants read the two versions through one object reader on the executor's git checkout. `read_file_from_git` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: Diff output is byte-identical, so the CLI and server diff tests pass unchanged; outside git each variant fails as today.\n- [hard] REQ-03: A CLI test with the counting stand-in first on `PATH` asserts one `cat-file` invocation for `jit doc diff`; today the diff runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1534,9 +1754,56 @@
   }
  },
  {
+  "key": "git-file-history",
+  "title": "Path history query in the git module",
+  "description": "Add the git module's query for the commits that touched one path, backed by one `git log` process.\n\n## Background\n\n- Document history walks the whole history from `HEAD` in libgit2 (`get_file_history`, `crates/jit/src/commands/document.rs:864-914`), so its cost grows with project history (`@/charter/D-19`).\n- `git log -z --format=… -- <path>` lists the commits touching a path newest first, applies git's default history simplification, and can use commit-graph filters.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::file_history(path)` runs one `git log` over the path and returns commits newest first with full id, author name, commit time and message.\n- [hard] REQ-02: The behaviour suite covers an added, a changed and a deleted path, a merge identical to one parent, a message with newlines, and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:storage",
+   "per:@/charter/D-21",
+   "per:@/charter/D-19",
+   "satisfies:f4d9502a/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "git-module-foundation"
+  ],
+  "planning": {
+   "outcome": "The git module lists a path's history with one git log process.",
+   "contract_refs": [
+    "git-module"
+   ],
+   "produces_contracts": [
+    "git-file-history"
+   ],
+   "source_refs": [
+    "REQ-10",
+    "DEC-13"
+   ],
+   "terminal": {
+    "consumer_family": "path history query",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One operation with one parser and its behaviour-suite cases.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "document-history-through-module",
-  "title": "Document history comes from one git log process",
-  "description": "Give the git module a path-history query backed by one `git log` process, and make the CLI and server document history use it instead of walking history in libgit2.\n\n## Background\n\n- `get_file_history` (`crates/jit/src/commands/document.rs:839-889`) walks the whole history from `HEAD` in libgit2, so its cost grows with project history (`@/charter/D-19`). It lists a commit whose tree holds the path when the path is added or its blob differs from the first parent's; a commit deleting the path is never listed, and a merge is compared with its first parent only.\n- `document_history` (`crates/jit/src/commands/document.rs:546-567`) fails outside git; `get_document_history` (`crates/jit/src/commands/document.rs:706-729`) returns an empty list there. Both produce `CommitInfo` with a seven-character id, the author name, the commit time as `%Y-%m-%d %H:%M:%S` UTC and the trimmed message.\n- `git log` over a path delegates the walk to git, which can use commit-graph filters, and applies git's default history simplification.\n- Kept as one change for a build reason: the query has one consumer family, these two variants, and the module exposes only operations production code calls.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:108` onwards.\n- `get_file_history` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::file_history(path)` runs one `git log` over the path and returns commits newest first with full id, author name, commit time and message. Both variants map it to `CommitInfo` as today, `get_file_history` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: Tests on a constructed repository assert the behaviour change: a commit that deletes the path is listed (today omitted, so this assertion fails on today's code), and a merge identical to one parent for the path is omitted.\n- [hard] REQ-03: The CLI command still fails outside git and the server variant still returns an empty list there.\n- [hard] REQ-04: The server routes' `test_executor` (`crates/server/src/routes.rs:1054-1080`) supplies detected `WorktreePaths` through `with_worktree_paths` for file-backed storage, and `test_document_reads_serve_a_derived_document_without_a_link` (`crates/server/src/routes.rs:2225`), which asserts a history count and a diff, passes unchanged.\n\n## Notes\n\n- Behaviour change: history follows git's default history simplification for the path.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "title": "Document history comes from the module's path history",
+  "description": "Make the CLI and server document history read the git module's path history instead of walking history in libgit2.\n\n## Background\n\n- `get_file_history` (`crates/jit/src/commands/document.rs:864-914`) walks the whole history from `HEAD` in libgit2. It lists a commit whose tree holds the path when the path is added or its blob differs from the first parent's; a commit deleting the path is never listed, and a merge is compared with its first parent only.\n- `document_history` (`crates/jit/src/commands/document.rs:556-579`) fails outside git; `get_document_history` (`crates/jit/src/commands/document.rs:731-754`) returns an empty list there. Both produce `CommitInfo` with a seven-character id, the author name, the commit time as `%Y-%m-%d %H:%M:%S` UTC and the trimmed message.\n- `GitCheckout::file_history(path)` returns the path's commits under git's default history simplification.\n- The server routes' `test_executor` (`crates/server/src/routes.rs:1054-1080`) builds executors without paths, and `test_document_reads_serve_a_derived_document_without_a_link` (`crates/server/src/routes.rs:2225`) asserts a history count and a diff over a real repository.\n- Tests: `crates/jit/tests/cli_repo_workflow/document_history_tests.rs:108` onwards.\n- Kept as one change for a build reason: `get_file_history` is private, and an uncalled private method fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Both variants map `file_history` of the executor's git checkout to `CommitInfo` as today, `get_file_history` no longer exists, and neither variant uses git2.\n- [hard] REQ-02: CLI tests assert the behaviour change: a commit that deletes the document is listed (today omitted, so this assertion fails on today's code), and a merge identical to one parent for it is omitted. The CLI command still fails outside git and the server variant still returns an empty list there.\n- [hard] REQ-03: `test_executor` supplies detected `WorktreePaths` through `with_worktree_paths` for file-backed storage, and `test_document_reads_serve_a_derived_document_without_a_link` passes unchanged.\n\n## Notes\n\n- Behaviour change: history follows git's default history simplification for the path.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1546,7 +1813,6 @@
    "component:cli",
    "component:server",
    "per:@/charter/D-21",
-   "per:@/charter/D-19",
    "satisfies:f4d9502a/REQ-01",
    "satisfies:f4d9502a/REQ-10"
   ],
@@ -1555,17 +1821,16 @@
    "code-review"
   ],
   "depends_on": [
+   "git-file-history",
    "layout-fallback-removal",
    "server-image-git-cli"
   ],
   "planning": {
-   "outcome": "Both document history variants read one git log process through the module.",
+   "outcome": "Both document history variants read the module's path history.",
    "contract_refs": [
-    "git-module"
-   ],
-   "produces_contracts": [
     "git-file-history"
    ],
+   "produces_contracts": [],
    "source_refs": [
     "REQ-01",
     "REQ-10",
@@ -1574,12 +1839,10 @@
    "terminal": {
     "consumer_family": "document history",
     "test_boundary": "document CLI tests",
-    "worker_sized_reason": "One query lands with the two variants of its single command, replacing one libgit2 walk.",
+    "worker_sized_reason": "Two variants of one command switch to the module query and one private walk goes.",
     "footprint": {
      "touches": [
-      "crates/jit/src/storage/git.rs",
       "crates/jit/src/commands/document.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs",
       "crates/jit/tests/cli_repo_workflow/document_history_tests.rs",
       "crates/server/src/routes.rs"
      ]
@@ -1590,7 +1853,7 @@
  {
   "key": "asset-check-through-module",
   "title": "Link checks test asset presence through one git process",
-  "description": "Make the document link check ask the git module, in one presence-check process, whether unpinned assets missing from the working tree are committed at `HEAD`.\n\n## Background\n\n- `check_document_links` (`crates/jit/src/commands/document.rs:1070-1341`) opens libgit2 (`crates/jit/src/commands/document.rs:1128`). For each unpinned local asset absent from the working tree it calls `check_asset_in_git` (`crates/jit/src/commands/document.rs:1883-1898`), which accepts any entry `HEAD`'s tree holds at the path: a file, a directory, a symlink or a submodule.\n- `git cat-file --batch-check` answers `HEAD:<path>` with the entry's object type for blobs and trees, but reports a submodule's commit as missing, since that object is not in the repository.\n- Pinned documents already resolve their assets through pinned target inspection.\n- Tests: `crates/jit/tests/cli_query_graph/check_links_tests.rs:887` and the other link-check tests in that file.\n- Kept as one change for a build reason: `check_asset_in_git` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: The check collects the unpinned local assets absent from the working tree and asks, in one `object_types` call on the executor's git checkout, whether `HEAD:<path>` names an object. `check_asset_in_git` no longer exists and the function uses no git2.\n- [hard] REQ-02: An asset in the working tree, or committed at `HEAD` as a file, directory or symlink, is present; others are reported missing, and without git only the working tree counts. The link-check tests pass unchanged.\n- [hard] REQ-03: A test asserts the behaviour change and fails on today's code: an asset path naming a submodule at `HEAD`, absent from the working tree, is reported missing.\n- [hard] REQ-04: A CLI test with the counting stand-in first on `PATH` checks a document citing several assets missing from the working tree and asserts one `cat-file` invocation; today the check runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Behaviour change: a submodule path no longer counts as a present asset.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make the document link check ask the git module, in one presence-check process, whether unpinned assets missing from the working tree are committed at `HEAD`.\n\n## Background\n\n- `check_document_links` (`crates/jit/src/commands/document.rs:1097-1370`) opens libgit2 (`crates/jit/src/commands/document.rs:1157`). For each unpinned local asset absent from the working tree it calls `check_asset_in_git` (`crates/jit/src/commands/document.rs:1912-1927`), which accepts any entry `HEAD`'s tree holds at the path: a file, a directory, a symlink or a submodule.\n- `git cat-file --batch-check` answers `HEAD:<path>` with the entry's object type for blobs and trees, but reports a submodule's commit as missing, since that object is not in the repository.\n- Pinned documents already resolve their assets through pinned target inspection.\n- Tests: `crates/jit/tests/cli_query_graph/check_links_tests.rs:887` and the other link-check tests in that file.\n- Kept as one change for a build reason: `check_asset_in_git` is private, and an uncalled private function fails the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: The check collects the unpinned local assets absent from the working tree and asks, in one `object_types` call on the executor's git checkout, whether `HEAD:<path>` names an object. `check_asset_in_git` no longer exists and the function uses no git2.\n- [hard] REQ-02: An asset in the working tree, or committed at `HEAD` as a file, directory or symlink, is present; others are reported missing, and without git only the working tree counts. The link-check tests pass unchanged.\n- [hard] REQ-03: A test asserts the behaviour change and fails on today's code: an asset path naming a submodule at `HEAD`, absent from the working tree, is reported missing.\n- [hard] REQ-04: A CLI test with the counting stand-in first on `PATH` checks a document citing several assets missing from the working tree and asserts one `cat-file` invocation; today the check runs in libgit2 and records none, so it fails.\n\n## Notes\n\n- Behaviour change: a submodule path no longer counts as a present asset.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1682,9 +1945,53 @@
   }
  },
  {
+  "key": "git-origin-url",
+  "title": "Origin URL query in the git module",
+  "description": "Add the git module's query for the `origin` remote's URL.\n\n## Background\n\n- Snapshot export reads the origin URL through libgit2 (`origin_remote_url`, `crates/jit/src/commands/snapshot.rs:19-23`).\n- `git remote get-url origin` prints the URL and exits nonzero when there is no `origin` remote.\n\n## Success Criteria\n\n- [hard] REQ-01: `GitCheckout::origin_url()` runs one `git remote get-url origin` and returns the URL, or `None` when the repository has no `origin`.\n- [hard] REQ-02: The behaviour suite covers a repository with and without an `origin` and counts one process per query.\n\n## Notes\n\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:git-cli-module",
+   "milestone:v1.0",
+   "story:libgit2-removal",
+   "component:storage",
+   "per:@/charter/D-21",
+   "satisfies:f4d9502a/REQ-10"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "git-module-foundation"
+  ],
+  "planning": {
+   "outcome": "The git module answers the origin remote's URL with one process.",
+   "contract_refs": [
+    "git-module"
+   ],
+   "produces_contracts": [],
+   "source_refs": [
+    "REQ-10",
+    "DEC-14"
+   ],
+   "terminal": {
+    "consumer_family": "origin URL query",
+    "test_boundary": "git module behaviour suite",
+    "worker_sized_reason": "One small operation with two behaviour-suite cases.",
+    "footprint": {
+     "touches": [
+      "crates/jit/src/storage/git.rs",
+      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "snapshot-metadata-through-module",
   "title": "Snapshot source and repository facts come from the module",
-  "description": "Make snapshot export resolve its source commit, origin URL, branch and dirtiness through the git module instead of libgit2.\n\n## Background\n\n- `determine_snapshot_source_mode` (`crates/jit/src/commands/snapshot.rs:47-80`) opens libgit2 to resolve `--at` or `HEAD`. Without a repository, `--at` and `--committed-only` fail and the default falls back to the working tree.\n- `get_repo_info` (`crates/jit/src/commands/snapshot.rs:352-392`) opens libgit2 for the origin URL (`origin_remote_url`, `crates/jit/src/commands/snapshot.rs:19-23`), the branch (`current_branch_name`, `crates/jit/src/commands/snapshot.rs:25-29`: `HEAD` when detached, none on an unborn branch) and dirtiness (`statuses(None)` non-empty, which with libgit2's default options includes ignored files).\n- The unit test `test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors` (`crates/jit/src/commands/snapshot.rs:1075`) builds its repository through git2.\n- `git remote get-url origin` prints the origin URL and exits nonzero when there is no origin.\n- Kept as one change for a build reason: `origin_remote_url` and `current_branch_name` are private, and uncalled private functions fail the zero-warning build. The origin query has this one caller, and the module exposes only operations production code calls, so it lands here.\n\n## Success Criteria\n\n- [hard] REQ-01: Source mode resolves commits with `GitCheckout::resolve_commit` on the executor's git checkout; without a checkout, `--at` and `--committed-only` fail and the default falls back to the working tree, as today.\n- [hard] REQ-02: Repository info takes the origin URL from one module query over `git remote get-url origin` (absent without an origin), the branch from the head lookup's branch label (absent on an unborn branch), and dirtiness from the dirty-path query being non-empty.\n- [hard] REQ-03: A test asserts the behaviour change and fails on today's code: a checkout whose only difference from `HEAD` is an ignored file exports as clean.\n- [hard] REQ-04: `origin_remote_url` and `current_branch_name` no longer exist, and the unit test builds its repository with the shared git repository fixture.\n\n## Notes\n\n- Behaviour change: ignored files no longer make a snapshot's repository dirty.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
+  "description": "Make snapshot export resolve its source commit, origin URL, branch and dirtiness through the git module instead of libgit2.\n\n## Background\n\n- `determine_snapshot_source_mode` (`crates/jit/src/commands/snapshot.rs:47-80`) opens libgit2 to resolve `--at` or `HEAD`. Without a repository, `--at` and `--committed-only` fail and the default falls back to the working tree.\n- `get_repo_info` (`crates/jit/src/commands/snapshot.rs:352-392`) opens libgit2 for the origin URL (`origin_remote_url`, `crates/jit/src/commands/snapshot.rs:19-23`), the branch (`current_branch_name`, `crates/jit/src/commands/snapshot.rs:25-29`: `HEAD` when detached, none on an unborn branch) and dirtiness (`statuses(None)` non-empty, which with libgit2's default options includes ignored files).\n- The module offers `resolve_commit`, `origin_url`, `head` with its branch label, and `dirty_paths`.\n- The unit test `test_git_metadata_extracts_remote_and_branch_with_fallible_text_accessors` (`crates/jit/src/commands/snapshot.rs:1075`) builds its repository through git2.\n- Kept as one change for a build reason: `origin_remote_url` and `current_branch_name` are private, and uncalled private functions fail the zero-warning build.\n\n## Success Criteria\n\n- [hard] REQ-01: Source mode resolves commits with `GitCheckout::resolve_commit` on the executor's git checkout; without a checkout, `--at` and `--committed-only` fail and the default falls back to the working tree, as today.\n- [hard] REQ-02: Repository info takes the origin URL from `origin_url`, the branch from the head lookup's branch label (absent on an unborn branch), and dirtiness from the dirty-path query being non-empty.\n- [hard] REQ-03: A test asserts the behaviour change and fails on today's code: a checkout whose only difference from `HEAD` is an ignored file exports as clean.\n- [hard] REQ-04: `origin_remote_url` and `current_branch_name` no longer exist, and the unit test builds its repository with the shared git repository fixture.\n\n## Notes\n\n- Behaviour change: ignored files no longer make a snapshot's repository dirty.\n- Written against the code as it stands after the changes this one follows; line citations name current code.\n",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -1703,6 +2010,7 @@
   "depends_on": [
    "git-dirty-paths",
    "git-head-lookup",
+   "git-origin-url",
    "pinned-reads-into-module",
    "layout-fallback-removal"
   ],
@@ -1728,9 +2036,7 @@
     "worker_sized_reason": "Two functions and two helpers in one file switch to module queries, with one regression test.",
     "footprint": {
      "touches": [
-      "crates/jit/src/commands/snapshot.rs",
-      "crates/jit/src/storage/git.rs",
-      "crates/jit/tests/fast_docs_templates/git_module_tests.rs"
+      "crates/jit/src/commands/snapshot.rs"
      ]
     }
    }
@@ -2158,8 +2464,8 @@
    "document-read-docs",
    "git-executable-docs",
    "libgit2-prose",
-   "archive-pinned-reads-batched",
-   "pinned-counting-wrappers-converge"
+   "git-revision-bridge-removal",
+   "pinned-inspection-object-reader"
   ],
   "planning": {
    "outcome": "No libgit2 remains and every git read goes through the module.",
