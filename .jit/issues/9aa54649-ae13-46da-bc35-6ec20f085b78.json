@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T15:32:15.971454996Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -25,5 +26,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Require archived_from on archived issue records",
-  "updated_at": "2026-10-21T01:01:02.538835804Z"
+  "updated_at": "2026-10-21T15:32:16.006536331Z"
 }
