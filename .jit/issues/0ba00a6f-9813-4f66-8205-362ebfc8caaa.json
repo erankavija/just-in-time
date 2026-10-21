@@ -1,12 +1,79 @@
 {
-  "assignee": null,
+  "assignee": "agent:planning-lead-df129d9e",
+  "claimed_at": "2026-10-20T20:55:26.986154003Z",
   "context": {},
   "created_at": "2026-10-20T20:38:39.166228363Z",
   "dependencies": [
     "a2546471-37d0-4822-8a6c-9090f3d71491"
   ],
   "description": "Plan Dispatch layering, executor surface, and build hygiene in crates/jit (df129d9e) against every hard success criterion, write the concise design at dev/active/df129d9e-rust-code-quality/plan.md and its authoritative sibling breakdown manifest, and link both to this planning issue.",
-  "documents": [],
+  "documents": [
+    {
+      "assets": [
+        {
+          "asset_type": "missing",
+          "content_hash": null,
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "plan.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/plan.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e5099fd96f86de2d1e09f3c12536382dc25b900f03d8c164c01fa912b6eadba9",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "prodlines.py",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/prodlines.py"
+        }
+      ],
+      "commit": null,
+      "doc_type": "research",
+      "format": "markdown",
+      "label": "Investigation",
+      "path": "dev/active/df129d9e-rust-code-quality/investigation.md"
+    },
+    {
+      "assets": [
+        {
+          "asset_type": "local",
+          "content_hash": "ac6d4471a6f8434a657a6fc836eff687ec03b089360f20fcdfff94789b2e7365",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "breakdown.json",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/breakdown.json"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "1c9d4ce1526645e971107bfc2039684d1aaa9af656e7a89e35b76ef1e406e955",
+          "is_shared": false,
+          "mime_type": "text/markdown",
+          "original_path": "investigation.md",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/investigation.md"
+        },
+        {
+          "asset_type": "local",
+          "content_hash": "e5099fd96f86de2d1e09f3c12536382dc25b900f03d8c164c01fa912b6eadba9",
+          "is_shared": false,
+          "mime_type": null,
+          "original_path": "prodlines.py",
+          "resolved_path": "dev/active/df129d9e-rust-code-quality/prodlines.py"
+        }
+      ],
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Plan",
+      "path": "dev/active/df129d9e-rust-code-quality/plan.md"
+    },
+    {
+      "commit": null,
+      "doc_type": "design",
+      "format": "markdown",
+      "label": "Breakdown manifest",
+      "path": "dev/active/df129d9e-rust-code-quality/breakdown.json"
+    }
+  ],
   "first_ready_at": "2026-10-20T20:38:39.166228363Z",
   "gates_required": [
     "plan-review"
@@ -31,5 +98,5 @@
   "priority": "high",
   "state": "ready",
   "title": "planning: Dispatch layering, executor surface, and build hygiene in crates/jit",
-  "updated_at": "2026-10-20T20:38:39.166228363Z"
+  "updated_at": "2026-10-21T00:35:17.438723160Z"
 }
