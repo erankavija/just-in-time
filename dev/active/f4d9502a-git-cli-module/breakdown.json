@@ -30,7 +30,8 @@
     "REQ-01",
     "REQ-07",
     "DEC-08",
-    "DEC-16"
+    "DEC-16",
+    "DEC-19"
    ],
    "terminal": {
     "consumer_family": "git test fixtures",
@@ -318,7 +319,8 @@
    "source_refs": [
     "REQ-03",
     "REQ-04",
-    "DEC-09"
+    "DEC-09",
+    "DEC-19"
    ],
    "terminal": {
     "consumer_family": "hook installation",
@@ -418,7 +420,8 @@
    ],
    "source_refs": [
     "REQ-05",
-    "DEC-10"
+    "DEC-10",
+    "DEC-18"
    ],
    "terminal": {
     "consumer_family": "head lookup",
@@ -562,7 +565,8 @@
    "source_refs": [
     "REQ-02",
     "REQ-05",
-    "DEC-10"
+    "DEC-10",
+    "DEC-18"
    ],
    "terminal": {
     "consumer_family": "init worktree identity",
@@ -1746,7 +1750,8 @@
    "produces_contracts": [],
    "source_refs": [
     "REQ-10",
-    "DEC-13"
+    "DEC-13",
+    "DEC-20"
    ],
    "terminal": {
     "consumer_family": "server image",
