@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "de5098128e5437cad8467cdfcf9766bd64623dbd",
+  "completed_at": "2026-10-21T01:06:24.626577273Z",
+  "duration_ms": 335701,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All required validation, rendering, dry-run, coverage, and review checks passed.",
+    "verdict": "pass"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "b5ba1b61-aab8-4da4-b5e2-1416a6e2e051",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "e4aed429-d79c-4264-aea4-a79c92f4ac8d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T01:00:48.924983412Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "1. None.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All required validation, rendering, dry-run, coverage, and review checks passed.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
