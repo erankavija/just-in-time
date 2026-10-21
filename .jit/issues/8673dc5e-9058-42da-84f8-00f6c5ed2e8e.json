@@ -4,7 +4,7 @@
   "context": {},
   "created_at": "2026-10-15T11:05:37.857620164Z",
   "dependencies": [
-    "1630015d-101d-4e1b-bc3a-da1026998588"
+    "72d89161-39e7-4858-9f16-31deb4ff7505"
   ],
   "description": "Gate status reports a recorded manual attestation as never run.\n\n## Background\n\nAfter a manual gate is attested, the latest-run view of gate status for that gate says the gate has not been run and suggests evaluating it, while the readiness view counts it as passed. A lead must use the readiness view to see manual gates.\n\nReproduction in a fresh repository: define a manual gate `review`, create and claim an issue requiring it, attest it with `--by human:me`, then request gate status for `review`. Output: `Gate 'review' has not been run yet for issue <id>. Use 'jit gate evaluate' to run it.`\n\nThe views read different sources. An attestation writes only the issue's gate status and a gate-passed event (`crates/jit/src/commands/mod.rs:1603-1651`). The latest-run and history views read gate-run records (`crates/jit/src/commands/gate_check.rs:1247-1257`, `crates/jit/src/commands/gate.rs:1447-1461`). The readiness view reads the issue's gate status. Line numbers are as of 2026-10-20.\n\nThe chosen design records an attestation as a gate-run record carrying the attestor, the time and the status, so all three views read one source. Projecting the issue's gate status into the run views was rejected because it keeps two sources.\n\n## Success Criteria\n\n- [hard] REQ-01: The latest-run view of gate status shows a recorded manual attestation with its attestor and time.\n- [hard] REQ-02: The history view lists manual attestations alongside automated runs.\n- [hard] REQ-03: The latest-run and readiness views agree on every gate's status.\n- [hard] REQ-04: An attestation publishes a gate-run record carrying its attestor, time and status, and the latest-run and history views read attestations only from such records.\n",
   "documents": [],
@@ -22,7 +22,7 @@
     "milestone:v1.0"
   ],
   "priority": "normal",
-  "state": "backlog",
+  "state": "ready",
   "title": "Gate status reports a manual attestation as never run",
-  "updated_at": "2026-10-21T10:40:10.777988526Z"
+  "updated_at": "2026-10-21T10:45:29.021204753Z"
 }

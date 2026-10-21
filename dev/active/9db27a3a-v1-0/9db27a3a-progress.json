@@ -226,14 +226,14 @@
           "short_id": "f8a6b298",
           "title": "Restructure storage so reads never scale with project history",
           "wave": 4,
-          "status": "planning"
+          "status": "planned"
         },
         {
           "id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
           "short_id": "f4d9502a",
           "title": "Reach git through one storage-owned CLI module instead of libgit2",
           "wave": 4,
-          "status": "pending"
+          "status": "planning"
         },
         {
           "id": "9876a23a-8535-45ad-83f8-ca237f017e70",
@@ -409,6 +409,18 @@
       "status": "resolved",
       "date": "2026-10-21",
       "summary": "A surfaced defect (renew_lease and acquire paths drop an auto-eviction when they bail before writing the claims index) is routed to f8a6b298 REQ-06, with a named task and regression test (planner just-in-time-59). Rejected: a 16th bug under 8376299c, because f8a6b298 rewrites that sequence."
+    },
+    {
+      "container_short_id": "f8a6b298",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Steward reversed the edge 8673dc5e -> 1630015d (added with --reduce, which also dropped 8673dc5e's edge to 72d89161). It had serialised 3d9a0ce3's small fix and df129d9e's global-json-flag gate behind cutover, types and the storage layout. Now 8673dc5e depends on 72d89161 (ready) and 1630015d depends on 8673dc5e."
+    },
+    {
+      "container_short_id": "b697a3f7",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "When b697a3f7 is planned: its REQ-06 (archive preview through the execute planner) task must depend on f8a6b298's archive-preview-reads-evidence."
     }
   ],
   "notes": [
@@ -431,7 +443,8 @@
     "2026-10-21: CI quiet-window convention adopted. Full gates run under `flock /tmp/jit-ci-turnstile.lock flock -x /tmp/jit-full-ci.lock`; all other builds wait on the turnstile and hold the lock shared. Reason: 7d1bfe89 failed cargo-ci's 30 s budget step four times (30.6-110 s) under host load ~32 while every other step passed.",
     "2026-10-21 ~09:20: gate rules. (1) cargo-ci reuses failed runs by input digest, so load-only failures are rerun with `jit gate evaluate <id> cargo-ci --force` under the turnstile and exclusive flock (load-only failures only). (2) The external code-review reviewer is at capacity: retry with back-off, keep issues gated, never pass manually. 3d9a0ce3's lead was asked to ensure 72d89161/fd9bfab8 never reuse infrastructure or environmental failures as verdicts.",
     "2026-10-21 ~09:35: df129d9e's first execution lead stopped after wave 1a (3 done, 1874e265 in flight; handoff-2.md). A continuation execution-lead subagent was dispatched from that handoff. External blockers: d8176fd3 waits on 2d10f1dd/16d63038/3754095f/8673dc5e; 083c9a91 on d759d606; handler tasks on 2195c98f cli-issue-id-boundary; 0eca332a on error-code-vocabulary.",
-    "2026-10-21 ~10:00-13:30: third shared usage-limit stall; leads were resumed at 13:31. 8376299c is at 14/15 with 16d63038 running last."
+    "2026-10-21 ~10:00-13:30: third shared usage-limit stall; leads were resumed at 13:31. 8376299c is at 14/15 with 16d63038 running last.",
+    "2026-10-21: f8a6b298 planned (62 issues, 84 edges; P 5e615dc2 and B b06cee74 done). Roots are wired to specific 2195c98f tasks. Execution waits on 2195c98f. just-in-time-59 was assigned to plan f4d9502a next."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
