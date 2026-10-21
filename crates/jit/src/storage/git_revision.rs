@@ -12,6 +12,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
+use std::sync::Arc;
 use std::thread;
 use thiserror::Error;
 
@@ -20,14 +21,14 @@ use thiserror::Error;
 const LS_TREE_PATHS_PER_PROCESS: usize = 1024;
 
 /// Errors from canonical revision resolution and historical blob reads.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum GitRevisionError {
     /// The configured Git executable could not be started.
     #[error("git is unavailable at {program}: {source}")]
     GitUnavailable {
         program: PathBuf,
         #[source]
-        source: std::io::Error,
+        source: Arc<io::Error>,
     },
     /// Git rejected the supplied revision under commit-peeling semantics.
     #[error("revision could not be resolved to a commit: {revision}: {stderr}")]
@@ -42,13 +43,9 @@ pub enum GitRevisionError {
         path: String,
         stderr: String,
     },
-    /// Git could not enumerate paths changed between the build and review
-    /// trees, or in the current working tree.
-    #[error("git changed-path query failed for {operation}: {stderr}")]
-    ChangedPathsFailed { operation: String, stderr: String },
     /// The artifact path violates the repository-relative storage contract.
-    #[error(transparent)]
-    InvalidPath(#[from] crate::storage::PathReadError),
+    #[error("{0}")]
+    InvalidPath(String),
 }
 
 /// Bytes read at one canonical historical commit.
@@ -175,7 +172,7 @@ impl GitRevisionResolver {
         revision: &str,
         path: &str,
     ) -> Result<PinnedArtifactRead, GitRevisionError> {
-        validate_repo_relative_path(path)?;
+        validate_path(path)?;
         let version = self.resolve_commit(revision)?;
         let object = format!("{}:{path}", version.as_str());
         let oid_output = self.run(["rev-parse", "--verify", object.as_str()])?;
@@ -204,80 +201,6 @@ impl GitRevisionResolver {
         })
     }
 
-    /// Resolve and classify `path` at `revision` without consulting the
-    /// working tree.
-    ///
-    /// Unlike [`read_pinned_path`](Self::read_pinned_path), directories and
-    /// unsupported Git tree entries are successful, typed results. A path
-    /// absent from an otherwise resolved commit is likewise represented as
-    /// [`RepositoryTargetKind::Missing`] with its boundary diagnostic.
-    pub fn inspect_pinned_target(
-        &self,
-        revision: &str,
-        path: &str,
-    ) -> Result<PinnedTargetRead, GitRevisionError> {
-        validate_repo_relative_path(path)?;
-        let version = self.resolve_commit(revision)?;
-        let entry_output = self.run([
-            "--literal-pathspecs",
-            "ls-tree",
-            "-z",
-            "--full-tree",
-            version.as_str(),
-            "--",
-            path,
-        ])?;
-        if !entry_output.status.success() {
-            return Err(GitRevisionError::PinnedReadFailed {
-                revision: revision.to_string(),
-                path: path.to_string(),
-                stderr: stderr(&entry_output),
-            });
-        }
-        let Some((mode, object_type, object_oid)) =
-            parse_pinned_tree_entry(&entry_output.stdout, path).map_err(|reason| {
-                GitRevisionError::PinnedReadFailed {
-                    revision: revision.to_string(),
-                    path: path.to_string(),
-                    stderr: reason,
-                }
-            })?
-        else {
-            return Ok(PinnedTargetRead {
-                version,
-                target_kind: RepositoryTargetKind::Missing,
-                object_oid: None,
-                bytes: None,
-                unavailable_reason: Some("not found in commit tree".into()),
-            });
-        };
-        let target_kind = match (mode.as_str(), object_type.as_str()) {
-            ("100644" | "100755", "blob") => RepositoryTargetKind::File,
-            ("040000", "tree") => RepositoryTargetKind::Directory,
-            _ => RepositoryTargetKind::Unsupported,
-        };
-        let bytes = if target_kind.is_file() {
-            let output = self.run(["cat-file", "blob", object_oid.as_str()])?;
-            if !output.status.success() {
-                return Err(GitRevisionError::PinnedReadFailed {
-                    revision: revision.to_string(),
-                    path: path.to_string(),
-                    stderr: stderr(&output),
-                });
-            }
-            Some(output.stdout)
-        } else {
-            None
-        };
-        Ok(PinnedTargetRead {
-            version,
-            target_kind,
-            object_oid: Some(object_oid),
-            bytes,
-            unavailable_reason: None,
-        })
-    }
-
     /// Resolve and inspect a set of pinned targets with shared Git processes.
     ///
     /// The supplied cache is owned by the caller and is replaced with only the
@@ -301,10 +224,10 @@ impl GitRevisionResolver {
             BTreeMap::new();
         let valid_requests = requests
             .iter()
-            .filter(|request| match validate_repo_relative_path(&request.1) {
+            .filter(|request| match validate_path(&request.1) {
                 Ok(()) => true,
                 Err(error) => {
-                    results.insert((*request).clone(), Err(error.into()));
+                    results.insert((*request).clone(), Err(error));
                     false
                 }
             })
@@ -337,7 +260,7 @@ impl GitRevisionResolver {
                     }
                 }
                 Some(Err(error)) => {
-                    results.insert(request.clone(), Err(clone_git_revision_error(error)));
+                    results.insert(request.clone(), Err(error.clone()));
                 }
                 None => {
                     results.insert(
@@ -358,10 +281,7 @@ impl GitRevisionResolver {
                 Ok(Ok(entries)) => entries,
                 Err(error) => {
                     paths.values().flatten().for_each(|(revision, path, _)| {
-                        results.insert(
-                            (revision.clone(), path.clone()),
-                            Err(clone_git_revision_error(&error)),
-                        );
+                        results.insert((revision.clone(), path.clone()), Err(error.clone()));
                     });
                     return;
                 }
@@ -461,10 +381,7 @@ impl GitRevisionResolver {
                 }),
                 Err(error) => pending_files.into_iter().for_each(|(_, requests)| {
                     requests.into_iter().for_each(|(revision, path, _, _)| {
-                        results.insert(
-                            (revision.clone(), path.clone()),
-                            Err(clone_git_revision_error(&error)),
-                        );
+                        results.insert((revision.clone(), path.clone()), Err(error.clone()));
                     });
                 }),
             }
@@ -519,43 +436,6 @@ impl GitRevisionResolver {
             })
     }
 
-    /// Return paths changed between two revisions, using NUL-delimited Git
-    /// output so unusual but valid repository paths cannot be confused with
-    /// record separators.
-    pub fn changed_paths_between(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<Vec<String>, GitRevisionError> {
-        let output = self.run(["diff", "--name-only", "--no-renames", "-z", from, to])?;
-        parse_changed_paths(output, format!("{from}..{to}"))
-    }
-
-    /// Return tracked and untracked paths that differ from `HEAD` in the
-    /// working tree. Ignored paths are included because a compile-time input
-    /// can be locally ignored while still changing the produced binary.
-    pub fn changed_worktree_paths(&self) -> Result<Vec<String>, GitRevisionError> {
-        let tracked = self.run(["diff", "--name-only", "--no-renames", "-z", "HEAD"])?;
-        let untracked = self.run(["ls-files", "--others", "--exclude-standard", "-z"])?;
-        let ignored = self.run([
-            "ls-files",
-            "--others",
-            "--ignored",
-            "--exclude-standard",
-            "-z",
-        ])?;
-        let mut paths = parse_changed_paths(tracked, "working tree".to_string())?;
-        paths.extend(parse_changed_paths(
-            untracked,
-            "untracked working tree".to_string(),
-        )?);
-        paths.extend(parse_changed_paths(
-            ignored,
-            "ignored working tree".to_string(),
-        )?);
-        Ok(paths)
-    }
-
     fn run<'a>(
         &self,
         arguments: impl IntoIterator<Item = &'a str>,
@@ -566,7 +446,7 @@ impl GitRevisionResolver {
             .output()
             .map_err(|source| GitRevisionError::GitUnavailable {
                 program: self.git_program.clone(),
-                source,
+                source: Arc::new(source),
             })
     }
 
@@ -589,7 +469,7 @@ impl GitRevisionResolver {
             Err(error) => {
                 return revisions
                     .iter()
-                    .map(|revision| (revision.clone(), Err(clone_git_revision_error(&error))))
+                    .map(|revision| (revision.clone(), Err(error.clone())))
                     .collect()
             }
         };
@@ -638,7 +518,7 @@ impl GitRevisionResolver {
             .spawn()
             .map_err(|source| GitRevisionError::GitUnavailable {
                 program: self.git_program.clone(),
-                source,
+                source: Arc::new(source),
             })?;
         let Some(mut stdin) = child.stdin.take() else {
             return Ok(oids
@@ -726,30 +606,6 @@ impl GitRevisionResolver {
     }
 }
 
-/// Parse the one exact NUL-delimited `git ls-tree` entry requested for a
-/// pinned path. Git emits `mode SP type SP oid TAB path NUL`; parse bytes so a
-/// path containing whitespace never changes the field boundary.
-fn parse_pinned_tree_entry(
-    output: &[u8],
-    expected_path: &str,
-) -> Result<Option<(String, String, String)>, String> {
-    let entries = parse_pinned_tree_entries(output)?;
-    match entries.as_slice() {
-        [] => Ok(None),
-        [(path, entry)] => {
-            if path != expected_path.as_bytes() {
-                return Err("git ls-tree returned a different path than requested".into());
-            }
-            Ok(Some((
-                entry.mode.clone(),
-                entry.object_type.clone(),
-                entry.object_oid.clone(),
-            )))
-        }
-        _ => Err("git ls-tree returned multiple entries for one path".into()),
-    }
-}
-
 fn parse_pinned_tree_entries(output: &[u8]) -> Result<Vec<(Vec<u8>, TreeEntry)>, String> {
     output
         .split(|byte| *byte == 0)
@@ -834,80 +690,9 @@ fn parse_cat_file_batch(
     Ok(responses)
 }
 
-fn clone_git_revision_error(error: &GitRevisionError) -> GitRevisionError {
-    match error {
-        GitRevisionError::GitUnavailable { program, source } => GitRevisionError::GitUnavailable {
-            program: program.clone(),
-            source: clone_io_error(source),
-        },
-        GitRevisionError::RevisionNotFound { revision, stderr } => {
-            GitRevisionError::RevisionNotFound {
-                revision: revision.clone(),
-                stderr: stderr.clone(),
-            }
-        }
-        GitRevisionError::NonCanonicalOid { revision, output } => {
-            GitRevisionError::NonCanonicalOid {
-                revision: revision.clone(),
-                output: output.clone(),
-            }
-        }
-        GitRevisionError::PinnedReadFailed {
-            revision,
-            path,
-            stderr,
-        } => GitRevisionError::PinnedReadFailed {
-            revision: revision.clone(),
-            path: path.clone(),
-            stderr: stderr.clone(),
-        },
-        GitRevisionError::ChangedPathsFailed { operation, stderr } => {
-            GitRevisionError::ChangedPathsFailed {
-                operation: operation.clone(),
-                stderr: stderr.clone(),
-            }
-        }
-        GitRevisionError::InvalidPath(error) => GitRevisionError::InvalidPath(match error {
-            crate::storage::PathReadError::NotFound(value) => {
-                crate::storage::PathReadError::NotFound(value.clone())
-            }
-            crate::storage::PathReadError::CommitNotFound(value) => {
-                crate::storage::PathReadError::CommitNotFound(value.clone())
-            }
-            crate::storage::PathReadError::InvalidPath(value) => {
-                crate::storage::PathReadError::InvalidPath(value.clone())
-            }
-            crate::storage::PathReadError::OutsideRepoRoot(value) => {
-                crate::storage::PathReadError::OutsideRepoRoot(value.clone())
-            }
-            crate::storage::PathReadError::Other(error) => {
-                crate::storage::PathReadError::Other(anyhow::anyhow!(error.to_string()))
-            }
-        }),
-    }
-}
-
-fn clone_io_error(error: &io::Error) -> io::Error {
-    error
-        .raw_os_error()
-        .map(io::Error::from_raw_os_error)
-        .unwrap_or_else(|| io::Error::new(error.kind(), error.to_string()))
-}
-
-fn parse_changed_paths(output: Output, operation: String) -> Result<Vec<String>, GitRevisionError> {
-    if !output.status.success() {
-        return Err(GitRevisionError::ChangedPathsFailed {
-            operation,
-            stderr: stderr(&output),
-        });
-    }
-
-    Ok(output
-        .stdout
-        .split(|byte| *byte == 0)
-        .filter(|path| !path.is_empty())
-        .map(|path| String::from_utf8_lossy(path).into_owned())
-        .collect())
+fn validate_path(path: &str) -> Result<(), GitRevisionError> {
+    validate_repo_relative_path(path)
+        .map_err(|error| GitRevisionError::InvalidPath(error.to_string()))
 }
 
 fn stderr(output: &Output) -> String {
