@@ -44,7 +44,7 @@
     "type:epic"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Fix correctness defects found by the v1.0 code audit",
-  "updated_at": "2026-10-21T11:23:44.024359492Z"
+  "updated_at": "2026-10-21T15:31:53.765731984Z"
 }

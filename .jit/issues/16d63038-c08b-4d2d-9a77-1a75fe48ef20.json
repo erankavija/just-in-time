@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "Issue-id resolution accepts a full-length id only in its exact stored spelling on some commands and in any case or hyphenation on others. The same id therefore resolves on `issue update` and fails on `issue show` and `gate evaluate`.\n\n## Background\n\nIds are matched case-insensitively and with hyphens ignored, and a prefix must normalise to at least four characters. Several resolvers implement this rule independently, and they disagree at the full-length boundary.\n\n- `crates/jit/src/storage/json.rs:1264` and `crates/jit/src/storage/memory.rs:848`: when the normalised input is 32 characters, `resolve_issue_id` loads the issue by the raw input instead of the normalised form. An uppercase or hyphen-free full id finds no record and returns \"Issue not found\".\n- `crates/jit/src/commands/gate_check.rs:737`: gate evaluation compares a 32-character input with `id.as_str() == requested`, which fails the same way.\n- `crates/jit/src/commands/validate.rs:262` (mutation preflight) matches on the normalised form and accepts both spellings. It applies no minimum-length check. A prefix shorter than four characters, including the empty string, reads every matching issue record before `resolve_issue_from_capture` (`crates/jit/src/commands/mod.rs:2000`) rejects it.\n\nReproduction in a fresh repository, with an issue `b53beeba-32f2-4671-a407-2d94e4d13d41` that has an automated gate `ok`:\n\n| Input | `issue show` | `issue update` | `gate evaluate` |\n|---|---|---|---|\n| `B53BEEBA-32F2-4671-A407-2D94E4D13D41` | not found | resolves | not found |\n| `b53beeba32f24671a4072d94e4d13d41` | not found | resolves | not found |\n| `b53beeba32f24671a4072d94e4d13d4` (31 chars) | resolves | resolves | resolves |\n\nA 31-character prefix resolves, and the full id with one more character does not.\n\n## Success Criteria\n\n- [hard] REQ-01: Every command that accepts an issue id resolves a full id given in uppercase or without hyphens to the same issue as its canonical spelling.\n- [hard] REQ-02: Every command rejects an id prefix that normalises to fewer than the minimum prefix length with the invalid-prefix error, before it reads any issue record.\n- [hard] REQ-03: One shared function owns id normalisation and prefix matching. Every issue-id resolver resolves through it, including the storage backends, gate evaluation, mutation preflight, dependency commands and template commands.\n- [hard] REQ-04: A regression test fails on the current code. It resolves an uppercase full id and a hyphen-free full id through storage resolution and through gate evaluation, and covers a prefix below the minimum length.\n\n## Notes\n\nDependency commands (`crates/jit/src/commands/dependency.rs:458`) and template commands (`crates/jit/src/commands/template.rs:911`) carry further copies of the matching rule. An id newtype is out of scope.",
   "documents": [],
+  "done_at": "2026-10-21T15:31:53.684992835Z",
   "first_ready_at": "2026-10-20T19:42:12.249754514Z",
   "gates_required": [
     "cargo-ci",
@@ -14,12 +15,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T11:07:04.495294549Z",
+      "updated_at": "2026-10-21T12:15:31.320286858Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T11:12:36.718487879Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T12:20:07.785707898Z",
       "updated_by": "auto:executor"
     }
   },
@@ -31,7 +32,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
-  "updated_at": "2026-10-21T11:12:36.718487879Z"
+  "updated_at": "2026-10-21T15:31:53.684992835Z"
 }
