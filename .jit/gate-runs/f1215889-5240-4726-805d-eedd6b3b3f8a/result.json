@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "30559e97d1c36dda59379332f39d9919c1025ed0",
+  "completed_at": "2026-10-21T16:25:38.038402341Z",
+  "duration_ms": 318601,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "No unresolved issue-impact findings; the tagged removal satisfies the scoped criteria, supported by passing cargo-ci evidence.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "2dd6b833-8f5d-484a-b412-158b74e3d7f5",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "f1215889-5240-4726-805d-eedd6b3b3f8a",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:20:19.437256735Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 65fc967cc (implementation) and 07c2bdd2c (merge; identical patch)\nPolicy sources: AGENTS.md; .jit/config.toml; dev/vision/9db27a3a-charter.md; .jit/invariants.toml; .jit/gates.toml\nResolved items: @/charter/D-8; @/issue/3d9a0ce3/requirement/REQ-04; @/invariant/canonical-cutover; @/invariant/architecture-dependency-direction; @/invariant/convention-convergence; @/invariant/essential-code-prose; @/invariant/orthogonal-tests; @/gate/cargo-ci; @/gate/mcp-ci\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:18:12Z); mcp-ci pending (no recorded run)\nTruncation recovery: Re-read package-reader and repository-state changes by path; narrowed residue inspection to affected source, tests, MCP manifest, and current docs after historical-record output truncated.\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"No unresolved issue-impact findings; the tagged removal satisfies the scoped criteria, supported by passing cargo-ci evidence.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
