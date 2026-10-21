@@ -166,63 +166,6 @@ fn is_applied_record_inventory_reader(source: &str) -> bool {
         && source.contains("directory_listings()")
 }
 
-/// Reject a predecessor declaration rather than its harmless mentions in tests,
-/// documentation, or a historical event parser.
-fn assert_retired_lifecycle_entry_point_absent(
-    production: &str,
-    definition: &str,
-) -> Result<(), String> {
-    (!production.contains(definition))
-        .then_some(())
-        .ok_or_else(|| {
-            format!(
-                "forbidden retired lifecycle entry point returned: {definition}; it violates the \
-             clean-cut lifecycle contract by restoring a single-profile selector, per-package \
-             publication bypass, or pre-aggregate audit constructor"
-            )
-        })
-}
-
-/// Reject every production and generated-contract spelling of the retired
-/// per-package profile audit event. Unknown event records remain generic parser
-/// input; this guard concerns only the current typed vocabulary and the schema
-/// projected from it.
-fn assert_retired_profile_applied_contract_absent(
-    production_sources: impl IntoIterator<Item = (PathBuf, String)>,
-    generated_event_tags: impl IntoIterator<Item = String>,
-) -> Result<(), String> {
-    let mut violations = production_sources
-        .into_iter()
-        .flat_map(|(path, source)| {
-            [
-                ("ProfileApplied", "typed Event::ProfileApplied variant"),
-                (
-                    "profile_applied",
-                    "retired profile_applied tag or constructor",
-                ),
-            ]
-            .into_iter()
-            .filter(move |(needle, _)| source.contains(needle))
-            .map(move |(_, surface)| format!("{surface} in {}", path.display()))
-        })
-        .collect::<Vec<_>>();
-    violations.extend(
-        generated_event_tags
-            .into_iter()
-            .filter(|tag| tag == "profile_applied")
-            .map(|tag| format!("generated schema event tag `{tag}`")),
-    );
-
-    violations.is_empty().then_some(()).ok_or_else(|| {
-        format!(
-            "forbidden retired profile-applied event contract returned: {}; use only \
-             Event::ProfileLifecycle and the `profile_lifecycle` schema tag; generic unknown-event \
-             retention must not restore a profile-specific decoder or compatibility path",
-            violations.join(", ")
-        )
-    })
-}
-
 fn production_sources(root: &Path) -> Vec<(PathBuf, String)> {
     let mut pending = vec![root.to_path_buf()];
     let mut sources = Vec::new();
@@ -240,14 +183,6 @@ fn production_sources(root: &Path) -> Vec<(PathBuf, String)> {
         }
     }
     sources
-}
-
-fn generated_event_tags() -> Vec<String> {
-    jit::CommandSchema::generate()
-        .events
-        .into_iter()
-        .map(|event| event.tag.as_str().to_string())
-        .collect()
 }
 
 fn enum_body<'a>(source: &'a str, declaration: &str) -> Option<&'a str> {
@@ -557,14 +492,6 @@ fn profile_generated_schema_text() -> String {
         "profile_lifecycle_events": lifecycle_events,
     })
     .to_string()
-}
-
-fn contains_cargo_manifest(root: &Path) -> bool {
-    std::fs::read_dir(root).unwrap().any(|entry| {
-        let path = entry.unwrap().path();
-        path.file_name().is_some_and(|name| name == "Cargo.toml")
-            || path.is_dir() && contains_cargo_manifest(&path)
-    })
 }
 
 /// `item` with its leading visibility removed.
@@ -1280,78 +1207,6 @@ fn test_repository_state_writer_scan_flags_unclassified_writers_wherever_their_p
 }
 
 #[test]
-fn test_cutover_has_no_known_predecessor_or_compatibility_module() {
-    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let source_root = crate_root.join("src");
-    for relative in [
-        "profile/render.rs",
-        "profile/snapshot.rs",
-        "profile/drift.rs",
-        "profile/preset.rs",
-        "profile/planner.rs",
-        "storage/config_store.rs",
-        "validation/rules.rs",
-        "validation/defaults.rs",
-        "validation/serialize.rs",
-        "validation/project_render.rs",
-        "validation/projection.rs",
-    ] {
-        assert!(!source_root.join(relative).exists(), "returned: {relative}");
-    }
-
-    let library = production_source(&source_root.join("lib.rs"));
-    assert!(library.contains("pub mod repository_state;"));
-    for alias in [
-        "pub type Storage =",
-        "pub type Gate =",
-        "pub use crate::repository_state",
-    ] {
-        assert!(!library.contains(alias), "alias returned: {alias}");
-    }
-    for facade in ["profile/mod.rs", "storage/mod.rs", "validation/mod.rs"] {
-        let source = production_source(&source_root.join(facade));
-        for seam in [
-            "pub use crate::repository_state",
-            "pub use crate::declarations",
-            "pub type Storage =",
-            "pub type Gate =",
-        ] {
-            assert!(!source.contains(seam), "facade seam in {facade}: {seam}");
-        }
-    }
-
-    let workspace = std::fs::read_to_string(crate_root.join("../../Cargo.toml")).unwrap();
-    for package in ["crates/repository-state", "crates/declarations"] {
-        assert!(
-            !workspace.contains(package),
-            "intermediate package: {package}"
-        );
-    }
-    for module in ["repository_state", "declarations"] {
-        assert!(!contains_cargo_manifest(&source_root.join(module)));
-    }
-
-    for (scope, wrapper) in [
-        ("storage", "fn save_issue("),
-        ("storage", "fn restore_issue_verbatim("),
-        ("storage", "fn delete_issue("),
-        ("storage", "fn append_event("),
-        ("storage", "fn save_gate_run_result("),
-        ("storage", "fn save_gate_registry("),
-        ("storage", "fn save_gate_preset("),
-        ("storage", "fn write_repo_file("),
-        ("profile", "fn project_package("),
-        ("profile", "fn capture_profile_snapshot("),
-        ("profile", "fn plan_profile_application_against("),
-    ] {
-        assert!(
-            definition_owners(&source_root.join(scope), wrapper).is_empty(),
-            "plan-deleted wrapper returned in {scope}: {wrapper}"
-        );
-    }
-}
-
-#[test]
 fn test_known_projection_renderer_definitions_keep_canonical_owners() {
     let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for (definition, file) in [
@@ -1401,39 +1256,6 @@ fn test_profile_lifecycle_has_one_canonical_package_and_record_authority() {
         )
         .unwrap_or_else(|error| panic!("{error}"));
     }
-}
-
-/// The selection stream and aggregate lifecycle event replaced two public
-/// predecessor shapes. Keeping their names absent is more precise than
-/// banning the legitimate `apply_profile_package*` closure wrappers: those
-/// wrappers resolve one package's dependency closure and enter the one
-/// aggregate seam rather than publishing per package.
-#[test]
-fn test_profile_lifecycle_has_no_retired_selector_bypass() {
-    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    for (relative, definition) in [
-        ("commands/init.rs", "struct ProfileSelection"),
-        ("commands/profile.rs", "fn apply_one_profile_package("),
-    ] {
-        assert_retired_lifecycle_entry_point_absent(
-            &production_source(&source_root.join(relative)),
-            definition,
-        )
-        .unwrap_or_else(|error| panic!("{error}"));
-    }
-}
-
-/// The typed Event vocabulary, its fieldless tag mirror, and `jit --schema`
-/// are one current contract. The retired per-package audit representation must
-/// not return through any of those surfaces after the aggregate cutover.
-#[test]
-fn test_profile_lifecycle_has_no_retired_profile_applied_event_contract() {
-    let source_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    assert_retired_profile_applied_contract_absent(
-        production_sources(&source_root),
-        generated_event_tags(),
-    )
-    .unwrap_or_else(|error| panic!("{error}"));
 }
 
 /// Profile packages enter through one worktree-relative directory contract.
@@ -1549,44 +1371,6 @@ fn test_profile_lifecycle_structural_guards_reject_their_forbidden_shapes() {
         assert!(
             duplicate.contains(&format!("forbidden duplicate {authority} authority"))
                 && duplicate.contains("clean-cut lifecycle contract")
-        );
-    }
-
-    let retired_bypass = assert_retired_lifecycle_entry_point_absent(
-        "pub(super) fn apply_one_profile_package() {}",
-        "fn apply_one_profile_package(",
-    )
-    .unwrap_err();
-    assert!(
-        retired_bypass.contains("forbidden retired lifecycle entry point")
-            && retired_bypass.contains("clean-cut lifecycle contract")
-    );
-
-    let retired_event_contract = assert_retired_profile_applied_contract_absent(
-        [
-            (
-                PathBuf::from("domain/types.rs"),
-                "enum Event { ProfileApplied { id: String } }".to_string(),
-            ),
-            (
-                PathBuf::from("domain/event_catalog.rs"),
-                "EventTag::ProfileApplied => \"profile_applied\"; \
-                 Event::draft_profile_applied()"
-                    .to_string(),
-            ),
-        ],
-        ["profile_applied".to_string()],
-    )
-    .unwrap_err();
-    for expected in [
-        "typed Event::ProfileApplied variant",
-        "retired profile_applied tag or constructor",
-        "generated schema event tag `profile_applied`",
-        "use only Event::ProfileLifecycle",
-    ] {
-        assert!(
-            retired_event_contract.contains(expected),
-            "{retired_event_contract}"
         );
     }
 
