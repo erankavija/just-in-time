@@ -28,7 +28,7 @@ use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
 
@@ -393,9 +393,6 @@ pub struct JsonFileStorage {
     repository_layout: Arc<Mutex<Option<RepositoryLayout>>>,
     /// Authoritative Git/non-Git classification for the selected data root.
     worktree_paths: Arc<Mutex<Option<WorktreePaths>>>,
-    /// Guards the one-time sweep of orphaned per-issue read-lock sidecars, shared
-    /// by every clone so the cleanup runs at most once per storage lifetime.
-    sidecars_swept: Arc<AtomicBool>,
     /// Shared commit-keyed pinned evidence retained for the most recent capture.
     pinned_target_cache: Arc<Mutex<BTreeMap<(String, String), crate::storage::PinnedTargetRead>>>,
     /// Pinned-document evidence built by the most recent capture that pinned
@@ -440,7 +437,6 @@ impl JsonFileStorage {
             active_mutation_layout: Arc::new(Default::default()),
             repository_layout: Arc::new(Mutex::new(None)),
             worktree_paths: Arc::new(Mutex::new(None)),
-            sidecars_swept: Arc::new(AtomicBool::new(false)),
             pinned_target_cache: Arc::new(Mutex::new(BTreeMap::new())),
             pinned_evidence_cache: Arc::new(Mutex::new(BTreeMap::new())),
             git_program: PathBuf::from("git"),
@@ -1307,31 +1303,6 @@ impl IssueStore for JsonFileStorage {
         let index_lock_path = self.root.join(INDEX_LOCK_FILE);
         let _lock = self.locker.lock_shared(&index_lock_path)?;
 
-        // One-time index-maintenance cleanup: remove any orphaned per-issue
-        // `<id>.lock` sidecars left behind by the retired shared read lock. The
-        // `swap` guard runs the sweep at most once per storage lifetime (shared by
-        // every clone), under the `.index.lock` already held here, so it is a
-        // single directory sweep — not a per-read unlink. This is the read-all path
-        // (`jit query available`) that historically leaked the sidecars, so it now
-        // clears them. Best-effort: any enumerate/unlink failure is ignored, since
-        // the sidecars are inert and the retained fixed locks live outside
-        // `issues/`.
-        if !self.sidecars_swept.swap(true, Ordering::Relaxed) {
-            let _ = crate::storage::lock::remove_orphaned_issue_read_sidecars(
-                &self.root.join(ISSUES_DIR),
-            );
-        }
-
-        self.read_indexed_issues()
-    }
-
-    fn read_issues(&self) -> Result<Vec<Issue>> {
-        let index_lock_path = self.root.join(INDEX_LOCK_FILE);
-        let _lock = self.locker.lock_shared(&index_lock_path)?;
-
-        // The enumeration alone: the sidecar sweep `list_issues` carries is
-        // index maintenance, and this is the path a caller that must leave the
-        // repository untouched reads through.
         self.read_indexed_issues()
     }
 
@@ -2270,7 +2241,7 @@ mod tests {
             assert_eq!(exact.issues, vec![linked_only]);
             assert_eq!(exact.events, vec![linked_event]);
 
-            let aggregated = secondary_storage.read_issues().unwrap();
+            let aggregated = secondary_storage.list_issues().unwrap();
             assert!(aggregated.iter().any(|issue| issue.id == primary_only.id));
 
             let absent_data = secondary_path.join("absent-store");
@@ -2376,78 +2347,22 @@ mod tests {
         }
 
         #[test]
-        fn test_list_issues_cleans_orphaned_sidecars_once_per_storage_lifetime() {
-            // REQ-03: the first read-all sweep removes inert legacy sidecars, but
-            // repeated reads through the same storage do not turn cleanup into a
-            // per-command-path directory scan.
+        fn test_list_issues_changes_no_file_other_than_the_index_lock() {
             let (_temp, storage) = setup_storage();
             let issue = crate::domain::types::fixture_issue(
-                "Cleanup target".to_string(),
+                "Listed without writes".to_string(),
                 "Description".to_string(),
             );
             seed_issue_preimage(&storage, &issue);
-            let sidecar = storage
-                .root
-                .join(ISSUES_DIR)
-                .join(format!("{}.lock", issue.id));
-            fs::write(&sidecar, "").unwrap();
-
+            // Warm the index lock so the comparison covers every other file.
             let _ = storage.list_issues().unwrap();
-            assert!(!sidecar.exists(), "the first read-all must remove sidecars");
 
-            fs::write(&sidecar, "").unwrap();
-            let _ = storage.list_issues().unwrap();
-            assert!(
-                sidecar.exists(),
-                "cleanup must run only once for a storage and its clones"
-            );
-        }
+            let before = physical_files(&storage.root);
+            let listed = storage.list_issues().unwrap();
+            let after = physical_files(&storage.root);
 
-        #[test]
-        fn test_read_issues_enumerates_the_same_issues_without_removing_an_orphaned_sidecar() {
-            // The read-only enumeration a strictly read-only command reads
-            // through: same issue set as `list_issues`, and the sidecar sweep
-            // that path carries stays on that path.
-            let (_temp, storage) = setup_storage();
-            let issue = crate::domain::types::fixture_issue(
-                "Read without maintenance".to_string(),
-                "Description".to_string(),
-            );
-            seed_issue_preimage(&storage, &issue);
-            let sidecar = storage
-                .root
-                .join(ISSUES_DIR)
-                .join(format!("{}.lock", issue.id));
-            fs::write(&sidecar, "").unwrap();
-
-            let ids = |issues: Vec<Issue>| {
-                issues
-                    .into_iter()
-                    .map(|issue| issue.id)
-                    .collect::<Vec<String>>()
-            };
-            let read = ids(storage.read_issues().unwrap());
-            assert!(
-                sidecar.exists(),
-                "read_issues must leave an orphaned sidecar in place"
-            );
-            assert!(
-                read.contains(&issue.id),
-                "read_issues enumerates the seeded issue"
-            );
-
-            // Non-vacuous: the surviving sidecar is one the maintenance path
-            // does collect, so its survival is the read path's doing rather
-            // than the plant missing the sweep's shape.
-            assert_eq!(
-                read,
-                ids(storage.list_issues().unwrap()),
-                "read_issues enumerates what list_issues enumerates"
-            );
-            assert!(
-                !sidecar.exists(),
-                "the planted sidecar is a sweep target, so read_issues declined to remove one"
-            );
+            assert!(listed.iter().any(|listed| listed.id == issue.id));
+            assert_eq!(before, after);
         }
 
         #[test]

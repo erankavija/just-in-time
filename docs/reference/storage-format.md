@@ -74,13 +74,8 @@ a complete version rather than a partial one. An exclusive acquisition still
 fails when it cannot open its lock file. The claims lock belongs to the separate
 recovery-aware control plane described below.
 
-Issue reads do not create per-issue lock files. On the first read-all through a
-storage instance, JIT removes empty UUID-shaped `.lock` sidecars left in
-`issues/` by versions that predate this format. That sweep is legacy cleanup,
-not part of read correctness or the current storage layout, so a command that
-reports without changing the repository enumerates issues through a read path
-that skips it and leaves any remaining sidecars in place. A pending redo
-record lives in the scratch directory `.jit/tmp/` as `redo.record` (see
+Issue reads do not create per-issue lock files. A pending redo record lives in
+the scratch directory `.jit/tmp/` as `redo.record` (see
 [Publication and Recovery](#publication-and-recovery)). All of these are
 runtime state, not part of the versioned data format.
 

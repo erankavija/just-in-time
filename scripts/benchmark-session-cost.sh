@@ -456,7 +456,7 @@ else
   LOCK_SITE="none (the measured commit has no per-issue sidecar read lock)"
   LOCK_CREATOR="not applicable; load_issue creates no per-issue sidecar"
   LOCK_LIFETIME="not applicable; no per-issue sidecar is created"
-  LOCK_CLEANUP="legacy per-issue sidecars are removed once by the read-all path"
+  LOCK_CLEANUP="none; legacy per-issue sidecars are left in place"
   SHOW_NOTE="reads one issue without creating a per-issue sidecar lock"
   QUERY_NOTE="reads all issues without creating per-issue sidecar locks"
 fi
