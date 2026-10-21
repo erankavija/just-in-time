@@ -3694,31 +3694,6 @@ mod tests {
             .expect("the package contributes the namespace")
     }
 
-    /// Every whole-repository validation finding naming `subject`.
-    ///
-    /// A finding reaches an adopter as the sentence it renders, so the test asks
-    /// the report the question an adopter asks it — does anything say this
-    /// declaration needs attention — rather than which rule produced it.
-    fn repository_findings_naming(
-        executor: &CommandExecutor<JsonFileStorage>,
-        subject: &str,
-    ) -> Vec<String> {
-        let report = match executor
-            .validate_repository_report()
-            .expect("the repository is readable")
-        {
-            Ok(report) => report,
-            Err(failure) => panic!("repository validation failed structurally: {failure:?}"),
-        };
-        report
-            .rule_report
-            .findings
-            .into_iter()
-            .filter(|finding| finding.message.contains(subject))
-            .map(|finding| finding.message)
-            .collect()
-    }
-
     /// Every divergence the profile check reports naming `subject`.
     fn recorded_divergences_naming(
         executor: &CommandExecutor<JsonFileStorage>,
@@ -8190,10 +8165,6 @@ target = "docs/guide.md"
             recorded_divergences_naming(&executor, REFRESH_NAMESPACE),
             Vec::<String>::new()
         );
-        assert_eq!(
-            repository_findings_naming(&executor, REFRESH_NAMESPACE),
-            Vec::<String>::new()
-        );
         // The registry keeps the adopter's value: the package agreed with the
         // repository rather than the repository being overwritten.
         assert!(fs::read_to_string(temp.path().join(".jit/config.toml"))
@@ -8202,10 +8173,10 @@ target = "docs/guide.md"
     }
 
     /// A contributed value changed in place is one repository state, so the
-    /// report an adopter consults, the profile check, and whole-repository
-    /// validation all say the same declaration needs attention.
+    /// report an adopter consults and the profile check say the same
+    /// declaration needs attention.
     #[test]
-    fn test_diff_profiles_from_sources_agrees_with_validation_on_an_edited_contribution() {
+    fn test_diff_profiles_from_sources_agrees_with_the_profile_check_on_an_edited_contribution() {
         let (temp, _storage, executor, _fixture) = fixture();
         let location = applied_then_edited_contribution(&temp, &executor);
 
@@ -8224,15 +8195,11 @@ target = "docs/guide.md"
         assert_eq!(
             reported_contribution_actions(entry, REFRESH_NAMESPACE),
             vec![ProfileTargetAction::Conflict],
-            "the report called a declaration clean that validation fails on"
+            "the report called a declaration clean that the profile check fails on"
         );
         assert_eq!(entry.status, ProfilePlanStatus::WouldConflict);
         assert_eq!(
             recorded_divergences_naming(&executor, REFRESH_NAMESPACE).len(),
-            1
-        );
-        assert_eq!(
-            repository_findings_naming(&executor, REFRESH_NAMESPACE).len(),
             1
         );
         // The refusal the report states is the refusal a publication makes.

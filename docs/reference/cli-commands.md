@@ -3464,7 +3464,7 @@ jit validate --branch-drift [--leases] [--json]
 | `<ID> --rule <RULE>` | Applies exactly one configured graph rule with `<ID>` as its sole firing issue. Repository issues remain graph and identifier-resolution context only. A missing, disabled, non-graph, or non-matching rule is a validation error rather than a vacuous pass. Clean exits `0`, a rule failure exits `1`, and invalid combinations exit `2`. |
 | `--explain` | Per-rule outcome for one issue: which selectors matched, and `PASS`/`FAIL`/`SKIP` for each rule with the reason a skipped selector did not apply. Requires an issue id. |
 | `--scope <ID>` | Evaluates the rules matching each issue in a container's transitive dependency closure, excluding whole-repository rules. Shaped as a deterministic gate checker: exit `4` on any error-severity finding, `0` when clean ([exit-code reference](exit-codes.md#command-specific-mappings)). |
-| `--fix` | Apply automatic rule/graph/state fixes and provenance-proven derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
+| `--fix` | Apply automatic rule/graph/state fixes and derived-state repairs. `--dry-run` reports what would be fixed and writes nothing. |
 | `--branch-drift` | Check that `origin/main` is an ancestor of the current branch. Requires git. |
 | `--leases` | Check that active leases are consistent and not stale. |
 

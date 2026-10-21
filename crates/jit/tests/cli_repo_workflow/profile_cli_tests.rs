@@ -829,7 +829,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
 }
 
 #[test]
-fn test_profile_variable_record_drives_validation_repair_and_provenance_checks() {
+fn test_profile_variable_record_drives_validation_and_provenance_checks() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     write_variable_package(
@@ -884,19 +884,6 @@ fn test_profile_variable_record_drives_validation_repair_and_provenance_checks()
         .unwrap();
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
-
-    fs::write(repo.path().join("docs/recorded-vars.txt"), "DRIFTED\n").unwrap();
-    let repaired = Command::new(env!("CARGO_BIN_EXE_jit"))
-        .args(["validate", "--fix", "--json"])
-        .env_remove("JIT_PROFILE_RECORDED_NAME")
-        .current_dir(repo.path())
-        .output()
-        .unwrap();
-    assert!(repaired.status.success(), "{repaired:?}");
-    assert_eq!(
-        fs::read_to_string(repo.path().join("docs/recorded-vars.txt")).unwrap(),
-        format!("NAME={resolved_value}\n")
-    );
 
     let assert_applied = |mutated: Value, expected_applied: bool| {
         fs::write(&record_path, serde_json::to_vec_pretty(&mutated).unwrap()).unwrap();
@@ -1503,44 +1490,6 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
             .map(|profile| (profile["id"].to_string(), Value::Bool(true)))
             .collect::<std::collections::BTreeMap<_, _>>()
     );
-}
-
-#[test]
-fn test_validate_plain_and_json_report_installed_profile_drift() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(
-        repo.path(),
-        &[
-            "init",
-            "--profile",
-            &path_selector(&crate::repository_package_at(repo.path(), "jit-dogfood")),
-            "--json",
-        ],
-    )
-    .status
-    .success());
-    fs::write(
-        repo.path().join(".agents/skills/jit-manage/SKILL.md"),
-        "STALE\n",
-    )
-    .unwrap();
-
-    let plain = jit(repo.path(), &["validate"]);
-    assert!(!plain.status.success(), "{plain:?}");
-    assert!(
-        String::from_utf8_lossy(&plain.stdout).contains("jit-manage/SKILL.md"),
-        "stdout={}",
-        String::from_utf8_lossy(&plain.stdout)
-    );
-
-    let structured = jit(repo.path(), &["validate", "--json"]);
-    assert!(!structured.status.success(), "{structured:?}");
-    let structured = json(&structured);
-    let details = &structured["error"]["details"];
-    assert_eq!(details["valid"], false);
-    assert!(details["integrity_error"]
-        .as_str()
-        .is_some_and(|message| message.contains("jit-manage/SKILL.md")));
 }
 
 #[test]
