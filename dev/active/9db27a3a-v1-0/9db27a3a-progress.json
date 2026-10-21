@@ -454,6 +454,12 @@
       "status": "open",
       "date": "2026-10-21",
       "summary": "When 0f8efc37 is planned: its document-convergence task depends on f4d9502a's 83c8632f (document-history-through-module)."
+    },
+    {
+      "container_short_id": "c780514e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Flaky 20 s timeouts (two test_utils profiled-fixture tests and four fast_rules cli_warnings tests) at load 5-9 cost reruns three times today. Folded into c780514e planning as an early task, independent of 2195c98f where possible. Forced reruns of these count as load-only meanwhile."
     }
   ],
   "notes": [
