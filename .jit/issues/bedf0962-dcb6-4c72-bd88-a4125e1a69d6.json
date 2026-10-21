@@ -6,6 +6,7 @@
   "dependencies": [],
   "description": "The `enforce_leases` value that `config show` reports often differs from the mode write commands enforce. An operator reading the effective configuration gets a wrong answer about whether writes need a lease, and `JIT_ENFORCE_LEASES` appears to work when it has no effect.\n\n## Background\n\nThe enforcement mode is resolved in two places:\n\n- **Commands** call `ConfigManager::enforcement_mode_from_config` (`crates/jit/src/config_manager.rs:104-113`). It reads only the repository `.jit/config.toml` and returns `off` when there is no `[worktree]` section. Otherwise it returns `WorktreeConfig::enforcement_mode`, which defaults to `strict` (`crates/jit/src/config.rs:1316-1318`). It ignores `JIT_ENFORCE_LEASES` and user/system configuration.\n- **`config show`** uses `EffectiveConfig::enforcement_mode` (`crates/jit/src/config.rs:1790-1821`, rendered at config.rs:1966 and main.rs:6807). It honours `JIT_ENFORCE_LEASES` first, then the repository, user and system layers, and defaults to `strict`.\n\nObserved in a fresh repository with no `[worktree]` section:\n\n```\n$ jit config show --json            # enforce_leases: \"strict\"\n$ jit issue update <id> --priority high    # succeeds without a lease (mode is off)\n$ JIT_ENFORCE_LEASES=strict jit issue update <id> --priority high   # still succeeds\n```\n\nWith a `[worktree]` section that omits `enforce_leases`:\n\n```\n$ JIT_ENFORCE_LEASES=off jit config show --json   # enforce_leases: \"off\"\n$ JIT_ENFORCE_LEASES=off jit issue update <id> --priority low\nError: No active lease for issue <id>.\n```\n\nThe configuration reference documents this divergence (\"Some execution paths ... read the repository `.jit/config.toml` directly\") instead of removing it.\n\n## Success Criteria\n\n- [hard] REQ-01: For every configuration state, the `enforce_leases` value that `config show` reports equals the mode write commands enforce. The states are: no `[worktree]` section, a section without the key, each explicit value, values from the user or system layer, and `JIT_ENFORCE_LEASES` set or unset.\n- [hard] REQ-02: `JIT_ENFORCE_LEASES` changes write enforcement and the reported value in the same way, or it is removed and changes neither.\n- [hard] REQ-03: The configuration reference states one resolution rule for `enforce_leases` that matches the behaviour above, with no carve-out for execution paths that bypass the merged configuration.\n- [hard] REQ-04: A regression test covers each configuration state from REQ-01 and asserts that the reported mode and the enforced mode agree.\n\n## Notes\n\nA single resolver used by both paths removes the divergence. If the env var and the user/system layers are not needed for lease policy, dropping them is the simpler fix. The same reference sentence says claim coordination limits also bypass the merge, so check whether `config show` misreports those too.",
   "documents": [],
+  "done_at": "2026-10-21T06:27:00.002137027Z",
   "first_ready_at": "2026-10-20T19:42:11.675146005Z",
   "gates_required": [
     "cargo-ci",
@@ -13,8 +14,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T06:20:14.760241943Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:26:45.251095645Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
@@ -32,7 +33,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Config show misreports the lease enforcement mode that commands apply",
-  "updated_at": "2026-10-21T06:25:41.283794010Z"
+  "updated_at": "2026-10-21T06:27:00.002137027Z"
 }
