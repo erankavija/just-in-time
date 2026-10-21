@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "78684701c74060d67889799e47ba367967f56b2d",
+  "completed_at": "2026-10-21T05:47:48.506909455Z",
+  "duration_ms": 273989,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributable manifest-version cutover satisfies the scoped requirements; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "756ec5ec-4cae-4e18-b67d-96c3a6d7ecd9",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "603155e8-1a27-4033-932f-272d9829904d",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T05:43:14.517427815Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 88c268536; e7ca0af72 (identical first-parent merge patch)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-06 (issue); @/invariant/canonical-cutover, @/invariant/essential-code-prose, @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T05:39:23Z); doc-review passed (exit 0, 2026-10-21T05:42:11Z); docs-mechanical pending\nTruncation recovery: recovered bounded wire/package diff slices, current source ranges, profile-only searches, and item-registry slices; omitted unrelated broad test and gate-run listings outside the impact cone.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributable manifest-version cutover satisfies the scoped requirements; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
