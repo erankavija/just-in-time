@@ -18,12 +18,12 @@
   "gates_status": {
     "cargo-ci": {
       "status": "passed",
-      "updated_at": "2026-10-21T15:38:06.509944071Z",
+      "updated_at": "2026-10-21T15:49:13.954304592Z",
       "updated_by": "auto:executor"
     },
     "code-review": {
-      "status": "failed",
-      "updated_at": "2026-10-21T15:43:26.168154525Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T15:50:28.840600180Z",
       "updated_by": "auto:executor"
     },
     "doc-review": {
@@ -49,5 +49,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Require archived_from on archived issue records",
-  "updated_at": "2026-10-21T15:47:06.283700743Z"
+  "updated_at": "2026-10-21T15:50:28.840600180Z"
 }
