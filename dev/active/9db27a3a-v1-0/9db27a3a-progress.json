@@ -226,7 +226,7 @@
           "short_id": "f8a6b298",
           "title": "Restructure storage so reads never scale with project history",
           "wave": 4,
-          "status": "pending"
+          "status": "planning"
         },
         {
           "id": "f4d9502a-c585-4436-8819-bcd3d5c59171",
@@ -332,7 +332,7 @@
     },
     {
       "container_short_id": "842b0ac6",
-      "status": "open",
+      "status": "resolved",
       "date": "2026-10-21",
       "summary": "Breakdown review advisory: 842b0ac6 became unreachable from the v1.0 tag task after 2195c98f's bracket moved its edge. Resolution: 2195c98f's breakdown re-homes the 842b0ac6 edge onto its root tasks (just-in-time-59 told). Close once bb03df0a reaches 842b0ac6 again and `jit query divergence` is clean."
     },
@@ -347,7 +347,7 @@
       "container_short_id": "3d9a0ce3",
       "status": "open",
       "date": "2026-10-21",
-      "summary": "Re-home whole-epic edges once their epics are broken down: dbbfcd6c -> 2195c98f's ProfileId task (requested from just-in-time-59), and 5f82e09a -> f4d9502a's git-module task (once f4d9502a is planned)."
+      "summary": "Re-home whole-epic edges once their epics are broken down: dbbfcd6c -> 2195c98f's ProfileId task (requested from just-in-time-59), and 5f82e09a -> f4d9502a's git-module task (once f4d9502a is planned). Update 2026-10-21: dbbfcd6c re-homed onto 5c232305 (domain-profile-id). 5f82e09a is still pending f4d9502a's planning."
     },
     {
       "container_short_id": "3d9a0ce3",
@@ -391,7 +391,8 @@
     "2026-10-21: df129d9e planned (78 issues, 227 edges; both gates passed). Execution was dispatched to a fresh background execution-lead subagent.",
     "2026-10-21 ~04:45: resource emergency. Disk 97% (33 GB free), 22 worktrees at ~17-23 GB each, load 27-50, and cargo-ci budget failures under load. Steward resource policy issued to all leads: freeze new worktrees until >=100 GB free; leads reclaim their own merged worktrees; cap 2 live worktrees for just-in-time-05 and just-in-time-7e and 1 each for the 3d9a0ce3 and df129d9e leads (6 total); full cargo-ci runs serialised under `flock /tmp/jit-full-ci.lock`; budget-only failures under load are reruns, not findings. Candidate for the user: a durable host-level build scheduler or a shared build cache (project-wide infrastructure).",
     "2026-10-21 ~04:55: policy revised. The 100 GB threshold was unreachable: agent worktrees hold ~55 GB and the main target ~65 GB, and the remaining ~700 GB used is outside this project. New rule: dispatch a worker worktree only when df shows >=60 GB free; per-lead caps unchanged; remove worktrees on merge; flock for full cargo-ci.",
-    "2026-10-21 04:45-08:30: second shared usage-limit stall; all leads were resumed at 08:31. Disk reached 98% (26 GB free). The steward removed the regenerable target/debug/incremental (28 GB) while no debug build ran, leaving 53 GB free. Policy addition: CARGO_INCREMENTAL=0 for every cargo invocation."
+    "2026-10-21 04:45-08:30: second shared usage-limit stall; all leads were resumed at 08:31. Disk reached 98% (26 GB free). The steward removed the regenerable target/debug/incremental (28 GB) while no debug build ran, leaving 53 GB free. Policy addition: CARGO_INCREMENTAL=0 for every cargo invocation.",
+    "2026-10-21 ~09:00: 2195c98f breakdown created (86 issues; 12 roots depend on B and on 842b0ac6; divergence 0; bb03df0a reaches 842b0ac6 again); its B gates are pending. df129d9e's lead had implemented 9ca31c64 directly on main during the freeze; the edits moved to a branch and were merged after lead review, with gates running. That was accepted as a one-off; no implementation on main from here on. just-in-time-59 is assigned next to plan wave-4 epic f8a6b298 while 2195c98f's execution waits on 842b0ac6."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
