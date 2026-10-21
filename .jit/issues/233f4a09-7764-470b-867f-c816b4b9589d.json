@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:df129d9e-lead",
+  "claimed_at": "2026-10-21T11:49:14.069628177Z",
   "context": {},
   "created_at": "2026-10-21T01:17:17.724444903Z",
   "dependencies": [
@@ -27,5 +28,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "Omit clap-hidden commands and flags from the generated schema",
-  "updated_at": "2026-10-21T11:20:20.314749582Z"
+  "updated_at": "2026-10-21T11:49:14.069628177Z"
 }

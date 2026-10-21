@@ -21,7 +21,7 @@
     },
     "code-review": {
       "status": "failed",
-      "updated_at": "2026-10-21T11:34:02.202007394Z",
+      "updated_at": "2026-10-21T11:47:35.761126824Z",
       "updated_by": "auto:executor"
     }
   },
@@ -37,5 +37,5 @@
   "priority": "high",
   "state": "ready",
   "title": "Parse lifecycle states from canonical tokens only",
-  "updated_at": "2026-10-21T11:34:02.202007394Z"
+  "updated_at": "2026-10-21T11:47:35.761126824Z"
 }

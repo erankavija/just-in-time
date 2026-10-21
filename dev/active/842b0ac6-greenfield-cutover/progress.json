@@ -419,14 +419,15 @@
   "escalations": [],
   "rework_counts": {
     "0ec8b001": 1,
-    "66bd4b5c": 1
+    "66bd4b5c": 2
   },
   "surfaced_pitfalls": [
     "cargo-ci's rust-build-budget fails the suite-duration threshold (30 s) under host load: bc0bd663 at c165e36a8 measured 53 s with load ~20 from parallel worker builds. Tests, clippy and fmt passed. Gate merges only on a quiet host.",
     "0ec8b001 worker saw one unreproduced jit-server --lib assertion failure in a full run (passed on two reruns).",
     "Suite clock on quiet host: 21.1 s (4251137e, 45b442f3), 26.0 s (866bdde0, moderate load). Load-only budget failures rerun with --force pass.",
     "d759d606 code-review advisory (pre-existing, low): execute_claim_list rustdoc names a nonexistent _storage argument (commands/claim.rs:510).",
-    "Suite clock is load-sensitive even at low start load: 66bd4b5c measured 34.2 s (start load 3.3), rerun 27.5 s while load rose to 16. Clocks after cutover deletions: 21.2 s (84745746), 27.6 s (71b0af0e)."
+    "Suite clock is load-sensitive even at low start load: 66bd4b5c measured 34.2 s (start load 3.3), rerun 27.5 s while load rose to 16. Clocks after cutover deletions: 21.2 s (84745746), 27.6 s (71b0af0e).",
+    "66bd4b5c code-review read 'every case variant' literally twice (R1, R2 same root cause); rework 2 requires exhaustive 2^k case enumeration. One more same-finding failure escalates (MAX_SAME_FINDING_REPEATS=3)."
   ],
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
