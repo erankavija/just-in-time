@@ -1,0 +1,52 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "77cfcd1f452a7a063c38582ebc610fd3f25a081c",
+  "completed_at": "2026-10-21T11:33:23.229400048Z",
+  "duration_ms": 332498,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F1",
+        "line": 657,
+        "origin": "issue-impact",
+        "references": [
+          "@/charter/D-8",
+          "@/charter/D-13"
+        ],
+        "severity": "high",
+        "summary": "Canonical reference pages still document all four removed profile commands."
+      },
+      {
+        "disposition": "blocking",
+        "id": "F2",
+        "origin": "issue-impact",
+        "references": [
+          "@/gate/mcp-ci"
+        ],
+        "severity": "high",
+        "summary": "Required mcp-ci is recorded failed (exit 1), leaving REQ-03 unmet."
+      }
+    ],
+    "summary": "Canonical documentation still advertises removed profile commands, and the required MCP CI gate is failing.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "24268b05-2ab4-4864-87fe-e8ff35945191",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "721f13ff-1fc2-4d87-968a-a06191c4bf80",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:27:50.730955339Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8986 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15e37-b290-7501-9e63-6a7b96c488c0\n--------\nuser\n--- 8973 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 44722add8 (substantive) and merge 77cfcd1f; union covers 22 files\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-8 and @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/issue/3d9a0ce3/requirement/REQ-04 (issue description); @/gate/mcp-ci and @/gate/jit-validate (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit code not recorded); mcp-ci failed (exit 1)\nTruncation recovery: narrowed commit/path diffs, current-source searches, and documentation line reads; historical benchmark/archive matches excluded as past records outside the impact cone\n\n1. [blocking, issue-impact] The canonical reference documentation still publishes all four removed commands: [`docs/reference/cli-commands.md:657`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:657), [`:702`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:702), [`:833`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:833), and [`:877`](/home/vkaskivuo/Projects/just-in-time/docs/reference/cli-commands.md:877), with further workflow guidance in [`docs/reference/profiles.md:224`](/home/vkaskivuo/Projects/just-in-time/docs/reference/profiles.md:224). The attributed change removes these CLI/schema surfaces, so these are now invalid adopter instructions. Update the canonical profile documentation for the D-8 model. References: @/charter/D-8, @/charter/D-13.\n\n2. [blocking, issue-impact] REQ-03 requires MCP tests to pass, but the latest required `mcp-ci` projection is failed with exit code 1. The attributable footprint changes both the curated MCP list and integration test, so this leaves the issue’s MCP criterion unmet until a passing `mcp-server` test run is recorded. References: @/gate/mcp-ci.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Canonical documentation still advertises removed profile commands, and the required MCP CI gate is failing.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Canonical reference pages still document all four removed profile commands.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":657,\"references\":[\"@/charter/D-8\",\"@/charter/D-13\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Required mcp-ci is recorded failed (exit 1), leaving REQ-03 unmet.\",\"references\":[\"@/gate/mcp-ci\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

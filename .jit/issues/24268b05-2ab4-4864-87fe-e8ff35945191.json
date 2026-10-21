@@ -21,9 +21,14 @@
       "updated_at": "2026-10-21T11:27:34.762310918Z",
       "updated_by": "auto:executor"
     },
-    "mcp-ci": {
+    "code-review": {
       "status": "failed",
-      "updated_at": "2026-10-21T11:27:35.339989652Z",
+      "updated_at": "2026-10-21T11:33:23.432824646Z",
+      "updated_by": "auto:executor"
+    },
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T11:37:48.034070329Z",
       "updated_by": "auto:executor"
     }
   },
@@ -39,5 +44,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove the record-reading profile subcommands",
-  "updated_at": "2026-10-21T11:27:35.339989652Z"
+  "updated_at": "2026-10-21T11:37:48.034070329Z"
 }

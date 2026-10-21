@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "0dd5a529636dd2d8f9741fff0ff9afb5cd6a4086",
+  "completed_at": "2026-10-21T11:37:26.951153749Z",
+  "duration_ms": 241540,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The registry and focused tests meet all six success criteria; the completed digest dependency is correctly integrated.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "5a3a886f-96cb-420d-9070-5f8e6dcedb1d",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "26c7e5b6-cadd-4137-aabf-0c55d74d2fdb",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T11:33:25.410617088Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8556d21be, 92a565df, 1096a117, 36f787596 (`jit:5a3a886f`)\nPolicy sources: AGENTS.md; .jit/config.toml; .jit/gates.toml\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md, markdown-first); @/issue/3d9a0ce3/requirement/REQ-01 (issue description, markdown-first); @/gate/jit-validate and @/gate/repo-validate (.jit/gates.toml, registry-first)\nGate evidence: repo-validate passed (exit 0, 2026-10-21T11:33:23Z); code-review pending\nTruncation recovery: recovered bounded individual patches, merge patch, registry slices, digest implementation/tests, and ignored/generated-path evidence\n\n1. No findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The registry and focused tests meet all six success criteria; the completed digest dependency is correctly integrated.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}
