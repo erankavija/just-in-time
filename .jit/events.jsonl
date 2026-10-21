@@ -16853,3 +16853,4 @@
 {"gate_key":"cargo-ci","id":"4c61296e-e8e2-4d39-aa49-db42c3180da2","issue_id":"7d1bfe89-c8f7-4382-bd94-a241a0a2b7e6","timestamp":"2026-10-21T01:02:30.971581547Z","type":"gate_failed","updated_by":"auto:executor"}
 {"fields":["assignee"],"id":"8666d744-7b25-485f-98da-45aae22c78d0","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-21T01:03:14.864793872Z","type":"issue_updated","updated_by":"issue-unassign"}
 {"assignee":"agent:jit-execution-lead","id":"34170cea-61d6-4e46-b7a0-e0fb3331a51f","issue_id":"842b0ac6-8a8b-4c20-b8dc-f39d0d9b083b","timestamp":"2026-10-21T01:03:20.402090505Z","type":"issue_claimed"}
+{"fields":["documents"],"id":"3f55ea45-bfe8-4ee4-a74a-29ec889c37c3","issue_id":"0ba00a6f-9813-4f66-8205-362ebfc8caaa","timestamp":"2026-10-21T01:03:30.245849080Z","type":"issue_updated","updated_by":"doc-update"}
