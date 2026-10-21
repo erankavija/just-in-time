@@ -798,9 +798,14 @@ fn collect_item_link_findings(
                         Ok(format!("@/{}/{}", address.kind, address.self_id))
                     }
                     AddressScope::Issue(issue_ref) => {
+                        let prefix = crate::domain::IssueIdPrefix::parse(&issue_ref).ok();
                         let matches: Vec<&Issue> = issues
                             .iter()
-                            .filter(|candidate| candidate.id.starts_with(&issue_ref))
+                            .filter(|candidate| {
+                                prefix
+                                    .as_ref()
+                                    .is_some_and(|prefix| prefix.matches(&candidate.id))
+                            })
                             .collect();
                         let [owner] = matches.as_slice() else {
                             return Err(anyhow!(

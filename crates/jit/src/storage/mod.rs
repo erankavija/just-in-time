@@ -5,7 +5,7 @@
 //! through [`RepositoryStateStore`] capture/apply sessions.
 
 use crate::declarations::GateRegistry;
-use crate::domain::{Event, Issue};
+use crate::domain::{Event, Issue, IssueIdPrefix};
 use anyhow::Result;
 
 pub mod artifact_discovery;
@@ -53,8 +53,7 @@ pub use claim_coordinator::{ClaimAcquireLimits, ClaimCoordinator, Lease};
 pub use clock::{Clock, SystemClock};
 pub use errors::{
     AmbiguousIdError, GateAlreadyExistsError, GateNotFoundError, GateRunNotFoundError,
-    InvalidIdPrefixError, IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError,
-    RepositoryNotFoundError, MIN_ID_PREFIX_LENGTH,
+    IssueNotFoundError, PresetNotFoundError, RepositoryFormatTooNewError, RepositoryNotFoundError,
 };
 pub use git_revision::{
     GitRevisionError, GitRevisionResolver, PinnedArtifactRead, PinnedTargetRead,
@@ -90,6 +89,47 @@ pub use worktree_paths::WorktreePaths;
 pub use memory::MemoryRedoApplier;
 
 pub use memory::InMemoryStorage;
+
+/// The one id among `ids` that `prefix` names, else the lookup error naming
+/// it; `describe` renders each candidate of an ambiguous match.
+pub(crate) fn resolve_unique_issue_id<'a>(
+    prefix: &IssueIdPrefix,
+    ids: impl IntoIterator<Item = &'a str>,
+    describe: impl Fn(&str) -> Option<String>,
+) -> Result<String> {
+    let matches = ids
+        .into_iter()
+        .filter(|id| prefix.matches(id))
+        .collect::<Vec<_>>();
+    match matches.as_slice() {
+        [] => Err(IssueNotFoundError::new(prefix.requested()).into()),
+        [id] => Ok(id.to_string()),
+        _ => Err(AmbiguousIdError::issue(
+            prefix.requested(),
+            matches.iter().filter_map(|id| describe(id)),
+        )
+        .into()),
+    }
+}
+
+/// The id of the one of `issues` that `prefix` names.
+///
+/// # Errors
+///
+/// [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for several.
+pub(crate) fn resolve_issue_id_among(prefix: &IssueIdPrefix, issues: &[Issue]) -> Result<String> {
+    resolve_unique_issue_id(prefix, issues.iter().map(|issue| issue.id.as_str()), |id| {
+        issues
+            .iter()
+            .find(|issue| issue.id == id)
+            .map(describe_issue)
+    })
+}
+
+/// An ambiguous-match candidate as `short_id | title`.
+pub(crate) fn describe_issue(issue: &Issue) -> String {
+    format!("{} | {}", issue.short_id(), issue.title)
+}
 
 /// Typed repository readers and session lifecycle controls.
 ///
@@ -179,15 +219,14 @@ pub trait IssueStore: Clone {
         self.load_issue(id).map_err(PathReadError::Other)
     }
 
-    /// Resolve a partial issue ID to its full UUID.
+    /// Resolve an issue id or unique id prefix, matched by
+    /// [`IssueIdPrefix`], to the stored id.
     ///
-    /// Accepts either a full UUID or a unique prefix (minimum 4 characters).
-    /// Returns the full UUID if a unique match is found.
     /// # Errors
     ///
-    /// - Prefix too short (< 4 chars): "Issue ID prefix must be at least 4 characters"
-    /// - No matching issue found: "Issue not found: {prefix}"
-    /// - Multiple issues match (ambiguous): "Ambiguous ID '{prefix}' matches multiple issues: ..."
+    /// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
+    /// read, [`IssueNotFoundError`] for no match, or [`AmbiguousIdError`] for
+    /// several.
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String>;
 
     /// List all issues in the repository.

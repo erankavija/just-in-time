@@ -706,10 +706,7 @@ impl<S: IssueStore> CommandExecutor<S> {
         use crate::repository_state::{CaptureSpec, VirtualPath};
         use std::collections::BTreeMap;
 
-        let normalized = requested.to_lowercase().replace('-', "");
-        if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
-            return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
-        }
+        let prefix = crate::domain::IssueIdPrefix::parse(requested)?;
         let mut candidates = Vec::new();
         let spec = CaptureSpec::new(
             [VirtualPath::INDEX],
@@ -719,13 +716,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             candidates = captured_repository_index(image)?
                 .all_ids
                 .into_iter()
-                .filter(|id| {
-                    if normalized.len() == 32 {
-                        id.as_str() == requested
-                    } else {
-                        id.to_lowercase().replace('-', "").starts_with(&normalized)
-                    }
-                })
+                .filter(|id| prefix.matches(id))
                 .collect();
             Ok(spec.discover_paths(
                 candidates
@@ -744,7 +735,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     .ok_or_else(|| crate::storage::IssueNotFoundError::new(id).into())
             })
             .collect::<Result<Vec<_>>>()?;
-        let target_id = super::resolve_issue_from_capture(&issues, requested)?;
+        let target_id = crate::storage::resolve_issue_id_among(&prefix, &issues)?;
         let mut paths = vec![
             VirtualPath::INDEX,
             VirtualPath::data(format!("issues/{target_id}.json"))?,
@@ -4370,7 +4361,7 @@ source-of-truth = "markdown-first"
     }
 
     #[test]
-    fn test_check_gate_rejects_noncanonical_full_issue_ids() {
+    fn test_check_gate_resolves_noncanonical_full_issue_ids() {
         let (_repo, executor, issue_id) = setup_file_repository();
         add_exec_gate(
             &executor,
@@ -4381,15 +4372,45 @@ source-of-truth = "markdown-first"
             None,
         );
 
-        for requested in [issue_id.to_uppercase(), issue_id.replace('-', "")] {
-            let error = executor.check_gate(&requested, "canonical-id").unwrap_err();
-            assert!(
-                error
-                    .downcast_ref::<crate::storage::IssueNotFoundError>()
-                    .is_some(),
-                "noncanonical full id {requested} must not resolve: {error:?}"
-            );
+        let requests = [issue_id.to_uppercase(), issue_id.replace('-', "")];
+        for requested in &requests {
+            let run = executor.check_gate(requested, "canonical-id").unwrap();
+            assert_eq!(run.issue_id, issue_id, "{requested} must bind the issue");
         }
+        assert_eq!(
+            executor
+                .storage
+                .list_gate_runs_for_issue(&issue_id)
+                .unwrap()
+                .len(),
+            requests.len()
+        );
+    }
+
+    #[test]
+    fn test_check_gate_rejects_a_prefix_below_the_minimum_length() {
+        let (_repo, executor, issue_id) = setup_file_repository();
+        add_exec_gate(
+            &executor,
+            &issue_id,
+            "short-id",
+            "Short id",
+            "true".to_string(),
+            None,
+        );
+
+        let error = executor
+            .check_gate(
+                &issue_id[..crate::domain::MIN_ID_PREFIX_LENGTH - 1],
+                "short-id",
+            )
+            .unwrap_err();
+        assert!(
+            error
+                .downcast_ref::<crate::domain::InvalidIdPrefixError>()
+                .is_some(),
+            "{error:?}"
+        );
         assert!(executor
             .storage
             .list_gate_runs_for_issue(&issue_id)

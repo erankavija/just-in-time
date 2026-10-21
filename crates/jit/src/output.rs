@@ -1109,7 +1109,7 @@ impl From<ErrorCode> for String {
 /// prefix in `details`. Any other error keeps its `fallback` unchanged, so this
 /// is a no-op for the vast majority of call sites.
 pub fn refine_id_error(error: &anyhow::Error, fallback: JsonError) -> JsonError {
-    if let Some(prefix_error) = error.downcast_ref::<crate::storage::InvalidIdPrefixError>() {
+    if let Some(prefix_error) = error.downcast_ref::<crate::domain::InvalidIdPrefixError>() {
         return JsonError::new(ErrorCode::InvalidIdPrefix, prefix_error.to_string())
             .with_details(serde_json::json!({ "prefix": prefix_error.prefix() }));
     }

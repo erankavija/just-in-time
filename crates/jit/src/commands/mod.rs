@@ -2076,34 +2076,7 @@ fn discover_gate_run_results(
 }
 
 fn resolve_issue_from_capture(issues: &[Issue], requested: &str) -> Result<String> {
-    if let Some(issue) = issues.iter().find(|issue| issue.id == requested) {
-        return Ok(issue.id.clone());
-    }
-    let normalized = requested.to_lowercase().replace('-', "");
-    if normalized.len() < crate::storage::MIN_ID_PREFIX_LENGTH {
-        return Err(crate::storage::InvalidIdPrefixError::new(requested).into());
-    }
-    let matches = issues
-        .iter()
-        .filter(|issue| {
-            issue
-                .id
-                .to_lowercase()
-                .replace('-', "")
-                .starts_with(&normalized)
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [] => Err(crate::storage::IssueNotFoundError::new(requested).into()),
-        [issue] => Ok(issue.id.clone()),
-        _ => Err(crate::storage::AmbiguousIdError::issue(
-            requested,
-            matches
-                .iter()
-                .map(|issue| format!("{} | {}", issue.short_id(), issue.title)),
-        )
-        .into()),
-    }
+    crate::storage::resolve_issue_id_among(&crate::domain::IssueIdPrefix::parse(requested)?, issues)
 }
 
 /// Executes CLI commands with business logic and validation.

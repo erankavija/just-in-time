@@ -7,17 +7,16 @@
 //! location can be overridden with the `JIT_DATA_DIR` environment variable.
 
 use crate::declarations::GateRegistry;
-use crate::domain::{parse_known_events, Event, Issue};
+use crate::domain::{parse_known_events, Event, Issue, IssueIdPrefix};
 use crate::repository_state::{
     gate_run_result_relative_path, RepositoryIndex, RepositoryIndexError, RepositoryLayout,
     BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
     SUPPORTED_INDEX_SCHEMA_VERSION,
 };
 use crate::storage::{
-    AmbiguousIdError, FileLocker, GateRunNotFoundError, InvalidIdPrefixError, IssueNotFoundError,
-    IssueStore, RecoveryDispatchReport, RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError,
-    RepositoryMutationSession, RepositoryNotFoundError, RepositoryStateStore,
-    RepositoryStateStoreError, WorktreePaths, MIN_ID_PREFIX_LENGTH,
+    FileLocker, GateRunNotFoundError, IssueNotFoundError, IssueStore, RecoveryDispatchReport,
+    RepoWriteGuard, RepoWriteLock, RepositoryFormatTooNewError, RepositoryMutationSession,
+    RepositoryNotFoundError, RepositoryStateStore, RepositoryStateStoreError, WorktreePaths,
 };
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
@@ -1255,48 +1254,17 @@ impl IssueStore for JsonFileStorage {
     }
 
     fn resolve_issue_id(&self, partial_id: &str) -> Result<String> {
-        // Normalize input: lowercase and remove hyphens
-        let normalized = partial_id.to_lowercase().replace('-', "");
-
-        // Full UUID check (fast path) - 32 hex chars without hyphens
-        if normalized.len() == 32 {
-            // Try loading to verify it exists
-            return self
-                .load_issue(partial_id)
-                .map(|issue| issue.id)
-                .map_err(|_| IssueNotFoundError::new(partial_id).into());
-        }
-
-        // Minimum length check
-        if normalized.len() < MIN_ID_PREFIX_LENGTH {
-            return Err(InvalidIdPrefixError::new(partial_id).into());
-        }
-
-        // Load aggregated index to search across all sources
+        let prefix = IssueIdPrefix::parse(partial_id)?;
         let index = self.load_aggregated_index()?;
-        let matches: Vec<String> = index
-            .all_ids
-            .iter()
-            .filter(|id| id.replace('-', "").to_lowercase().starts_with(&normalized))
-            .cloned()
-            .collect();
-
-        match matches.len() {
-            0 => Err(IssueNotFoundError::new(partial_id).into()),
-            1 => Ok(matches[0].clone()),
-            _ => {
-                // Load issue titles for better error message
-                let issue_list: Vec<String> = matches
-                    .iter()
-                    .filter_map(|id| {
-                        self.load_issue(id)
-                            .ok()
-                            .map(|issue| format!("{} | {}", issue.short_id(), issue.title))
-                    })
-                    .collect();
-                Err(AmbiguousIdError::issue(partial_id, issue_list).into())
-            }
-        }
+        crate::storage::resolve_unique_issue_id(
+            &prefix,
+            index.all_ids.iter().map(String::as_str),
+            |id| {
+                self.load_issue(id)
+                    .ok()
+                    .map(|issue| crate::storage::describe_issue(&issue))
+            },
+        )
     }
 
     fn list_issues(&self) -> Result<Vec<Issue>> {
