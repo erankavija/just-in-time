@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "94b072c0421a1b44969657cba0d36d1c15394f86",
+  "completed_at": "2026-10-21T06:38:09.058020074Z",
+  "duration_ms": 370733,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard criteria are implemented and covered; no issue-impact defects found.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "31548c82-e5ad-41af-82aa-d22d6d336380",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:31:58.324846871Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 7487c84b2; 428147948 merge (same first-parent implementation)\nPolicy sources: AGENTS.md\nResolved items: @/issue/3d9a0ce3/requirement/REQ-03; @/charter/D-4; @/charter/D-20; @/invariant/architecture-dependency-direction; @/invariant/essential-code-prose; @/invariant/orthogonal-tests\nGate evidence: cargo-ci passed (exit 0); doc-review pending\nTruncation recovery: narrower per-file and per-range reads of patches, routes, storage walker, docs, and policy sources\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard criteria are implemented and covered; no issue-impact defects found.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}
