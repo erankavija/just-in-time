@@ -1017,7 +1017,7 @@ fn evaluate_label_coverage(
             };
 
             // Select the parser per container issue (content_format -> repo
-            // default -> Markdown). A feature-not-compiled selection surfaces as a
+            // default -> ContentFormat::DEFAULT). A feature-not-compiled selection surfaces as a
             // single config-error finding rather than parsing wrongly.
             let criteria = match criterion_ids(
                 container,

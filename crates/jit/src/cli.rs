@@ -607,7 +607,8 @@ pub enum InvariantCommands {
 /// kind or kinds) into its documentation target: a markdown-first kind renders its
 /// `- **{self-id}** — {text}` rows, the built-in invariant and rule+gate registries
 /// render their rich views. Targets, modes, and region delimiters come only from
-/// config; delimiters default to `<!-- jit:<name>:begin/end -->`.
+/// config; unset delimiters derive from the projection name (see
+/// docs/reference/runtime-defaults.md).
 #[derive(Subcommand)]
 pub enum ProjectCommands {
     /// Render declared documentation projections into their configured targets

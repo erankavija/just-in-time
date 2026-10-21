@@ -139,7 +139,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
 
-**Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the built-in claim stale threshold ([Runtime Coordination Defaults](../reference/runtime-defaults.md)).
+**Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the built-in claim stale threshold ([Runtime Defaults](../reference/runtime-defaults.md)).
 
 **Solutions:**
 
@@ -161,7 +161,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 **Symptom:**
 ```
 Error: Exceeded per-agent limit for indefinite leases.
-Agent copilot:worker-1 already has 2 indefinite lease(s) (max: 2).
+Agent copilot:worker-1 already has 3 indefinite lease(s) (max: 3).
 ```
 
 **Cause:** Policy limits prevent too many indefinite leases to avoid deadlocks.
@@ -201,7 +201,7 @@ The command exits with the dedicated lock-timeout exit code (see
 willing to wait. Mutations serialize on the repository lock, so a burst of
 concurrent mutations, or one slow mutation, can exhaust a short wait. The default
 wait is the lock-acquisition timeout in
-[Runtime Coordination Defaults](../reference/runtime-defaults.md).
+[Runtime Defaults](../reference/runtime-defaults.md).
 
 **Solution:** Retry the command, or raise `JIT_LOCK_TIMEOUT` (whole seconds) for
 workflows that run many mutations concurrently. If no other jit process is

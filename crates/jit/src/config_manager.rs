@@ -76,12 +76,12 @@ impl ConfigManager {
     /// inside a linked non-primary checkout.
     ///
     /// Returns the configured stance from `.jit/config.toml`, defaulting to
-    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] (refuse) if not
+    /// [`crate::domain::LinkedCheckoutWriteStance::DEFAULT`] if not
     /// configured.
     ///
     /// Unlike [`JitConfig::enforcement_mode`], an absent `write_policy` key in
     /// a present `[worktree]` section and an absent `[worktree]` section
-    /// altogether resolve identically — both refuse.
+    /// altogether resolve identically, to the default.
     ///
     /// # Errors
     ///
@@ -226,7 +226,10 @@ fn build_namespaces_from_config(
         .collect();
 
     let mut result = LabelNamespaces {
-        schema_version: config.version.as_ref().map(|v| v.schema).unwrap_or(2),
+        schema_version: config
+            .version
+            .as_ref()
+            .map_or(crate::config::VersionConfig::DEFAULT_SCHEMA, |v| v.schema),
         namespaces,
         type_hierarchy: config.type_hierarchy.as_ref().map(|h| h.types.clone()),
         label_associations: config

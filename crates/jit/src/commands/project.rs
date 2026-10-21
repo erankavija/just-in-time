@@ -19,7 +19,7 @@
 //! (declaration scope), so a single-name render leaves sibling targets untouched.
 
 use super::*;
-use crate::config::{JitConfig, ProjectionMode, ProjectionStyle};
+use crate::config::JitConfig;
 
 /// The result of rendering ONE projection, serialized as an element of
 /// [`ProjectRenderResult::projections`].
@@ -49,24 +49,6 @@ pub struct ProjectRenderResult {
     pub count: usize,
     /// Per-projection reports, in projection-name order.
     pub projections: Vec<ProjectionRenderReport>,
-}
-
-/// The config token for a [`ProjectionMode`].
-fn mode_token(mode: ProjectionMode) -> String {
-    match mode {
-        ProjectionMode::SeparateFile => "separate-file",
-        ProjectionMode::Region => "region",
-    }
-    .to_string()
-}
-
-/// The config token for a [`ProjectionStyle`].
-fn style_token(style: ProjectionStyle) -> String {
-    match style {
-        ProjectionStyle::Full => "full",
-        ProjectionStyle::IdAnchor => "id-anchor",
-    }
-    .to_string()
 }
 
 /// Preserve validation-class producer sources at the command's anyhow transport
@@ -208,8 +190,8 @@ impl<S: IssueStore + crate::storage::RepositoryStateStore> CommandExecutor<S> {
                     Ok(ProjectionRenderReport {
                         name: proj_name.clone(),
                         target,
-                        mode: mode_token(projection.mode()),
-                        style: style_token(projection.style()),
+                        mode: projection.mode().to_string(),
+                        style: projection.style().to_string(),
                         kinds: projection.kinds().to_vec(),
                         count,
                     })
