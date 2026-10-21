@@ -43,7 +43,7 @@ A canonical-string newtype (DEC-07). Its trait set is exactly `Display` (the sam
 
 ### `issue-id-prefix` [implementation-produced] — Parsed id prefix
 
-`IssueIdPrefix` owns `MIN_ID_PREFIX_LENGTH` and the normalisation rules of the shared resolver. Resolution maps `&IssueIdPrefix` to `IssueId`, and a parse failure keeps the not-found class and exit code 3 (DEC-23). Only the CLI and server entry points parse and resolve; executor and internal methods take `IssueId` (DEC-24).
+`IssueIdPrefix` owns `MIN_ID_PREFIX_LENGTH` and the normalisation rules of the shared resolver. Resolution maps `&IssueIdPrefix` to `IssueId`. Parsing produces exactly two error classes: a prefix that normalises below the minimum length gets the resolver's invalid-prefix error before any record is read, and well-formed-length input outside the alphabet or matching nothing keeps not-found, exit 3 (DEC-23). The landed 16d63038 contract governs where they differ. Only the CLI and server entry points parse and resolve; executor and internal methods take `IssueId` (DEC-24).
 
 ### `test-issue-id-fixture` [implementation-produced] — Canonical test ids
 
@@ -417,7 +417,7 @@ flowchart LR
 | DEC-20 Projection schema | Chosen: accept the change from a string schema to an enum schema. Rejected: keeping `String` fields. |
 | DEC-21 Unnamed token twins | Chosen: rule severity and scope, gate stage and mode, `ErrorCode`, the divergence enums and the type-hierarchy kind, each in a bounded macro entry. Rejected: leaving them out, which is a convergence defect. |
 | DEC-22 HierarchyConfig | Chosen: one fallible constructor at three production sites. The silent fallback is removed, and callers propagate the error. Rejected: also validating at declaration load (optional follow-up). |
-| DEC-23 Malformed id input | Chosen: input that fails to parse as a prefix keeps today's not-found class and exit code 3. Rejected: a new invalid-argument class, which is a contract change no criterion asks for. |
+| DEC-23 Id-input error classes | Chosen: follow the landed 16d63038 contract, which is authoritative. A prefix that normalises below the minimum length gets the invalid-prefix error before any record is read, and well-formed-length input outside the id alphabet or matching nothing keeps not-found and exit code 3. Rejected: a new invalid-argument class, which is a contract change no criterion asks for. |
 | DEC-24 Prefix boundary | Chosen: executor and internal command methods take `IssueId`, and `IssueIdPrefix` is parsed and resolved only at the CLI and server entry points, each owned by one entry. Rejected: prefix-typed executor methods, which re-resolve full ids and churn about 160 test call sites twice. |
 | Shared-file contention | `domain/types.rs`, `main.rs`, `commands/mod.rs`, `declarations/rules.rs`, `validation/graph.rs`, `test_utils.rs` and `crates/server/src/routes.rs` are edited by several entries. Edges serialize every same-region rewrite the review found: the event chain before domain staging, the gate-run actor before gate-run ids, the pattern type before the assertion chain, and the well-known-path chain. The footprint advisories list the overlaps that remain; workers rebase over them. |
 
