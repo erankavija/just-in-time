@@ -7680,11 +7680,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_renew;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_renew::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    &lease_id,
-                    extension,
-                ) {
+                match execute_claim_renew(&worktree_paths, &lease_id, extension) {
                     Ok((renewed_lease, warnings)) => {
                         if json {
                             let response = serde_json::json!({
@@ -7755,11 +7751,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_status::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    issue.as_deref(),
-                    agent.as_deref(),
-                ) {
+                match execute_claim_status(&worktree_paths, issue.as_deref(), agent.as_deref()) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());
@@ -7921,11 +7913,7 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_force_evict;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_force_evict::<jit::JsonFileStorage>(
-                    &worktree_paths,
-                    &lease_id,
-                    &reason,
-                ) {
+                match execute_claim_force_evict(&worktree_paths, &lease_id, &reason) {
                     Ok(warnings) => {
                         if json {
                             let response = serde_json::json!({
