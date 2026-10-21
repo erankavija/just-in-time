@@ -1,17 +1,29 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T01:26:19.950241248Z",
   "context": {},
   "created_at": "2026-10-20T19:42:11.964360315Z",
   "dependencies": [],
   "description": "`issue search --label` rejects namespace wildcards such as `type:*`, while `query --label` accepts the same pattern. Label filtering has two contracts depending on the command, so agents cannot reuse a pattern across them.\n\n## Background\n\n`jit query --label` matches through `labels::matches_pattern` (`crates/jit/src/labels.rs:183`), which supports exact labels and `namespace:*` wildcards; its help states this. `jit issue search --label` validates each filter as a concrete label at `crates/jit/src/main.rs:3167` and rejects `type:*` with `invalid --label filter 'type:*'`. If that validation were bypassed, `search_issues_with_filters` would still match nothing, because it compares by exact string equality (`crates/jit/src/commands/search.rs:66-68`). The search help documents the filter as `namespace:value` only.\n\nReproduction with one `type:task` and one `type:epic` issue:\n\n```bash\njit query all --label 'type:*' --json        # count 2\njit issue search --label 'type:*' --json     # Error: invalid --label filter 'type:*'\njit issue search --label 'type:task' --json  # count 1\n```\n\n## Success Criteria\n\n- [hard] REQ-01: `issue search --label namespace:*` returns every issue that carries any label in that namespace and that satisfies the text query and other filters.\n- [hard] REQ-02: `issue search --label` and `query --label` accept the same patterns and return the same issue set for the same pattern when no other filter is given.\n- [hard] REQ-03: Search label filtering uses the shared label-pattern matcher; `search_issues_with_filters` contains no separate exact-match comparison.\n- [hard] REQ-04: A malformed pattern such as `type` or `:*` still fails with an invalid-argument error.\n- [hard] REQ-05: `issue search --help` describes the `--label` argument as accepting exact labels and `namespace:*` wildcards.\n- [hard] REQ-06: A regression test proves a `namespace:*` search label filter matches issues in that namespace and excludes issues outside it.\n\n## Notes\n\n`query` applies label filters through `domain::queries::query_by_labels`; search can apply the same predicate rather than re-validating labels its own way.",
   "documents": [],
+  "done_at": "2026-10-21T10:31:24.480880809Z",
   "first_ready_at": "2026-10-20T19:42:11.964360315Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T07:15:12.633640803Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T07:11:09.859075885Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "c0d0c8bf-679f-463b-87ca-25cae8945646",
   "labels": [
     "epic:audit-correctness",
@@ -21,7 +33,7 @@
     "type:bug"
   ],
   "priority": "normal",
-  "state": "in_progress",
+  "state": "done",
   "title": "Accept namespace wildcards in issue search label filters",
-  "updated_at": "2026-10-21T01:26:19.950241248Z"
+  "updated_at": "2026-10-21T10:31:24.480880809Z"
 }

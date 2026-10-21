@@ -28,7 +28,6 @@
 
 mod archive;
 pub mod batch_create;
-mod breakdown;
 pub mod bulk_update;
 pub mod claim;
 mod config;
@@ -71,7 +70,6 @@ pub use batch_create::{
     BatchCreateOutcome, BatchDryRunOutcome, BatchIssueDef, BatchValidationError,
     BatchValidationProblem,
 };
-pub use breakdown::{BracketBreakdownResult, BracketChild};
 pub use bulk_update::{BulkUpdatePreview, BulkUpdateResult, UpdateOperations};
 pub use config::{resolve_dotted_key, ConfigGetOutcome, ConfigKeyError, ConfigSetOutcome};
 pub use gate::{
@@ -994,14 +992,19 @@ impl CapturedFieldUpdate {
 
 struct DerivedFieldUpdate {
     changed: bool,
+    /// The update moved the issue from a non-terminal into a terminal state,
+    /// which is what makes dependents eligible for readiness.
+    entered_terminal: bool,
     warnings: Vec<String>,
     intents: Vec<crate::repository_state::MutationIntent>,
     error_after_apply: Option<crate::errors::TransitionBlockedError>,
 }
 
+#[derive(Debug)]
 struct CapturedFieldUpdateOutcome {
     target_id: String,
     changed: bool,
+    entered_terminal: bool,
     warnings: Vec<String>,
 }
 
@@ -1486,6 +1489,7 @@ fn derive_field_update(
             } => {
                 return Ok(DerivedFieldUpdate {
                     changed: false,
+                    entered_terminal: false,
                     warnings,
                     intents: blocked_events
                         .into_iter()
@@ -1501,6 +1505,7 @@ fn derive_field_update(
     }
 
     let changed = staged || !changed_fields.is_empty() || issue.state != original.state;
+    let entered_terminal = !original.state.is_terminal() && issue.state.is_terminal();
     if issue.assignee != original.assignee {
         if let Some(assignee) = issue.assignee.clone() {
             events.push((4, Event::draft_issue_claimed(issue.id.clone(), assignee)));
@@ -1542,6 +1547,7 @@ fn derive_field_update(
         .collect();
     Ok(DerivedFieldUpdate {
         changed,
+        entered_terminal,
         warnings,
         intents,
         error_after_apply: gate_error,
@@ -2643,6 +2649,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                     None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
                         target_id: target,
                         changed: derived.changed,
+                        entered_terminal: derived.entered_terminal,
                         warnings: derived.warnings,
                     })),
                 };
@@ -2656,6 +2663,7 @@ impl<S: IssueStore> CommandExecutor<S> {
                 None => Ok(AttemptOutcome::Done(CapturedFieldUpdateOutcome {
                     target_id: target,
                     changed: derived.changed,
+                    entered_terminal: derived.entered_terminal,
                     warnings: derived.warnings,
                 })),
             }
@@ -2667,13 +2675,12 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: String,
         operations: &UpdateOperations,
         force: bool,
-    ) -> Result<(bool, Vec<String>)>
+    ) -> Result<CapturedFieldUpdateOutcome>
     where
         S: crate::storage::RepositoryStateStore,
     {
         let request = CapturedFieldUpdate::bulk(issue_id, operations, force)?;
-        let outcome = self.publish_captured_field_update(request)?;
-        Ok((outcome.changed, outcome.warnings))
+        self.publish_captured_field_update(request)
     }
 
     fn publish_captured_state_transition(
@@ -3669,7 +3676,6 @@ mod tests {
             issue_id: issue_id.to_string(),
             commit: None,
             branch: None,
-            tree_dirty: None,
             status: crate::domain::GateRunStatus::Passed,
             started_at: chrono::Utc::now(),
             completed_at: Some(chrono::Utc::now()),

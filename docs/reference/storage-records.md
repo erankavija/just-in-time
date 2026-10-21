@@ -106,8 +106,7 @@ its coupled issue and event updates.
   "started_at": "2026-01-09T23:06:40Z",
   "status": "passed",
   "stderr": "",
-  "stdout": "test result: ok. 812 passed; 0 failed",
-  "tree_dirty": false
+  "stdout": "test result: ok. 812 passed; 0 failed"
 }
 ```
 
@@ -126,8 +125,7 @@ a `null` one alike.
 | `issue_id` | always | Full id of the issue the run is about. An issue's runs are selected by matching this field across the run directories, so `gate-runs/` is flat rather than nested per issue. |
 | `commit` | `null` when unset | Git commit the checker was launched at, when the working directory is a git repository. Unset for a run that launched no checker: a verdict taken from an earlier run ran at no commit of its own, and `origin` names the run that carries one. |
 | `branch` | `null` when unset | Git branch the checker was launched on, under the same conditions as `commit`. |
-| `tree_dirty` | `null` when unset | Whether the working tree differed from `commit` when the checker started: `true` if it carried uncommitted or untracked changes, `false` if it matched the commit exactly. A `true` run evidences that modified tree rather than the commit alone. `null` when no cleanliness value provably describes the recorded commit: there was no commit to compare against (not a git repository, no commits yet, or no checker launched), or `HEAD` moved through every paired probe attempt while the evidence was being taken, so the tree state is recorded as unknown rather than paired with a commit it might not describe. |
-| `status` | always | The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an executed checker the exit code decides it — `0` passes; a shell that could not run the command (`126`, `127`) and a checker killed by a signal or by its timeout are an `error`; any other code fails. |
+| `status` | always | The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an executed checker the exit status decides it, as [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines. |
 | `started_at` | always | RFC 3339 timestamp taken before the checker is launched. |
 | `completed_at` | `null` when unset | RFC 3339 timestamp taken once the checker has returned. |
 | `duration_ms` | `null` when unset | Wall-clock duration of the checker, in milliseconds. |

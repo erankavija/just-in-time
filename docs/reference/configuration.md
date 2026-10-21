@@ -26,7 +26,7 @@ or customize individual settings.
 | `~/.config/jit/agent.toml` | Agent identity |
 | `/etc/jit/config.toml` | System defaults |
 
-Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) and [`write_policy`](#write_policy) are repository-scoped and resolve from `.jit/config.toml` alone, for `jit config` and command execution alike. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
+Priority (how the merged effective configuration is resolved, e.g. for `jit config`): environment variables > repository > user > system > hardcoded defaults. [`enforce_leases`](#enforce_leases) is repository-scoped and resolves from `.jit/config.toml` alone, for `jit config` and command execution alike. [`write_policy`](#write_policy) is read from `.jit/config.toml` alone, outranked only by its per-invocation override, and `jit config` does not report it. Claim coordination limits are applied from the repository `.jit/config.toml` alone, while `jit config` reports their merged value.
 
 ---
 
@@ -519,8 +519,8 @@ machine-local runtime state still counts as state-mutating and is still
 refused. Over-refusing that class is the chosen behaviour.
 
 The stance is read from the repository's own `.jit/config.toml` only, never
-from the merged system/user/repo surface `jit config get` and `jit config show`
-report: it is a repository-scoped policy, not something a user- or system-level
+from user- or system-level config, and `jit config get` and `jit config show`
+do not report it: it is a repository-scoped policy, not something a user- or system-level
 config should be able to relax on the repository's behalf. The one surface that
 outranks it is the per-invocation
 [`JIT_WORKTREE_WRITE_POLICY`](#jit_worktree_write_policy) below.

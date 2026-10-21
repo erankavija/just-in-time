@@ -44,7 +44,6 @@ fn reused_gate_run(source: &GateRunResult, issue_id: &str, stage: GateStage) -> 
         issue_id: issue_id.to_string(),
         commit: None,
         branch: None,
-        tree_dirty: None,
         status: source.status,
         started_at,
         completed_at: Some(started_at),
@@ -1203,7 +1202,6 @@ impl<S: IssueStore> CommandExecutor<S> {
             branch: None,
             // In-process built-in checker: it stamps no commit, so there is no
             // named commit for the tree to match.
-            tree_dirty: None,
             status,
             started_at,
             completed_at: Some(chrono::Utc::now()),
@@ -1775,7 +1773,6 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             issue_id: "issue-1".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
-            tree_dirty: None,
             status: GateRunStatus::Failed,
             started_at: Utc.timestamp_opt(started_at, 0).unwrap(),
             completed_at: Some(Utc.timestamp_opt(started_at + 1, 0).unwrap()),
@@ -2038,7 +2035,6 @@ assert = { label-reference = { from = "satisfies", to = "req" } }
             .pass_gate(&issue_id, "editable-review".to_string(), None, true)
             .unwrap();
 
-        assert!(!outcome.already_passed);
         assert_eq!(outcome.warnings.len(), 1);
         assert!(outcome.warnings[0].contains("WITHOUT RUNNING A REVIEWER"));
     }

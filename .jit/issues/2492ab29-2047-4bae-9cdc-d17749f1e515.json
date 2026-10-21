@@ -7,6 +7,7 @@
   ],
   "description": "A one-off lifecycle-timestamp backfill still ships as a CLI command, a module, an event variant, a mutation intent and a derivation function. The derivation costs O(issues × events).\n\n## Background\n\nThe backfill surface:\n\n- CLI: `crates/jit/src/cli.rs:435-440,2310-2330,3265,3325,3765-3769,3870`; dispatch at `main.rs:23,7873-7895`.\n- `commands/migrate.rs` (148 lines), declared at `commands/mod.rs:48,87`.\n- `Event::LifecycleTimestampsBackfilled` (`domain/types.rs:1553-1568,1642,1674,1943-1949,2010`) and its catalog entries (`domain/event_catalog.rs:118-119,151,178,206,257-259,416,478,790`).\n- `MutationIntent::RepairIssueLifecycle` (`repository_state/mutation.rs:372-380,941-953,2400-2430`).\n- `derive_lifecycle_timestamps` and `LifecycleTimestamps` (`domain/queries.rs:10-100`, tests `:514-572`), which fold the whole event slice per issue (`migrate.rs:98`).\n\nTests: backfill tests at `tests/fast_issue/lifecycle_timestamps_tests.rs:220-479`. The write-point tests at `:1-69` stay; the module doc at `:1-7` names the backfill. `tests/cli_repo_workflow/integration_test.rs:431` `test_migrate_lifecycle_timestamps_runs` runs the command, and `tests/cli_issue/failure_lever_registry.toml:924-925` declares a failure lever for it.\n\nOther consumers:\n\n- `mcp-server/curated-tools.json:73` excludes `jit_migrate_lifecycle-timestamps`. `mcp-server/test-unit.js:506-508` fails on a stale curated name.\n- `docs/reference/events.md:20,47`, generated from the event catalog.\n- `docs/reference/cli-commands.md:3904-3925`, `docs/reference/cli-command-grammar.md:27`, `docs/reference/storage-format.md:233-236,254-256,427` and `docs/concepts/guarantees.md:199-200`.\n\nBoth storage backends read event logs through `domain::parse_known_events` (`domain/event_log.rs:42-76`), which skips well-formed records whose type is not in `EventTag::ALL` (`:66`). A cross-backend storage test owns that property. This repository's `.jit/events.jsonl` holds one backfill record, at line 5417.\n\n## Success Criteria\n\n- [hard] REQ-01: The `migrate` command, `commands/migrate.rs`, `Event::LifecycleTimestampsBackfilled` with its tag, `MutationIntent::RepairIssueLifecycle`, `derive_lifecycle_timestamps` and `LifecycleTimestamps` no longer exist.\n- [hard] REQ-02: An event log holding a backfill record parses without error, through the existing retired-tag tolerance, and this repository's log loads under repository validation.\n- [hard] REQ-03: The generated events reference, the CLI references, the storage-format reference and the guarantees page do not describe the command or the event.\n- [hard] REQ-04: The MCP curated tool list names no migrate tool, and the MCP unit suite passes.\n- [hard] REQ-05: Backfill tests, the migrate integration test and the migrate failure lever are deleted. Lifecycle write-point tests remain, and their module doc does not mention the backfill.\n\n## Notes\n\nNo parse-only variant and no new tolerance test are added; the cross-backend storage test owns tolerance. This repository's event log is not rewritten. `CHANGELOG.md:944-945` is history and stays.\n",
   "documents": [],
+  "first_ready_at": "2026-10-21T06:37:56.696961994Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
@@ -28,7 +29,7 @@
     "satisfies:842b0ac6/REQ-08"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove the lifecycle-timestamp backfill",
-  "updated_at": "2026-10-21T00:54:09.217003678Z"
+  "updated_at": "2026-10-21T06:37:56.696961994Z"
 }

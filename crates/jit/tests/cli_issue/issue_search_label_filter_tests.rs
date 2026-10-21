@@ -207,20 +207,36 @@ fn test_search_label_query_field_null_when_absent() {
 }
 
 #[test]
-fn test_search_invalid_label_format_is_error() {
+fn test_search_label_namespace_wildcard_matches_query_label_set() {
+    let temp = setup_test_repo();
+    let searched = titles(&search_json(temp.path(), &["--label", "type:*"]));
+
+    let out = Command::new(jit_binary())
+        .current_dir(temp.path())
+        .args(["query", "all", "--label", "type:*", "--json"])
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let queried = titles(&serde_json::from_slice(&out.stdout).unwrap());
+
+    let sorted = |mut v: Vec<String>| {
+        v.sort();
+        v
+    };
+    assert_eq!(searched.len(), 3);
+    assert_eq!(sorted(searched), sorted(queried));
+}
+
+#[test]
+fn test_search_malformed_label_pattern_exits_invalid_argument() {
     let temp = setup_test_repo();
     let out = Command::new(jit_binary())
         .current_dir(temp.path())
-        .args(["issue", "search", "--label", "notalabel"])
+        .args(["issue", "search", "--label", "type:"])
         .output()
         .unwrap();
-    assert!(
-        !out.status.success(),
-        "search with malformed label should fail"
-    );
-    let stderr = String::from_utf8_lossy(&out.stderr).to_lowercase();
-    assert!(
-        stderr.contains("label"),
-        "error should mention label: {stderr}"
+    assert_eq!(
+        out.status.code(),
+        Some(jit::output::ExitCode::InvalidArgument.code())
     );
 }

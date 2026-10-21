@@ -29,8 +29,13 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// An empty `query` matches every issue, so callers can pass `""` to search
     /// across the whole repository and rely on the filters alone. The
     /// `label_filters` are ANDed: an issue is kept only when it carries every
-    /// requested label. The priority, state, and assignee filters each keep an
+    /// requested label pattern (`namespace:value` or `namespace:*`, as in
+    /// `query --label`). The priority, state, and assignee filters each keep an
     /// issue only when it matches exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InvalidLabelPatternError` for a malformed `label_filters` entry.
     pub fn search_issues_with_filters(
         &self,
         query: &str,
@@ -39,6 +44,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         assignee_filter: Option<String>,
         label_filters: &[String],
     ) -> Result<Vec<Issue>> {
+        label_filters
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
         let mut results = self.search_issues(query)?;
 
         // Apply additional filters
@@ -62,16 +70,12 @@ impl<S: IssueStore> CommandExecutor<S> {
                     return false;
                 }
             }
-            // Label filters are ANDed: keep only issues carrying every label.
-            if !label_filters
-                .iter()
-                .all(|wanted| issue.labels.contains(wanted))
-            {
-                return false;
-            }
             true
         });
 
-        Ok(results)
+        Ok(crate::domain::queries::query_by_labels(
+            &results,
+            label_filters,
+        ))
     }
 }

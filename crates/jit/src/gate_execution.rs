@@ -99,7 +99,8 @@ pub fn execute_gate_checker_with_context(
     let start_time = Instant::now();
     let started_at = chrono::Utc::now();
 
-    let git_context = get_git_context(working_dir);
+    let commit = get_git_commit(working_dir);
+    let branch = get_git_branch(working_dir);
 
     // Build base env vars that are always set
     let mut base_env = std::collections::HashMap::new();
@@ -164,9 +165,8 @@ pub fn execute_gate_checker_with_context(
         gate_key: gate_key.to_string(),
         stage,
         issue_id: issue_id.to_string(),
-        commit: git_context.commit,
-        branch: git_context.branch,
-        tree_dirty: git_context.tree_dirty,
+        commit,
+        branch,
         status,
         started_at,
         completed_at: Some(completed_at),
@@ -542,110 +542,13 @@ fn is_git_plumbing(repository_path: &str) -> bool {
     repository_path.split('/').any(|segment| segment == ".git")
 }
 
-/// Git context information
-struct GitContext {
-    /// The commit paired with `tree_dirty` by [`probe_stable_git_pair`]: a
-    /// HEAD read taken immediately after the tree-status probe, verified (or,
-    /// past the retry bound, best-effort) to match a HEAD read taken before
-    /// it, so `tree_dirty` is never attributed to the wrong commit.
-    commit: Option<String>,
-    branch: Option<String>,
-    /// Whether the working tree differed from `commit` at capture time. `None`
-    /// whenever `commit` is `None`: with no named commit there is nothing for
-    /// the tree to match, so no cleanliness is claimed.
-    tree_dirty: Option<bool>,
-}
-
-/// Get git context, gracefully degrading if not in a git repo.
-///
-/// `commit` and `tree_dirty` are read together through
-/// [`probe_stable_git_pair`] so a commit landing between the two reads cannot
-/// pair a cleanliness flag with the wrong commit; `branch` is read
-/// independently since nothing downstream pairs it with `tree_dirty`.
-fn get_git_context(working_dir: &Path) -> GitContext {
-    let branch = get_git_branch(working_dir);
-    let pair = probe_stable_git_pair(
-        || get_git_commit(working_dir),
-        || get_git_tree_dirty(working_dir),
-    );
-
-    GitContext {
-        commit: pair.commit,
-        branch,
-        tree_dirty: pair.tree_dirty,
-    }
-}
-
-/// Bound on retry attempts in [`probe_stable_git_pair`]: enough to absorb one
-/// or two commits landing mid-probe under this repository's concurrent-agent
-/// commit churn, without looping indefinitely if HEAD never quiesces.
-const STABLE_PAIR_MAX_ATTEMPTS: u32 = 3;
-
-/// A commit paired with a tree-dirty flag by [`probe_stable_git_pair`].
-struct StableGitPair {
-    commit: Option<String>,
-    tree_dirty: Option<bool>,
-}
-
-/// Pair a HEAD probe with a working-tree-status probe so the recorded commit
-/// is never attributed to the wrong `tree_dirty` value.
-///
-/// `head_probe` and `status_probe` are injected as closures — rather than
-/// this function calling [`get_git_commit`]/[`get_git_tree_dirty`] directly —
-/// so a unit test can simulate a commit landing between reads without
-/// shelling out to git.
-///
-/// Each attempt reads HEAD (`h1`), then the tree status, then HEAD again
-/// (`h2`). `status_probe` runs only when `h1` is `Some`: tree cleanliness is
-/// meaningful only relative to a resolved commit, so a repo with no commits
-/// yet never reports a fabricated clean tree. When `h1 == h2`, the two HEAD
-/// reads bracket a quiescent status probe and the pair is returned
-/// immediately.
-///
-/// If `h1 != h2` on every attempt through [`STABLE_PAIR_MAX_ATTEMPTS`], the
-/// returned `commit` is the final attempt's trailing `h2` and `tree_dirty` is
-/// `None`: with HEAD moving through every attempt, no observed cleanliness
-/// value provably describes any single commit, so the evidence records the
-/// tree state as unknown rather than pairing a claim with a commit it might
-/// not describe. (A commit landing during a `status_probe` call on an
-/// otherwise-stable attempt remains invisible to the bracketing HEAD reads;
-/// the bracket bounds that window to the one probe call.)
-fn probe_stable_git_pair(
-    mut head_probe: impl FnMut() -> Option<String>,
-    mut status_probe: impl FnMut() -> Option<bool>,
-) -> StableGitPair {
-    let mut last = StableGitPair {
-        commit: None,
-        tree_dirty: None,
-    };
-    for _ in 0..STABLE_PAIR_MAX_ATTEMPTS {
-        let h1 = head_probe();
-        let tree_dirty = if h1.is_some() { status_probe() } else { None };
-        let h2 = head_probe();
-        let stable = h1 == h2;
-        last = StableGitPair {
-            commit: h2,
-            tree_dirty,
-        };
-        if stable {
-            return last;
-        }
-    }
-    // Never pair a cleanliness claim with a commit it might not describe: when
-    // HEAD would not hold still for any attempt, the recorded commit is the
-    // final trailing read and the tree state is unknown.
-    last.tree_dirty = None;
-    last
-}
-
 /// Resolve the current `HEAD` commit hash for `working_dir`.
 ///
 /// Returns `None` when `working_dir` is not inside a git repository, when git
 /// is unavailable, or when the `git rev-parse HEAD` invocation fails (e.g. a
 /// repository with no commits yet). The value is the full 40-character SHA, the
-/// same one stamped into [`GateRunResult::commit`](crate::domain::GateRunResult)
-/// via [`get_git_context`], so callers can compare the two directly.
-pub(crate) fn get_git_commit(working_dir: &Path) -> Option<String> {
+/// same one stamped into [`GateRunResult::commit`](crate::domain::GateRunResult).
+fn get_git_commit(working_dir: &Path) -> Option<String> {
     Command::new("git")
         .arg("rev-parse")
         .arg("HEAD")
@@ -676,26 +579,6 @@ fn get_git_branch(working_dir: &Path) -> Option<String> {
                 None
             }
         })
-}
-
-/// Report whether `working_dir`'s tree differs from `HEAD`.
-///
-/// Returns `Some(true)` when `git status --porcelain` reports any change —
-/// staged, unstaged, or untracked (`--untracked-files=normal`) — `Some(false)`
-/// when the tree is clean, and `None` when git is unavailable or `working_dir`
-/// is not inside a git repository. Recorded into
-/// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult), so a pass
-/// produced against a modified tree is distinguishable from one evidencing the
-/// commit itself.
-pub(crate) fn get_git_tree_dirty(working_dir: &Path) -> Option<bool> {
-    Command::new("git")
-        .arg("status")
-        .arg("--porcelain")
-        .arg("--untracked-files=normal")
-        .current_dir(working_dir)
-        .output()
-        .ok()
-        .and_then(|output| output.status.success().then_some(!output.stdout.is_empty()))
 }
 
 #[cfg(test)]
@@ -837,11 +720,12 @@ mod tests {
     fn test_git_context_graceful_degradation() {
         // Test in a non-git directory
         let temp_dir = std::env::temp_dir();
-        let context = get_git_context(&temp_dir);
+        let commit = get_git_commit(&temp_dir);
+        let branch = get_git_branch(&temp_dir);
 
         // Should not panic, just return None values
-        assert!(context.commit.is_none() || !context.commit.unwrap().is_empty());
-        assert!(context.branch.is_none() || !context.branch.unwrap().is_empty());
+        assert!(commit.is_none() || !commit.unwrap().is_empty());
+        assert!(branch.is_none() || !branch.unwrap().is_empty());
     }
 
     /// Initialize a git repo at `dir` with one commit; returns nothing but leaves
@@ -1223,140 +1107,9 @@ mod tests {
         assert_ne!(baseline, layout_digest(&layout, &["."]));
     }
 
-    /// REQ-01: the tree probe reports a committed tree clean and a modified tree
-    /// dirty, and counts an untracked file as dirty.
+    /// A recorded gate run stamps the `HEAD` commit the checker started at.
     #[test]
-    fn test_get_git_tree_dirty_reports_clean_then_dirty() {
-        let temp = tempfile::TempDir::new().unwrap();
-        init_committed_repo(temp.path());
-
-        assert_eq!(get_git_tree_dirty(temp.path()), Some(false));
-
-        std::fs::write(temp.path().join("seed.txt"), "changed\n").unwrap();
-        assert_eq!(get_git_tree_dirty(temp.path()), Some(true));
-
-        // Restore, then an untracked file alone still reads dirty.
-        std::fs::write(temp.path().join("seed.txt"), "seed\n").unwrap();
-        assert_eq!(get_git_tree_dirty(temp.path()), Some(false));
-        std::fs::write(temp.path().join("untracked.txt"), "new\n").unwrap();
-        assert_eq!(get_git_tree_dirty(temp.path()), Some(true));
-    }
-
-    /// git is optional (@/charter/D-4): outside a git repository the probe yields
-    /// `None` rather than a fabricated clean tree.
-    #[test]
-    fn test_get_git_tree_dirty_is_none_without_git() {
-        let temp = tempfile::TempDir::new().unwrap();
-        assert_eq!(get_git_tree_dirty(temp.path()), None);
-    }
-
-    /// Tree cleanliness is only recorded relative to a resolved commit: a repo
-    /// with no commits yet has no `commit`, so `tree_dirty` stays `None` even
-    /// though `git status` would succeed.
-    #[test]
-    fn test_get_git_context_ties_tree_dirty_to_commit() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let git = |args: &[&str]| {
-            Command::new("git")
-                .args(args)
-                .current_dir(temp.path())
-                .status()
-                .expect("git runs")
-        };
-        assert!(git(&["init", "-q"]).success());
-        std::fs::write(temp.path().join("untracked.txt"), "x\n").unwrap();
-
-        let context = get_git_context(temp.path());
-        assert!(context.commit.is_none());
-        assert_eq!(context.tree_dirty, None);
-    }
-
-    /// TOCTOU fix: a commit landing between the two HEAD reads of the first
-    /// attempt (`h1 = "a"`, `h2 = "b"`) is discarded rather than paired with
-    /// that attempt's `tree_dirty`. The second attempt observes a quiescent
-    /// HEAD (`"b"` both times) and its pair — not the first attempt's — is
-    /// the one returned.
-    #[test]
-    fn test_probe_stable_git_pair_retries_until_stable() {
-        let head_calls = std::cell::Cell::new(0u32);
-        let head_probe = || {
-            let n = head_calls.get();
-            head_calls.set(n + 1);
-            match n {
-                0 => Some("a".to_string()), // attempt 1, h1
-                1 => Some("b".to_string()), // attempt 1, h2 -> mismatch, retry
-                _ => Some("b".to_string()), // attempt 2, h1 and h2 -> stable
-            }
-        };
-        let status_calls = std::cell::Cell::new(0u32);
-        let status_probe = || {
-            let n = status_calls.get();
-            status_calls.set(n + 1);
-            match n {
-                0 => Some(true),  // attempt 1's (discarded) tree_dirty
-                _ => Some(false), // attempt 2's tree_dirty
-            }
-        };
-
-        let pair = probe_stable_git_pair(head_probe, status_probe);
-
-        assert_eq!(pair.commit.as_deref(), Some("b"));
-        assert_eq!(pair.tree_dirty, Some(false));
-        assert_eq!(
-            head_calls.get(),
-            4,
-            "two HEAD reads per attempt, two attempts"
-        );
-        assert_eq!(status_calls.get(), 2);
-    }
-
-    /// TOCTOU fix, give-up bound: when HEAD changes on every read (never
-    /// stable), the probe stops after [`STABLE_PAIR_MAX_ATTEMPTS`] attempts
-    /// and returns the LAST attempt's pair, with `commit` set to that
-    /// attempt's `h2` — the HEAD read bracketing the trailing side of the
-    /// status probe.
-    #[test]
-    fn test_probe_stable_git_pair_gives_up_after_max_attempts() {
-        let head_calls = std::cell::Cell::new(0u32);
-        let head_probe = || {
-            let n = head_calls.get();
-            head_calls.set(n + 1);
-            Some(format!("commit-{n}"))
-        };
-
-        let pair = probe_stable_git_pair(head_probe, || Some(true));
-
-        assert_eq!(head_calls.get(), STABLE_PAIR_MAX_ATTEMPTS * 2);
-        let last_h2 = format!("commit-{}", STABLE_PAIR_MAX_ATTEMPTS * 2 - 1);
-        assert_eq!(pair.commit, Some(last_h2));
-        // Instability through every attempt means no cleanliness value provably
-        // describes the recorded commit: the evidence must say "unknown".
-        assert_eq!(pair.tree_dirty, None);
-    }
-
-    /// The seam preserves the existing tie-to-commit rule: when HEAD never
-    /// resolves, the status probe never runs (and the unresolved pair is
-    /// accepted on the first attempt, since `None == None`).
-    #[test]
-    fn test_probe_stable_git_pair_skips_status_probe_when_head_unresolved() {
-        let status_calls = std::cell::Cell::new(0u32);
-        let pair = probe_stable_git_pair(
-            || None,
-            || {
-                status_calls.set(status_calls.get() + 1);
-                Some(false)
-            },
-        );
-
-        assert_eq!(pair.commit, None);
-        assert_eq!(pair.tree_dirty, None);
-        assert_eq!(status_calls.get(), 0);
-    }
-
-    /// REQ-01/REQ-04: a recorded gate run stamps `tree_dirty == Some(false)` when
-    /// the checker starts against a clean committed tree.
-    #[test]
-    fn test_execute_gate_checker_records_clean_tree() {
+    fn test_execute_gate_checker_records_head_commit() {
         let temp = tempfile::TempDir::new().unwrap();
         init_committed_repo(temp.path());
 
@@ -1374,32 +1127,7 @@ mod tests {
                 .unwrap();
 
         assert!(result.commit.is_some());
-        assert_eq!(result.tree_dirty, Some(false));
-    }
-
-    /// REQ-01/REQ-04: a recorded gate run stamps `tree_dirty == Some(true)` when
-    /// the working tree carries an uncommitted change at checker start.
-    #[test]
-    fn test_execute_gate_checker_records_dirty_tree() {
-        let temp = tempfile::TempDir::new().unwrap();
-        init_committed_repo(temp.path());
-        std::fs::write(temp.path().join("seed.txt"), "dirtied\n").unwrap();
-
-        let checker = GateChecker::Exec {
-            command: "true".to_string(),
-            timeout_seconds: 10,
-            working_dir: None,
-            env: HashMap::new(),
-            pass_context: false,
-            prompt: None,
-            prompt_file: None,
-        };
-        let result =
-            execute_gate_checker("g", "issue-1", GateStage::Postcheck, &checker, temp.path())
-                .unwrap();
-
-        assert!(result.commit.is_some());
-        assert_eq!(result.tree_dirty, Some(true));
+        assert_eq!(result.commit, get_git_commit(temp.path()));
     }
 
     #[test]
@@ -1708,7 +1436,6 @@ mod tests {
             issue_id: "issue-123".to_string(),
             commit: Some("abc123".to_string()),
             branch: Some("main".to_string()),
-            tree_dirty: None,
             status: RS::Failed,
             started_at: chrono::Utc::now(),
             completed_at: Some(chrono::Utc::now()),

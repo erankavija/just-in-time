@@ -153,8 +153,7 @@ to enter planning:
 - `SemanticMutation` — rebuild all declaration-owned state after a record change.
 - `RenderConfiguredProjections` — render the selected configured projections
   (`None` selects all).
-- `RepairDerivedState` — repair all declaration-owned derived state, including
-  installed-profile targets.
+- `RepairDerivedState` — repair all declaration-owned derived state.
 - `Initialize` — derive a fresh or missing-file repository scaffold.
 - `ApplyProfileSelection` — derive one complete profile-selection application
   over an existing repository.
@@ -194,7 +193,8 @@ scope while sharing the producer code:
   out-of-scope projection contributes no action, leaving its target untouched. The
   scope is declaration scope, never a choice of producer family.
 - `derive_repair` runs `compose_complete` and then layers ownership-safe
-  profile-target composition on top.
+  composition of any profile claims its caller supplies; `jit validate --fix`
+  supplies none.
 
 Shared projection targets compose through the one `managed_document` primitive
 (`compose_managed_documents`), never last-writer-wins, so two projections into one

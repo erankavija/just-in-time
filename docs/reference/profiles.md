@@ -22,8 +22,8 @@ A package is applied from a location inside the repository worktree, so an
 obtained directory is placed in the repository before it is applied. A package
 read from outside the worktree — including from under `.jit/` — is refused by
 name. Leave the directory where it was applied from: the applied-profile record
-names that location, and `jit profile list`, `jit validate`, and
-`jit validate --fix` read the package there again.
+names that location, and later `jit profile` commands read the package there
+again.
 
 Place a package and the packages it depends on as siblings under one parent,
 each directory named by its own profile ID — that is where [Profile
@@ -336,8 +336,7 @@ declaration a selection would create, update, retain, remove, or conflict on.
 Each decision identifies every package that owns it; an empty owner list is
 repository-authored content, while several owners identify shared content.
 `jit profile validate` checks every applied-profile record against its package
-and the content it owns. `jit validate` includes those findings in its
-whole-repository validation. Both checks report drift without changing files.
+and the content it owns, and reports drift without changing files.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
 validation as its corresponding `apply`, `reconfigure`, `upgrade`, `capture`,
@@ -485,30 +484,25 @@ differing content is a conflict; that content is not silently overwritten.
 
 ## Derived state and managed regions
 
-Declared configuration, registries, and applied-profile provenance are the
-authorities for generated schemas, default-rule assertions, configured
-projections, and installed profile targets. `jit validate` reports an owned
-target that is missing, stale, has the wrong executable mode, or is unexpected.
-For provenance-proven derived-state repairs, `jit validate --fix` recomputes
-the complete final-state plan and publishes it through one redo record, as
-every other mutation publishes.
+Declared configuration and registries are the authorities for generated
+schemas, default-rule assertions, and configured projections. `jit validate`
+reports an owned target that is missing, stale, or unexpected, and
+`jit validate --fix` recomputes the complete final-state plan and publishes it
+through one redo record, as every other mutation publishes.
 It preserves authored rule comments, order, policy, and all unmanaged document
 bytes; it never treats a conventional filename as proof of ownership.
 
-What a recorded profile owns is recomputed from the package its own record
-resolves to, read again from the location that record names. A stored record
-that disagrees with the package read there fails validation naming the record,
-so repair restores every profile-owned target or none. The command-level
-package lookup and its failure behavior are defined in
-[Profile Commands](cli-commands.md#profile-commands).
+Repository validation reads no applied-profile record. A value a package
+contributed is repository content: editing it is an ordinary repository change
+that git shows and restores, and `jit validate` neither reports nor repairs it.
 
 Managed regions replace only the package- or projection-owned marked region.
 Distinct regions may nest, but delimiters must form one unambiguous containment
 tree. Duplicate, partial, reversed, crossing, or multiply owned regions fail
-before publication. Unresolvable provenance and ambiguous ownership are likewise
-non-repairable and leave every target unchanged. Human output and the standard
-JSON `VALIDATION_FAILED` error envelope retain the underlying target, delimiter,
-or provenance cause so an operator can repair the authority rather than guess;
+before publication. Ambiguous ownership is likewise non-repairable and leaves
+every target unchanged. Human output and the standard JSON `VALIDATION_FAILED`
+error envelope retain the underlying target or delimiter cause so an operator
+can repair the authority rather than guess;
 see the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ## Publication and recovery

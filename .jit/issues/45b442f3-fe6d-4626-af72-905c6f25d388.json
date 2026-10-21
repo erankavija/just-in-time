@@ -1,5 +1,6 @@
 {
-  "assignee": null,
+  "assignee": "agent:jit-execution-lead",
+  "claimed_at": "2026-10-21T06:48:51.797295674Z",
   "context": {},
   "created_at": "2026-10-21T00:54:09.217003678Z",
   "dependencies": [
@@ -7,12 +8,24 @@
   ],
   "description": "`ContainerDestinationState` has six variants for three outcomes. Classification facts default silently when location evidence is missing, so an uninspected location reads as a value instead of an error.\n\n## Background\n\n`ContainerDestinationState` (`crates/jit/src/domain/artifact_classifier.rs:243-257`) has one consumer, `append_container_destination_blocker` (`:1602-1628`). It maps `Absent`, `OwnedByTarget` and `MarkerlessAccounted` to no blocker; `OwnedByOther(_)` and `MarkerlessWithUnaccountedEntries` to `DestinationConflict`; and `Symlink` to `SymlinkArtifact`. The `String` in `OwnedByOther` is never read. Constructors: `:549` (`_ => Absent`) and `:586-628` (`container_destination_from_evidence`).\n\n`ArtifactLocation` derives `Default` with `#[default] Unknown` (`:193-197`: \"The caller did not inspect this path. Production planners should avoid this state\"). `ArtifactLocationFacts`, `ContainerDestinationState` and `ArtifactClassificationFacts` also derive `Default`. Production default sites: `:966` (`locations.get(&source).cloned().unwrap_or_default()`), `:536-539` and `:549`. No code matches `ArtifactLocation::Unknown` explicitly.\n\n`ArtifactEvidenceError::IncompleteEvidence { path }` (`:410-420`) is the typed evidence error, produced by `required_resolution_evidence` (`:495-503`). An anyhow twin, `required_evidence` (`:631-639`), serves `classification_facts_from_evidence` (`:519`). `classify_artifacts` returns `PlanError` (`domain/artifact_plan.rs:1115`). The storage side builds the evidence map (`storage/artifact_planning.rs:82-145`).\n\nTest sites: `artifact_classifier.rs:2612,2616,2957,3944,3991,4076-4212,4672`.\n\n## Success Criteria\n\n- [hard] REQ-01: `ContainerDestinationState` has one variant per outcome it produces, with no unread payload.\n- [hard] REQ-02: `ArtifactLocation` has no unknown or uninspected variant, and the classification facts types derive no `Default`.\n- [hard] REQ-03: Classifying an artifact whose location was never inspected fails with `ArtifactEvidenceError::IncompleteEvidence` naming the path, and no anyhow evidence twin remains.\n- [hard] REQ-04: `classify_artifacts` surfaces the evidence error through its own error type.\n- [hard] REQ-05: Classifier unit tests cover each outcome and the missing-evidence error.\n\n## Notes\n\nThe archive's short-id destination fallback (`artifact_classifier.rs:417-431`) is out of scope.\n",
   "documents": [],
+  "done_at": "2026-10-21T10:32:18.797709366Z",
   "first_ready_at": "2026-10-21T00:54:09.217003678Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T10:32:12.687944568Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T07:16:16.150425410Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "45b442f3-fe6d-4626-af72-905c6f25d388",
   "labels": [
     "type:task",
@@ -23,7 +36,7 @@
     "satisfies:842b0ac6/REQ-21"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Collapse container-destination classification to its outcomes",
-  "updated_at": "2026-10-21T01:01:01.582563451Z"
+  "updated_at": "2026-10-21T10:32:18.797709366Z"
 }

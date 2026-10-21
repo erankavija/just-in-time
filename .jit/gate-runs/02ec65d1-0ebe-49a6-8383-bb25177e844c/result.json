@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "2ca34408e3890d727356869c7b07583be3f47b0d",
+  "completed_at": "2026-10-21T06:37:46.616180057Z",
+  "duration_ms": 65799,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The attributed change routes in-memory event reads through the shared parser and establishes the required cross-backend conformance coverage.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "47a082ef-f1c5-4874-910f-ae1057a8579f",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "02ec65d1-0ebe-49a6-8383-bb25177e844c",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:36:40.816308059Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 8aab9a5aa1e9d029f78ae1dee1eb8990917edc37, e5fa116925a8ba5a86b52b2e462df5ad114ba8d4\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests (.jit/invariants.toml); @/issue/842b0ac6/requirement/REQ-08 (parent issue description)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:33:23.197682484+00:00)\nTruncation recovery: none\n\nNo findings.\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The attributed change routes in-memory event reads through the shared parser and establishes the required cross-backend conformance coverage.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

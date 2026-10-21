@@ -659,7 +659,7 @@ jit validate --leases
 # Auto-fix what is mechanically fixable
 jit validate --fix
 # ✓ Applies repairable rule/graph/state fixes and derived-state repairs
-# ✓ Publishes derived repairs recoverably; ambiguous ownership/provenance writes nothing
+# ✓ Publishes derived repairs recoverably; ambiguous ownership writes nothing
 ```
 
 ## See Also

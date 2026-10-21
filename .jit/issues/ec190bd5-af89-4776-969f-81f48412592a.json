@@ -7,6 +7,7 @@
   ],
   "description": "Storage defines one function twice under opposite `cfg` conditions and keeps stale `allow(dead_code)` attributes on public in-memory storage items.\n\n## Background\n\n`with_mutation_interruptions` exists as `#[cfg(feature = \"test-support\")] pub fn` (`crates/jit/src/storage/json.rs:453-462`) and as `#[cfg(not(feature = \"test-support\"))] #[allow(dead_code)] pub(crate) fn` (`:473-482`). The self dev-dependency at `crates/jit/Cargo.toml:103` enables `test-support` for every test build, so the second form is never needed. Every source caller is `cfg(test)`, and one integration test calls it (`tests/cli_repo_workflow/profile_publication_tests.rs:113`).\n\n`InMemoryStorage` and `InMemoryStorage::new` carry `allow(dead_code)` (`storage/memory.rs:34,68`). Both are public items of a public module (`storage/mod.rs:92`), so no lint fires without the attributes.\n\n## Success Criteria\n\n- [hard] REQ-01: `with_mutation_interruptions` in JSON storage has one definition, and storage holds no function or re-export defined twice under opposite `test` or `test-support` conditions.\n- [hard] REQ-02: No public item in `storage/` carries `allow(dead_code)`.\n\n## Notes\n\nPlatform-conditional implementations stay, such as `cfg(unix)` and `cfg(not(unix))` pairs (`storage/redo_apply.rs:283,471`, `atomic_write.rs:125`, `lock_cleanup.rs:40`, `repository_state_store.rs:1573,1989,2017,2148`, `redo_record.rs:368`). The `pub(crate)` configuration-dependent allows at `memory.rs:121,155,171` mark code that is live in other build configurations, and they stay too.\n",
   "documents": [],
+  "first_ready_at": "2026-10-21T06:37:56.781589432Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
@@ -22,7 +23,7 @@
     "satisfies:842b0ac6/REQ-24"
   ],
   "priority": "high",
-  "state": "backlog",
+  "state": "ready",
   "title": "Remove cfg twins in storage",
-  "updated_at": "2026-10-21T00:54:09.217003678Z"
+  "updated_at": "2026-10-21T06:37:56.781589432Z"
 }

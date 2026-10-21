@@ -1,5 +1,5 @@
 {
-  "assignee": null,
+  "assignee": "agent:worker",
   "claimed_at": "2026-10-21T00:59:06.986765403Z",
   "context": {},
   "created_at": "2026-10-15T11:05:36.870067202Z",
@@ -8,13 +8,30 @@
   ],
   "description": "Make the digest of a gate's declared inputs the only way a gate verdict is reused, removing the commit-based \"already passed at HEAD\" skip and the dirty-tree flag that jit's own tracker writes falsify.\n\n## Background\n\nTwo mechanisms avoid re-running an automated checker:\n\n1. A commit-based skip: an evaluation is skipped when the latest run passed at the current `HEAD` commit (`crates/jit/src/commands/gate.rs:838-856`, helper `gate_passed_at_head` at `:985-1010`). Each run records `commit`, `branch` and `tree_dirty`; `tree_dirty` comes from `git status --porcelain` over the whole worktree (`crates/jit/src/gate_execution.rs:654-663`).\n2. Digest reuse: a gate declaring `[gates.inputs]` digests those files' working-tree content and reuses any prior verdict over the same digest, across issues.\n\nThe commit-based skip breaks in normal use. Every gate evaluation writes the tracker's own files, so the next run records `tree_dirty: true`, and committing those files moves `HEAD`, so the next evaluation re-runs a ten-minute checker over an unchanged tree. An execution lead ends up alternating gate, commit, gate, and avoiding commits while a gate runs. Digest reuse already answers the same question exactly, independent of commits.\n\nThe skip's surfaces are the `already_passed` field of batch evaluation output (`crates/jit/src/output.rs:2636-2638`, published through the command schema), its renderers in `crates/jit/src/main.rs`, and the help text of `--force` and the evaluate commands (`crates/jit/src/cli.rs:1580-1679`). The dirty-tree field is read and written across the gate-run record type, its storage and reference projection, the run summary the server exposes, and the web UI model. Existing gate-run records carry the key and still parse, since the record type does not deny unknown fields. Line numbers are as of 2026-10-20.\n\n## Success Criteria\n\n- [hard] REQ-01: An automated gate that declares no inputs executes its checker on every evaluation; no commit-based skip exists, and its `already_passed` output field is removed.\n- [hard] REQ-02: Gate-run records carry no dirty-tree field; nothing reads or writes it.\n- [hard] REQ-05: `--force` executes the checker unconditionally, and its help text describes only digest reuse.\n- [hard] REQ-06: User documentation describes one reuse mechanism, and the net change removes more code than it adds.\n\n## Notes\n\n- Supersedes `ea2bb1f6` (refuse to re-run a passed gate without `--force`): with one reuse mechanism, re-evaluating unchanged inputs is free and `--force` remains the deliberate re-run.\n- A checker that reads git state (the `HEAD` tree or the index) rather than working-tree files is outside what a digest can see; the gate documentation states that inputs describe working-tree content.\n- Accepting `.` as an input root and excluding tracker-written paths from every digest are separate work; criterion IDs REQ-03 and REQ-04 are retired here.\n",
   "documents": [],
+  "done_at": "2026-10-21T06:59:39.636074979Z",
   "first_ready_at": "2026-10-15T11:05:36.870067202Z",
   "gates_required": [
     "cargo-ci",
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:54:19.483342120Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:57:38.911157482Z",
+      "updated_by": "auto:executor"
+    },
+    "doc-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:59:19.867674538Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "72d89161-39e7-4858-9f16-31deb4ff7505",
   "labels": [
     "type:task",
@@ -24,7 +41,7 @@
     "satisfies:3d9a0ce3/REQ-01"
   ],
   "priority": "high",
-  "state": "ready",
+  "state": "done",
   "title": "Reuse gate verdicts only by declared-input digest",
-  "updated_at": "2026-10-21T01:16:00.637862201Z"
+  "updated_at": "2026-10-21T06:59:39.636074979Z"
 }

@@ -730,7 +730,7 @@ stateDiagram-v2
 ### Gate Behavior
 
 - Gates apply uniformly at state transitions
-- Checker commands run in shell; the exit code decides pass/fail
+- Checker commands run in shell; the exit code decides the run's status, as [Custom Gates - Exit Codes](../how-to/custom-gates.md#exit-codes) defines
 - Checkers can emit a machine-readable findings block (verdict, per-finding severity and file:line) that is parsed and stored with the run
 
 For domain-specific gate examples, see [Custom Gates - Adapting Gates to Your Domain](../how-to/custom-gates.md#adapting-gates-to-your-domain).

@@ -20,7 +20,7 @@
           "short_id": "ef9897ab",
           "title": "Compile the integration harness once in jit's test-support surface",
           "classification": "implementation",
-          "status": "pending"
+          "status": "in_progress (worker w-ef9897ab, sonnet, worktree agent-ef9897ab)"
         },
         {
           "key": "production-line-baseline",
@@ -36,7 +36,7 @@
           "short_id": "1874e265",
           "title": "Move the error classifier into output::failure",
           "classification": "implementation",
-          "status": "in_progress (worker w-1874e265, worktree agent-1874e265)"
+          "status": "merged e20c3b743; gates pending"
         },
         {
           "key": "mcp-global-json-injection",

@@ -1,0 +1,54 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "ae78ac5488656abb30aae93107624df8926dc956",
+  "completed_at": "2026-10-21T06:47:29.504848630Z",
+  "duration_ms": 419201,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/query.rs",
+        "id": "F1",
+        "line": 298,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/label-format"
+        ],
+        "severity": "high",
+        "summary": "The shared label-pattern validator accepts empty values and extra colons, so issue search no longer rejects malformed exact label filters."
+      },
+      {
+        "disposition": "blocking",
+        "file": "docs/reference/cli-commands.md",
+        "id": "F2",
+        "line": 1370,
+        "origin": "issue-impact",
+        "references": [
+          "@/invariant/single-source-prose"
+        ],
+        "severity": "medium",
+        "summary": "The CLI reference simultaneously documents a namespace wildcard example and restricts --label to exact namespace:value syntax."
+      }
+    ],
+    "summary": "Search accepts malformed exact label patterns, and the edited reference documentation contradicts wildcard support.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "c0d0c8bf-679f-463b-87ca-25cae8945646",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a7a543a1-d094-4423-8ffa-6e24acd0436f",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:40:30.303077686Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 18196 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d30-a1c2-7e91-8e99-cc4f943c83c6\n--------\nuser\n--- 18183 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 91e6b1040, 2707c8924 (`jit:c0d0c8bf`)\nPolicy sources: AGENTS.md\nResolved items: @/invariant/label-format, @/invariant/single-source-prose, @/invariant/architecture-dependency-direction, @/invariant/convention-convergence, @/invariant/essential-code-prose, @/invariant/orthogonal-tests, @/invariant/semantic-test-assertions, @/invariant/shared-test-contracts (all registry-first: .jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T06:38:38Z); code-review pending with no recorded run\nTruncation recovery: narrowed the merge to its first-parent affected paths and reread the validator, tests, and documentation in bounded ranges\n\n1. **F1 — blocking, issue-impact (high):** `validate_label_pattern` accepts malformed exact patterns such as `type:` and `type:task:extra`: it validates only the namespace and never checks the value or a second colon. Search now calls this validator after the prior concrete-label validation was removed, so these inputs return an empty result instead of the required invalid-argument error. This violates REQ-04 and the canonical label format. [crates/jit/src/commands/query.rs:298] References: `@/invariant/label-format`.\n\n2. **F2 — blocking, issue-impact (medium):** The edited CLI reference contradicts the new wildcard support. It adds a `type:*` example at line 1354, but its flag rules still state that `--label` has only `namespace:value` format, misleading users into treating valid wildcard input as malformed. [docs/reference/cli-commands.md:1370] References: `@/invariant/single-source-prose`.\n\nTotal findings: 2\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Search accepts malformed exact label patterns, and the edited reference documentation contradicts wildcard support.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The shared label-pattern validator accepts empty values and extra colons, so issue search no longer rejects malformed exact label filters.\",\"file\":\"crates/jit/src/commands/query.rs\",\"line\":298,\"references\":[\"@/invariant/label-format\"]},{\"id\":\"F2\",\"severity\":\"medium\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The CLI reference simultaneously documents a namespace wildcard example and restricts --label to exact namespace:value syntax.\",\"file\":\"docs/reference/cli-commands.md\",\"line\":1370,\"references\":[\"@/invariant/single-source-prose\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

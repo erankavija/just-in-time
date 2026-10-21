@@ -1,0 +1,70 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "e0e8a3b96ade923dba838aa099dcda62f1591eda",
+  "completed_at": "2026-10-21T06:54:26.503034373Z",
+  "duration_ms": 465330,
+  "evaluation_stability": "inputs_moved",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F1",
+        "line": 587,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-05",
+          "@/issue/f8a6b298/requirement/REQ-06",
+          "@/inv/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "The lease per-issue-records leaf combines several independently deliverable storage, protocol, recovery, CLI, and fixture changes."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F2",
+        "line": 909,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-10",
+          "@/inv/atomic-writes"
+        ],
+        "severity": "high",
+        "summary": "The event torn-line-rule leaf combines parser, append protocol, deletion, backend, testing, and documentation work."
+      },
+      {
+        "disposition": "blocking",
+        "file": "dev/active/f8a6b298-history-independent-reads/breakdown.json",
+        "id": "F3",
+        "line": 329,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/f8a6b298/requirement/REQ-01",
+          "@/inv/shared-test-contracts"
+        ],
+        "severity": "high",
+        "summary": "The gate-run per-issue-layout leaf combines path/write cutover, backend listing, conformance, fixtures, and documentation."
+      }
+    ],
+    "summary": "Three terminal manifest entries materially exceed one focused worker cycle.",
+    "verdict": "fail"
+  },
+  "gate_key": "plan-review",
+  "issue_id": "5e615dc2-5ca4-4a8c-b94a-dd8689894069",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "49a06709-bf22-4e3b-8d90-f351ac95f3ca",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:46:41.172273245Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 8349 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: workspace-write [workdir, /tmp, $TMPDIR]\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d36-4a5f-7683-ac18-649ce8f8b0e0\n--------\nuser\n--- 8336 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "1. **F1 — blocking, issue-impact:** `lease-per-issue-records` is materially oversized: it combines a new per-issue persistence model, the `LeaseLock` transaction protocol, all lease-operation rewrites, repository-session locking, removal of index/recovery machinery, CLI/error behavior, and fixture migration across 13 paths. Current coordinator operations are separately substantial (`claim_coordinator.rs:450,659,824,1016,1087,1142,1188,1252`). Split it into ordered leaves for the record/read model, the lock/apply mutation sequence, and recovery/index-removal plus boundary fixtures; retain a single explicit producer for `lease-sequence`. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:587) (`@/issue/f8a6b298/requirement/REQ-05`, `@/issue/f8a6b298/requirement/REQ-06`, `@/inv/atomic-writes`)\n\n2. **F2 — blocking, issue-impact:** `event-torn-line-rule` combines independent domain parser semantics, finalizer append/commit semantics, deletion of the profile-marker protocol, backend/archive convergence, test ownership, and documentation correction. Its 15-path footprint crosses these component families, so one worker cannot credibly complete and review it in one focused cycle. Split parser/retired-tag convergence, committed-tail append behavior, and the documentation/restatement sweep into dependency-ordered leaves. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:909) and [event_log.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/domain/event_log.rs:42) (`@/issue/f8a6b298/requirement/REQ-10`, `@/inv/atomic-writes`)\n\n3. **F3 — blocking, issue-impact:** `gate-run-per-issue-layout` conflates record-path/write cutover, both storage backends’ listing behavior, shared conformance migration, CLI-fixture migration, and generated/reference documentation in one 14-path terminal. Split the path/write cutover from per-issue listing/conformance and move the rustdoc/reference regeneration to a documentation leaf, with dependencies preserving the relayout’s final position. [breakdown.json](/home/vkaskivuo/Projects/just-in-time/dev/active/f8a6b298-history-independent-reads/breakdown.json:329) and [json.rs](/home/vkaskivuo/Projects/just-in-time/crates/jit/src/storage/json.rs:959) (`@/issue/f8a6b298/requirement/REQ-01`, `@/inv/shared-test-contracts`)\n\nTotal findings: 3\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"Three terminal manifest entries materially exceed one focused worker cycle.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The lease per-issue-records leaf combines several independently deliverable storage, protocol, recovery, CLI, and fixture changes.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":587,\"references\":[\"@/issue/f8a6b298/requirement/REQ-05\",\"@/issue/f8a6b298/requirement/REQ-06\",\"@/inv/atomic-writes\"]},{\"id\":\"F2\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The event torn-line-rule leaf combines parser, append protocol, deletion, backend, testing, and documentation work.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":909,\"references\":[\"@/issue/f8a6b298/requirement/REQ-10\",\"@/inv/atomic-writes\"]},{\"id\":\"F3\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"The gate-run per-issue-layout leaf combines path/write cutover, backend listing, conformance, fixtures, and documentation.\",\"file\":\"dev/active/f8a6b298-history-independent-reads/breakdown.json\",\"line\":329,\"references\":[\"@/issue/f8a6b298/requirement/REQ-01\",\"@/inv/shared-test-contracts\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

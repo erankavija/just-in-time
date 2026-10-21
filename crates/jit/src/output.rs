@@ -519,8 +519,10 @@ pub struct ErrorDetail {
 /// Standardized exit codes for the JIT CLI
 ///
 /// These codes follow Unix conventions and provide consistent error reporting
-/// for automation and scripting.
+/// for automation and scripting. [`ExitCode::ALL`] is checked against this
+/// enum's test-only derived schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(test, derive(JsonSchema))]
 #[repr(i32)]
 pub enum ExitCode {
     /// Command succeeded (0)
@@ -2357,7 +2359,6 @@ impl From<&Issue> for IssueShowSummaryResponse {
 ///     issue_id: "i1".into(),
 ///     commit: None,
 ///     branch: None,
-///     tree_dirty: None,
 ///     status: GateRunStatus::Passed,
 ///     started_at: Utc::now(),
 ///     completed_at: None,
@@ -2398,14 +2399,6 @@ pub struct GateRunSummary {
     pub commit: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
-    /// Whether the working tree differed from [`commit`](Self::commit) when the
-    /// checker started: `true` dirty, `false` clean, omitted when there was no
-    /// commit to compare against. Carries
-    /// [`GateRunResult::tree_dirty`](crate::domain::GateRunResult) so a machine
-    /// reader can tell a pass evidencing the commit from one taken on a modified
-    /// tree.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tree_dirty: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub by: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2464,7 +2457,6 @@ impl GateRunSummary {
             command: r.command.clone(),
             commit: r.commit.clone(),
             branch: r.branch.clone(),
-            tree_dirty: r.tree_dirty,
             by: r.by.clone(),
             message: r.message.clone(),
             stdout: include_output.then(|| r.stdout.clone()),
@@ -2541,9 +2533,6 @@ pub struct GateEvaluateManyResult {
     /// lookup and argument errors leave this absent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verdict: Option<String>,
-    /// Whether an automated checker was skipped because its current pass was reusable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub already_passed: Option<bool>,
     /// Advisory warnings from the gate evaluation.
     pub warnings: Vec<String>,
     /// The single-issue gate error envelope's `error` object, when evaluation failed.
@@ -3089,7 +3078,6 @@ mod tests {
             issue_id: issue.id.clone(),
             commit: None,
             branch: None,
-            tree_dirty: None,
             status: GateRunStatus::Passed,
             started_at: run_at,
             completed_at: Some(run_at),
@@ -3557,23 +3545,22 @@ mod tests {
     }
 
     #[test]
-    fn test_exit_code_all_lists_every_variant_with_a_distinct_described_status() {
-        // Exhaustive match: adding a variant fails compilation here until listed.
-        fn is_listed(code: ExitCode) -> bool {
-            match code {
-                ExitCode::Success
-                | ExitCode::GenericError
-                | ExitCode::InvalidArgument
-                | ExitCode::NotFound
-                | ExitCode::ValidationFailed
-                | ExitCode::PermissionDenied
-                | ExitCode::AlreadyExists
-                | ExitCode::ExternalError
-                | ExitCode::LockTimeout
-                | ExitCode::BrokenPipe => ExitCode::ALL.contains(&code),
-            }
-        }
-        assert!(ExitCode::ALL.into_iter().all(is_listed));
+    fn test_exit_code_all_lists_every_derived_variant() {
+        let schema =
+            serde_json::to_value(schema_for!(ExitCode)).expect("ExitCode schema should serialize");
+        let derived = schema_accepted_strings(&schema);
+        assert!(!derived.is_empty(), "derived schema should list variants");
+
+        let listed: BTreeSet<String> = ExitCode::ALL
+            .iter()
+            .map(|code| format!("{code:?}"))
+            .collect();
+
+        assert_eq!(listed, derived, "ExitCode::ALL must list every variant");
+    }
+
+    #[test]
+    fn test_exit_code_all_members_have_distinct_described_statuses() {
         let statuses: BTreeSet<i32> = ExitCode::ALL.iter().map(|c| c.code()).collect();
         assert_eq!(statuses.len(), ExitCode::ALL.len());
         assert!(ExitCode::ALL.iter().all(|c| !c.description().is_empty()));

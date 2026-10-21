@@ -1,0 +1,42 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "471b998f7dcd3f03f22417ea0325cf8094b83974",
+  "completed_at": "2026-10-21T06:17:33.200752038Z",
+  "duration_ms": 217589,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/commands/bulk_update.rs",
+        "id": "F1",
+        "line": 292,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/05d1b34e/requirement/REQ-03"
+        ],
+        "severity": "high",
+        "summary": "Cascade is triggered by a terminal request plus any modification rather than an actual terminal transition, violating REQ-03."
+      }
+    ],
+    "summary": "The bulk cascade runs when a terminal state is requested even if no issue actually enters that state.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "05d1b34e-3174-411e-851b-86b5223a6841",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "a05b634b-f8a5-4a14-8893-15fb9ce25dab",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:13:55.610951633Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2549 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15d18-4d06-7be3-b588-7b929292b685\n--------\nuser\n--- 2536 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: 471b998f7, 59965c223, e22a5e307\nPolicy sources: AGENTS.md\nResolved items: @/issue/05d1b34e/requirement/REQ-01–REQ-05 (issue description, markdown-first); @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/architecture-dependency-direction (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T06:11:16Z; suite-duration budget exceeded); code-review pending\nTruncation recovery: none\n\n1. [blocking][issue-impact] `crates/jit/src/commands/bulk_update.rs:292` triggers the cascade from the requested terminal target and any modification, not from an actual transition to a terminal state. A bulk request against an already-Done issue with `state: Done` plus a priority or label change leaves every matched state unchanged but still promotes eligible backlog dependents, violating REQ-03. The new negative test only uses a non-terminal target and misses this case. References: @/issue/05d1b34e/requirement/REQ-03.\n\nTotal findings: 1\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The bulk cascade runs when a terminal state is requested even if no issue actually enters that state.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"Cascade is triggered by a terminal request plus any modification rather than an actual terminal transition, violating REQ-03.\",\"file\":\"crates/jit/src/commands/bulk_update.rs\",\"line\":292,\"references\":[\"@/issue/05d1b34e/requirement/REQ-03\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n",
+  "tree_dirty": true
+}

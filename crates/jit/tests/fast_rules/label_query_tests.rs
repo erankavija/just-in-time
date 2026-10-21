@@ -323,3 +323,78 @@ fn test_query_by_label_multiple_labels_per_issue() {
     assert_eq!(results3.len(), 1);
     assert_eq!(results3[0].id, multi_id);
 }
+
+fn create_labeled(
+    executor: &jit::commands::CommandExecutor<InMemoryStorage>,
+    title: &str,
+    labels: &[&str],
+) -> String {
+    executor
+        .create_issue(
+            title.to_string(),
+            "".to_string(),
+            Priority::Normal,
+            vec![],
+            labels.iter().map(|l| l.to_string()).collect(),
+            None,
+            None,
+            false,
+        )
+        .unwrap()
+        .0
+}
+
+#[test]
+fn test_search_issues_with_filters_namespace_wildcard_matches_query_by_label_set() {
+    let executor = crate::memory_executor(InMemoryStorage::new());
+    create_labeled(&executor, "Task one", &["type:task"]);
+    create_labeled(&executor, "Epic one", &["type:epic", "area:auth"]);
+    create_labeled(&executor, "Unlabelled-ish", &["area:auth"]);
+
+    let pattern = "type:*".to_string();
+    let searched = executor
+        .search_issues_with_filters("", None, None, None, std::slice::from_ref(&pattern))
+        .unwrap();
+    let queried = executor.query_by_labels(&[pattern]).unwrap();
+
+    let ids = |issues: &[jit::domain::Issue]| {
+        let mut ids: Vec<_> = issues.iter().map(|i| i.id.clone()).collect();
+        ids.sort();
+        ids
+    };
+    assert_eq!(searched.len(), 2);
+    assert_eq!(ids(&searched), ids(&queried));
+}
+
+#[test]
+fn test_search_issues_with_filters_wildcard_still_applies_text_query() {
+    let executor = crate::memory_executor(InMemoryStorage::new());
+    let wanted = create_labeled(&executor, "Billing task", &["type:task"]);
+    create_labeled(&executor, "Auth task", &["type:task"]);
+    create_labeled(&executor, "Billing note", &["area:billing"]);
+
+    let results = executor
+        .search_issues_with_filters("billing", None, None, None, &["type:*".to_string()])
+        .unwrap();
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].id, wanted);
+}
+
+#[test]
+fn test_search_issues_with_filters_malformed_pattern_is_invalid_label_pattern() {
+    let executor = crate::memory_executor(InMemoryStorage::new());
+    // Search goes through the shared validator, so it rejects malformed exact
+    // labels as well as malformed wildcards; `labels` owns the full matrix.
+    for bad in ["type", ":*", "type:", "type:a:b"] {
+        let error = executor
+            .search_issues_with_filters("", None, None, None, &[bad.to_string()])
+            .unwrap_err();
+        assert!(
+            error
+                .downcast_ref::<jit::errors::InvalidLabelPatternError>()
+                .is_some(),
+            "{bad:?} should be rejected as an invalid label pattern: {error}"
+        );
+    }
+}

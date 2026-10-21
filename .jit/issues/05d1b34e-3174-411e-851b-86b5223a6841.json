@@ -1,17 +1,29 @@
 {
-  "assignee": "agent:worker",
+  "assignee": "agent:jit-execution-lead",
   "claimed_at": "2026-10-21T05:52:33.498250261Z",
   "context": {},
   "created_at": "2026-10-20T19:42:10.815384848Z",
   "dependencies": [],
   "description": "Moving issues to a terminal state through a filtered bulk update does not promote their now-unblocked dependents to Ready. The single-issue update does. Dependents stay in Backlog with no unmet dependencies and drop out of available-work queries.\n\n## Background\n\nThe single-issue update path runs the dependent-readiness cascade after any terminal state change (`crates/jit/src/commands/issue.rs:519-524`, calling `check_auto_transitions` at `issue.rs:804`). The bulk path `apply_bulk_update` (`crates/jit/src/commands/bulk_update.rs:231-282`) publishes each matched issue through `publish_captured_bulk_update` and returns without running that cascade.\n\nReproduction in a fresh repository:\n\n1. Create issues A and B, and make A depend on B.\n2. Bulk-update with filter `state:ready` and target state `done` (matches B only).\n3. A stays in `backlog`, reports no unmet dependencies, and is absent from available work.\n\nThe same update addressed to B by id moves A to `ready`.\n\n## Success Criteria\n\n- [hard] REQ-01: After a bulk update moves issues to Done, every dependent whose dependencies are all terminal is in Ready.\n- [hard] REQ-02: After a bulk update moves issues to Rejected, every dependent whose dependencies are all terminal is in Ready.\n- [hard] REQ-03: A bulk update that changes no issue to a terminal state leaves dependent states unchanged.\n- [hard] REQ-04: Dependent states after a bulk terminal update match those after the same per-issue updates applied by id.\n- [hard] REQ-05: A regression test covers a bulk update to a terminal state that unblocks a dependent and asserts the dependent reaches Ready.\n\n## Notes\n\nThe cascade can run once after the whole batch rather than once per issue.",
   "documents": [],
+  "done_at": "2026-10-21T06:34:56.673273251Z",
   "first_ready_at": "2026-10-20T19:42:10.815384848Z",
   "gates_required": [
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:30:16.831142926Z",
+      "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:34:42.431103200Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "05d1b34e-3174-411e-851b-86b5223a6841",
   "labels": [
     "epic:audit-correctness",
@@ -20,7 +32,7 @@
     "type:bug"
   ],
   "priority": "high",
-  "state": "in_progress",
+  "state": "done",
   "title": "Bulk state updates to a terminal state leave unblocked dependents in backlog",
-  "updated_at": "2026-10-21T05:52:33.498250261Z"
+  "updated_at": "2026-10-21T06:34:56.673273251Z"
 }

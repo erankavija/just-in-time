@@ -34,7 +34,7 @@ impl<S: IssueStore> CommandExecutor<S> {
     }
 
     pub fn query_by_label(&self, pattern: &str) -> Result<Vec<Issue>> {
-        validate_label_pattern(pattern)?;
+        crate::labels::validate_label_pattern(pattern)?;
         let issues = self.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_label(&issues, pattern))
     }
@@ -46,9 +46,9 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// returned). Matching is AND-combined: an issue is kept only when it
     /// matches every pattern. An empty `patterns` slice matches every issue.
     pub fn query_by_labels(&self, patterns: &[String]) -> Result<Vec<Issue>> {
-        for pattern in patterns {
-            validate_label_pattern(pattern)?;
-        }
+        patterns
+            .iter()
+            .try_for_each(|pattern| crate::labels::validate_label_pattern(pattern))?;
 
         let issues = self.storage.list_issues()?;
         Ok(crate::domain::queries::query_by_labels(&issues, patterns))
@@ -269,42 +269,4 @@ impl<S: IssueStore> CommandExecutor<S> {
 
         Ok(issues)
     }
-}
-
-/// Validate a label filter pattern's format (`namespace:value` or
-/// `namespace:*`). Shared by [`CommandExecutor::query_by_label`] and
-/// [`CommandExecutor::query_by_labels`] so both single- and multi-pattern
-/// callers reject malformed patterns identically.
-fn validate_label_pattern(pattern: &str) -> Result<()> {
-    if !pattern.contains(':') {
-        return Err(crate::errors::InvalidLabelPatternError::new(format!(
-            "Invalid label pattern '{}': must be 'namespace:value' or 'namespace:*'",
-            pattern
-        ))
-        .into());
-    }
-
-    let parts: Vec<&str> = pattern.splitn(2, ':').collect();
-    if parts.len() != 2 {
-        return Err(crate::errors::InvalidLabelPatternError::new(format!(
-            "Invalid label pattern '{}': must contain exactly one colon",
-            pattern
-        ))
-        .into());
-    }
-
-    let namespace = parts[0];
-
-    if !namespace
-        .chars()
-        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-    {
-        return Err(crate::errors::InvalidLabelPatternError::new(format!(
-            "Invalid label pattern '{}': namespace must be lowercase alphanumeric with hyphens",
-            pattern
-        ))
-        .into());
-    }
-
-    Ok(())
 }

@@ -1,0 +1,29 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "6155397c3b610b6f7dfc2327d4ad4c61d85554d1",
+  "completed_at": "2026-10-21T06:25:41.084160502Z",
+  "duration_ms": 320537,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "The shared resolver aligns reported and enforced lease policy across all configuration sources, and the prior documentation finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "bedf0962-dcb6-4c72-bd88-a4125e1a69d6",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "1430e568-d706-4957-a278-aff73ef8c3af",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T06:20:20.546331086Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: dcf6f5dd, ffb25059, c593cd5d, 4d409adf, 7c5a78a, 64e25aaa, 7c4db885 (`jit:bedf0962`; merges add no distinct combined diff)\nPolicy sources: AGENTS.md\nResolved items: @/charter/D-13 (dev/vision/9db27a3a-charter.md); @/invariant/essential-code-prose and @/invariant/orthogonal-tests (.jit/invariants.toml); @/gate/cargo-ci and @/gate/code-review (.jit/gates.toml)\nGate evidence: cargo-ci failed (exit 1, 2026-10-21T06:19:30.944025007+00:00); prior code-review failed (exit 1, prior F1 addressed)\nTruncation recovery: narrowed merge inspection to combined diffs and issue paths; reread resolver, call sites, documentation, and tests after broad reads included unrelated concurrent work\n\nTotal findings: 0\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"The shared resolver aligns reported and enforced lease policy across all configuration sources, and the prior documentation finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n",
+  "tree_dirty": true
+}

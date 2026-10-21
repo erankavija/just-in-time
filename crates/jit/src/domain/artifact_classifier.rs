@@ -19,7 +19,6 @@ use crate::domain::Issue;
 use crate::domain::State;
 use crate::domain::SHORT_ID_LENGTH;
 use crate::labels::type_value_of;
-use anyhow::{anyhow, bail};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -190,11 +189,8 @@ impl ArtifactClassificationPolicy {
 }
 
 /// Filesystem state captured by the storage boundary for one path.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArtifactLocation {
-    /// The caller did not inspect this path. Production planners should avoid this state.
-    #[default]
-    Unknown,
     /// No filesystem object exists at the path.
     Missing,
     /// A regular file exists with this byte identity.
@@ -206,7 +202,7 @@ pub enum ArtifactLocation {
 }
 
 /// Source and computed-mirror facts for one working-tree artifact.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactLocationFacts {
     pub source: ArtifactLocation,
     pub destination: ArtifactLocation,
@@ -239,20 +235,13 @@ impl EmbeddedArtifactOwner {
     }
 }
 
-/// Existing state of a container's short-id destination directory.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+/// Whether a container's short-id destination directory admits the archive.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContainerDestinationState {
-    /// No directory exists yet.
-    #[default]
-    Absent,
-    /// Its `.jit-container` marker names this exact full container id.
-    OwnedByTarget,
-    /// Its marker names another full container id.
-    OwnedByOther(String),
-    /// It has no marker and every existing entry is accounted for by this plan.
-    MarkerlessAccounted,
-    /// It has no marker and contains at least one unaccounted entry.
-    MarkerlessWithUnaccountedEntries,
+    /// The directory is absent, marked for this container, or holds only entries this plan accounts for.
+    Available,
+    /// Another container owns it, or it holds entries this plan does not account for.
+    Conflict,
     /// The directory path or a traversed component is a symbolic link.
     Symlink,
 }
@@ -381,7 +370,7 @@ impl TextLine {
 }
 
 /// All I/O-derived facts consumed by pure classification.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArtifactClassificationFacts {
     /// Facts keyed by normalized repository-relative source path.
     pub locations: BTreeMap<String, ArtifactLocationFacts>,
@@ -406,7 +395,7 @@ pub struct ResolvedContainerDestination {
 }
 
 /// Stable failures while resolving a container destination from closed evidence.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub enum ArtifactEvidenceError {
     /// A path implied by complete evidence was not itself captured.
     #[error("archive evidence is incomplete for {path}")]
@@ -417,6 +406,9 @@ pub enum ArtifactEvidenceError {
     /// The legacy destination does not identify an archive root.
     #[error("container archive destination has no archive root")]
     MissingArchiveRoot,
+    /// The container marker holds bytes that are not a UTF-8 container id.
+    #[error("container marker is not valid UTF-8: {path}")]
+    InvalidMarker { path: String },
 }
 
 /// Resolve marker ownership, legacy fallback, and preferred placement from closed evidence.
@@ -516,7 +508,7 @@ pub fn classification_facts_from_evidence(
     policy: &ArtifactClassificationPolicy,
     embedded_owners: Vec<EmbeddedArtifactOwner>,
     evidence: &ArtifactEvidenceMap,
-) -> anyhow::Result<ArtifactClassificationFacts> {
+) -> Result<ArtifactClassificationFacts, ArtifactEvidenceError> {
     let inspect_destinations = !policy.archive_root.is_empty();
     let layout = ArchiveLayout::new(target, destination_root, policy, artifacts);
     let locations = artifacts
@@ -541,12 +533,12 @@ pub fn classification_facts_from_evidence(
                 },
             ))
         })
-        .collect::<anyhow::Result<BTreeMap<_, _>>>()?;
+        .collect::<Result<BTreeMap<_, _>, ArtifactEvidenceError>>()?;
     let container_destination = match target {
         PlanTarget::Container { id } if inspect_destinations => {
             container_destination_from_evidence(destination_root, policy, id, artifacts, evidence)?
         }
-        _ => ContainerDestinationState::Absent,
+        _ => ContainerDestinationState::Available,
     };
     Ok(ArtifactClassificationFacts {
         locations,
@@ -559,8 +551,8 @@ pub fn classification_facts_from_evidence(
 fn location_from_evidence(
     path: &str,
     evidence: &ArtifactEvidenceMap,
-) -> anyhow::Result<ArtifactLocation> {
-    Ok(match required_evidence(evidence, path)? {
+) -> Result<ArtifactLocation, ArtifactEvidenceError> {
+    Ok(match required_resolution_evidence(evidence, path)? {
         ArtifactEvidence::File(bytes) => {
             ArtifactLocation::Regular(ContentIdentity::from_bytes(bytes))
         }
@@ -578,42 +570,43 @@ fn container_destination_from_evidence(
     container_id: &str,
     artifacts: &[ArtifactPlanEntry],
     evidence: &ArtifactEvidenceMap,
-) -> anyhow::Result<ContainerDestinationState> {
+) -> Result<ContainerDestinationState, ArtifactEvidenceError> {
     let target = PlanTarget::Container {
         id: container_id.to_string(),
     };
-    let entries = match required_evidence(evidence, destination_root)? {
-        ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Absent),
+    let entries = match required_resolution_evidence(evidence, destination_root)? {
+        ArtifactEvidence::Missing => return Ok(ContainerDestinationState::Available),
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
         ArtifactEvidence::File(_)
         | ArtifactEvidence::Unsupported
-        | ArtifactEvidence::InvalidPath => {
-            return Ok(ContainerDestinationState::MarkerlessWithUnaccountedEntries)
-        }
+        | ArtifactEvidence::InvalidPath => return Ok(ContainerDestinationState::Conflict),
         ArtifactEvidence::Directory { scope, entries } => {
             if *scope != ArtifactListingScope::RecursiveFiles {
-                bail!("archive evidence for {destination_root} is not a recursive listing");
+                return Err(ArtifactEvidenceError::WrongListingScope {
+                    path: destination_root.to_string(),
+                });
             }
             entries
         }
     };
     let marker_path = format!("{destination_root}/.jit-container");
-    match required_evidence(evidence, &marker_path)? {
+    match required_resolution_evidence(evidence, &marker_path)? {
         ArtifactEvidence::Symlink => return Ok(ContainerDestinationState::Symlink),
         ArtifactEvidence::File(owner) => {
-            let owner = std::str::from_utf8(owner.trim_ascii())
-                .map_err(|_| anyhow!("container marker is not valid UTF-8: {marker_path}"))?;
+            let owner = std::str::from_utf8(owner.trim_ascii()).map_err(|_| {
+                ArtifactEvidenceError::InvalidMarker {
+                    path: marker_path.clone(),
+                }
+            })?;
             return Ok(if owner == container_id {
-                ContainerDestinationState::OwnedByTarget
+                ContainerDestinationState::Available
             } else {
-                ContainerDestinationState::OwnedByOther(owner.to_string())
+                ContainerDestinationState::Conflict
             });
         }
         ArtifactEvidence::Unsupported
         | ArtifactEvidence::Directory { .. }
-        | ArtifactEvidence::InvalidPath => {
-            return Ok(ContainerDestinationState::MarkerlessWithUnaccountedEntries)
-        }
+        | ArtifactEvidence::InvalidPath => return Ok(ContainerDestinationState::Conflict),
         ArtifactEvidence::Missing => {}
     }
     let layout = ArchiveLayout::new(&target, destination_root, policy, artifacts);
@@ -623,19 +616,10 @@ fn container_destination_from_evidence(
         .filter_map(|artifact| layout.destination(artifact.source()))
         .collect::<BTreeSet<_>>();
     Ok(if entries.iter().all(|entry| accounted.contains(entry)) {
-        ContainerDestinationState::MarkerlessAccounted
+        ContainerDestinationState::Available
     } else {
-        ContainerDestinationState::MarkerlessWithUnaccountedEntries
+        ContainerDestinationState::Conflict
     })
-}
-
-fn required_evidence<'a>(
-    evidence: &'a ArtifactEvidenceMap,
-    path: &str,
-) -> anyhow::Result<&'a ArtifactEvidence> {
-    evidence
-        .get(path)
-        .ok_or_else(|| anyhow!("archive evidence is missing for {path}"))
 }
 
 /// Inventory data accepted from recursive discovery.
@@ -963,7 +947,11 @@ fn classify_entry(
     }
 
     let source = entry.source().to_string();
-    let location = locations.get(&source).cloned().unwrap_or_default();
+    let location = locations.get(&source).cloned().ok_or_else(|| {
+        ArtifactEvidenceError::IncompleteEvidence {
+            path: source.clone(),
+        }
+    })?;
     let archived_source = policy.is_archived(&source);
     let permanent = policy.is_permanent(&source);
     let outside_development_root = policy.retains_outside_development_root(&source);
@@ -1608,23 +1596,12 @@ fn append_container_destination_blocker(
     if !matches!(target, PlanTarget::Container { .. }) {
         return;
     }
-    let blocked = matches!(
-        state,
-        ContainerDestinationState::OwnedByOther(_)
-            | ContainerDestinationState::MarkerlessWithUnaccountedEntries
-    );
-    if blocked {
-        blockers.push(PlanBlocker::new(
-            BlockerCode::DestinationConflict,
-            Some(destination_root),
-        ));
-    }
-    if matches!(state, ContainerDestinationState::Symlink) {
-        blockers.push(PlanBlocker::new(
-            BlockerCode::SymlinkArtifact,
-            Some(destination_root),
-        ));
-    }
+    let code = match state {
+        ContainerDestinationState::Available => return,
+        ContainerDestinationState::Conflict => BlockerCode::DestinationConflict,
+        ContainerDestinationState::Symlink => BlockerCode::SymlinkArtifact,
+    };
+    blockers.push(PlanBlocker::new(code, Some(destination_root)));
 }
 
 /// Compute the stable target destination root used by planning and storage inspection.
@@ -2609,11 +2586,11 @@ mod tests {
         for (entries, expected) in [
             (
                 vec!["archive/docs/a.md"],
-                ContainerDestinationState::MarkerlessAccounted,
+                ContainerDestinationState::Available,
             ),
             (
                 vec!["archive/docs/a.md", "archive/foreign"],
-                ContainerDestinationState::MarkerlessWithUnaccountedEntries,
+                ContainerDestinationState::Conflict,
             ),
         ] {
             let evidence = ArtifactEvidenceMap::from([
@@ -2651,6 +2628,122 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn test_classification_evidence_maps_each_destination_to_its_outcome() {
+        let artifact = embedded("docs/a.md");
+        let owner_marker = |owner: &str| ArtifactEvidence::File(owner.as_bytes().to_vec());
+        let cases = [
+            (
+                "absent",
+                ArtifactEvidence::Missing,
+                None,
+                ContainerDestinationState::Available,
+            ),
+            (
+                "owned by target",
+                directory(ArtifactListingScope::RecursiveFiles, &["archive/foreign"]),
+                Some(owner_marker(CONTAINER)),
+                ContainerDestinationState::Available,
+            ),
+            (
+                "owned by other",
+                directory(ArtifactListingScope::RecursiveFiles, &[]),
+                Some(owner_marker("another-container")),
+                ContainerDestinationState::Conflict,
+            ),
+            (
+                "symlink root",
+                ArtifactEvidence::Symlink,
+                None,
+                ContainerDestinationState::Symlink,
+            ),
+            (
+                "symlink marker",
+                directory(ArtifactListingScope::RecursiveFiles, &[]),
+                Some(ArtifactEvidence::Symlink),
+                ContainerDestinationState::Symlink,
+            ),
+            (
+                "file in place of directory",
+                ArtifactEvidence::File(b"x".to_vec()),
+                None,
+                ContainerDestinationState::Conflict,
+            ),
+        ];
+        for (name, root, marker, expected) in cases {
+            let mut evidence = ArtifactEvidenceMap::from([
+                ("docs/a.md".into(), ArtifactEvidence::File(b"a".to_vec())),
+                ("archive/docs/a.md".into(), ArtifactEvidence::Missing),
+                ("archive".into(), root),
+            ]);
+            if let Some(marker) = marker {
+                evidence.insert("archive/.jit-container".into(), marker);
+            }
+            let facts = classification_facts_from_evidence(
+                &PlanTarget::Container {
+                    id: CONTAINER.into(),
+                },
+                "archive",
+                std::slice::from_ref(&artifact),
+                &ArtifactClassificationPolicy::configured("", vec![], vec![], "archive"),
+                Vec::new(),
+                &evidence,
+            )
+            .unwrap();
+            assert_eq!(facts.container_destination, expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn test_classification_evidence_rejects_uninspected_location() {
+        let artifact = embedded("docs/a.md");
+        let evidence = ArtifactEvidenceMap::from([(
+            "docs/a.md".into(),
+            ArtifactEvidence::File(b"a".to_vec()),
+        )]);
+        assert_eq!(
+            classification_facts_from_evidence(
+                &PlanTarget::Container {
+                    id: CONTAINER.into()
+                },
+                "archive",
+                &[artifact],
+                &ArtifactClassificationPolicy::configured("", vec![], vec![], "archive"),
+                Vec::new(),
+                &evidence,
+            ),
+            Err(ArtifactEvidenceError::IncompleteEvidence {
+                path: "archive/docs/a.md".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_classify_artifacts_rejects_working_tree_entry_without_location_facts() {
+        let result = classify_artifacts(
+            ArtifactClassificationInventory::new(
+                PlanTarget::Container {
+                    id: CONTAINER.into(),
+                },
+                vec![explicit(
+                    "dev/active/doc.md",
+                    vec![owner("i", State::Done, true)],
+                )],
+                Vec::new(),
+            ),
+            default_policy(),
+            no_facts(),
+        );
+        assert_eq!(
+            result,
+            Err(PlanError::Evidence(
+                ArtifactEvidenceError::IncompleteEvidence {
+                    path: "dev/active/doc.md".into(),
+                }
+            ))
+        );
     }
 
     #[test]
@@ -2954,7 +3047,16 @@ mod tests {
                     )
                 })
                 .collect(),
-            ..ArtifactClassificationFacts::default()
+            ..no_facts()
+        }
+    }
+
+    fn no_facts() -> ArtifactClassificationFacts {
+        ArtifactClassificationFacts {
+            locations: BTreeMap::new(),
+            embedded_owners: Vec::new(),
+            container_destination: ContainerDestinationState::Available,
+            citations: CitationScanEvidence::new(),
         }
     }
 
@@ -3941,7 +4043,7 @@ mod tests {
             ArtifactLocation::Symlink,
             ArtifactLocation::Missing,
         )]);
-        facts.container_destination = ContainerDestinationState::OwnedByOther("foreign".into());
+        facts.container_destination = ContainerDestinationState::Conflict;
         let plan = container(
             vec![explicit(
                 "dev/active/doc.md",
@@ -3957,6 +4059,34 @@ mod tests {
             .blockers()
             .iter()
             .any(|blocker| blocker.code == BlockerCode::SymlinkArtifact));
+    }
+
+    #[test]
+    fn test_container_destination_outcomes_raise_their_own_blockers() {
+        let blocker_codes = |state| {
+            let mut facts = present_source("dev/active/doc.md");
+            facts.container_destination = state;
+            container(
+                vec![explicit(
+                    "dev/active/doc.md",
+                    vec![owner("i", State::Done, true)],
+                )],
+                facts,
+            )
+            .blockers()
+            .iter()
+            .map(|blocker| blocker.code)
+            .collect::<Vec<_>>()
+        };
+        assert!(blocker_codes(ContainerDestinationState::Available).is_empty());
+        assert_eq!(
+            blocker_codes(ContainerDestinationState::Conflict),
+            [BlockerCode::DestinationConflict]
+        );
+        assert_eq!(
+            blocker_codes(ContainerDestinationState::Symlink),
+            [BlockerCode::SymlinkArtifact]
+        );
     }
 
     #[test]
@@ -3988,7 +4118,7 @@ mod tests {
             ArtifactLocation::Regular(identity(b"doc")),
             ArtifactLocation::Missing,
         )]);
-        facts.container_destination = ContainerDestinationState::MarkerlessWithUnaccountedEntries;
+        facts.container_destination = ContainerDestinationState::Conflict;
         let plan = container(
             vec![explicit(
                 "dev/active/doc.md",
@@ -4669,7 +4799,7 @@ mod tests {
             pinned: true,
             ..owner("i", State::Done, true)
         }]);
-        let plan = container(vec![pinned], ArtifactClassificationFacts::default());
+        let plan = container(vec![pinned], no_facts());
         let artifact = entry(&plan, "dev/active/history.md");
         assert_eq!(artifact.action(), ArtifactAction::Retain);
         assert_eq!(artifact.destination(), None);
