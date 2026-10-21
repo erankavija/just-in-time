@@ -1195,7 +1195,7 @@ fetch the body with `jit issue show`:
   "short_id": "5c581575",
   "state": "in_progress",
   "updated_at": "2026-04-28T18:25:16.699033997Z",
-  "message": "Updated issue 5c581575 to in_progress"
+  "message": "Updated issue 5c581575 to InProgress"
 }
 ```
 

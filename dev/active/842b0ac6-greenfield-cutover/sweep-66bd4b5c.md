@@ -134,7 +134,7 @@ web/src/components/Issue/__tests__/stateEmojis.test.ts:9 — not a state (canoni
 web/src/components/Issue/__tests__/stateEmojis.test.ts:25 — not a state (canonical token in_progress (correct))
 docs/reference/cli-commands.md:1182 — not a state (canonical token in_progress (correct))
 docs/reference/cli-commands.md:1196 — not a state (canonical token in_progress (correct))
-docs/reference/cli-commands.md:1198 — fixed
+docs/reference/cli-commands.md:1198 — not changed: human output owned by 1622756a
 docs/reference/cli-commands.md:1245 — not a state (canonical token in_progress (correct))
 docs/reference/cli-commands.md:1444 — not a state (canonical token in_progress (correct))
 docs/reference/cli-commands.md:1525 — not a state (canonical token in_progress (correct))
@@ -356,7 +356,7 @@ dev/active/2195c98f-semantic-types/investigation.md:389 — not a state (generic
 dev/active/2195c98f-semantic-types/investigation.md:390 — not a state (generic English "open" or the rollup `open` count (not effectively terminal), not a lifecycle-state token)
 dev/active/2195c98f-semantic-types/investigation.md:416 — not a state (historical work record describing the retired alias as its subject)
 dev/active/2195c98f-semantic-types/investigation.md:564 — not a state (generic English "open" or the rollup `open` count (not effectively terminal), not a lifecycle-state token)
-dev/active/2195c98f-semantic-types/investigation.md:627 — fixed
+dev/active/2195c98f-semantic-types/investigation.md:627 — not a state (historical record of another epic)
 dev/active/2195c98f-semantic-types/investigation.md:635 — not a state (historical work record describing the retired alias as its subject)
 dev/active/2195c98f-semantic-types/investigation.md:636 — not a state (verb or adjective: open as an action, not a lifecycle state)
 crates/server/src/shutdown.rs:8 — not a state (generic English "open" or the rollup `open` count (not effectively terminal), not a lifecycle-state token)
@@ -528,8 +528,8 @@ dev/active/df129d9e-rust-code-quality/investigation.md:22 — not a state (verb 
 dev/active/df129d9e-rust-code-quality/investigation.md:23 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:24 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:27 — not a state (generic English or tracker status wording, not a lifecycle-state token)
-dev/active/df129d9e-rust-code-quality/investigation.md:178 — fixed
-dev/active/df129d9e-rust-code-quality/investigation.md:179 — fixed
+dev/active/df129d9e-rust-code-quality/investigation.md:178 — not a state (historical record of another epic)
+dev/active/df129d9e-rust-code-quality/investigation.md:179 — not a state (historical record of another epic)
 dev/active/df129d9e-rust-code-quality/investigation.md:194 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:195 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:196 — not a state (generic English or tracker status wording, not a lifecycle-state token)
@@ -540,13 +540,13 @@ dev/active/df129d9e-rust-code-quality/investigation.md:200 — not a state (gene
 dev/active/df129d9e-rust-code-quality/investigation.md:201 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:204 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:278 — not a state (generic English "open" or the rollup `open` count (not effectively terminal), not a lifecycle-state token)
-dev/active/df129d9e-rust-code-quality/investigation.md:570 — fixed
+dev/active/df129d9e-rust-code-quality/investigation.md:570 — not a state (historical record of another epic)
 dev/active/df129d9e-rust-code-quality/investigation.md:575 — not a state (generic English "in progress" describing work or an adjective, not a state label)
 dev/active/df129d9e-rust-code-quality/investigation.md:583 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:584 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:585 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/df129d9e-rust-code-quality/investigation.md:587 — not a state (generic English or tracker status wording, not a lifecycle-state token)
-dev/active/df129d9e-rust-code-quality/investigation.md:945 — fixed
+dev/active/df129d9e-rust-code-quality/investigation.md:945 — not a state (historical record of another epic)
 dev/active/f4d9502a-git-cli-module/plan.md:10 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/b80e3c70-v1-release/handoff-4.md:35 — not a state (verb or adjective: open as an action, not a lifecycle state)
 crates/jit/src/storage/discovery.rs:75 — not a state (verb or adjective: open as an action, not a lifecycle state)
@@ -702,7 +702,7 @@ dev/active/f8a6b298-history-independent-reads/investigation.md:150 — not a sta
 dev/active/f8a6b298-history-independent-reads/investigation.md:151 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/f8a6b298-history-independent-reads/investigation.md:152 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/f8a6b298-history-independent-reads/investigation.md:153 — not a state (generic English or tracker status wording, not a lifecycle-state token)
-dev/active/f8a6b298-history-independent-reads/investigation.md:321 — fixed
+dev/active/f8a6b298-history-independent-reads/investigation.md:321 — not a state (historical record of another epic)
 dev/active/f8a6b298-history-independent-reads/investigation.md:447 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/f8a6b298-history-independent-reads/investigation.md:449 — not a state (generic English or tracker status wording, not a lifecycle-state token)
 dev/active/f8a6b298-history-independent-reads/investigation.md:450 — not a state (historical work record describing the retired alias as its subject)

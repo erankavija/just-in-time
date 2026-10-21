@@ -553,7 +553,7 @@ async function main() {
       // Single content block with summary + serialized JSON
       assert.ok(result.content.length >= 1, 'should have content');
       const text = result.content[0].text;
-      assert.ok(text.includes('open') || text.includes('ready') || text.includes('done'),
+      assert.ok(text.includes('backlog') || text.includes('ready') || text.includes('done'),
         'content should include human summary');
       assert.ok(text.includes('"total"'), 'content should include serialized JSON');
 
