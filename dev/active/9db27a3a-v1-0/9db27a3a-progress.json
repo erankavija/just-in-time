@@ -186,7 +186,7 @@
           "short_id": "3d9a0ce3",
           "title": "Remove execution-lead friction in gate, document and profile workflows",
           "wave": 2,
-          "status": "planning"
+          "status": "executing"
         },
         {
           "id": "df129d9e-c795-4d92-9ee5-ffd776339252",
@@ -335,6 +335,26 @@
       "status": "open",
       "date": "2026-10-21",
       "summary": "Breakdown review advisory: 842b0ac6 became unreachable from the v1.0 tag task after 2195c98f's bracket moved its edge. Resolution: 2195c98f's breakdown re-homes the 842b0ac6 edge onto its root tasks (just-in-time-59 told). Close once bb03df0a reaches 842b0ac6 again and `jit query divergence` is clean."
+    },
+    {
+      "container_short_id": "3d9a0ce3",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/charter/D-8",
+      "summary": "The planner rejected study e643ef66 as resolution:obsolete, since D-8 (revised 2026-10-15) is the ruling the study awaited. Accepted."
+    },
+    {
+      "container_short_id": "3d9a0ce3",
+      "status": "open",
+      "date": "2026-10-21",
+      "summary": "Re-home whole-epic edges once their epics are broken down: dbbfcd6c -> 2195c98f's ProfileId task (requested from just-in-time-59), and 5f82e09a -> f4d9502a's git-module task (once f4d9502a is planned)."
+    },
+    {
+      "container_short_id": "3d9a0ce3",
+      "status": "blocked-for-user",
+      "date": "2026-10-21",
+      "category": "project-wide infrastructure",
+      "summary": "OD-9: this checkout's drift checks keep the jit-dogfood package manifest and .jit/ in sync. D-8 states that no drift check exists for applied profiles, but it does not name this repository-local consistency check. Decide whether to keep it (dogfood package must mirror .jit/), remove it under D-8/D-18, or replace it by deriving one from the other. Outside 3d9a0ce3's scope until decided."
     }
   ],
   "notes": [
@@ -346,7 +366,8 @@
     "Tooling note: `jit claim acquire` sets the assignee and `claim release` does not restore it. Unassign after steward lease edits, and never lease an issue assigned to someone else.",
     "2026-10-21: all sessions stalled about 3h on the shared usage limit (00:31-03:30) and were resumed at 03:31. 2195c98f's planner re-homes the 842b0ac6 edge onto the epic's root tasks, so a downstream epic's breakdown does not wait for its upstream epic to finish. Wave-4 planning can start before 2195c98f is done, once sessions free up.",
     "2026-10-21 (7e): an indefinite container lease went stale after 1h (d92f54aa's threshold), and `claim acquire` by the same agent returned the stale lease instead of renewing it; `claim heartbeat` recovered it. Possible defect: acquire should renew the caller's own stale lease. Verify after d92f54aa lands, and file it if it reproduces.",
-    "2026-10-21: 842b0ac6 planning accepted (P 201634a8 and B 6792cc41 done; 38 tasks, 42 edges). Execution is assigned to just-in-time-7e, the same session that planned it, because no other session is free. The deviation from the fresh-lead rule is contained: the gated breakdown is fixed, and changes go through escalation and a new planning pass."
+    "2026-10-21: 842b0ac6 planning accepted (P 201634a8 and B 6792cc41 done; 38 tasks, 42 edges). Execution is assigned to just-in-time-7e, the same session that planned it, because no other session is free. The deviation from the fresh-lead rule is contained: the gated breakdown is fixed, and changes go through escalation and a new planning pass.",
+    "2026-10-21: 3d9a0ce3 planned (both gates passed; 35 new tasks joined to 7 existing children; REQ-14/15 added). Execution was dispatched to a fresh background execution-lead subagent. A breakdown dep add transitively reduced bb03df0a: its direct edges to 5f71a48d and f4d9502a are gone, and both stay reachable through 3d9a0ce3."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
