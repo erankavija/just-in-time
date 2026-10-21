@@ -14,7 +14,7 @@
           "title": "Keep one profile manifest version",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "f11514dd-ad2a-4a76-a2d0-c0eb9da9e150",
@@ -23,7 +23,7 @@
           "title": "Remove linked-worktree evidence from repository capture",
           "classification": "implementation",
           "model": "opus",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "0ec8b001-ef0b-49c8-82a9-536ca896996c",
@@ -32,7 +32,7 @@
           "title": "Prune the uncalled output surface",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "52732879-2ab3-4475-8d07-a8718ef0cc15",
@@ -41,7 +41,7 @@
           "title": "Trim git revision access to production queries",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "bc0bd663-859c-4d88-b46d-17a334f60784",
@@ -50,7 +50,7 @@
           "title": "Derive mermaid state classes from the state enumeration",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "dc6fac0c-f449-47fc-b2f3-29f756fad4b5",
@@ -59,7 +59,7 @@
           "title": "Remove the orphaned web hierarchy module",
           "classification": "implementation",
           "model": "haiku",
-          "status": "pending"
+          "status": "dispatched"
         }
       ]
     },
@@ -407,7 +407,8 @@
   "notes": [
     "Sub-waves 1a-1d split topological layer 1 for file contention and host build load (24 cores, ~75 GB disk free).",
     "Config tasks wait for bedf0962 (8376299c, just-in-time-05).",
-    "just-in-time-05: bedf0962 lands in ~2-3h; 16d63038 later and rebases onto our read_issues/load_events changes, so those land in 1b."
+    "just-in-time-05: bedf0962 lands in ~2-3h; 16d63038 later and rebases onto our read_issues/load_events changes, so those land in 1b.",
+    "Wave 1a dispatched at main 23d4f5526; worker prompts are built by a scratchpad generator from the live issue text."
   ],
   "started_at": "2026-10-21T01:03:03.002143+00:00"
 }
