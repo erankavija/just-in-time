@@ -5490,7 +5490,7 @@ fn run() -> Result<()> {
                     ))?;
                 }
 
-                std::process::exit(result.exit_code);
+                std::process::exit(i32::from(!result.valid));
             }
         },
         Commands::Archive(archive_cmd) => match archive_cmd {

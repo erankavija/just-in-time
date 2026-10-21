@@ -2847,9 +2847,9 @@ jit doc check-links [--scope all|issue:<ID>] [--json]
 ```
 
 `--scope` defaults to `all`. The exit code carries the verdict per the
-[exit-code reference](exit-codes.md#command-specific-mappings): `0` when every
-document is valid, otherwise `1` (broken links) or `2` (only warnings). JSON
-reports `valid`, `errors`, `warnings`, and a `summary`.
+[exit-code reference](exit-codes.md#command-specific-mappings): `0` unless a link is
+broken, which exits `1`; warnings are reported in the output and the JSON
+result but never change the exit status. JSON reports `valid`, `errors`, `warnings`, and a `summary`.
 
 The documents in scope include each issue's derived documents, which are also
 tracked link targets. Each reference is checked at the version it names, the same version `jit

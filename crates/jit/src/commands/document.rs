@@ -1140,7 +1140,6 @@ impl<S: IssueStore> CommandExecutor<S> {
                 valid: true,
                 errors: Vec::new(),
                 warnings: Vec::new(),
-                exit_code: 0,
                 scope: scope.to_string(),
                 summary: crate::commands::LinkCheckSummary {
                     total_documents: 0,
@@ -1346,20 +1345,10 @@ impl<S: IssueStore> CommandExecutor<S> {
         let error_count = error_docs.len();
         let warning_count = warnings.len();
 
-        // Determine exit code
-        let exit_code = if !errors.is_empty() {
-            1 // Errors found
-        } else if !warnings.is_empty() {
-            2 // Only warnings
-        } else {
-            0 // All valid
-        };
-
         Ok(crate::commands::LinkCheckResult {
             valid: errors.is_empty(),
             errors,
             warnings,
-            exit_code,
             scope: scope.to_string(),
             summary: crate::commands::LinkCheckSummary {
                 total_documents: all_documents.len(),

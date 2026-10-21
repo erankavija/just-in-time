@@ -521,10 +521,10 @@ fn test_command_exit_codes_config_validate_invalid_value_emits_4() {
     });
 }
 
-/// `jit doc check-links` exits 1 on a broken link and 2 on a risky-link warning
-/// — matching the two `doc check-links` rows.
+/// `jit doc check-links` exits 1 on a broken link and 0 on a risky-link
+/// warning alone — matching the `doc check-links` row and the `*`/0 row.
 #[test]
-fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
+fn test_command_exit_codes_doc_check_links_emits_1_and_warnings_exit_0() {
     // Broken link -> exit 1.
     let temp = setup();
     let id = create_issue(&temp, "Doc host", &[]);
@@ -551,7 +551,7 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
         command.output().unwrap()
     });
 
-    // Risky (deep relative) but valid link -> exit 2.
+    // Risky (deep relative) but valid link -> warning only, exit 0.
     let temp = setup();
     let id = create_issue(&temp, "Doc host", &[]);
     fs::create_dir_all(temp.path().join("docs/subdir")).unwrap();
@@ -568,7 +568,7 @@ fn test_command_exit_codes_doc_check_links_emits_1_and_2() {
         .status()
         .unwrap()
         .success());
-    assert_projected_exit_status_in_both_forms("doc check-links", 2, true, |json| {
+    assert_projected_exit_status_in_both_forms("*", 0, false, |json| {
         let mut command = Command::new(jit_binary());
         command
             .current_dir(&temp)
@@ -1158,7 +1158,6 @@ fn test_command_exit_codes_every_row_is_verified() {
         ("invariant check", Some(4)),
         ("config validate", Some(4)),
         ("doc check-links", Some(1)),
-        ("doc check-links", Some(2)),
         ("gate preset apply", Some(3)),
         ("serve, serve --stop, serve --status", Some(1)),
         ("*", Some(141)),
