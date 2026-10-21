@@ -1847,16 +1847,11 @@ fn test_package_archive_read_reaches_no_filesystem_network_or_process() {
     }
 }
 
-/// A package tree reaches the worktree through one publication.
-///
-/// Capturing a tree from the repository files a manifest declares and adding
-/// one from a portable archive differ in where the bytes came from, not in how
-/// they land: both derive one plan against one captured image and publish it
-/// through one mutation session, whose redo record is the commit point either
-/// route reaches. A second publication route is
-/// where the no-replace guarantee, the whole-tree delta, or the retry on a
-/// concurrent change goes missing for one of them
-/// (`@/inv/convention-convergence`).
+/// A package tree reaches the worktree through one publication: one plan
+/// against one captured image, published through one mutation session whose
+/// redo record is the commit point. A second route is where the no-replace
+/// guarantee, the whole-tree delta, or the retry on a concurrent change goes
+/// missing (`@/inv/convention-convergence`).
 #[test]
 fn test_package_tree_publication_has_one_owner_in_the_command_layer() {
     let profile =
@@ -1871,14 +1866,8 @@ fn test_package_tree_publication_has_one_owner_in_the_command_layer() {
         1,
         "a package tree publication is declared in more than one place in the profile commands"
     );
-    for caller in [
-        "TreePlacement::Republish",
-        "TreePlacement::RequireAbsent",
-        "fn publish_package_tree(",
-    ] {
-        assert!(
-            profile.contains(caller),
-            "{caller} is absent, so the counts above are not about the two publications"
-        );
-    }
+    assert!(
+        profile.contains("fn publish_package_tree("),
+        "fn publish_package_tree( is absent, so the counts above are not about the publication"
+    );
 }

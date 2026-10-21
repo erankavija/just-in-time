@@ -72,19 +72,18 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
         std::collections::BTreeSet::from([
             "add".to_string(),
             "apply".to_string(),
-            "capture".to_string(),
             "diff".to_string(),
             "pack".to_string(),
             "show".to_string(),
         ])
     );
-    for command in ["show", "diff", "apply", "capture", "pack", "add"] {
+    for command in ["show", "diff", "apply", "pack", "add"] {
         assert!(
             profile[command]["output"]["success_schema"].is_object(),
             "profile {command} must expose a success schema"
         );
     }
-    for command in ["apply", "capture", "pack", "add"] {
+    for command in ["apply", "pack", "add"] {
         assert!(profile[command]["flags"]
             .as_array()
             .unwrap()

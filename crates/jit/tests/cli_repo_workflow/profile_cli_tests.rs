@@ -1730,9 +1730,9 @@ fn assert_human_profile_decision(
 }
 
 /// A package directory whose live assets are absent from it and present in the
-/// repository, so a captured live asset's bytes can only have come from the
+/// repository, so a packed live asset's bytes can only have come from the
 /// repository file its declaration targets.
-pub(super) fn capture_sources(repo: &Path, location: &str) -> String {
+pub(super) fn live_asset_package(repo: &Path, location: &str) -> String {
     let root = repo.join(location);
     fs::create_dir_all(root.join("assets/install")).unwrap();
     fs::write(
@@ -1750,116 +1750,10 @@ pub(super) fn capture_sources(repo: &Path, location: &str) -> String {
     location.to_string()
 }
 
-/// `profile capture` publishes the declared tree at the destination its
-/// arguments name and reports it through the list envelope.
-#[test]
-fn test_profile_capture_publishes_the_declared_tree_and_reports_the_list_envelope() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    capture_sources(repo.path(), "packages/captured");
-
-    let output = jit(
-        repo.path(),
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/captured",
-            "--destination",
-            "build/captured",
-            "--json",
-        ],
-    );
-
-    assert!(output.status.success(), "{output:?}");
-    let payload = json(&output);
-    let payload = only_profile(&payload);
-    assert_eq!(payload["id"], "captured");
-    assert_eq!(payload["destination"], "build/captured");
-    assert_eq!(payload["source"], "packages/captured");
-    let files = payload["targets"]
-        .as_array()
-        .expect("a capture reports one entry per decided path");
-    assert_eq!(
-        files
-            .iter()
-            .map(|file| file["path"].as_str().expect("each entry names its path"))
-            .collect::<Vec<_>>(),
-        vec![
-            "build/captured/assets/install/settings.toml",
-            "build/captured/assets/live/docs/guide.md",
-            "build/captured/manifest.toml",
-        ]
-    );
-    assert_eq!(
-        fs::read_to_string(repo.path().join("build/captured/assets/live/docs/guide.md")).unwrap(),
-        "# Captured guide\n",
-        "the published live asset did not carry the repository file's bytes"
-    );
-
-    // The published tree is a package this repository can go on to apply.
-    let applied = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            "path:build/captured",
-            "--json",
-        ],
-    );
-    assert!(applied.status.success(), "{applied:?}");
-    assert_eq!(applied_ids(&json(&applied)), vec!["captured"]);
-}
-
 #[test]
 fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writing() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
-    capture_sources(repo.path(), "packages/captured");
-
-    let capture = jit(
-        repo.path(),
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/captured",
-            "--destination",
-            "build/captured",
-            "--dry-run",
-            "--json",
-        ],
-    );
-    assert!(capture.status.success(), "{capture:?}");
-    let capture = json(&capture);
-    let captured = only_profile(&capture);
-    assert_eq!(captured["status"], "would_apply");
-    assert_eq!(captured["origin"]["location"], "packages/captured");
-    assert!(captured["targets"]
-        .as_array()
-        .is_some_and(|targets| targets.iter().all(|target| target["action"] == "create")));
-    assert!(!repo.path().join("build/captured").exists());
-    let capture_human = jit(
-        repo.path(),
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/captured",
-            "--destination",
-            "build/captured",
-            "--dry-run",
-        ],
-    );
-    assert_human_profile_decision(
-        &capture_human,
-        "captured",
-        "1.0.0",
-        "packages/captured",
-        "would capture",
-    );
-
     let package = synthetic_package_at(repo.path(), "packages/synthetic");
     let external = TempDir::new().unwrap();
     let external_archive = external.path().join("synthetic.tar");
@@ -1957,41 +1851,6 @@ fn test_profile_authoring_and_exchange_rehearsals_report_decisions_without_writi
         "packages/added",
         "would add",
     );
-}
-
-/// A destination outside the repository worktree is a typed JSON failure that
-/// publishes nothing.
-#[test]
-fn test_profile_capture_refuses_a_destination_outside_the_worktree_without_publishing() {
-    let repo = TempDir::new().unwrap();
-    let outside = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    capture_sources(repo.path(), "packages/captured");
-    let destination = outside.path().join("captured");
-
-    let output = jit(
-        repo.path(),
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/captured",
-            "--destination",
-            destination.to_str().unwrap(),
-            "--json",
-        ],
-    );
-
-    assert!(!output.status.success(), "{output:?}");
-    let payload = json(&output);
-    assert!(
-        payload["error"]["message"]
-            .as_str()
-            .expect("a typed failure carries an error message")
-            .contains("worktree"),
-        "{payload}"
-    );
-    assert!(!destination.exists(), "a refused capture published a tree");
 }
 
 /// Copy the checked-in synthetic fixture into `repo` at the repository-relative
@@ -2543,19 +2402,16 @@ fn test_profile_pack_and_add_carry_a_package_at_the_model_limits() {
     );
 }
 
-/// Both routes that publish a package tree carry a package at the model limits,
-/// including a republication over one already published.
+/// A package at the model limits packs and adds.
 ///
 /// A package the model accepts and `pack` writes an archive for has to be one
 /// `add` publishes, or the operator is left holding an archive nothing takes.
 /// The package used here sits at the file bound, fills the byte budget, and
 /// gives every asset a directory chain no other asset shares, so what a
 /// publication enumerates is driven by the package's directories rather than by
-/// its files — the shape the package model leaves unconstrained. The second
-/// capture is the one that republishes over that whole tree, so what the first
-/// capture published is read back rather than assumed absent.
+/// its files — the shape the package model leaves unconstrained.
 #[test]
-fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_its_files() {
+fn test_profile_add_publishes_a_package_whose_directories_outnumber_its_files() {
     let source_repo = TempDir::new().unwrap();
     let target_repo = TempDir::new().unwrap();
     let exchange = TempDir::new().unwrap();
@@ -2629,36 +2485,5 @@ fn test_profile_add_and_capture_publish_a_package_whose_directories_outnumber_it
     assert!(
         worktree_directories(&published).len() > worktree_files(&published).len(),
         "the package under test must publish more directories than files"
-    );
-
-    // Recapturing the added package in place is the route that reads the whole
-    // published tree back: the destination is occupied by every directory the
-    // add just wrote, so the declaration is expanded over all of them rather
-    // than settling against an absent destination as the add did.
-    let files_before = worktree_files(&published);
-    let captured = jit(
-        target_repo.path(),
-        &[
-            "profile",
-            "capture",
-            "--source",
-            "packages/bounded",
-            "--destination",
-            "packages/bounded",
-            "--json",
-        ],
-    );
-    assert!(captured.status.success(), "{captured:?}");
-    let captured = json(&captured);
-    let captured = only_profile(&captured);
-    assert_eq!(captured["package_hash"], packed["package_hash"]);
-    assert_eq!(
-        captured["status"], "unchanged",
-        "recapturing an unchanged package republished content"
-    );
-    assert_eq!(
-        worktree_files(&published),
-        files_before,
-        "recapturing the package changed the tree it was captured from"
     );
 }

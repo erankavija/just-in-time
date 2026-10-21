@@ -423,40 +423,6 @@ mod tests {
     }
 }
 
-/// One package-tree capture inside the shared profile collection.
-///
-/// [`Self::targets`] carries every path the capture decided about, including
-/// removals, so an adopter sees what the destination stopped carrying as well
-/// as what it now carries. [`Self::contributions`] reports the declarations the
-/// captured manifest carries through the same decision vocabulary.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
-pub struct ProfileCaptureEntry {
-    /// Stable identifier the captured manifest declares.
-    pub id: String,
-    /// Semantic version the captured manifest declares.
-    pub version: String,
-    /// Where the source package bytes were read from.
-    pub origin: ProfileOrigin,
-    /// Hash of the complete captured package.
-    pub package_hash: String,
-    /// Repository-relative package directory the capture read.
-    pub source: String,
-    /// Repository-relative directory the tree was published at.
-    pub destination: String,
-    /// Captured package file count, including `manifest.toml`.
-    pub file_count: usize,
-    /// Total captured package byte size.
-    pub byte_size: usize,
-    /// Whether the capture published its changes.
-    pub status: ProfileApplicationStatus,
-    /// Every path the capture decided about, in canonical path order.
-    pub targets: Vec<ProfileTargetChange>,
-    /// Every contribution the capture decided about, in declaration order.
-    pub contributions: Vec<ProfileContributionChange>,
-}
-
-pub type ProfileCaptureResult = ProfileCollection<ProfileCaptureEntry>;
-
 /// One packed package inside the shared profile collection.
 ///
 /// The identity fields are the package's own, read from the directory that was

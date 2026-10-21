@@ -770,64 +770,6 @@ recovery-required conditions use the shared typed error envelope and exit-code
 taxonomy. The [Repository Profiles reference](profiles.md) defines what
 application may change.
 
-### `jit profile capture`
-
-Capture a package tree from the repository targets its manifest declares:
-
-```bash
-jit profile capture --source <DIR> --destination <DIR> [--dry-run] [--json]
-```
-
-`--source` names the package directory whose `manifest.toml` declares what to
-capture; `--destination` names the directory the resulting tree is published at.
-Both are resolved like any other path argument and must classify as worktree
-content, so the separate data root and anything outside the repository are
-refused before anything is read.
-
-Each asset the manifest declares under the `assets/live/` package-source prefix
-draws the bytes of the repository file its `target` names; every other declared
-source — the manifest, the install-only assets, the region sources — is read
-from the package directory itself. Capturing a package whose owned content was
-edited in place therefore produces a tree whose package identity reflects that
-edit, which is what lets [`jit profile apply`](#jit-profile-apply) reconcile the
-repository from it.
-
-Each contribution the manifest declares is read back from the registry that
-holds it, and the captured manifest declares the value the registry states.
-Which declarations a capture may draw back is the repository's own
-applied-profile record for the package: it names what that package published, so
-a value the package put in a registry and the repository then changed is folded
-back, while a declaration no record of the package claims is the repository's own
-and is left as the manifest's author wrote it. No contribution the manifest does
-not already declare enters the package, and a declaration the package published
-that the repository no longer holds keeps its authored value rather than being
-dropped or defaulted.
-
-Publication is one redo record. The destination ends up holding exactly
-the manifest, the declared asset sources, and the declared region sources: a
-source the manifest stopped declaring, and any other file the destination held,
-is removed in the same record. The manifest is republished whole, so a
-contribution it stopped declaring does not survive in the captured package. A
-capture that changes nothing publishes nothing.
-
-`--dry-run` performs the same reads and validation and reports the exact tree
-and declaration decisions without publishing the destination, a provenance
-record, or an event.
-
-A declared target that is a symbolic link, resolves outside the worktree, or
-carries executable permission its declaration did not is refused before anything
-is published, leaving the destination exactly as it was. The captured content is
-validated as a package before publication, so a published tree always decodes.
-
-JSON uses the standard `{"count": N, "profiles": [...]}` envelope. Its single
-entry carries `id`, `version`, `origin`, `package_hash`, `source`, `destination`,
-`file_count`, `byte_size`, `status`, and `targets` and `contributions` decisions.
-Those decisions use the same `unchanged`, `create`, `update`, `retain`, `remove`,
-and `conflict` vocabulary as the lifecycle commands; each names its owners and
-any reason. `status` is `would_apply` for a rehearsal that would publish,
-`applied` after publication, or `unchanged`. Human output presents the same
-identity, origin, status, and decisions.
-
 ### `jit profile pack`
 
 Pack a package directory into one portable archive file:
@@ -838,7 +780,7 @@ jit profile pack --source <DIR> --output <FILE> [--dry-run] [--json]
 
 `--source` names the package directory and must classify as worktree content.
 Before archiving, JIT captures live assets from the repository targets declared
-by the manifest and refreshes declared contributions from their registries.
+by the manifest.
 `--output` names the archive file to write, anywhere the invocation can write.
 When that path is inside the repository, it is limited to 128 path components
 below the repository root; an external output path has no repository traversal.

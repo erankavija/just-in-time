@@ -5,7 +5,7 @@
 Repository profiles install a coherent JIT workflow as one explicit operation.
 A profile is a package: a directory holding a manifest, the assets that
 manifest declares, and the managed-region sources it owns. This is the
-canonical adopter reference for the profile lifecycle: authoring and capture,
+canonical adopter reference for the profile lifecycle: authoring,
 offline exchange, composition, variables and ownership, and drift recovery. Use [`jit profile show --json`](cli-commands.md#jit-profile-show)
 to inspect the exact packages a release or a repository currently carries.
 
@@ -156,7 +156,7 @@ be binary but cannot contain that token. All other contribution strings, plus
 paths, IDs, versions, modes, and targets, are literal and reject variable
 references. A reference with no resolved value refuses the operation.
 
-### Files, regions, and capture roots
+### Files, regions, and live roots
 
 An `[[asset]]` copies exactly one package file at required `source` to the
 required repository `target`. `executable` and `template` are optional and
@@ -172,11 +172,10 @@ that region. `template` is optional and defaults to `false`. An asset and a
 region cannot share a source or a target, and package files other than
 `manifest.toml` must be declared as one of those sources.
 
-For a live asset that `jit profile capture` or `jit profile pack` refreshes from
-the repository, write its asset source below `assets/live/` and make its
-`target` the repository file that supplies the bytes. The package does not need
-a checked-in copy of that live source: capture creates the package tree and
-packing assembles the same tree in memory before writing its archive. Assets
+For a live asset that `jit profile pack` draws from the repository, write its
+asset source below `assets/live/` and make its `target` the repository file that
+supplies the bytes. The package does not need a checked-in copy of that live
+source: packing assembles the tree in memory before writing its archive. Assets
 outside that prefix, and every region source, are package-authored files read
 from the package directory.
 
@@ -185,7 +184,7 @@ Each `[[live-source]]` declares one required repository-relative directory
 repository-relative patterns in `exclude` (`*` stays within a path segment and
 `**` spans segments). Roots cannot repeat or overlap. A root states the live
 repository area the package intends to account for. When a package is intended
-to capture a complete area, declare each live asset under that root or
+to account for a complete area, declare each live asset under that root or
 explicitly exclude it, rather than silently omitting material.
 
 ### Semantic contributions
@@ -211,7 +210,7 @@ two entries cannot publish the same target and identity. Use the
 [Configuration reference](configuration.md) for namespaces, item kinds,
 hierarchy, documentation, and projections; use the linked registry references
 above for gates, invariants, rules, and templates. The manifest carries each
-declared value whole so it can be composed, validated, and captured without
+declared value whole so it can be composed, validated, and packed without
 treating repository-local vocabulary as an engine default.
 
 ## Commands
@@ -244,24 +243,10 @@ jit profile apply --profile path:packages/jit-dogfood
 jit profile apply --profile id:jit-dogfood --dry-run
 ```
 
-Author a package by creating its manifest and declared sources in a worktree
-directory. Capture refreshes a package tree from the repository targets its
-manifest declares, which is how an edit made in place reaches the package that
-owns it:
-
-```bash
-jit profile capture --source profiles/my-workflow --destination build/my-workflow --dry-run
-jit profile capture --source profiles/my-workflow --destination build/my-workflow
-```
-
-That covers both classes of content a package owns and the repository authors:
-the bytes of a live asset, and the value of a declared contribution. An adopter
-who changes a contributed value in its registry captures the package that
-published it and applies the result; the registry keeps the value they chose,
-and the package and its applied-profile record agree with it again. Until they
-do, [`jit profile diff`](cli-commands.md#jit-profile-diff) and `jit validate`
-both name that declaration, and an application is refused rather than
-reporting nothing to do.
+Author a package by creating and editing its manifest and declared sources in
+a worktree directory. The repository owns the values it holds: a package author
+edits the manifest directly, and `jit profile pack` draws each live asset from
+the repository file its declaration targets.
 
 Pack a package into one portable file to hand to somebody, and place one
 somebody handed you:
@@ -326,20 +311,12 @@ Each decision identifies every package that owns it; an empty owner list is
 repository-authored content, while several owners identify shared content.
 
 Start with a rehearsal for any mutation. `--dry-run` runs the same planning and
-validation as its corresponding `apply`, `capture`, `pack`, or `add` command, but writes no target, provenance record, or lifecycle
+validation as its corresponding `apply`, `pack`, or `add` command, but writes no target, provenance record, or lifecycle
 event. Unlike a rehearsal, `jit profile diff` reports all conflicts so an
 operator can identify the conflicting target or declaration and its owner.
 
-Choose the recovery action from the reported ownership and intended authority:
-
-- Capture a package when its owner intentionally adopts a changed declared live
-  asset or semantic contribution from the repository: `jit profile capture --source <DIR> --destination <DIR>`.
-  Capture refreshes every declared contribution it owns from the registry and
-  leaves repository-authored declarations out of the package.
-
 An owned target that has drifted is a conflict that publishes nothing. Restore
-the intended owner’s content, or capture the intended package change before
-applying it. Do not use a
+the intended owner’s content before applying it. Do not use a
 profile operation to overwrite repository-authored or another profile’s
 conflicting content. Every conflict carries this choice as a
 typed remedy; see [the remedy contract](#the-remedy-contract) for the
@@ -374,15 +351,13 @@ tools.
 
 A refused publication carries a typed remedy: the resolutions that apply to
 that finding, drawn from one
-fixed vocabulary rather than composed per command. The restore-versus-capture
-guidance above is that vocabulary read as prose; this section is its data
+fixed vocabulary rather than composed per command. This section is that vocabulary's data
 contract.
 
 | Resolution | What it does |
 |---|---|
 | `move-target-aside` | Move the repository-authored target aside before applying. |
 | `restore-recorded-content` | Restore the value this profile published. |
-| `capture-repository-content` | Fold the repository's current value into a live-source package with `jit profile capture`. |
 | `stop-one-package-from-declaring-target` | Stop one of the two conflicting packages from declaring the target. |
 | `apply-one-of-conflicting-packages` | Apply only one of the packages that conflict over a target. |
 | `make-definitions-identical` | Make the competing semantic definitions identical. |
@@ -395,9 +370,9 @@ depends on who holds it:
 
 | Conflict class | Held by | Remedy |
 |---|---|---|
-| Occupied | the repository | `move-target-aside`, `capture-repository-content` |
+| Occupied | the repository | `move-target-aside` |
 | Occupied | a package | `stop-one-package-from-declaring-target`, `apply-one-of-conflicting-packages` |
-| Diverged | — | `restore-recorded-content`, `capture-repository-content` |
+| Diverged | — | `restore-recorded-content` |
 | Contested | — | `make-definitions-identical`, `apply-only-one-declaring-package` |
 
 The remedy reaches machine-readable output as part of the [standard `--json`
@@ -406,8 +381,7 @@ error envelope](cli-commands.md#cli-json-contracts): a refused publication's
 refused target or declaration as `{owner, subject, conflict}`. `conflict.kind`
 names the conflict class and `conflict.remedy.resolutions` carries its remedy
 from the vocabulary above. `error.suggestions` carries the distinct resolution
-messages across every conflict in the refusal, in first-occurrence order, naming
-`jit profile capture` only where some conflict's remedy allows it.
+messages across every conflict in the refusal, in first-occurrence order.
 
 `jit --schema` is the field-level contract for both shapes.
 

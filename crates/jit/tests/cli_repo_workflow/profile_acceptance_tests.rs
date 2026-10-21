@@ -749,15 +749,11 @@ fn test_public_profile_schema_states_the_shipped_lifecycle_surface() {
         .contains("multi-target redo record"));
     assert_eq!(
         commands.keys().cloned().collect::<BTreeSet<_>>(),
-        expected_keys(&["add", "apply", "capture", "diff", "pack", "show",])
+        expected_keys(&["add", "apply", "diff", "pack", "show"])
     );
-    // Capture authors a package rather than selecting an applied one, so it
-    // takes the two directories it works between instead of the selector
-    // stream and value channels the lifecycle commands share. Pack and add
-    // move a package between repositories, so each takes the package location
-    // it works from and the archive it works through.
+    // Pack and add move a package between repositories, so each takes the
+    // package location it works from and the archive it works through.
     for (command, flags) in [
-        ("capture", ["destination", "dry-run", "json", "source"]),
         ("pack", ["dry-run", "json", "output", "source"]),
         ("add", ["archive", "destination", "dry-run", "json"]),
     ] {

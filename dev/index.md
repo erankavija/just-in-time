@@ -109,33 +109,31 @@ them.
 
 ---
 
-## Capturing the Workflow Package
+## Packing the Workflow Package
 
 This repository's workflow package is a directory: a manifest, the assets it
 declares, and a managed-region source. Most of those assets name a repository
 file as their target and carry that file's bytes, so the repository file is the
-authority and the tree is produced from it:
+authority and the archive is produced from it:
 
 ```bash
-jit profile capture --source profiles/jit-dogfood --destination target/package/jit-dogfood
+jit profile pack --source profiles/jit-dogfood --output target/package/jit-dogfood.jitprof
 ```
 
-Capture is the product command an adopter runs the same way, documented in
-[the CLI reference](../docs/reference/cli-commands.md#jit-profile-capture); this
+Pack is the product command an adopter runs the same way, documented in
+[the CLI reference](../docs/reference/cli-commands.md#jit-profile-pack); this
 repository has no entry point of its own over it. It draws each declared source
 from the side that owns it — a live asset from the repository file its
 declaration targets, everything else from the checked-in sources under
-[profiles/jit-dogfood](../profiles/jit-dogfood) — and republishes the whole
-tree, so a source the manifest stops declaring is absent from the next run.
+[profiles/jit-dogfood](../profiles/jit-dogfood) — so a source the manifest stops
+declaring is absent from the next run.
 
-The captured tree is not one of the artifacts above: it is not committed, so it
-carries no drift assertion. The destination is whichever path the caller names —
-the example above names one under `target/`, which this repository ignores. No
-build consumes what a run produces, so capturing during a build would make every
-build do work no build consumes, and the directory watching a build step needs
-is what once relinked every test target on an unchanged rebuild. The release
-workflow captures the package with the binary it ships, so the packaged tree is
-the one the released commit declares.
+The archive is not one of the artifacts above: it is not committed, so it
+carries no drift assertion. The output is whichever path the caller names — the
+example above names one under `target/`, which this repository ignores. No build
+consumes what a run produces, so packing during a build would make every build
+do work no build consumes. The release workflow packs the package with the
+binary it ships, so the packaged tree is the one the released commit declares.
 
 ---
 
