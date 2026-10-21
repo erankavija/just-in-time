@@ -319,10 +319,8 @@ impl<S: IssueStore> CommandExecutor<S> {
     /// the run publishes, rewrites, and unlinks no repository content. The
     /// issue set the report resolves owners against — both the short ids those
     /// issues answer to and the document references they hold — is read through
-    /// [`IssueStore::read_issues`](crate::storage::IssueStore::read_issues),
-    /// which carries no index maintenance, rather than `list_issues`, which
-    /// carries the sidecar sweep. A declared area that does not exist yet
-    /// contributes no findings.
+    /// [`IssueStore::list_issues`](crate::storage::IssueStore::list_issues). A
+    /// declared area that does not exist yet contributes no findings.
     ///
     /// # Errors
     ///
@@ -339,7 +337,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             .documentation
             .unwrap_or_default();
         let hierarchy = crate::config_manager::get_hierarchy_config(&self.storage)?;
-        let issues = self.storage.read_issues()?;
+        let issues = self.storage.list_issues()?;
         let listings =
             self.list_issue_scoped_areas(&documentation, ArtifactListingScope::RecursiveEntries)?;
 
