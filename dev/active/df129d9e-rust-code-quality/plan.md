@@ -75,7 +75,7 @@ Every success response a handler returns is a type defined in the output module 
 
 ### `executor-family-facades` [implementation-produced] — Narrow executor capabilities
 
-`CommandExecutor` exposes one accessor per command family, such as `issues()` returning `IssueOps<'_, S>`. Each family's methods live on its facade, and their storage bounds move with them. A consumer that needs one family accepts that facade. The kernel (sessions, rule and config caches, the validation `capture_*` helpers) stays on `CommandExecutor` (D-1).
+`CommandExecutor` exposes one accessor per command family, such as `issues()` returning `IssueOps<'_, S>`. The families follow the command groups that consume them: issues, queries, graph, gates, documents, validation, profiles, templates, archive, config, items and claims. Each family's methods live on its facade, and their storage bounds move with them. A consumer that needs one family accepts that facade. The kernel (sessions, rule and config caches, the validation `capture_*` helpers) stays on `CommandExecutor` (D-1).
 
 ### `repository-bootstrap` [implementation-produced] — One library repository opener
 
@@ -97,68 +97,76 @@ Production lines are counted by `python3 scripts/production-lines.py <rev>`, com
 | mcp-global-json-injection | MCP bridge injects --json from the schema's global options | task | The MCP bridge adds --json when the schema declares it per leaf or globally, without exposing a global json tool property | — | A24, F-MCP-JSON, REQ-15 | touches 3 | — | — |
 | verb-hint-stub-removal | Wrong-verb hints come only from the parser-level path | task | The 13 hidden verb stubs are gone and COMMAND_HINTS is served by unknown_subcommand_hint on stderr with exit 2 | parser-diagnostics-outside-envelope | D-7, F-HIDDEN, REQ-09, REQ-15, REQ-20, S13 | touches 4 | — | — |
 | global-json-flag | One global --json flag carried as OutputMode | task | --json is declared once on Cli and threaded as OutputMode from parse to failure rendering, with no per-command json field or argv scan | — | A24, F-JSON-FIELDS, REQ-09, REQ-15 | touches 6 | — | mcp-global-json-injection, verb-hint-stub-removal |
-| executor-facade-issues | Issue methods behind an issues facade | task | `CommandExecutor::issues()` returns `IssueOps<'_, S>` carrying the issue-lifecycle methods, establishing the facade shape other families reuse. | — | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 21 | — | global-json-flag |
-| executor-facade-admin | Archive, snapshot, config, item, invariant and project methods behind an admin facade | task | The repository administration methods live on `AdminOps<'_, S>` reached through `CommandExecutor::admin()`, with behaviour unchanged. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 13 | — | executor-facade-issues |
+| executor-facade-issues | Issue lifecycle methods behind an issues facade | task | CommandExecutor::issues() returns IssueOps carrying the issue-lifecycle methods, establishing the facade shape the other families reuse | — | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 18 | — | global-json-flag |
+| executor-facade-items | Item, invariant and projection methods behind an items facade | task | The addressable-item, invariant-check and projection methods live on ItemOps reached through CommandExecutor::items() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 10 | — | executor-facade-issues |
 | executor-facade-validation | Validation methods behind a validation facade | task | The validation methods live on `ValidationOps<'_, S>` reached through `CommandExecutor::validation()`, with behaviour unchanged. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 10 | — | executor-facade-issues |
-| classifier-derives-details | Derive failure details and suggestions from the error type | task | classify returns the details and suggestions call sites build today, derived only from the error value | failure-classification, type-only-error-codes | A3, F-CALLSITE-DETAILS, F-FALLBACK-SITES, REQ-11, REQ-13 | touches 7 | — | failure-classifier-library, executor-facade-admin, executor-facade-validation |
+| executor-facade-profiles | Profile and init methods behind a profiles facade | task | The profile and repository-initialization methods live on ProfileOps reached through CommandExecutor::profiles() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 8 | — | executor-facade-issues |
+| classifier-derives-details | Derive failure details and suggestions from the error type | task | classify returns the details and suggestions call sites build today, derived only from the error value | failure-classification, type-only-error-codes | A3, F-CALLSITE-DETAILS, F-FALLBACK-SITES, REQ-11, REQ-13 | touches 7 | — | failure-classifier-library, executor-facade-items, executor-facade-validation, executor-facade-profiles |
 | list-envelope-type | Introduce the generic ListEnvelope type | task | ListEnvelope<K, T, E> and CollectionKey exist with serialization and schema tests, ProfileCollection uses it, dead query structs are gone | — | A25, D-17, D-9, F-COUNT-STRUCTS, REQ-04, REQ-18 | creates 1, touches 4 | — | — |
 | list-envelope-adoption | Express output-module count structs as ListEnvelope instantiations | task | The live count structs in the output module are ListEnvelope instantiations with unchanged wire shapes | list-envelope | A25, D-9, F-COUNT-STRUCTS, REQ-04, REQ-18 | touches 3 | — | list-envelope-type |
 | handler-contract | Library-side command handler contract | task | dispatch/ provides CommandContext, Outcome, per-group registration feeding dispatch and schema, and one Outcome emitter in output | failure-classification, output-mode, list-envelope, handler-response-ownership, findings-envelope | D-2, D-3, D-5, F-HANDLER-SHAPE, REQ-02, REQ-05, REQ-12, REQ-17 | creates 1, touches 4 | — | classifier-derives-details, list-envelope-adoption |
-| executor-facade-queries | Query, search, event, graph and dependency methods behind a queries facade | task | The query and graph methods live on `QueryOps<'_, S>` reached through `CommandExecutor::queries()`, with behaviour unchanged. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 16 | — | executor-facade-issues |
+| executor-facade-queries | Query, search and event methods behind a queries facade | task | The query, search and event-log methods live on QueryOps reached through CommandExecutor::queries() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 12 | — | executor-facade-issues |
 | issue-filter-args | Shared IssueFilterArgs group for issue filters | task | The issue-filtering commands flatten one IssueFilterArgs group whose single conversion parses state, priority, assignee and label patterns | — | A24, D-8, F-FILTERS, REQ-09, REQ-16 | touches 6 | — | executor-facade-queries |
 | issue-list-renderer | Render issue lists through one output renderer | task | One output-module renderer prints the human issue list for each listing command, with deliberate format changes tested | — | D-18, F-RENDER-DUP, REQ-09, REQ-21, S14 | touches 2 | — | global-json-flag |
-| executor-facade-gates | Gate methods behind a gates facade | task | The gate methods live on `GateOps<'_, S>` reached through `CommandExecutor::gates()`, with behaviour unchanged. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 10 | — | executor-facade-issues |
+| executor-facade-gates | Gate definition and attachment methods behind a gates facade | task | The gate definition, attachment and run-lookup methods of gate.rs live on GateOps reached through CommandExecutor::gates() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 10 | — | executor-facade-issues |
 | handlers-issue-reads | Issue read commands move to library handlers | task | Issue read leaves and the list alias run as dispatch handlers returning typed output-owned responses, with no fallback error codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode, issue-filter-args | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 6 | — | handler-contract, issue-filter-args, issue-list-renderer, executor-facade-gates |
-| create-returns-issue | Issue creation returns the created issue | task | create_issue returns the new Issue with its warnings, so the CLI reports it without a storage reload | executor-family-facades | A26, F-BYPASS, REQ-19 | touches 9 | — | executor-facade-queries |
+| executor-facade-graph | Graph and dependency methods behind a graph facade | task | The graph and dependency methods live on GraphOps reached through CommandExecutor::graph() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 12 | — | executor-facade-issues |
+| create-returns-issue | Issue creation returns the created issue | task | create_issue returns the new Issue with its warnings, so the CLI reports it without a storage reload | executor-family-facades | A26, F-BYPASS, REQ-19 | touches 9 | — | executor-facade-queries, executor-facade-graph |
 | mutations-return-issue | Issue mutations return the updated issue | task | Issue update, assignment, claim, reject and release methods return the updated Issue, so those CLI paths make no storage call | executor-family-facades | A26, F-BYPASS, REQ-19 | touches 4 | — | create-returns-issue |
-| handlers-issue-writes | Issue write commands move to library handlers | task | Issue mutation leaves run as dispatch handlers that report the Issue the executor returns, with no storage call in main.rs | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | touches 8 | — | handlers-issue-reads, mutations-return-issue |
-| handlers-dep | Dependency commands move to library handlers | task | dep add and dep rm run as dispatch handlers with typed responses and classifier-only error codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract, executor-facade-queries |
-| handlers-graph | Graph commands move to library handlers | task | graph leaves and the rdeps alias run as dispatch handlers with typed responses and list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 6 | — | handler-contract, issue-list-renderer, executor-facade-queries |
+| executor-facade-issue-batches | Label and batch issue methods onto the issues facade | task | The label, bulk and batch methods of the issue family live on IssueOps instead of CommandExecutor | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 8 | — | executor-facade-issues |
+| handlers-issue-writes | Issue write commands move to library handlers | task | Issue mutation leaves run as dispatch handlers that report the Issue the executor returns, with no storage call in main.rs | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | touches 8 | — | handlers-issue-reads, mutations-return-issue, executor-facade-issue-batches |
+| handlers-dep | Dependency commands move to library handlers | task | dep add and dep rm run as dispatch handlers with typed responses and classifier-only error codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract, executor-facade-graph |
+| handlers-graph | Graph commands move to library handlers | task | graph leaves and the rdeps alias run as dispatch handlers with typed responses and list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 6 | — | handler-contract, issue-list-renderer, executor-facade-graph |
 | handlers-gate-definitions | Gate definition and preset commands move to library handlers | task | Gate definition and preset leaves run as dispatch handlers with typed responses, classifier-only codes and a findings envelope for preset apply | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, executor-facade-gates |
 | gate-run-status-renderer | Render gate run status lines through one output renderer | task | One output-module renderer prints the not-run and passed gate run lines for gate status and the evaluate commands | — | D-18, F-RENDER-DUP, REQ-09, REQ-21, S14 | touches 2 | — | global-json-flag |
-| handlers-gate-status | Gate status commands move to library handlers | task | gate status and status-all run as dispatch handlers with typed responses, a findings envelope for status-all and no storage call | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | touches 9 | — | handlers-gate-definitions, gate-run-status-renderer |
+| executor-facade-gate-checks | Gate check methods onto the gates facade | task | The gate check and run-status methods of gate_check.rs live on GateOps instead of CommandExecutor | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 7 | — | executor-facade-issues |
+| handlers-gate-status | Gate status commands move to library handlers | task | gate status and status-all run as dispatch handlers with typed responses, a findings envelope for status-all and no storage call | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | touches 9 | — | handlers-gate-definitions, gate-run-status-renderer, executor-facade-gate-checks |
 | handlers-gate-evaluation | Gate evaluation commands move to library handlers | task | The gate evaluation leaves run as dispatch handlers with typed responses and evaluate-many findings as the failure envelope | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | touches 8 | — | handlers-gate-status |
 | executor-facade-documents | Document methods behind a documents facade | task | The document methods live on DocumentOps reached through CommandExecutor::documents(), with behaviour unchanged | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 7 | — | executor-facade-issues |
 | handlers-doc | Document commands move to library handlers | task | doc, doc assets and check-links run as dispatch handlers with typed responses and check-links findings as the failure envelope | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 8 | — | handler-contract, executor-facade-documents |
 | handlers-query-status | Query and status commands move to library handlers | task | query subcommands, bare query and jit status run as dispatch handlers returning typed list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode, issue-filter-args | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handlers-issue-reads |
 | validation-report-renderer | One output renderer for validation findings | task | One output-module function prints the findings block of each validation command | — | D-18, F-RENDER-DUP, REQ-09, REQ-21, S14 | touches 2 | — | global-json-flag |
 | handlers-validate | Validate command moves to a library handler | task | The jit validate modes run through one dispatch handler that returns findings as VALIDATION_FAILED outcomes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, validation-report-renderer |
-| handlers-config | Config commands move to library handlers | task | config leaves run as dispatch handlers with typed responses and the config check in the commands layer | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, validation-report-renderer |
+| executor-facade-config | Config methods behind a config facade | task | The configuration methods live on ConfigOps reached through CommandExecutor::config() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 7 | — | executor-facade-issues |
+| handlers-config | Config commands move to library handlers | task | config leaves run as dispatch handlers with typed responses and the config check in the commands layer | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, validation-report-renderer, executor-facade-config |
 | handlers-hooks | Hooks command moves to a library handler | task | hooks install runs as a dispatch handler with a typed response and its classified failure code | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 6 | — | handler-contract |
 | claims-executor-family | Claim and recover operations behind a claims facade | task | Claim and recover operations are methods of a `claims()` facade, and the CLI passes no storage handle to them. | executor-family-facades | A26, D-11, F-BYPASS, REQ-03, REQ-19 | touches 5 | — | executor-facade-issues |
 | handlers-claim-recover | Claim and recover commands move to library handlers | task | claim and recover leaves run as dispatch handlers through executor claim methods with typed responses and classifier-only codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | creates 2, touches 6 | — | handler-contract, claims-executor-family |
 | serve-foreground-command | Foreground serve as a commands-layer operation | task | `commands::serve::run_foreground` owns the foreground server lifecycle and returns its outcome; the CLI no longer exits from the serve arm. | — | A26, F-BYPASS, REQ-19 | touches 4 | — | global-json-flag |
 | handlers-serve | Serve command moves to a library handler | task | jit serve runs as a dispatch handler over commands/serve with typed responses and no process calls in main.rs | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-09, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | creates 2, touches 8 | — | handler-contract, serve-foreground-command |
-| executor-facade-profiles | Profile, init, template and breakdown methods behind a profiles facade | task | The profile and template methods live on `ProfileOps<'_, S>` reached through `CommandExecutor::profiles()`, with behaviour unchanged. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 10 | — | executor-facade-issues |
-| handlers-profile | Profile commands move to library handlers | task | profile leaves run as dispatch handlers with typed responses, findings outcomes and classified codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, executor-facade-profiles |
-| apply-returns-created-issues | Template application returns the created issues | task | `apply_template` returns the created issues by role, and `jit apply` reporting makes no storage call. | executor-family-facades | A26, F-BYPASS, REQ-19 | touches 4 | — | executor-facade-profiles |
+| handlers-profile | Profile commands move to library handlers | task | profile leaves run as dispatch handlers with typed responses, findings outcomes and classified codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract |
+| executor-facade-templates | Template methods behind a templates facade | task | The template-application methods live on TemplateOps reached through CommandExecutor::templates() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 7 | — | executor-facade-issues |
+| apply-returns-created-issues | Template application returns the created issues | task | `apply_template` returns the created issues by role, and `jit apply` reporting makes no storage call. | executor-family-facades | A26, F-BYPASS, REQ-19 | touches 4 | — | executor-facade-templates |
 | handlers-init-apply | Init and apply commands move to library handlers | task | init and apply run as dispatch handlers with typed responses, and apply reports created issues without a storage reload | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | creates 2, touches 6 | — | handler-contract, apply-returns-created-issues |
-| handlers-label | Label commands move to library handlers | task | label namespaces and label values run as dispatch handlers returning list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract |
+| handlers-label | Label commands move to library handlers | task | label namespaces and label values run as dispatch handlers returning list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract, executor-facade-issue-batches |
 | handlers-events | Events commands move to library handlers | task | events tail and events query run as dispatch handlers returning list envelopes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 5 | — | handler-contract, executor-facade-queries |
-| handlers-snapshot-migrate | Snapshot and migrate commands move to library handlers | task | snapshot export and any remaining migrate leaf run as dispatch handlers with typed responses | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 7 | — | handler-contract |
+| executor-facade-archive | Archive and snapshot methods behind an archive facade | task | The archive and snapshot-export methods live on ArchiveOps reached through CommandExecutor::archive() | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | touches 7 | — | executor-facade-issues |
+| handlers-snapshot-migrate | Snapshot and migrate commands move to library handlers | task | snapshot export and any remaining migrate leaf run as dispatch handlers with typed responses | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 7 | — | handler-contract, executor-facade-archive, executor-facade-config |
 | archive-execution-renderer | One output renderer for archive execution summaries | task | The archive execution summary prints through one output-module function for both archive commands | — | F-RENDER-DUP, REQ-21, S14 | touches 2 | — | global-json-flag |
-| handlers-archive | Archive commands move to library handlers | task | archive leaves run as dispatch handlers whose payloads go through the success envelope as typed responses | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, archive-execution-renderer |
+| handlers-archive | Archive commands move to library handlers | task | archive leaves run as dispatch handlers whose payloads go through the success envelope as typed responses | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract, archive-execution-renderer, executor-facade-archive |
 | handlers-worktree | Worktree commands move to library handlers | task | worktree leaves run as dispatch handlers with list envelopes and classified failure codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract |
-| handlers-item-invariant-project | Item, invariant and project commands move to library handlers | task | item, invariant and project leaves run as dispatch handlers with typed list envelopes and classifier-only codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 9 | — | handler-contract |
+| handlers-item | Item commands move to library handlers | task | item leaves run as dispatch handlers returning typed responses and classified failure codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 2, touches 7 | — | handler-contract |
+| handlers-invariant | Invariant command moves to a library handler | task | invariant check runs as a dispatch handler whose drift is a findings outcome | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 7 | — | handler-contract |
+| handlers-project | Project command moves to a library handler | task | project render runs as a dispatch handler with a typed list response and classified failure codes | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 6 | — | handler-contract |
 | search-through-executor | CLI search runs through the executor | task | One executor method serves `jit search` and returns matches with issue titles, so the search path calls neither `jit::search` nor storage. | executor-family-facades | A26, D-11, F-BYPASS, REQ-19 | touches 5 | — | executor-facade-queries |
 | handlers-search | Top-level search command moves to a library handler | task | jit search runs as a dispatch handler over the executor search with a typed list envelope and one classification on both paths | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18, REQ-19 | creates 1, touches 6 | — | handler-contract, search-through-executor |
 | handlers-version | Version command moves to a library handler | task | jit version runs as a registered pre-bootstrap handler with a typed response | handler-contract, handler-response-ownership, failure-classification, type-only-error-codes, findings-envelope, list-envelope, output-mode | A25, D-3, F-GROUP-ARMS, REQ-01, REQ-02, REQ-12, REQ-13, REQ-17, REQ-18 | creates 1, touches 5 | — | handler-contract |
 | repository-bootstrap-constructor | Library repository bootstrap for the CLI | task | One library function opens the repository and returns the executor with its retained session; `main.rs` calls only it. | — | A26, D-11, F-BYPASS, REQ-19 | touches 5 | — | global-json-flag |
 | json-silent-stderr | Keep stderr empty for --json failures | task | A failing --json invocation writes one envelope to stdout and nothing to stderr; human mode prints one Error: line | json-mode-streams, output-mode | D-6, F-STDERR-DUP, REQ-09, REQ-12 | touches 3 | — | global-json-flag, failure-classifier-library |
-| main-entry-consolidation | Reduce main.rs to parse, bootstrap, dispatch, render and exit | task | main.rs only parses, bootstraps, dispatches, renders and exits, with the crate's single std::process::exit call | handler-contract, failure-classification, repository-bootstrap, json-mode-streams | A26, A3, F-DROP-SKIPPED, F-EXIT-SITES, REQ-02, REQ-11, REQ-12, REQ-19 | touches 6 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item-invariant-project, handlers-search, handlers-version, repository-bootstrap-constructor, json-silent-stderr |
+| main-entry-consolidation | Reduce main.rs to parse, bootstrap, dispatch, render and exit | task | main.rs only parses, bootstraps, dispatches, renders and exits, with the crate's single std::process::exit call | handler-contract, failure-classification, repository-bootstrap, json-mode-streams | A26, A3, F-DROP-SKIPPED, F-EXIT-SITES, REQ-02, REQ-11, REQ-12, REQ-19 | touches 6 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item, handlers-invariant, handlers-project, handlers-search, handlers-version, repository-bootstrap-constructor, json-silent-stderr |
 | main-rs-line-ceiling | Enforce a main.rs production-line ceiling in the budget script | task | rust-build-budget.sh fails when main.rs exceeds MAX_MAIN_RS_CODE_LINES and reports the value on its success line | production-line-count | D-20, F-BUDGET-SCRIPT, REQ-08 | touches 4 | — | main-entry-consolidation, production-line-baseline |
 | path-read-error-codes | Classify document path-read failures by variant | task | PathReadError variants classify to INVALID_ARGUMENT or a document-not-found code instead of generic or repository-not-found codes | failure-classification, type-only-error-codes | D-10, F-SERVER-STATUS, REQ-09, REQ-13, REQ-14 | touches 4 | — | classifier-derives-details |
 | server-status-from-classification | Derive server HTTP statuses from the library classification | task | Server routes map failures through classify and one exhaustive ErrorCode-to-StatusCode match | failure-classification | A3, D-10, F-SERVER-STATUS, REQ-14 | touches 1 | — | path-read-error-codes |
-| executor-kernel-closure | Crate-private executor kernel | task | `CommandExecutor`'s public surface is its constructors and family accessors; the kernel and `config_manager` are crate-private. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | creates 1, touches 6 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item-invariant-project, handlers-search, handlers-version, server-status-from-classification |
-| retire-unproduced-error-codes | Retire error codes that nothing produces | task | ErrorCode, the generated error-code page and the failure-lever registry list only codes some error type classifies to | type-only-error-codes | A3, F-FALLBACK-SITES, REQ-09, REQ-13 | touches 5 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item-invariant-project, handlers-search, handlers-version |
+| executor-kernel-closure | Crate-private executor kernel | task | `CommandExecutor`'s public surface is its constructors and family accessors; the kernel and `config_manager` are crate-private. | executor-family-facades | D-1, F-EXECUTOR-SURFACE, REQ-03 | creates 1, touches 6 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item, handlers-invariant, handlers-project, handlers-search, handlers-version, server-status-from-classification |
+| retire-unproduced-error-codes | Retire error codes that nothing produces | task | ErrorCode, the generated error-code page and the failure-lever registry list only codes some error type classifies to | type-only-error-codes | A3, F-FALLBACK-SITES, REQ-09, REQ-13 | touches 5 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item, handlers-invariant, handlers-project, handlers-search, handlers-version |
 | schema-omits-hidden | Omit clap-hidden commands and flags from the generated schema | task | CommandSchema::generate() skips the commands and flags clap marks hidden | — | F-HIDDEN, REQ-05, REQ-20, S13 | touches 1 | — | verb-hint-stub-removal |
-| schema-registry-derivation | Derive output schemas from the handler registry | task | get_output_schema_for_command looks up the handler registry, the hand table and CommandResponse leaf fallback are gone | handler-contract | A25, D-2, F-SCHEMA-TABLE, REQ-05, REQ-17 | touches 2 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item-invariant-project, handlers-search, handlers-version, schema-omits-hidden |
+| schema-registry-derivation | Derive output schemas from the handler registry | task | get_output_schema_for_command looks up the handler registry, the hand table and CommandResponse leaf fallback are gone | handler-contract | A25, D-2, F-SCHEMA-TABLE, REQ-05, REQ-17 | touches 2 | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item, handlers-invariant, handlers-project, handlers-search, handlers-version, schema-omits-hidden |
 | cli-contract-docs | State the CLI output contract once in the command reference | task | cli-commands.md states the list envelope, global --json, stream rule, findings envelope and wrong-verb hints once | list-envelope, json-mode-streams, findings-envelope, parser-diagnostics-outside-envelope, output-mode | D-5, D-6, D-7, D-8, F-CONTRACT-DOCS, REQ-09 | touches 3 | — | main-entry-consolidation, retire-unproduced-error-codes, schema-registry-derivation |
 | completion-report | Write the df129d9e completion report | task | completion-report.md records per-module production lines before and after plus the re-measured build-footprint budget line | production-line-count | D-13, F-BUDGET-SCRIPT, F-PRODLINES, REQ-07, REQ-10 | creates 1 | — | main-rs-line-ceiling, shared-test-harness, workspace-lints, executor-kernel-closure, cli-contract-docs |
 | build-hygiene | Build hygiene and measured completion for crates/jit | story | Lints live in the manifests, the harness compiles once, main.rs has a ceiling, and line counts are reported before and after | — | REQ-06, REQ-07, REQ-08, REQ-10 | — | — | completion-report |
 | error-boundary | One library error boundary for the CLI and the server | story | One library classifier owns every failure's code, exit code, details and HTTP status, and main.rs holds the only exit | — | REQ-02, REQ-09, REQ-11, REQ-12, REQ-13, REQ-14, REQ-19 | — | — | server-status-from-classification, retire-unproduced-error-codes, main-entry-consolidation |
 | output-contract | One stated output and schema contract for the CLI | story | List payloads share one envelope type, shared human views have one renderer, and the schema derives every leaf's type | — | REQ-04, REQ-05, REQ-09, REQ-17, REQ-18, REQ-20, REQ-21 | — | — | cli-contract-docs |
-| command-dispatch | Library-side command dispatch for crates/jit | story | Every command group dispatches from a thin run() to a typed library handler over one global --json and shared filter args | — | REQ-01, REQ-02, REQ-05, REQ-09, REQ-12, REQ-13, REQ-15, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20 | — | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item-invariant-project, handlers-search, handlers-version |
+| command-dispatch | Library-side command dispatch for crates/jit | story | Every command group dispatches from a thin run() to a typed library handler over one global --json and shared filter args | — | REQ-01, REQ-02, REQ-05, REQ-09, REQ-12, REQ-13, REQ-15, REQ-16, REQ-17, REQ-18, REQ-19, REQ-20 | — | — | handlers-issue-writes, handlers-dep, handlers-graph, handlers-gate-evaluation, handlers-doc, handlers-query-status, handlers-validate, handlers-config, handlers-hooks, handlers-claim-recover, handlers-serve, handlers-profile, handlers-init-apply, handlers-label, handlers-events, handlers-snapshot-migrate, handlers-archive, handlers-worktree, handlers-item, handlers-invariant, handlers-project, handlers-search, handlers-version |
 | executor-surface | Narrow executor surface and storage-free CLI entry | story | CommandExecutor is reached through per-family facades, and the CLI path makes no direct storage or library-bypass call. | — | REQ-03, REQ-19 | — | — | repository-bootstrap-constructor, executor-kernel-closure |
 
 ```mermaid
@@ -170,270 +178,304 @@ flowchart LR
     N4["mcp-global-json-injection: MCP bridge injects --json from the schema's global options"]
     N5["verb-hint-stub-removal: Wrong-verb hints come only from the parser-level path"]
     N6["global-json-flag: One global --json flag carried as OutputMode"]
-    N7["executor-facade-issues: Issue methods behind an issues facade"]
-    N8["executor-facade-admin: Archive, snapshot, config, item, invariant and project methods behind an admin facade"]
+    N7["executor-facade-issues: Issue lifecycle methods behind an issues facade"]
+    N8["executor-facade-items: Item, invariant and projection methods behind an items facade"]
     N9["executor-facade-validation: Validation methods behind a validation facade"]
-    N10["classifier-derives-details: Derive failure details and suggestions from the error type"]
-    N11["list-envelope-type: Introduce the generic ListEnvelope type"]
-    N12["list-envelope-adoption: Express output-module count structs as ListEnvelope instantiations"]
-    N13["handler-contract: Library-side command handler contract"]
-    N14["executor-facade-queries: Query, search, event, graph and dependency methods behind a queries facade"]
-    N15["issue-filter-args: Shared IssueFilterArgs group for issue filters"]
-    N16["issue-list-renderer: Render issue lists through one output renderer"]
-    N17["executor-facade-gates: Gate methods behind a gates facade"]
-    N18["handlers-issue-reads: Issue read commands move to library handlers"]
-    N19["create-returns-issue: Issue creation returns the created issue"]
-    N20["mutations-return-issue: Issue mutations return the updated issue"]
-    N21["handlers-issue-writes: Issue write commands move to library handlers"]
-    N22["handlers-dep: Dependency commands move to library handlers"]
-    N23["handlers-graph: Graph commands move to library handlers"]
-    N24["handlers-gate-definitions: Gate definition and preset commands move to library handlers"]
-    N25["gate-run-status-renderer: Render gate run status lines through one output renderer"]
-    N26["handlers-gate-status: Gate status commands move to library handlers"]
-    N27["handlers-gate-evaluation: Gate evaluation commands move to library handlers"]
-    N28["executor-facade-documents: Document methods behind a documents facade"]
-    N29["handlers-doc: Document commands move to library handlers"]
-    N30["handlers-query-status: Query and status commands move to library handlers"]
-    N31["validation-report-renderer: One output renderer for validation findings"]
-    N32["handlers-validate: Validate command moves to a library handler"]
-    N33["handlers-config: Config commands move to library handlers"]
-    N34["handlers-hooks: Hooks command moves to a library handler"]
-    N35["claims-executor-family: Claim and recover operations behind a claims facade"]
-    N36["handlers-claim-recover: Claim and recover commands move to library handlers"]
-    N37["serve-foreground-command: Foreground serve as a commands-layer operation"]
-    N38["handlers-serve: Serve command moves to a library handler"]
-    N39["executor-facade-profiles: Profile, init, template and breakdown methods behind a profiles facade"]
-    N40["handlers-profile: Profile commands move to library handlers"]
-    N41["apply-returns-created-issues: Template application returns the created issues"]
-    N42["handlers-init-apply: Init and apply commands move to library handlers"]
-    N43["handlers-label: Label commands move to library handlers"]
-    N44["handlers-events: Events commands move to library handlers"]
-    N45["handlers-snapshot-migrate: Snapshot and migrate commands move to library handlers"]
-    N46["archive-execution-renderer: One output renderer for archive execution summaries"]
-    N47["handlers-archive: Archive commands move to library handlers"]
-    N48["handlers-worktree: Worktree commands move to library handlers"]
-    N49["handlers-item-invariant-project: Item, invariant and project commands move to library handlers"]
-    N50["search-through-executor: CLI search runs through the executor"]
-    N51["handlers-search: Top-level search command moves to a library handler"]
-    N52["handlers-version: Version command moves to a library handler"]
-    N53["repository-bootstrap-constructor: Library repository bootstrap for the CLI"]
-    N54["json-silent-stderr: Keep stderr empty for --json failures"]
-    N55["main-entry-consolidation: Reduce main.rs to parse, bootstrap, dispatch, render and exit"]
-    N56["main-rs-line-ceiling: Enforce a main.rs production-line ceiling in the budget script"]
-    N57["path-read-error-codes: Classify document path-read failures by variant"]
-    N58["server-status-from-classification: Derive server HTTP statuses from the library classification"]
-    N59["executor-kernel-closure: Crate-private executor kernel"]
-    N60["retire-unproduced-error-codes: Retire error codes that nothing produces"]
-    N61["schema-omits-hidden: Omit clap-hidden commands and flags from the generated schema"]
-    N62["schema-registry-derivation: Derive output schemas from the handler registry"]
-    N63["cli-contract-docs: State the CLI output contract once in the command reference"]
-    N64["completion-report: Write the df129d9e completion report"]
-    N65["build-hygiene: Build hygiene and measured completion for crates/jit"]
-    N66["error-boundary: One library error boundary for the CLI and the server"]
-    N67["output-contract: One stated output and schema contract for the CLI"]
-    N68["command-dispatch: Library-side command dispatch for crates/jit"]
-    N69["executor-surface: Narrow executor surface and storage-free CLI entry"]
+    N10["executor-facade-profiles: Profile and init methods behind a profiles facade"]
+    N11["classifier-derives-details: Derive failure details and suggestions from the error type"]
+    N12["list-envelope-type: Introduce the generic ListEnvelope type"]
+    N13["list-envelope-adoption: Express output-module count structs as ListEnvelope instantiations"]
+    N14["handler-contract: Library-side command handler contract"]
+    N15["executor-facade-queries: Query, search and event methods behind a queries facade"]
+    N16["issue-filter-args: Shared IssueFilterArgs group for issue filters"]
+    N17["issue-list-renderer: Render issue lists through one output renderer"]
+    N18["executor-facade-gates: Gate definition and attachment methods behind a gates facade"]
+    N19["handlers-issue-reads: Issue read commands move to library handlers"]
+    N20["executor-facade-graph: Graph and dependency methods behind a graph facade"]
+    N21["create-returns-issue: Issue creation returns the created issue"]
+    N22["mutations-return-issue: Issue mutations return the updated issue"]
+    N23["executor-facade-issue-batches: Label and batch issue methods onto the issues facade"]
+    N24["handlers-issue-writes: Issue write commands move to library handlers"]
+    N25["handlers-dep: Dependency commands move to library handlers"]
+    N26["handlers-graph: Graph commands move to library handlers"]
+    N27["handlers-gate-definitions: Gate definition and preset commands move to library handlers"]
+    N28["gate-run-status-renderer: Render gate run status lines through one output renderer"]
+    N29["executor-facade-gate-checks: Gate check methods onto the gates facade"]
+    N30["handlers-gate-status: Gate status commands move to library handlers"]
+    N31["handlers-gate-evaluation: Gate evaluation commands move to library handlers"]
+    N32["executor-facade-documents: Document methods behind a documents facade"]
+    N33["handlers-doc: Document commands move to library handlers"]
+    N34["handlers-query-status: Query and status commands move to library handlers"]
+    N35["validation-report-renderer: One output renderer for validation findings"]
+    N36["handlers-validate: Validate command moves to a library handler"]
+    N37["executor-facade-config: Config methods behind a config facade"]
+    N38["handlers-config: Config commands move to library handlers"]
+    N39["handlers-hooks: Hooks command moves to a library handler"]
+    N40["claims-executor-family: Claim and recover operations behind a claims facade"]
+    N41["handlers-claim-recover: Claim and recover commands move to library handlers"]
+    N42["serve-foreground-command: Foreground serve as a commands-layer operation"]
+    N43["handlers-serve: Serve command moves to a library handler"]
+    N44["handlers-profile: Profile commands move to library handlers"]
+    N45["executor-facade-templates: Template methods behind a templates facade"]
+    N46["apply-returns-created-issues: Template application returns the created issues"]
+    N47["handlers-init-apply: Init and apply commands move to library handlers"]
+    N48["handlers-label: Label commands move to library handlers"]
+    N49["handlers-events: Events commands move to library handlers"]
+    N50["executor-facade-archive: Archive and snapshot methods behind an archive facade"]
+    N51["handlers-snapshot-migrate: Snapshot and migrate commands move to library handlers"]
+    N52["archive-execution-renderer: One output renderer for archive execution summaries"]
+    N53["handlers-archive: Archive commands move to library handlers"]
+    N54["handlers-worktree: Worktree commands move to library handlers"]
+    N55["handlers-item: Item commands move to library handlers"]
+    N56["handlers-invariant: Invariant command moves to a library handler"]
+    N57["handlers-project: Project command moves to a library handler"]
+    N58["search-through-executor: CLI search runs through the executor"]
+    N59["handlers-search: Top-level search command moves to a library handler"]
+    N60["handlers-version: Version command moves to a library handler"]
+    N61["repository-bootstrap-constructor: Library repository bootstrap for the CLI"]
+    N62["json-silent-stderr: Keep stderr empty for --json failures"]
+    N63["main-entry-consolidation: Reduce main.rs to parse, bootstrap, dispatch, render and exit"]
+    N64["main-rs-line-ceiling: Enforce a main.rs production-line ceiling in the budget script"]
+    N65["path-read-error-codes: Classify document path-read failures by variant"]
+    N66["server-status-from-classification: Derive server HTTP statuses from the library classification"]
+    N67["executor-kernel-closure: Crate-private executor kernel"]
+    N68["retire-unproduced-error-codes: Retire error codes that nothing produces"]
+    N69["schema-omits-hidden: Omit clap-hidden commands and flags from the generated schema"]
+    N70["schema-registry-derivation: Derive output schemas from the handler registry"]
+    N71["cli-contract-docs: State the CLI output contract once in the command reference"]
+    N72["completion-report: Write the df129d9e completion report"]
+    N73["build-hygiene: Build hygiene and measured completion for crates/jit"]
+    N74["error-boundary: One library error boundary for the CLI and the server"]
+    N75["output-contract: One stated output and schema contract for the CLI"]
+    N76["command-dispatch: Library-side command dispatch for crates/jit"]
+    N77["executor-surface: Narrow executor surface and storage-free CLI entry"]
     N4 --> N6
     N5 --> N6
     N6 --> N7
     N7 --> N8
     N7 --> N9
-    N3 --> N10
-    N8 --> N10
-    N9 --> N10
-    N11 --> N12
-    N10 --> N13
+    N7 --> N10
+    N3 --> N11
+    N8 --> N11
+    N9 --> N11
+    N10 --> N11
     N12 --> N13
-    N7 --> N14
-    N14 --> N15
-    N6 --> N16
-    N7 --> N17
-    N13 --> N18
-    N15 --> N18
-    N16 --> N18
-    N17 --> N18
+    N11 --> N14
+    N13 --> N14
+    N7 --> N15
+    N15 --> N16
+    N6 --> N17
+    N7 --> N18
     N14 --> N19
-    N19 --> N20
-    N18 --> N21
+    N16 --> N19
+    N17 --> N19
+    N18 --> N19
+    N7 --> N20
+    N15 --> N21
     N20 --> N21
-    N13 --> N22
-    N14 --> N22
-    N13 --> N23
-    N16 --> N23
-    N14 --> N23
-    N13 --> N24
-    N17 --> N24
-    N6 --> N25
-    N24 --> N26
-    N25 --> N26
-    N26 --> N27
-    N7 --> N28
-    N13 --> N29
-    N28 --> N29
-    N18 --> N30
-    N6 --> N31
-    N13 --> N32
-    N31 --> N32
-    N13 --> N33
-    N31 --> N33
-    N13 --> N34
-    N7 --> N35
-    N13 --> N36
+    N21 --> N22
+    N7 --> N23
+    N19 --> N24
+    N22 --> N24
+    N23 --> N24
+    N14 --> N25
+    N20 --> N25
+    N14 --> N26
+    N17 --> N26
+    N20 --> N26
+    N14 --> N27
+    N18 --> N27
+    N6 --> N28
+    N7 --> N29
+    N27 --> N30
+    N28 --> N30
+    N29 --> N30
+    N30 --> N31
+    N7 --> N32
+    N14 --> N33
+    N32 --> N33
+    N19 --> N34
+    N6 --> N35
+    N14 --> N36
     N35 --> N36
-    N6 --> N37
-    N13 --> N38
+    N7 --> N37
+    N14 --> N38
+    N35 --> N38
     N37 --> N38
-    N7 --> N39
-    N13 --> N40
-    N39 --> N40
-    N39 --> N41
-    N13 --> N42
-    N41 --> N42
-    N13 --> N43
-    N13 --> N44
+    N14 --> N39
+    N7 --> N40
+    N14 --> N41
+    N40 --> N41
+    N6 --> N42
+    N14 --> N43
+    N42 --> N43
     N14 --> N44
-    N13 --> N45
-    N6 --> N46
-    N13 --> N47
+    N7 --> N45
+    N45 --> N46
+    N14 --> N47
     N46 --> N47
-    N13 --> N48
-    N13 --> N49
-    N14 --> N50
-    N13 --> N51
+    N14 --> N48
+    N23 --> N48
+    N14 --> N49
+    N15 --> N49
+    N7 --> N50
+    N14 --> N51
     N50 --> N51
-    N13 --> N52
-    N6 --> N53
-    N6 --> N54
-    N3 --> N54
-    N21 --> N55
-    N22 --> N55
-    N23 --> N55
-    N27 --> N55
-    N29 --> N55
-    N30 --> N55
-    N32 --> N55
-    N33 --> N55
-    N34 --> N55
-    N36 --> N55
-    N38 --> N55
-    N40 --> N55
-    N42 --> N55
-    N43 --> N55
-    N44 --> N55
-    N45 --> N55
-    N47 --> N55
-    N48 --> N55
-    N49 --> N55
-    N51 --> N55
-    N52 --> N55
-    N53 --> N55
-    N54 --> N55
-    N55 --> N56
-    N2 --> N56
-    N10 --> N57
-    N57 --> N58
-    N21 --> N59
-    N22 --> N59
-    N23 --> N59
-    N27 --> N59
-    N29 --> N59
-    N30 --> N59
-    N32 --> N59
-    N33 --> N59
-    N34 --> N59
-    N36 --> N59
-    N38 --> N59
-    N40 --> N59
-    N42 --> N59
-    N43 --> N59
-    N44 --> N59
-    N45 --> N59
-    N47 --> N59
-    N48 --> N59
-    N49 --> N59
-    N51 --> N59
-    N52 --> N59
+    N37 --> N51
+    N6 --> N52
+    N14 --> N53
+    N52 --> N53
+    N50 --> N53
+    N14 --> N54
+    N14 --> N55
+    N14 --> N56
+    N14 --> N57
+    N15 --> N58
+    N14 --> N59
     N58 --> N59
-    N21 --> N60
-    N22 --> N60
-    N23 --> N60
-    N27 --> N60
-    N29 --> N60
-    N30 --> N60
-    N32 --> N60
-    N33 --> N60
-    N34 --> N60
-    N36 --> N60
-    N38 --> N60
-    N40 --> N60
-    N42 --> N60
-    N43 --> N60
-    N44 --> N60
-    N45 --> N60
-    N47 --> N60
-    N48 --> N60
-    N49 --> N60
-    N51 --> N60
-    N52 --> N60
-    N5 --> N61
-    N21 --> N62
-    N22 --> N62
-    N23 --> N62
-    N27 --> N62
-    N29 --> N62
-    N30 --> N62
-    N32 --> N62
-    N33 --> N62
-    N34 --> N62
-    N36 --> N62
-    N38 --> N62
-    N40 --> N62
-    N42 --> N62
-    N43 --> N62
-    N44 --> N62
-    N45 --> N62
-    N47 --> N62
-    N48 --> N62
-    N49 --> N62
-    N51 --> N62
-    N52 --> N62
-    N61 --> N62
+    N14 --> N60
+    N6 --> N61
+    N6 --> N62
+    N3 --> N62
+    N24 --> N63
+    N25 --> N63
+    N26 --> N63
+    N31 --> N63
+    N33 --> N63
+    N34 --> N63
+    N36 --> N63
+    N38 --> N63
+    N39 --> N63
+    N41 --> N63
+    N43 --> N63
+    N44 --> N63
+    N47 --> N63
+    N48 --> N63
+    N49 --> N63
+    N51 --> N63
+    N53 --> N63
+    N54 --> N63
     N55 --> N63
+    N56 --> N63
+    N57 --> N63
+    N59 --> N63
     N60 --> N63
+    N61 --> N63
     N62 --> N63
-    N56 --> N64
-    N1 --> N64
-    N0 --> N64
-    N59 --> N64
     N63 --> N64
-    N64 --> N65
-    N58 --> N66
-    N60 --> N66
-    N55 --> N66
-    N63 --> N67
-    N21 --> N68
-    N22 --> N68
-    N23 --> N68
-    N27 --> N68
-    N29 --> N68
-    N30 --> N68
-    N32 --> N68
+    N2 --> N64
+    N11 --> N65
+    N65 --> N66
+    N24 --> N67
+    N25 --> N67
+    N26 --> N67
+    N31 --> N67
+    N33 --> N67
+    N34 --> N67
+    N36 --> N67
+    N38 --> N67
+    N39 --> N67
+    N41 --> N67
+    N43 --> N67
+    N44 --> N67
+    N47 --> N67
+    N48 --> N67
+    N49 --> N67
+    N51 --> N67
+    N53 --> N67
+    N54 --> N67
+    N55 --> N67
+    N56 --> N67
+    N57 --> N67
+    N59 --> N67
+    N60 --> N67
+    N66 --> N67
+    N24 --> N68
+    N25 --> N68
+    N26 --> N68
+    N31 --> N68
     N33 --> N68
     N34 --> N68
     N36 --> N68
     N38 --> N68
-    N40 --> N68
-    N42 --> N68
+    N39 --> N68
+    N41 --> N68
     N43 --> N68
     N44 --> N68
-    N45 --> N68
     N47 --> N68
     N48 --> N68
     N49 --> N68
     N51 --> N68
-    N52 --> N68
-    N53 --> N69
-    N59 --> N69
+    N53 --> N68
+    N54 --> N68
+    N55 --> N68
+    N56 --> N68
+    N57 --> N68
+    N59 --> N68
+    N60 --> N68
+    N5 --> N69
+    N24 --> N70
+    N25 --> N70
+    N26 --> N70
+    N31 --> N70
+    N33 --> N70
+    N34 --> N70
+    N36 --> N70
+    N38 --> N70
+    N39 --> N70
+    N41 --> N70
+    N43 --> N70
+    N44 --> N70
+    N47 --> N70
+    N48 --> N70
+    N49 --> N70
+    N51 --> N70
+    N53 --> N70
+    N54 --> N70
+    N55 --> N70
+    N56 --> N70
+    N57 --> N70
+    N59 --> N70
+    N60 --> N70
+    N69 --> N70
+    N63 --> N71
+    N68 --> N71
+    N70 --> N71
+    N64 --> N72
+    N1 --> N72
+    N0 --> N72
+    N67 --> N72
+    N71 --> N72
+    N72 --> N73
+    N66 --> N74
+    N68 --> N74
+    N63 --> N74
+    N71 --> N75
+    N24 --> N76
+    N25 --> N76
+    N26 --> N76
+    N31 --> N76
+    N33 --> N76
+    N34 --> N76
+    N36 --> N76
+    N38 --> N76
+    N39 --> N76
+    N41 --> N76
+    N43 --> N76
+    N44 --> N76
+    N47 --> N76
+    N48 --> N76
+    N49 --> N76
+    N51 --> N76
+    N53 --> N76
+    N54 --> N76
+    N55 --> N76
+    N56 --> N76
+    N57 --> N76
+    N59 --> N76
+    N60 --> N76
+    N61 --> N77
+    N67 --> N77
 ```
 <!-- jit:breakdown-overview:end -->
 
@@ -468,11 +510,30 @@ All decisions were taken autonomously under the session's no-question rule. Each
 | D-23 Foreground serve exit | Chosen: a foreground server whose child exits non-zero returns a typed `ForegroundServerExited` error carrying the child's status. It classifies to a new `SERVER_EXITED` code with exit 1, with the status in `error.details`, and the `serve --fg` pass-through exception leaves the exit-code projection. Rejected: an `Outcome` variant carrying an arbitrary exit status, which would reopen the per-site exit codes that REQ-13 removes. |
 | Wide `main.rs` fan-out | Risk: about forty tasks edit `main.rs`. Mitigation: `global-json-flag` lands first as the only sweep across every arm. A facade task rewrites every arm that calls its family. Any task that changes a family's method signatures or rewrites its call sites therefore waits for that family's facade, and a handler task waits for every facade its arms call, not only its own family's. Handler migrations then delete arms rather than editing them. |
 
+## External dependency re-homes
+
+The manifest cannot name issues outside it, so breakdown wires these edges after creation, exactly as listed (D-16). Each row makes the manifest key depend on the external issue.
+
+| Manifest key | External issue | Reason |
+|---|---|---|
+| `global-json-flag` | 2d10f1dd | Update and reject arms |
+| `global-json-flag` | 3754095f | Emoji markers across human output arms |
+| `global-json-flag` | 16d63038 | Id resolution in issue and gate arms |
+| `global-json-flag` | 8673dc5e | Gate status arm |
+| `global-json-flag` | f37d228e | Link-check exit in the doc arm |
+| `mutations-return-issue` | 2d10f1dd | The single reject operation |
+| `mutations-return-issue` | 16d63038 | The shared id resolver |
+| `gate-run-status-renderer` | 8673dc5e | Manual attestation in the not-run view |
+| `validation-report-renderer` | 3754095f | Words instead of emoji in findings |
+| `handlers-doc` | f37d228e | Link-check findings exit |
+
+A row whose edge is already implied through `global-json-flag` is dropped as redundant when `jit dep add` rejects it; the implication still holds. Cross-epic edges to 2195c98f and 842b0ac6 stages are wired by the steward once those breakdowns exist (D-21, D-22).
+
 ## Investigation sources
 
 - [Investigation](investigation.md) owns the inventories. Finding ids used as manifest sources:
   - F-CLASSIFIER, F-CALLSITE-DETAILS, F-FALLBACK-SITES, F-EXIT-SITES, F-DROP-SKIPPED, F-STDERR-DUP and F-SERVER-STATUS: area 1, from the classifier through the server mappings.
   - F-JSON-FIELDS, F-MCP-JSON, F-FILTERS, F-HIDDEN, F-COUNT-STRUCTS, F-SCHEMA-TABLE, F-RENDER-DUP, F-HANDLER-SHAPE, F-GROUP-ARMS and F-CONTRACT-DOCS: area 2 §1 to §8 and its Consumer sweep.
   - F-EXECUTOR-SURFACE, F-BYPASS, F-LINTS, F-HARNESS, F-BUDGET-SCRIPT and F-PRODLINES: area 3.
-- Audit rows A3, A24, A25, A26, S13 and S14 are the findings this epic folds in.
+- Audit rows A3, A24, A25, A26, S13 and S14 are defined in the investigation's [Audit findings folded into this epic](investigation.md#audit-findings-folded-into-this-epic) section.
 - [prodlines.py](prodlines.py) is the investigation's production-line counter, which becomes `scripts/production-lines.py`.

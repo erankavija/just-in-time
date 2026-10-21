@@ -331,8 +331,8 @@
  },
  {
   "key": "executor-facade-issues",
-  "title": "Issue methods behind an issues facade",
-  "description": "Introduces the executor facade mechanism and moves the issue-lifecycle methods onto it, so an issue consumer depends on `IssueOps<'_, S>` instead of the whole `CommandExecutor` surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so the HTTP server, which needs four read-only families, accepts sessions, caches and every mutation. The issue family is the largest: `commands/issue.rs` (`create_issue`, `list_issues`, `show_issue`, `get_dependencies_enriched`, `issue_status_response`, `issue_children`, `issue_progress`, `update_issue`, `update_issue_resolved`, `confirm_deletion_allowed`, `delete_issue`, `update_issue_state`, `assign_issue`, `claim_issue`, `unassign_issue`, `release_issue`, `claim_next`, plus any reject operation present), `commands/labels.rs` (`get_issue`, `add_label`, `list_label_values`), `commands/bulk_update.rs` (`apply_bulk_update`, `preview_bulk_update`) and `commands/batch_create.rs` (`validate_batch_from_json`, `batch_create_from_json`). `create_issue` carries an extra `RepositoryStateStore` where-clause.\n\nCallers: the issue arms of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`), the server's `list_issues`/`show_issue` routes in `crates/server/src/routes.rs`, other families inside `commands/`, `crates/jit/src/test_utils.rs`, `commands/test_helpers.rs`, and most integration tests (`create_issue` alone has about 390 call sites in about 50 files).\n\nThe shape: `CommandExecutor::issues(&self) -> IssueOps<'_, S>`, where `IssueOps` holds `&CommandExecutor<S>`; the family's methods live in `impl` blocks on `IssueOps` in their own files with the same storage bounds; the kernel (sessions, rule and config caches, `require_active_lease`) stays on `CommandExecutor` and is reached through the held reference.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::issues` returns `IssueOps<'_, S>`, re-exported beside `CommandExecutor` from `jit::commands`, and every public method listed in the Background is a method of `IssueOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `IssueOps` impl block carries the storage bound of the block it replaces, and `create_issue` keeps its `RepositoryStateStore` requirement.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `issues()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Call-site rewrites in tests are mechanical; a harness helper that shortens them is in scope only if it is the one shared fixture.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "title": "Issue lifecycle methods behind an issues facade",
+  "description": "Introduces the executor facade shape and moves the issue-lifecycle methods onto it, so an issue consumer depends on `IssueOps<'_, S>` instead of the whole `CommandExecutor` surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/issue.rs`: `create_issue`, `list_issues`, `show_issue`, `get_dependencies_enriched`, `issue_status_response`, `issue_children`, `issue_progress`, `update_issue`, `update_issue_resolved`, `confirm_deletion_allowed`, `delete_issue`, `update_issue_state`, `assign_issue`, `claim_issue`, `unassign_issue`, `release_issue`, `claim_next`, and the single reject operation if present (`create_issue` carries an extra `RepositoryStateStore` where-clause). Callers: the issue arms of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`), the server's `list_issues` and `show_issue` routes and its test setup (`crates/server/src/lib.rs`, `routes.rs`, `crates/server/tests/`), other families inside `commands/` (`breakdown.rs`, `document.rs`, `gate_check.rs`, `graph.rs`, `query.rs`, `validate.rs`), `validation/repository.rs`, `crates/jit/src/test_utils.rs`, `commands/test_helpers.rs`, and most integration tests (`create_issue` alone has about 390 call sites in about 50 files, a mechanical rewrite the compiler enumerates).\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::issues()` returns `IssueOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `IssueOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `IssueOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `issues()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "type": "task",
   "priority": "high",
   "labels": [
@@ -351,7 +351,7 @@
    "global-json-flag"
   ],
   "planning": {
-   "outcome": "`CommandExecutor::issues()` returns `IssueOps<'_, S>` carrying the issue-lifecycle methods, establishing the facade shape other families reuse.",
+   "outcome": "CommandExecutor::issues() returns IssueOps carrying the issue-lifecycle methods, establishing the facade shape the other families reuse",
    "contract_refs": [],
    "source_refs": [
     "D-1",
@@ -364,23 +364,11 @@
    "terminal": {
     "consumer_family": "callers of the issue-lifecycle executor methods",
     "test_boundary": "the existing workspace test suites",
-    "worker_sized_reason": "One accessor plus a relocation of four files' impl blocks; call-site rewrites are mechanical and compiler-driven, so one agent completes and reviews it in one cycle despite the call-site count.",
+    "worker_sized_reason": "One accessor and one file's impl blocks; the large call-site count is a single compiler-driven textual rewrite (`executor.m(` to `executor.issues().m(`) with no judgement per site.",
     "footprint": {
      "creates": [],
      "touches": [
-      "crates/jit/src/commands/mod.rs",
       "crates/jit/src/commands/issue.rs",
-      "crates/jit/src/commands/labels.rs",
-      "crates/jit/src/commands/bulk_update.rs",
-      "crates/jit/src/commands/batch_create.rs",
-      "crates/jit/src/commands/test_helpers.rs",
-      "crates/jit/src/test_utils.rs",
-      "crates/jit/src/lib.rs",
-      "crates/jit/src/main.rs",
-      "crates/jit/src/dispatch/",
-      "crates/server/src/routes.rs",
-      "crates/jit/tests/",
-      "crates/server/tests/",
       "crates/jit/src/commands/breakdown.rs",
       "crates/jit/src/commands/document.rs",
       "crates/jit/src/commands/gate_check.rs",
@@ -388,16 +376,25 @@
       "crates/jit/src/commands/query.rs",
       "crates/jit/src/commands/validate.rs",
       "crates/jit/src/validation/repository.rs",
-      "crates/server/src/lib.rs"
+      "crates/jit/src/test_utils.rs",
+      "crates/jit/src/commands/test_helpers.rs",
+      "crates/server/src/lib.rs",
+      "crates/server/src/routes.rs",
+      "crates/server/tests/",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
      ]
     }
    }
   }
  },
  {
-  "key": "executor-facade-admin",
-  "title": "Archive, snapshot, config, item, invariant and project methods behind an admin facade",
-  "description": "Moves the repository administration methods off `CommandExecutor` onto the `admin()` facade, so a repository administration consumer depends on `AdminOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The repository administration family lives in `commands/archive.rs` (an `IssueStore` block and a `JsonFileStorage` block), `commands/snapshot.rs`, `commands/config.rs`, `commands/item.rs`, `commands/invariant.rs`, `commands/project.rs`, and `commands/migrate.rs` if it still exists: `archive_candidates`, `preview_archive_document`, `preview_archive_container`, `execute_archive_document`, `execute_archive_container`, `determine_snapshot_source_mode`, `export_snapshot`, `set_config`, `get_config`, `list_items`, `search_items`, `show_item`, `resolve_link_label`, `check_invariants`, `project_render`, and `backfill_lifecycle_timestamps` if present; the `pub(crate)` `item_kinds` moves too. Consumers are the `archive`, `snapshot`, `config`, `item`, `invariant`, `project` and `migrate` arms of `crates/jit/src/main.rs` (or their handler modules under `crates/jit/src/dispatch/`), the doc links in `crates/jit/src/domain/item.rs` and `crates/jit/src/repository_state/default_rules.rs`, and the matching test suites. A concurrent cleanup may delete `migrate.rs` before this work starts; whatever exists when it starts moves.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::admin()` returns `AdminOps<'_, S>`, and every public method listed in the Background is a method of `AdminOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `AdminOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `admin()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- These files share no consumer beyond the CLI's administrative arms; one facade keeps the family count small without coupling them to the issue or query families.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "key": "executor-facade-items",
+  "title": "Item, invariant and projection methods behind an items facade",
+  "description": "Moves the addressable-item methods onto an `items()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/item.rs`, `commands/invariant.rs` and `commands/project.rs`: `list_items`, `search_items`, `show_item`, `resolve_link_label`, `check_invariants` and `project_render`, with the `pub(crate)` `item_kinds`. Callers: the item, invariant and project helpers of `crates/jit/src/main.rs` (or their handler modules), doc links in `crates/jit/src/domain/item.rs` and `crates/jit/src/repository_state/default_rules.rs`, and the item suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::items()` returns `ItemOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `ItemOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ItemOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `items()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -416,7 +413,7 @@
    "executor-facade-issues"
   ],
   "planning": {
-   "outcome": "The repository administration methods live on `AdminOps<'_, S>` reached through `CommandExecutor::admin()`, with behaviour unchanged.",
+   "outcome": "The addressable-item, invariant-check and projection methods live on ItemOps reached through CommandExecutor::items()",
    "contract_refs": [
     "executor-family-facades"
    ],
@@ -426,22 +423,19 @@
     "REQ-03"
    ],
    "terminal": {
-    "consumer_family": "Callers of the repository administration methods of CommandExecutor",
+    "consumer_family": "callers of the item family executor methods",
     "test_boundary": "the existing workspace test suites",
-    "worker_sized_reason": "A mechanical relocation of one family's impl blocks onto an already-established facade shape; the compiler finds every call site, so one agent moves and reviews it in one cycle.",
+    "worker_sized_reason": "Six methods in three files over the item-kind registry move onto one new struct.",
     "footprint": {
      "creates": [],
      "touches": [
-      "crates/jit/src/commands/archive.rs",
-      "crates/jit/src/commands/snapshot.rs",
-      "crates/jit/src/commands/config.rs",
       "crates/jit/src/commands/item.rs",
       "crates/jit/src/commands/invariant.rs",
       "crates/jit/src/commands/project.rs",
-      "crates/jit/src/commands/migrate.rs",
-      "crates/jit/src/commands/mod.rs",
       "crates/jit/src/domain/item.rs",
       "crates/jit/src/repository_state/default_rules.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
       "crates/jit/src/main.rs",
       "crates/jit/src/dispatch/",
       "crates/jit/tests/"
@@ -504,6 +498,57 @@
   }
  },
  {
+  "key": "executor-facade-profiles",
+  "title": "Profile and init methods behind a profiles facade",
+  "description": "Moves the profile-package and repository-initialization methods onto a `profiles()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/profile.rs` and `commands/init.rs` (both `impl CommandExecutor<JsonFileStorage>`): the `resolve_profile_*`, `list_recorded_profiles`, `validate_recorded_profiles`, `capture/pack/add_profile_*` and their `plan_*` twins, `show_profiles`, `plan_profile[s][_with_inputs|_from_sources]`, `apply_profile[_with_inputs|_from_sources]`, `diff/reconfigure/upgrade_profiles_from_sources` and their `plan_*` twins, `resolve_profile_closure`, `resolve_profile_graph`, `validate_profile_selection`, `apply_profile_package[_with_inputs]`, and `initialize_profiled_repository[_from_sources]` and `initialize_fresh_repository[_from_sources]`. Callers: the profile and init arms of `crates/jit/src/main.rs` (or their handler modules), `crates/jit/src/profile/` tests, and the profile and init suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::profiles()` returns `ProfileOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `ProfileOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ProfileOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `profiles()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The profile and repository-initialization methods live on ProfileOps reached through CommandExecutor::profiles()",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the profile family executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "Two files whose methods already share one concrete storage bound move onto one new struct; the compiler lists every caller.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/profile.rs",
+      "crates/jit/src/commands/init.rs",
+      "crates/jit/src/profile/",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "classifier-derives-details",
   "title": "Derive failure details and suggestions from the error type",
   "description": "`jit::output::failure::classify` derives each failure's details and suggestions from the error value, so call sites no longer need to build them.\n\n## Background\n\n`classify(&anyhow::Error) -> JsonError` in `crates/jit/src/output/failure.rs` currently returns only a code and message. The details and suggestions a user sees are built at call sites in `crates/jit/src/main.rs`: `gate_pass_json_error` for `GatePassFailed`, `GateNotRequiredError` and `ManualGateAttestationRequiredError`; `JsonError::issue_not_found(id)` although `IssueNotFoundError` carries the id; `JsonError::transition_blocked` for `TransitionBlockedError`; `emit_top_level_json_error` for the `InvalidLabelPatternError` suggestion and `LinkedCheckoutWriteRefusedError` details; `dep_add_batch_json_error` for `DependencyBatchRejectedError`; `refine_id_error` for `AmbiguousIdError`/`InvalidIdPrefixError`; `profile_json_error` for `RepositoryStateError::ProfileTargetConflicts` and the profile not-found suggestion; and the `Commands::Search` arm for `search::SearchError` (`RipgrepNotInstalled` suggestion), which the classifier does not downcast at all. The transposed-argument guard in `GateCommands::Status`, the profile not-found path and `item show`'s not-found path (its `ITEM_NOT_FOUND` is a call-site substitution in `IssueCommands::Show`) have no distinguishing error type, so no type-only classifier can reproduce them.\n\n## Success Criteria\n\n- [hard] REQ-01: For each error type listed in the Background, `classify` returns the details and suggestions the corresponding call site builds today.\n- [hard] REQ-02: `search::SearchError` is classified by type, to the codes the `Commands::Search` arm chooses today, with the ripgrep-missing suggestion.\n- [hard] REQ-03: The transposed `gate status` arguments, a missing profile and a missing item (`show_item` in `crates/jit/src/commands/item.rs` raises an untyped error today) each have a typed error whose classification yields the code, details and suggestions their call sites produce today.\n- [hard] REQ-04: Library unit tests in `output/failure.rs` own each derivation, asserting the classified code and the presence and meaning of details and suggestions rather than copied strings.\n- [hard] REQ-05: The CLI's observable failures are unchanged; the existing envelope and exit-code suites pass without weakened assertions.\n\n## Notes\n\nCall sites keep their emitters until their command group migrates to a handler. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.\n",
@@ -523,8 +568,9 @@
   ],
   "depends_on": [
    "failure-classifier-library",
-   "executor-facade-admin",
-   "executor-facade-validation"
+   "executor-facade-items",
+   "executor-facade-validation",
+   "executor-facade-profiles"
   ],
   "planning": {
    "outcome": "classify returns the details and suggestions call sites build today, derived only from the error value",
@@ -724,8 +770,8 @@
  },
  {
   "key": "executor-facade-queries",
-  "title": "Query, search, event, graph and dependency methods behind a queries facade",
-  "description": "Moves the query and graph methods off `CommandExecutor` onto the `queries()` facade, so a query and graph consumer depends on `QueryOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The query and graph family lives in `commands/query.rs`, `commands/search.rs`, `commands/events.rs`, `commands/graph.rs` and `commands/dependency.rs`: the fifteen `query_*` methods, `search_issues` and `search_issues_with_filters`, `tail_events` and `query_events`, the graph methods (`publish_graph_export`, `build_dependency_tree`, `show_dependencies_with_depth`, `show_rdeps_with_depth`, `show_roots`, `export_graph`, `export_graph_batch`, `resolve_hierarchy_tree`, `detect_divergences`) and the dependency mutations (`add_dependency`, `add_dependency_with_policy`, `remove_dependency`, `add_dependencies`, `add_dependencies_with_policy`, `remove_dependencies`). Consumers are the query, graph, dep, events and issue-search arms of `crates/jit/src/main.rs` (or their handler modules under `crates/jit/src/dispatch/`), template application in `commands/template.rs` and `commands/breakdown.rs` (if present), and many test suites that wire dependencies.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::queries()` returns `QueryOps<'_, S>`, and every public method listed in the Background is a method of `QueryOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `QueryOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `queries()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- One facade covers these five files because they share read-side consumers and rarely call each other's internals; a second facade for dependency mutation would split one consumer family.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "title": "Query, search and event methods behind a queries facade",
+  "description": "Moves the query, search and event-log read methods onto a `queries()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/query.rs`, `commands/search.rs` and `commands/events.rs`: `query_ready`, `query_blocked`, `query_by_assignee`, `query_by_state`, `query_by_priority`, `query_by_label`, `query_by_labels`, `query_strategic`, `query_closed`, `query_all`, `query_available`, `query_blocked_filtered`, `query_strategic_filtered`, `query_count_by_state`, `query_closed_filtered`, `search_issues`, `search_issues_with_filters`, `tail_events` and `query_events`. Callers: the query, list, issue search and events arms of `crates/jit/src/main.rs` (or their handler modules), `commands/issue.rs`, and the query and search suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::queries()` returns `QueryOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `QueryOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `QueryOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `queries()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -744,7 +790,7 @@
    "executor-facade-issues"
   ],
   "planning": {
-   "outcome": "The query and graph methods live on `QueryOps<'_, S>` reached through `CommandExecutor::queries()`, with behaviour unchanged.",
+   "outcome": "The query, search and event-log methods live on QueryOps reached through CommandExecutor::queries()",
    "contract_refs": [
     "executor-family-facades"
    ],
@@ -756,24 +802,20 @@
    "terminal": {
     "consumer_family": "callers of the query family executor methods",
     "test_boundary": "the existing workspace test suites",
-    "worker_sized_reason": "A mechanical relocation of one family's impl blocks onto an already-established facade shape; the compiler finds every call site, so one agent moves and reviews it in one cycle.",
+    "worker_sized_reason": "Nineteen read-only methods in three files move onto one new struct; callers are CLI arms and query tests the compiler lists.",
     "footprint": {
      "creates": [],
      "touches": [
       "crates/jit/src/commands/query.rs",
       "crates/jit/src/commands/search.rs",
       "crates/jit/src/commands/events.rs",
-      "crates/jit/src/commands/graph.rs",
-      "crates/jit/src/commands/dependency.rs",
+      "crates/jit/src/commands/issue.rs",
       "crates/jit/src/commands/mod.rs",
-      "crates/jit/src/commands/template.rs",
+      "crates/jit/src/lib.rs",
       "crates/jit/src/main.rs",
       "crates/jit/src/dispatch/",
-      "crates/jit/src/test_utils.rs",
       "crates/jit/tests/",
-      "crates/server/tests/",
       "crates/server/src/routes.rs",
-      "crates/jit/src/commands/issue.rs",
       "crates/jit/src/commands/gate_check.rs",
       "crates/jit/src/commands/breakdown.rs"
      ]
@@ -880,8 +922,8 @@
  },
  {
   "key": "executor-facade-gates",
-  "title": "Gate methods behind a gates facade",
-  "description": "Moves the gate methods off `CommandExecutor` onto the `gates()` facade, so a gate consumer depends on `GateOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The gate family lives in `commands/gate.rs` (`impl` at about :694) and `commands/gate_check.rs` (about :674): `add_gate`, `add_gates`, `remove_gates`, `pass_gate`, `pass_all_gates`, `pass_gate_many`, `fail_gate`, `list_gates`, the gate-definition and preset methods (`define_gate`, `update_gate`, `remove_gate_definition`, `show_gate_definition`, `list_gate_presets`, `show_gate_preset`, `apply_gate_preset`, `create_gate_preset`, and `add_gate_definition` if it still exists), the run lookups (`list_gate_runs`, `get_gate_run_result`, `get_last_gate_run`, `get_last_gate_runs_for_issue`, `get_required_gate_statuses_for_issue`) and `check_gate`/`check_gate_with`; the `pub(crate)` helpers `checker_repo_root`, `real_repo_root` and `run_postchecks` move with them. Consumers are the gate arms of `crates/jit/src/main.rs` (or their handler module under `crates/jit/src/dispatch/`), the server's gate routes in `crates/server/src/routes.rs` (`list_gates`, `show_gate_definition`, `list_gate_runs`, `get_gate_run_result`), and the gate test suites.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::gates()` returns `GateOps<'_, S>`, and every public method listed in the Background is a method of `GateOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GateOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `gates()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "title": "Gate definition and attachment methods behind a gates facade",
+  "description": "Moves the gate definition, preset, attachment and run-lookup methods onto a `gates()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/gate.rs`: `add_gate`, `add_gates`, `remove_gates`, `pass_gate`, `pass_all_gates`, `pass_gate_many`, `fail_gate`, `list_gates`, `define_gate`, `update_gate`, `remove_gate_definition`, `show_gate_definition`, `list_gate_presets`, `show_gate_preset`, `apply_gate_preset`, `create_gate_preset`, `list_gate_runs`, `get_gate_run_result`, and `add_gate_definition` if it still exists. Callers: the gate arms of `crates/jit/src/main.rs` (or their handler module), the server's gate routes (`list_gates`, `show_gate_definition`, `list_gate_runs`, `get_gate_run_result` in `crates/server/src/routes.rs`), `crates/jit/src/gate_execution.rs` doc links, and the gate suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::gates()` returns `GateOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `GateOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GateOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `gates()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -900,7 +942,7 @@
    "executor-facade-issues"
   ],
   "planning": {
-   "outcome": "The gate methods live on `GateOps<'_, S>` reached through `CommandExecutor::gates()`, with behaviour unchanged.",
+   "outcome": "The gate definition, attachment and run-lookup methods of gate.rs live on GateOps reached through CommandExecutor::gates()",
    "contract_refs": [
     "executor-family-facades"
    ],
@@ -910,22 +952,22 @@
     "REQ-03"
    ],
    "terminal": {
-    "consumer_family": "Callers of the gate methods of CommandExecutor",
+    "consumer_family": "callers of the gate.rs executor methods",
     "test_boundary": "the existing workspace test suites",
-    "worker_sized_reason": "A mechanical relocation of one family's impl blocks onto an already-established facade shape; the compiler finds every call site, so one agent moves and reviews it in one cycle.",
+    "worker_sized_reason": "One file's impl block moves onto one new struct; the compiler lists every caller.",
     "footprint": {
      "creates": [],
      "touches": [
       "crates/jit/src/commands/gate.rs",
-      "crates/jit/src/commands/gate_check.rs",
-      "crates/jit/src/commands/mod.rs",
       "crates/jit/src/commands/gate_cli_tests.rs",
       "crates/jit/src/gate_execution.rs",
+      "crates/server/src/routes.rs",
+      "crates/server/tests/",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
       "crates/jit/src/main.rs",
       "crates/jit/src/dispatch/",
-      "crates/server/src/routes.rs",
-      "crates/jit/tests/",
-      "crates/server/tests/"
+      "crates/jit/tests/"
      ]
     }
    }
@@ -1005,6 +1047,61 @@
   }
  },
  {
+  "key": "executor-facade-graph",
+  "title": "Graph and dependency methods behind a graph facade",
+  "description": "Moves the dependency-graph methods onto a `graph()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/graph.rs` and `commands/dependency.rs`: `publish_graph_export`, `build_dependency_tree`, `show_dependencies_with_depth`, `show_rdeps_with_depth`, `show_roots`, `export_graph`, `export_graph_batch`, `resolve_hierarchy_tree`, `detect_divergences`, `add_dependency`, `add_dependency_with_policy`, `remove_dependency`, `add_dependencies`, `add_dependencies_with_policy` and `remove_dependencies`. Callers: the dep, graph and divergence arms of `crates/jit/src/main.rs` (or their handler modules), `commands/issue.rs`, `commands/gate_check.rs`, `commands/breakdown.rs`, the server route tests that add dependencies (`crates/server/src/routes.rs`), and the dependency and graph suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::graph()` returns `GraphOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `GraphOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GraphOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `graph()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The graph and dependency methods live on GraphOps reached through CommandExecutor::graph()",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the graph family executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "Fifteen methods in two files move onto one new struct; the compiler lists every caller.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/graph.rs",
+      "crates/jit/src/commands/dependency.rs",
+      "crates/jit/src/commands/issue.rs",
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/breakdown.rs",
+      "crates/server/src/routes.rs",
+      "crates/server/tests/",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "create-returns-issue",
   "title": "Issue creation returns the created issue",
   "description": "`create_issue` returns only the new id, so the CLI reloads the issue from storage to report it. This makes creation return the created issue.\n\n## Background\n\n`CommandExecutor::create_issue` (`crates/jit/src/commands/issue.rs`, reached through the issues facade) returns `Result<(String, Vec<String>)>`: the new id and warnings. `IssueCommands::Create` in `crates/jit/src/main.rs` then calls `storage.load_issue(&id)` to build its response. About 390 call sites across `crates/jit` (including `test_utils.rs` and the integration suites) and `crates/server` (`lib.rs`, `routes.rs` tests and `crates/server/tests/`) destructure the returned tuple, almost all only for the id.\n\n## Success Criteria\n\n- [hard] REQ-01: `create_issue` returns a value carrying the created `Issue` as stored and the warnings it returns today, and the returned issue equals what storage holds after creation, shown by a harness test through `CommandExecutor` over `InMemoryStorage`.\n- [hard] REQ-02: The CLI create path reports the returned issue and makes no `load_issue` call.\n- [hard] REQ-03: Every caller compiles against the new return value, with test call sites reading the id from the returned issue, and the existing suites pass without weakened assertions.\n\n## Notes\n\nThe call-site rewrite is mechanical and compiler-driven. Other mutations change their return values separately. Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md`.",
@@ -1023,7 +1120,8 @@
    "code-review"
   ],
   "depends_on": [
-   "executor-facade-queries"
+   "executor-facade-queries",
+   "executor-facade-graph"
   ],
   "planning": {
    "outcome": "create_issue returns the new Issue with its warnings, so the CLI reports it without a storage reload",
@@ -1107,6 +1205,57 @@
   }
  },
  {
+  "key": "executor-facade-issue-batches",
+  "title": "Label and batch issue methods onto the issues facade",
+  "description": "Moves the label, bulk-update and batch-create methods onto the existing issues facade, completing the issue family's narrowing.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/labels.rs`, `commands/bulk_update.rs` and `commands/batch_create.rs`: `get_issue`, `add_label`, `list_label_values`, `apply_bulk_update`, `preview_bulk_update`, `validate_batch_from_json` and `batch_create_from_json`. Callers: the label, `issue update --filter` and `issue batch-create` arms of `crates/jit/src/main.rs` (or their handler modules) and their test suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: Every public method listed in the Background is a method of the existing `IssueOps<'_, S>` reached through `CommandExecutor::issues()`, rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `IssueOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `issues()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The label, bulk and batch methods of the issue family live on IssueOps instead of CommandExecutor",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the batch issue methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "Seven methods in three files move onto an existing struct; callers are a few CLI arms and their tests.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/labels.rs",
+      "crates/jit/src/commands/bulk_update.rs",
+      "crates/jit/src/commands/batch_create.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "handlers-issue-writes",
   "title": "Issue write commands move to library handlers",
   "description": "The issue mutation arms reload what they changed through `storage` and print hand-built payloads. This moves them to library handlers that report the entity the executor mutation returns.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `IssueCommands::{Create, Update, Delete, Assign, Claim, Unassign, Reject, Release, ClaimNext, BatchCreate}` call the executor and then `storage.resolve_issue_id` and `storage.load_issue` to report the result; `create` also lists every issue through `storage` to evaluate graph rules. `delete` builds its success body with `json!` and its confirmation failure with an inline `JsonError`; `update` substitutes `GenericError` for unclassified failures under `--json`; `batch-create` prints its dry-run outcome and its `{key: id}` result as bare serialized documents outside the success envelope; `issue delete` and `issue batch-create` fall back to `CommandResponse` in the schema. The executor mutations now return the updated `Issue`.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `issue create|update|delete|assign|claim|unassign|reject|release|claim-next|batch-create` to handlers in `crates/jit/src/dispatch/issue.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: These handlers make no `storage` call: each reports the `Issue` (or the batch result) its executor mutation returns.\n- [hard] REQ-03: Each leaf returns its registered response type and the schema names it; the `batch-create` dry run and real run print through the one success emitter, and a test states their new payload form.\n- [hard] REQ-04: The handlers return failures as errors with no substituted code, inline `JsonError` or `std::process::exit`; a test asserts that an `issue update` failure the classifier maps to a specific code reports that code on both paths instead of `GENERIC_ERROR`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n2d10f1dd makes update and reject single atomic mutations; 16d63038 changes id resolution.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -1132,7 +1281,8 @@
   ],
   "depends_on": [
    "handlers-issue-reads",
-   "mutations-return-issue"
+   "mutations-return-issue",
+   "executor-facade-issue-batches"
   ],
   "planning": {
    "outcome": "Issue mutation leaves run as dispatch handlers that report the Issue the executor returns, with no storage call in main.rs",
@@ -1202,7 +1352,7 @@
   ],
   "depends_on": [
    "handler-contract",
-   "executor-facade-queries"
+   "executor-facade-graph"
   ],
   "planning": {
    "outcome": "dep add and dep rm run as dispatch handlers with typed responses and classifier-only error codes",
@@ -1272,7 +1422,7 @@
   "depends_on": [
    "handler-contract",
    "issue-list-renderer",
-   "executor-facade-queries"
+   "executor-facade-graph"
   ],
   "planning": {
    "outcome": "graph leaves and the rdeps alias run as dispatch handlers with typed responses and list envelopes",
@@ -1434,6 +1584,56 @@
   }
  },
  {
+  "key": "executor-facade-gate-checks",
+  "title": "Gate check methods onto the gates facade",
+  "description": "Moves the gate check and run-status methods onto the existing gates facade, completing the gate family's narrowing.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/gate_check.rs`: `check_gate`, `check_gate_with`, `get_last_gate_run`, `get_last_gate_runs_for_issue` and `get_required_gate_statuses_for_issue`, with the `pub(crate)` helpers `checker_repo_root`, `real_repo_root` and `run_postchecks`. Callers: the gate status and evaluation arms of `crates/jit/src/main.rs` (or their handler modules), `commands/gate.rs`, and the gate check suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: Every public method listed in the Background is a method of the existing `GateOps<'_, S>` reached through `CommandExecutor::gates()`, rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `GateOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `gates()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The gate check and run-status methods of gate_check.rs live on GateOps instead of CommandExecutor",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the gate check executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "Five methods and three helpers in one file move onto an existing struct.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/gate_check.rs",
+      "crates/jit/src/commands/gate.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "handlers-gate-status",
   "title": "Gate status commands move to library handlers",
   "description": "The gate status arms label every failure `GATE_CHECK_ERROR`, print a bare `null` for gates never run, and reach storage to detect transposed arguments. This moves them to library handlers.\n\n## Background\n\n`GateCommands::Status` in `crates/jit/src/main.rs` (latest run, `--all` run history, flat and findings views) builds `GateRunHistoryResponse` and related responses inline and reports any failure under `--json` as `GATE_CHECK_ERROR` (exit 3) at four sites while the human path uses the classifier. Its \"not run\" branches print `JsonOutput::<Option<()>>::success(None)`, so stdout is the bare text `null`. Its transposed-argument guard calls `executor.storage().resolve_issue_id` twice, then prints an inline `INVALID_ARGUMENT` `JsonError` or calls `exit(2)` on the human path. `GateCommands::StatusAll` prints a success envelope and then exits 4 when not all gates passed, so its exit code matches no envelope code. `gate status` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `gate status` (all views, including `--all` history) and `gate status-all` to handlers in `crates/jit/src/dispatch/gate.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: The transposed-argument guard uses an executor predicate instead of `storage().resolve_issue_id` and raises a typed error classified as `INVALID_ARGUMENT` with exit 2 on both paths.\n- [hard] REQ-03: Each view returns a registered typed response, the not-run case is a typed object instead of bare `null`, human output uses the shared gate-run-status renderer, and the schema names the response; a test states the not-run payload.\n- [hard] REQ-04: `gate status-all` with a failed or unrun gate returns a findings outcome, and a test asserts the failure envelope with `GATE_FAILED`, exit 4 and the report in `error.details`; failures carry the classifier's code instead of `GATE_CHECK_ERROR`, which a test asserts for one non-missing-gate failure.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n8673dc5e changes how manual attestation appears in gate status.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -1459,7 +1659,8 @@
   ],
   "depends_on": [
    "handlers-gate-definitions",
-   "gate-run-status-renderer"
+   "gate-run-status-renderer",
+   "executor-facade-gate-checks"
   ],
   "planning": {
    "outcome": "gate status and status-all run as dispatch handlers with typed responses, a findings envelope for status-all and no storage call",
@@ -1886,6 +2087,56 @@
   }
  },
  {
+  "key": "executor-facade-config",
+  "title": "Config methods behind a config facade",
+  "description": "Moves the configuration methods onto a `config()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/config.rs` and `commands/migrate.rs` if it still exists: `set_config`, `get_config`, and `backfill_lifecycle_timestamps` if present. Callers: the config and migrate arms of `crates/jit/src/main.rs` (or their handler modules) and the config suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::config()` returns `ConfigOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `ConfigOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ConfigOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `config()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- 842b0ac6 may delete `migrate.rs` first; move whatever exists.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The configuration methods live on ConfigOps reached through CommandExecutor::config()",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the config executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "At most three methods in two files move onto one new struct.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/config.rs",
+      "crates/jit/src/commands/migrate.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "handlers-config",
   "title": "Config commands move to library handlers",
   "description": "The config arms assemble the effective configuration and validate it inline. This moves the config group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ConfigCommands::Show` builds the whole effective-config tree with `json!`, `Get` and `Set` build bodies inline, and `Validate` carries its checking logic and a local `struct ValidationResult` in the arm, rendering through `render_validation_json` and calling `std::process::exit` on errors. One config arm substitutes `INVALID_ARGUMENT` for its failures, and `ShowHierarchy` renders inline. Every config leaf falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `config show|get|set|validate|show-hierarchy` to a handler in `crates/jit/src/dispatch/config.rs`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: The config check lives in `crates/jit/src/commands/config.rs` and returns a report; `config validate` with errors returns a findings outcome with `VALIDATION_FAILED`, printed in human mode through the shared validation-report renderer.\n- [hard] REQ-03: Each leaf returns its registered output-owned response type, and the schema names that type for each leaf.\n- [hard] REQ-04: The handler returns failures as errors with no substituted code or `std::process::exit`, and a test states any exit code that changes as a result.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n842b0ac6 removes inert keys from `config show`; migrate whatever the arm holds when this starts.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -1910,7 +2161,8 @@
   ],
   "depends_on": [
    "handler-contract",
-   "validation-report-renderer"
+   "validation-report-renderer",
+   "executor-facade-config"
   ],
   "planning": {
    "outcome": "config leaves run as dispatch handlers with typed responses and the config check in the commands layer",
@@ -2268,59 +2520,6 @@
   }
  },
  {
-  "key": "executor-facade-profiles",
-  "title": "Profile, init, template and breakdown methods behind a profiles facade",
-  "description": "Moves the profile and template methods off `CommandExecutor` onto the `profiles()` facade, so a profile and template consumer depends on `ProfileOps<'_, S>` instead of the whole executor surface.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks. The profile and template family lives in `commands/profile.rs` and `commands/init.rs` (both `impl CommandExecutor<JsonFileStorage>`), `commands/template.rs`, and `commands/breakdown.rs` if it still exists: the 29 profile methods (`resolve_profile_*`, `list_recorded_profiles`, `validate_recorded_profiles`, the capture/pack/add/plan/apply/diff/reconfigure/upgrade families, `resolve_profile_closure`, `resolve_profile_graph`, `validate_profile_selection`, `apply_profile_package*`), the four `initialize_*_repository*` methods, `initialize_worktree_identity` (today on the kernel block in `mod.rs` and used only by `jit init`), `container_anchor`, `apply_template`, `apply_template_with`, and `bracket_breakdown*` if present. Consumers are the `init`, `profile`, `apply` and breakdown arms of `crates/jit/src/main.rs` (or their handler modules under `crates/jit/src/dispatch/`), `crates/jit/src/profile/repository_package.rs` tests, `crates/jit/src/test_utils.rs` profiled fixtures, and the profile and template test suites. A concurrent cleanup may delete `breakdown.rs` before this work starts; whatever exists when it starts moves.\n\nThe facade shape is fixed: `CommandExecutor::<family>()` returns a borrowing struct (`IssueOps<'_, S>` holds `&CommandExecutor<S>`), the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::profiles()` returns `ProfileOps<'_, S>`, and every public method listed in the Background is a method of `ProfileOps<'_, S>` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ProfileOps<'_, S>` impl block carries the same storage bound as the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers of the moved methods in `crates/jit`, `crates/server` and their test suites reach them through `profiles()`, intra-doc links name the new paths, and the Rust workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile plus the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
-  "type": "task",
-  "priority": "normal",
-  "labels": [
-   "epic:rust-code-quality",
-   "milestone:v1.0",
-   "component:cli",
-   "component:server",
-   "story:executor-surface",
-   "satisfies:df129d9e/REQ-03"
-  ],
-  "gates": [
-   "cargo-ci",
-   "code-review"
-  ],
-  "depends_on": [
-   "executor-facade-issues"
-  ],
-  "planning": {
-   "outcome": "The profile and template methods live on `ProfileOps<'_, S>` reached through `CommandExecutor::profiles()`, with behaviour unchanged.",
-   "contract_refs": [
-    "executor-family-facades"
-   ],
-   "source_refs": [
-    "D-1",
-    "F-EXECUTOR-SURFACE",
-    "REQ-03"
-   ],
-   "terminal": {
-    "consumer_family": "callers of the profile family executor methods",
-    "test_boundary": "the existing workspace test suites",
-    "worker_sized_reason": "A mechanical relocation of one family's impl blocks onto an already-established facade shape; the compiler finds every call site, so one agent moves and reviews it in one cycle.",
-    "footprint": {
-     "creates": [],
-     "touches": [
-      "crates/jit/src/commands/profile.rs",
-      "crates/jit/src/commands/init.rs",
-      "crates/jit/src/commands/template.rs",
-      "crates/jit/src/commands/breakdown.rs",
-      "crates/jit/src/commands/mod.rs",
-      "crates/jit/src/profile/repository_package.rs",
-      "crates/jit/src/test_utils.rs",
-      "crates/jit/src/main.rs",
-      "crates/jit/src/dispatch/",
-      "crates/jit/tests/"
-     ]
-    }
-   }
-  }
- },
- {
   "key": "handlers-profile",
   "title": "Profile commands move to library handlers",
   "description": "The profile arms run their own error classifier and render findings through separate JSON and human exits. This moves the profile group to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `ProfileCommands::{List, Show, Validate, Diff, Apply, Reconfigure, Capture, Pack, Add, Upgrade}` go through `run_profile_lifecycle`, `render_profile_difference`, `render_profile_agreement` and `profile_result`, which call `profile_json_error`. Its downcast cascade reports any `NotFoundError` as `PROFILE_NOT_FOUND` and every other repository-state or unknown error as `PROFILE_ERROR`, unlike the classifier. `profile diff` with conflicts and the agreement check with divergence exit `VALIDATION_FAILED` through separate JSON and human paths. A missing profile has a typed error the classifier maps to `PROFILE_NOT_FOUND`.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches every `profile` leaf to a handler in `crates/jit/src/dispatch/profile.rs`, and `main.rs` keeps none of `run_profile_lifecycle`, `render_profile_difference`, `render_profile_agreement`, `profile_result` or `profile_json_error`.\n- [hard] REQ-02: Each leaf returns its registered response type, profile leaves register their `ProfileCollection` responses, and the schema names a typed response for each leaf.\n- [hard] REQ-03: `profile diff` conflicts and agreement divergence return findings outcomes with `VALIDATION_FAILED`.\n- [hard] REQ-04: Failures are classified errors with no substituted code; a missing profile still reports `PROFILE_NOT_FOUND`, and a test asserts that a repository-state failure reports its classified code instead of `PROFILE_ERROR`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -2344,8 +2543,7 @@
    "mcp-ci"
   ],
   "depends_on": [
-   "handler-contract",
-   "executor-facade-profiles"
+   "handler-contract"
   ],
   "planning": {
    "outcome": "profile leaves run as dispatch handlers with typed responses, findings outcomes and classified codes",
@@ -2392,6 +2590,56 @@
   }
  },
  {
+  "key": "executor-facade-templates",
+  "title": "Template methods behind a templates facade",
+  "description": "Moves the template-application methods onto a `templates()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/template.rs` and `commands/breakdown.rs` if it still exists: `container_anchor`, `apply_template`, `apply_template_with`, the `pub(crate)` `template_roles`, and `bracket_breakdown` and `bracket_breakdown_with_template` if present. Callers: the `apply` arm of `crates/jit/src/main.rs` (or its handler module) and the template suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::templates()` returns `TemplateOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `TemplateOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `TemplateOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `templates()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- 842b0ac6 may delete `breakdown.rs` first; move whatever exists.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The template-application methods live on TemplateOps reached through CommandExecutor::templates()",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the template executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "At most five methods in two files move onto one new struct.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/template.rs",
+      "crates/jit/src/commands/breakdown.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "apply-returns-created-issues",
   "title": "Template application returns the created issues",
   "description": "Makes template application return the issues it created, so `jit apply` reports them without loading each one from storage.\n\n## Background\n\n`apply_template` on the profiles facade (`crates/jit/src/commands/template.rs`) returns `(TemplateApplyResult, Vec<String>)`, whose roles map to created issue ids. `print_apply_result` in `crates/jit/src/main.rs` (called from the `Commands::Apply` arm, or from its handler under `crates/jit/src/dispatch/`) then calls `storage.load_issue(id)` per role to print titles and states. That is a storage call the CLI makes only because the mutation does not hand back what it produced.\n\n## Success Criteria\n\n- [hard] REQ-01: `apply_template` returns, for each role it created, the created `Issue` alongside its role, and its warnings as today.\n- [hard] REQ-02: Rendering the result of `jit apply` makes no storage call; `print_apply_result` (or its replacement) takes the returned issues.\n- [hard] REQ-03: A harness test (`test_apply_template_returns_created_issues_by_role`) shows each returned issue equals the stored issue for its role, and `jit apply` human and JSON output are unchanged with existing suites passing unweakened.\n\n## Notes\n\n- `apply_template_with` follows the same return shape if it shares the result type.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1, D-11); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
@@ -2409,7 +2657,7 @@
    "code-review"
   ],
   "depends_on": [
-   "executor-facade-profiles"
+   "executor-facade-templates"
   ],
   "planning": {
    "outcome": "`apply_template` returns the created issues by role, and `jit apply` reporting makes no storage call.",
@@ -2533,7 +2781,8 @@
    "mcp-ci"
   ],
   "depends_on": [
-   "handler-contract"
+   "handler-contract",
+   "executor-facade-issue-batches"
   ],
   "planning": {
    "outcome": "label namespaces and label values run as dispatch handlers returning list envelopes",
@@ -2646,6 +2895,56 @@
   }
  },
  {
+  "key": "executor-facade-archive",
+  "title": "Archive and snapshot methods behind an archive facade",
+  "description": "Moves the archive and snapshot-export methods onto an `archive()` facade.\n\n## Background\n\n`CommandExecutor` (`crates/jit/src/commands/mod.rs`) carries every command family in one public surface of about 195 methods across 28 `impl` blocks, so a consumer of one family accepts all of them. This family lives in `commands/archive.rs` (an `IssueStore` block and a `JsonFileStorage` block) and `commands/snapshot.rs`: `archive_candidates`, `preview_archive_document`, `preview_archive_container`, `execute_archive_document`, `execute_archive_container`, `determine_snapshot_source_mode` and `export_snapshot`. Callers: the archive and snapshot arms of `crates/jit/src/main.rs` (or their handler modules) and the archive and snapshot suites.\n\nThe facade shape: `CommandExecutor::<family>()` returns a borrowing struct holding `&CommandExecutor<S>`; the family's methods live in `impl` blocks on that struct in the family's own `commands/` file, and each block keeps the storage bound its `impl CommandExecutor` block had (`IssueStore`, `IssueStore + RepositoryStateStore`, or concrete `JsonFileStorage`). The kernel (sessions, rule and config caches, `require_active_lease`, the validation `capture_*` helpers) stays on `CommandExecutor`; a facade method reaches it through its executor reference, and calls into another family go through that family's accessor.\n\n## Success Criteria\n\n- [hard] REQ-01: `CommandExecutor::archive()` returns `ArchiveOps<'_, S>`, re-exported from `jit::commands`, and every public method listed in the Background is a method of `ArchiveOps` rather than of `CommandExecutor`.\n- [hard] REQ-02: Each `ArchiveOps` impl block for these methods carries the storage bound of the `CommandExecutor` block it replaces, so no method becomes callable on a storage it could not use before.\n- [hard] REQ-03: Callers in `crates/jit`, `crates/server` and their test suites reach the moved methods through `archive()`, intra-doc links name the new paths, and the workspace builds, lints and passes its existing suites with no assertion changed.\n\n## Notes\n\n- Behaviour, output and exit codes are unchanged; the compile and the existing suites are the test boundary.\n- Design rationale: `dev/active/df129d9e-rust-code-quality/plan.md` (D-1); method inventory: `dev/active/df129d9e-rust-code-quality/investigation.md` area 3.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "component:server",
+   "story:executor-surface",
+   "satisfies:df129d9e/REQ-03"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review"
+  ],
+  "depends_on": [
+   "executor-facade-issues"
+  ],
+  "planning": {
+   "outcome": "The archive and snapshot-export methods live on ArchiveOps reached through CommandExecutor::archive()",
+   "contract_refs": [
+    "executor-family-facades"
+   ],
+   "source_refs": [
+    "D-1",
+    "F-EXECUTOR-SURFACE",
+    "REQ-03"
+   ],
+   "terminal": {
+    "consumer_family": "callers of the archive family executor methods",
+    "test_boundary": "the existing workspace test suites",
+    "worker_sized_reason": "Seven methods in two files move onto one new struct.",
+    "footprint": {
+     "creates": [],
+     "touches": [
+      "crates/jit/src/commands/archive.rs",
+      "crates/jit/src/commands/snapshot.rs",
+      "crates/jit/src/commands/mod.rs",
+      "crates/jit/src/lib.rs",
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/",
+      "crates/jit/tests/"
+     ]
+    }
+   }
+  }
+ },
+ {
   "key": "handlers-snapshot-migrate",
   "title": "Snapshot and migrate commands move to library handlers",
   "description": "The snapshot and migrate arms build payloads inline. This moves them to library handlers.\n\n## Background\n\nIn `crates/jit/src/main.rs`, `SnapshotCommands::Export` renders inline and `MigrateCommands::LifecycleTimestamps` builds its body with `json!`. Both leaves fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `snapshot export`, and `migrate lifecycle-timestamps` if it still exists, to handlers in `crates/jit/src/dispatch/`, and `main.rs` keeps no arm body for them.\n- [hard] REQ-02: Each leaf returns its registered output-owned response type, and the schema names that type.\n- [hard] REQ-03: The snapshot manifest's `IssuesInfo` and `DocumentsInfo` (`crates/jit/src/snapshot.rs`) derive `count` from their collection through `ListEnvelope` instead of storing it, and a snapshot export test states the manifest shape.\n- [hard] REQ-04: The handlers return failures as errors with no substituted code or `std::process::exit`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\n842b0ac6 REQ-08 deletes the `migrate` group; when it has landed, this covers `snapshot export` alone.\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
@@ -2669,7 +2968,9 @@
    "mcp-ci"
   ],
   "depends_on": [
-   "handler-contract"
+   "handler-contract",
+   "executor-facade-archive",
+   "executor-facade-config"
   ],
   "planning": {
    "outcome": "snapshot export and any remaining migrate leaf run as dispatch handlers with typed responses",
@@ -2781,7 +3082,8 @@
   ],
   "depends_on": [
    "handler-contract",
-   "archive-execution-renderer"
+   "archive-execution-renderer",
+   "executor-facade-archive"
   ],
   "planning": {
    "outcome": "archive leaves run as dispatch handlers whose payloads go through the success envelope as typed responses",
@@ -2896,9 +3198,9 @@
   }
  },
  {
-  "key": "handlers-item-invariant-project",
-  "title": "Item, invariant and project commands move to library handlers",
-  "description": "The item, invariant and project groups are already extracted into helper functions but stay in the binary with per-group fallback codes. This moves them to library handlers.\n\n## Background\n\n`run_item`/`run_item_inner`, `run_invariant`/`run_invariant_inner` and `run_project`/`run_project_inner` in `crates/jit/src/main.rs` wrap their results with `handle_json_error!` and substitute `ITEM_COMMAND_FAILED`, `INVARIANT_COMMAND_FAILED`, `PROJECT_COMMAND_FAILED` or `VALIDATION_FAILED`. They serialize `ItemListResult` (`crates/jit/src/commands/item.rs`), `InvariantCheckResult` and `ProjectRenderResult` directly. `invariant check` with drift prints an inline `JsonError` and exits, or exits `VALIDATION_FAILED` on the human path. `item list|show|search|resolve`, `invariant check` and `project render` fall back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output/`) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `item list|show|search|resolve`, `invariant check` and `project render` to handlers in `crates/jit/src/dispatch/`, and `main.rs` keeps none of the `run_item`, `run_invariant` or `run_project` helpers.\n- [hard] REQ-02: Each leaf returns its registered response type; items, findings and projections reach output as `ListEnvelope` instantiations, `ItemListResult`, `InvariantCheckResult` and `ProjectRenderResult` carry no `count` field, and the schema names a typed response for every leaf.\n- [hard] REQ-03: `invariant check` with drift returns a findings outcome with `VALIDATION_FAILED` and exit 4.\n- [hard] REQ-04: The handlers return failures as errors with no substituted code; a test asserts that an item failure now reports its classified code on both paths instead of `ITEM_COMMAND_FAILED`.\n- [hard] REQ-05: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-06: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "key": "handlers-item",
+  "title": "Item commands move to library handlers",
+  "description": "The item group runs through binary helpers that substitute one fallback code. This moves it to a library handler.\n\n## Background\n\n`run_item`/`run_item_inner` in `crates/jit/src/main.rs` wrap results with `handle_json_error!`, substitute `ITEM_COMMAND_FAILED` for failures, and serialize `ItemListResult` (`crates/jit/src/commands/item.rs`, which stores its own `count`) directly. `item list|show|search|resolve` fall back to `CommandResponse` in the schema. A missing item has a typed error the classifier maps to `ITEM_NOT_FOUND`.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `item list|show|search|resolve` to a handler in `crates/jit/src/dispatch/item.rs`, and `main.rs` keeps neither `run_item` nor `run_item_inner`.\n- [hard] REQ-02: Each leaf returns its registered response type, item lists are `ListEnvelope` instantiations, `ItemListResult` carries no `count` field, and the schema names a typed response for each leaf.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that an item failure other than a missing item reports its classified code on both paths instead of `ITEM_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
   "type": "task",
   "priority": "normal",
   "labels": [
@@ -2922,7 +3224,7 @@
    "handler-contract"
   ],
   "planning": {
-   "outcome": "item, invariant and project leaves run as dispatch handlers with typed list envelopes and classifier-only codes",
+   "outcome": "item leaves run as dispatch handlers returning typed responses and classified failure codes",
    "contract_refs": [
     "handler-contract",
     "handler-response-ownership",
@@ -2944,9 +3246,9 @@
     "REQ-18"
    ],
    "terminal": {
-    "consumer_family": "project-knowledge CLI commands",
+    "consumer_family": "item CLI commands",
     "test_boundary": "CLI integration tests of item payloads",
-    "worker_sized_reason": "Moves one command group's arms onto an existing handler contract; six leaves already isolated in helper functions, so the move is relocation plus response wrapping.",
+    "worker_sized_reason": "Moves one command group's arms onto the existing handler contract; four read leaves already isolated in one helper.",
     "footprint": {
      "creates": [
       "crates/jit/src/dispatch/item.rs",
@@ -2956,12 +3258,147 @@
       "crates/jit/src/main.rs",
       "crates/jit/src/dispatch/mod.rs",
       "crates/jit/src/schema.rs",
-      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs",
-      "crates/jit/src/commands/item.rs",
-      "crates/jit/src/commands/invariant.rs",
-      "crates/jit/src/commands/project.rs",
       "crates/jit/src/output.rs",
-      "docs/reference/exit-codes.md"
+      "docs/reference/exit-codes.md",
+      "crates/jit/src/commands/item.rs",
+      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "handlers-invariant",
+  "title": "Invariant command moves to a library handler",
+  "description": "`invariant check` renders drift through its own JSON error and exit. This moves it to a library handler.\n\n## Background\n\n`run_invariant`/`run_invariant_inner` in `crates/jit/src/main.rs` substitute `INVARIANT_COMMAND_FAILED` for failures, serialize `InvariantCheckResult` (`crates/jit/src/commands/invariant.rs`, which stores its own `count`), and on drift print an inline `JsonError` and exit, or exit `VALIDATION_FAILED` on the human path. `invariant check` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `invariant check` to a handler in `crates/jit/src/dispatch/invariant.rs`, and `main.rs` keeps neither `run_invariant` nor `run_invariant_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, findings are a `ListEnvelope` instantiation, `InvariantCheckResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: Drift returns a findings outcome with `VALIDATION_FAILED` and exit 4, asserted by a test; other failures carry their classified code instead of `INVARIANT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "story:command-dispatch",
+   "satisfies:df129d9e/REQ-01",
+   "satisfies:df129d9e/REQ-02",
+   "satisfies:df129d9e/REQ-12",
+   "satisfies:df129d9e/REQ-13",
+   "satisfies:df129d9e/REQ-17",
+   "satisfies:df129d9e/REQ-18"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review",
+   "mcp-ci"
+  ],
+  "depends_on": [
+   "handler-contract"
+  ],
+  "planning": {
+   "outcome": "invariant check runs as a dispatch handler whose drift is a findings outcome",
+   "contract_refs": [
+    "handler-contract",
+    "handler-response-ownership",
+    "failure-classification",
+    "type-only-error-codes",
+    "findings-envelope",
+    "list-envelope",
+    "output-mode"
+   ],
+   "source_refs": [
+    "A25",
+    "D-3",
+    "F-GROUP-ARMS",
+    "REQ-01",
+    "REQ-02",
+    "REQ-12",
+    "REQ-13",
+    "REQ-17",
+    "REQ-18"
+   ],
+   "terminal": {
+    "consumer_family": "invariant CLI command",
+    "test_boundary": "CLI integration test of invariant check",
+    "worker_sized_reason": "Moves one command group's arms onto the existing handler contract; one leaf already isolated in one helper.",
+    "footprint": {
+     "creates": [
+      "crates/jit/src/dispatch/invariant.rs"
+     ],
+     "touches": [
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/mod.rs",
+      "crates/jit/src/schema.rs",
+      "crates/jit/src/output.rs",
+      "docs/reference/exit-codes.md",
+      "crates/jit/src/commands/invariant.rs",
+      "crates/jit/tests/cli_item_validate/validation_lease_tests.rs"
+     ]
+    }
+   }
+  }
+ },
+ {
+  "key": "handlers-project",
+  "title": "Project command moves to a library handler",
+  "description": "`project render` substitutes its own fallback codes. This moves it to a library handler.\n\n## Background\n\n`run_project`/`run_project_inner` in `crates/jit/src/main.rs` substitute `VALIDATION_FAILED` or `PROJECT_COMMAND_FAILED` for failures and serialize `ProjectRenderResult` (`crates/jit/src/commands/project.rs`, which stores its own `count`) directly. `project render` falls back to `CommandResponse` in the schema.\n\nA handler in `crates/jit/src/dispatch/` takes its parsed arguments and a `CommandContext` (the executor and the `OutputMode { json, quiet }`) and returns `anyhow::Result<Outcome<R>>`; one registration per group generates the group's dispatch and its schema response lookup. Success responses are types defined in the output module (`crates/jit/src/output.rs` and its submodules) or output constructors wrapping a command-layer result, each deriving `JsonSchema` and a human rendering; list payloads are `ListEnvelope<K, T, E>` instantiations; failures are returned as errors that `jit::output::failure::classify` maps to one code and exit status; a non-zero findings result is `Outcome`'s findings variant, rendered under `--json` as the failure envelope with the report in `error.details` and its registered code as the exit status.\n\n## Success Criteria\n\n- [hard] REQ-01: `run()` dispatches `project render` to a handler in `crates/jit/src/dispatch/project.rs`, and `main.rs` keeps neither `run_project` nor `run_project_inner`.\n- [hard] REQ-02: The leaf returns its registered response type, projections are a `ListEnvelope` instantiation, `ProjectRenderResult` carries no `count` field, and the schema names that type.\n- [hard] REQ-03: The handler returns failures as errors with no substituted code; a test asserts that a render failure reports its classified code on both paths instead of `PROJECT_COMMAND_FAILED`.\n- [hard] REQ-04: Where a leaf's exit codes change, its rows in `CommandSchema::generate_command_exit_codes` (`crates/jit/src/schema.rs`) state the new codes and `docs/reference/exit-codes.md` is regenerated.\n- [hard] REQ-05: Human output, success payloads and exit codes of these leaves are otherwise unchanged, and the existing suites pass without weakened assertions.\n\n## Notes\n\nDesign rationale: `dev/active/df129d9e-rust-code-quality/plan.md`; inventories with function and arm citations: `dev/active/df129d9e-rust-code-quality/investigation.md`.",
+  "type": "task",
+  "priority": "normal",
+  "labels": [
+   "epic:rust-code-quality",
+   "milestone:v1.0",
+   "component:cli",
+   "story:command-dispatch",
+   "satisfies:df129d9e/REQ-01",
+   "satisfies:df129d9e/REQ-02",
+   "satisfies:df129d9e/REQ-12",
+   "satisfies:df129d9e/REQ-13",
+   "satisfies:df129d9e/REQ-17",
+   "satisfies:df129d9e/REQ-18"
+  ],
+  "gates": [
+   "cargo-ci",
+   "code-review",
+   "mcp-ci"
+  ],
+  "depends_on": [
+   "handler-contract"
+  ],
+  "planning": {
+   "outcome": "project render runs as a dispatch handler with a typed list response and classified failure codes",
+   "contract_refs": [
+    "handler-contract",
+    "handler-response-ownership",
+    "failure-classification",
+    "type-only-error-codes",
+    "findings-envelope",
+    "list-envelope",
+    "output-mode"
+   ],
+   "source_refs": [
+    "A25",
+    "D-3",
+    "F-GROUP-ARMS",
+    "REQ-01",
+    "REQ-02",
+    "REQ-12",
+    "REQ-13",
+    "REQ-17",
+    "REQ-18"
+   ],
+   "terminal": {
+    "consumer_family": "project CLI command",
+    "test_boundary": "CLI integration test of project render",
+    "worker_sized_reason": "Moves one command group's arms onto the existing handler contract; one leaf already isolated in one helper.",
+    "footprint": {
+     "creates": [
+      "crates/jit/src/dispatch/project.rs"
+     ],
+     "touches": [
+      "crates/jit/src/main.rs",
+      "crates/jit/src/dispatch/mod.rs",
+      "crates/jit/src/schema.rs",
+      "crates/jit/src/output.rs",
+      "docs/reference/exit-codes.md",
+      "crates/jit/src/commands/project.rs"
      ]
     }
    }
@@ -3290,7 +3727,9 @@
    "handlers-snapshot-migrate",
    "handlers-archive",
    "handlers-worktree",
-   "handlers-item-invariant-project",
+   "handlers-item",
+   "handlers-invariant",
+   "handlers-project",
    "handlers-search",
    "handlers-version",
    "repository-bootstrap-constructor",
@@ -3511,7 +3950,9 @@
    "handlers-snapshot-migrate",
    "handlers-archive",
    "handlers-worktree",
-   "handlers-item-invariant-project",
+   "handlers-item",
+   "handlers-invariant",
+   "handlers-project",
    "handlers-search",
    "handlers-version",
    "server-status-from-classification"
@@ -3583,7 +4024,9 @@
    "handlers-snapshot-migrate",
    "handlers-archive",
    "handlers-worktree",
-   "handlers-item-invariant-project",
+   "handlers-item",
+   "handlers-invariant",
+   "handlers-project",
    "handlers-search",
    "handlers-version"
   ],
@@ -3697,7 +4140,9 @@
    "handlers-snapshot-migrate",
    "handlers-archive",
    "handlers-worktree",
-   "handlers-item-invariant-project",
+   "handlers-item",
+   "handlers-invariant",
+   "handlers-project",
    "handlers-search",
    "handlers-version",
    "schema-omits-hidden"
@@ -3969,7 +4414,9 @@
    "handlers-snapshot-migrate",
    "handlers-archive",
    "handlers-worktree",
-   "handlers-item-invariant-project",
+   "handlers-item",
+   "handlers-invariant",
+   "handlers-project",
    "handlers-search",
    "handlers-version"
   ],
