@@ -15,6 +15,9 @@ impl<S: IssueStore> CommandExecutor<S> {
         issue_id: Option<String>,
         limit: usize,
     ) -> Result<Vec<Event>> {
+        let issue = issue_id
+            .map(|id| super::resolve_issue_filter(&self.storage, &id))
+            .transpose()?;
         let events = self.storage.read_events()?;
 
         let filtered: Vec<Event> = events
@@ -26,8 +29,8 @@ impl<S: IssueStore> CommandExecutor<S> {
                         return false;
                     }
                 }
-                if let Some(ref iid) = issue_id {
-                    if e.get_issue_id() != iid {
+                if let Some(ref issue) = issue {
+                    if !issue.matches(e.get_issue_id()) {
                         return false;
                     }
                 }

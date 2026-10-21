@@ -7704,7 +7704,12 @@ fn run() -> Result<()> {
                 use jit::commands::claim::execute_claim_status;
                 use jit::output::{JsonOutput, OutputContext};
 
-                match execute_claim_status(&worktree_paths, issue.as_deref(), agent.as_deref()) {
+                match execute_claim_status(
+                    &storage,
+                    &worktree_paths,
+                    issue.as_deref(),
+                    agent.as_deref(),
+                ) {
                     Ok((leases, warnings)) => {
                         if json {
                             let msg = format!("{} active lease(s)", leases.len());

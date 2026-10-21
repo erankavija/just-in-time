@@ -640,7 +640,18 @@ impl<S: IssueStore> CommandExecutor<S> {
         &self,
         issue_id: &str,
     ) -> Result<crate::domain::Issue, crate::storage::PathReadError> {
-        self.storage.load_issue_or_not_found(issue_id)
+        use crate::storage::{AmbiguousIdError, IssueNotFoundError, PathReadError};
+
+        let prefix = IssueIdPrefix::parse(issue_id)
+            .map_err(|error| PathReadError::NotFound(error.to_string()))?;
+        let full_id = self.storage.resolve_issue_id(&prefix).map_err(|error| {
+            if error.is::<IssueNotFoundError>() || error.is::<AmbiguousIdError>() {
+                PathReadError::NotFound(error.to_string())
+            } else {
+                PathReadError::Other(error)
+            }
+        })?;
+        self.storage.load_issue_or_not_found(&full_id)
     }
 
     /// Read document content from git or filesystem.

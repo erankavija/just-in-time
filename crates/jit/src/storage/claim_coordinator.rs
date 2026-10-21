@@ -1170,7 +1170,7 @@ impl ClaimCoordinator {
     ///
     /// # Arguments
     ///
-    /// * `issue_id` - Optional filter by issue ID
+    /// * `issue_id` - Optional filter matching each lease's issue id
     /// * `agent_id` - Optional filter by agent ID
     ///
     /// # Returns
@@ -1182,7 +1182,7 @@ impl ClaimCoordinator {
     /// Returns an error if the index cannot be loaded
     pub fn get_active_leases(
         &self,
-        issue_id: Option<&str>,
+        issue_id: Option<&crate::domain::IssueIdPrefix>,
         agent_id: Option<&str>,
     ) -> Result<Vec<Lease>> {
         // 1. Acquire exclusive lock with metadata (needed for evict_expired which writes)
@@ -1202,8 +1202,8 @@ impl ClaimCoordinator {
             .leases
             .into_iter()
             .filter(|lease| {
-                if let Some(iid) = issue_id {
-                    if lease.issue_id != iid {
+                if let Some(issue) = issue_id {
+                    if !issue.matches(&lease.issue_id) {
                         return false;
                     }
                 }

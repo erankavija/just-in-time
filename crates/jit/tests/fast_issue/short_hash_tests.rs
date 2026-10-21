@@ -307,6 +307,11 @@ fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records
         ("archive preview", |h, short, _| {
             h.executor.preview_archive_container(short).map(drop)
         }),
+        ("events query", |h, short, _| {
+            h.executor
+                .query_events(None, Some(short.into()), 10)
+                .map(drop)
+        }),
     ];
 
     let h = TestHarness::new();
@@ -329,6 +334,53 @@ fn test_every_issue_id_entry_point_rejects_a_short_prefix_before_reading_records
         unrefused.is_empty(),
         "read before refusing a short prefix: {unrefused:?}"
     );
+}
+
+/// The event-query issue filter and the server document reads resolve a full
+/// id in any case or hyphenation to the issue it names.
+#[test]
+fn test_issue_id_filters_and_document_reads_resolve_any_spelling_of_a_full_id() {
+    let h = TestHarness::new();
+    let id = h.create_issue("Documented");
+    h.executor
+        .add_document_reference(&id, "d.md", None, None, None, true)
+        .unwrap();
+    let events = h
+        .executor
+        .query_events(None, Some(id.clone()), 100)
+        .unwrap();
+    assert!(!events.is_empty());
+    // The in-memory store backs no document bytes, so a read that resolved the
+    // issue fails on the document exactly as the canonical spelling does.
+    let read = |id: &str| format!("{:?}", h.executor.read_document_content(id, "d.md", None));
+    assert_ne!(read(&id), read("ffffffff"));
+
+    for spelling in [id.to_uppercase(), id.replace('-', "")] {
+        assert_eq!(
+            h.executor
+                .query_events(None, Some(spelling.clone()), 100)
+                .unwrap(),
+            events,
+            "{spelling}"
+        );
+        assert_eq!(read(&spelling), read(&id), "{spelling}");
+    }
+}
+
+/// An event-query issue filter naming a deleted issue still selects its
+/// events, in any spelling.
+#[test]
+fn test_query_events_issue_filter_matches_a_deleted_issue_in_any_spelling() {
+    let h = TestHarness::new();
+    let id = h.create_issue("Deleted");
+    h.executor.delete_issue(&id).unwrap();
+
+    let events = h
+        .executor
+        .query_events(None, Some(id.to_uppercase()), 100)
+        .unwrap();
+    assert!(!events.is_empty());
+    assert!(events.iter().all(|event| event.get_issue_id() == id));
 }
 
 // ========== Property-Based Tests ==========

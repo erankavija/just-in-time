@@ -1572,3 +1572,25 @@ fn test_config_show_reports_the_lease_enforcement_mode_issue_update_applies() {
         );
     }
 }
+
+/// `claim status --issue` resolves a full id in any case or hyphenation to the
+/// issue's lease.
+#[test]
+fn test_claim_status_issue_filter_resolves_any_spelling_of_a_full_id() {
+    let temp = setup_repo();
+    let issue_id = create_issue(temp.path(), "Leased");
+    let lease_id = acquire_lease(temp.path(), &issue_id, "agent:status");
+
+    for spelling in [issue_id.to_uppercase(), issue_id.replace('-', "")] {
+        let output = Command::new(assert_cmd::cargo::cargo_bin!("jit"))
+            .current_dir(temp.path())
+            .env("JIT_AGENT_ID", "agent:status")
+            .args(["claim", "status", "--issue", &spelling, "--json"])
+            .output()
+            .unwrap();
+        let json: Value = serde_json::from_slice(&output.stdout).unwrap();
+        let leases = json["leases"].as_array().unwrap();
+        assert_eq!(leases.len(), 1, "{spelling}: {json}");
+        assert_eq!(leases[0]["lease_id"], lease_id);
+    }
+}

@@ -2075,6 +2075,26 @@ fn discover_gate_run_results(
     Ok(())
 }
 
+/// The prefix an issue-id filter matches stored ids by: the canonical id
+/// `requested` resolves to, or, when it names no live issue, `requested` itself,
+/// so records of a deleted issue still match.
+///
+/// # Errors
+///
+/// [`InvalidIdPrefixError`](crate::domain::InvalidIdPrefixError) before any
+/// read, or [`AmbiguousIdError`](crate::storage::AmbiguousIdError).
+pub(crate) fn resolve_issue_filter<S: IssueStore>(
+    storage: &S,
+    requested: &str,
+) -> Result<IssueIdPrefix> {
+    let prefix = IssueIdPrefix::parse(requested)?;
+    match storage.resolve_issue_id(&prefix) {
+        Ok(id) => Ok(IssueIdPrefix::of_stored(&id)),
+        Err(error) if error.is::<crate::storage::IssueNotFoundError>() => Ok(prefix),
+        Err(error) => Err(error),
+    }
+}
+
 fn resolve_issue_from_capture(issues: &[Issue], prefix: &IssueIdPrefix) -> Result<String> {
     crate::storage::resolve_issue_id_among(prefix, issues)
 }
