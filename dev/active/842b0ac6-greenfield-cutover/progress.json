@@ -212,7 +212,7 @@
           "title": "Remove the DocumentReference builder methods",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "rework-awaiting-merge"
+          "status": "done"
         },
         {
           "id": "d125490a-558d-41d6-bfe6-2270d6bf7cf4",
@@ -230,7 +230,7 @@
           "title": "Keep one agent configuration type",
           "classification": "implementation",
           "model": "sonnet",
-          "status": "pending"
+          "status": "dispatched"
         },
         {
           "id": "af9a5509-51c2-4a3b-9881-b870603ab71c",
