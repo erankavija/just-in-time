@@ -252,6 +252,7 @@ mod tests {
         CaptureBudget, CaptureSpec, CapturedBytes, EntryIdentity, FileMode, PinnedDocumentEvidence,
         PinnedSourceClass, RepositoryEntry, RepositoryLayout, RepositoryRootEvidence,
     };
+    use crate::test_utils::{document_reference, document_reference_at};
     use std::collections::BTreeMap;
 
     const BUDGET: CaptureBudget = CaptureBudget {
@@ -266,17 +267,6 @@ mod tests {
             RepositoryRootEvidence::new("/repo/.jit", "data", true),
         )
         .unwrap()
-    }
-
-    fn reference(path: &str, commit: Option<&str>) -> DocumentReference {
-        DocumentReference {
-            path: path.to_string(),
-            commit: commit.map(String::from),
-            label: None,
-            doc_type: None,
-            format: None,
-            assets: Vec::new(),
-        }
     }
 
     fn present_evidence(revision: &str, path: &str) -> PinnedDocumentEvidence {
@@ -361,16 +351,17 @@ mod tests {
 
     #[test]
     fn test_for_reference_requests_only_the_pin_for_a_pinned_reference() {
-        let pinned = DocumentReferenceRequests::for_reference(&reference(
+        let pinned = DocumentReferenceRequests::for_reference(&document_reference_at(
             "docs/design.md",
-            Some("c".repeat(40).as_str()),
+            "c".repeat(40),
         ))
         .unwrap();
         assert!(pinned.worktree().is_none());
         assert_eq!(pinned.pinned(), ("c".repeat(40).as_str(), "docs/design.md"));
 
         let unpinned =
-            DocumentReferenceRequests::for_reference(&reference("docs/design.md", None)).unwrap();
+            DocumentReferenceRequests::for_reference(&document_reference("docs/design.md"))
+                .unwrap();
         assert_eq!(
             unpinned.worktree(),
             Some(&VirtualPath::worktree("docs/design.md").unwrap())
@@ -381,7 +372,7 @@ mod tests {
     #[test]
     fn test_resolve_document_reference_honours_the_pin_over_the_working_tree() {
         let commit = "d".repeat(40);
-        let document = reference("docs/design.md", Some(&commit));
+        let document = document_reference_at("docs/design.md", commit.as_str());
 
         let present = image(
             &document,
@@ -413,7 +404,7 @@ mod tests {
     #[test]
     fn test_resolve_document_reference_reports_pinned_directory_as_unsupported() {
         let commit = "f".repeat(40);
-        let document = reference("docs/studies", Some(&commit));
+        let document = document_reference_at("docs/studies", commit.as_str());
         let image = image(
             &document,
             true,
@@ -432,7 +423,7 @@ mod tests {
     #[test]
     fn test_resolve_document_reference_reports_an_uncaptured_pin() {
         let commit = "e".repeat(40);
-        let document = reference("docs/design.md", Some(&commit));
+        let document = document_reference_at("docs/design.md", commit.as_str());
         assert!(matches!(
             resolve_document_reference(&image(&document, true, None), &document)
                 .unwrap()
@@ -443,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_resolve_document_reference_falls_back_to_head_for_an_unpinned_reference() {
-        let document = reference("docs/design.md", None);
+        let document = document_reference("docs/design.md");
 
         assert!(resolve_document_reference(
             &image(

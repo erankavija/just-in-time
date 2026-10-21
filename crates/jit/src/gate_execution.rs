@@ -589,7 +589,7 @@ mod tests {
         BOOTSTRAP_LOCK_FILE, EVENTS_LOCK_FILE, GATES_LOCK_FILE, INDEX_LOCK_FILE,
         RECORD_SCRATCH_DIR, REPO_WRITE_LOCK_FILE, WORKTREE_IDENTITY_FILE,
     };
-    use crate::test_utils::document_reference;
+    use crate::test_utils::{document_reference, document_reference_typed};
     use std::collections::HashMap;
 
     #[test]
@@ -1204,12 +1204,8 @@ mod tests {
     fn test_build_issue_docs_env_serializes_path_type_and_label() {
         let docs = vec![
             DocumentReference {
-                path: "dev/active/plan.md".to_string(),
-                commit: None,
                 label: Some("Implementation Plan".to_string()),
-                doc_type: Some("design".to_string()),
-                format: None,
-                assets: Vec::new(),
+                ..document_reference_typed("dev/active/plan.md", "design")
             },
             // A doc with no label/doc_type still serializes, as explicit nulls.
             document_reference("NOTES.md"),
@@ -1235,12 +1231,8 @@ mod tests {
         // machine-readable list of {path, doc_type, label} for the issue's
         // linked documents.
         let documents = vec![DocumentReference {
-            path: "dev/active/my-plan.md".to_string(),
-            commit: None,
             label: Some("Plan".to_string()),
-            doc_type: Some("design".to_string()),
-            format: None,
-            assets: Vec::new(),
+            ..document_reference_typed("dev/active/my-plan.md", "design")
         }];
 
         let checker = GateChecker::Exec {

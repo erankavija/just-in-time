@@ -1,0 +1,41 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "33258bff117add50a48da713e63a82fca0418924",
+  "completed_at": "2026-10-21T16:11:23.598044302Z",
+  "duration_ms": 251052,
+  "evaluation_stability": "stable",
+  "exit_code": 1,
+  "findings": {
+    "findings": [
+      {
+        "disposition": "blocking",
+        "file": "crates/jit/src/document/reference.rs",
+        "id": "F1",
+        "line": 271,
+        "origin": "issue-impact",
+        "references": [
+          "@/issue/81e7cdc3/requirement/REQ-02"
+        ],
+        "severity": "high",
+        "summary": "A test-local DocumentReference builder remains, leaving hard REQ-02 unmet."
+      }
+    ],
+    "summary": "The shared DocumentReference fixture migration is incomplete.",
+    "verdict": "fail"
+  },
+  "gate_key": "code-review",
+  "issue_id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "6af3affa-cc62-4f95-81bd-7dfec4736801",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:07:12.545463192Z",
+  "status": "failed",
+  "stderr": "--- agent stderr (first 13 of 2641 lines; the session id below points to the full agent transcript) ---\nReading prompt from stdin...\nOpenAI Codex v0.162.0\n--------\nworkdir: /home/vkaskivuo/Projects/just-in-time\nmodel: gpt-5.6-terra\nprovider: openai\napproval: on-request\nsandbox: read-only\nreasoning effort: high\nreasoning summaries: none\nsession id: 01a15f37-7625-7d62-9989-74a188695f61\n--------\nuser\n--- 2628 more lines omitted (resume the session for the rest) ---\n",
+  "stdout": "Attribution: fe42b77de, 31bab5142 (identical patch)\nPolicy sources: AGENTS.md\nResolved items: @/issue/81e7cdc3/requirement/REQ-01–03 (.jit issue source); @/issue/842b0ac6/requirement/REQ-16 (.jit issue source); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/invariant/orthogonal-tests, @/invariant/essential-code-prose (.jit/invariants.toml); @/gate/cargo-ci (.jit/gates.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:05:38Z)\nTruncation recovery: none\n\n1. **F1 — blocking, issue-impact:** `crates/jit/src/document/reference.rs:271` still defines a test-local `reference` helper that constructs `DocumentReference`. This leaves hard REQ-02 unmet: test references do not exclusively use the new shared fixture and a test file still owns its own reference builder.\n\nTotal findings: 1\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"fail\",\"summary\":\"The shared DocumentReference fixture migration is incomplete.\",\"findings\":[{\"id\":\"F1\",\"severity\":\"high\",\"disposition\":\"blocking\",\"origin\":\"issue-impact\",\"summary\":\"A test-local DocumentReference builder remains, leaving hard REQ-02 unmet.\",\"file\":\"crates/jit/src/document/reference.rs\",\"line\":271,\"references\":[\"@/issue/81e7cdc3/requirement/REQ-02\"]}]}\nJIT-FINDINGS-JSON>>>\nVERDICT: FAIL\n---\nGate result: FAILED\n"
+}

@@ -1,0 +1,28 @@
+{
+  "branch": "main",
+  "by": "auto:executor",
+  "command": "./contrib/gates/ai-review.sh",
+  "commit": "f5ae631f730e57665cd3574e556dee5892d25b2e",
+  "completed_at": "2026-10-21T16:24:18.794941295Z",
+  "duration_ms": 85774,
+  "evaluation_stability": "stable",
+  "exit_code": 0,
+  "findings": {
+    "findings": [],
+    "summary": "All hard requirements are satisfied; the prior local-fixture finding is resolved.",
+    "verdict": "pass"
+  },
+  "gate_key": "code-review",
+  "issue_id": "81e7cdc3-881f-46c6-bb23-764e2604d570",
+  "message": null,
+  "origin": {
+    "derivation": "executed"
+  },
+  "run_id": "10e9fc89-f831-49a5-964f-5456566ce36b",
+  "schema_version": 1,
+  "stage": "postcheck",
+  "started_at": "2026-10-21T16:22:53.020832717Z",
+  "status": "passed",
+  "stderr": "",
+  "stdout": "Attribution: 31bab5142, fe42b77de, 787af6b7e, 3f61cfb77 (jit:81e7cdc3)\nPolicy sources: AGENTS.md\nResolved items: @/issue/81e7cdc3/requirement/REQ-01..REQ-03 (issue description); @/charter/D-18 (dev/vision/9db27a3a-charter.md); @/issue/842b0ac6/requirement/REQ-16 (parent issue); @/invariant/shared-test-contracts, @/invariant/orthogonal-tests, @/invariant/essential-code-prose, @/invariant/canonical-cutover (.jit/invariants.toml)\nGate evidence: cargo-ci passed (exit 0, 2026-10-21T16:21:12Z)\nTruncation recovery: reread affected patches in path-bounded calls; verified both merge first-parent patches have identical raw file pairs to their child commits\n\nTotal findings: 0\n\n<<<JIT-FINDINGS-JSON\n{\"verdict\":\"pass\",\"summary\":\"All hard requirements are satisfied; the prior local-fixture finding is resolved.\",\"findings\":[]}\nJIT-FINDINGS-JSON>>>\nVERDICT: PASS\n---\nGate result: PASSED\n"
+}

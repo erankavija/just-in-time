@@ -621,8 +621,8 @@ ISO 8601 timestamp when this agent config was created.
 Human-readable description of this agent.
 
 `[agent].id` is the active persistent identity source (after an explicit CLI
-identity and `JIT_AGENT_ID`). The optional `default_ttl_secs` field is parsed
-metadata only: it does not select a claim TTL.
+identity and `JIT_AGENT_ID`). All three fields are required, and any other key
+or section fails to load with an error naming it.
 
 ## Environment Variables
 
