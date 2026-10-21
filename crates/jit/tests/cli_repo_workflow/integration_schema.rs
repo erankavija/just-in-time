@@ -74,49 +74,32 @@ fn test_schema_exposes_profile_commands_and_typed_outputs() {
             "apply".to_string(),
             "capture".to_string(),
             "diff".to_string(),
-            "list".to_string(),
             "pack".to_string(),
-            "reconfigure".to_string(),
             "show".to_string(),
-            "upgrade".to_string(),
-            "validate".to_string(),
         ])
     );
-    for command in [
-        "list",
-        "show",
-        "validate",
-        "diff",
-        "apply",
-        "capture",
-        "pack",
-        "add",
-        "reconfigure",
-        "upgrade",
-    ] {
+    for command in ["show", "diff", "apply", "capture", "pack", "add"] {
         assert!(
             profile[command]["output"]["success_schema"].is_object(),
             "profile {command} must expose a success schema"
         );
     }
-    for command in ["apply", "capture", "pack", "add", "reconfigure", "upgrade"] {
+    for command in ["apply", "capture", "pack", "add"] {
         assert!(profile[command]["flags"]
             .as_array()
             .unwrap()
             .iter()
             .any(|flag| flag["name"] == "dry-run"));
     }
-    for command in ["apply", "reconfigure", "upgrade"] {
-        for name in ["set", "values-file"] {
-            assert!(
-                profile[command]["flags"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .any(|flag| flag["name"] == name),
-                "profile {command} must expose --{name}"
-            );
-        }
+    for name in ["set", "values-file"] {
+        assert!(
+            profile["apply"]["flags"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|flag| flag["name"] == name),
+            "profile apply must expose --{name}"
+        );
     }
 
     for command in profile.keys() {
@@ -165,17 +148,15 @@ fn test_schema_exposes_a_bare_show_id_and_tagged_lifecycle_selectors() {
         }])
     );
 
-    for command in ["apply", "reconfigure", "upgrade"] {
-        let flags = profile[command]["flags"].as_array().unwrap();
-        let selector = flags
-            .iter()
-            .find(|flag| flag["name"] == "profile")
-            .unwrap_or_else(|| panic!("profile {command} must expose --profile"));
-        assert_eq!(selector["type"], "array<string>");
-        assert_eq!(selector["required"], true);
-        assert!(!flags.iter().any(|flag| flag["name"] == "from"));
-        assert!(profile[command]["args"].as_array().unwrap().is_empty());
-    }
+    let flags = profile["apply"]["flags"].as_array().unwrap();
+    let selector = flags
+        .iter()
+        .find(|flag| flag["name"] == "profile")
+        .expect("profile apply must expose --profile");
+    assert_eq!(selector["type"], "array<string>");
+    assert_eq!(selector["required"], true);
+    assert!(!flags.iter().any(|flag| flag["name"] == "from"));
+    assert!(profile["apply"]["args"].as_array().unwrap().is_empty());
 
     let show_schema = &profile["show"]["output"]["success_schema"];
     let show_properties = show_schema

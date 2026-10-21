@@ -94,28 +94,10 @@ fn write_live_source_package(repo: &Path) {
     fs::write(repo.join(TARGET), "# Captured guide\n").expect("write owned target");
 }
 
-/// The structured divergence entry a `changed_target` report carries for
-/// [`PROFILE`]'s [`TARGET`], with its target, class, and typed remedy —
-/// REQ-02's whole answer rather than the summary sentence beside it.
-fn changed_target_divergence(report: &Value) -> &Value {
-    report["error"]["details"]["profiles"]
-        .as_array()
-        .expect("a divergent report carries profiles")
-        .iter()
-        .find(|profile| profile["id"] == PROFILE)
-        .expect("the report includes the profile")["divergences"]
-        .as_array()
-        .expect("a profile report carries divergences")
-        .iter()
-        .find(|entry| entry["kind"] == "changed_target" && entry["target"] == TARGET)
-        .expect("the edited target diverged")
-}
-
 /// Capturing an in-place edit makes the same package identity/version
-/// re-applicable and returns the repository to recorded agreement
-/// (jit:acf49914).
+/// re-applicable (jit:acf49914).
 #[test]
-fn test_profile_capture_refreshes_an_edited_owned_target_back_into_agreement() {
+fn test_profile_capture_refreshes_an_edited_owned_target_so_the_package_reapplies() {
     let repo = TempDir::new().expect("create repository");
     assert!(jit(repo.path(), &["init"]).status.success());
     write_live_source_package(repo.path());
@@ -158,29 +140,6 @@ fn test_profile_capture_refreshes_an_edited_owned_target_back_into_agreement() {
 
     let edited = b"# Edited in place\n";
     fs::write(repo.path().join(TARGET), edited).expect("edit the owned target");
-    let divergent = jit(repo.path(), &["profile", "validate", "--json"]);
-    assert_eq!(divergent.status.code(), Some(4), "{divergent:?}");
-    let report = json(&divergent);
-
-    // REQ-02: the reported divergence names the diverged target, its
-    // divergence class, and its typed remedy as structured details.
-    let divergence = changed_target_divergence(&report);
-    assert_eq!(
-        divergence["remedy"]["resolutions"],
-        serde_json::json!(["restore-recorded-content", "capture-repository-content"])
-    );
-
-    // REQ-03: capture is suggested because this divergence's remedy allows it.
-    let suggestions = report["error"]["suggestions"]
-        .as_array()
-        .expect("a divergence report attaches suggestions");
-    assert!(
-        suggestions.iter().any(|suggestion| suggestion
-            .as_str()
-            .is_some_and(|text| text.contains("jit profile capture"))),
-        "suggestions: {suggestions:?}"
-    );
-
     let repository_before_refusal = files(repo.path());
     let refused = jit(
         repo.path(),
@@ -261,16 +220,4 @@ fn test_profile_capture_refreshes_an_edited_owned_target_back_into_agreement() {
         initial_record["package_hash"]
     );
     assert_eq!(fs::read(repo.path().join(TARGET)).unwrap(), edited);
-
-    let agreement = jit(repo.path(), &["profile", "validate", "--json"]);
-    assert!(agreement.status.success(), "{agreement:?}");
-    assert!(json(&agreement)["profiles"]
-        .as_array()
-        .expect("an agreement report carries profiles")
-        .iter()
-        .find(|profile| profile["id"] == PROFILE)
-        .expect("the agreement report includes the profile")["divergences"]
-        .as_array()
-        .expect("a profile report carries divergences")
-        .is_empty());
 }

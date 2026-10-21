@@ -193,19 +193,9 @@ pub(super) fn json(output: &Output) -> Value {
 }
 
 #[test]
-fn test_profile_list_and_show_work_without_repository() {
+fn test_profile_show_works_without_repository() {
     let repo = TempDir::new().unwrap();
 
-    // A directory that is not a repository has recorded no profile, so it names
-    // none.
-    let list = jit(repo.path(), &["profile", "list", "--json"]);
-    assert!(list.status.success(), "{list:?}");
-    let list = json(&list);
-    assert_eq!(list["count"], 0);
-    assert_eq!(list["profiles"].as_array().unwrap(), &Vec::<Value>::new());
-
-    // Inspection still resolves a package a location names, which is the only
-    // route left when nothing has been recorded.
     let location = crate::repository_package_at(repo.path(), "jit-dogfood");
     let show = jit(
         repo.path(),
@@ -829,7 +819,7 @@ fn test_profile_variable_inputs_cover_init_apply_dry_run_and_dependency_preceden
 }
 
 #[test]
-fn test_profile_variable_record_drives_validation_and_provenance_checks() {
+fn test_profile_variable_record_keeps_the_resolved_value_out_of_events_and_validates() {
     let repo = TempDir::new().unwrap();
     assert!(jit(repo.path(), &["init"]).status.success());
     write_variable_package(
@@ -867,8 +857,7 @@ fn test_profile_variable_record_drives_validation_and_provenance_checks() {
     );
 
     let record_path = repo.path().join(".jit/profiles/recorded-vars.json");
-    let record_bytes = fs::read(&record_path).unwrap();
-    let record: Value = serde_json::from_slice(&record_bytes).unwrap();
+    let record: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
     assert_eq!(record["variables"]["NAME"]["value"], resolved_value);
     assert_eq!(record["variables"]["NAME"]["source"], "set");
     let events = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
@@ -884,30 +873,6 @@ fn test_profile_variable_record_drives_validation_and_provenance_checks() {
         .unwrap();
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
-
-    let assert_applied = |mutated: Value, expected_applied: bool| {
-        fs::write(&record_path, serde_json::to_vec_pretty(&mutated).unwrap()).unwrap();
-        let listed = jit(repo.path(), &["profile", "list", "--json"]);
-        assert!(listed.status.success(), "{listed:?}");
-        assert_eq!(
-            json(&listed)["profiles"][0]["applied"],
-            expected_applied,
-            "{listed:?}"
-        );
-    };
-    let mut value_tamper = record.clone();
-    value_tamper["variables"]["NAME"]["value"] = Value::String("tampered".to_string());
-    assert_applied(value_tamper, true);
-    let mut source_tamper = record.clone();
-    source_tamper["variables"]["NAME"]["source"] = Value::String("values_file".to_string());
-    assert_applied(source_tamper, true);
-    let mut package_hash_tamper = record.clone();
-    package_hash_tamper["package_hash"] = Value::String("0".repeat(64));
-    assert_applied(package_hash_tamper, false);
-    let mut claim_tamper = record.clone();
-    claim_tamper["claims"][0]["base_fingerprint"] = Value::String("0".repeat(64));
-    assert_applied(claim_tamper, true);
-    fs::write(record_path, record_bytes).unwrap();
 }
 
 #[test]
@@ -1048,17 +1013,6 @@ fn test_profile_apply_from_a_supplied_location_is_re_read_from_the_record() {
     );
     assert!(reapplied.status.success(), "{reapplied:?}");
     assert_eq!(requested_profile(&json(&reapplied))["status"], "unchanged");
-
-    let listed = jit(repo.path(), &["profile", "list", "--json"]);
-    assert!(listed.status.success(), "{listed:?}");
-    let listed = json(&listed);
-    assert_eq!(listed["count"], 1);
-    assert_eq!(listed["profiles"][0]["id"], FIXTURE_PROFILE);
-    assert_eq!(listed["profiles"][0]["applied"], true);
-    assert_eq!(
-        listed["profiles"][0]["origin"],
-        serde_json::json!({ "source": "directory", "location": location })
-    );
 }
 
 #[test]
@@ -1123,56 +1077,6 @@ fn test_profile_show_prefers_a_supplied_location_over_the_recorded_one() {
         recorded_show["profiles"][0]["origin"],
         serde_json::json!({ "source": "directory", "location": recorded })
     );
-}
-
-#[test]
-fn test_profile_list_reports_a_recorded_location_that_no_longer_resolves() {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    let location = package_at(repo.path(), "vendor/planner");
-    assert!(jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &path_selector(location),
-            "--json"
-        ]
-    )
-    .status
-    .success());
-    fs::remove_dir_all(repo.path().join(location)).unwrap();
-
-    let listed = jit(repo.path(), &["profile", "list", "--json"]);
-
-    assert!(!listed.status.success(), "{listed:?}");
-    let listed = json(&listed);
-    let message = listed["error"]["message"].as_str().unwrap_or_default();
-    assert!(
-        message.contains(&format!(".jit/profiles/{FIXTURE_PROFILE}.json"))
-            && message.contains(location),
-        "the failure must name the record and the location: {listed}"
-    );
-    assert_ne!(
-        listed["error"]["code"], "PROFILE_NOT_FOUND",
-        "a record whose package moved is not a profile this repository never applied"
-    );
-
-    // A location that is simply gone carries a NotFound cause, which the human
-    // path would otherwise classify as a missing repository. Both renderings
-    // report one failure, so they carry one exit status.
-    let plain = jit(repo.path(), &["profile", "list"]);
-    assert_eq!(
-        plain.status.code(),
-        jit(repo.path(), &["profile", "list", "--json"])
-            .status
-            .code(),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&plain.stdout),
-        String::from_utf8_lossy(&plain.stderr)
-    );
-    assert_ne!(plain.status.code(), Some(3), "{plain:?}");
 }
 
 #[test]
@@ -1299,26 +1203,6 @@ fn test_init_profile_resolves_a_declared_dependency_beside_the_declaring_package
     let validate = jit(repo.path(), &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
-    let listed = jit(repo.path(), &["profile", "list", "--json"]);
-    assert!(listed.status.success(), "{listed:?}");
-    let listed = json(&listed);
-    let carried: Vec<(&str, &Value)> = listed["profiles"]
-        .as_array()
-        .expect("the repository names the profiles it carries")
-        .iter()
-        .map(|profile| {
-            (
-                profile["id"].as_str().expect("a named profile"),
-                &profile["applied"],
-            )
-        })
-        .collect();
-    assert!(
-        ["jit-default", FIXTURE_PROFILE]
-            .iter()
-            .all(|id| carried.contains(&(*id, &Value::Bool(true)))),
-        "the repository carries both packages as applied: {listed}"
-    );
 }
 
 #[test]
@@ -1429,7 +1313,7 @@ fn test_profile_unknown_id_has_typed_json_error_without_mutation() {
 }
 
 #[test]
-fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
+fn test_profiled_init_publishes_a_valid_repo() {
     let repo = TempDir::new().unwrap();
     let init = jit(
         repo.path(),
@@ -1453,9 +1337,6 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
         .path()
         .join(".agents/skills/jit-manage/SKILL.md")
         .is_file());
-    let applied = init["profile"]["profiles"]
-        .as_array()
-        .expect("one result per applied package");
     let events = fs::read_to_string(repo.path().join(".jit/events.jsonl"))
         .unwrap()
         .lines()
@@ -1472,24 +1353,6 @@ fn test_profiled_init_publishes_valid_repo_and_applied_inventory() {
     let validate = jit(repo.path(), &["validate", "--json"]);
     assert!(validate.status.success(), "{validate:?}");
     assert_eq!(json(&validate)["valid"], true);
-
-    // Every package the initialization applied is enumerated as applied.
-    // Enumeration follows the records, whose order is theirs rather than the
-    // closure's, so the two are compared as sets.
-    let list = json(&jit(repo.path(), &["profile", "list", "--json"]));
-    let listed = list["profiles"]
-        .as_array()
-        .expect("a listed profile per record")
-        .iter()
-        .map(|profile| (profile["id"].to_string(), profile["applied"].clone()))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    assert_eq!(
-        listed,
-        applied
-            .iter()
-            .map(|profile| (profile["id"].to_string(), Value::Bool(true)))
-            .collect::<std::collections::BTreeMap<_, _>>()
-    );
 }
 
 #[test]
@@ -1827,25 +1690,6 @@ pub(super) fn write_lifecycle_package(repo: &Path, location: &str, id: &str, ver
     fs::write(root.join("assets/fixed.txt"), "no variable reaches this\n").unwrap();
 }
 
-/// Initialize a repository holding the lifecycle package, and apply it.
-fn installed_lifecycle_repository(id: &str) -> TempDir {
-    let repo = TempDir::new().unwrap();
-    assert!(jit(repo.path(), &["init"]).status.success());
-    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "1.0.0");
-    let applied = jit(
-        repo.path(),
-        &[
-            "profile",
-            "apply",
-            "--profile",
-            &path_selector("packages/lifecycle"),
-            "--json",
-        ],
-    );
-    assert!(applied.status.success(), "{applied:?}");
-    repo
-}
-
 /// Every collection a response carries reads through the project's count
 /// envelope, so a machine consumer never has to know which key holds it.
 fn assert_count_envelope(response: &Value, collection: &str) {
@@ -1883,203 +1727,6 @@ fn assert_human_profile_decision(
         "{stdout}"
     );
     assert!(stdout.contains("  create:"), "{stdout}");
-}
-
-#[test]
-fn test_profile_reconfigure_and_upgrade_json_carry_the_count_wrapped_collection_envelope() {
-    let id = "lifecycle-envelope";
-    let repo = installed_lifecycle_repository(id);
-
-    let rehearsal = jit(
-        repo.path(),
-        &[
-            "profile",
-            "reconfigure",
-            "--profile",
-            &id_selector(id),
-            "--set",
-            "GREETING=supplied",
-            "--dry-run",
-            "--json",
-        ],
-    );
-    assert!(rehearsal.status.success(), "{rehearsal:?}");
-    assert_count_envelope(&json(&rehearsal), "profiles");
-
-    let reconfigured = jit(
-        repo.path(),
-        &[
-            "profile",
-            "reconfigure",
-            "--profile",
-            &id_selector(id),
-            "--set",
-            "GREETING=supplied",
-            "--json",
-        ],
-    );
-    assert!(reconfigured.status.success(), "{reconfigured:?}");
-    assert_count_envelope(&json(&reconfigured), "profiles");
-    assert_eq!(requested_profile(&json(&reconfigured))["status"], "applied");
-
-    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "2.0.0");
-    let upgraded = jit(
-        repo.path(),
-        &[
-            "profile",
-            "upgrade",
-            "--profile",
-            &id_selector(id),
-            "--json",
-        ],
-    );
-    assert!(upgraded.status.success(), "{upgraded:?}");
-    assert_count_envelope(&json(&upgraded), "profiles");
-    assert_eq!(requested_profile(&json(&upgraded))["version"], "2.0.0");
-}
-
-#[test]
-fn test_profile_reconfigure_and_upgrade_run_without_a_git_directory() {
-    let id = "lifecycle-gitless";
-    let repo = installed_lifecycle_repository(id);
-    assert!(
-        !repo.path().join(".git").exists(),
-        "the scenario is a repository git never touched"
-    );
-
-    let reconfigured = jit(
-        repo.path(),
-        &[
-            "profile",
-            "reconfigure",
-            "--profile",
-            &id_selector(id),
-            "--set",
-            "GREETING=supplied",
-        ],
-    );
-    assert!(reconfigured.status.success(), "{reconfigured:?}");
-    assert_eq!(
-        fs::read_to_string(repo.path().join(format!("docs/{id}-templated.txt"))).unwrap(),
-        "greeting=supplied\n"
-    );
-
-    write_lifecycle_package(repo.path(), "packages/lifecycle", id, "2.0.0");
-    let upgraded = jit(
-        repo.path(),
-        &["profile", "upgrade", "--profile", &id_selector(id)],
-    );
-
-    assert!(upgraded.status.success(), "{upgraded:?}");
-    assert!(!repo.path().join(".git").exists());
-    assert_eq!(
-        stored_lifecycle_record(repo.path(), id)["version"],
-        "2.0.0",
-        "the upgrade published its new provenance without git"
-    );
-}
-
-/// The record this repository stores for the lifecycle package.
-fn stored_lifecycle_record(repo: &Path, id: &str) -> Value {
-    serde_json::from_slice(&fs::read(repo.join(format!(".jit/profiles/{id}.json"))).unwrap())
-        .expect("a stored record is JSON")
-}
-
-#[test]
-fn test_profile_reconfigure_exits_non_zero_and_publishes_nothing_on_a_conflict() {
-    let id = "lifecycle-conflict";
-    let repo = installed_lifecycle_repository(id);
-    let target = repo.path().join(format!("docs/{id}-templated.txt"));
-    fs::write(&target, "greeting=edited in place\n").unwrap();
-    let events_before = fs::read(repo.path().join(".jit/events.jsonl")).unwrap();
-    let record_before = fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap();
-
-    let output = jit(
-        repo.path(),
-        &[
-            "profile",
-            "reconfigure",
-            "--profile",
-            &id_selector(id),
-            "--set",
-            "GREETING=supplied",
-            "--json",
-        ],
-    );
-
-    // REQ-04: the conflict code and exit status are the pinned compatibility
-    // contract this refusal keeps byte-stable.
-    assert_eq!(
-        output.status.code(),
-        Some(4),
-        "publishing nothing because of a conflict is a validation failure: {output:?}"
-    );
-    let body = json(&output);
-    assert_eq!(body["error"]["code"], "PROFILE_CONFLICT");
-    let message = body["error"]["message"]
-        .as_str()
-        .expect("a conflict states what diverged")
-        .to_string();
-    for expected in [format!("docs/{id}-templated.txt"), id.to_string()] {
-        assert!(
-            message.contains(&expected),
-            "the conflict omits '{expected}': {message}"
-        );
-    }
-    // The refusal names the values that no longer agree and what resolves it,
-    // and it names them as facts rather than as the Rust types carrying them.
-    assert!(
-        ["recorded", "now", "would publish", "jit profile capture"]
-            .iter()
-            .all(|stated| message.contains(stated))
-            && !message.contains("ProfileBaseFingerprint"),
-        "a conflict states the values that disagree and a remedy: {message}"
-    );
-
-    // REQ-01: the same refusal names the conflicting target, its conflict
-    // class, and its typed remedy as structured details, not just prose.
-    let conflicts = body["error"]["details"]["conflicts"]
-        .as_array()
-        .expect("a conflict attaches structured details");
-    let entry = conflicts
-        .iter()
-        .find(|entry| {
-            entry["subject"]["path"]
-                .as_str()
-                .is_some_and(|path| path.ends_with(&format!("docs/{id}-templated.txt")))
-        })
-        .expect("the refused target appears in the structured details");
-    assert_eq!(entry["owner"], id);
-    assert_eq!(entry["subject"]["kind"], "file");
-    assert_eq!(entry["conflict"]["kind"], "diverged");
-    assert_eq!(
-        entry["conflict"]["remedy"]["resolutions"],
-        serde_json::json!(["restore-recorded-content", "capture-repository-content"])
-    );
-
-    // REQ-03: capture is suggested because this remedy allows it.
-    let suggestions = body["error"]["suggestions"]
-        .as_array()
-        .expect("a conflict attaches suggestions");
-    assert!(
-        suggestions.iter().any(|suggestion| suggestion
-            .as_str()
-            .is_some_and(|text| text.contains("jit profile capture"))),
-        "suggestions: {suggestions:?}"
-    );
-
-    assert_eq!(
-        fs::read_to_string(&target).unwrap(),
-        "greeting=edited in place\n"
-    );
-    assert_eq!(
-        fs::read(repo.path().join(".jit/events.jsonl")).unwrap(),
-        events_before
-    );
-    assert_eq!(
-        fs::read(repo.path().join(format!(".jit/profiles/{id}.json"))).unwrap(),
-        record_before
-    );
 }
 
 /// A package directory whose live assets are absent from it and present in the

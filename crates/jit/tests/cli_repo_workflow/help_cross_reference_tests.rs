@@ -113,12 +113,6 @@ fn test_invariant_help_mentions_item_list_route() {
 
 #[test]
 fn test_profile_help_describes_repository_package_locations() {
-    let list = help_text(&["profile", "list", "--help"]);
-    assert!(
-        list.contains("repository package locations"),
-        "profile list --help should describe repository package locations, got: {list}"
-    );
-
     for command in ["show", "apply"] {
         let help = help_text(&["profile", command, "--help"]);
         assert!(

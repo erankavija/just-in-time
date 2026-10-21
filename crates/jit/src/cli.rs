@@ -2971,13 +2971,6 @@ pub enum HooksCommands {
 /// Repository profile commands.
 #[derive(Debug, Subcommand)]
 pub enum ProfileCommands {
-    /// List the profiles this repository records from repository package locations
-    List {
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
     /// Show one profile manifest and package identity from a repository package
     Show {
         /// Select one recorded profile by its bare canonical id.
@@ -2989,31 +2982,6 @@ pub enum ProfileCommands {
         #[arg(long, value_name = "SELECTOR", action = ArgAction::Append)]
         profile: Vec<String>,
 
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Check the profiles this repository records against their packages and its own content
-    ///
-    /// Reads every applied-profile record and reports, per profile, whether the
-    /// package is still readable at the location that record names, whether it
-    /// is still the package the record identifies, and whether each target the
-    /// record claims still holds the value that profile published. A target the
-    /// record claims that is no longer in the repository, and every target
-    /// claimed by a record whose package is gone, are reported in their own
-    /// right.
-    ///
-    /// The check writes nothing and exits 4 when any profile diverged, so it
-    /// serves as a repository check. A repository that has applied no profile
-    /// reports none and succeeds.
-    ///
-    /// Examples:
-    ///   jit profile validate
-    ///   jit profile validate --json
-    ///
-    /// JSON output uses the list envelope `{"count": N, "profiles": [...]}`.
-    Validate {
         /// Output as JSON
         #[arg(long)]
         json: bool,
@@ -3090,35 +3058,6 @@ pub enum ProfileCommands {
         set: Vec<String>,
 
         /// Build and validate the exact application plans without writing
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
-
-    /// Re-render an installed profile from recorded values and supplied overrides
-    Reconfigure {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append,
-            required = true
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-
-        /// Build and validate the exact reconfiguration plan without writing
         #[arg(long)]
         dry_run: bool,
 
@@ -3228,35 +3167,6 @@ pub enum ProfileCommands {
         #[arg(long)]
         json: bool,
     },
-
-    /// Replace an installed profile with a newer package version
-    Upgrade {
-        /// Select a recorded profile id or worktree package directory
-        /// (`id:ID` or `path:DIR`). Repeatable; occurrence order is preserved.
-        #[arg(
-            long,
-            value_name = "SELECTOR",
-            action = ArgAction::Append,
-            required = true
-        )]
-        profile: Vec<String>,
-
-        /// Optional TOML file containing the `[variables]` value map.
-        #[arg(long, value_name = "PATH")]
-        values_file: Option<std::path::PathBuf>,
-
-        /// Set one declared profile variable; repeatable and last-wins.
-        #[arg(long = "set", value_name = "NAME=VALUE", action = ArgAction::Append)]
-        set: Vec<String>,
-
-        /// Build and validate the exact upgrade plan without writing
-        #[arg(long)]
-        dry_run: bool,
-
-        /// Output as JSON
-        #[arg(long)]
-        json: bool,
-    },
 }
 
 impl Commands {
@@ -3349,9 +3259,7 @@ impl Commands {
 impl ProfileCommands {
     fn requires_recovery_dispatch(&self) -> bool {
         match self {
-            Self::Apply { dry_run, .. }
-            | Self::Reconfigure { dry_run, .. }
-            | Self::Upgrade { dry_run, .. } => !*dry_run,
+            Self::Apply { dry_run, .. } => !*dry_run,
             // Each of these publishes a redo record — a captured or
             // added package tree, or an archive written inside a repository
             // root — so they dispatch recovery like every other mutating
@@ -3359,9 +3267,7 @@ impl ProfileCommands {
             Self::Capture { dry_run, .. }
             | Self::Pack { dry_run, .. }
             | Self::Add { dry_run, .. } => !*dry_run,
-            Self::List { .. } | Self::Show { .. } | Self::Validate { .. } | Self::Diff { .. } => {
-                false
-            }
+            Self::Show { .. } | Self::Diff { .. } => false,
         }
     }
 }
@@ -3530,16 +3436,12 @@ impl SnapshotCommands {
 impl ProfileCommands {
     fn coordinates_claims_first(&self) -> bool {
         match self {
-            Self::List { .. }
-            | Self::Show { .. }
-            | Self::Validate { .. }
+            Self::Show { .. }
             | Self::Diff { .. }
             | Self::Apply { .. }
             | Self::Capture { .. }
             | Self::Pack { .. }
-            | Self::Add { .. }
-            | Self::Reconfigure { .. }
-            | Self::Upgrade { .. } => false,
+            | Self::Add { .. } => false,
         }
     }
 }
@@ -3878,12 +3780,8 @@ mod recovery_dispatch_tests {
         "profile apply",
         "profile capture",
         "profile diff",
-        "profile list",
         "profile pack",
-        "profile reconfigure",
         "profile show",
-        "profile upgrade",
-        "profile validate",
         "project render",
         "query all",
         "query available",

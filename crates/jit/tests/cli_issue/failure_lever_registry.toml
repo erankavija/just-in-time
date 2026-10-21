@@ -672,26 +672,6 @@ expected_exit = 1
 confirmation = "invoked"
 
 [[arms]]
-path = "profile list"
-argv = ["profile", "list", "--json"]
-setup = ["init", "malformed-profile-record"]
-setup_notes = "Create .jit/profiles/jit-dogfood.json with malformed JSON after initialization."
-expected_failure = "PROFILE_CONFLICT because the installed profile record is malformed"
-expected_code = "PROFILE_CONFLICT"
-expected_exit = 4
-confirmation = "invoked"
-
-[[arms]]
-path = "profile validate"
-argv = ["profile", "validate", "--json"]
-setup = ["init", "malformed-profile-record"]
-setup_notes = "Create .jit/profiles/jit-dogfood.json with malformed JSON after initialization."
-expected_failure = "PROFILE_CONFLICT because provenance that cannot be read is a repository the check cannot answer over, not a profile that diverged"
-expected_code = "PROFILE_CONFLICT"
-expected_exit = 4
-confirmation = "invoked"
-
-[[arms]]
 path = "profile show"
 argv = ["profile", "show", "--profile", "id:absent-profile", "--json"]
 setup = ["init"]
@@ -743,24 +723,6 @@ setup = ["init"]
 expected_failure = "PROFILE_ERROR for an archive path that names no readable file"
 expected_code = "PROFILE_ERROR"
 expected_exit = 1
-confirmation = "invoked"
-
-[[arms]]
-path = "profile reconfigure"
-argv = ["profile", "reconfigure", "--profile", "id:absent-profile", "--json"]
-setup = ["init"]
-expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
-expected_code = "PROFILE_NOT_FOUND"
-expected_exit = 3
-confirmation = "invoked"
-
-[[arms]]
-path = "profile upgrade"
-argv = ["profile", "upgrade", "--profile", "id:absent-profile", "--json"]
-setup = ["init"]
-expected_failure = "PROFILE_NOT_FOUND for a profile ID no location and no record supplies"
-expected_code = "PROFILE_NOT_FOUND"
-expected_exit = 3
 confirmation = "invoked"
 
 [[arms]]

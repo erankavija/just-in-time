@@ -887,8 +887,7 @@ fn fingerprint_label(value: &ThreeWayValue<ProfileBaseFingerprint>) -> String {
 /// refused: a repository file it publishes bytes into, or a semantic identity
 /// it declares inside a registry. The registry file is not the identity's
 /// subject — several packages contribute distinct identities to one registry —
-/// so an identity is named by the canonical spelling `jit profile validate`
-/// names it with.
+/// so an identity is named by its canonical spelling.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileTargetSubject {
     /// A repository file the package publishes.
@@ -1178,9 +1177,7 @@ impl AppliedProfileClaimIdentity {
     ///
     /// A semantic declaration is read from the registry its identity names, and
     /// an asset or managed region from the path it occupies. A capture that
-    /// intends to compare a claim must cover this path, and
-    /// [`claimed_target_state`] reads exactly it, so both sides of that
-    /// arrangement derive the path here.
+    /// reads a claim must cover this path.
     ///
     /// # Errors
     ///
@@ -1207,8 +1204,7 @@ impl AppliedProfileClaimIdentity {
 /// A semantic declaration is named by its own canonical identity, which already
 /// begins with its registry path; an asset by the repository path it occupies;
 /// and a managed region by its document and region id. Every message about a
-/// claim — the profile check's report and repository-wide validation's finding —
-/// names it this way, so an adopter reading either finds the same subject.
+/// claim, including repository-wide validation's finding, names it this way.
 impl std::fmt::Display for AppliedProfileClaimIdentity {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -1335,9 +1331,7 @@ const REGION_MARKER_PREFIX: &[u8] = b"<!-- jit:";
 
 /// The exact delimiters one profile-owned managed region is published between.
 ///
-/// Composition splices a region between these bytes and the ownership check
-/// reads it back from between them, so the pair is spelled once here rather
-/// than at each end of that round trip.
+/// Composition splices a region between these bytes.
 fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
     let delimiter = |edge: &str| {
         [
@@ -1348,13 +1342,6 @@ fn region_delimiters(region_id: &RegionId) -> (Vec<u8>, Vec<u8>) {
         .concat()
     };
     (delimiter("begin"), delimiter("end"))
-}
-
-/// Whether `body` carries a managed-region delimiter, meaning some owner
-/// manages a region inside it.
-fn carries_nested_region(body: &[u8]) -> bool {
-    body.windows(REGION_MARKER_PREFIX.len())
-        .any(|window| window == REGION_MARKER_PREFIX)
 }
 
 fn file_mode_bytes(mode: FileMode) -> Vec<u8> {
@@ -2746,125 +2733,6 @@ fn retained_semantic_claim_identities(
             identity: contribution.semantic_identity(),
         })
         .collect())
-}
-
-/// What a captured image says about the value one recorded ownership claim
-/// published.
-///
-/// The comparison is against the claim's own recorded base, never against what
-/// a package would publish today, so it answers "does the repository still hold
-/// what this profile put there" for a repository whose package moved, changed,
-/// or disappeared.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ClaimedTargetState {
-    /// The claimed target lies outside this capture, so this image is not
-    /// evidence either way.
-    Uncaptured,
-    /// The repository holds the claimed target, but its value is composed with
-    /// content another owner manages, so this claim's recorded base is not the
-    /// whole of what sits there.
-    Composed,
-    /// The repository no longer holds what the claim names.
-    Absent,
-    /// The repository holds exactly the value the claim recorded.
-    Unchanged,
-    /// The repository holds a value other than the one the claim recorded.
-    Changed,
-}
-
-impl ClaimedTargetState {
-    fn matching(matches: bool) -> Self {
-        if matches {
-            Self::Unchanged
-        } else {
-            Self::Changed
-        }
-    }
-}
-
-/// Compare one recorded ownership claim against the value `base` currently
-/// holds for it.
-///
-/// This is the sole comparison behind the profile-scoped agreement check, so
-/// each claim kind is read back through the construction that published it: an
-/// asset by its exact bytes and mode, a managed region by the body between the
-/// delimiters composition splices it under, and a semantic declaration by the
-/// registry entry its identity names.
-///
-/// A region's published body is read back with the newline the splice inserts
-/// after the begin delimiter removed, and a content that did not end in a
-/// newline is stored with the terminator the splice supplies. Both spellings
-/// render the same document, so either matching the recorded fingerprint is
-/// agreement rather than a difference the document could express.
-///
-/// A region whose published body carries a region another owner manages — a
-/// package's guidance region enclosing a configured projection's region — is
-/// [`ClaimedTargetState::Composed`] rather than compared. That nested body is
-/// rendered from what its own owner declares and moves whenever that
-/// declaration does, so the profile's recorded base is not the whole of what
-/// sits between its delimiters and a comparison against it would report every
-/// such profile as diverged. Its presence is still answered: a document or a
-/// delimiter pair that is gone is [`ClaimedTargetState::Absent`].
-///
-/// # Errors
-///
-/// Returns [`RepositoryStateError`] when the image cannot be read at a captured
-/// path, when a registry the claim names is not a regular file, or when the
-/// registry does not parse as the declaration the identity addresses.
-pub fn claimed_target_state(
-    base: &RepositoryImage,
-    claim: &AppliedProfileClaim,
-) -> Result<ClaimedTargetState, RepositoryStateError> {
-    let path = claim.identity.claimed_path(base.layout())?;
-    if !base.capture_spec().contains_path(&path) {
-        return Ok(ClaimedTargetState::Uncaptured);
-    }
-    match &claim.identity {
-        AppliedProfileClaimIdentity::Semantic { identity } => {
-            Ok(match repository_definition(base, identity)? {
-                None => ClaimedTargetState::Absent,
-                Some(current) => ClaimedTargetState::matching(
-                    fingerprint_semantic_contribution(&current)
-                        .map_err(ProducerError::ProfileClaimFingerprint)?
-                        == claim.base_fingerprint,
-                ),
-            })
-        }
-        AppliedProfileClaimIdentity::Asset { .. } => {
-            Ok(match base.entry(&path).map_err(ProducerError::from)? {
-                RepositoryEntry::File { content, mode } => ClaimedTargetState::matching(
-                    fingerprint_profile_asset(content.bytes(), *mode) == claim.base_fingerprint,
-                ),
-                _ => ClaimedTargetState::Absent,
-            })
-        }
-        AppliedProfileClaimIdentity::ManagedRegion { region_id, .. } => {
-            let RepositoryEntry::File { content, mode } =
-                base.entry(&path).map_err(ProducerError::from)?
-            else {
-                return Ok(ClaimedTargetState::Absent);
-            };
-            let (begin, end) = region_delimiters(region_id);
-            let Some(body) = super::managed_document::region_body(content.bytes(), &begin, &end)
-            else {
-                return Ok(ClaimedTargetState::Absent);
-            };
-            if carries_nested_region(body) {
-                return Ok(ClaimedTargetState::Composed);
-            }
-            let published = body.strip_prefix(b"\n").unwrap_or(body);
-            Ok(ClaimedTargetState::matching(
-                [
-                    published,
-                    published.strip_suffix(b"\n").unwrap_or(published),
-                ]
-                .into_iter()
-                .any(|content| {
-                    fingerprint_managed_region(region_id, content, *mode) == claim.base_fingerprint
-                }),
-            ))
-        }
-    }
 }
 
 /// Read the repository definition carrying one semantic identity, if authored.
@@ -4886,246 +4754,5 @@ mod tests {
         assert!(render_composed_contributions(&image, &[])
             .unwrap()
             .is_empty());
-    }
-
-    /// An image whose exact-path closure is `captured` and which holds a file at
-    /// each path `held` names.
-    ///
-    /// A path in `captured` but not in `held` is captured absence; a path in
-    /// neither is outside the closure, which is what distinguishes "the
-    /// repository no longer holds this" from "this image cannot say".
-    fn image_over(
-        captured: &[VirtualPath],
-        held: &[(VirtualPath, &[u8], FileMode)],
-    ) -> RepositoryImage {
-        let layout = super::super::RepositoryLayout::new(
-            super::super::RepositoryRootEvidence::new("/repo", "worktree", true),
-            super::super::RepositoryRootEvidence::new("/repo/.jit", "data", true),
-        )
-        .expect("layout is valid");
-        // The registry is always in the closure.
-        let captured = std::iter::once(VirtualPath::CONFIG)
-            .chain(captured.iter().cloned())
-            .collect::<BTreeSet<_>>();
-        let spec = CaptureSpec::new(
-            captured.iter().cloned(),
-            CaptureBudget {
-                max_listings: 0,
-                max_bytes: 64 * 1024,
-                max_depth: 8,
-            },
-        )
-        .expect("capture spec is valid");
-        let entries = captured
-            .iter()
-            .map(|path| {
-                let held = held.iter().find(|(candidate, ..)| candidate == path);
-                let entry = match held {
-                    None => RepositoryEntry::Absent,
-                    Some((path, bytes, mode)) => RepositoryEntry::File {
-                        content: CapturedBytes::new(path.repository_relative(), bytes.to_vec())
-                            .expect("entry identity"),
-                        mode: *mode,
-                    },
-                };
-                (path.clone(), entry)
-            })
-            .collect();
-        RepositoryImage::close(layout, spec, entries, BTreeMap::new(), BTreeMap::new())
-            .expect("image closes")
-    }
-
-    #[test]
-    fn test_claimed_target_state_answers_for_an_asset_from_its_recorded_bytes_and_mode() {
-        let target = VirtualPath::worktree("docs/profile.txt").expect("canonical target");
-        let claim = AppliedProfileClaim::asset(&target, b"published\n", FileMode::Regular, false);
-        let state = |held: &[(VirtualPath, &[u8], FileMode)]| {
-            claimed_target_state(&image_over(std::slice::from_ref(&target), held), &claim)
-                .expect("the claim is comparable")
-        };
-
-        assert_eq!(
-            state(&[(target.clone(), b"published\n", FileMode::Regular)]),
-            ClaimedTargetState::Unchanged
-        );
-        assert_eq!(
-            state(&[(target.clone(), b"edited in place\n", FileMode::Regular)]),
-            ClaimedTargetState::Changed
-        );
-        assert_eq!(
-            state(&[(target.clone(), b"published\n", FileMode::Executable)]),
-            ClaimedTargetState::Changed,
-            "mode belongs to the published identity, so a mode-only edit is a change"
-        );
-        assert_eq!(state(&[]), ClaimedTargetState::Absent);
-        assert_eq!(
-            claimed_target_state(&image_over(&[], &[]), &claim).expect("an uncaptured claim"),
-            ClaimedTargetState::Uncaptured,
-            "an image that never captured the target is evidence of nothing about it"
-        );
-    }
-
-    /// The region a profile published is read back out of the document the
-    /// composition engine wrote it into, so an untouched region agrees and an
-    /// edited body does not.
-    #[test]
-    fn test_claimed_target_state_reads_a_managed_region_back_out_of_its_published_document() {
-        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
-        let region_id: RegionId = "guidance".try_into().expect("canonical region id");
-        let content = b"managed guidance\n";
-        let claim = AppliedProfileClaim::managed_region(
-            &target,
-            region_id.clone(),
-            content,
-            FileMode::Regular,
-            false,
-        );
-        let (begin, end) = region_delimiters(&region_id);
-        let published = super::super::managed_document::render_managed_document(
-            b"# Doc\n\nauthored prose\n",
-            &[ManagedDocumentClaim::Region {
-                owner: "example".to_string(),
-                region_id: region_id.to_string(),
-                begin: begin.clone(),
-                end: end.clone(),
-                content: content.to_vec(),
-                placement: RegionPlacement::AppendIfAbsent,
-            }],
-        )
-        .expect("the region composes into the document");
-        let state = |bytes: &[u8]| {
-            claimed_target_state(
-                &image_over(
-                    std::slice::from_ref(&target),
-                    &[(target.clone(), bytes, FileMode::Regular)],
-                ),
-                &claim,
-            )
-            .expect("the claim is comparable")
-        };
-
-        assert_eq!(state(&published), ClaimedTargetState::Unchanged);
-        assert_eq!(
-            state(
-                &String::from_utf8(published.clone())
-                    .expect("the document is UTF-8")
-                    .replace("managed guidance", "edited guidance")
-                    .into_bytes()
-            ),
-            ClaimedTargetState::Changed
-        );
-        assert_eq!(
-            state(b"# Doc\n\nauthored prose\n"),
-            ClaimedTargetState::Absent,
-            "a document whose markers are gone no longer holds the claimed region"
-        );
-    }
-
-    /// A region enclosing a region another owner manages is present but not
-    /// compared: that nested body is rendered from what its own owner declares,
-    /// so the enclosing profile's recorded base is not the whole of it.
-    #[test]
-    fn test_claimed_target_state_does_not_compare_a_region_enclosing_another_owners_region() {
-        let target = VirtualPath::worktree("AGENTS.md").expect("canonical target");
-        let region_id: RegionId = "guidance".try_into().expect("canonical region id");
-        let nested: RegionId = "invariants".try_into().expect("canonical region id");
-        let (nested_begin, nested_end) = region_delimiters(&nested);
-        let declared = [
-            b"## Invariants\n\n".as_slice(),
-            &nested_begin,
-            b"\n_none declared._\n",
-            &nested_end,
-            b"\n",
-        ]
-        .concat();
-        let claim = AppliedProfileClaim::managed_region(
-            &target,
-            region_id.clone(),
-            &declared,
-            FileMode::Regular,
-            false,
-        );
-        let (begin, end) = region_delimiters(&region_id);
-        let published = super::super::managed_document::render_managed_document(
-            b"# Doc\n",
-            &[ManagedDocumentClaim::Region {
-                owner: "example".to_string(),
-                region_id: region_id.to_string(),
-                begin,
-                end,
-                content: declared.clone(),
-                placement: RegionPlacement::AppendIfAbsent,
-            }],
-        )
-        .expect("the enclosing region composes into the document");
-        // What the nested region's own owner then renders into it.
-        let rendered = String::from_utf8(published)
-            .expect("the document is UTF-8")
-            .replace("_none declared._", "- **an-invariant** — a statement.")
-            .into_bytes();
-        let state = |bytes: &[u8]| {
-            claimed_target_state(
-                &image_over(
-                    std::slice::from_ref(&target),
-                    &[(target.clone(), bytes, FileMode::Regular)],
-                ),
-                &claim,
-            )
-            .expect("the claim is comparable")
-        };
-
-        assert_eq!(state(&rendered), ClaimedTargetState::Composed);
-        assert_eq!(
-            state(b"# Doc\n"),
-            ClaimedTargetState::Absent,
-            "presence is still answered for a region that is not compared"
-        );
-    }
-
-    /// A semantic claim is compared against the registry entry its own identity
-    /// addresses, so the check reads the current declaration without holding the
-    /// package that contributed it.
-    #[test]
-    fn test_claimed_target_state_compares_a_semantic_claim_against_the_registry_it_names() {
-        let contribution = Contribution::MapEntry {
-            target: MapEntryTarget::Namespaces,
-            identity: "stream".to_string(),
-            value: serde_json::json!({"description": "Synthetic stream.", "unique": false}),
-        };
-        let claim =
-            AppliedProfileClaim::semantic(&contribution, false).expect("claim fingerprints");
-        let rendered = |contribution: Option<&Contribution>| {
-            let mut document = "".parse::<DocumentMut>().expect("an empty document parses");
-            if let Some(contribution) = contribution {
-                merge_authored_contribution(&mut document, contribution)
-                    .expect("the contribution renders");
-            }
-            document.to_string().into_bytes()
-        };
-        let config = VirtualPath::CONFIG;
-        let state = |bytes: &[u8]| {
-            claimed_target_state(
-                &image_over(
-                    std::slice::from_ref(&config),
-                    &[(config.clone(), bytes, FileMode::Regular)],
-                ),
-                &claim,
-            )
-            .expect("the claim is comparable")
-        };
-
-        assert_eq!(
-            state(&rendered(Some(&contribution))),
-            ClaimedTargetState::Unchanged
-        );
-        assert_eq!(
-            state(&rendered(Some(&Contribution::MapEntry {
-                target: MapEntryTarget::Namespaces,
-                identity: "stream".to_string(),
-                value: serde_json::json!({"description": "Edited by hand.", "unique": false}),
-            }))),
-            ClaimedTargetState::Changed
-        );
-        assert_eq!(state(&rendered(None)), ClaimedTargetState::Absent);
     }
 }
