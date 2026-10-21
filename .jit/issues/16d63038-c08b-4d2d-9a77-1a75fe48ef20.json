@@ -16,6 +16,11 @@
       "status": "passed",
       "updated_at": "2026-10-21T11:07:04.495294549Z",
       "updated_by": "auto:executor"
+    },
+    "code-review": {
+      "status": "failed",
+      "updated_at": "2026-10-21T11:12:36.718487879Z",
+      "updated_by": "auto:executor"
     }
   },
   "id": "16d63038-c08b-4d2d-9a77-1a75fe48ef20",
@@ -28,5 +33,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Resolve full-length issue ids regardless of case and hyphens on every command",
-  "updated_at": "2026-10-21T11:07:04.495294549Z"
+  "updated_at": "2026-10-21T11:12:36.718487879Z"
 }
