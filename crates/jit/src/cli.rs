@@ -390,8 +390,8 @@ pub enum Commands {
         #[arg(long, value_name = "RULE")]
         rule: Option<String>,
 
-        /// Repair safe findings; provenance-proven derived-state repairs publish
-        /// through one redo record
+        /// Repair safe findings; derived-state repairs publish through one redo
+        /// record
         #[arg(long)]
         fix: bool,
 

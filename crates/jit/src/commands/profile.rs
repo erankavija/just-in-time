@@ -2752,11 +2752,9 @@ pub(super) fn package_identity_divergence(
 /// Whether one recorded profile still agrees with the package its record names
 /// and with the repository content that record claims.
 ///
-/// This is the sole comparison behind the profile-scoped agreement check and
-/// behind the identity gate repository-wide validation applies before deriving
-/// repair, so a profile is judged by one rule wherever it is judged. The owned
-/// targets are compared through the same pure claim comparison validation's
-/// profile-ownership pass uses ([`claimed_target_divergences`]).
+/// This is the sole comparison behind the profile-scoped agreement check, so a
+/// profile is judged by one rule wherever it is judged. The owned targets are
+/// compared through the pure claim comparison ([`claimed_target_divergences`]).
 ///
 /// The package is read through the location the record names, so a record whose
 /// package moved or was deleted reports that rather than an absent profile, and

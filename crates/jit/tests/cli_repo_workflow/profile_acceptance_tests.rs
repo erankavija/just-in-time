@@ -419,58 +419,6 @@ fn test_profile_apply_applies_the_packages_the_named_one_depends_on() {
         .all(|profile| profile["status"] == "unchanged"));
 }
 
-/// A repository that applied a directory package validates, and repairs the
-/// targets that package owns from the location its record names.
-///
-/// The recorded location is the only place the package's bytes exist, so every
-/// fact validation states about it — that the repository is coherent, and the
-/// bytes it restores to a deleted target — can only have come from reading that
-/// location again.
-#[test]
-fn test_validate_repairs_a_profile_applied_from_a_directory() {
-    const LOCATION: &str = "packages/planner";
-
-    let repo = TestRepo::new();
-    let directory =
-        jit::test_utils::copy_package_tree(&composition_package(), &repo.path.join(LOCATION));
-    let package = jit::profile::ProfilePackage::from_directory(&directory)
-        .expect("a valid package tree")
-        .model()
-        .clone();
-    let declared = package
-        .assets
-        .first()
-        .expect("the fixture package declares one asset");
-    let asset = fs::read_to_string(directory.join(&declared.source)).expect("read package asset");
-
-    let selector = format!("path:{LOCATION}");
-    success_json(&repo.path, &["init", "--profile", &selector, "--json"]);
-
-    assert_eq!(
-        success_json(&repo.path, &["validate", "--json"])["valid"],
-        true,
-        "a repository that correctly applied a directory package is coherent"
-    );
-
-    let target = repo.path.join(&declared.target);
-    fs::remove_file(&target).expect("delete the profile-owned target");
-    let repaired = success_json(&repo.path, &["validate", "--fix", "--json"]);
-
-    assert!(
-        repaired["fixes_applied"].as_u64().unwrap_or_default() > 0,
-        "the deleted profile-owned target is repairable: {repaired}"
-    );
-    assert_eq!(
-        fs::read_to_string(&target).expect("the deleted target is restored"),
-        asset,
-        "repair restores the bytes the recorded location holds"
-    );
-    assert_eq!(
-        success_json(&repo.path, &["validate", "--json"])["valid"],
-        true
-    );
-}
-
 #[test]
 fn test_init_profile_reports_a_dependency_that_cannot_be_resolved() {
     let repo = TestRepo::new();
@@ -1417,52 +1365,6 @@ fn test_profile_validate_names_the_owned_declaration_and_region_a_hand_edit_chan
         )],
         "the removed region is named by its document and region id: {report}"
     );
-}
-
-/// Repository-wide validation reports the same owned-target divergence the
-/// profile check reports, because both read it from the same comparison
-/// (REQ-04).
-#[test]
-fn test_repository_validation_reports_the_owned_target_divergence_the_profile_check_reports() {
-    let (repo, target) = repository_with_applied_planner();
-    assert_eq!(
-        success_json(&repo.path, &["validate", "--json"])["valid"],
-        true,
-        "an agreeing repository validates"
-    );
-    fs::write(&target, b"edited by hand\n").expect("edit the profile-owned target in place");
-
-    let owned = divergences(&profile_agreement(&repo.path).1, "planner-asset-only");
-    let repository = failed_json_with_path(&repo.path, &["validate", "--json"], 4, None);
-    let findings = repository["error"]["details"]["rule_findings"]
-        .as_array()
-        .unwrap_or_else(|| panic!("validation reports its findings: {repository}"))
-        .iter()
-        .filter(|finding| finding["rule"] == "profile-ownership")
-        .map(|finding| {
-            finding["message"]
-                .as_str()
-                .expect("a finding carries a message")
-                .to_string()
-        })
-        .collect::<Vec<_>>();
-
-    assert_eq!(
-        findings.len(),
-        owned.len(),
-        "one finding per divergence the profile check reports: {repository}"
-    );
-    for (_, named) in &owned {
-        let named = named
-            .as_deref()
-            .expect("an owned-target divergence names it");
-        assert!(
-            findings
-                .iter()
-                .any(|finding| finding.contains(named) && finding.contains("planner-asset-only")),
-            "validation names the same profile and target: {findings:?}"
-        );
-    }
 }
 
 // ===========================================================================
