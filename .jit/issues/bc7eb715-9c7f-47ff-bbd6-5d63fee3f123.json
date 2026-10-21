@@ -13,7 +13,13 @@
     "mcp-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "mcp-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T05:46:03.701304816Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "bc7eb715-9c7f-47ff-bbd6-5d63fee3f123",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "ready",
   "title": "MCP bridge injects --json from the schema's global options",
-  "updated_at": "2026-10-21T01:29:03.893753983Z"
+  "updated_at": "2026-10-21T05:46:03.701304816Z"
 }

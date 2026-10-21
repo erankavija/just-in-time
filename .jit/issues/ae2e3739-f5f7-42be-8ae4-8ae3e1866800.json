@@ -14,7 +14,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-21T05:48:10.608172736Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "ae2e3739-f5f7-42be-8ae4-8ae3e1866800",
   "labels": [
     "type:task",
@@ -27,5 +33,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Accept the worktree root as a gate input root",
-  "updated_at": "2026-10-21T01:21:03.793199205Z"
+  "updated_at": "2026-10-21T05:48:10.608172736Z"
 }

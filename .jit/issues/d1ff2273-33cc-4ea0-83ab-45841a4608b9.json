@@ -13,7 +13,13 @@
     "code-review",
     "docs-mechanical"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "docs-mechanical": {
+      "status": "passed",
+      "updated_at": "2026-10-21T05:48:43.604989201Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d1ff2273-33cc-4ea0-83ab-45841a4608b9",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Produce the shipped workflow package by packing its directory",
-  "updated_at": "2026-10-21T01:21:05.720767589Z"
+  "updated_at": "2026-10-21T05:48:43.604989201Z"
 }

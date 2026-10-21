@@ -14,7 +14,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-21T05:47:16.627719751Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "fd9bfab8-63dd-40d3-92a2-2dfb3d17260d",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Record a checker infrastructure fault as an error",
-  "updated_at": "2026-10-21T01:21:05.127015494Z"
+  "updated_at": "2026-10-21T05:47:16.627719751Z"
 }

@@ -13,7 +13,13 @@
     "cargo-ci",
     "code-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "failed",
+      "updated_at": "2026-10-21T05:48:25.223099475Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "d6bbe05f-3a84-48bd-98ce-0dc99d204039",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "high",
   "state": "in_progress",
   "title": "Remove profile checks from repository validation",
-  "updated_at": "2026-10-21T01:21:05.541025682Z"
+  "updated_at": "2026-10-21T05:48:25.223099475Z"
 }
