@@ -480,6 +480,13 @@
       "date": "2026-10-21",
       "decision": "@/charter/D-18, @/inv/shared-test-contracts",
       "summary": "D1: c780514e's fixture consolidation lands before 2195c98f's eight retype tasks, which get edges onto specific c780514e fixture terminals. Those terminals carry no 2195c98f or 842b0ac6 dependency and run in the first wave. Rejected: c780514e waiting behind 107 retype-chain tasks. D2: c780514e REQ-08 owns the IssueStore conformance suite and 89e7a273 consumes it. D3: REQ-13 added (suite clock measured before and after; no default-suite test over 5 s warm at load <=10; server shutdown test and doctests in scope). D4: REQ-01/04 consolidate after df129d9e's 650e6a56, not after the handler wave."
+    },
+    {
+      "container_short_id": "f8a6b298",
+      "issue": "98184c64",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "summary": "Accepted after the fact: REQ-03 added to the gated f8a6b298 task 98184c64 (no validation-report input carries claims-index problems), making it the single remover of 9876a23a's interim claims-index input in either landing order. The planner is reminded to clear gated-breakdown edits with the steward first."
     }
   ],
   "notes": [
