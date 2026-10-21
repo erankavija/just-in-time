@@ -2581,9 +2581,8 @@ fn render_composed_contributions(
 /// An occupant of the listing that is not a regular file is not a record and
 /// contributes nothing.
 ///
-/// Composition, adoption-intent retention, and repository-wide validation's
-/// profile-ownership pass all begin here, so the record inventory is enumerated
-/// and read under one rule.
+/// Composition and adoption-intent retention both begin here, so the record
+/// inventory is enumerated and read under one rule.
 ///
 /// # Errors
 ///
@@ -2786,12 +2785,11 @@ impl ClaimedTargetState {
 /// Compare one recorded ownership claim against the value `base` currently
 /// holds for it.
 ///
-/// This is the sole comparison behind both the profile-scoped agreement check
-/// and repository-wide validation's profile-ownership pass, so each claim kind
-/// is read back through the construction that published it: an asset by its
-/// exact bytes and mode, a managed region by the body between the delimiters
-/// composition splices it under, and a semantic declaration by the registry
-/// entry its identity names.
+/// This is the sole comparison behind the profile-scoped agreement check, so
+/// each claim kind is read back through the construction that published it: an
+/// asset by its exact bytes and mode, a managed region by the body between the
+/// delimiters composition splices it under, and a semantic declaration by the
+/// registry entry its identity names.
 ///
 /// A region's published body is read back with the newline the splice inserts
 /// after the begin delimiter removed, and a content that did not end in a

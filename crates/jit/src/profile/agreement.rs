@@ -9,8 +9,8 @@
 //! recorded base against the value the repository holds now.
 //!
 //! The claim comparison here is pure — it reads only a captured image — so the
-//! profile-scoped check and repository-wide validation report the same
-//! divergences without either resolving a package to ask the question.
+//! profile-scoped check reports divergences without resolving a package to ask
+//! the question.
 
 use crate::domain::ProfileOrigin;
 use crate::profile::ProfileCollection;

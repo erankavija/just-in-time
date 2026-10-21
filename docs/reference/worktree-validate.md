@@ -317,11 +317,11 @@ behavior depends on the arguments.
 
 `--fix` additionally repairs the auto-fixable findings (type-hierarchy label
 fixes, transitive-reduction violations, pending state transitions) and owned
-derived-state drift (default rules and schemas, configured projections, and
-provenance-proven profile targets). Derived repairs publish through one redo
-record ([Publication and Recovery](storage-format.md#publication-and-recovery))
-and preserve authored or unmanaged bytes. Ambiguous ownership and
-unresolvable provenance are reported without writes. Coordination state — stale
+derived-state drift (default rules and schemas, configured projections). Derived
+repairs publish through one redo record
+([Publication and Recovery](storage-format.md#publication-and-recovery)) and
+preserve authored or unmanaged bytes. Ambiguous ownership is reported without
+writes. Coordination state — stale
 locks, the claims index, expired leases — is repaired by
 [`jit recover`](#jit-recover), not by `jit validate`.
 
@@ -333,7 +333,7 @@ locks, the claims index, expired leases — is repaired by
 | `--explain` | Report which rules matched the issue and whether each passed (requires an `[ID]`) |
 | `--rule <RULE>` | Apply one configured graph rule with `[ID]` as its sole firing issue; clean exits `0`, and a rule or selection failure exits `1`. Invalid combinations or a missing required `[ID]` are usage errors and exit `2` |
 | `--scope <ID>` | Evaluate a container's bracket subtree as a deterministic gate checker (the rules whose selector matches each issue in the container's dependency closure). Mutually exclusive with `[ID]`, `--fix`, `--branch-drift`, `--leases`, `--explain`, and `--rule` |
-| `--fix` | Auto-fix repairable rule/graph/state findings and provenance-proven derived-state drift |
+| `--fix` | Auto-fix repairable rule/graph/state findings and derived-state drift |
 | `--dry-run` | Show what `--fix` would change without applying it (requires `--fix`) |
 | `--branch-drift` | Validate that git's `origin/main` is an ancestor of the current branch (requires git) |
 | `--leases` | Report active leases that are inconsistent or stale |
@@ -392,7 +392,7 @@ Error-severity rule findings print with a leading `❌ [<rule>]`, warnings with
 If `--fix` cannot prove ownership, human output includes the complete actionable
 cause chain. With `--json`, the same failure is a standard error object whose
 code is `VALIDATION_FAILED` and whose message retains that chain (for example,
-the target and duplicate delimiter or the mismatched profile provenance); see
+the target and duplicate delimiter); see
 the [machine-readable failure contract](cli-commands.md#cli-json-contracts).
 
 ### Failure modes

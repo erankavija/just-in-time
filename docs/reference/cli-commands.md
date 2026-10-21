@@ -728,9 +728,9 @@ serves as a repository check. A repository that cannot be read — an unreadable
 record, or a claimed registry that is not a regular file — is an error rather
 than a divergence, and uses the shared typed error envelope.
 
-Whole-repository [`jit validate`](#jit-validate) reports the same owned-target
-divergences among everything else it checks, under the `profile-ownership` rule.
-What each divergence means for the package that owns it, and which of
+Whole-repository [`jit validate`](#jit-validate) does not report these
+divergences: an edit to a value a package contributed is an ordinary repository
+change. What each divergence means for the package that owns it, and which of
 [`reconfigure`](#jit-profile-reconfigure), [`upgrade`](#jit-profile-upgrade), and
 [`capture`](#jit-profile-capture) resolves it, is described in
 [Repository Profiles](profiles.md#publication-and-recovery).
