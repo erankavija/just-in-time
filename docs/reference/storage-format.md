@@ -128,7 +128,8 @@ Each issue is stored as `issues/<uuid>.json`:
     "tests": {
       "status": "passed",
       "updated_by": "auto:executor",
-      "updated_at": "2026-01-15T10:30:00Z"
+      "updated_at": "2026-01-15T10:30:00Z",
+      "run_id": "<gate-run-uuid>"
     }
   },
   "labels": ["type:task", "epic:auth", "component:backend"],
@@ -160,7 +161,7 @@ Each issue is stored as `issues/<uuid>.json`:
 | `assignee` | string? | Format: `type:identifier` (e.g., `agent:copilot-1`) |
 | `dependencies` | UUID[] | Issues that must reach an effective terminal state (done, rejected, or archived from one — see `archived_from`) before this one |
 | `gates_required` | string[] | Gate keys from registry |
-| `gates_status` | object | Per-gate status with timestamps |
+| `gates_status` | object | Per-gate status with timestamps; `run_id` names the gate run the status was projected from, the run every latest-run view shows, and is absent until a run is recorded |
 | `labels` | string[] | Format: `namespace:value` |
 | `content_format` | enum? | `markdown`, `html`, or `xml`; selects the parser for `description`. Absent inherits `[validation].content_format`, falling back to `markdown`. Omitted from JSON when unset |
 | `documents` | object[] | Linked document references |

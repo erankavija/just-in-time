@@ -519,6 +519,7 @@ mod tests {
                 status: GateStatus::Passed,
                 updated_by: None,
                 updated_at: chrono::Utc::now(),
+                run_id: None,
             },
         );
         issue.mark_first_ready(chrono::Utc::now());

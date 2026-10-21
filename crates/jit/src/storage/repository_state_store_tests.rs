@@ -1794,6 +1794,7 @@ fn req01_map_issue(reverse: bool) -> Issue {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:alpha".parse().unwrap()),
                 updated_at: req01_instant(),
+                run_id: None,
             },
         ),
         (
@@ -1802,6 +1803,7 @@ fn req01_map_issue(reverse: bool) -> Issue {
                 status: GateStatus::Failed,
                 updated_by: Some("agent:zeta".parse().unwrap()),
                 updated_at: req01_instant(),
+                run_id: None,
             },
         ),
     ];

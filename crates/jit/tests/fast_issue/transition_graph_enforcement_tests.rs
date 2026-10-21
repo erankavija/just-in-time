@@ -657,6 +657,7 @@ fn test_enforce_at_done_rule_blocks_gated_auto_done_path() {
             status: GateStatus::Passed,
             updated_by: Some("ci:test".parse().unwrap()),
             updated_at: chrono::Utc::now(),
+            run_id: None,
         },
     );
     let epic = issue.id.clone();

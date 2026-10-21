@@ -360,7 +360,9 @@ pub enum MutationIntent {
     /// Semantic full-issue update of an issue that ALREADY EXISTS in the captured
     /// image. The finalizer stamps `updated_at` from the mutation clock and derives
     /// `created_at`/`first_ready_at` from the captured preimage (they are not the
-    /// caller's to set); every other field is taken verbatim from `issue`. Index
+    /// caller's to set), and names in each gate status the run a
+    /// [`MutationIntent::RecordGateRun`] of the same mutation records for that
+    /// issue and gate; every other field is taken verbatim from `issue`. Index
     /// membership is unchanged (no id is allocated), and a target absent from the
     /// captured image is a typed [`MutationError::MissingIssue`] — never an implicit
     /// create.
@@ -400,7 +402,8 @@ pub enum MutationIntent {
         /// Canonical full issue id whose captured record must exist.
         issue_id: String,
     },
-    /// Record one gate-run artifact. The finalizer assigns `run_id` and preserves
+    /// Record one gate-run artifact. The finalizer assigns `run_id`, before the
+    /// issue updates that name it, and preserves
     /// external checker `started_at`/`completed_at` evidence verbatim; an
     /// attestation, which ran no checker, is stamped with the mutation timestamp.
     RecordGateRun {
@@ -849,6 +852,25 @@ pub(super) fn finalize_delta(
         }
     }
 
+    // Gate-run records get identifiers next, in (issue id, gate key) order. They
+    // are allocated before the issue updates so each gate status published with a
+    // run names that run.
+    let mut gate_runs: Vec<&GateRunResult> = intents
+        .iter()
+        .filter_map(|intent| match intent {
+            MutationIntent::RecordGateRun { draft } => Some(&**draft),
+            _ => None,
+        })
+        .collect();
+    gate_runs.sort_by(|left, right| {
+        (left.issue_id.as_str(), left.gate_key.as_str())
+            .cmp(&(right.issue_id.as_str(), right.gate_key.as_str()))
+    });
+    let gate_runs: Vec<(String, &GateRunResult)> = gate_runs
+        .into_iter()
+        .map(|draft| (context.allocate(), draft))
+        .collect();
+
     // Pass 2: convergent claim upserts (existing issues; no new identifiers).
     for intent in intents {
         if let MutationIntent::ClaimIssue { issue_id, agent } = intent {
@@ -887,8 +909,7 @@ pub(super) fn finalize_delta(
     }
 
     // Pass 2b: full-issue semantic updates of existing issues. No identifier is
-    // allocated (the id must match a captured issue), preserving the frozen
-    // allocation order. `updated_at` is stamped from the single mutation clock;
+    // allocated (the id must match a captured issue). `updated_at` is stamped from the single mutation clock;
     // lifecycle history is reconciled from the captured preimage and exact state /
     // assignment transitions are stamped from the one mutation clock. A target
     // absent from the captured image is a typed error, never an implicit create.
@@ -912,6 +933,13 @@ pub(super) fn finalize_delta(
                 updated.mark_done(now);
             }
             for (key, state) in &mut updated.gates_status {
+                if let Some((run_id, _)) = gate_runs
+                    .iter()
+                    .rev()
+                    .find(|(_, run)| run.issue_id == updated.id && &run.gate_key == key)
+                {
+                    state.run_id = Some(run_id.clone());
+                }
                 let records_evidence = intents.iter().any(|intent| match intent {
                     MutationIntent::RecordEvent { event, .. } => match (&**event, state.status) {
                         (
@@ -1045,19 +1073,7 @@ pub(super) fn finalize_delta(
         }
     }
 
-    // Pass 3: gate-run / other published records get identifiers next,
-    // in (target, key) order — here keyed by (issue id, gate key).
-    let mut gate_runs: Vec<&GateRunResult> = intents
-        .iter()
-        .filter_map(|intent| match intent {
-            MutationIntent::RecordGateRun { draft } => Some(&**draft),
-            _ => None,
-        })
-        .collect();
-    gate_runs.sort_by(|left, right| {
-        (left.issue_id.as_str(), left.gate_key.as_str())
-            .cmp(&(right.issue_id.as_str(), right.gate_key.as_str()))
-    });
+    // Pass 3: gate-run records, identified above, are published.
     if !gate_runs.is_empty() {
         let parent = VirtualPath::GATE_RUNS;
         if matches!(
@@ -1071,8 +1087,7 @@ pub(super) fn finalize_delta(
             });
         }
     }
-    for draft in gate_runs {
-        let run_id = context.allocate();
+    for (run_id, draft) in gate_runs {
         let mut result = draft.clone();
         result.run_id = run_id.clone();
         if result.origin == crate::domain::GateVerdictOrigin::Attested {
@@ -1459,6 +1474,7 @@ mod tests {
                     status: GateStatus::Passed,
                     updated_by: Some("agent:alpha".parse().unwrap()),
                     updated_at: fixed_instant(),
+                    run_id: None,
                 },
             ),
             (
@@ -1467,6 +1483,7 @@ mod tests {
                     status: GateStatus::Failed,
                     updated_by: Some("agent:zeta".parse().unwrap()),
                     updated_at: fixed_instant(),
+                    run_id: None,
                 },
             ),
         ];
@@ -1949,6 +1966,7 @@ mod tests {
                 status: GateStatus::Pending,
                 updated_by: None,
                 updated_at: old_time,
+                run_id: None,
             },
         );
         let mut updated = preimage.clone();
@@ -1959,6 +1977,7 @@ mod tests {
                 updated_by: Some("agent:reviewer".parse().unwrap()),
                 // Checker/manual callers submit no lifecycle timestamp.
                 updated_at: DateTime::default(),
+                run_id: None,
             },
         );
         let bytes = serialize_issue(&preimage).unwrap();
@@ -1985,6 +2004,62 @@ mod tests {
         let persisted: Issue = serde_json::from_slice(written).unwrap();
         assert_eq!(persisted.gates_status["tests"].updated_at, fixed_instant());
         assert_eq!(persisted.updated_at, fixed_instant());
+    }
+
+    #[test]
+    fn test_update_issue_gate_state_names_the_run_recorded_with_it() {
+        let id = "11111111-1111-4111-8111-111111111111";
+        let preimage = seeded_issue(id, None);
+        let mut updated = preimage.clone();
+        updated.gates_status.insert(
+            "review".into(),
+            GateState {
+                status: GateStatus::Passed,
+                updated_by: None,
+                updated_at: DateTime::default(),
+                run_id: None,
+            },
+        );
+        let bytes = serialize_issue(&preimage).unwrap();
+        let image = image_with(vec![
+            (issue_path(id).unwrap(), file_entry(&bytes)),
+            (VirtualPath::GATE_RUNS, RepositoryEntry::Absent),
+        ]);
+        let intents = [
+            MutationIntent::UpdateIssue {
+                issue: Box::new(updated),
+            },
+            MutationIntent::RecordGateRun {
+                draft: Box::new(GateRunResult::attestation(
+                    id,
+                    "review",
+                    crate::declarations::GateStage::Postcheck,
+                    GateStatus::Passed,
+                    None,
+                )),
+            },
+        ];
+        let plan = finalize(&layout(), &image, &ctx(), &intents).unwrap();
+        let written = |wanted: &dyn Fn(&VirtualPath) -> bool| {
+            plan.delta()
+                .actions()
+                .iter()
+                .find_map(|action| match action {
+                    RepositoryAction::WriteFile { path, bytes, .. } if wanted(path) => {
+                        Some(bytes.clone())
+                    }
+                    _ => None,
+                })
+                .unwrap()
+        };
+        let issue_path = issue_path(id).unwrap();
+        let persisted: Issue =
+            serde_json::from_slice(&written(&|path| path == &issue_path)).unwrap();
+        let run: GateRunResult = serde_json::from_slice(&written(&|path| {
+            path.relative().as_str().starts_with("gate-runs/")
+        }))
+        .unwrap();
+        assert_eq!(persisted.gates_status["review"].run_id, Some(run.run_id));
     }
 
     #[test]

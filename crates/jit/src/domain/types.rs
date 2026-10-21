@@ -397,6 +397,24 @@ pub struct GateState {
     pub updated_by: Option<Assignee>,
     /// When the gate was last updated
     pub updated_at: DateTime<Utc>,
+    /// The gate run this status was projected from, which every latest-run view
+    /// selects; absent while no run has been recorded since the gate became
+    /// required.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+}
+
+impl GateState {
+    /// The run of `gate_key` among `runs` this status was projected from.
+    pub fn projected_run<'a>(
+        &self,
+        gate_key: &str,
+        runs: &'a [GateRunResult],
+    ) -> Option<&'a GateRunResult> {
+        let run_id = self.run_id.as_deref()?;
+        runs.iter()
+            .find(|run| run.run_id == run_id && run.gate_key == gate_key)
+    }
 }
 
 /// An issue representing a unit of work
@@ -2361,6 +2379,7 @@ mod tests {
                 status: GateStatus::Pending,
                 updated_by: None,
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 
@@ -2382,6 +2401,7 @@ mod tests {
                 status: GateStatus::Failed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 
@@ -2403,6 +2423,7 @@ mod tests {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 
@@ -2576,6 +2597,7 @@ mod tests {
                 status: GateStatus::Passed,
                 updated_by: Some("human:reviewer".parse().unwrap()),
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 
@@ -2594,6 +2616,7 @@ mod tests {
                 status: GateStatus::Pending,
                 updated_by: None,
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 
@@ -2612,6 +2635,7 @@ mod tests {
                 status: GateStatus::Failed,
                 updated_by: Some("ci:tests".parse().unwrap()),
                 updated_at: Utc::now(),
+                run_id: None,
             },
         );
 

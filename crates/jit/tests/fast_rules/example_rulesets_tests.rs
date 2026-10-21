@@ -867,6 +867,7 @@ mod fresh_evidence {
                 status: GateStatus::Passed,
                 updated_by: Some("agent:reviewer".parse().unwrap()),
                 updated_at: fixed_now() - Duration::hours(hours_ago),
+                run_id: None,
             },
         );
         issue
