@@ -528,7 +528,8 @@
     "2026-10-21 ~19:30: df129d9e's continuation lead stopped with waves 1-2 done except d8176fd3 (global-json-flag; 6 more tasks done; handoff-3.md). d8176fd3 waits on 3d9a0ce3's 8673dc5e and 3754095f (behind f37d228e). 3d9a0ce3's lead was asked to prioritise them. A fresh df129d9e lead goes out once both are done.",
     "2026-10-21 ~20:00: dogfood reinstall HELD until 8673dc5e's gates_status run_id conversion merges, because the new engine would otherwise show every legacy status as unrun.",
     "2026-10-21 ~20:30-23:30: fifth shared usage-limit stall; work was resumed at 23:31. Tally: 842b0ac6 26 done; 3d9a0ce3 13 done (8673dc5e conversion pending); df129d9e 11 done (blocked on 3d9a0ce3); c780514e and 9876a23a in planning.",
-    "2026-10-21 ~23:50: 9876a23a planned (39 issues, 67 edges; behaviour changes are stated in its tasks). just-in-time-59 is assigned to plan b697a3f7, with the steward's open notes for that planner passed along."
+    "2026-10-21 ~23:50: 9876a23a planned (39 issues, 67 edges; behaviour changes are stated in its tasks). just-in-time-59 is assigned to plan b697a3f7, with the steward's open notes for that planner passed along.",
+    "2026-10-21 23:45: gates_status run_id conversion committed (e2f2693d8): 2615 entries lacked run_id; 2407 pointed at existing runs; 210 runs published from entry fields; 19 pending untouched; 0 remaining. The steward reinstalled the dogfood binary at e2f2693d8. The one-off tool lives in the steward scratchpad (convert/target/release/gate-run-id-backfill), outside the repository."
   ],
   "started_at": "2026-07-03",
   "user_actions": [
@@ -575,7 +576,7 @@
     },
     {
       "date": "2026-10-21",
-      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones."
+      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code). Scale in this repository: every historical gate status (2399 with runs, 210 without, the latter including auto:executor statuses whose runs were never recorded), not only manual ones. A working one-off converter exists, built out-of-tree at /tmp/claude-1000/-home-vkaskivuo-Projects-just-in-time/5d9082fe-576b-47d5-869b-e30710dfc656/scratchpad/convert/ (`gate-run-id-backfill [--dry-run] <repo>`). It is not in the repository; the scratchpad is session-local, so copy it if you want to keep it."
     },
     {
       "date": "2026-10-21",
