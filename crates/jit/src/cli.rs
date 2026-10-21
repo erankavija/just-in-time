@@ -1668,7 +1668,7 @@ pub enum GateCommands {
     ///
     /// History view (`--all` / `--limit <N>`) lists prior runs newest-first.
     /// Here the gate key is OPTIONAL and acts as a filter (positional or
-    /// `--gate`); `--status <passed|failed|error|pending|skipped>` filters by
+    /// `--gate`); `--status <passed|failed|error|pending>` filters by
     /// outcome:
     ///
     ///   jit gate status <ISSUE_ID> --all
@@ -1714,7 +1714,7 @@ pub enum GateCommands {
         limit: Option<usize>,
 
         /// History view: filter runs by status
-        /// (passed|failed|error|pending|skipped)
+        /// (passed|failed|error|pending)
         #[arg(long, value_name = "STATUS")]
         status: Option<String>,
 

@@ -2006,7 +2006,7 @@ present, filters the listing to that gate.
 - `--all` - History view: list every prior run, newest-first.
 - `--limit <N>` - History view: list the most recent `N` runs, newest-first.
 - `--status <STATUS>` - History view: keep only runs with this outcome
-  (`passed`, `failed`, `error`, `pending`, `skipped`).
+  (`passed`, `failed`, `error`, `pending`).
 - `--stdout` - Flat view: print the latest run's stored stdout verbatim.
 - `--stderr` - Flat view: print the latest run's stored stderr verbatim.
 - `--tail <N>` - Flat view: keep only the last `N` lines of the printed text.

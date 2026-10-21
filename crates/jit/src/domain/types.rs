@@ -1126,8 +1126,6 @@ pub enum GateRunStatus {
     Error,
     /// Not yet run (for manual gates)
     Pending,
-    /// Not applicable (future: for conditional gates)
-    Skipped,
 }
 
 /// Origin vocabulary persisted for an installed profile package.

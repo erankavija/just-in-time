@@ -196,7 +196,7 @@ impl GateRunField {
                     .to_string()
             }
             GateRunField::Status => {
-                "The run's verdict: `passed`, `failed`, `error`, `pending`, or `skipped`. For an \
+                "The run's verdict: `passed`, `failed`, `error`, or `pending`. For an \
                  executed checker the exit status decides it, as \
                  [Checker Exit Codes](../how-to/custom-gates.md#exit-codes) defines."
                     .to_string()

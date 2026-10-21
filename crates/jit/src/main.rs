@@ -879,11 +879,10 @@ fn parse_run_status(value: &str, json: bool) -> Result<jit::domain::GateRunStatu
         "failed" => Ok(GateRunStatus::Failed),
         "error" => Ok(GateRunStatus::Error),
         "pending" => Ok(GateRunStatus::Pending),
-        "skipped" => Ok(GateRunStatus::Skipped),
         other => Err(invalid_argument(
             format!(
                 "unknown --status value '{other}'; expected one of: \
-                 passed, failed, error, pending, skipped."
+                 passed, failed, error, pending."
             ),
             json,
         )),
