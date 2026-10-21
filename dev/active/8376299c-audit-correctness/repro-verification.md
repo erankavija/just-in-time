@@ -2,7 +2,7 @@
 
 Binary: release `jit` / `jit-server` built from main 0805ad781754 (`which jit` = scratchpad/release/jit).
 All repros ran in fresh `mktemp -d` repositories under scratchpad/repro/ (`git init`, `jit init`). Nothing was run mutating in the real repository.
-Summary: 13 CORRECTED, 0 NOT CORRECTED, 1 N/A (6ff14f21, policy test shown). See notes on 34999aad (server search coverage) and cd2ed136 (scope shape).
+Summary for the 14 issues below (16d63038 and b5faef84 are in the addendum, and the overall tally is at the end): 13 CORRECTED, 0 NOT CORRECTED, 1 N/A (6ff14f21, policy test shown). See notes on 34999aad (server search coverage) and cd2ed136 (scope shape).
 
 ## 2d10f1dd update/reject atomicity
 ```sh

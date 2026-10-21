@@ -18048,3 +18048,4 @@
 {"from":"in_progress","id":"4af810be-2cf8-4c3e-b364-c1c53a640ced","issue_id":"24268b05-2ab4-4864-87fe-e8ff35945191","timestamp":"2026-10-21T15:38:34.810368529Z","to":"done","type":"issue_state_changed"}
 {"id":"8058f67d-f149-4fa2-acf5-94dadd408fa5","issue_id":"24268b05-2ab4-4864-87fe-e8ff35945191","timestamp":"2026-10-21T15:38:34.810368529Z","type":"issue_completed"}
 {"from":"backlog","id":"61ae5743-a51d-4af6-99be-97f4079396c0","issue_id":"2dd6b833-8f5d-484a-b412-158b74e3d7f5","timestamp":"2026-10-21T15:38:34.926294445Z","to":"ready","type":"issue_state_changed"}
+{"gate_key":"holistic-review","id":"5108d7db-9799-4b75-bde8-074c8ea27abb","issue_id":"8376299c-f9e1-4b7b-be62-27af493f6969","timestamp":"2026-10-21T15:38:41.970414570Z","type":"gate_passed","updated_by":"auto:executor"}
