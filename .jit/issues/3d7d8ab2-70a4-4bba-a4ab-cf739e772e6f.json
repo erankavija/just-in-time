@@ -1,0 +1,42 @@
+{
+  "assignee": null,
+  "context": {},
+  "created_at": "2026-10-21T15:40:49.485551803Z",
+  "dependencies": [
+    "7c885165-89de-45a0-a867-e621c96867d1"
+  ],
+  "description": "After the plan-review checkpoint passes, decompose the plan for Give each test property one owning test on shared fixtures and contracts (c780514e) into well-ordered implementation issues.",
+  "documents": [],
+  "gates_required": [
+    "coverage-preview",
+    "breakdown-review"
+  ],
+  "gates_status": {
+    "breakdown-review": {
+      "status": "pending",
+      "updated_at": "2026-10-21T15:40:49.485551803Z",
+      "updated_by": null
+    },
+    "coverage-preview": {
+      "status": "pending",
+      "updated_at": "2026-10-21T15:40:49.485551803Z",
+      "updated_by": null
+    }
+  },
+  "id": "3d7d8ab2-70a4-4bba-a4ab-cf739e772e6f",
+  "labels": [
+    "epic:test-topology",
+    "milestone:v1.0",
+    "component:testing",
+    "component:storage",
+    "component:tooling",
+    "per:@/charter/D-18",
+    "per:@/charter/D-2",
+    "type:breakdown",
+    "brackets:c780514e"
+  ],
+  "priority": "normal",
+  "state": "backlog",
+  "title": "breakdown: Give each test property one owning test on shared fixtures and contracts",
+  "updated_at": "2026-10-21T15:40:49.485551803Z"
+}
