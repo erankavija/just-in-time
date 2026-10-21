@@ -487,6 +487,14 @@
       "status": "resolved",
       "date": "2026-10-21",
       "summary": "Accepted after the fact: REQ-03 added to the gated f8a6b298 task 98184c64 (no validation-report input carries claims-index problems), making it the single remover of 9876a23a's interim claims-index input in either landing order. The planner is reminded to clear gated-breakdown edits with the steward first."
+    },
+    {
+      "container_short_id": "3d9a0ce3",
+      "issue": "8673dc5e",
+      "status": "resolved",
+      "date": "2026-10-21",
+      "decision": "@/inv/canonical-cutover",
+      "summary": "Rework limit reached on REQ-03: gates_status entries lacking the new run_id show as unrun (92 legacy manual statuses). Chosen (A): an idempotent one-time conversion of this repo's records through jit's publication path. Each entry is pointed at its run, or gets a run published from the entry's own fields; counts are reported; no engine compatibility code. Rejected (B), narrowing REQ-03: leaves the views disagreeing. Rejected (C), re-attesting: fabricates attestations."
     }
   ],
   "notes": [
@@ -561,6 +569,10 @@
     {
       "date": "2026-10-21",
       "item": "Informational review: f4d9502a's plan adds git to the server Docker image (a consequence of D-21, git through the CLI, applied to document history), touching the D-10 single-image topology. It also deletes the HEAD-read storage tier, which resurrected deleted issues."
+    },
+    {
+      "date": "2026-10-21",
+      "item": "Adopter data: 8673dc5e makes gate statuses carry the run_id they were projected from. This repository's 92 legacy statuses are converted once, but adopter repositories (for example gf2) hold the same legacy gates_status entries and will show them as unrun after upgrading. Decide whether v1.0 ships a converter command, a documented one-off script, or a release note (greenfield stance: no engine compatibility code)."
     }
   ]
 }
