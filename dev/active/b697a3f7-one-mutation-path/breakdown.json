@@ -847,7 +847,8 @@
       "source_refs": [
         "REQ-06",
         "DEC-09",
-        "DEC-12"
+        "DEC-12",
+        "DEC-22"
       ],
       "terminal": {
         "consumer_family": "archive candidate listing",
