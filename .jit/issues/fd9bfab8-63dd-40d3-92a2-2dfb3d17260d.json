@@ -16,8 +16,8 @@
   ],
   "gates_status": {
     "cargo-ci": {
-      "status": "failed",
-      "updated_at": "2026-10-21T05:47:16.627719751Z",
+      "status": "passed",
+      "updated_at": "2026-10-21T06:09:36.757401507Z",
       "updated_by": "auto:executor"
     }
   },
@@ -32,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Record a checker infrastructure fault as an error",
-  "updated_at": "2026-10-21T05:47:16.627719751Z"
+  "updated_at": "2026-10-21T06:09:36.757401507Z"
 }

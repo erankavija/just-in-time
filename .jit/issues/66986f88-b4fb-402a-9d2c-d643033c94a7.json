@@ -14,7 +14,13 @@
     "code-review",
     "doc-review"
   ],
-  "gates_status": {},
+  "gates_status": {
+    "cargo-ci": {
+      "status": "passed",
+      "updated_at": "2026-10-21T06:15:01.510035793Z",
+      "updated_by": "auto:executor"
+    }
+  },
   "id": "66986f88-b4fb-402a-9d2c-d643033c94a7",
   "labels": [
     "type:task",
@@ -26,5 +32,5 @@
   "priority": "normal",
   "state": "in_progress",
   "title": "Derive an issue's documents from its artifact directory",
-  "updated_at": "2026-10-21T01:21:05.361825858Z"
+  "updated_at": "2026-10-21T06:15:01.510035793Z"
 }
