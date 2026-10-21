@@ -1424,8 +1424,8 @@ pub struct DependencyTreeNode {
     /// Whether this node appears multiple times in the tree (shared dependency)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shared: Option<bool>,
-    /// Pre-archive origin state, present only for an `Archived` node that
-    /// recorded one. Carried so dependency consumers can compute effective
+    /// Pre-archive origin state, present exactly for an `Archived` node.
+    /// Carried so dependency consumers can compute effective
     /// terminality (`jit:45a140ae`): an `archived` node with a terminal origin
     /// still satisfies its dependents.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1956,8 +1956,7 @@ pub struct StateCount {
 /// rejected issue is terminal but not delivered. `Archived` is
 /// terminality-preserving, so an issue archived from `Done` counts toward `done`
 /// and one archived from `Rejected` toward `rejected`; an `Archived` issue with a
-/// non-terminal (or unrecorded, legacy) origin is not effectively terminal and
-/// counts as `open`. `open` is every issue that is not effectively terminal
+/// non-terminal origin is not effectively terminal and counts as `open`. `open` is every issue that is not effectively terminal
 /// (`total − done − rejected`). The `done`/`total` ratio and `percent` (rounded,
 /// `0` when `total` is `0`) measure delivery, i.e. `done` against `total`.
 #[derive(Debug, Serialize, JsonSchema)]

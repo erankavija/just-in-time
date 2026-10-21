@@ -733,8 +733,7 @@ pub struct MinimalIssue {
     pub labels: Vec<String>,
     /// Pre-archive origin state, carried so a dependency projection can decide
     /// effective terminality without the full record. Mirrors
-    /// [`Issue::archived_from`]: `Some` only for an `Archived` issue that
-    /// recorded its origin, absent otherwise.
+    /// [`Issue::archived_from`]: `Some` exactly for an `Archived` issue.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub archived_from: Option<State>,
 }

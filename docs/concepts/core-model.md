@@ -815,7 +815,7 @@ do not rely on it to prohibit a later explicit state update.
 - `→ Gated`: A `done` request with unpassed gates is diverted here
 - `Any State → Rejected`: Via `jit issue reject` (bypasses gates)
 - `Any State → Archived`: Via `jit issue update --state archived` (retires the issue and records its origin; bypasses gates). A successful `jit archive container` also retires its container to `Archived` as its final step.
-- `Archived → origin`: Reviving via `jit issue update --state <origin>` restores the recorded pre-archive state exactly. Any other target is refused, naming the origin as the only legal revive target. (A legacy archived record from before origins were recorded has no origin to restore, so its revive is unconstrained and carries an advisory warning.)
+- `Archived → origin`: Reviving via `jit issue update --state <origin>` restores the recorded pre-archive state exactly. Any other target is refused, naming the origin as the only legal revive target.
 
 ### Gate Bypass for Rejected
 
