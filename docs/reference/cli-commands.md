@@ -3969,7 +3969,7 @@ jit config get documentation --json
 # The layered settings resolve through their precedence chain
 # (env var, then repo, then user, then system, then default).
 jit config get worktree.mode
-jit config get coordination.default_ttl_secs
+jit config get coordination.max_indefinite_leases_per_agent
 ```
 
 **Two resolution strategies**, matching how the rest of jit already reads
@@ -4029,7 +4029,7 @@ untouched).
 ```bash
 jit config set <KEY> <VALUE> [--global] [--json]
 
-jit config set coordination.default_ttl_secs 1200
+jit config set coordination.max_indefinite_leases_per_agent 3
 jit config set --global worktree.enforce_leases warn
 ```
 

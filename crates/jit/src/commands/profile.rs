@@ -4843,18 +4843,18 @@ placement = "append"
         )
         .expect("the packaged manifest is UTF-8");
 
-        // The scaffold renders two engine constants into its coordination
-        // guidance. A package is bytes and projects nothing, so the packaged
-        // guidance names those keys and leaves their values to the reference
-        // that does project them.
-        for key in ["default_ttl_secs", "stale_threshold_secs"] {
-            let stated: Vec<&str> = manifest.lines().filter(|line| line.contains(key)).collect();
-            assert!(!stated.is_empty(), "packaged guidance must name '{key}'");
+        // The claim timing defaults are engine constants. A package is bytes
+        // and projects nothing, so the packaged guidance points at the
+        // reference that projects them and offers no configuration key for them.
+        assert!(manifest.contains(crate::runtime_defaults::test_support::REFERENCE_PATH));
+        for key in [
+            "default_ttl_secs",
+            "lease_renewal_threshold_pct",
+            "stale_threshold_secs",
+        ] {
             assert!(
-                stated
-                    .iter()
-                    .all(|line| !line.contains(|character: char| character.is_ascii_digit())),
-                "packaged guidance restates '{key}' with a value: {stated:?}"
+                !manifest.contains(key),
+                "packaged guidance offers the removed key '{key}'"
             );
         }
     }

@@ -6807,9 +6807,6 @@ fn run() -> Result<()> {
                             "enforce_leases": format!("{:?}", config.enforcement_mode().unwrap_or(jit::config::EnforcementMode::Strict)).to_lowercase(),
                         },
                         "coordination": {
-                            "default_ttl_secs": config.coordination().default_ttl_secs(),
-                            "lease_renewal_threshold_pct": config.coordination().lease_renewal_threshold_pct(),
-                            "stale_threshold_secs": config.coordination().stale_threshold_secs(),
                             "max_indefinite_leases_per_agent": config.coordination().max_indefinite_leases_per_agent(),
                             "max_indefinite_leases_per_repo": config.coordination().max_indefinite_leases_per_repo(),
                         },
@@ -6851,18 +6848,6 @@ fn run() -> Result<()> {
                     );
                     println!();
                     println!("[coordination]");
-                    println!(
-                        "  default_ttl_secs = {}",
-                        config.coordination().default_ttl_secs()
-                    );
-                    println!(
-                        "  lease_renewal_threshold_pct = {}",
-                        config.coordination().lease_renewal_threshold_pct()
-                    );
-                    println!(
-                        "  stale_threshold_secs = {}",
-                        config.coordination().stale_threshold_secs()
-                    );
                     println!(
                         "  max_indefinite_leases_per_agent = {}",
                         config.coordination().max_indefinite_leases_per_agent()

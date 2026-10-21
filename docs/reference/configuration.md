@@ -563,18 +563,18 @@ Maximum indefinite (TTL=0) leases per agent. Default: `2`.
 
 Maximum indefinite leases across entire repository. Default: `10`.
 
-`default_ttl_secs`, `lease_renewal_threshold_pct`, and `stale_threshold_secs`
-are accepted and shown by config commands, but currently do not alter claim
-timing. Timed claims therefore use `jit claim acquire --ttl` (defaulting to the
-built-in claim lease TTL — see
-[Runtime coordination defaults](#runtime-coordination-defaults)), and an
-indefinite lease needs explicit `jit claim heartbeat` calls.
+These two limits are the only `[coordination]` keys; a config setting any
+other key in the section fails to load. Claim timing is not configurable: a
+timed claim takes its duration from `jit claim acquire --ttl`, defaulting to
+the built-in claim lease TTL, and an indefinite lease becomes stale once its
+last `jit claim heartbeat` is older than the built-in claim stale threshold.
+Both values are listed under
+[Runtime coordination defaults](#runtime-coordination-defaults).
 
 ### Runtime coordination defaults
 
-The built-in lock acquisition timeout and poll interval, orphaned temp-file
-cleanup threshold, and claim lease TTL — each with its unit and operational
-scope — are listed in
+The built-in lock, recovery-cleanup, and claim lease defaults, each with its
+unit and operational scope, are listed in
 [Runtime Coordination Defaults](runtime-defaults.md). That reference is
 projected from `crates/jit/src/runtime_defaults.rs`, the single source those
 defaults are read from, so the values there never drift from the code.

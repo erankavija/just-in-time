@@ -310,7 +310,12 @@ fn test_config_set_unrelated_key_rejects_preexisting_invalid_project_name() {
     let before = fs::read_to_string(&config_path).unwrap();
 
     let out = Command::new(jit_binary())
-        .args(["config", "set", "coordination.default_ttl_secs", "900"])
+        .args([
+            "config",
+            "set",
+            "coordination.max_indefinite_leases_per_agent",
+            "3",
+        ])
         .current_dir(&repo_dir)
         .output()
         .expect("failed to run jit config set");

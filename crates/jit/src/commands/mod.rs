@@ -3286,7 +3286,7 @@ impl<S: IssueStore> CommandExecutor<S> {
             }
 
             // Must not be stale
-            if claims_index.is_stale(lease) {
+            if lease.is_stale(now) {
                 return false;
             }
 

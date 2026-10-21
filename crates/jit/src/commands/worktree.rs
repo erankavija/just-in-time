@@ -557,7 +557,6 @@ mod tests {
             schema_version: 1,
             generated_at: Utc::now(),
             last_seq: 3,
-            stale_threshold_secs: 3600,
             sequence_gaps: Vec::new(),
             leases: vec![
                 Lease {
@@ -633,7 +632,6 @@ mod tests {
             schema_version: 1,
             generated_at: now,
             last_seq: 3,
-            stale_threshold_secs: 3600,
             sequence_gaps: Vec::new(),
             leases: vec![
                 // Live: finite TTL, expiry in the future

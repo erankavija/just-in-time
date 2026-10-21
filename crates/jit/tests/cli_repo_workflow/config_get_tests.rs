@@ -74,7 +74,7 @@ scope = "issue"
 source-of-truth = "markdown-first"
 
 [coordination]
-default_ttl_secs = 900
+max_indefinite_leases_per_agent = 3
 "#;
 
 // ---------------------------------------------------------------------------
@@ -352,12 +352,15 @@ fn test_get_on_fresh_repo_without_config_toml_resolves_defaults() {
     fs::remove_file(&config_path).ok();
 
     // A merged section with a built-in default still resolves.
-    let out = config_get(temp.path(), &["coordination.default_ttl_secs"]);
-    assert!(out.status.success(), "get failed: {:?}", out);
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
-        jit::runtime_defaults::CLAIM_TTL_SECS.to_string()
+    let out = config_get(
+        temp.path(),
+        &["coordination.max_indefinite_leases_per_agent"],
     );
+    assert!(out.status.success(), "get failed: {:?}", out);
+    assert!(String::from_utf8_lossy(&out.stdout)
+        .trim()
+        .parse::<u32>()
+        .is_ok());
 
     // A raw, repo-only section with nothing configured is an intermediate key
     // resolving to an empty object, not an error.

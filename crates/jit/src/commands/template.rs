@@ -305,7 +305,7 @@ fn template_lease_warnings(
         let active = claims.leases.iter().any(|lease| {
             lease.issue_id == *id
                 && lease.expires_at.is_none_or(|expires| expires > now)
-                && !claims.is_stale(lease)
+                && !lease.is_stale(now)
                 && agent
                     .as_ref()
                     .is_none_or(|agent_id| lease.agent_id == *agent_id)

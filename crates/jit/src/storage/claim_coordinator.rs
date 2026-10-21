@@ -97,6 +97,16 @@ impl Lease {
         }
         false
     }
+
+    /// Return whether this lease is stale at `now`: an indefinite lease whose
+    /// last heartbeat is older than
+    /// [`CLAIM_STALE_THRESHOLD_SECS`](crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS).
+    /// Finite leases use expiry instead and are never stale.
+    pub fn is_stale(&self, now: DateTime<Utc>) -> bool {
+        self.ttl_secs == 0
+            && now.signed_duration_since(self.last_beat).num_seconds()
+                > crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64
+    }
 }
 
 /// Claim operation types for audit log
@@ -161,8 +171,6 @@ pub struct ClaimsIndex {
     pub generated_at: DateTime<Utc>,
     /// Last sequence number processed
     pub last_seq: u64,
-    /// Stale threshold in seconds (for indefinite leases)
-    pub stale_threshold_secs: u64,
     /// Active leases by issue ID
     pub leases: Vec<Lease>,
     /// Detected sequence gaps (for diagnostics)
@@ -207,7 +215,6 @@ impl ClaimsIndex {
                 schema_version: 1,
                 generated_at: Utc::now(),
                 last_seq: 0,
-                stale_threshold_secs: 3600, // 1 hour default
                 leases: Vec::new(),
                 sequence_gaps: Vec::new(),
             });
@@ -245,20 +252,6 @@ impl ClaimsIndex {
     /// Remove a lease from the index
     pub fn remove_lease(&mut self, lease_id: &str) {
         self.leases.retain(|l| l.lease_id != lease_id);
-    }
-
-    /// Check if lease is stale (for indefinite leases)
-    pub fn is_stale(&self, lease: &Lease) -> bool {
-        self.is_stale_at(lease, Utc::now())
-    }
-
-    fn is_stale_at(&self, lease: &Lease, now: DateTime<Utc>) -> bool {
-        if lease.ttl_secs > 0 {
-            return false; // Finite leases use expiration, not staleness
-        }
-
-        let elapsed = now.signed_duration_since(lease.last_beat);
-        elapsed.num_seconds() as u64 > self.stale_threshold_secs
     }
 
     /// Find a lease by lease_id
@@ -307,7 +300,7 @@ impl ClaimsMutationGuard {
         self.index
             .leases
             .iter()
-            .filter(|lease| !lease.is_expired(self.now) && !self.index.is_stale_at(lease, self.now))
+            .filter(|lease| !lease.is_expired(self.now) && !lease.is_stale(self.now))
             .filter(|lease| {
                 let stored = lease.issue_id.to_lowercase().replace('-', "");
                 stored.len() >= crate::storage::MIN_ID_PREFIX_LENGTH
@@ -1331,24 +1324,15 @@ impl ClaimCoordinator {
         // Filter out expired finite leases. Uses the same single source of
         // truth (`Lease::is_expired`) as eviction and `worktree list`, so the
         // rebuilt index cannot diverge from those views at the TTL boundary.
-        let stale_threshold_secs = 3600u64; // 1 hour default
         if !include_expired {
             active.retain(|_, lease| !lease.is_expired(now));
         }
 
-        // Compute staleness for each lease
         let leases: Vec<Lease> = active
             .into_values()
-            .map(|mut lease| {
-                if lease.ttl_secs == 0 {
-                    // Indefinite lease: compute staleness from last_beat
-                    let elapsed = now.signed_duration_since(lease.last_beat);
-                    lease.stale = elapsed.num_seconds() as u64 > stale_threshold_secs;
-                } else {
-                    // Finite lease: not stale (uses expiration instead)
-                    lease.stale = false;
-                }
-                lease
+            .map(|lease| Lease {
+                stale: lease.is_stale(now),
+                ..lease
             })
             .collect();
 
@@ -1356,7 +1340,6 @@ impl ClaimCoordinator {
             schema_version: 1,
             generated_at: now,
             last_seq: max_seq,
-            stale_threshold_secs,
             leases,
             sequence_gaps,
         })
@@ -2560,7 +2543,6 @@ mod tests {
             schema_version: 1,
             generated_at: Utc::now(),
             last_seq: 2,
-            stale_threshold_secs: 3600,
             leases: vec![make_lease("lease-a"), make_lease("lease-b")],
             sequence_gaps: Vec::new(),
         };
@@ -2581,56 +2563,42 @@ mod tests {
     }
 
     #[test]
-    fn test_staleness_check() {
+    fn test_lease_is_stale_past_built_in_threshold() {
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
+        let now = Utc::now();
+        let beaten_secs_ago = |secs: i64| Lease {
+            last_beat: now - Duration::seconds(secs),
+            ..make_lease(0, None)
+        };
+
+        assert!(!beaten_secs_ago(threshold).is_stale(now));
+        assert!(beaten_secs_ago(threshold + 1).is_stale(now));
+    }
+
+    #[test]
+    fn test_lock_claims_for_repository_mutation_excludes_stale_indefinite_lease() {
+        use crate::storage::clock::FixedClock;
+
+        let threshold = crate::runtime_defaults::CLAIM_STALE_THRESHOLD_SECS as i64;
         let temp_dir = TempDir::new().unwrap();
-        let coordinator = setup_coordinator(&temp_dir);
+        let base = Utc::now();
+        let clock = Arc::new(FixedClock::new(base));
+        let coordinator = setup_coordinator(&temp_dir).with_clock(clock.clone());
+        let issue_id = "abcd1111111111111111111111111111";
+        coordinator
+            .acquire_claim_with_reason(issue_id, 0, Some("probe"), 1, 1)
+            .unwrap();
 
-        let index = coordinator.load_claims_index().unwrap();
-
-        // Stale indefinite lease (old heartbeat)
-        let stale_lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:test".to_string(),
-            branch: None,
-            ttl_secs: 0,
-            acquired_at: Utc::now() - Duration::seconds(7200),
-            expires_at: None,
-            last_beat: Utc::now() - Duration::seconds(7200),
-            stale: true, // would be computed as true by is_stale
+        let is_enforced_after = |elapsed_secs: i64| {
+            clock.set(base + Duration::seconds(elapsed_secs));
+            coordinator
+                .lock_claims_for_repository_mutation()
+                .unwrap()
+                .has_active_lease(issue_id, None, |raw| Ok(raw.to_string()))
+                .unwrap()
         };
-        assert!(index.is_stale(&stale_lease));
-
-        // Fresh indefinite lease (recent heartbeat)
-        let fresh_lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:test".to_string(),
-            branch: None,
-            ttl_secs: 0,
-            acquired_at: Utc::now() - Duration::seconds(60),
-            expires_at: None,
-            last_beat: Utc::now() - Duration::seconds(60),
-            stale: false,
-        };
-        assert!(!index.is_stale(&fresh_lease));
-
-        // Finite lease - never stale (uses expiration instead)
-        let finite_lease = Lease {
-            lease_id: Uuid::new_v4().to_string(),
-            issue_id: "test".to_string(),
-            agent_id: "agent:test".to_string(),
-            worktree_id: "wt:test".to_string(),
-            branch: None,
-            ttl_secs: 600,
-            acquired_at: Utc::now() - Duration::seconds(7200),
-            expires_at: Some(Utc::now() + Duration::seconds(600)),
-            last_beat: Utc::now() - Duration::seconds(7200),
-            stale: false,
-        };
-        assert!(!index.is_stale(&finite_lease));
+        assert!(is_enforced_after(threshold));
+        assert!(!is_enforced_after(threshold + 1));
     }
 
     #[test]

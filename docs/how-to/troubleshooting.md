@@ -139,7 +139,7 @@ Error: Issue abc123 already claimed by agent:worker-1 until 2026-02-02 17:30:00 
 ⚠️  STALE: Lease marked stale (no heartbeat for 75 minutes)
 ```
 
-**Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the hardcoded 1-hour threshold.
+**Cause:** Indefinite lease (TTL=0) hasn't received a heartbeat within the built-in claim stale threshold ([Runtime Coordination Defaults](../reference/runtime-defaults.md)).
 
 **Solutions:**
 

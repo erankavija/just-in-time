@@ -148,11 +148,11 @@ jit claim status
 - Max 2 indefinite leases per agent (configurable)
 - Max 10 indefinite leases per repository (configurable)
 
-Indefinite leases are marked **stale** after a hardcoded hour without a
-heartbeat. Staleness is only a marker: a stale indefinite lease is not evicted
-automatically — it remains until a heartbeat, a `jit claim release`, or a
-`jit claim force-evict`. The threshold is not a pre-commit-hook setting and
-`stale_threshold_secs` does not configure it.
+Indefinite leases are marked **stale** after the built-in claim stale
+threshold ([Runtime Coordination Defaults](../reference/runtime-defaults.md))
+without a heartbeat. Staleness is only a marker: a stale indefinite lease is not
+evicted automatically — it remains until a heartbeat, a `jit claim release`, or
+a `jit claim force-evict`. The threshold is not configurable.
 
 ## Handling Conflicts
 
@@ -254,10 +254,8 @@ finite lease duration on each claim with `--ttl`; for an indefinite lease, run
 `--ttl` falls back to the built-in claim lease TTL listed in
 [Runtime Coordination Defaults](../reference/runtime-defaults.md).
 
-`worktree.mode`, `default_ttl_secs`, and `stale_threshold_secs` are parsed and
-shown by configuration commands but do not control the current claim runtime.
-Indefinite leases are currently marked stale after a hardcoded hour without an
-explicit heartbeat; changing `stale_threshold_secs` does not alter that behavior.
+`worktree.mode` is parsed and shown by configuration commands but does not
+control the current claim runtime. Claim timing has no configuration keys.
 
 ### Agent Config (`~/.config/jit/agent.toml`)
 

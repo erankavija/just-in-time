@@ -7,8 +7,8 @@ set -euo pipefail
 # Target:
 #   docs/reference/runtime-defaults.md
 #
-# WHERE THE VALUES COME FROM. The lock timeout and poll interval, the orphaned
-# temp-file cleanup threshold, and the claim lease TTL are declared once as the
+# WHERE THE VALUES COME FROM. The lock, recovery-cleanup, and claim lease
+# defaults are declared once as the
 # constants in crates/jit/src/runtime_defaults.rs, which every call site reads,
 # so the page cannot state a default the code does not use
 # (`@/inv/single-source-prose`). The conformance test beside the constants
