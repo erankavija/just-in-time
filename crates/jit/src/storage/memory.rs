@@ -4,7 +4,7 @@
 //! test execution compared to JSON file I/O. Thread-safe for concurrent access.
 
 use crate::declarations::{parse_gate_registry, GateRegistry};
-use crate::domain::{Event, GateRunResult, Issue};
+use crate::domain::{parse_known_events, Event, GateRunResult, Issue};
 use crate::repository_state::{
     gate_run_result_relative_path, CapturedBytes, EntryIdentity, FileMode, RepositoryEntry,
     RepositoryRootClass, RootRelativePath, VirtualPath,
@@ -481,14 +481,8 @@ impl InMemoryStorage {
         let Some(bytes) = Self::data_entry_bytes(state, &VirtualPath::EVENTS) else {
             return Ok(Vec::new());
         };
-        String::from_utf8_lossy(&bytes)
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| {
-                serde_json::from_str::<Event>(line)
-                    .context("Failed to deserialize event from repository image")
-            })
-            .collect()
+        parse_known_events(&String::from_utf8_lossy(&bytes))
+            .context("Failed to deserialize event log from repository image")
     }
 }
 
