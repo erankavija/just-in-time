@@ -7,6 +7,7 @@
 //! model.
 
 use crate::config::DocumentationConfig;
+use crate::domain::artifact_classifier::ArtifactEvidenceError;
 use crate::domain::State;
 use schemars::JsonSchema;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -1133,6 +1134,8 @@ pub enum PlanError {
     NonCanonicalEnvelope,
     /// Policy or plan blockers prohibit mutation.
     Ineligible,
+    /// Classification lacked evidence for a path it names.
+    Evidence(ArtifactEvidenceError),
 }
 
 impl fmt::Display for PlanError {
@@ -1180,11 +1183,25 @@ impl fmt::Display for PlanError {
             Self::NonCanonicalEnvelope => formatter
                 .write_str("artifact plan ordering, count, or action counts are not canonical"),
             Self::Ineligible => formatter.write_str("artifact plan is not eligible for execution"),
+            Self::Evidence(error) => write!(formatter, "{error}"),
         }
     }
 }
 
-impl std::error::Error for PlanError {}
+impl std::error::Error for PlanError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Evidence(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+
+impl From<ArtifactEvidenceError> for PlanError {
+    fn from(error: ArtifactEvidenceError) -> Self {
+        Self::Evidence(error)
+    }
+}
 
 fn normalize_target(target: PlanTarget) -> PlanTarget {
     match target {
