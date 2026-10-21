@@ -1,0 +1,26 @@
+{
+  "assignee": "agent:worker",
+  "claimed_at": "2026-10-21T11:23:44.212591846Z",
+  "context": {},
+  "created_at": "2026-10-21T11:23:16.576647698Z",
+  "dependencies": [],
+  "description": "The HTTP search endpoint never returns matches from issue records in a repository with the default `.jit` data directory. It searches only linked documents, so a query for text that appears in an issue title or description returns no issue hits.\n\n## Background\n\n`search` in `crates/server/src/routes.rs` (around lines 280-330) runs ripgrep from the worktree root. When the data root is nested in the worktree (the default `.jit`), it adds the glob `.jit/issues/*.json` to the linked document paths. ripgrep skips hidden directories unless `--hidden` is passed, so the glob matches no file under `.jit/`. The separate data-root search that uses the glob `issues/*.json` runs only when the data root is outside the worktree.\n\nReproduction against a release build, in a fresh repository:\n\n```sh\njit init && jit issue create --title Hello\njit-server --bind 127.0.0.1:38917 &\ncurl -s '127.0.0.1:38917/api/search?q=Hello'\n# 200 with no issue-file matches\nrg --glob '.jit/issues/*.json' Hello .            # no output\nrg --hidden --glob '.jit/issues/*.json' Hello .   # matches the issue file\n```\n\n## Success Criteria\n\n- [hard] REQ-01: With the default nested `.jit` data directory, a search request for text in an issue's title or description returns a match from that issue's record.\n- [hard] REQ-02: Issue-record matches are returned the same way whether the data directory is nested in the worktree or outside it.\n- [hard] REQ-03: Linked-document matches are still returned, and files outside issue records and linked documents are still excluded.\n- [hard] REQ-04: A regression test serves a search over a repository with a nested `.jit` and asserts that an issue-record match is returned.\n\n## Notes\n\nFound while verifying the release-build reproductions of the audit correctness epic. The core search's argv handling is already correct; this defect is in which files the server route asks it to search.\n",
+  "documents": [],
+  "first_ready_at": "2026-10-21T11:23:16.576647698Z",
+  "gates_required": [
+    "cargo-ci",
+    "code-review"
+  ],
+  "gates_status": {},
+  "id": "b5faef84-fd5b-477d-be87-2cf020e93fa4",
+  "labels": [
+    "epic:audit-correctness",
+    "milestone:v1.0",
+    "component:server",
+    "type:bug"
+  ],
+  "priority": "normal",
+  "state": "in_progress",
+  "title": "Search endpoint returns no issue matches for the default nested data directory",
+  "updated_at": "2026-10-21T11:23:44.212591846Z"
+}
