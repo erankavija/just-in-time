@@ -1351,6 +1351,9 @@ jit issue search auth
 # Label filter, NO positional query
 jit issue search --label type:epic
 
+# Namespace wildcard: any label in the namespace (same patterns as `jit query --label`)
+jit issue search --label 'type:*'
+
 # Repeatable --label is ANDed: an issue must carry EVERY label
 jit issue search --label type:task --label area:auth
 
