@@ -18477,3 +18477,4 @@
 {"from":"backlog","id":"9fc83ba8-4754-4d47-9598-829313f00dde","issue_id":"fe761000-c89f-447f-a20b-e292c5b4e2e8","timestamp":"2026-10-21T20:41:16.932004934Z","to":"ready","type":"issue_state_changed"}
 {"assignee":"agent:jit-execution-lead","id":"e3429e0d-6403-4587-954b-eb2f852ac581","issue_id":"2492ab29-2047-4bae-9cdc-d17749f1e515","timestamp":"2026-10-21T20:41:33.838998735Z","type":"issue_claimed"}
 {"assignee":"agent:worker","id":"6f6cf859-b131-4651-ab8c-571f319fa47f","issue_id":"2492ab29-2047-4bae-9cdc-d17749f1e515","timestamp":"2026-10-21T20:41:33.900341702Z","type":"issue_claimed"}
+{"gate_key":"cargo-ci","id":"a87c5a05-7099-4d02-a01b-17c1f3bd5930","issue_id":"459bb995-46f9-42d3-a83c-d50d406c0f80","timestamp":"2026-10-21T20:43:31.625136483Z","type":"gate_failed","updated_by":"auto:executor"}
